@@ -1,0 +1,31 @@
+# Build output
+build/
+out/
+.cmake/
+
+# CMake generated
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+
+# IDE
+.vs/
+*.user
+*.suo
+.vscode/launch.json
+
+# Compiled artifacts
+*.exe
+*.pdb
+*.ilk
+*.obj
+*.o
+*.lib
+*.a
+*.dll
+*.so
+
+# FetchContent cache lives inside build/ — covered above
