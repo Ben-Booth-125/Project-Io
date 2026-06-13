@@ -1,5 +1,7 @@
 #include "header_panel.hpp"
 
+#include "format.hpp"
+
 #include <imgui.h>
 
 namespace ui {
@@ -26,23 +28,21 @@ void draw_header_panel(float left, float right)
 
     ImGui::Begin("##header_panel", nullptr, flags);
 
-    // Budget on the left. Placeholder zeroes until the treasury is wired.
+    // Budget on the left. Placeholder zeroes until the treasury is wired, but
+    // routed through the shared formatters so the live numbers drop straight in.
     ImGui::TextDisabled("BUDGET");
     ImGui::SameLine();
-    ImGui::Text("Cr 0");     // treasury balance (Cr = credits placeholder)
+    ImGui::Text("%s", fmt::credits(0.0).c_str());     // treasury balance
     ImGui::SameLine();
-    ImGui::TextDisabled("(±0 / econ tick)"); // net per economy tick
+    ImGui::TextDisabled("(%s)", fmt::rate(0.0, "qtr").c_str()); // net per economy tick
 
-    // Resource overview on the right — deliberately scarce for the prototype.
-    // A fixed handful of headline stockpiles, summed across all holdings.
-    static const char* const resources[] = {"Ore", "Metal", "Fuel", "Goods"};
+    // Resource overview — single aggregate until resources are wired.
     ImGui::SameLine();
     ImGui::TextDisabled("   |   ");
-    for (const char* name : resources)
-    {
-        ImGui::SameLine();
-        ImGui::Text("%s 0", name); // quantity placeholder
-    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("STOCKPILE");
+    ImGui::SameLine();
+    ImGui::Text("%s", fmt::abbreviate(0.0).c_str()); // total stockpile placeholder
 
     ImGui::End();
 }

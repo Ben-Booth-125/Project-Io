@@ -1,0 +1,48 @@
+#pragma once
+
+#include "world/entity.hpp"
+
+/// Which rung of the canvas zoom ladder currently fills the primary viewport.
+/// The minimap shows the rung one step *out* (towards solar) from this.
+enum class canvas_level
+{
+    solar,           ///< The whole system: the star and every body orbiting it.
+    circumplanetary, ///< One planet and its moons / local space.
+    planetary,       ///< One body's hex tile surface.
+};
+
+/// Shared selection and view state for the three primary canvases.
+///
+/// Held by app and passed by reference to the canvas drawing functions. The
+/// canvases read it to know what is selected and which rung is foregrounded,
+/// and write to it in response to body clicks (descend), tile clicks, and
+/// minimap clicks (ascend).
+struct ui_state
+{
+    entity_id    active_body   = null_entity;         ///< Drives the lower rungs (circumplanetary anchor and surface). null_entity = nothing selected.
+    entity_id    active_tile   = null_entity;         ///< Set by a tile click; consumed by later layers.
+    canvas_level primary_level = canvas_level::solar; ///< Which canvas rung fills the window.
+
+    // --- navigation pane state ---
+    // Policy: all ledgers start closed. The player opens them deliberately from
+    // the navigation pane; none are shown on a fresh session.
+    bool show_tile_ledger = false; ///< Whether the Tile Ledger window is open. Toggled by the nav pane tab and the window's close button.
+
+    // --- solar system canvas view (primary only; the minimap always shows the
+    // default framing) ---
+    float solar_zoom  = 1.0f; ///< Scroll-wheel zoom factor. 1.0 = default auto-fit framing.
+    float solar_pan_x = 0.0f; ///< Pan offset of the system centre from the canvas centre, screen px.
+    float solar_pan_y = 0.0f; ///< Pan offset of the system centre from the canvas centre, screen px.
+
+    // --- circumplanetary canvas view (primary only; the minimap always shows
+    // the default framing) ---
+    float circum_zoom  = 1.0f; ///< Scroll-wheel zoom factor. 1.0 = default auto-fit framing.
+    float circum_pan_x = 0.0f; ///< Pan offset of the anchor centre from the canvas centre, screen px.
+    float circum_pan_y = 0.0f; ///< Pan offset of the anchor centre from the canvas centre, screen px.
+
+    // --- planetary canvas view (primary only; the minimap always shows the
+    // default framing) ---
+    float planetary_zoom  = 4.0f / 3.0f; ///< Scroll-wheel zoom factor. 4/3 shows 3/4 of the grid height on load.
+    float planetary_pan_x = 0.0f; ///< Pan offset of the grid centre from the canvas centre, screen px.
+    float planetary_pan_y = 0.0f; ///< Pan offset of the grid centre from the canvas centre, screen px.
+};

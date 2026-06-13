@@ -2,16 +2,40 @@
 
 #include "world/entity.hpp"
 
-/// Shared selection and view state for the two primary canvases.
+/// Which rung of the canvas zoom ladder currently fills the primary viewport.
+/// The minimap shows the rung one step *out* (towards solar) from this.
+enum class canvas_level
+{
+    solar,           ///< The whole system: the star and every body orbiting it.
+    circumplanetary, ///< One planet and its moons / local space.
+    planetary,       ///< One body's hex tile surface.
+};
+
+/// Which data overlay (if any) is drawn on top of the canvases. The minimap
+/// mode bar toggles these; overlay_mode::none is the plain canvas. Reserved for
+/// the economic/military lenses later layers add — Layer 5 supply routes are the
+/// first hard requirement. See CANVASES.md ("What is deferred"), MINIMAP.md
+/// (mode bar), and ui/overlay.hpp.
+enum class overlay_mode
+{
+    none = 0, ///< No overlay; the plain canvas.
+    supply,   ///< Supply routes / convoy paths (Layer 5).
+    market,   ///< Market / price lens.
+    faction,  ///< Faction presence.
+};
+
+/// Shared selection and view state for the three primary canvases.
 ///
-/// Held by app and passed by reference to both canvas drawing functions. The
-/// canvases read it to know what is selected and which view is foregrounded,
-/// and write to it in response to body clicks, tile clicks, and minimap swaps.
+/// Held by app and passed by reference to the canvas drawing functions. The
+/// canvases read it to know what is selected and which rung is foregrounded,
+/// and write to it in response to body clicks (descend), tile clicks, and
+/// minimap clicks (ascend).
 struct ui_state
 {
-    entity_id active_body = null_entity; ///< Drives the Body Surface Canvas. null_entity = nothing selected.
-    entity_id active_tile = null_entity; ///< Set by a tile click; consumed by later layers.
-    bool      surface_is_primary = false; ///< false = Solar System Canvas is primary, Body Surface is the minimap.
+    entity_id    active_body   = null_entity;         ///< Drives the lower rungs (circumplanetary anchor and surface). null_entity = nothing selected.
+    entity_id    active_tile   = null_entity;         ///< Set by a tile click; consumed by later layers.
+    canvas_level primary_level = canvas_level::solar; ///< Which canvas rung fills the window.
+    overlay_mode overlay       = overlay_mode::none;  ///< Active canvas overlay lens; toggled by the minimap mode bar.
 
     // --- navigation pane state ---
     // Policy: all ledgers start closed. The player opens them deliberately from
@@ -23,6 +47,12 @@ struct ui_state
     float solar_zoom  = 1.0f; ///< Scroll-wheel zoom factor. 1.0 = default auto-fit framing.
     float solar_pan_x = 0.0f; ///< Pan offset of the system centre from the canvas centre, screen px.
     float solar_pan_y = 0.0f; ///< Pan offset of the system centre from the canvas centre, screen px.
+
+    // --- circumplanetary canvas view (primary only; the minimap always shows
+    // the default framing) ---
+    float circum_zoom  = 1.0f; ///< Scroll-wheel zoom factor. 1.0 = default auto-fit framing.
+    float circum_pan_x = 0.0f; ///< Pan offset of the anchor centre from the canvas centre, screen px.
+    float circum_pan_y = 0.0f; ///< Pan offset of the anchor centre from the canvas centre, screen px.
 
     // --- planetary canvas view (primary only; the minimap always shows the
     // default framing) ---

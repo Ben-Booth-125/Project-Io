@@ -2,6 +2,244 @@
 
 Entries are newest-first. Each entry covers one development session and records what was built, what in-session decisions were made, and what was left open. Decisions that affect the whole project permanently belong in TECH_FOUNDATIONS or a dedicated ADR; this log is for session-scoped choices and progress notes.
 
+Entries that correspond to a tagged snapshot in `backups/` carry an explicit **version** marker in their heading (e.g. *version 0.0.2*) and a **Backup** line naming the snapshot path. These are the rollback points: to revert, restore the named `backups/vX.Y.Z/` tree over `src/`.
+
+---
+
+## 2026-06-13 — Pre-Layer-3 UI building blocks + asteroid belt (label-shimmer fixed)
+
+**Status:** Complete. Builds and runs (verified after each item; solar view
+captured to confirm the belt and the new font render). Worked through every
+`TODO.md` item below difficulty 6 ahead of Layer 3, leaving only the two
+deferred (difficulty 6) items — the hover-card system and the menu definition.
+
+Eight items, each a small focused module under `src/ui/`, built and
+build-verified one at a time. Foundational/shared primitives first so later
+items reuse them; the meatiest (asteroid belt) last.
+
+### What was built
+
+**[2] Value & date formatting helpers — `src/ui/format.hpp` / `.cpp`.**
+`ui::fmt` with `abbreviate` (1.2k / 3.4M / 5.0B), `credits` ("Cr 1.2k"),
+`signed_delta` (+/−/"±0"), `rate` ("+1.2k / qtr"), `percent`, `sign_of`, and the
+deferred **calendar** (`date_from_day` / `short_date`). The calendar completes
+sim_loop's tentative constants (30-day months, 3-month quarters) with a defined
+4-quarter / 360-day year. The system-tick readout now shows `Y1 M05 D12` and
+`Q2  -  Day N` instead of raw counts, and the header budget/stockpile
+placeholders route through the formatters so live numbers drop straight in.
+
+**[3] Presentation metadata — `src/ui/presentation.hpp` / `.cpp`.**
+Single source of truth for resource identity (`resource_presentation`: name,
+abbreviation, identity colour) replacing the duplicated `resource_labels[]` in
+`tile_inspector.cpp` and `body_surface_canvas.cpp`. Plus a **semantic palette**:
+positive/negative/neutral (deltas), selection/hover/pinned (interaction), and
+six reserved faction colour slots (the data model already permits multi-faction).
+`value_colour(...)` maps a signed value to its palette colour. Demonstrated in
+the Tile Ledger market table (resource colour swatch; price coloured by its move
+vs. base_price).
+
+**[2] Shared selection / hover / pinned highlight convention — `src/ui/highlight.hpp` / `.cpp`.**
+`resolve_highlight(selected, hovered, pinned)` (precedence selected > pinned >
+hovered) plus `draw_body_highlight` / `draw_hex_highlight` using palette colours.
+All three canvases refactored onto it; this **adds a hover ring** (light blue) on
+bodies and tiles, previously only a tooltip. Pinning is reserved in the
+vocabulary (amber) but not yet driven.
+
+**[2] Focus-on-entity helper — `src/ui/view_nav.hpp` / `.cpp`.**
+`focus_on_body` / `focus_on_surface` / `focus_on_tile` / `focus_on_entity` — one
+call that selects an entity, chooses the rung that frames it, and centres that
+rung. Rung rule: a *body* frames in its orbital/local view (star → Solar,
+planet/asteroid/station → its own Circumplanetary, moon → parent's with the moon
+selected); something *on* a surface → that body's Planetary surface. The opening
+view now goes through `focus_on_surface` rather than poking `ui_state`.
+
+**[3] Render-time interpolation building block — `src/ui/interp.hpp` / `.cpp`.**
+The decided read path for fractional-progress entities before convoys exist:
+`lerp` (float/ImVec2), an `interpolated<T>` (previous/current with `advance` and
+`at(alpha)`), and `econ_tick_alpha` / `day_alpha` from the continuous
+`elapsed_days` clock. Layer 5 convoys will hold `interpolated<float> progress`
+and read `lerp(route_start, route_end, progress.at(econ_tick_alpha(...)))` to
+glide across the quarter instead of jumping at the boundary. No consumer yet
+(documented building block).
+
+**[4] Canvas overlay layer + mode switching — `src/ui/overlay.hpp` / `.cpp` + `ui_state`.**
+`overlay_mode { none, supply, market, faction }` in `ui_state`; an overlay draw
+pass (`draw_canvas_overlay`) over the primary canvas, below the chrome; and the
+minimap **mode bar made interactive** — three dots toggle the three lenses
+(click the active dot to clear). No overlay data yet, so an active lens draws
+only a bottom-left legend chip naming itself — the single extension point where
+Layer 5 supply routes etc. will hang their geometry. Mode bar height bumped 10→14
+px so the dots are clickable.
+
+**[3] Icon/glyph + font-atlas strategy — `src/ui/fonts.*`, `src/ui/icons.*`.**
+Decided with the developer: **vector glyphs via the draw list** (no font asset)
+and a **system TTF loaded with oversampling** (`OversampleH=3`, `PixelSnapH=false`,
+candidates under `C:/Windows/Fonts`, falling back to an oversampled built-in
+font). The oversampled atlas improves glyph crispness. **Note:** this did *not*
+resolve the label-motion artefact — the developer reports body labels still
+advance in steps every few ticks rather than gliding, so the bug is re-logged in
+`TODO.md` (Known bugs) with that sharper symptom; the cause appears temporal, not
+purely sub-pixel rasterisation. `ui::icons` draws building
+(diamond/square/triangle), resource pip, and unit chevron glyphs; the Planetary
+built-tile marker now uses the building-type glyph instead of a uniform white
+square.
+
+**[4] Asteroid belt as a textured ring — `world.belt`, `hard_coded_world.cpp`, `solar_system_canvas.cpp`.**
+A `world::belt` (`asteroid_belt` { inner/outer radius }) — system-level data,
+**not a body**. The Solar canvas renders it as a translucent annulus (thick ring
+stroke) with a deterministic fixed-seed scatter of dusty specks (positions in AU
+space, so it pans/zooms with the view and holds still between frames). One
+**notable asteroid** — Pallas (the prototype keeps a single belt body per the
+developer's call) — is an ordinary `body_type::asteroid` entity at a radius
+inside the band, drawn *over* it in the normal body pass, so it stays
+hoverable/labelled/selectable and carries a small 30×14 tile grid (no water) so
+its surface is explorable. The Solar auto-fit extent now includes the belt's
+outer radius.
+
+### In-session decisions
+
+- **Font: system TTF + oversampling (developer choice).** Crisp, fluid labels
+  with no committed binary asset; Windows font path for now (prototype is
+  Windows-only). A bundled `assets/fonts/*.ttf` can be prepended to the candidate
+  list later for portability without touching call sites. Default size 16 px.
+- **Icons: vector glyphs via the draw list (developer choice).** Crisp at any
+  zoom, no atlas/licensing, matches how the canvases already draw.
+- **Notable asteroids are separate bodies drawn over the band**, not markers
+  embedded in the ring — resolving the open question in the belt TODO. Keeps them
+  uniform with every other body (selectable, labelled, own surface).
+- **Overlay building block lands now, data later.** The mode bar drives a real
+  `ui_state.overlay` + draw pass; with no economic data yet it shows only a
+  legend chip. This reserves the mechanism so Layer 5 adds geometry, not plumbing.
+- **Highlight precedence selected > pinned > hovered**, single ring per entity, so
+  a pinned entity keeps its identity colour under the cursor and selection always
+  wins.
+
+### Open items
+
+- **Overlay lenses have no data.** The pass and toggle exist; supply-route
+  geometry (Layer 5) is the first real consumer.
+- **Pinning is unwired.** The highlight convention and `focus_on_entity` are
+  ready, but nothing sets a "pinned" state yet (the Explorer is still a
+  placeholder).
+- **Interpolation has no consumer** until convoys exist (Layer 5).
+- **Font candidate list is Windows-only** — fine for the prototype; revisit for
+  cross-platform with a bundled font.
+- **Asteroid surfaces** use the generic tile generator at a small grid; proper
+  asteroid terrain/deposit authoring is for the extraction layer.
+
+---
+
+## 2026-06-13 — version 0.0.2 — Layer 2 finalisation (standardised body grids, infinite side-scroll, zoom floor)
+
+**Status:** Complete. Builds and runs. **Tagged snapshot.**
+**Backup:** `backups/v0.0.2/` (copy of `src/` at this version — the rollback point for v0.0.2; previous snapshot is `backups/v0.0.1/`).
+
+The hard-coded world is pared to three surface bodies on standardised grids, the Planetary canvas scrolls horizontally without bound, and its zoom floor is derived correctly. Layer 2 is considered finalised at this version.
+
+### What was built
+
+**Standardised body grids (~9:5 width:height).**
+`make_hard_coded_world` now sizes the two planets at **180 × 84** (columns × rows) and Selene (Kepler's moon) at **90 × 42** — the same ratio at half scale. The height is a little under half the width by design: the width spans the full circumference (both hemispheres) and the height is pole-to-pole with the non-traversable polar caps truncated. The stale generation TODO (which described the rule as unenforced) was replaced with a comment recording the settled ratio.
+
+**Backdrop bodies removed.**
+With the canvas perspectives settled, every body except Helios, Cinder, Kepler, and Selene was deleted from the world: Veld, Ochre, Vesta, Ceres, Pallas, Bastion, Forge, Cyra, Halo, Mote. Vesta's hand-authored tiles, extraction site, and market went with it. The now-unused `create_simple_body`, `tile_spec`, and `create_tile` helpers were removed; `hard_coded_world.hpp`'s doc comment was rewritten to list the three surviving surface bodies.
+
+**Infinite horizontal scroll on the Planetary canvas.**
+`draw_body_surface_canvas` now draws each tile at every integer wrap offset `k` whose copy falls within the canvas, where the grid repeats every `period_px = gw * col_step * zoom`. The `k`-range is derived per tile from the visible x-extent, so panning past either edge continues seamlessly from the far side with no seam and no special-casing of "three offsets". Hit-testing runs inside the same copy loop, so the hovered/clicked column is always correct regardless of wrap. Horizontal pan is wrapped with `fmod(pan_x, period_px)` each frame to stop `pan_x` drifting without bound — visually identical because the grid is periodic.
+
+**Planetary zoom floor derived from the height-normalised zoom.**
+The minimum zoom was a guessed constant (`0.2f`) unrelated to the zoom definition, so it let the grid shrink to ~19% of the canvas height (viewport showing ~525% of the grid). Since zoom is normalised so the grid fills `kFitMargin` (0.95) of the canvas height at zoom 1, the floor is now derived: `kMinZoom = 1 / (kMinZoomHeadroom * kFitMargin) ≈ 0.877`, where `kMinZoomHeadroom = 1.2` means the viewport spans ~120% of the grid height at minimum zoom (full grid + ~20% headroom). Max zoom (`kMaxZoom = 20`) is unchanged; the stored zoom is clamped to `[kMinZoom, kMaxZoom]` each frame as well as in the wheel handler.
+
+### Docs
+
+- `PLANETARY.md` updated: new "Target size and aspect ratio" wording (180×84 / 90×42, the 9:5 rationale, three-body world), the horizontal-wrap and interaction sections describe the seamless side-scroll, and the deferred table now lists only seam *visualisation* (an explicit wrap marker) as post-prototype.
+- `TODO.md` gained a **"UI building blocks (decide before Layer 3)"** section capturing the rendering primitives Layers 3–6 will need but Layer 2 simplified: a tooltip/hover-card system (recorded then **deferred to difficulty 6** at the developer's call), centralised resource/palette presentation metadata, shared value/date formatting, a canvas overlay layer + mode-bar wiring, an icon/font-atlas strategy (folds in the label-shimmer fix), a shared selection/hover/pinned highlight convention, a "focus on entity" view-navigation helper, and render-time interpolation for fractional-progress entities (convoys). The stale Vesta/Ceres/Pallas reference in the asteroid-belt item was corrected to note the backdrop bodies are now removed.
+
+### Versioning / backups
+
+- This session is tagged **version 0.0.2**; `src/` is snapshotted to `backups/v0.0.2/` as the rollback point. DEVLOG headings now carry an explicit version marker + Backup line for any tagged snapshot (see the note at the top of this file). Decision on whether to split DEVLOG into per-version files: **kept as a single newest-first file** — version markers make rollback points easy to find by search, and one file preserves chronological review and grep across the whole history. Revisit only if the file becomes unwieldy.
+
+### Open items
+
+- Procedural generation still seeds water from the centre row only; with the taller 84-row grids the polar caps are land by default. Whether the caps should read as ice/barren rather than ordinary land terrain is unaddressed.
+
+---
+
+## 2026-06-13 — Canvas zoom ladder + Circumplanetary canvas
+
+**Status:** Complete. The two-canvas binary swap is replaced by a three-rung zoom ladder (Solar → Circumplanetary → Planetary) with click-to-descend / minimap-to-ascend navigation. Builds and runs; the game opens on the home planet's surface.
+
+### What was built
+
+**Circumplanetary canvas (new middle rung).**
+`src/ui/circumplanetary_canvas.{hpp,cpp}` — a top-down view of a single planet (the *anchor*) and its moons: the anchor at centre (enlarged), an orbital ring and dot per moon, selection outline on `active_body`, hover tooltips, and primary-only pan/zoom (`circum_zoom`, `circum_pan_x/y` in `ui_state`). The free function `circumplanetary_anchor(world, active_body)` resolves the anchor — the body itself if it orbits the star, or its parent planet if it is a moon — and is shared with `app::render()` for the minimap title.
+
+**The zoom ladder replaces the binary swap.**
+`ui_state::surface_is_primary` (bool) became `ui_state::primary_level` (`enum class canvas_level { solar, circumplanetary, planetary }`). The minimap is now pure **context**: it shows the rung one step *out* from the primary. Navigation:
+- **Descend** by clicking a body in the primary canvas (Solar→Circumplanetary, Circumplanetary→Planetary). Clicking a moon on the Solar canvas opens its parent's circumplanetary view with the moon selected.
+- **Ascend** by clicking the minimap.
+
+The solar and circumplanetary canvases gained an explicit `bool is_minimap` parameter (their click handling differs between primary and minimap). The body-surface canvas is now only ever primary — its minimap branch and `surface_is_primary` writes were removed.
+
+**Star as a body entity.**
+`body_type::star` added to `components.hpp`. `make_hard_coded_world` creates **Helios** at the system centre (radius 0, stationary) and stores it in `world.star_body`. The solar canvas now draws the star through the normal body pass (new star style: 18 px, yellow) instead of a hard-coded circle, labels it, and excludes it from descend clicks (it has no circumplanetary view). Zero-radius bodies are skipped in the orbital-ring pass.
+
+**Home planet start.**
+`world.home_body` added and set to **Kepler**. `app::run()` opens with `active_body = home_body` and `primary_level = planetary` — the game starts on the home planet's surface, with Kepler's circumplanetary view in the minimap.
+
+**Minimap chrome.**
+`app::render()` now draws a title bar above the inset and a placeholder mode bar (three dim dots) below it, with the inset canvas between. The title names what the minimap shows: the **star name** (primary Circumplanetary), the **planet name** (primary Planetary), or the **game name `Project Io`** at the top rung, where the inset is a dark branding fill (no canvas, non-interactive).
+
+**Docs reconciled to the ladder.**
+`CANVASES.md` rewritten (binary swap → three-rung ladder, context minimap, new `ui_state`/signatures). New `CIRCUMPLANETARY.md`. `SOLAR.md` (body click descends; star is an entity), `PLANETARY.md` (surface is always primary), `LAYOUT.md` (canvas area / minimap / companion list), `MINIMAP.md` (top rung = game name), and `CLAUDE.md` (CANVASES entry) updated.
+
+### In-session decisions
+
+**Minimap is context-only; descend via the primary, not the minimap.**
+Chosen over an up/down tabbed minimap. The minimap always shows the zoom-out neighbour; the player descends by clicking a body in the primary canvas. This keeps the bottom mode bar free for future overlay modes rather than spending it on level navigation.
+
+**Star as an entity, not a `world.star_name` string.**
+Keeps the star uniform with every other body (name, position, style, future selectability) at the cost of a new enum value and a skip in the ring pass. Name "Helios" is a placeholder, consistent with the original body names.
+
+**Open:** the mode bar has no function yet (placeholder); the ladder navigation was verified by screenshot (opens on Kepler surface, minimap shows Kepler + Selene), not yet by interactive click-through of every rung.
+
+---
+
+## 2026-06-13 — TODO triage and UI shell polish
+
+**Status:** Complete. Cleared the difficulty-1/2 TODO items; the asteroid-belt ring (difficulty 4) and the two deferred items (label shimmer, menu definition) remain.
+
+### What was built
+
+**TODO difficulty ratings.**
+`docs/development/TODO.md` was annotated with a 1–6 difficulty scale (1 trivial → 5 very hard, 6 deferred). The four easiest items were implemented this session and removed from the list.
+
+**Pause as a toggle.**
+The time-controls pause button (`App.cpp`) now toggles. `app` gained `m_prev_speed`: pressing pause stores the current speed and sets speed 0; pressing it again restores the stored speed. Speed buttons 1–5 also update `m_prev_speed` so a later pause/unpause round-trips correctly. The button label flips to `>` while paused and `II` while running, so it reflects its toggle state.
+
+**Quarter label.**
+The system-tick readout was relabelled: economy ticks now read `Quarter N` (previously `Econ`, briefly `Q`), aligning with the quarterly econ-tick model in `sim_loop.hpp`.
+
+**Header resource strip simplified.**
+`header_panel.cpp` dropped the four named placeholder resources (Ore/Metal/Fuel/Goods) for a single `STOCKPILE 0` aggregate placeholder, per the prototype's "deliberately scarce" header intent in HEADER.md.
+
+**Default solar view ≈ 5 AU + scale bar and zoom slider.**
+`app::run()` sets the initial `solar_zoom` so the opening view spans roughly 5 AU (computed from the outermost orbit). The scroll-wheel zoom-out is capped at 50 AU (min zoom derived from `max_radius_au / 50`).
+
+A bottom-centre overlay on the primary solar canvas (`solar_system_canvas.cpp`) replaces the earlier `[-] X.X AU [+]` text row:
+- A **fixed-width scale bar** (8% of canvas width) with end ticks. Its label shows the spanned distance dynamically to two decimals (`%.2f AU`) at the current zoom.
+- A **logarithmic zoom slider** offset to the right of the bar, ranging 0.5 AU (zoomed in) to 50 AU (zoomed out), with no value text — the bar already reports distance.
+
+The overlay is a borderless, fill-free, padding-free ImGui window anchored so the scale bar is screen-centred and the slider sits to its right.
+
+### In-session decisions
+
+**Scale overlay drawn before the `input_enabled` early-out.**
+The scale/slider block sits before the canvas's `if (!input_enabled) return;`. Drawing it after would cause a one-frame flicker loop: hovering the slider sets `WantCaptureMouse`, which disables canvas input the next frame, which would skip the draw. Placing it earlier and building it as a real ImGui window keeps it persistent while still handling its own input.
+
+**Fixed-width bar with dynamic distance, not a round-number bar.**
+An earlier pass picked the largest "nice" AU span (0.1/0.2/0.5/1/…) that fit within 8% of the width. Changed to a fixed 8%-width bar whose AU value floats to two decimals — simpler and reads as a steady on-screen ruler whose label changes with zoom.
+
 ---
 
 ## 2026-06-13 — Layer 2: planetary view, hex tiles, procedural terrain
