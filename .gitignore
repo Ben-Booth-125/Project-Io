@@ -20,6 +20,9 @@ Makefile
 # Claude Code personal/project-local settings
 .claude/settings.local.json
 
+# Dear ImGui auto-saved window state (per-machine runtime layout)
+imgui.ini
+
 # Compiled artifacts
 *.exe
 *.pdb
