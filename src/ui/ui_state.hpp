@@ -11,6 +11,19 @@ enum class canvas_level
     planetary,       ///< One body's hex tile surface.
 };
 
+/// Which data overlay (if any) is drawn on top of the canvases. The minimap
+/// mode bar toggles these; overlay_mode::none is the plain canvas. Reserved for
+/// the economic/military lenses later layers add — Layer 5 supply routes are the
+/// first hard requirement. See CANVASES.md ("What is deferred"), MINIMAP.md
+/// (mode bar), and ui/overlay.hpp.
+enum class overlay_mode
+{
+    none = 0, ///< No overlay; the plain canvas.
+    supply,   ///< Supply routes / convoy paths (Layer 5).
+    market,   ///< Market / price lens.
+    faction,  ///< Faction presence.
+};
+
 /// Shared selection and view state for the three primary canvases.
 ///
 /// Held by app and passed by reference to the canvas drawing functions. The
@@ -22,6 +35,7 @@ struct ui_state
     entity_id    active_body   = null_entity;         ///< Drives the lower rungs (circumplanetary anchor and surface). null_entity = nothing selected.
     entity_id    active_tile   = null_entity;         ///< Set by a tile click; consumed by later layers.
     canvas_level primary_level = canvas_level::solar; ///< Which canvas rung fills the window.
+    overlay_mode overlay       = overlay_mode::none;  ///< Active canvas overlay lens; toggled by the minimap mode bar.
 
     // --- navigation pane state ---
     // Policy: all ledgers start closed. The player opens them deliberately from

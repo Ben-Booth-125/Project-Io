@@ -10,10 +10,13 @@ This document records the current implemented behaviour and is to be expanded. T
 
 A permanent, non-interactive player-facing clock:
 
-- **Day** — in-game days elapsed.
-- **Econ** — economy ticks (quarters) elapsed.
+- **Calendar date** — a compact `Y1 M05 D12` line (year / month / day), derived
+  from the raw day count by `ui::fmt::short_date` (see `src/ui/format.hpp`).
+- **Quarter + day** — the in-year quarter (`Q1`–`Q4`) alongside the absolute day
+  count, e.g. `Q2  -  Day 132`.
 
-No date formatting yet — the readout shows raw Day/Econ counts.
+The calendar completes sim_loop's tentative constants (30-day months, 3-month
+quarters) with a 4-quarter, 360-day year.
 
 ## Speed controls (below)
 
@@ -35,7 +38,6 @@ These constants are deliberately tentative and authored in `src/core/sim_loop.hp
 
 ## Open questions
 
-- Calendar/date formatting for the Day readout (currently raw counts).
 - Whether pause and speed gain keyboard shortcuts.
 - Surfacing the economy-tick countdown (how long until the next quarter resolves).
 

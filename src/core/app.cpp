@@ -8,15 +8,20 @@
 #include "ui/body_surface_canvas.hpp"
 #include "ui/circumplanetary_canvas.hpp"
 #include "ui/explorer_panel.hpp"
+#include "ui/fonts.hpp"
+#include "ui/format.hpp"
 #include "ui/header_panel.hpp"
 #include "ui/nav_pane.hpp"
+#include "ui/overlay.hpp"
 #include "ui/profile_panel.hpp"
 #include "ui/solar_system_canvas.hpp"
 #include "ui/tile_inspector.hpp"
+#include "ui/view_nav.hpp"
 #include "world/hard_coded_world.hpp"
 #include "world/orbital_system.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <filesystem>
 #include <stdexcept>
@@ -39,6 +44,11 @@ app::app()
     ImGui::StyleColorsDark();
     ImGui_ImplSDL3_InitForSDLRenderer(m_window, m_renderer);
     ImGui_ImplSDLRenderer3_Init(m_renderer);
+
+    // Load the UI font with oversampling so on-canvas labels stay crisp at the
+    // fractional positions moving bodies produce. The renderer backend uploads
+    // the atlas on the first NewFrame.
+    ui::load_ui_font();
 }
 
 app::~app()
@@ -79,11 +89,8 @@ int app::run()
 
     // Open on the corporation's home planet (its surface). Fall back to the
     // lowest-id tiled body, then any body, if no home is set.
-    if (m_world.home_body != null_entity)
-    {
-        m_ui.active_body = m_world.home_body;
-    }
-    else if (!m_world.bodies.empty())
+    entity_id start_body = m_world.home_body;
+    if (start_body == null_entity && !m_world.bodies.empty())
     {
         entity_id fallback = m_world.bodies.begin()->first;
         entity_id tiled    = null_entity;
@@ -97,11 +104,12 @@ int app::run()
             if (has_tiles && (tiled == null_entity || id < tiled))
                 tiled = id;
         }
-        m_ui.active_body = (tiled != null_entity) ? tiled : fallback;
+        start_body = (tiled != null_entity) ? tiled : fallback;
     }
 
     // The game opens looking at the home planet's surface — the bottom rung.
-    m_ui.primary_level = canvas_level::planetary;
+    // Routed through the shared focus helper rather than poking ui_state.
+    ui::focus_on_surface(m_world, m_ui, start_body);
 
     bool running = true;
     while (running)
@@ -157,7 +165,7 @@ void app::render()
         // Minimap chrome reserves a title bar above the inset and a placeholder
         // mode bar below; the neighbouring canvas occupies the space between.
         const float  title_h      = ImGui::GetTextLineHeight() + 6.0f;
-        const float  mode_h       = 10.0f;
+        const float  mode_h       = 14.0f; // tall enough for the overlay mode dots to be clickable
         const ImVec2 inset_origin = { mm_origin.x, mm_origin.y + title_h };
         const ImVec2 inset_size   = { mm_w, mm_h - title_h - mode_h };
 
@@ -203,6 +211,11 @@ void app::render()
                 break;
         }
 
+        // Overlay pass — drawn over the primary canvas (full window), below the
+        // minimap chrome. A no-op unless an overlay lens is active.
+        ui::draw_canvas_overlay(m_world, m_ui, m_ui.primary_level,
+                                {0.0f, 0.0f}, disp, ImGui::GetBackgroundDrawList());
+
         // --- Minimap chrome, drawn on top of the inset ---
         ImDrawList* bdl = ImGui::GetBackgroundDrawList();
 
@@ -217,13 +230,46 @@ void app::render()
         bdl->AddRectFilled(mm_origin, {mm_origin.x + mm_w, mm_origin.y + title_h}, IM_COL32(28, 30, 40, 255));
         bdl->AddText({mm_origin.x + 5.0f, mm_origin.y + 3.0f}, IM_COL32(220, 225, 235, 255), mm_title);
 
-        // Mode bar — reserved placeholder for alternative minimap modes. Three
-        // dim dots hint at the future affordance.
+        // Mode bar — toggles the canvas overlay lens. Three dots map to the
+        // three overlay modes; the active mode's dot lights up, and clicking it
+        // again clears the overlay. No visible effect until later layers add
+        // overlay data, but the building block (ui_state.overlay + the overlay
+        // pass above) is wired now. See MINIMAP.md (mode bar) and overlay.hpp.
         const float mb_y = mm_origin.y + mm_h - mode_h;
         bdl->AddRectFilled({mm_origin.x, mb_y}, {mm_origin.x + mm_w, mm_origin.y + mm_h}, IM_COL32(20, 22, 30, 255));
+
+        constexpr overlay_mode mode_dots[3] = {
+            overlay_mode::supply, overlay_mode::market, overlay_mode::faction };
+        constexpr float dot_spacing = 16.0f;
+        const float     dot_cy      = mb_y + mode_h * 0.5f;
+        const float     dot_cx0     = mm_origin.x + mm_w * 0.5f - dot_spacing; // centre dot is index 1
+
+        // Resolve the dot under the cursor (nearest within half a spacing),
+        // gated like the canvases on an ImGui panel not capturing the mouse.
+        int hovered_dot = -1;
+        if (!panel_blocking && mp.y >= mb_y && mp.y <= mm_origin.y + mm_h &&
+            mp.x >= mm_origin.x && mp.x <= mm_origin.x + mm_w)
+        {
+            float best = dot_spacing * 0.5f;
+            for (int i = 0; i < 3; ++i)
+            {
+                const float dx = std::fabs(mp.x - (dot_cx0 + static_cast<float>(i) * dot_spacing));
+                if (dx <= best) { best = dx; hovered_dot = i; }
+            }
+        }
+
         for (int i = 0; i < 3; ++i)
-            bdl->AddCircleFilled({mm_origin.x + mm_w * 0.5f + static_cast<float>(i - 1) * 8.0f, mb_y + mode_h * 0.5f},
-                                 1.5f, IM_COL32(70, 75, 90, 255));
+        {
+            const ImVec2 c       = { dot_cx0 + static_cast<float>(i) * dot_spacing, dot_cy };
+            const bool   active  = (m_ui.overlay == mode_dots[i]);
+            const ImU32  col     = active        ? IM_COL32(235, 220, 140, 255)
+                                 : (i == hovered_dot) ? IM_COL32(150, 156, 175, 255)
+                                                      : IM_COL32(70, 75, 90, 255);
+            bdl->AddCircleFilled(c, active ? 3.0f : 2.0f, col);
+        }
+
+        if (hovered_dot >= 0 && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+            ui::toggle_overlay(m_ui, mode_dots[hovered_dot]);
 
         // Border around the whole minimap box.
         bdl->AddRect(mm_origin, {mm_origin.x + mm_w, mm_origin.y + mm_h}, IM_COL32(90, 95, 110, 255));
@@ -248,8 +294,12 @@ void app::render()
             ImGuiWindowFlags_NoBringToFrontOnFocus |
             ImGuiWindowFlags_NoSavedSettings;
         ImGui::Begin("##system_tick", nullptr, tick_flags);
-        ImGui::Text("Day      %llu", m_sim_loop.day_tick());
-        ImGui::Text("Quarter  %llu", m_sim_loop.econ_tick());
+        // Player-facing calendar derived from the raw day count, with the
+        // in-year quarter alongside the absolute day for continuity.
+        const uint64_t            day  = m_sim_loop.day_tick();
+        const ui::fmt::calendar_date date = ui::fmt::date_from_day(day);
+        ImGui::Text("%s", ui::fmt::short_date(day).c_str());
+        ImGui::Text("Q%d  -  Day %llu", date.quarter, static_cast<unsigned long long>(day));
         ImGui::End();
     }
 

@@ -1,10 +1,14 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "body_surface_canvas.hpp"
 
+#include "highlight.hpp"
+#include "icons.hpp"
+#include "presentation.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
-#include <unordered_set>
+#include <unordered_map>
 
 namespace ui {
 
@@ -59,10 +63,6 @@ const char* body_type_name(body_type t)
         default:                  return "?";
     }
 }
-
-constexpr const char* resource_labels[resource_count] = {
-    "Iron Ore", "Ice", "Silicates", "Rare Metals"
-};
 
 /// Fills `out[6]` with the screen-space vertices of a pointy-top hexagon
 /// centred at (cx, cy) with circumradius r.
@@ -165,13 +165,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
     // Clip to the grid area so hexes don't overdraw the title bar or the solar canvas.
     dl->PushClipRect(grid_area_origin, grid_area_origin + grid_area_size, true);
 
-    // Tiles that carry a building, for the building marker pass.
-    std::unordered_set<entity_id> built_tiles;
+    // Tiles that carry a building, mapped to their type so the marker pass can
+    // draw the type-specific glyph.
+    std::unordered_map<entity_id, building_type> built_tiles;
     for (const auto& [id, bld] : w.buildings)
     {
         auto tile_it = w.tiles.find(bld.tile);
         if (tile_it != w.tiles.end() && tile_it->second.body == state.active_body)
-            built_tiles.insert(bld.tile);
+            built_tiles[bld.tile] = bld.type;
     }
 
     const ImVec2 mouse = ImGui::GetIO().MousePos;
@@ -199,7 +200,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
         const ImVec2 lc   = hex_local_centre(tile.grid_x, tile.grid_y, hex_size);
         const ImVec2 sc   = to_screen(lc);
         const ImU32  fill = terrain_colour(tile.terrain);
-        const bool   built     = built_tiles.count(id) != 0;
+        const auto   built_it  = built_tiles.find(id);
+        const bool   built     = built_it != built_tiles.end();
+        const building_type built_type = built ? built_it->second : building_type::none;
         const bool   selected  = (id == state.active_tile);
 
         // Range of wrap copies that land inside the canvas horizontally.
@@ -219,19 +222,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
 
             if (built)
             {
-                const float mh = std::max(2.0f, draw_r * 0.18f);
-                dl->AddRectFilled(ImVec2{cx - mh, cy - mh}, ImVec2{cx + mh, cy + mh},
-                                  IM_COL32(255, 255, 255, 255));
+                const float mr = std::max(2.0f, draw_r * 0.22f);
+                icons::building(dl, {cx, cy}, mr, built_type, IM_COL32(255, 255, 255, 255));
             }
 
-            if (selected)
-            {
-                ImVec2 outline[6];
-                hex_vertices(outline, cx, cy, draw_r);
-                dl->AddPolyline(outline, 6, IM_COL32(255, 255, 255, 255), ImDrawFlags_Closed, 2.0f);
-            }
-
-            // Hit-test: distance to hex centre < circumradius (approximate, sufficient for usability).
+            // Hit-test: distance to hex centre < circumradius (approximate,
+            // sufficient for usability). Scoped per wrap copy so the highlight
+            // lands on the copy actually under the cursor.
+            bool copy_hovered = false;
             if (input_enabled)
             {
                 const float dx = mouse.x - cx;
@@ -241,8 +239,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
                                      mouse.y >= grid_area_origin.y &&
                                      mouse.y <= grid_area_origin.y + grid_area_size.y;
                 if (in_area && dx * dx + dy * dy <= hit_r * hit_r)
+                {
+                    copy_hovered = true;
                     hovered_tile = id;
+                }
             }
+
+            // Shared selection / hover / pinned outline (pinning not yet wired).
+            draw_hex_highlight(dl, verts,
+                resolve_highlight(selected, copy_hovered, /*pinned=*/false));
         }
     }
 
@@ -265,7 +270,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
         {
             if (tile.resource_deposit[r] > 0.0f)
             {
-                ImGui::Text("%s: %.1f", resource_labels[r], tile.resource_deposit[r]);
+                ImGui::Text("%s: %.1f", resource_name(static_cast<resource_type>(r)), tile.resource_deposit[r]);
                 any_deposit = true;
             }
         }

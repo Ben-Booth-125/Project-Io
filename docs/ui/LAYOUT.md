@@ -94,8 +94,8 @@ A two-panel stack in the top-right corner, both the same width as the minimap so
 
 **System tick** (top) — a permanent, non-interactive readout. Shows the player-facing clock:
 
-- **Day** — in-game days elapsed.
-- **Econ** — economy ticks (quarters) elapsed.
+- **Calendar date** — a compact `Y1 M05 D12` line (see `TIME_CONTROLS.md`).
+- **Quarter + day** — the in-year quarter and the absolute day count.
 
 **Speed controls** (below) — the time controls and a raw `Sim` counter with the current multiplier:
 
@@ -144,7 +144,6 @@ These are **not implemented next** and have no dedicated spec yet. They are note
 - Profile, header, and explorer are specified but not yet implemented.
 - Nav slot layout (count, ordering, the slot-8 Tile Ledger) is placeholder.
 - Canvases are not yet inset clear of the chrome.
-- No date formatting yet — the tick readout shows raw Day/Econ counts.
 - Popup elements (context menus, dialogs) are deferred.
 - ImGui is the prototype UI only; the production shell is a later, Lua-driven retained layer (TECH_FOUNDATIONS).
 

@@ -1,6 +1,7 @@
 #include "tile_inspector.hpp"
 
 #include "nav_pane.hpp"
+#include "presentation.hpp"
 
 #include <imgui.h>
 
@@ -45,11 +46,6 @@ const char* building_type_name(building_type t)
         default:                                 return "None";
     }
 }
-
-// Resource column headers, matching resource_type order.
-constexpr const char* resource_labels[resource_count] = {
-    "Iron Ore", "Ice", "Silicates", "Rare Metals"
-};
 
 } // namespace
 
@@ -132,8 +128,9 @@ void draw_tile_inspector(const world& w, bool* p_open)
         ImGui::TableSetupColumn("Terrain",     ImGuiTableColumnFlags_WidthFixed,  80.0f);
         ImGui::TableSetupColumn("Hazard",      ImGuiTableColumnFlags_WidthFixed,  60.0f);
         ImGui::TableSetupColumn("Habitability",ImGuiTableColumnFlags_WidthFixed,  90.0f);
-        for (const char* label : resource_labels)
-            ImGui::TableSetupColumn(label, ImGuiTableColumnFlags_WidthFixed, 88.0f);
+        for (std::size_t r = 0; r < resource_count; ++r)
+            ImGui::TableSetupColumn(resource_name(static_cast<resource_type>(r)),
+                                    ImGuiTableColumnFlags_WidthFixed, 88.0f);
         ImGui::TableHeadersRow();
 
         // Collect and sort tiles belonging to the selected body.
@@ -220,11 +217,30 @@ void draw_tile_inspector(const world& w, bool* p_open)
 
             for (std::size_t r = 0; r < resource_count; ++r)
             {
+                const resource_presentation& rp = presentation_of(static_cast<resource_type>(r));
                 ImGui::TableNextRow();
-                ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted(resource_labels[r]);
+
+                // Resource: identity colour swatch + name, drawn from the shared
+                // presentation metadata so the colour reads the same everywhere.
+                ImGui::TableSetColumnIndex(0);
+                const float    sw   = ImGui::GetTextLineHeight();
+                const ImVec2   swp  = ImGui::GetCursorScreenPos();
+                ImGui::GetWindowDrawList()->AddRectFilled(swp, {swp.x + sw, swp.y + sw}, rp.colour);
+                ImGui::Dummy({sw, sw});
+                ImGui::SameLine();
+                ImGui::TextUnformatted(rp.name);
+
                 ImGui::TableSetColumnIndex(1); ImGui::Text("%.1f", mkt.supply[r]);
                 ImGui::TableSetColumnIndex(2); ImGui::Text("%.1f", mkt.demand[r]);
-                ImGui::TableSetColumnIndex(3); ImGui::Text("%.2f", mkt.price[r]);
+
+                // Price coloured by its move against the base: above base reads as
+                // a gain (sold dear), below as a loss. Neutral until the first
+                // economy tick moves prices off base_price.
+                ImGui::TableSetColumnIndex(3);
+                const float move = mkt.price[r] - mkt.base_price[r];
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(value_colour(move)),
+                                   "%.2f", mkt.price[r]);
+
                 ImGui::TableSetColumnIndex(4); ImGui::Text("%.2f", mkt.base_price[r]);
             }
             ImGui::EndTable();

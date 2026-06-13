@@ -75,12 +75,14 @@ A small struct in `src/ui/ui_state.hpp`, held by `app`:
 
 ```cpp
 enum class canvas_level { solar, circumplanetary, planetary };
+enum class overlay_mode { none, supply, market, faction };
 
 struct ui_state
 {
     entity_id    active_body   = null_entity;            // drives the lower rungs
     entity_id    active_tile   = null_entity;            // set by tile click; consumed by later layers
     canvas_level primary_level = canvas_level::solar;    // which rung fills the window
+    overlay_mode overlay       = overlay_mode::none;     // active overlay lens; toggled by the minimap mode bar
 
     bool show_tile_ledger = false;                       // owned by the nav pane, not the canvases
 
@@ -90,6 +92,14 @@ struct ui_state
     float planetary_zoom, planetary_pan_x, planetary_pan_y;
 };
 ```
+
+Selection, hover, and pinning are drawn through a shared **highlight convention**
+(`src/ui/highlight.hpp`) so they read the same on every canvas: white for the
+selected entity, light blue for hover, amber for pinned (pinning not yet wired),
+with `selected > pinned > hover` precedence. A reusable **focus helper**
+(`src/ui/view_nav.hpp`) jumps the view to any entity — selecting it, choosing the
+rung that frames it, and centring that rung — for the opening view and the
+Explorer's "jump to".
 
 `active_body` drives both lower rungs: the Circumplanetary view centres on
 `active_body`'s planet (the body itself if it orbits the star directly, or its
@@ -139,5 +149,9 @@ function still draws unconditionally; it just skips hover/click handling when
 ## What is deferred
 
 Economic and military data (supply routes, faction presence, convoy paths) are
-added in later layers as overlays on these canvases. The minimap's **mode bar**
-is reserved chrome for selecting such overlay modes; it has no function in Layer 2.
+added in later layers as overlay **lenses** on these canvases. The overlay
+*mechanism* now exists as a building block — an overlay draw pass over each
+canvas (`src/ui/overlay.hpp`), an `overlay_mode` value in `ui_state`, and the
+minimap **mode bar** wired to toggle it. Until those layers supply data, an
+active lens draws only a legend chip naming itself; the lens geometry (Layer 5
+supply routes first) hangs off the same pass.

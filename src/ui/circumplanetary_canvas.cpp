@@ -1,6 +1,8 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "circumplanetary_canvas.hpp"
 
+#include "highlight.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <vector>
@@ -158,18 +160,23 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
         const float      radius = body_radius(id, is_anchor);
         const ImVec2     pos    = to_screen(local_pos(id, is_anchor));
 
+        bool this_hovered = false;
         if (input_enabled)
         {
             const float dx = mouse.x - pos.x;
             const float dy = mouse.y - pos.y;
             if (dx * dx + dy * dy <= (radius + 3.0f) * (radius + 3.0f))
+            {
+                this_hovered = true;
                 hovered_body = id;
+            }
         }
 
         dl->AddCircleFilled(pos, radius, style.colour);
 
-        if (id == state.active_body)
-            dl->AddCircle(pos, radius + 3.0f, IM_COL32(255, 255, 255, 255), 0, 1.5f);
+        // Shared selection / hover / pinned ring (pinning not yet wired).
+        draw_body_highlight(dl, pos, radius,
+            resolve_highlight(id == state.active_body, this_hovered, /*pinned=*/false));
 
         if (draw_labels)
         {

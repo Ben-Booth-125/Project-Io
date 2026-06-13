@@ -35,12 +35,13 @@ Economic and military data (supply routes, faction presence, convoy paths) are a
 | Background | Near-black: `(8, 10, 20)` |
 | Star | Filled circle at the system centre, drawn from the star body entity. Radius: ~18 px at full size (1.5× the planet reference). Colour: `(255, 220, 80)`. Labelled with the star name. |
 | Orbital rings | Thin circle at each body's `orbital_radius_au` distance. Colour: `(38, 42, 52)` — barely visible, structural only. |
+| Asteroid belt | A thick, translucent textured **band** between two orbital radii (`world.belt`), drawn over the orbital rings and under the bodies. Rendered as a translucent annulus (a thick ring stroke) with a deterministic scatter of dusty specks for texture. The belt is **not a body**; the notable asteroids within it are separate body entities drawn over the band. See *Asteroid belt* below. |
 | Body (planet) | Filled circle, radius 7 px. Colour: `(80, 120, 180)` blue-grey. |
 | Body (moon) | Filled circle, radius 5 px. Colour: `(148, 145, 140)` grey. |
 | Body (asteroid) | Filled circle, radius 4 px. Colour: `(140, 110, 80)` brown. |
 | Body (station) | Filled circle, radius 4 px. Colour: `(80, 180, 160)` teal. |
-| Body label | Body name in small ImGui default font, drawn just below the body circle. Colour: white. **Planets and asteroids are labelled permanently; moons are labelled only while hovered**, to keep the crowded inner system readable. The label tracks the live body position every frame. Known issue: it shimmers slightly while moving because the default ImGui font is a bitmap atlas with no sub-pixel positioning — see the *Known bugs* note in `docs/development/TODO.md`. |
-| Selection indicator | Unfilled circle (outline only) drawn around the selected body, 3 px larger than the body radius. Colour: white. |
+| Body label | Body name, drawn just below the body circle. Colour: white. **Planets and asteroids are labelled permanently; moons are labelled only while hovered**, to keep the crowded inner system readable. The label tracks the live body position every frame; it stays crisp because the UI font atlas is loaded with horizontal oversampling (the former sub-pixel shimmer is fixed — see `src/ui/fonts.hpp`). |
+| Selection / hover ring | Ring drawn around a body via the shared highlight convention (`src/ui/highlight.hpp`): white for the selected body, light blue for the hovered body, amber for a pinned body (pinning not yet wired). 3 px outside the body radius, constant pixel size. |
 | Hover tooltip | Body name, type string, orbital radius in AU. Shown while mouse is over a body circle. |
 
 ---
@@ -56,7 +57,31 @@ body_screen_pos.x = canvas_centre.x + cos(orbital_angle_rad) * orbital_radius_au
 body_screen_pos.y = canvas_centre.y - sin(orbital_angle_rad) * orbital_radius_au * scale
 ```
 
+`max_radius_au` also includes `world.belt.outer_radius_au` when a belt is present, so the whole band fits the auto-fit framing.
+
 The y-axis is negated so that angle 0 is to the right and angles increase counter-clockwise, matching the conventional 2D maths orientation.
+
+---
+
+## Asteroid belt
+
+The system has a single asteroid belt, held as system-level data (`world.belt`,
+an `asteroid_belt` with `inner_radius_au` / `outer_radius_au`) — **not** a body
+and not an entity. The canvas renders it as a thick, somewhat translucent
+textured ring: a translucent annulus (a thick circle stroke between the two
+radii) overlaid with a deterministic, fixed-seed scatter of dusty specks so it
+reads as a dust band rather than a solid disc. Speck positions are in AU space,
+so the band pans and zooms with the view, and the fixed seed keeps the pattern
+still between frames (no flicker).
+
+Within the band sit one or more **notable asteroids** — ordinary
+`body_type::asteroid` body entities (currently just Pallas in the prototype) at
+radii inside the belt. They are drawn *over* the band in the normal body pass, so
+they remain individually hoverable, labelled, and selectable (clicking one
+descends to its Circumplanetary view). They carry small tile grids so their
+surfaces are explorable like the planets. This is the chosen relationship between
+the notable asteroids and the ring: **separate bodies drawn over the band**, not
+markers embedded in it.
 
 ---
 

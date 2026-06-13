@@ -6,6 +6,129 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## 2026-06-13 — Pre-Layer-3 UI building blocks + asteroid belt (label-shimmer fixed)
+
+**Status:** Complete. Builds and runs (verified after each item; solar view
+captured to confirm the belt and the new font render). Worked through every
+`TODO.md` item below difficulty 6 ahead of Layer 3, leaving only the two
+deferred (difficulty 6) items — the hover-card system and the menu definition.
+
+Eight items, each a small focused module under `src/ui/`, built and
+build-verified one at a time. Foundational/shared primitives first so later
+items reuse them; the meatiest (asteroid belt) last.
+
+### What was built
+
+**[2] Value & date formatting helpers — `src/ui/format.hpp` / `.cpp`.**
+`ui::fmt` with `abbreviate` (1.2k / 3.4M / 5.0B), `credits` ("Cr 1.2k"),
+`signed_delta` (+/−/"±0"), `rate` ("+1.2k / qtr"), `percent`, `sign_of`, and the
+deferred **calendar** (`date_from_day` / `short_date`). The calendar completes
+sim_loop's tentative constants (30-day months, 3-month quarters) with a defined
+4-quarter / 360-day year. The system-tick readout now shows `Y1 M05 D12` and
+`Q2  -  Day N` instead of raw counts, and the header budget/stockpile
+placeholders route through the formatters so live numbers drop straight in.
+
+**[3] Presentation metadata — `src/ui/presentation.hpp` / `.cpp`.**
+Single source of truth for resource identity (`resource_presentation`: name,
+abbreviation, identity colour) replacing the duplicated `resource_labels[]` in
+`tile_inspector.cpp` and `body_surface_canvas.cpp`. Plus a **semantic palette**:
+positive/negative/neutral (deltas), selection/hover/pinned (interaction), and
+six reserved faction colour slots (the data model already permits multi-faction).
+`value_colour(...)` maps a signed value to its palette colour. Demonstrated in
+the Tile Ledger market table (resource colour swatch; price coloured by its move
+vs. base_price).
+
+**[2] Shared selection / hover / pinned highlight convention — `src/ui/highlight.hpp` / `.cpp`.**
+`resolve_highlight(selected, hovered, pinned)` (precedence selected > pinned >
+hovered) plus `draw_body_highlight` / `draw_hex_highlight` using palette colours.
+All three canvases refactored onto it; this **adds a hover ring** (light blue) on
+bodies and tiles, previously only a tooltip. Pinning is reserved in the
+vocabulary (amber) but not yet driven.
+
+**[2] Focus-on-entity helper — `src/ui/view_nav.hpp` / `.cpp`.**
+`focus_on_body` / `focus_on_surface` / `focus_on_tile` / `focus_on_entity` — one
+call that selects an entity, chooses the rung that frames it, and centres that
+rung. Rung rule: a *body* frames in its orbital/local view (star → Solar,
+planet/asteroid/station → its own Circumplanetary, moon → parent's with the moon
+selected); something *on* a surface → that body's Planetary surface. The opening
+view now goes through `focus_on_surface` rather than poking `ui_state`.
+
+**[3] Render-time interpolation building block — `src/ui/interp.hpp` / `.cpp`.**
+The decided read path for fractional-progress entities before convoys exist:
+`lerp` (float/ImVec2), an `interpolated<T>` (previous/current with `advance` and
+`at(alpha)`), and `econ_tick_alpha` / `day_alpha` from the continuous
+`elapsed_days` clock. Layer 5 convoys will hold `interpolated<float> progress`
+and read `lerp(route_start, route_end, progress.at(econ_tick_alpha(...)))` to
+glide across the quarter instead of jumping at the boundary. No consumer yet
+(documented building block).
+
+**[4] Canvas overlay layer + mode switching — `src/ui/overlay.hpp` / `.cpp` + `ui_state`.**
+`overlay_mode { none, supply, market, faction }` in `ui_state`; an overlay draw
+pass (`draw_canvas_overlay`) over the primary canvas, below the chrome; and the
+minimap **mode bar made interactive** — three dots toggle the three lenses
+(click the active dot to clear). No overlay data yet, so an active lens draws
+only a bottom-left legend chip naming itself — the single extension point where
+Layer 5 supply routes etc. will hang their geometry. Mode bar height bumped 10→14
+px so the dots are clickable.
+
+**[3] Icon/glyph + font-atlas strategy — `src/ui/fonts.*`, `src/ui/icons.*`.**
+Decided with the developer: **vector glyphs via the draw list** (no font asset)
+and a **system TTF loaded with oversampling** (`OversampleH=3`, `PixelSnapH=false`,
+candidates under `C:/Windows/Fonts`, falling back to an oversampled built-in
+font). The oversampled atlas improves glyph crispness. **Note:** this did *not*
+resolve the label-motion artefact — the developer reports body labels still
+advance in steps every few ticks rather than gliding, so the bug is re-logged in
+`TODO.md` (Known bugs) with that sharper symptom; the cause appears temporal, not
+purely sub-pixel rasterisation. `ui::icons` draws building
+(diamond/square/triangle), resource pip, and unit chevron glyphs; the Planetary
+built-tile marker now uses the building-type glyph instead of a uniform white
+square.
+
+**[4] Asteroid belt as a textured ring — `world.belt`, `hard_coded_world.cpp`, `solar_system_canvas.cpp`.**
+A `world::belt` (`asteroid_belt` { inner/outer radius }) — system-level data,
+**not a body**. The Solar canvas renders it as a translucent annulus (thick ring
+stroke) with a deterministic fixed-seed scatter of dusty specks (positions in AU
+space, so it pans/zooms with the view and holds still between frames). One
+**notable asteroid** — Pallas (the prototype keeps a single belt body per the
+developer's call) — is an ordinary `body_type::asteroid` entity at a radius
+inside the band, drawn *over* it in the normal body pass, so it stays
+hoverable/labelled/selectable and carries a small 30×14 tile grid (no water) so
+its surface is explorable. The Solar auto-fit extent now includes the belt's
+outer radius.
+
+### In-session decisions
+
+- **Font: system TTF + oversampling (developer choice).** Crisp, fluid labels
+  with no committed binary asset; Windows font path for now (prototype is
+  Windows-only). A bundled `assets/fonts/*.ttf` can be prepended to the candidate
+  list later for portability without touching call sites. Default size 16 px.
+- **Icons: vector glyphs via the draw list (developer choice).** Crisp at any
+  zoom, no atlas/licensing, matches how the canvases already draw.
+- **Notable asteroids are separate bodies drawn over the band**, not markers
+  embedded in the ring — resolving the open question in the belt TODO. Keeps them
+  uniform with every other body (selectable, labelled, own surface).
+- **Overlay building block lands now, data later.** The mode bar drives a real
+  `ui_state.overlay` + draw pass; with no economic data yet it shows only a
+  legend chip. This reserves the mechanism so Layer 5 adds geometry, not plumbing.
+- **Highlight precedence selected > pinned > hovered**, single ring per entity, so
+  a pinned entity keeps its identity colour under the cursor and selection always
+  wins.
+
+### Open items
+
+- **Overlay lenses have no data.** The pass and toggle exist; supply-route
+  geometry (Layer 5) is the first real consumer.
+- **Pinning is unwired.** The highlight convention and `focus_on_entity` are
+  ready, but nothing sets a "pinned" state yet (the Explorer is still a
+  placeholder).
+- **Interpolation has no consumer** until convoys exist (Layer 5).
+- **Font candidate list is Windows-only** — fine for the prototype; revisit for
+  cross-platform with a bundled font.
+- **Asteroid surfaces** use the generic tile generator at a small grid; proper
+  asteroid terrain/deposit authoring is for the extraction layer.
+
+---
+
 ## 2026-06-13 — version 0.0.2 — Layer 2 finalisation (standardised body grids, infinite side-scroll, zoom floor)
 
 **Status:** Complete. Builds and runs. **Tagged snapshot.**

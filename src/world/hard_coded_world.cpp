@@ -364,5 +364,45 @@ world make_hard_coded_world()
         std::vector<land_tier>{ {terrain_type::barren, 65}, {terrain_type::rocky, 30}, {terrain_type::icy, 5} },
         /*base_hazard=*/0.30f, /*base_habitability=*/0.25f, /*seed=*/0x5E1E001u);
 
+    // -----------------------------------------------------------------------
+    // Asteroid belt — a band beyond Kepler. The belt itself is not a body; it
+    // is system-level data the Solar canvas renders as a textured ring. One
+    // notable asteroid (Pallas) sits within the band as a separate, selectable
+    // body entity drawn over it, carrying a small tile grid (no water) so it is
+    // explorable like the planets. See TODO.md (asteroid belt) and SOLAR.md.
+    // -----------------------------------------------------------------------
+    w.belt = asteroid_belt{ /*inner_radius_au=*/2.10f, /*outer_radius_au=*/3.30f };
+
+    struct notable_asteroid
+    {
+        const char* name;
+        float       radius_au;
+        float       angle_rad;
+        uint32_t    seed;
+    };
+    constexpr notable_asteroid notables[] = {
+        { "Pallas", 3.05f, 4.6f, 0x9A11A5u },
+    };
+
+    for (const notable_asteroid& a : notables)
+    {
+        const entity_id id = w.create_entity();
+        w.bodies[id] = body_component{
+            .name                                 = a.name,
+            .type                                 = body_type::asteroid,
+            .parent                               = null_entity,
+            .orbital_radius_au                    = a.radius_au,
+            .orbital_angle_rad                    = a.angle_rad,
+            .orbital_angular_velocity_rad_per_day = kepler_angular_velocity(a.radius_au),
+            .grid_width                           = 30,
+            .grid_height                          = 14,
+        };
+
+        // Rocky/barren with a little ice; no oceans on an asteroid.
+        generate_body_tiles(w, id, 30, 14, /*water_fraction=*/0.0f,
+            std::vector<land_tier>{ {terrain_type::rocky, 50}, {terrain_type::barren, 35}, {terrain_type::icy, 15} },
+            /*base_hazard=*/0.40f, /*base_habitability=*/0.05f, a.seed);
+    }
+
     return w;
 }

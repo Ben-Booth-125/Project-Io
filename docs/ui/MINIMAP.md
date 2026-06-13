@@ -122,14 +122,15 @@ minimap chrome owns the title, the inset canvas suppresses its own.
 
 ### Mode bar
 
-A thin strip along the bottom of the minimap, **reserved as a placeholder**. It
-is intended to host alternative minimap *modes* — for example overlay lenses
-(supply, market, faction presence) once those overlays land, or other
-not-yet-decided readouts. It carries no function in Layer 2 and may be cut if no
-mode justifies it; it reserves the space and the shape so the chrome does not
-have to be re-laid-out later. (The zoom-ladder navigation lives in the body/
-minimap clicks described above, **not** in this bar — the bar is free for other
-modes.)
+A thin strip along the bottom of the minimap that **toggles the canvas overlay
+lens**. It holds three dots, one per overlay mode (supply routes, market,
+faction presence); clicking a dot activates that lens and clicking the active
+dot again clears it. The active mode's dot lights up. The overlay itself is the
+building block in `src/ui/overlay.hpp` (an overlay draw pass over each canvas,
+keyed by `ui_state::overlay`); until later layers add overlay data it draws only
+a legend chip naming the active lens, but the wiring — state, draw pass, and the
+mode-bar toggle — is in place. (The zoom-ladder navigation lives in the body /
+minimap clicks described above, **not** in this bar.)
 
 ---
 
@@ -193,8 +194,9 @@ canvas holds the primary slot; the minimap always renders the default framing.
 
 ## Open questions
 
-- **Does the mode bar earn its place?** It is reserved on spec but has no Layer 2
-  function. Cut it if no minimap mode materialises.
+- **Mode bar interaction polish.** The bar now toggles the overlay lens (three
+  dots → supply / market / faction), but the dots are terse; a clearer affordance
+  (icons, labels, or a tooltip) may be wanted once the lenses draw real data.
 - **Circumplanetary framing** for a planet with many vs. zero moons — how much
   local space to show, and at what scale, is for `CIRCUMPLANETARY.md`.
 - **Overlays.** Once supply routes / units land on the canvases, does the minimap

@@ -1,125 +1,108 @@
 # Project Io — TODO
 
 Parked thoughts, recorded but not yet actioned. These are deliberately deferred
-while canvas work takes priority. None of them are committed designs — they are
-reminders to revisit.
+while higher-priority work takes precedence. None of them are committed designs —
+they are reminders to revisit.
 
 Difficulty scale: **1** trivial · **2** light work · **3** medium · **4** hard ·
 **5** very hard · **6** deferred
+
+The pre-Layer-3 **UI building blocks** (the difficulty 1–5 items: presentation
+metadata, value/date formatters, the shared highlight convention, the focus-on-
+entity helper, render-time interpolation, the canvas overlay layer + mode bar,
+and the icon/font-atlas strategy) and the **asteroid belt** ring were implemented
+in the 2026-06-13 building-blocks session — see `DEVLOG.md`. The items below are
+the follow-up revisions raised against that work, plus the still-deferred
+(difficulty 6) work.
 
 ---
 
 ## Canvas
 
-- **[4] Asteroid belt as a textured ring, not bodies.** There is a single asteroid
-  belt. Render it as a thick, somewhat translucent textured ring (a band, not a
-  set of orbiting body dots). Within the belt sit ~3 *notable* asteroids that
-  remain individually selectable bodies; the belt itself is **not** a body.
-  Current state: the placeholder belt asteroids (Vesta, Ceres, Pallas) and all
-  other backdrop bodies were removed during Layer 2 finalisation — the world now
-  holds only Helios, Cinder, Kepler, and Selene. There is no belt or ring yet.
-  Decide how the notable asteroids relate to the ring (embedded markers? separate
-  bodies drawn over the band?) when implementing. See `docs/ui/CANVASES.md`.
+- **[3] Zoom slider direction + Circumplanetary scale/zoom.** Two parts. (a) The
+  Solar zoom slider is **reversed**: dragging right zooms *out* (toward 50 AU) and
+  left zooms *in*. Flip it so the **right** end is maximum zoom (zoomed in) and the
+  **left** is minimum (zoomed out). (b) The Circumplanetary canvas has **no scale
+  bar or zoom slider** — duplicate the Solar canvas's scale/zoom overlay onto it.
+  Best done by factoring the scale-bar + slider block out of `solar_system_canvas.cpp`
+  into a shared helper both canvases call. See `SOLAR.md` / `CIRCUMPLANETARY.md`.
 
-## UI building blocks (decide before Layer 3)
+## Selection & info panel
 
-Layer 2 deliberately kept the UI thin, but Layers 3–6 (extraction → market →
-supply → budget) all lean on the same handful of rendering primitives. These are
-the pieces we simplified that are *certainly* needed later; the goal is a
-versatile basic version of each now — the **building block**, not the detail — so
-later layers extend it rather than inventing one each. None are committed
-designs; record, then decide.
+- **[4] Selection info element (a ledger).** A closable panel (fits the ledger
+  category — open/close like the Tile Ledger) docked **above the lens/zoom
+  controls**, showing details of the **current selection**. It is **polymorphic
+  by selection type**: a tile shows tile data, a body shows body data, a unit
+  shows unit data, a building/market each their own — different content per kind
+  of selected entity. It carries a **'go to' button next to the close button**
+  that focuses the selection (reuse `ui::focus_on_entity`, `src/ui/view_nav.hpp`).
+  Pair this with a **navigation change**: **single-click selects** (populates this
+  panel) and **double-click navigates** (descends/focuses the rung), where the
+  'go to' button has the same effect as a double-click. This revises the canvas
+  click handlers (currently a single click descends). Needs its own doc
+  (`docs/ui/SELECTION.md`) and an entry in `LAYOUT.md`.
 
-- **[6] Informative tooltip / hover-card system.** Deferred. The single most important
-  player-communication surface for a grand strategy game. Today there is one
-  ad-hoc `ImGui::BeginTooltip` inside the Planetary canvas; everything else has
-  none. We want a *shared* hover-card primitive with a consistent structure —
-  title line (name + type + icon), a short stat block, optional sectioned detail,
-  and room for "why" annotations (e.g. how a price or yield was derived) so we
-  can explain mechanics from the player's perspective as we revise them. It must
-  work for every hoverable thing across all canvases and ledgers: bodies (Solar /
-  Circumplanetary), tiles (Planetary), buildings, markets, and later convoys and
-  routes. Decide: a single `draw_hover_card(...)` helper vs. per-entity builders;
-  instant vs. delayed reveal; how a "rich card" (LAYOUT.md popup elements) differs
-  from the lightweight canvas tooltip. Likely earns its own `docs/ui/TOOLTIP.md`
-  once the shape is settled. See `docs/ui/LAYOUT.md` (UI popup elements).
+- **[2] Date format & epoch.** The calendar readout shows `Y1 M05 D12`. Switch to
+  a **`dd/mmm/yyyy`** form with month abbreviations (e.g. `01/Jan/1960`) and set
+  the campaign epoch so **Day 1 falls in year 1960**. The 12 thirty-day months map
+  to Jan–Dec. Touches `ui::fmt::date_from_day` / `short_date` and a month-name
+  table in `src/ui/format.{hpp,cpp}`, and the readout in `app.cpp`. See
+  `TIME_CONTROLS.md`.
 
-- **[3] Centralised presentation metadata (resource identity + semantic palette).**
-  `resource_labels[]` is duplicated in `tile_inspector.cpp` and
-  `body_surface_canvas.cpp`, and carries only a name. Establish one source of
-  truth for each resource — display name, short label/abbreviation, colour, and
-  (eventually) icon — used everywhere a resource appears (header strip, market
-  ledger, tile deposits, tooltips, future overlays). Alongside it, a small
-  **semantic palette**: positive/negative (profit/loss, surplus/deficit),
-  selection/hover/pinned, and reserved faction colour slots (data model already
-  allows multi-faction). Keeps the data-dense UI visually consistent and makes a
-  later restyle a one-file change. See `docs/ui/HEADER.md`.
+- **[2] Highlight resolution on ties.** When more than one entity satisfies the
+  same highlight condition at once (e.g. two overlapping hover targets), the
+  convention should resolve to a single, **arbitrary-but-stable** choice rather
+  than highlighting both or flickering between them. Refines the per-canvas hover
+  resolution and `resolve_highlight` (`src/ui/highlight.hpp`).
 
-- **[2] Shared value & date formatting helpers.** Layers 3–6 are almost entirely
-  changing numbers, currently printed raw (`%.1f`, `%llu`). Provide small
-  formatters for: credits/currency, large-magnitude abbreviation (1.2k / 3.4M),
-  signed and colour-coded deltas (income vs. expense, price moves), rates
-  (per-tick / per-day), and percentages. Include the deferred **date/quarter
-  formatting** (the tick readout still shows raw Day/Econ counts). One legible,
-  reused number path before the numbers start moving. See `docs/ui/LAYOUT.md`
-  (time column) and `docs/ui/HEADER.md`.
+## Overlays / minimap
 
-- **[4] Canvas overlay layer + mode switching.** Economic/military data (supply
-  routes, convoy paths/progress, faction presence) is deferred to later layers as
-  *overlays* on the canvases, and the minimap **mode bar** is already reserved
-  chrome for selecting them — but no overlay mechanism exists. Decide the building
-  block now: an overlay draw pass on top of each canvas, an overlay-mode value in
-  `ui_state`, and how the mode bar toggles it. Layer 5 (supply routing) is the
-  first hard requirement — convoy lines between bodies on the Solar canvas with a
-  progress marker. See `docs/ui/CANVASES.md` (What is deferred) and `MINIMAP.md`.
-
-- **[3] Icon/glyph + font atlas strategy.** A grand-strategy UI is icon-heavy
-  (resource strip "icon + quantity", building-type markers, unit/convoy markers),
-  and the canvases currently use only the default ImGui bitmap font. Decide an
-  approach — an icon font (Font Awesome / Kenney) merged into the atlas, or vector
-  glyphs via the draw list — and load the atlas with **oversampling / sub-pixel
-  positioning** while we are at it, which also fixes the body-label shimmer bug
-  below. Tackling the font atlas once covers both. See the shimmer item under
-  *Known bugs*.
-
-- **[2] Shared selection / hover / pinned highlight convention.** Each canvas
-  hand-draws its own selection (white hex outline, body ring). As more selectable
-  entity types appear (buildings, convoys, routes) and the Explorer adds *pinned*
-  items, settle one visual language for selected vs. hovered vs. pinned and a
-  small shared helper, so highlights read the same everywhere. See
-  `docs/ui/EXPLORER.md` and `CANVASES.md`.
-
-- **[2] "Focus on entity" view-navigation helper.** The Explorer's "jump straight
-  to them" and any future notification/alert needs one call that focuses an
-  entity: set `active_body`, choose the correct rung (`primary_level`), and centre
-  that rung's pan/zoom on the target. A reusable building block rather than
-  ad-hoc state pokes. See `docs/ui/EXPLORER.md`.
-
-- **[3] Render-time interpolation for fractional-progress entities.**
-  TECH_FOUNDATIONS specifies the render loop interpolates visual state between
-  simulation states; orbits currently advance directly by elapsed days, which is
-  fine. But Layer 5 convoys carry a fractional progress that completes only at the
-  economy-tick boundary — their position on the Solar canvas must interpolate
-  smoothly between ticks rather than jumping. Decide the render-side read path for
-  fractional progress before convoys exist. See `docs/tech/TECH_FOUNDATIONS.md`
-  (in-flight actions at tick boundaries).
-
-## Known bugs
-
-- **[6] Body labels shimmer while moving (font sub-pixel rendering).** On the Solar
-  System Canvas, planet/asteroid labels shimmer slightly as the body moves. Root
-  cause: the default ImGui font is a bitmap atlas with **no sub-pixel
-  positioning**, so glyphs are only crisp at integer pixel coordinates — the
-  anti-aliased body dot reads smooth at any fraction, but text at a fractional
-  coordinate softens/shimmers as the fraction changes each frame. Currently the
-  label is drawn at its live fractional position (fluid motion, but shimmers).
-  Rounding to whole pixels removes the shimmer but makes the label step 1px at a
-  time. The durable fix is to enable **font oversampling / sub-pixel rendering**
-  (fluid *and* crisp) — load the font with oversampling, or render labels via a
-  higher-quality text path. Deferred. See `docs/ui/CANVASES.md`.
+- **[3] Relocate the overlay (lens) controls + default lens.** Move the overlay
+  mode controls **off the minimap mode bar** to a **bottom-of-screen strip**
+  running from the Menu (nav pane) edge inward toward the centre — on the Solar
+  view, extending up to the scale bar / zoom control. Also: select a **default
+  overlay** on load rather than `overlay_mode::none`. Touches the mode-bar
+  handling in `app::render()`, `src/ui/overlay.hpp`, and the `ui_state.overlay`
+  default; coordinate with the Solar scale/zoom placement (see the zoom item above)
+  and the bottom-left legend chip. See `MINIMAP.md` / `CANVASES.md`.
 
 ## Menus
+
+- **[3] Narrower, icon-based Menu.** Restyle the nav pane (Menu) to be **narrower**
+  and show **icons instead of worded labels** for each slot, using the vector-glyph
+  icon helper (`src/ui/icons.hpp`). Affects `nav_pane.{hpp,cpp}` (`nav_pane_width`)
+  and every panel laid out relative to `nav_pane_width`. See `MENU.md` / `LAYOUT.md`.
 
 - **[6] Define the menu items from the systems.** Work out the important menu items
   driven by the game systems (`docs/SYSTEMS.md`), then **get feedback on the
   intended order before final implementation.** See `docs/ui/MENU.md`.
+
+## UI building blocks
+
+- **[6] Informative tooltip / hover-card system.** Deferred. The single most important
+  player-communication surface for a grand strategy game. Today there is one
+  ad-hoc `ImGui::BeginTooltip` inside the Planetary canvas, plus the lightweight
+  `ImGui::SetTooltip` body tooltips on the Solar / Circumplanetary canvases;
+  there is no shared rich card. We want a *shared* hover-card primitive with a
+  consistent structure — title line (name + type + icon), a short stat block,
+  optional sectioned detail, and room for "why" annotations (e.g. how a price or
+  yield was derived). It must work for every hoverable thing across all canvases
+  and ledgers: bodies, tiles, buildings, markets, and later convoys and routes.
+  It can now build on the shared presentation metadata, formatters, and icon
+  helpers (`src/ui/presentation.hpp`, `format.hpp`, `icons.hpp`). Decide: a single
+  `draw_hover_card(...)` helper vs. per-entity builders; instant vs. delayed
+  reveal; how a "rich card" (LAYOUT.md popup elements) differs from the lightweight
+  canvas tooltip. Likely earns its own `docs/ui/TOOLTIP.md`. Note the overlap with
+  the **Selection info element** above — both present per-entity detail; share the
+  per-type content builders where it makes sense. See `docs/ui/LAYOUT.md`.
+
+## Known bugs
+
+- **[4] Body labels move in steps, not smoothly.** Re-logged. The font-oversampling
+  pass (`src/ui/fonts.hpp`) improved glyph crispness but did **not** fix the motion
+  artefact: body labels visibly advance only every few ticks while the body dot
+  glides. The symptom is temporal (stepped position over time), not purely the
+  sub-pixel rasterisation originally diagnosed. The label and the dot are drawn
+  from the same per-frame `pos`, so the stepping must enter via the text path
+  itself (glyph placement quantisation) or the way the label position is read —
+  compare the two paths on the Solar / Circumplanetary canvases. See `SOLAR.md`.

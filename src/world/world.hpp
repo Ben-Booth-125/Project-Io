@@ -4,6 +4,21 @@
 
 #include <unordered_map>
 
+/// The system's single asteroid belt — a band between two orbital radii. The
+/// belt is not a body (it owns no entity); it is rendered as a thick, translucent
+/// textured ring on the Solar canvas, with notable asteroids sitting within it as
+/// separate, selectable body entities drawn over the band. A system with no belt
+/// has outer_radius_au <= inner_radius_au.
+struct asteroid_belt
+{
+    float inner_radius_au = 0.0f; ///< Inner edge of the band, AU from the star.
+    float outer_radius_au = 0.0f; ///< Outer edge of the band, AU from the star.
+
+    /// Whether the system has a belt to draw.
+    /// @return True when the band has positive width.
+    bool present() const { return outer_radius_au > inner_radius_au && outer_radius_au > 0.0f; }
+};
+
 /// ECS registry. Entities are plain integer IDs; components are stored in
 /// per-type maps. The registry owns all component data for the lifetime of
 /// the simulation.
@@ -31,6 +46,10 @@ struct world
 
     /// The corporation's home planet. The game opens on this body's surface.
     entity_id home_body = null_entity;
+
+    /// The system's asteroid belt (a band, not a body). belt.present() is false
+    /// when the system has no belt.
+    asteroid_belt belt;
 
     // --- component stores ---
     std::unordered_map<entity_id, body_component>      bodies;

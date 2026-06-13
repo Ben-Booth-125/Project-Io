@@ -50,8 +50,8 @@ Stockpile readouts, market state, and workforce indicators are added in later la
 |---|---|
 | Background | Dark: `(18, 18, 24)` |
 | Tile | Filled hexagon. Colour from terrain table above. A 1 px gap between hexes lets the background show through as a border — achieved by drawing each hex at `circumradius - 1 px` rather than adding explicit borders. |
-| Building marker | Small filled square (centred on tile, ~18% of hex circumradius) in white. A visual distinction between building types can be introduced later; a uniform marker is sufficient for Layer 2. |
-| Selection indicator | 2 px white hex outline around the selected tile (if any). |
+| Building marker | A small white vector glyph centred on the tile (~22% of hex circumradius), drawn by `ui::icons::building` with a thin dark outline. The silhouette encodes the type: extraction = diamond, processing = square, port = triangle. |
+| Selection / hover indicator | Hex outline drawn through the shared highlight convention (`src/ui/highlight.hpp`): white for the selected tile, light blue for the hovered tile (per wrap copy), amber for pinned (not yet wired). |
 | Hover tooltip | Tile coordinates `[col, row]`, terrain name, hazard, habitability, and all four resource deposit values. Suppress zero deposits. |
 | Body label | Canvas title bar shows the selected body name, type, and grid dimensions. As the Planetary screen is always primary (full size), the title is always shown. |
 

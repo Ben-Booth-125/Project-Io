@@ -1,9 +1,12 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "solar_system_canvas.hpp"
 
+#include "highlight.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <random>
 #include <vector>
 
 namespace ui {
@@ -60,10 +63,13 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
     const float element_scale = min_dim / 720.0f;
     const bool  draw_labels    = min_dim > 320.0f; // suppress label clutter on the minimap
 
-    // Find the outermost orbit so all bodies fit with a margin.
+    // Find the outermost orbit so all bodies fit with a margin. The asteroid
+    // belt's outer edge is included so the whole band fits the auto-fit framing.
     float max_radius_au = 0.0f;
     for (const auto& [id, body] : w.bodies)
         max_radius_au = std::max(max_radius_au, body.orbital_radius_au);
+    if (w.belt.present())
+        max_radius_au = std::max(max_radius_au, w.belt.outer_radius_au);
     if (max_radius_au <= 0.0f)
         max_radius_au = 1.0f; // guard against an empty or degenerate world
 
@@ -118,6 +124,38 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
                       IM_COL32(38, 42, 52, 255), 0, 1.0f);
     }
 
+    // Asteroid belt — a thick, translucent textured band between two orbital
+    // radii (not a body). Drawn over the orbital rings and under the bodies, so
+    // the notable asteroids within it render on top of the band. The annulus is
+    // approximated by a thick circle stroke; a deterministic scatter of dusty
+    // specks gives it texture and holds still frame-to-frame (a fixed seed, with
+    // positions in AU space so they pan and zoom with the view).
+    if (w.belt.present())
+    {
+        const ImVec2 bc       = to_screen({0.0f, 0.0f}); // system centre
+        const float  inner_px = w.belt.inner_radius_au * scale * zoom;
+        const float  outer_px = w.belt.outer_radius_au * scale * zoom;
+        const float  mid_px   = (inner_px + outer_px) * 0.5f;
+        const float  band_px  = outer_px - inner_px;
+
+        // Translucent band fill via a thick ring stroke.
+        dl->AddCircle(bc, mid_px, IM_COL32(150, 130, 95, 38), 128, band_px);
+
+        std::mt19937 rng(0xA57E0u);
+        std::uniform_real_distribution<float> ang(0.0f, 6.2831853f);
+        std::uniform_real_distribution<float> rad(w.belt.inner_radius_au, w.belt.outer_radius_au);
+        std::uniform_real_distribution<float> bright(0.0f, 1.0f);
+        constexpr int speck_count = 420;
+        for (int i = 0; i < speck_count; ++i)
+        {
+            const float  a  = ang(rng);
+            const float  rr = rad(rng) * scale * zoom;
+            const ImVec2 p  = { bc.x + std::cos(a) * rr, bc.y - std::sin(a) * rr };
+            const int    alpha = 70 + static_cast<int>(bright(rng) * 110.0f);
+            dl->AddCircleFilled(p, 1.0f, IM_COL32(180, 160, 120, alpha), 4);
+        }
+    }
+
     // The star is drawn in the body pass below (body_type::star, at the centre),
     // so it needs no dedicated draw here.
 
@@ -157,9 +195,10 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
 
         dl->AddCircleFilled(pos, radius, style.colour);
 
-        // Selection outline, 3 px larger than the body.
-        if (id == state.active_body)
-            dl->AddCircle(pos, radius + 3.0f, IM_COL32(255, 255, 255, 255), 0, 1.5f);
+        // Shared selection / hover / pinned ring. Pinning is not yet wired, so
+        // pinned is always false here.
+        draw_body_highlight(dl, pos, radius,
+            resolve_highlight(id == state.active_body, this_hovered, /*pinned=*/false));
 
         // Labelling: planets (and other notable bodies) carry a permanent
         // label; moons are labelled only while hovered, to keep the inner
