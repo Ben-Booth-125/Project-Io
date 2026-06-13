@@ -57,6 +57,7 @@ world make_hard_coded_world()
         .name              = "Kepler",
         .type              = body_type::planet,
         .orbital_radius_au = 1.00f,
+        .orbital_angle_rad = 1.05f, // ~60deg, upper-right of the disc
         .grid_width        = 4,
         .grid_height       = 4,
     };
@@ -138,6 +139,7 @@ world make_hard_coded_world()
         .name              = "Vesta",
         .type              = body_type::moon,
         .orbital_radius_au = 5.20f,
+        .orbital_angle_rad = 3.93f, // ~225deg, lower-left of the disc
         .grid_width        = 3,
         .grid_height       = 3,
     };

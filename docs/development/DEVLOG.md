@@ -4,6 +4,61 @@ Entries are newest-first. Each entry covers one development session and records 
 
 ---
 
+## 2026-06-13 — Layer 2: Primary canvases
+
+**Status:** Complete. Canvas visual refinement and Layer 3 (extraction and production) are next.
+
+### What was built
+
+- `src/ui/ui_state.hpp` — `ui_state` struct shared by both canvases: `active_body`, `active_tile`, `surface_is_primary`, plus `show_tile_ledger` (owned by the nav pane).
+- `src/ui/solar_system_canvas.hpp` / `.cpp` — Top-down system view: star, per-body orbital rings, type-coloured body dots, labels, selection outline, hover tooltip. Draws to the ImGui background draw list. Coordinate mapping per CANVASES.md (y negated, `scale = min_dim·0.45 / max_radius_au`).
+- `src/ui/body_surface_canvas.hpp` / `.cpp` — Tile grid for `active_body`: terrain-coloured cells with 1 px gaps, building markers, selection outline, title bar, and a hover tooltip (suppresses zero deposits).
+- `src/ui/nav_pane.hpp` / `.cpp` — Left navigation pane: fixed full-height column, ten numbered tab slots, only the **Tile Ledger** wired (parked at slot 8). Exposes `nav_pane_width`.
+- `src/world/components.hpp` — `orbital_angle_rad` added to `body_component`; Kepler `1.05`, Vesta `3.93` authored in `hard_coded_world.cpp`.
+- `src/ui/tile_inspector` — renamed window to **Tile Ledger**; now takes `bool* p_open` so it fully closes (X button) rather than collapsing. Toggled by the nav tab.
+- `src/core/sim_loop` — rebuilt as a **three-layer clock**: sim tick → day tick → econ tick, with a runtime speed multiplier (pause + 1x–5x).
+- `src/core/app` — fixed top-right **system tick** readout (Day/Econ) and a **speed-control** panel below it; nav pane and Tile Ledger wired into `render()`; F12 screenshot capture (`save_screenshot` via `SDL_RenderReadPixels` + `SDL_SaveBMP`).
+- `tools/capture.ps1` — build → launch → F12 → BMP→PNG dev-loop wrapper.
+- `.claude/settings.local.json` — `acceptEdits` default plus an allowlist for the build/screenshot loop (gitignored).
+
+### In-session decisions
+
+**Body click always brings the surface forward.**
+CANVASES.md contradicted itself: the layout section states the intent ("click a body, arrive at its surface — a single action") while the interaction bullet made the swap conditional on the Solar System Canvas already being the minimap. Implemented the *intent*: clicking a body sets `active_body` and `surface_is_primary = true` unconditionally. CANVASES.md updated to match.
+
+**`input_enabled` added as a 5th canvas parameter.**
+The primary canvas fills the whole window *behind* the bottom-right minimap, so a click in the overlap would otherwise be processed by both canvases. `app::render()` routes input to exactly one canvas (mouse-in-minimap → minimap, else primary), gated by `WantCaptureMouse` so ImGui panels take precedence. Deviates from the 4-arg signature in the spec; documented.
+
+**Canvases drawn to the ImGui background draw list.**
+Keeps the debug/overlay windows (nav pane, tick, ledger) on top with no z-order management, and lets manual hit-testing coexist with ImGui. No separate minimap draw path — element sizes scale by `min_dim/720` with floors, and labels/titles are suppressed below ~320 px so the minimap stays readable.
+
+**Minimap / right-column sizing.** `mm_w = max(240, 0.20·min(window w,h))`, `mm_h = mm_w·0.75` (the 240×180 4:3 ratio). The system-tick and speed panels reuse `mm_w` so the right column stays aligned; each is ~⅓ of `mm_h` tall.
+
+**Three-layer tick model with derived pacing.**
+`sim_ticks_per_day = 12`, `econ_tick_days = 90` (three 30-day months → quarterly economy resolution). Real-time pacing comes from one constant, `seconds_per_day_1x = 6.0`, so 1x = 6 s/day and **3x ≈ 2 s/day** as requested; 12 sim ticks/day gives 6 steps/sec at 3x — fine-grained enough to interpolate fluid motion later. Speed 0 = paused (drops the accumulator so unpausing doesn't fast-forward). All calendar/pacing values are `static constexpr` tunables — explicitly tentative.
+
+**`init.lua` config repurposed.** The unused `sim_hz` / `econ_per_sec` were retired in favour of `default_speed` (1x–5x), which `run()` reads via `set_speed`. Closes the Layer 0/1 open item about wiring `config` to the loop. The calendar itself now lives in C++.
+
+**Nav pane is a launcher, ledger stays a window.** Tabs toggle panels rather than docking content; the Tile Ledger remains a floating, movable window (kept "as-is") but closable. Slot numbering and the slot-8 placement are temporary — menu layout is deliberately out of scope while canvas work takes priority.
+
+**Screenshot tooling: in-app capture over external screengrab.** F12 dumps the exact composited backbuffer to `build/Debug/screenshots/`. BMP (not PNG) to avoid adding an `SDL_image` dependency; the wrapper converts to PNG via `System.Drawing`. Permissions use a wrapper-script allowlist because shell permission rules are prefix-matched and can't scope by directory.
+
+### Corrections made during session
+
+`tools/capture.ps1` used an em dash in a string literal; Windows PowerShell 5.1 reads BOM-less files as ANSI and the multibyte character broke parsing. Replaced with ASCII.
+
+Nav pane labels were clipped to a single glyph. Cause: `-1.0f` was passed as the `Selectable` width — unlike `Button`, `Selectable` treats a nonzero `size.x` as a *literal* width, producing a near-zero-width box. Fixed by deriving the width from `GetContentRegionAvail().x`. (Widening the pane had no effect until this was found.)
+
+### Open items
+
+- **Canvases render full-window behind the nav pane and top-right panels.** The leftmost sliver of the solar view and the top-right corner are occluded. Clean follow-up: inset the primary canvas to start at `nav_pane_width` and below the tick/speed column. `nav_pane_width` is already exposed for this.
+- **Nav slot layout is temporary** — Tile Ledger at slot 8, others empty placeholders. Revisit when the menu set is designed.
+- **Calendar values tentative** — no year/month/day date display yet; the tick widget shows raw Day/Econ counts.
+- **Lua "alive" indicator dropped** from the fixed tick widget to fit the ~⅓-minimap height; restore with a slightly taller widget if wanted.
+- `m_` member prefix still unaddressed in DEVELOPMENT_PRACTICES (carried from Layer 0/1).
+
+---
+
 ## 2026-06-13 — Layer 1: ECS data model
 
 **Status:** Complete. Layer 2 (extraction and production) is next.

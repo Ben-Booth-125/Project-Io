@@ -17,6 +17,9 @@ Makefile
 *.suo
 .vscode/launch.json
 
+# Claude Code personal/project-local settings
+.claude/settings.local.json
+
 # Compiled artifacts
 *.exe
 *.pdb

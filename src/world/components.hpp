@@ -77,6 +77,7 @@ struct body_component
     std::string name;
     body_type   type;
     float       orbital_radius_au; ///< Distance from the system's star in AU.
+    float       orbital_angle_rad; ///< Authored angular position on the orbital disc, radians. 0 = right, increases counter-clockwise.
     int         grid_width;        ///< Number of tile columns.
     int         grid_height;       ///< Number of tile rows.
 };

@@ -17,9 +17,11 @@ The game window is divided into two regions:
 
 **Swap mechanic:** clicking anywhere inside the minimap region swaps primary and minimap. The two canvases exchange roles; selection state is unchanged. There is no animation in the prototype.
 
-**Clicking a body in the Solar System Canvas** (whether it is primary or minimap) selects that body and, if the Solar System Canvas was minimap at the time, swaps it to primary so the Body Surface Canvas comes forward. The intent is that the natural workflow — click a body in the solar system, arrive at its surface — is a single action.
+**Clicking a body in the Solar System Canvas** (whether it is primary or minimap) selects that body and makes the Body Surface Canvas the primary view — unconditionally. The natural workflow — click a body in the solar system, arrive at its surface — is a single action regardless of which canvas was primary at the time. (Selecting a *different* body while the surface is already primary simply re-targets it and leaves the surface in front.)
 
-The minimap renders the same drawing code as the primary canvas, parameterised by the available region size. No separate minimap drawing path. Scale, cell size, and orbit radius are all derived from the canvas size at draw time.
+The minimap renders the same drawing code as the primary canvas, parameterised by the available region size. No separate minimap drawing path. Scale, cell size, and orbit radius are all derived from the canvas size at draw time. Fixed-pixel element sizes (star/body radii, building markers) scale by `min(size.x, size.y) / 720` with small floors so they stay visible at minimap scale, and labels/title text are suppressed below ~320 px on the shorter edge to avoid clutter.
+
+**Minimap region size.** `mm_w = max(240, 0.20 × min(window width, height))`; `mm_h = mm_w × 0.75`, preserving the 240×180 (4:3) ratio of the default. Anchored bottom-right with an 8 px margin.
 
 ---
 
@@ -68,8 +70,9 @@ The y-axis is negated so that angle 0 is to the right and angles increase counte
 ### Interaction
 
 - **Hover** a body circle: show tooltip.
-- **Left-click** a body circle: set `active_body`; swap to Body Surface Canvas as primary if Solar System Canvas is currently minimap.
-- **Click minimap** (when Solar System is minimap): swap to primary.
+- **Left-click** a body circle: set `active_body` and make the Body Surface Canvas primary (`surface_is_primary = true`). Unconditional — clicking a body always brings its surface forward.
+- **Click empty space in the minimap** (when Solar System is minimap): swap the Solar System Canvas to primary.
+- Input is only processed for the canvas the mouse is over (see Implementation approach); an ImGui panel under the cursor takes precedence over both canvases.
 - No pan or zoom in the prototype. Auto-fit always shows all bodies.
 
 ### `body_component` addition
@@ -123,25 +126,27 @@ The grid is centred in the available canvas area. Cell size scales to use the fu
 
 - **Hover** a tile: show tooltip.
 - **Left-click** a tile: set `active_tile` in selection state.
-- **Click minimap** (when Body Surface is minimap): swap to primary.
+- **Click anywhere in the minimap** (when Body Surface is minimap): swap to primary. If the click also landed on a tile, that tile becomes `active_tile` in the same action.
 - No pan or zoom in the prototype.
 
 ---
 
 ## Shared selection state
 
-A small struct held by `app` (or in a dedicated `ui/ui_state.hpp` header):
+A small struct in `src/ui/ui_state.hpp`, held by `app`:
 
 ```cpp
 struct ui_state
 {
-    entity_id active_body = null_entity; // drives Body Surface Canvas
-    entity_id active_tile = null_entity; // set by tile click; consumed by later layers
+    entity_id active_body = null_entity;  // drives Body Surface Canvas
+    entity_id active_tile = null_entity;  // set by tile click; consumed by later layers
     bool      surface_is_primary = false; // false = Solar System is primary
+
+    bool      show_tile_ledger = true;    // owned by the nav pane, not the canvases
 };
 ```
 
-Both canvas drawing functions take `ui_state&` and may write to it (body click, tile click, minimap click).
+Both canvas drawing functions take `ui_state&` and may write to it (body click, tile click, minimap click). `show_tile_ledger` is shared housekeeping for the left navigation pane and the Tile Ledger window; the canvases do not touch it.
 
 ---
 
@@ -151,15 +156,17 @@ Each canvas is a free function:
 
 ```cpp
 // solar_system_canvas.hpp / .cpp
-void draw_solar_system_canvas(const world& w, ui_state& ui, ImVec2 origin, ImVec2 size);
+void draw_solar_system_canvas(const world& w, ui_state& ui, ImVec2 origin, ImVec2 size, bool input_enabled);
 
 // body_surface_canvas.hpp / .cpp
-void draw_body_surface_canvas(const world& w, ui_state& ui, ImVec2 origin, ImVec2 size);
+void draw_body_surface_canvas(const world& w, ui_state& ui, ImVec2 origin, ImVec2 size, bool input_enabled);
 ```
 
-`app::render()` computes the primary and minimap regions from the window size, then calls both functions with the appropriate `origin` and `size`. The minimap region is fixed at 240×180 px (or 20% of the window's shorter dimension, whichever is larger) anchored to the bottom-right corner with an 8 px margin.
+`app::render()` computes the primary and minimap regions from the window size (see *Minimap region size* above), then calls both functions with the appropriate `origin` and `size`.
 
-Because scale is derived from `size` at draw time, the same function renders correctly at both primary and minimap dimensions.
+**`input_enabled` exists because the primary canvas fills the whole window *behind* the minimap.** A click in the overlapping bottom-right corner would otherwise be handled by both canvases. `render()` therefore enables input for exactly one canvas per frame — the minimap if the mouse is over the minimap region, the primary otherwise — and only when an ImGui panel isn't capturing the mouse (`WantCaptureMouse`). Each function still draws unconditionally; it just skips hover/click handling when `input_enabled` is false.
+
+Because scale and element sizes are derived from `size` at draw time, the same function renders correctly at both primary and minimap dimensions.
 
 ---
 
