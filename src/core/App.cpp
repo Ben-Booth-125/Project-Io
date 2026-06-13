@@ -6,10 +6,14 @@
 #include <SDL3/SDL.h>
 
 #include "ui/body_surface_canvas.hpp"
+#include "ui/explorer_panel.hpp"
+#include "ui/header_panel.hpp"
 #include "ui/nav_pane.hpp"
+#include "ui/profile_panel.hpp"
 #include "ui/solar_system_canvas.hpp"
 #include "ui/tile_inspector.hpp"
 #include "world/hard_coded_world.hpp"
+#include "world/orbital_system.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -61,14 +65,25 @@ int app::run()
 
     m_world = make_hard_coded_world();
 
-    // Default the surface canvas to the lowest-id body so it has something to
-    // show before the player clicks anything.
+    // Default the surface canvas to a body that has authored tiles, so it shows
+    // a populated surface before the player clicks anything. Many bodies are
+    // backdrop-only (no tiles); prefer the lowest-id tiled body, falling back to
+    // the lowest-id body of any kind.
     if (!m_world.bodies.empty())
     {
-        entity_id first = m_world.bodies.begin()->first;
+        entity_id fallback = m_world.bodies.begin()->first;
+        entity_id tiled    = null_entity;
         for (const auto& [id, _] : m_world.bodies)
-            first = std::min(first, id);
-        m_ui.active_body = first;
+        {
+            fallback = std::min(fallback, id);
+
+            const bool has_tiles = std::any_of(
+                m_world.tiles.begin(), m_world.tiles.end(),
+                [id](const auto& kv) { return kv.second.body == id; });
+            if (has_tiles && (tiled == null_entity || id < tiled))
+                tiled = id;
+        }
+        m_ui.active_body = (tiled != null_entity) ? tiled : fallback;
     }
 
     bool running = true;
@@ -76,6 +91,13 @@ int app::run()
     {
         process_events(running);
         m_sim_loop.tick();
+
+        // Advance orbital motion by the in-game days elapsed this frame. Freezes
+        // automatically while paused, since elapsed_days() stops advancing.
+        const double now_days = m_sim_loop.elapsed_days();
+        advance_orbits(m_world, now_days - m_last_orbit_days);
+        m_last_orbit_days = now_days;
+
         render();
     }
     return 0;
@@ -212,8 +234,30 @@ void app::render()
         ImGui::End();
     }
 
-    // Left navigation pane and the menus it opens.
-    ui::draw_nav_pane(m_ui);
+    // Corporation profile — top-left corner, above the navigation pane.
+    ui::draw_profile_panel();
+
+    // Budget + resource header — spans the top between the profile and the
+    // time column, clear of both.
+    {
+        const float header_left  = ui::nav_pane_width;
+        const float header_right = (disp.x - margin - tick_w) - margin;
+        ui::draw_header_panel(header_left, header_right);
+    }
+
+    // Explorer — right edge, between the time column and the minimap.
+    {
+        const float ctrl_h        = mm_h / 3.0f;
+        const float column_bottom = margin + tick_h + 4.0f + ctrl_h;
+        const float exp_x         = mm_origin.x;
+        const float exp_y         = column_bottom + margin;
+        const float exp_w         = mm_w;
+        const float exp_h         = (mm_origin.y - margin) - exp_y;
+        ui::draw_explorer_panel(exp_x, exp_y, exp_w, exp_h);
+    }
+
+    // Left navigation pane and the menus it opens. Starts below the profile.
+    ui::draw_nav_pane(m_ui, ui::profile_panel_height);
     ui::draw_tile_inspector(m_world, &m_ui.show_tile_ledger);
 
     ImGui::Render();

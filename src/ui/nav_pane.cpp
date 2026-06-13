@@ -6,12 +6,12 @@
 
 namespace ui {
 
-void draw_nav_pane(ui_state& state)
+void draw_nav_pane(ui_state& state, float top_offset)
 {
     const ImVec2 disp = ImGui::GetIO().DisplaySize;
 
-    ImGui::SetNextWindowPos({0.0f, 0.0f});
-    ImGui::SetNextWindowSize({nav_pane_width, disp.y});
+    ImGui::SetNextWindowPos({0.0f, top_offset});
+    ImGui::SetNextWindowSize({nav_pane_width, disp.y - top_offset});
 
     constexpr ImGuiWindowFlags flags =
         ImGuiWindowFlags_NoTitleBar          |

@@ -32,6 +32,11 @@ void sim_loop::tick()
     const double step_ms = (seconds_per_day_1x * 1000.0)
                          / (sim_ticks_per_day * m_speed);
 
+    // Continuous day counter for smooth visual motion. One day passes every
+    // seconds_per_day_1x / speed real seconds, so days advance by delta scaled
+    // accordingly. Decoupled from the discrete sim-step accumulator below.
+    m_elapsed_days += (delta * m_speed) / (seconds_per_day_1x * 1000.0);
+
     m_accum_ms += delta;
 
     // Clamp to avoid a spiral of death when a frame hitch lets the accumulator

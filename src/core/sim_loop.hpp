@@ -50,6 +50,12 @@ public:
     /// Economy ticks (quarters) elapsed since construction.
     uint64_t econ_tick() const { return m_econ_tick; }
 
+    /// Continuous in-game days elapsed since construction, including the
+    /// fractional part of the current day. Advances smoothly with wall-clock
+    /// time (scaled by speed) and freezes while paused — drives visual orbital
+    /// motion, which wants finer resolution than the discrete day counter.
+    double elapsed_days() const { return m_elapsed_days; }
+
 private:
     void on_sim_step();
 
@@ -62,4 +68,5 @@ private:
     uint64_t m_sim_tick  = 0;
     uint64_t m_day_tick  = 0;
     uint64_t m_econ_tick = 0;
+    double   m_elapsed_days = 0.0; ///< Continuous in-game days; smooth, advanced in tick().
 };

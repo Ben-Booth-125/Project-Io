@@ -4,6 +4,34 @@ Entries are newest-first. Each entry covers one development session and records 
 
 ---
 
+## 2026-06-13 — UI shell placeholders, orbital motion, and canvas pan/zoom
+
+**Status:** Complete. Canvas refinement continues; asteroid belt (as a ring) and the parked UI items remain open — see `docs/development/TODO.md`.
+
+### What was built
+
+- **UI shell docs** — expanded `docs/ui/LAYOUT.md` with profile, header, explorer, minimap, and a UI-popup note, each linking its own spec. New stub specs: `PROFILE.md`, `HEADER.md`, `EXPLORER.md`, `MENU.md`, `MINIMAP.md`, `TIME_CONTROLS.md`. Gated behind LAYOUT.md (not added to the CLAUDE.md authoritative set, by request).
+- **Placeholder panels** — `src/ui/profile_panel`, `header_panel`, `explorer_panel`: fixed ImGui panels matching the `nav_pane` style. Profile (top-left, portrait + name placeholder), header (budget + scarce resource strip, zeroed), explorer (empty pin list). `nav_pane` gained a `top_offset` so it sits below the profile. Wired into `app::render()`.
+- **Orbital motion** — `body_component` gained `parent`, `orbital_angular_velocity_rad_per_day`. New `src/world/orbital_system`: `advance_orbits` (advances angles by elapsed days, freezes when paused) and `kepler_angular_velocity` (speed from radius via Kepler's third law). `sim_loop` exposes continuous `elapsed_days()`; the app loop advances orbits per-frame.
+- **Sol-approximation world** — `hard_coded_world.cpp` rebuilt to ~6 planets (Cinder/Veld/**Kepler**/Ochre/Bastion/Halo, real-AU spacing), 4 parented moons, and 3 belt asteroids (**Vesta** repurposed from moon → asteroid, keeps its tiles/market). Only Kepler and Vesta carry tiles; the rest are backdrop bodies. Default surface selection now prefers a tiled body.
+- **Canvas pan/zoom + labelling** — Solar System Canvas gained cursor-anchored scroll zoom and middle-drag pan (primary view only; the minimap stays at default framing). Positions/rings scale with zoom; element sizes do not. Star bumped to 1.5x. Planets/asteroids labelled permanently, moons on hover. View state (`solar_zoom`, `solar_pan_x/y`) lives in `ui_state`. Labels track the live body position; a residual shimmer (bitmap-font sub-pixel artifact) is left unfixed and logged in `TODO.md`.
+
+### In-session decisions
+
+**Moons are parented, not flat orbits.** When asked, chose to add a `parent` field so a moon orbits its planet (composed at draw time) and tracks it as it moves, rather than giving moons their own star orbit (which would drift apart under animation). Moon orbital radii are a small *visible* offset, **not** true scale — real moon distances render on top of the planet.
+
+**Label shimmer is a font-rasterization artifact, left as a known bug.** Bodies move smoothly (continuous `elapsed_days`), but text labels shimmer. Root cause: the default ImGui font is a bitmap atlas with no sub-pixel positioning, so glyphs are crisp only at integer coordinates — an anti-aliased body dot reads smooth at any fraction, but text at the same fractional coordinate shimmers as the fraction changes each frame. Two attempts were explored and reverted: (1) sampling the label position once per sim tick — wrong, it made the label hold still then hop to catch the still-moving body, a positional jump amplified by zoom (the `sim_tick` canvas parameter added for this was removed); (2) rounding the label's screen coordinate to whole pixels — crisp but it made the label step 1px at a time. Final state: the label draws at its live fractional position (fluid motion, residual shimmer). The durable fix is font oversampling / sub-pixel rendering; deferred and logged under *Known bugs* in `TODO.md`.
+
+**Pan/zoom on the solar canvas only.** The Body Surface Canvas keeps "no pan/zoom" (deferred until large procedural bodies exist). Zoom keeps element sizes constant per the request — only framing changes.
+
+**Ledgers start closed (policy).** Codified in `MENU.md` and `LAYOUT.md`: every ledger defaults closed on a fresh session; `show_tile_ledger` now defaults `false`. New ledgers must follow.
+
+**Asteroid belt deferred.** Intended as a single thick, translucent textured *ring* (not orbiting body dots) with ~3 notable asteroids that remain selectable bodies; the belt itself is not a body. Recorded in `TODO.md`; current three asteroids are placeholders.
+
+**Header currency placeholder.** Used `Cr` (credits) rather than a currency glyph — ImGui's default font has no `₡`/symbol coverage beyond ASCII.
+
+---
+
 ## 2026-06-13 — Layer 2: Primary canvases
 
 **Status:** Complete. Canvas visual refinement and Layer 3 (extraction and production) are next.

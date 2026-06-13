@@ -44,13 +44,13 @@ Economic and military data (supply routes, faction presence, convoy paths) are a
 | Element | Description |
 |---|---|
 | Background | Near-black: `(8, 10, 20)` |
-| Star | Filled circle at canvas centre. Radius: ~12 px at full size. Colour: `(255, 220, 80)`. No label needed. |
+| Star | Filled circle at the system centre. Radius: ~18 px at full size (1.5x the planet reference). Colour: `(255, 220, 80)`. No label needed. |
 | Orbital rings | Thin circle at each body's `orbital_radius_au` distance. Colour: `(38, 42, 52)` — barely visible, structural only. |
 | Body (planet) | Filled circle, radius 7 px. Colour: `(80, 120, 180)` blue-grey. |
 | Body (moon) | Filled circle, radius 5 px. Colour: `(148, 145, 140)` grey. |
 | Body (asteroid) | Filled circle, radius 4 px. Colour: `(140, 110, 80)` brown. |
 | Body (station) | Filled circle, radius 4 px. Colour: `(80, 180, 160)` teal. |
-| Body label | Body name in small ImGui default font, drawn just below the body circle. Colour: white. |
+| Body label | Body name in small ImGui default font, drawn just below the body circle. Colour: white. **Planets and asteroids are labelled permanently; moons are labelled only while hovered**, to keep the crowded inner system readable. The label tracks the live body position every frame. Known issue: it shimmers slightly while moving because the default ImGui font is a bitmap atlas with no sub-pixel positioning — see the *Known bugs* note in `docs/development/TODO.md`. |
 | Selection indicator | Unfilled circle (outline only) drawn around the selected body, 3 px larger than the body radius. Colour: white. |
 | Hover tooltip | Body name, type string, orbital radius in AU. Shown while mouse is over a body circle. |
 
@@ -73,14 +73,17 @@ The y-axis is negated so that angle 0 is to the right and angles increase counte
 - **Left-click** a body circle: set `active_body` and make the Body Surface Canvas primary (`surface_is_primary = true`). Unconditional — clicking a body always brings its surface forward.
 - **Click empty space in the minimap** (when Solar System is minimap): swap the Solar System Canvas to primary.
 - Input is only processed for the canvas the mouse is over (see Implementation approach); an ImGui panel under the cursor takes precedence over both canvases.
-- No pan or zoom in the prototype. Auto-fit always shows all bodies.
+- **Pan and zoom (primary view only).** Scroll wheel zooms, anchored at the cursor so the point under the mouse stays fixed; the middle mouse button pans. Positions and orbital rings scale with zoom, but element sizes (body/star radii, labels, selection outlines) stay the same pixel size. The default framing (zoom 1, no pan) is the auto-fit that shows all bodies. The **minimap always renders the default framing** — pan/zoom apply only when the canvas holds the primary slot. View state (`solar_zoom`, `solar_pan_x/y`) lives in `ui_state`.
 
-### `body_component` addition
+### Orbital motion
 
-Add `orbital_angle_rad` (float) to `body_component`. This is an authored value set during world construction — not procedurally generated. Hard-coded values for the prototype bodies:
+Bodies orbit continuously. Each `body_component` carries an `orbital_angular_velocity_rad_per_day`; `advance_orbits` (see `src/world/orbital_system.hpp`) advances `orbital_angle_rad` each frame by the in-game days elapsed, freezing while the simulation is paused. Star-orbiting bodies derive a plausible speed from their radius via Kepler's third law (`kepler_angular_velocity`), so inner bodies sweep faster than outer ones; moons author their own speed.
 
-- Kepler: `1.05` rad (~60°) — upper-right of the disc
-- Vesta: `3.93` rad (~225°) — lower-left of the disc
+### `body_component` orbital fields
+
+- `orbital_angle_rad` (float) — current angular position; the authored value is the phase at world construction, advanced over time by orbital motion. y is negated at draw so angle 0 points right and increases CCW.
+- `orbital_angular_velocity_rad_per_day` (float) — angular speed; 0 = stationary.
+- `parent` (entity_id) — the body this one orbits; `null_entity` means it orbits the star directly. **Moons set `parent` to their planet** and are composed at draw time (`parent position + own orbit`) so they track the planet as it moves. `orbital_radius_au` / `orbital_angle_rad` are then relative to the parent. Moon orbital radii are *not* true scale — real moon distances would render on top of the planet — they use a small visible offset.
 
 ---
 
@@ -180,5 +183,5 @@ Because scale and element sizes are derived from `size` at draw time, the same f
 | Faction colour coding on bodies | Post-prototype (diplomacy) |
 | Convoy entities in transit on Solar System Canvas | Layer 5 |
 | Resource deposit overlay / lens mode | Deferred indefinitely — terrain colour is sufficient for prototype |
-| Camera pan and zoom | Deferred until procedural generation produces large bodies |
+| Camera pan and zoom on the **Body Surface Canvas** | Deferred until procedural generation produces large bodies (the Solar System Canvas already has pan/zoom) |
 | Tile inspector ledger redesign (exploration system) | Post-prototype |

@@ -38,4 +38,6 @@ private:
     ui_state  m_ui;
 
     bool m_capture_requested = false; ///< Set by F12, consumed in render().
+
+    double m_last_orbit_days = 0.0; ///< elapsed_days at the previous orbit advance; gives the per-frame delta.
 };

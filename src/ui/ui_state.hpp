@@ -14,5 +14,13 @@ struct ui_state
     bool      surface_is_primary = false; ///< false = Solar System Canvas is primary, Body Surface is the minimap.
 
     // --- navigation pane state ---
-    bool show_tile_ledger = true; ///< Whether the Tile Ledger window is open. Toggled by the nav pane tab and the window's close button.
+    // Policy: all ledgers start closed. The player opens them deliberately from
+    // the navigation pane; none are shown on a fresh session.
+    bool show_tile_ledger = false; ///< Whether the Tile Ledger window is open. Toggled by the nav pane tab and the window's close button.
+
+    // --- solar system canvas view (primary only; the minimap always shows the
+    // default framing) ---
+    float solar_zoom  = 1.0f; ///< Scroll-wheel zoom factor. 1.0 = default auto-fit framing.
+    float solar_pan_x = 0.0f; ///< Pan offset of the system centre from the canvas centre, screen px.
+    float solar_pan_y = 0.0f; ///< Pan offset of the system centre from the canvas centre, screen px.
 };
