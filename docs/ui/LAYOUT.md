@@ -1,6 +1,6 @@
 # Project Io — UI Layout
 
-Surface-level description of the application **shell** — the persistent chrome arranged around the two canvases. This document covers *where things sit and what they are for*, not their internals. Each region below links to its own detailed specification where one exists. For the canvases themselves see **`CANVASES.md`**; for the tick model see `src/core/sim_loop.hpp`.
+Surface-level description of the application **shell** — the persistent chrome arranged around the canvases. This document covers *where things sit and what they are for*, not their internals. Each region below links to its own detailed specification where one exists. For the canvases themselves see **`CANVASES.md`**; for the tick model see `src/core/sim_loop.hpp`.
 
 The prototype UI is built with Dear ImGui (see TECH_FOUNDATIONS). Everything here is a debugging-grade layout that doubles as the functional specification for the eventual production shell — it is expected to be revised.
 
@@ -15,7 +15,7 @@ The prototype UI is built with Dear ImGui (see TECH_FOUNDATIONS). Everything her
 │          ├────────────────────────────────────┤ Speed controls│
 │   Nav    │                                     │              │
 │   pane   │         Primary canvas              │              │
-│          │      (Solar System or Surface)      ├──────────────┤
+│          │  (Solar / Circumplanetary / Surface)├──────────────┤
 │  1.      │                                     │   Explorer   │
 │  ...     │     [ floating ledger windows ]     │  (pinned     │
 │  8. Tile │                                     │   shortcuts) │
@@ -74,7 +74,7 @@ A fixed, full-height column pinned to the left edge (`nav_pane_width`, currently
 ## Canvas area — centre
 **Spec: `CANVASES.md`**
 
-The two canvases share the window. One is **primary** (fills the window) and the other is the **minimap** (a fixed inset, bottom-right). Clicking the minimap, or clicking a body in the Solar System Canvas, swaps which is primary. Full detail — visual language, coordinate mapping, interaction, and the primary/minimap swap rules — lives in **`CANVASES.md`**.
+Three canvases — Solar, Circumplanetary, Planetary — form a **zoom ladder** and share the window. One is **primary** (fills the window) and the rung one step *out* from it is shown in the **minimap** (a fixed inset, bottom-right). The player **descends** (zooms in) by clicking a body in the primary canvas and **ascends** (zooms out) by clicking the minimap. Full detail — visual language, coordinate mapping, interaction, and the ladder navigation rules — lives in **`CANVASES.md`**.
 
 The canvases render behind the foreground panels, so the chrome currently occludes the edges of the primary canvas. Insetting the primary region clear of the chrome is a known follow-up.
 
@@ -83,7 +83,7 @@ The canvases render behind the foreground panels, so the chrome currently occlud
 ## Minimap — bottom-right inset
 **Spec: `MINIMAP.md`**
 
-A fixed inset in the bottom-right corner showing the **inactive** canvas at reduced scale. Clicking it swaps primary and minimap. It shares the primary canvases' drawing code, parameterised by region size, so it is documented in depth alongside them in **`CANVASES.md`**; `MINIMAP.md` collects the shell-level behaviour (placement, sizing, swap interaction).
+A fixed inset in the bottom-right corner showing the **zoom-out neighbour** of the primary canvas at reduced scale, framed by its own chrome — a title bar (the viewed body, or the star name; the game name at the top rung) above the inset, and a placeholder mode bar below. Clicking it **ascends** one rung. It shares the primary canvases' drawing code, parameterised by region size. `MINIMAP.md` is the authoritative spec for the minimap chrome and the ladder navigation; `CANVASES.md` covers the shared drawing path.
 
 ---
 
@@ -157,7 +157,10 @@ These are **not implemented next** and have no dedicated spec yet. They are note
 | Profile | `PROFILE.md` |
 | Header | `HEADER.md` |
 | Navigation pane / menus | `MENU.md` |
-| Canvases | `CANVASES.md` |
+| Canvases (overview / ladder) | `CANVASES.md` |
+| Solar canvas | `SOLAR.md` |
+| Circumplanetary canvas | `CIRCUMPLANETARY.md` |
+| Planetary canvas | `PLANETARY.md` |
 | Minimap | `MINIMAP.md` |
 | Time column | `TIME_CONTROLS.md` |
 | Explorer | `EXPLORER.md` |

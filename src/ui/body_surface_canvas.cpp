@@ -86,7 +86,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
 
     dl->AddRectFilled(origin, origin + size, IM_COL32(18, 18, 24, 255));
 
-    const bool  is_minimap = !state.surface_is_primary;
+    // The surface canvas is the bottom rung of the ladder, so it is only ever
+    // drawn as the primary view — never the minimap.
     const float min_dim    = std::min(size.x, size.y);
     const bool  draw_title = min_dim > 320.0f;
 
@@ -99,8 +100,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
             const ImVec2 ts = ImGui::CalcTextSize(msg);
             dl->AddText(origin + (size - ts) * 0.5f, IM_COL32(150, 150, 150, 255), msg);
         }
-        if (input_enabled && is_minimap && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-            state.surface_is_primary = true;
         return;
     }
 
@@ -141,14 +140,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
     const float grid_cy  = static_cast<float>(gh - 1) * row_step * 0.5f;
 
     // --- View transform (pan/zoom) ---
-    // Both primary and minimap share the same zoom level so they stay in sync.
-    // Pan applies only when primary — the minimap centres on the grid midpoint.
-    const bool   apply_view  = !is_minimap;
+    // The surface canvas is always primary, so pan and zoom always apply.
     const float  zoom        = std::max(0.1f, state.planetary_zoom);
-    const ImVec2 view_origin = apply_view
-        ? ImVec2{ canvas_centre.x + state.planetary_pan_x,
-                  canvas_centre.y + state.planetary_pan_y }
-        : canvas_centre;
+    const ImVec2 view_origin = ImVec2{ canvas_centre.x + state.planetary_pan_x,
+                                       canvas_centre.y + state.planetary_pan_y };
 
     // Local world space → screen space.
     auto to_screen = [&](ImVec2 lp) -> ImVec2 {
@@ -251,18 +246,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
         ImGui::EndTooltip();
     }
 
-    // Click handling.
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-    {
-        if (is_minimap)
-            state.surface_is_primary = true;
-        if (hovered_tile != null_entity)
-            state.active_tile = hovered_tile;
-    }
+    // Click handling — select the hovered tile. The surface is the bottom rung,
+    // so a tile click never changes the view; the player ascends via the minimap.
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && hovered_tile != null_entity)
+        state.active_tile = hovered_tile;
 
-    // Pan and zoom — primary view only. Middle mouse button pans; scroll wheel
-    // zooms, anchored at the cursor so the point under the mouse stays fixed.
-    if (apply_view)
+    // Pan and zoom. Middle mouse button pans; scroll wheel zooms, anchored at
+    // the cursor so the point under the mouse stays fixed.
     {
         ImGuiIO& io = ImGui::GetIO();
 

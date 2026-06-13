@@ -40,6 +40,7 @@ enum class body_type : uint8_t
     moon     = 1,
     asteroid = 2,
     station  = 3,
+    star     = 4, ///< The system's central star. Sits at the centre, stationary; has no surface.
 };
 
 /// Type of surface installation.

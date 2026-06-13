@@ -24,6 +24,14 @@ struct world
     /// yet — the ID alone is sufficient until the budget layer is reached.
     entity_id player_entity = null_entity;
 
+    /// The system's central star (a body entity of type body_type::star). Drawn
+    /// at the Solar canvas centre; its name titles the minimap when the Solar
+    /// canvas is shown there.
+    entity_id star_body = null_entity;
+
+    /// The corporation's home planet. The game opens on this body's surface.
+    entity_id home_body = null_entity;
+
     // --- component stores ---
     std::unordered_map<entity_id, body_component>      bodies;
     std::unordered_map<entity_id, tile_component>      tiles;

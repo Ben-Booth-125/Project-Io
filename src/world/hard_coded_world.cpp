@@ -294,6 +294,22 @@ world make_hard_coded_world()
     // System layout — a loose approximation of Sol.
     // -----------------------------------------------------------------------
 
+    // Helios — the central star. A stationary body at the system centre with no
+    // surface; its name titles the Solar minimap. Drawn through the same body
+    // pass as every other body (with a star style), so it needs no special case.
+    const entity_id helios = w.create_entity();
+    w.bodies[helios] = body_component{
+        .name                                 = "Helios",
+        .type                                 = body_type::star,
+        .parent                               = null_entity,
+        .orbital_radius_au                    = 0.0f,
+        .orbital_angle_rad                    = 0.0f,
+        .orbital_angular_velocity_rad_per_day = 0.0f,
+        .grid_width                           = 0,
+        .grid_height                          = 0,
+    };
+    w.star_body = helios;
+
     // -----------------------------------------------------------------------
     // Cinder — hot inner planet (Mercury analogue, 0.39 AU)
     // 36×186 tile grid. Mostly volcanic and barren; ~60% water.
@@ -335,6 +351,9 @@ world make_hard_coded_world()
         .grid_width                           = 174,
         .grid_height                          = 42,
     };
+
+    // Kepler is the corporation's home planet — the game opens on its surface.
+    w.home_body = kepler;
 
     auto kepler_tiles = generate_body_tiles(w, kepler, 174, 42, 0.60f,
         std::vector<land_tier>{ {terrain_type::barren, 40}, {terrain_type::rocky, 35},

@@ -19,13 +19,17 @@ namespace ui {
 /// region for the minimap.
 ///
 /// @param w             Read-only world state.
-/// @param state         Shared UI state; mutated on body click, minimap swap,
-///                      and (when primary) scroll-zoom / middle-drag pan.
+/// @param state         Shared UI state; mutated on body click (descend),
+///                      minimap click (ascend), and (when primary) scroll-zoom /
+///                      middle-drag pan.
 /// @param origin        Top-left of the region, in screen pixels.
 /// @param size          Width and height of the region, in screen pixels.
 /// @param input_enabled When true, hover, click, zoom, and pan are processed.
 ///                      The caller disables input for whichever canvas the
 ///                      mouse is not over.
-void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, ImVec2 size, bool input_enabled);
+/// @param is_minimap    True when this canvas is rendered as the minimap inset
+///                      (the Circumplanetary screen is primary). A click then
+///                      ascends to the Solar view rather than descending.
+void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, ImVec2 size, bool input_enabled, bool is_minimap);
 
 } // namespace ui

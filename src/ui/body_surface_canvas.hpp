@@ -12,15 +12,14 @@ namespace ui {
 ///
 /// A pointy-top hex grid for state.active_body: each tile is a coloured
 /// hexagon keyed to its terrain, buildings are marked with a small square,
-/// and hovering a tile shows its full data. When primary, the player can pan
-/// (middle mouse) and zoom (scroll wheel). The minimap always shows the full
-/// auto-fit framing.
+/// and hovering a tile shows its full data. The player can pan (middle mouse)
+/// and zoom (scroll wheel).
 ///
-/// The same function renders both the primary viewport and the inset minimap;
-/// all sizes are derived from @p size.
+/// This is the bottom rung of the canvas ladder, so it is only ever drawn as
+/// the primary viewport — never the minimap. All sizes are derived from @p size.
 ///
 /// @param w             Read-only world state.
-/// @param state         Shared UI state; mutated on tile click, minimap swap, and pan/zoom.
+/// @param state         Shared UI state; mutated on tile click and pan/zoom.
 /// @param origin        Top-left of the region, in screen pixels.
 /// @param size          Width and height of the region, in screen pixels.
 /// @param input_enabled When true, hover and click are processed. The caller

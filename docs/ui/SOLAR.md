@@ -1,12 +1,22 @@
 # Project Io — Solar Screen
 
-The Solar screen is the top-down 2D view of the solar system. See [CANVASES.md](CANVASES.md) for layout rules shared with the Planetary screen (primary/minimap swap, region sizing, shared selection state, implementation approach).
+The Solar screen is the top-down 2D view of the solar system — the **top rung**
+of the canvas ladder. See [CANVASES.md](CANVASES.md) for layout rules shared
+across the three canvases (the zoom ladder, context minimap, region sizing,
+shared selection state, implementation approach).
 
 ---
 
 ## What the user sees
 
 The star sits at the centre. Each body orbits it at a position derived from `orbital_radius_au` and `orbital_angle_rad`. Orbital rings mark each body's distance from the star. Bodies are labelled.
+
+The **star is a body entity** (`body_type::star`) at the system centre
+(`orbital_radius_au = 0`, no parent, stationary) — not a hard-coded circle. It
+carries a `name`, which the canvas labels and which the minimap shows as its
+title when the Solar screen is the minimap (see `MINIMAP.md`). The star is drawn
+through the same body-draw pass as every other body, with a star style (large,
+yellow). It has no Circumplanetary view, so clicking it does nothing.
 
 At Layer 2, this canvas communicates:
 
@@ -23,7 +33,7 @@ Economic and military data (supply routes, faction presence, convoy paths) are a
 | Element | Description |
 |---|---|
 | Background | Near-black: `(8, 10, 20)` |
-| Star | Filled circle at the system centre. Radius: ~18 px at full size (1.5× the planet reference). Colour: `(255, 220, 80)`. No label needed. |
+| Star | Filled circle at the system centre, drawn from the star body entity. Radius: ~18 px at full size (1.5× the planet reference). Colour: `(255, 220, 80)`. Labelled with the star name. |
 | Orbital rings | Thin circle at each body's `orbital_radius_au` distance. Colour: `(38, 42, 52)` — barely visible, structural only. |
 | Body (planet) | Filled circle, radius 7 px. Colour: `(80, 120, 180)` blue-grey. |
 | Body (moon) | Filled circle, radius 5 px. Colour: `(148, 145, 140)` grey. |
@@ -53,9 +63,9 @@ The y-axis is negated so that angle 0 is to the right and angles increase counte
 ## Interaction
 
 - **Hover** a body circle: show tooltip.
-- **Left-click** a body circle: set `active_body`. The Planetary screen minimap updates immediately to show the selected body's surface. The canvas does **not** switch to planetary view — the Solar screen stays primary. The player navigates to the Planetary view by clicking the minimap.
-- **Click empty space in the minimap** (when Solar screen is minimap): swap to primary.
-- Input is only processed for the canvas the mouse is over; an ImGui panel under the cursor takes precedence over both canvases.
+- **Left-click a body — descend (zoom in).** When the Solar screen is primary, clicking a body sets `active_body` and drills the primary down one rung to that body's **Circumplanetary** view. Clicking a **planet** opens the planet's view; clicking a **moon** opens its **parent planet's** view with the moon selected. Clicking the **star** does nothing (it has no Circumplanetary view).
+- **Click the Solar minimap — ascend.** When the Solar screen is the minimap (i.e. the Circumplanetary screen is primary), any click promotes the Solar screen back to primary.
+- Input is only processed for the canvas the mouse is over; an ImGui panel under the cursor takes precedence over the canvases.
 - **Pan and zoom (primary view only).** Scroll wheel zooms, anchored at the cursor so the point under the mouse stays fixed; the middle mouse button pans. Positions and orbital rings scale with zoom, but element sizes (body/star radii, labels, selection outlines) stay the same pixel size. The default framing (zoom 1, no pan) is the auto-fit that shows all bodies. The **minimap always renders the default framing** — pan/zoom apply only when the canvas holds the primary slot. View state (`solar_zoom`, `solar_pan_x/y`) lives in `ui_state`.
 
 ---

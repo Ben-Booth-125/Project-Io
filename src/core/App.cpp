@@ -6,6 +6,7 @@
 #include <SDL3/SDL.h>
 
 #include "ui/body_surface_canvas.hpp"
+#include "ui/circumplanetary_canvas.hpp"
 #include "ui/explorer_panel.hpp"
 #include "ui/header_panel.hpp"
 #include "ui/nav_pane.hpp"
@@ -76,11 +77,13 @@ int app::run()
             m_ui.solar_zoom = max_radius_au / 5.0f;
     }
 
-    // Default the surface canvas to a body that has authored tiles, so it shows
-    // a populated surface before the player clicks anything. Many bodies are
-    // backdrop-only (no tiles); prefer the lowest-id tiled body, falling back to
-    // the lowest-id body of any kind.
-    if (!m_world.bodies.empty())
+    // Open on the corporation's home planet (its surface). Fall back to the
+    // lowest-id tiled body, then any body, if no home is set.
+    if (m_world.home_body != null_entity)
+    {
+        m_ui.active_body = m_world.home_body;
+    }
+    else if (!m_world.bodies.empty())
     {
         entity_id fallback = m_world.bodies.begin()->first;
         entity_id tiled    = null_entity;
@@ -96,6 +99,9 @@ int app::run()
         }
         m_ui.active_body = (tiled != null_entity) ? tiled : fallback;
     }
+
+    // The game opens looking at the home planet's surface — the bottom rung.
+    m_ui.primary_level = canvas_level::planetary;
 
     bool running = true;
     while (running)
@@ -141,38 +147,86 @@ void app::render()
     const float  mm_w   = std::max(240.0f, 0.20f * std::min(disp.x, disp.y));
     const float  mm_h   = mm_w * 0.75f; // keep the 4:3 ratio of the 240x180 default
     const ImVec2 mm_origin = {disp.x - margin - mm_w, disp.y - margin - mm_h};
-    const ImVec2 mm_size   = {mm_w, mm_h};
 
-    // --- Primary canvases (Layer 2) ---
-    // The active canvas fills the window; the inactive one is a fixed inset in
-    // the bottom-right corner. Both draw to the ImGui background draw list, so
-    // the debug panels below render on top of them.
+    // --- Primary canvases (Layer 2) — the zoom ladder ---
+    // The primary rung fills the window; the rung one step *out* renders in the
+    // minimap inset (bottom-right), framed by chrome (title bar + mode bar).
+    // Both draw to the ImGui background draw list, so the panels below render on
+    // top. See CANVASES.md / MINIMAP.md.
     {
-        // Route input to whichever region the mouse is over; an ImGui panel
-        // under the cursor (WantCaptureMouse) takes precedence over both.
+        // Minimap chrome reserves a title bar above the inset and a placeholder
+        // mode bar below; the neighbouring canvas occupies the space between.
+        const float  title_h      = ImGui::GetTextLineHeight() + 6.0f;
+        const float  mode_h       = 10.0f;
+        const ImVec2 inset_origin = { mm_origin.x, mm_origin.y + title_h };
+        const ImVec2 inset_size   = { mm_w, mm_h - title_h - mode_h };
+
+        // Route input: the whole minimap box blocks the primary behind it; only
+        // the inset canvas receives minimap input. An ImGui panel under the
+        // cursor (WantCaptureMouse) takes precedence over both.
         const ImVec2 mp = io.MousePos;
         const bool mouse_in_mm =
             mp.x >= mm_origin.x && mp.x <= mm_origin.x + mm_w &&
             mp.y >= mm_origin.y && mp.y <= mm_origin.y + mm_h;
+        const bool mouse_in_inset =
+            mp.x >= inset_origin.x && mp.x <= inset_origin.x + inset_size.x &&
+            mp.y >= inset_origin.y && mp.y <= inset_origin.y + inset_size.y;
         const bool panel_blocking = io.WantCaptureMouse;
-        const bool primary_input = !mouse_in_mm && !panel_blocking;
-        const bool minimap_input = mouse_in_mm && !panel_blocking;
+        const bool primary_input  = !mouse_in_mm && !panel_blocking;
+        const bool minimap_input  = mouse_in_inset && !panel_blocking;
 
-        // Draw the primary canvas first, then the minimap on top of it.
-        if (!m_ui.surface_is_primary)
+        // Draw the primary rung full-window, then the zoom-out neighbour into the
+        // inset. The minimap title names what the inset shows.
+        const char* mm_title = "Project Io";
+        switch (m_ui.primary_level)
         {
-            ui::draw_solar_system_canvas(m_world, m_ui, {0.0f, 0.0f}, disp, primary_input);
-            ui::draw_body_surface_canvas(m_world, m_ui, mm_origin, mm_size, minimap_input);
-        }
-        else
-        {
-            ui::draw_body_surface_canvas(m_world, m_ui, {0.0f, 0.0f}, disp, primary_input);
-            ui::draw_solar_system_canvas(m_world, m_ui, mm_origin, mm_size, minimap_input);
+            case canvas_level::solar:
+                ui::draw_solar_system_canvas(m_world, m_ui, {0.0f, 0.0f}, disp, primary_input, false);
+                // No rung above solar — the minimap is game branding (game name).
+                break;
+
+            case canvas_level::circumplanetary:
+                ui::draw_circumplanetary_canvas(m_world, m_ui, {0.0f, 0.0f}, disp, primary_input, false);
+                ui::draw_solar_system_canvas(m_world, m_ui, inset_origin, inset_size, minimap_input, true);
+                if (m_world.star_body != null_entity && m_world.bodies.count(m_world.star_body))
+                    mm_title = m_world.bodies.at(m_world.star_body).name.c_str();
+                break;
+
+            case canvas_level::planetary:
+                ui::draw_body_surface_canvas(m_world, m_ui, {0.0f, 0.0f}, disp, primary_input);
+                ui::draw_circumplanetary_canvas(m_world, m_ui, inset_origin, inset_size, minimap_input, true);
+                {
+                    const entity_id anchor = ui::circumplanetary_anchor(m_world, m_ui.active_body);
+                    if (anchor != null_entity && m_world.bodies.count(anchor))
+                        mm_title = m_world.bodies.at(anchor).name.c_str();
+                }
+                break;
         }
 
-        // A thin border marks the minimap region.
-        ImGui::GetBackgroundDrawList()->AddRect(
-            mm_origin, {mm_origin.x + mm_w, mm_origin.y + mm_h}, IM_COL32(90, 95, 110, 255));
+        // --- Minimap chrome, drawn on top of the inset ---
+        ImDrawList* bdl = ImGui::GetBackgroundDrawList();
+
+        // At the top rung the inset has no canvas — fill it as a dark branding
+        // placeholder so the full-window solar canvas does not show through.
+        if (m_ui.primary_level == canvas_level::solar)
+            bdl->AddRectFilled(inset_origin,
+                               {inset_origin.x + inset_size.x, inset_origin.y + inset_size.y},
+                               IM_COL32(8, 10, 20, 255));
+
+        // Title bar.
+        bdl->AddRectFilled(mm_origin, {mm_origin.x + mm_w, mm_origin.y + title_h}, IM_COL32(28, 30, 40, 255));
+        bdl->AddText({mm_origin.x + 5.0f, mm_origin.y + 3.0f}, IM_COL32(220, 225, 235, 255), mm_title);
+
+        // Mode bar — reserved placeholder for alternative minimap modes. Three
+        // dim dots hint at the future affordance.
+        const float mb_y = mm_origin.y + mm_h - mode_h;
+        bdl->AddRectFilled({mm_origin.x, mb_y}, {mm_origin.x + mm_w, mm_origin.y + mm_h}, IM_COL32(20, 22, 30, 255));
+        for (int i = 0; i < 3; ++i)
+            bdl->AddCircleFilled({mm_origin.x + mm_w * 0.5f + static_cast<float>(i - 1) * 8.0f, mb_y + mode_h * 0.5f},
+                                 1.5f, IM_COL32(70, 75, 90, 255));
+
+        // Border around the whole minimap box.
+        bdl->AddRect(mm_origin, {mm_origin.x + mm_w, mm_origin.y + mm_h}, IM_COL32(90, 95, 110, 255));
     }
 
     // System tick — a permanent, fixed readout pinned to the top-right corner.
@@ -194,8 +248,8 @@ void app::render()
             ImGuiWindowFlags_NoBringToFrontOnFocus |
             ImGuiWindowFlags_NoSavedSettings;
         ImGui::Begin("##system_tick", nullptr, tick_flags);
-        ImGui::Text("Day   %llu", m_sim_loop.day_tick());
-        ImGui::Text("Q     %llu", m_sim_loop.econ_tick());
+        ImGui::Text("Day      %llu", m_sim_loop.day_tick());
+        ImGui::Text("Quarter  %llu", m_sim_loop.econ_tick());
         ImGui::End();
     }
 
@@ -223,7 +277,8 @@ void app::render()
             ImGui::TextDisabled("(%dx)", m_sim_loop.speed());
 
         // Pause plus 1x..5x. The active speed is highlighted.
-        const char* labels[] = {"II", "1", "2", "3", "4", "5"};
+        // Pause label flips to a play symbol when paused so it reflects the toggle state.
+        const char* labels[] = {m_sim_loop.paused() ? ">" : "II", "1", "2", "3", "4", "5"};
         const int   speeds[] = { 0,    1,   2,   3,   4,   5 };
         const int   n        = 6;
         const float spacing  = ImGui::GetStyle().ItemSpacing.x;

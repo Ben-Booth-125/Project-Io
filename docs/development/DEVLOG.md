@@ -4,6 +4,83 @@ Entries are newest-first. Each entry covers one development session and records 
 
 ---
 
+## 2026-06-13 — Canvas zoom ladder + Circumplanetary canvas
+
+**Status:** Complete. The two-canvas binary swap is replaced by a three-rung zoom ladder (Solar → Circumplanetary → Planetary) with click-to-descend / minimap-to-ascend navigation. Builds and runs; the game opens on the home planet's surface.
+
+### What was built
+
+**Circumplanetary canvas (new middle rung).**
+`src/ui/circumplanetary_canvas.{hpp,cpp}` — a top-down view of a single planet (the *anchor*) and its moons: the anchor at centre (enlarged), an orbital ring and dot per moon, selection outline on `active_body`, hover tooltips, and primary-only pan/zoom (`circum_zoom`, `circum_pan_x/y` in `ui_state`). The free function `circumplanetary_anchor(world, active_body)` resolves the anchor — the body itself if it orbits the star, or its parent planet if it is a moon — and is shared with `app::render()` for the minimap title.
+
+**The zoom ladder replaces the binary swap.**
+`ui_state::surface_is_primary` (bool) became `ui_state::primary_level` (`enum class canvas_level { solar, circumplanetary, planetary }`). The minimap is now pure **context**: it shows the rung one step *out* from the primary. Navigation:
+- **Descend** by clicking a body in the primary canvas (Solar→Circumplanetary, Circumplanetary→Planetary). Clicking a moon on the Solar canvas opens its parent's circumplanetary view with the moon selected.
+- **Ascend** by clicking the minimap.
+
+The solar and circumplanetary canvases gained an explicit `bool is_minimap` parameter (their click handling differs between primary and minimap). The body-surface canvas is now only ever primary — its minimap branch and `surface_is_primary` writes were removed.
+
+**Star as a body entity.**
+`body_type::star` added to `components.hpp`. `make_hard_coded_world` creates **Helios** at the system centre (radius 0, stationary) and stores it in `world.star_body`. The solar canvas now draws the star through the normal body pass (new star style: 18 px, yellow) instead of a hard-coded circle, labels it, and excludes it from descend clicks (it has no circumplanetary view). Zero-radius bodies are skipped in the orbital-ring pass.
+
+**Home planet start.**
+`world.home_body` added and set to **Kepler**. `app::run()` opens with `active_body = home_body` and `primary_level = planetary` — the game starts on the home planet's surface, with Kepler's circumplanetary view in the minimap.
+
+**Minimap chrome.**
+`app::render()` now draws a title bar above the inset and a placeholder mode bar (three dim dots) below it, with the inset canvas between. The title names what the minimap shows: the **star name** (primary Circumplanetary), the **planet name** (primary Planetary), or the **game name `Project Io`** at the top rung, where the inset is a dark branding fill (no canvas, non-interactive).
+
+**Docs reconciled to the ladder.**
+`CANVASES.md` rewritten (binary swap → three-rung ladder, context minimap, new `ui_state`/signatures). New `CIRCUMPLANETARY.md`. `SOLAR.md` (body click descends; star is an entity), `PLANETARY.md` (surface is always primary), `LAYOUT.md` (canvas area / minimap / companion list), `MINIMAP.md` (top rung = game name), and `CLAUDE.md` (CANVASES entry) updated.
+
+### In-session decisions
+
+**Minimap is context-only; descend via the primary, not the minimap.**
+Chosen over an up/down tabbed minimap. The minimap always shows the zoom-out neighbour; the player descends by clicking a body in the primary canvas. This keeps the bottom mode bar free for future overlay modes rather than spending it on level navigation.
+
+**Star as an entity, not a `world.star_name` string.**
+Keeps the star uniform with every other body (name, position, style, future selectability) at the cost of a new enum value and a skip in the ring pass. Name "Helios" is a placeholder, consistent with the original body names.
+
+**Open:** the mode bar has no function yet (placeholder); the ladder navigation was verified by screenshot (opens on Kepler surface, minimap shows Kepler + Selene), not yet by interactive click-through of every rung.
+
+---
+
+## 2026-06-13 — TODO triage and UI shell polish
+
+**Status:** Complete. Cleared the difficulty-1/2 TODO items; the asteroid-belt ring (difficulty 4) and the two deferred items (label shimmer, menu definition) remain.
+
+### What was built
+
+**TODO difficulty ratings.**
+`docs/development/TODO.md` was annotated with a 1–6 difficulty scale (1 trivial → 5 very hard, 6 deferred). The four easiest items were implemented this session and removed from the list.
+
+**Pause as a toggle.**
+The time-controls pause button (`App.cpp`) now toggles. `app` gained `m_prev_speed`: pressing pause stores the current speed and sets speed 0; pressing it again restores the stored speed. Speed buttons 1–5 also update `m_prev_speed` so a later pause/unpause round-trips correctly. The button label flips to `>` while paused and `II` while running, so it reflects its toggle state.
+
+**Quarter label.**
+The system-tick readout was relabelled: economy ticks now read `Quarter N` (previously `Econ`, briefly `Q`), aligning with the quarterly econ-tick model in `sim_loop.hpp`.
+
+**Header resource strip simplified.**
+`header_panel.cpp` dropped the four named placeholder resources (Ore/Metal/Fuel/Goods) for a single `STOCKPILE 0` aggregate placeholder, per the prototype's "deliberately scarce" header intent in HEADER.md.
+
+**Default solar view ≈ 5 AU + scale bar and zoom slider.**
+`app::run()` sets the initial `solar_zoom` so the opening view spans roughly 5 AU (computed from the outermost orbit). The scroll-wheel zoom-out is capped at 50 AU (min zoom derived from `max_radius_au / 50`).
+
+A bottom-centre overlay on the primary solar canvas (`solar_system_canvas.cpp`) replaces the earlier `[-] X.X AU [+]` text row:
+- A **fixed-width scale bar** (8% of canvas width) with end ticks. Its label shows the spanned distance dynamically to two decimals (`%.2f AU`) at the current zoom.
+- A **logarithmic zoom slider** offset to the right of the bar, ranging 0.5 AU (zoomed in) to 50 AU (zoomed out), with no value text — the bar already reports distance.
+
+The overlay is a borderless, fill-free, padding-free ImGui window anchored so the scale bar is screen-centred and the slider sits to its right.
+
+### In-session decisions
+
+**Scale overlay drawn before the `input_enabled` early-out.**
+The scale/slider block sits before the canvas's `if (!input_enabled) return;`. Drawing it after would cause a one-frame flicker loop: hovering the slider sets `WantCaptureMouse`, which disables canvas input the next frame, which would skip the draw. Placing it earlier and building it as a real ImGui window keeps it persistent while still handling its own input.
+
+**Fixed-width bar with dynamic distance, not a round-number bar.**
+An earlier pass picked the largest "nice" AU span (0.1/0.2/0.5/1/…) that fit within 8% of the width. Changed to a fixed 8%-width bar whose AU value floats to two decimals — simpler and reads as a steady on-screen ruler whose label changes with zoom.
+
+---
+
 ## 2026-06-13 — Layer 2: planetary view, hex tiles, procedural terrain
 
 **Status:** Complete. Horizontal wrap rendering, pan/zoom min/max enforcement, and grid size expansion via procedural generation are the main open items.
