@@ -1,7 +1,7 @@
 #include "tile_inspector.hpp"
 
-#include "nav_pane.hpp"
 #include "presentation.hpp"
+#include "profile_panel.hpp" // profile_panel_width/height — spawn clear of the profile
 
 #include <imgui.h>
 
@@ -62,8 +62,10 @@ void draw_tile_inspector(const world& w, bool* p_open)
         body_ids.push_back(id);
     std::sort(body_ids.begin(), body_ids.end());
 
-    // Open to the right of the navigation pane on first appearance.
-    ImGui::SetNextWindowPos({nav_pane_width + 10.0f, 10.0f}, ImGuiCond_Once);
+    // Open clear of the profile (top-left) on first appearance — to its right and
+    // below the header strip. The window is movable thereafter.
+    ImGui::SetNextWindowPos({profile_panel_width + 10.0f, profile_panel_height + 10.0f},
+                            ImGuiCond_Once);
     ImGui::SetNextWindowSize({820, 560}, ImGuiCond_Once);
     // Passing p_open gives the window a close button that clears the flag.
     ImGui::Begin("Tile Ledger", p_open);

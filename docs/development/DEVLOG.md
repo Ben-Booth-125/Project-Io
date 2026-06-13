@@ -6,6 +6,122 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## 2026-06-14 — Calendar polish + two-column time panel + TODO recategorisation
+
+**Status:** Complete. Builds (Debug, MSVC) and links; default view captured (and a
+zoomed crop of the time panel) to confirm the two-column layout renders.
+
+### What was built
+
+**Compact calendar formatters.** Dropped yesterday's `short_date` (`dd/mmm/yyyy`).
+The readout is now built from two pieces: `1960 Q1` (year + quarter, formatted
+inline from `calendar_date`) and `Jan 01` (`ui::fmt::month_abbrev` + zero-padded
+day). The epoch is unchanged (day 0 = Jan 01 1960). A brief intermediate
+`long_date` (`January 1st 1960`, with full month names + ordinal) was tried and
+then removed when the layout settled on the compact two-line block; only
+`month_abbrev` remains.
+
+**Quarter progress bar.** Replaced the `Q1 - Day N` text with an ImGui
+`ProgressBar` driven by `ui::fmt::quarter_progress(day)` (0..1 through the 90-day
+in-year quarter), labelled with its percentage. Since the economy resolves on the
+quarter boundary, the bar doubles as a countdown to the next economy tick.
+
+**Two-column time panel.** The two stacked top-right panels (system tick readout +
+speed controls) are merged into one `##time_panel` window, split 25% / 75% via a
+two-column stretch table: a left calendar block (`1960 Q1` / `Jan 01` / progress
+bar in three rows) and the compressed speed controls on the right (`Sim` counter +
+the pause/1–5 buttons). The panel now takes input (it was previously NoInputs);
+the explorer's top is keyed off the single panel height (`mm_h * 0.5`).
+
+**TODO recategorisation.** `docs/development/TODO.md` now declares an explicit
+category set — UI categories (Canvas, Menu, Ledger, Documentation, Known Bug) plus
+game-system categories mirroring `SYSTEMS.md` — and every item sits under exactly
+one. Existing items were re-homed (selection-info ledger → Ledger, hover-card →
+Canvas, label-stepping → Known Bug, menu-definition → Menu). The per-session
+changelog paragraph was dropped (the items stand alone; session history lives
+here). Three new items were filed: Circumplanetary 0.3 AU max zoom (Canvas, [1]),
+map-lens icons (Canvas, [2]), Tile Ledger default body from the active view
+(Ledger, [2]).
+
+### Open items
+
+- The three new TODO items are recorded, not implemented.
+- Combined-panel verified on the default (Planetary) view; an interactive pass over
+  the quarter bar advancing across an economy tick is still worth a look.
+
+---
+
+## 2026-06-13 — TODO follow-ups: zoom/scale, calendar, highlight ties, overlay controls, icon nav
+
+**Status:** Complete. Builds (Debug, MSVC) and links. Worked through every
+`TODO.md` item at difficulty 3 and below — the follow-up revisions raised against
+the building-blocks session — leaving the difficulty 4+ items (selection-info
+ledger, stepped-label bug) and the deferred (difficulty 6) work.
+
+### What was built
+
+**[3] Zoom slider direction + shared Circumplanetary scale/zoom.** The Solar zoom
+slider was reversed (dragging right zoomed *out*). Factored the scale-bar + zoom-
+slider block out of `solar_system_canvas.cpp` into a shared
+`ui::draw_scale_zoom_overlay` (`src/ui/canvas_scale.{hpp,cpp}`); both the Solar
+and Circumplanetary canvases now call it. The slider now drives the zoom factor
+directly on a logarithmic track, so **right = zoomed in, left = zoomed out**, and
+shares its `[zoom_min, zoom_max]` bounds with the scroll-wheel handler on each
+canvas. The Circumplanetary canvas gained the scale bar + zoom slider it lacked.
+
+**[2] Date format & epoch.** `ui::fmt::short_date` switched from `Y1 M05 D12` to a
+`dd/mmm/yyyy` form with month abbreviations (`01/Jan/1960`); added a month-abbrev
+table + `month_abbrev`, and a `campaign_epoch_year = 1960` so day 0 is `01/Jan/1960`
+(`calendar_date::year` is now the calendar year, not a 1-based campaign year). The
+in-year quarter readout is unchanged.
+
+**[2] Highlight resolution on ties.** Overlapping markers each drew their own hover
+ring (the per-entity hit-test set `this_hovered` independently). Each canvas now
+runs a hit-test pass that resolves a **single** hovered entity — nearest centre to
+the cursor, entity id breaking exact ties (arbitrary but stable) — before drawing,
+so a tie highlights one entity. Solar and Circumplanetary resolve the hovered body
+up front; the Planetary canvas defers the hover outline to the single nearest hex
+copy (selection still draws on every visible wrap copy). Documented the convention
+on `resolve_highlight` (tie resolution is the caller's responsibility).
+
+**[3] Relocate overlay controls + default lens.** Removed the minimap **mode bar**
+(the three overlay-mode dots) — the inset now uses the full height under the title.
+Added `ui::draw_overlay_controls`, a bottom-left strip of labelled mode buttons
+(Supply / Market / Faction) running from the nav-rail edge inward, clear of the
+centred scale/zoom control. `ui_state::overlay` now defaults to `supply` rather
+than `none`. The on-canvas legend chip was dropped (the strip names the active
+lens); `draw_canvas_overlay` is now a no-op extension point for real lens geometry.
+
+**[3] Narrower, icon-based nav rail.** `nav_pane_width` 200 → 56; the pane is now an
+icon rail of ten square slots, each a glyph (`src/ui/icons.hpp`) with the menu name
+in a hover tooltip instead of a worded label. Added `icons::ledger` (ruled-table
+glyph, for the wired Tile Ledger slot) and `icons::placeholder` (hollow square, for
+reserved slots). Decoupled the profile from the rail width — added
+`profile_panel_width` (200) so the profile and the header stay wide while the rail
+is narrow; the header now starts at the profile's right edge, and the Tile Ledger
+window spawns clear of the profile/header.
+
+### In-session decisions
+
+**Slider drives zoom directly, not visible-AU.** The old slider edited a derived
+"visible AU" value (0.5–50) inverted relative to zoom, which is why it read
+backwards. Driving `zoom` directly on a log track makes the direction obvious and
+lets the slider and wheel share one `[zoom_min, zoom_max]` range per canvas.
+
+**Profile width decoupled from the nav rail.** The profile previously aligned to
+`nav_pane_width`; narrowing the rail to 56 px would have crushed the portrait +
+name. Gave the profile its own `profile_panel_width` so the rail can be an icon
+column without distorting the identity panel above it.
+
+### Open items
+
+- Per-menu nav icons are placeholders (one ledger glyph + a generic reserved
+  glyph) until the menu set is defined (TODO `[6]`).
+- Changes verified by build + code review; an interactive click-through / screenshot
+  pass of the new slider direction, overlay strip, and icon rail is still worth doing.
+
+---
+
 ## 2026-06-13 — Pre-Layer-3 UI building blocks + asteroid belt (label-shimmer fixed)
 
 **Status:** Complete. Builds and runs (verified after each item; solar view

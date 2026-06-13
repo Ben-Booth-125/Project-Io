@@ -10,18 +10,18 @@ The prototype UI is built with Dear ImGui (see TECH_FOUNDATIONS). Everything her
 
 ```
 ┌──────────┬────────────────────────────────────┬──────────────┐
-│ Profile  │              Header                 │  System tick │
-├──────────┤      (budget + resource strip)      ├──────────────┤
-│          ├────────────────────────────────────┤ Speed controls│
-│   Nav    │                                     │              │
-│   pane   │         Primary canvas              │              │
-│          │  (Solar / Circumplanetary / Surface)├──────────────┤
-│  1.      │                                     │   Explorer   │
-│  ...     │     [ floating ledger windows ]     │  (pinned     │
-│  8. Tile │                                     │   shortcuts) │
-│   Ledger │                                     │              │
-│  ...     │                                     ┌──────────────┐│
-│  10.     │                                     │   Minimap    ││
+│ Profile  │              Header                 │  Time panel  │
+├──────────┤      (budget + resource strip)      │ (date + bar, │
+│          ├────────────────────────────────────┤  speed ctl)  │
+│ Nav rail │                                     ├──────────────┤
+│ (icons)  │         Primary canvas              │              │
+│ ▢        │  (Solar / Circumplanetary / Surface)│   Explorer   │
+│ ▢        │                                     │  (pinned     │
+│ ▢  …     │     [ floating ledger windows ]     │   shortcuts) │
+│ ▦ (8)    │                                     │              │
+│ ▢  …     │                                     │              │
+│ ▢        │     [ overlay lens strip ]          ┌──────────────┐│
+│ ▢        │                                     │   Minimap    ││
 │          │                                     │ (inactive    ││
 │          │                                     │   canvas)    ││
 └──────────┴─────────────────────────────────────┴─────────────┘
@@ -63,11 +63,11 @@ The header answers "can I afford this, and what do I have?" without opening a le
 ## Navigation pane — left
 **Spec: `MENU.md`**
 
-A fixed, full-height column pinned to the left edge (`nav_pane_width`, currently 200 px), below the profile. Cannot move, resize, or collapse.
+A fixed, full-height **icon rail** pinned to the left edge (`nav_pane_width`, currently 56 px), below the profile. Cannot move, resize, or collapse. The rail is narrow; the profile keeps its own (wider) `profile_panel_width` above it rather than matching the rail.
 
-- Holds a vertical strip of **ten numbered tab slots** — the home for the game's menus and ledgers.
-- Each tab toggles a panel open/closed; the active tab is highlighted.
-- **Layer 2 wires only one tab: `8. Tile Ledger`**, parked at slot 8. The other nine are reserved, disabled placeholders. Slot numbering and placement are temporary while canvas work takes priority over menu design.
+- Holds a vertical strip of **ten square icon slots** — the home for the game's menus and ledgers. Each slot shows a **vector glyph** (`src/ui/icons.hpp`) instead of a worded label, with the menu name in a hover tooltip.
+- Each slot toggles a panel open/closed; the active slot is highlighted.
+- **Layer 2 wires only one slot: the Tile Ledger** (a ruled-table glyph), parked at slot 8. The other nine are reserved, disabled placeholders (a neutral hollow-square glyph). Slot placement is temporary while canvas work takes priority over menu design.
 
 ---
 
@@ -83,21 +83,33 @@ The canvases render behind the foreground panels, so the chrome currently occlud
 ## Minimap — bottom-right inset
 **Spec: `MINIMAP.md`**
 
-A fixed inset in the bottom-right corner showing the **zoom-out neighbour** of the primary canvas at reduced scale, framed by its own chrome — a title bar (the viewed body, or the star name; the game name at the top rung) above the inset, and a placeholder mode bar below. Clicking it **ascends** one rung. It shares the primary canvases' drawing code, parameterised by region size. `MINIMAP.md` is the authoritative spec for the minimap chrome and the ladder navigation; `CANVASES.md` covers the shared drawing path.
+A fixed inset in the bottom-right corner showing the **zoom-out neighbour** of the primary canvas at reduced scale, framed by its own chrome — a title bar (the viewed body, or the star name; the game name at the top rung) above the inset. Clicking it **ascends** one rung. It shares the primary canvases' drawing code, parameterised by region size. The overlay-lens controls that once sat in a mode bar below the inset now live in a bottom-left **overlay control strip** (see below). `MINIMAP.md` is the authoritative spec for the minimap chrome and the ladder navigation; `CANVASES.md` covers the shared drawing path.
 
 ---
 
-## Time column — top-right
+## Overlay control strip — bottom-left
+**Spec: `CANVASES.md` / `MINIMAP.md`**
+
+A small horizontal strip pinned to the bottom-left of the shell, running from the
+nav-rail edge inward toward the centre (clear of the centred scale/zoom control on
+the Solar and Circumplanetary canvases). It toggles the **canvas overlay lens** —
+a labelled button per mode (Supply / Market / Faction); the active lens is
+highlighted, and clicking it again clears the overlay. This replaces the former
+minimap mode-bar dots. A default lens is active on load (the supply lens) rather
+than no overlay. See `overlay.hpp` (`draw_overlay_controls`).
+
+## Time panel — top-right
 **Spec: `TIME_CONTROLS.md`**
 
-A two-panel stack in the top-right corner, both the same width as the minimap so the right edge stays aligned.
+A single panel in the top-right corner, the same width as the minimap so the right edge stays aligned. It is split into **two columns** (25% / 75%): a compact calendar block on the left and the speed controls on the right.
 
-**System tick** (top) — a permanent, non-interactive readout. Shows the player-facing clock:
+**Calendar block** (left column, 25%) — the player-facing clock in three rows:
 
-- **Calendar date** — a compact `Y1 M05 D12` line (see `TIME_CONTROLS.md`).
-- **Quarter + day** — the in-year quarter and the absolute day count.
+- **Year + quarter** — `1960 Q1` (see `TIME_CONTROLS.md`).
+- **Month + day** — `Jan 01`, abbreviated month + zero-padded day.
+- **Quarter progress** — a progress bar through the current in-year quarter, labelled with its percentage.
 
-**Speed controls** (below) — the time controls and a raw `Sim` counter with the current multiplier:
+**Speed controls** (right column, 75%) — a raw `Sim` counter with the current multiplier, then the controls:
 
 - **`II`** pauses; **`1`–`5`** set the speed multiplier. The active speed is highlighted.
 

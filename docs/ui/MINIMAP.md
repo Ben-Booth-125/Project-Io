@@ -86,9 +86,12 @@ Solar primary.
 
 ## Minimap chrome
 
-The minimap is now framed by its own chrome — a **title bar** above the inset
-canvas and a **mode bar** below it — so it reads as a deliberate panel rather
-than a floating thumbnail.
+The minimap is framed by its own chrome — a **title bar** above the inset
+canvas — so it reads as a deliberate panel rather than a floating thumbnail. (It
+previously also carried a **mode bar** below the inset for the overlay-lens
+toggles; those controls have moved to a bottom-left overlay control strip — see
+*Overlay controls* below — and the inset now uses the full height under the
+title.)
 
 ```
 ┌─────────────────────────┐
@@ -97,8 +100,6 @@ than a floating thumbnail.
 │                         │
 │   [ inset canvas ]      │   ← the zoom-out neighbour, drawn at reduced scale
 │                         │
-├─────────────────────────┤
-│  [ · · · ]    (mode bar)│   ← reserved placeholder for alternative modes
 └─────────────────────────┘
 ```
 
@@ -120,17 +121,21 @@ The title bar is part of the minimap chrome, not the in-canvas title, so it is
 title/labels are suppressed for clutter. The two should not both draw; when the
 minimap chrome owns the title, the inset canvas suppresses its own.
 
-### Mode bar
+### Overlay controls (relocated off the minimap)
 
-A thin strip along the bottom of the minimap that **toggles the canvas overlay
-lens**. It holds three dots, one per overlay mode (supply routes, market,
-faction presence); clicking a dot activates that lens and clicking the active
-dot again clears it. The active mode's dot lights up. The overlay itself is the
-building block in `src/ui/overlay.hpp` (an overlay draw pass over each canvas,
-keyed by `ui_state::overlay`); until later layers add overlay data it draws only
-a legend chip naming the active lens, but the wiring — state, draw pass, and the
-mode-bar toggle — is in place. (The zoom-ladder navigation lives in the body /
-minimap clicks described above, **not** in this bar.)
+The overlay-lens toggles used to be a thin **mode bar** along the bottom of the
+minimap (three dots, one per mode). They now live in a separate **overlay control
+strip** pinned to the bottom-left of the shell, running from the nav-rail edge
+inward (clear of the centred scale/zoom control). It holds a labelled button per
+mode — Supply / Market / Faction — with the active lens highlighted; clicking the
+active button clears the overlay. A **default lens** (supply) is active on load
+rather than no overlay. The overlay itself is the building block in
+`src/ui/overlay.hpp` (an overlay draw pass over each canvas, keyed by
+`ui_state::overlay`); the control strip is `draw_overlay_controls` in the same
+header. Until later layers add overlay data the draw pass renders nothing — the
+active lens is named by the control strip, not an on-canvas chip. (The zoom-ladder
+navigation lives in the body / minimap clicks described above, **not** in these
+controls.)
 
 ---
 
@@ -162,8 +167,8 @@ done in this doc.
 Unchanged from `CANVASES.md` (authoritative there), with the chrome accounted for:
 
 - `mm_w = max(240, 0.20 × min(window width, height))`; `mm_h = mm_w × 0.75` (4:3)
-  governs the **inset canvas**; the title bar and mode bar add fixed-height strips
-  above and below it.
+  governs the minimap box; the title bar takes a fixed-height strip at the top and
+  the inset canvas fills the rest beneath it.
 - Anchored bottom-right with an 8 px margin.
 - In-canvas labels/title suppressed below ~320 px on the shorter edge; the chrome
   title bar is exempt (always shown).
@@ -194,13 +199,14 @@ canvas holds the primary slot; the minimap always renders the default framing.
 
 ## Open questions
 
-- **Mode bar interaction polish.** The bar now toggles the overlay lens (three
-  dots → supply / market / faction), but the dots are terse; a clearer affordance
-  (icons, labels, or a tooltip) may be wanted once the lenses draw real data.
+- **Overlay control polish.** The overlay lens now toggles from a labelled
+  bottom-left control strip (Supply / Market / Faction), having moved off the
+  former minimap mode-bar dots. The button labels may want icons or richer state
+  once the lenses draw real data.
 - **Circumplanetary framing** for a planet with many vs. zero moons — how much
   local space to show, and at what scale, is for `CIRCUMPLANETARY.md`.
 - **Overlays.** Once supply routes / units land on the canvases, does the minimap
-  mirror them, and is that what the mode bar selects?
+  mirror them, and is that what the overlay control strip selects?
 
 ---
 

@@ -1,10 +1,12 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "circumplanetary_canvas.hpp"
 
+#include "canvas_scale.hpp"
 #include "highlight.hpp"
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <vector>
 
 namespace ui {
@@ -104,6 +106,10 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
         max_moon_au = 0.5f;
     const float scale = (min_dim * 0.40f) / max_moon_au;
 
+    // Zoom bounds shared by the scale/zoom slider and the scroll-wheel handler.
+    constexpr float zoom_min = 0.2f;
+    constexpr float zoom_max = 20.0f;
+
     // View transform — pan/zoom only when primary; the minimap shows the default
     // framing. Element sizes do not scale with zoom.
     const bool   apply_view  = !is_minimap;
@@ -144,7 +150,6 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
     }
 
     const ImVec2 mouse = ImGui::GetIO().MousePos;
-    entity_id hovered_body = null_entity;
 
     // Draw the anchor first, then the moons on top. Each entry is (id, is_anchor).
     std::vector<std::pair<entity_id, bool>> draw_list;
@@ -153,6 +158,30 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
     for (entity_id id : moons)
         draw_list.push_back({id, false});
 
+    // Resolve the single hovered body up front so a moon overlapping the anchor
+    // settles on one stable choice rather than both drawing a ring (see the
+    // highlight tie convention in highlight.hpp). Nearest centre to the cursor
+    // wins; the strict `<` keeps an exact tie on the first entry (the anchor).
+    entity_id hovered_body = null_entity;
+    if (input_enabled)
+    {
+        float best_d2 = std::numeric_limits<float>::max();
+        for (const auto& [id, is_anchor] : draw_list)
+        {
+            const float  radius = body_radius(id, is_anchor);
+            const ImVec2 pos    = to_screen(local_pos(id, is_anchor));
+            const float  dx = mouse.x - pos.x;
+            const float  dy = mouse.y - pos.y;
+            const float  d2 = dx * dx + dy * dy;
+            const float  hit = radius + 3.0f;
+            if (d2 <= hit * hit && d2 < best_d2)
+            {
+                best_d2 = d2;
+                hovered_body = id;
+            }
+        }
+    }
+
     for (const auto& [id, is_anchor] : draw_list)
     {
         const body_component& body = w.bodies.at(id);
@@ -160,17 +189,7 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
         const float      radius = body_radius(id, is_anchor);
         const ImVec2     pos    = to_screen(local_pos(id, is_anchor));
 
-        bool this_hovered = false;
-        if (input_enabled)
-        {
-            const float dx = mouse.x - pos.x;
-            const float dy = mouse.y - pos.y;
-            if (dx * dx + dy * dy <= (radius + 3.0f) * (radius + 3.0f))
-            {
-                this_hovered = true;
-                hovered_body = id;
-            }
-        }
+        const bool this_hovered = (id == hovered_body);
 
         dl->AddCircleFilled(pos, radius, style.colour);
 
@@ -185,6 +204,14 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
                         IM_COL32(255, 255, 255, 255), body.name.c_str());
         }
     }
+
+    // Scale bar + zoom slider — primary view only, pinned to the bottom centre.
+    // Shared with the Solar canvas via draw_scale_zoom_overlay. Drawn before the
+    // input_enabled early-out so it stays put while an ImGui panel captures the
+    // mouse. `scale * zoom` is the live pixels-per-AU.
+    if (apply_view)
+        draw_scale_zoom_overlay("circum", origin, size, scale * zoom,
+                                state.circum_zoom, zoom_min, zoom_max);
 
     if (!input_enabled)
         return;
@@ -226,7 +253,7 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
 
         if (io.MouseWheel != 0.0f)
         {
-            const float new_zoom = std::clamp(zoom * std::pow(1.1f, io.MouseWheel), 0.2f, 20.0f);
+            const float new_zoom = std::clamp(zoom * std::pow(1.1f, io.MouseWheel), zoom_min, zoom_max);
             // World point under the cursor, kept fixed across the zoom change.
             const ImVec2 wp = { (mouse.x - view_origin.x) / zoom,
                                 (mouse.y - view_origin.y) / zoom };

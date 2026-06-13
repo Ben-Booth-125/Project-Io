@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <iterator>
+#include <limits>
 #include <unordered_map>
 
 namespace ui {
@@ -176,7 +178,17 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
     }
 
     const ImVec2 mouse = ImGui::GetIO().MousePos;
-    entity_id hovered_tile = null_entity;
+
+    // Hover resolves to a single tile copy. Adjacent hexes' circular hit-tests
+    // overlap, and the cylinder draws several wrap copies of each tile, so more
+    // than one (tile, copy) can satisfy the hover test at once. The nearest hex
+    // centre to the cursor wins; its outline is drawn after the grid pass so only
+    // one tile highlights (see the highlight tie convention in highlight.hpp).
+    entity_id hovered_tile     = null_entity;
+    bool      hovered_selected = false;
+    bool      have_hover       = false;
+    float     best_d2          = std::numeric_limits<float>::max();
+    ImVec2    hover_verts[6]   = {};
 
     // Slightly shrink the drawn hex so the background shows through as a border.
     // Use the full circumradius for hit-testing so small hexes stay clickable.
@@ -226,30 +238,39 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
                 icons::building(dl, {cx, cy}, mr, built_type, IM_COL32(255, 255, 255, 255));
             }
 
+            // Selection outline is drawn on every visible copy of the selected
+            // tile; hover is deferred to a single nearest copy, resolved below.
+            draw_hex_highlight(dl, verts,
+                resolve_highlight(selected, /*hovered=*/false, /*pinned=*/false));
+
             // Hit-test: distance to hex centre < circumradius (approximate,
             // sufficient for usability). Scoped per wrap copy so the highlight
-            // lands on the copy actually under the cursor.
-            bool copy_hovered = false;
+            // lands on the copy actually under the cursor; nearest centre wins.
             if (input_enabled)
             {
                 const float dx = mouse.x - cx;
                 const float dy = mouse.y - cy;
+                const float d2 = dx * dx + dy * dy;
                 const bool in_area = mouse.x >= grid_area_origin.x &&
                                      mouse.x <= grid_area_origin.x + grid_area_size.x &&
                                      mouse.y >= grid_area_origin.y &&
                                      mouse.y <= grid_area_origin.y + grid_area_size.y;
-                if (in_area && dx * dx + dy * dy <= hit_r * hit_r)
+                if (in_area && d2 <= hit_r * hit_r && d2 < best_d2)
                 {
-                    copy_hovered = true;
-                    hovered_tile = id;
+                    best_d2          = d2;
+                    hovered_tile     = id;
+                    hovered_selected = selected;
+                    have_hover       = true;
+                    std::copy(std::begin(verts), std::end(verts), std::begin(hover_verts));
                 }
             }
-
-            // Shared selection / hover / pinned outline (pinning not yet wired).
-            draw_hex_highlight(dl, verts,
-                resolve_highlight(selected, copy_hovered, /*pinned=*/false));
         }
     }
+
+    // Hover outline for the single resolved copy. Skipped when the hovered tile is
+    // also the selection — selection outranks hover, and its ring is already drawn.
+    if (have_hover && !hovered_selected)
+        draw_hex_highlight(dl, hover_verts, highlight::hovered);
 
     dl->PopClipRect();
 

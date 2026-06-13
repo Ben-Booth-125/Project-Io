@@ -24,8 +24,15 @@ enum class highlight : uint8_t
 /// hover so a pinned entity keeps its identity colour while the cursor is over
 /// it; selection outranks both because it is the player's current focus.
 ///
+/// This resolves the state of a *single* entity. When several entities satisfy
+/// the same condition at once (e.g. two markers overlapping the cursor), the
+/// caller must first pick one — by convention the candidate nearest the cursor,
+/// with entity id breaking exact ties so the choice is arbitrary but stable —
+/// and pass `hovered = true` only for that one, so a tie highlights one entity
+/// rather than several. The canvases do this in a hit-test pass before drawing.
+///
 /// @param selected Whether the entity is the active selection.
-/// @param hovered  Whether the cursor is over the entity.
+/// @param hovered  Whether the cursor is over the entity (and it won any tie).
 /// @param pinned   Whether the entity is pinned in the Explorer.
 /// @return         The dominant highlight to draw.
 highlight resolve_highlight(bool selected, bool hovered, bool pinned);

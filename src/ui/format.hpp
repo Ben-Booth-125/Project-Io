@@ -68,28 +68,40 @@ std::string percent(double fraction, int decimals = 0);
 ///
 /// The calendar is the natural completion of sim_loop's tentative constants:
 /// 30-day months, 3-month quarters, and (defined here) 4 quarters to a year —
-/// a 360-day year. The campaign clock starts at year 1, month 1, day 1.
+/// a 360-day year. The 12 thirty-day months map to Jan–Dec, and the campaign
+/// epoch is set so day 0 falls on the first day of 1960.
 struct calendar_date
 {
-    int year;    ///< 1-based campaign year.
-    int month;   ///< 1-12.
+    int year;    ///< Calendar year; the campaign epoch is 1960 (see campaign_epoch_year).
+    int month;   ///< 1-12 (Jan–Dec).
     int day;     ///< 1-30.
     int quarter; ///< 1-4 (the in-year quarter, derived from the month).
 };
 
+/// The calendar year day 0 falls in. The campaign opens on January 1st 1960.
+constexpr int campaign_epoch_year = 1960;
+
+/// Three-letter English month abbreviation for a 1-12 month index ("Jan".."Dec").
+/// Returns "?" for an out-of-range month so a bad value is visible rather than
+/// reading as a silent wrong month. Used by the compact `Jan 01` calendar line.
+///
+/// @param month 1-based month (1 == January).
+/// @return      Static, null-terminated month abbreviation.
+const char* month_abbrev(int month);
+
 /// Decompose an absolute in-game day count (sim_loop::day_tick) into a calendar
-/// date. Day 0 is Y1 M1 D1 Q1.
+/// date. Day 0 is January 1st 1960, Q1.
 ///
 /// @param day_tick In-game days elapsed since the campaign start.
 /// @return         The corresponding calendar date.
 calendar_date date_from_day(uint64_t day_tick);
 
-/// Format a day count as a compact calendar string for the tick readout, e.g.
-/// "Y1 M05 D12". The in-year quarter is available separately via
-/// date_from_day(...).quarter.
+/// Fraction (0..1) of the way through the current in-year quarter, for a quarter
+/// progress bar. Day 0 of a quarter reads 0.0; the value advances one quarter-day
+/// step per day and reaches just under 1.0 on the quarter's final day.
 ///
 /// @param day_tick In-game days elapsed since the campaign start.
-/// @return         Short calendar string.
-std::string short_date(uint64_t day_tick);
+/// @return         Progress through the quarter, clamped to [0, 1).
+float quarter_progress(uint64_t day_tick);
 
 } // namespace ui::fmt

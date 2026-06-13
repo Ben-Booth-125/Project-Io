@@ -2,14 +2,12 @@
 
 #include <imgui.h>
 
-#include "nav_pane.hpp" // nav_pane_width — the profile aligns to the pane
-
 namespace ui {
 
 void draw_profile_panel()
 {
     ImGui::SetNextWindowPos({0.0f, 0.0f});
-    ImGui::SetNextWindowSize({nav_pane_width, profile_panel_height});
+    ImGui::SetNextWindowSize({profile_panel_width, profile_panel_height});
 
     constexpr ImGuiWindowFlags flags =
         ImGuiWindowFlags_NoTitleBar          |

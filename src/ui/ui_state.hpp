@@ -35,7 +35,7 @@ struct ui_state
     entity_id    active_body   = null_entity;         ///< Drives the lower rungs (circumplanetary anchor and surface). null_entity = nothing selected.
     entity_id    active_tile   = null_entity;         ///< Set by a tile click; consumed by later layers.
     canvas_level primary_level = canvas_level::solar; ///< Which canvas rung fills the window.
-    overlay_mode overlay       = overlay_mode::none;  ///< Active canvas overlay lens; toggled by the minimap mode bar.
+    overlay_mode overlay       = overlay_mode::supply; ///< Active canvas overlay lens; toggled by the bottom overlay control strip. Defaults to the supply lens (the first Layer 5 requirement) rather than none.
 
     // --- navigation pane state ---
     // Policy: all ledgers start closed. The player opens them deliberately from

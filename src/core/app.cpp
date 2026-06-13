@@ -162,12 +162,13 @@ void app::render()
     // Both draw to the ImGui background draw list, so the panels below render on
     // top. See CANVASES.md / MINIMAP.md.
     {
-        // Minimap chrome reserves a title bar above the inset and a placeholder
-        // mode bar below; the neighbouring canvas occupies the space between.
+        // Minimap chrome reserves a title bar above the inset; the neighbouring
+        // canvas occupies the rest. The overlay-lens controls used to sit in a
+        // mode bar below the inset — they now live in a bottom-left strip
+        // (ui::draw_overlay_controls), so the inset takes the full height here.
         const float  title_h      = ImGui::GetTextLineHeight() + 6.0f;
-        const float  mode_h       = 14.0f; // tall enough for the overlay mode dots to be clickable
         const ImVec2 inset_origin = { mm_origin.x, mm_origin.y + title_h };
-        const ImVec2 inset_size   = { mm_w, mm_h - title_h - mode_h };
+        const ImVec2 inset_size   = { mm_w, mm_h - title_h };
 
         // Route input: the whole minimap box blocks the primary behind it; only
         // the inset canvas receives minimap input. An ImGui panel under the
@@ -230,140 +231,97 @@ void app::render()
         bdl->AddRectFilled(mm_origin, {mm_origin.x + mm_w, mm_origin.y + title_h}, IM_COL32(28, 30, 40, 255));
         bdl->AddText({mm_origin.x + 5.0f, mm_origin.y + 3.0f}, IM_COL32(220, 225, 235, 255), mm_title);
 
-        // Mode bar — toggles the canvas overlay lens. Three dots map to the
-        // three overlay modes; the active mode's dot lights up, and clicking it
-        // again clears the overlay. No visible effect until later layers add
-        // overlay data, but the building block (ui_state.overlay + the overlay
-        // pass above) is wired now. See MINIMAP.md (mode bar) and overlay.hpp.
-        const float mb_y = mm_origin.y + mm_h - mode_h;
-        bdl->AddRectFilled({mm_origin.x, mb_y}, {mm_origin.x + mm_w, mm_origin.y + mm_h}, IM_COL32(20, 22, 30, 255));
-
-        constexpr overlay_mode mode_dots[3] = {
-            overlay_mode::supply, overlay_mode::market, overlay_mode::faction };
-        constexpr float dot_spacing = 16.0f;
-        const float     dot_cy      = mb_y + mode_h * 0.5f;
-        const float     dot_cx0     = mm_origin.x + mm_w * 0.5f - dot_spacing; // centre dot is index 1
-
-        // Resolve the dot under the cursor (nearest within half a spacing),
-        // gated like the canvases on an ImGui panel not capturing the mouse.
-        int hovered_dot = -1;
-        if (!panel_blocking && mp.y >= mb_y && mp.y <= mm_origin.y + mm_h &&
-            mp.x >= mm_origin.x && mp.x <= mm_origin.x + mm_w)
-        {
-            float best = dot_spacing * 0.5f;
-            for (int i = 0; i < 3; ++i)
-            {
-                const float dx = std::fabs(mp.x - (dot_cx0 + static_cast<float>(i) * dot_spacing));
-                if (dx <= best) { best = dx; hovered_dot = i; }
-            }
-        }
-
-        for (int i = 0; i < 3; ++i)
-        {
-            const ImVec2 c       = { dot_cx0 + static_cast<float>(i) * dot_spacing, dot_cy };
-            const bool   active  = (m_ui.overlay == mode_dots[i]);
-            const ImU32  col     = active        ? IM_COL32(235, 220, 140, 255)
-                                 : (i == hovered_dot) ? IM_COL32(150, 156, 175, 255)
-                                                      : IM_COL32(70, 75, 90, 255);
-            bdl->AddCircleFilled(c, active ? 3.0f : 2.0f, col);
-        }
-
-        if (hovered_dot >= 0 && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-            ui::toggle_overlay(m_ui, mode_dots[hovered_dot]);
-
         // Border around the whole minimap box.
         bdl->AddRect(mm_origin, {mm_origin.x + mm_w, mm_origin.y + mm_h}, IM_COL32(90, 95, 110, 255));
     }
 
-    // System tick — a permanent, fixed readout pinned to the top-right corner.
-    // Same width as the minimap, about a third of its height. Non-interactive
-    // so clicks pass through to the canvas behind it.
+    // Time panel — top-right, same width as the minimap. Two columns: a compact
+    // date/quarter block (left, 25%) and the speed controls (right, 75%). The
+    // panel takes input (the speed buttons), so it is not flagged NoInputs.
     const float tick_w = mm_w;
-    const float tick_h = mm_h / 3.0f;
+    const float time_h = mm_h * 0.5f;
     {
         ImGui::SetNextWindowPos({disp.x - margin - tick_w, margin});
-        ImGui::SetNextWindowSize({tick_w, tick_h});
-        constexpr ImGuiWindowFlags tick_flags =
+        ImGui::SetNextWindowSize({tick_w, time_h});
+        constexpr ImGuiWindowFlags time_flags =
             ImGuiWindowFlags_NoTitleBar          |
             ImGuiWindowFlags_NoResize            |
             ImGuiWindowFlags_NoMove              |
             ImGuiWindowFlags_NoCollapse          |
             ImGuiWindowFlags_NoScrollbar         |
             ImGuiWindowFlags_NoNav               |
-            ImGuiWindowFlags_NoInputs            |
             ImGuiWindowFlags_NoBringToFrontOnFocus |
             ImGuiWindowFlags_NoSavedSettings;
-        ImGui::Begin("##system_tick", nullptr, tick_flags);
-        // Player-facing calendar derived from the raw day count, with the
-        // in-year quarter alongside the absolute day for continuity.
-        const uint64_t            day  = m_sim_loop.day_tick();
+        ImGui::Begin("##time_panel", nullptr, time_flags);
+
+        const uint64_t day = m_sim_loop.day_tick();
         const ui::fmt::calendar_date date = ui::fmt::date_from_day(day);
-        ImGui::Text("%s", ui::fmt::short_date(day).c_str());
-        ImGui::Text("Q%d  -  Day %llu", date.quarter, static_cast<unsigned long long>(day));
-        ImGui::End();
-    }
 
-    // Time speed controls — directly below the tick readout, same width.
-    {
-        const float ctrl_h = mm_h / 3.0f;
-        ImGui::SetNextWindowPos({disp.x - margin - tick_w, margin + tick_h + 4.0f});
-        ImGui::SetNextWindowSize({tick_w, ctrl_h});
-        constexpr ImGuiWindowFlags ctrl_flags =
-            ImGuiWindowFlags_NoTitleBar          |
-            ImGuiWindowFlags_NoResize            |
-            ImGuiWindowFlags_NoMove              |
-            ImGuiWindowFlags_NoCollapse          |
-            ImGuiWindowFlags_NoScrollbar         |
-            ImGuiWindowFlags_NoNav               |
-            ImGuiWindowFlags_NoBringToFrontOnFocus |
-            ImGuiWindowFlags_NoSavedSettings;
-        ImGui::Begin("##time_controls", nullptr, ctrl_flags);
-
-        ImGui::Text("Sim %llu", m_sim_loop.sim_tick());
-        ImGui::SameLine();
-        if (m_sim_loop.paused())
-            ImGui::TextDisabled("(paused)");
-        else
-            ImGui::TextDisabled("(%dx)", m_sim_loop.speed());
-
-        // Pause plus 1x..5x. The active speed is highlighted.
-        // Pause label flips to a play symbol when paused so it reflects the toggle state.
-        const char* labels[] = {m_sim_loop.paused() ? ">" : "II", "1", "2", "3", "4", "5"};
-        const int   speeds[] = { 0,    1,   2,   3,   4,   5 };
-        const int   n        = 6;
-        const float spacing  = ImGui::GetStyle().ItemSpacing.x;
-        const float bw       = (ImGui::GetContentRegionAvail().x - spacing * (n - 1)) / n;
-
-        for (int i = 0; i < n; ++i)
+        // 25% / 75% split via a two-column stretch table.
+        if (ImGui::BeginTable("##time_cols", 2, ImGuiTableFlags_SizingStretchProp))
         {
-            const bool active = (m_sim_loop.speed() == speeds[i]);
-            if (active)
-                ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-            if (ImGui::Button(labels[i], {bw, 0.0f}))
+            ImGui::TableSetupColumn("##date", ImGuiTableColumnFlags_WidthStretch, 0.25f);
+            ImGui::TableSetupColumn("##ctrl", ImGuiTableColumnFlags_WidthStretch, 0.75f);
+            ImGui::TableNextRow();
+
+            // --- Left: a date/quarter block in three rows. The progress bar
+            // shows how far through the current quarter the campaign is (the
+            // economy resolves on the quarter boundary).
+            ImGui::TableSetColumnIndex(0);
+            ImGui::Text("%d Q%d", date.year, date.quarter);
+            ImGui::Text("%s %02d", ui::fmt::month_abbrev(date.month), date.day);
+            ImGui::ProgressBar(ui::fmt::quarter_progress(day), {-1.0f, 0.0f});
+
+            // --- Right: the compressed speed controls.
+            ImGui::TableSetColumnIndex(1);
+            ImGui::Text("Sim %llu", m_sim_loop.sim_tick());
+            ImGui::SameLine();
+            if (m_sim_loop.paused())
+                ImGui::TextDisabled("(paused)");
+            else
+                ImGui::TextDisabled("(%dx)", m_sim_loop.speed());
+
+            // Pause plus 1x..5x. The active speed is highlighted. The pause label
+            // flips to a play symbol when paused so it reflects the toggle state.
+            const char* labels[] = {m_sim_loop.paused() ? ">" : "II", "1", "2", "3", "4", "5"};
+            const int   speeds[] = { 0,    1,   2,   3,   4,   5 };
+            const int   n        = 6;
+            const float spacing  = ImGui::GetStyle().ItemSpacing.x;
+            const float bw       = (ImGui::GetContentRegionAvail().x - spacing * (n - 1)) / n;
+
+            for (int i = 0; i < n; ++i)
             {
-                if (speeds[i] == 0)
+                const bool active = (m_sim_loop.speed() == speeds[i]);
+                if (active)
+                    ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+                if (ImGui::Button(labels[i], {bw, 0.0f}))
                 {
-                    // Pause button toggles: if already paused, restore the
-                    // previous speed; otherwise save the current speed and pause.
-                    if (m_sim_loop.paused())
-                        m_sim_loop.set_speed(m_prev_speed);
+                    if (speeds[i] == 0)
+                    {
+                        // Pause button toggles: if already paused, restore the
+                        // previous speed; otherwise save the current speed and pause.
+                        if (m_sim_loop.paused())
+                            m_sim_loop.set_speed(m_prev_speed);
+                        else
+                        {
+                            m_prev_speed = m_sim_loop.speed();
+                            m_sim_loop.set_speed(0);
+                        }
+                    }
                     else
                     {
-                        m_prev_speed = m_sim_loop.speed();
-                        m_sim_loop.set_speed(0);
+                        // Speed button: remember it so pause can restore it later.
+                        m_prev_speed = speeds[i];
+                        m_sim_loop.set_speed(speeds[i]);
                     }
                 }
-                else
-                {
-                    // Speed button: remember it so pause can restore it later.
-                    m_prev_speed = speeds[i];
-                    m_sim_loop.set_speed(speeds[i]);
-                }
+                if (active)
+                    ImGui::PopStyleColor();
+                if (i + 1 < n)
+                    ImGui::SameLine();
             }
-            if (active)
-                ImGui::PopStyleColor();
-            if (i + 1 < n)
-                ImGui::SameLine();
+
+            ImGui::EndTable();
         }
 
         ImGui::End();
@@ -373,17 +331,17 @@ void app::render()
     ui::draw_profile_panel();
 
     // Budget + resource header — spans the top between the profile and the
-    // time column, clear of both.
+    // time column, clear of both. Starts at the profile's right edge (the profile
+    // keeps its own width, wider than the narrow icon nav rail below it).
     {
-        const float header_left  = ui::nav_pane_width;
+        const float header_left  = ui::profile_panel_width;
         const float header_right = (disp.x - margin - tick_w) - margin;
         ui::draw_header_panel(header_left, header_right);
     }
 
-    // Explorer — right edge, between the time column and the minimap.
+    // Explorer — right edge, between the time panel and the minimap.
     {
-        const float ctrl_h        = mm_h / 3.0f;
-        const float column_bottom = margin + tick_h + 4.0f + ctrl_h;
+        const float column_bottom = margin + time_h;
         const float exp_x         = mm_origin.x;
         const float exp_y         = column_bottom + margin;
         const float exp_w         = mm_w;
@@ -394,6 +352,10 @@ void app::render()
     // Left navigation pane and the menus it opens. Starts below the profile.
     ui::draw_nav_pane(m_ui, ui::profile_panel_height);
     ui::draw_tile_inspector(m_world, &m_ui.show_tile_ledger);
+
+    // Overlay-lens controls — a bottom-left strip from the nav-pane edge inward,
+    // clear of the centred scale/zoom control. Replaces the old minimap mode bar.
+    ui::draw_overlay_controls(m_ui, ui::nav_pane_width, disp.y - margin);
 
     ImGui::Render();
     SDL_SetRenderDrawColor(m_renderer, 15, 15, 20, 255);

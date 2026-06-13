@@ -18,7 +18,7 @@ specifications for each rung are in their own documents:
 - [SOLAR.md](SOLAR.md) — Solar System Canvas: visual design, coordinate mapping, orbital motion, interaction.
 - [CIRCUMPLANETARY.md](CIRCUMPLANETARY.md) — Circumplanetary Canvas: a planet and its moons / local space; the middle rung.
 - [PLANETARY.md](PLANETARY.md) — Body Surface (Planetary) Canvas: tile grid, terrain colours, building markers, interaction.
-- [MINIMAP.md](MINIMAP.md) — the inset's chrome (title bar, mode bar), what it shows at each rung, and the navigation model.
+- [MINIMAP.md](MINIMAP.md) — the inset's chrome (title bar), what it shows at each rung, and the navigation model.
 
 ---
 
@@ -27,7 +27,7 @@ specifications for each rung are in their own documents:
 The game window is divided into two regions:
 
 - **Primary region** — the majority of the window. The active canvas fills this space.
-- **Minimap region** — a fixed inset in the bottom-right corner, framed by its own chrome (a title bar above, a placeholder mode bar below). The neighbouring canvas renders in the inset between them.
+- **Minimap region** — a fixed inset in the bottom-right corner, framed by its own chrome (a title bar above). The neighbouring canvas renders in the inset beneath it. (The overlay-lens toggles that once sat in a mode bar below the inset now live in a bottom-left overlay control strip.)
 
 **Default state.** The game opens on the **corporation's home planet** (Kepler in
 the hard-coded world): the Planetary screen is primary with the home body
@@ -82,7 +82,7 @@ struct ui_state
     entity_id    active_body   = null_entity;            // drives the lower rungs
     entity_id    active_tile   = null_entity;            // set by tile click; consumed by later layers
     canvas_level primary_level = canvas_level::solar;    // which rung fills the window
-    overlay_mode overlay       = overlay_mode::none;     // active overlay lens; toggled by the minimap mode bar
+    overlay_mode overlay       = overlay_mode::supply;   // active overlay lens; toggled by the bottom overlay control strip (defaults to the supply lens)
 
     bool show_tile_ledger = false;                       // owned by the nav pane, not the canvases
 
@@ -96,7 +96,11 @@ struct ui_state
 Selection, hover, and pinning are drawn through a shared **highlight convention**
 (`src/ui/highlight.hpp`) so they read the same on every canvas: white for the
 selected entity, light blue for hover, amber for pinned (pinning not yet wired),
-with `selected > pinned > hover` precedence. A reusable **focus helper**
+with `selected > pinned > hover` precedence. When several entities satisfy the
+same condition at once (overlapping markers under the cursor), each canvas first
+resolves a **single** choice — the candidate nearest the cursor, with entity id
+breaking exact ties — so a tie highlights one entity, arbitrarily but stably,
+rather than several. A reusable **focus helper**
 (`src/ui/view_nav.hpp`) jumps the view to any entity — selecting it, choosing the
 rung that frames it, and centring that rung — for the opening view and the
 Explorer's "jump to".
@@ -129,7 +133,7 @@ void draw_body_surface_canvas(const world& w, ui_state& ui, ImVec2 origin, ImVec
 
 `app::render()` switches on `primary_level`: it draws the primary canvas
 full-window, then — for the lower two rungs — draws the zoom-out neighbour into
-the minimap inset, and finally the minimap chrome (title bar + mode bar). Scale,
+the minimap inset, and finally the minimap chrome (title bar). Scale,
 cell size, orbit radius, and element sizes are all derived from the region
 `size` at draw time, so the same function renders correctly at both primary and
 minimap dimensions. Fixed-pixel element sizes scale by `min(size.x, size.y) / 720`
@@ -151,7 +155,9 @@ function still draws unconditionally; it just skips hover/click handling when
 Economic and military data (supply routes, faction presence, convoy paths) are
 added in later layers as overlay **lenses** on these canvases. The overlay
 *mechanism* now exists as a building block — an overlay draw pass over each
-canvas (`src/ui/overlay.hpp`), an `overlay_mode` value in `ui_state`, and the
-minimap **mode bar** wired to toggle it. Until those layers supply data, an
-active lens draws only a legend chip naming itself; the lens geometry (Layer 5
-supply routes first) hangs off the same pass.
+canvas (`src/ui/overlay.hpp`), an `overlay_mode` value in `ui_state`, and a
+bottom-left **overlay control strip** (`draw_overlay_controls`) wired to toggle
+it (a default lens is active on load). Until those layers supply data, the draw
+pass renders nothing — the active lens is named by the control strip, not an
+on-canvas chip; the lens geometry (Layer 5 supply routes first) hangs off the
+same pass.

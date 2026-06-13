@@ -56,8 +56,9 @@ name). If `active_body` is unknown, the canvas shows a "No body selected" notice
 | Moon | Filled circle at its orbital position. Colour `(148, 145, 140)` grey (the shared moon style). |
 | Orbital rings | Thin circle at each moon's `orbital_radius_au` from the anchor. Colour `(38, 42, 52)` — structural only. |
 | Body label | Anchor and moon names in the small default font, below each circle. White. |
-| Selection indicator | Unfilled circle around `active_body`, 3 px larger than its radius. White. |
+| Selection indicator | Unfilled circle around `active_body`, 3 px larger than its radius. White. When a moon overlaps the anchor under the cursor, **only one** highlights — the nearest centre wins (anchor on an exact tie); a hit-test pass resolves the single hovered body before drawing, matching the Solar canvas. |
 | Hover tooltip | Body name, type string, and orbital radius (from the anchor for moons). |
+| Scale bar + zoom slider | Bottom-centre overlay (primary view only), identical to the Solar canvas's — the shared `ui::draw_scale_zoom_overlay` (`src/ui/canvas_scale.hpp`). The zoom slider runs **right = zoomed in, left = zoomed out**. |
 
 Moon orbital radii are **not** true scale — real moon distances would render on
 top of the planet — they use a visible offset, consistent with how moons are
@@ -88,7 +89,7 @@ framing.
 - **Hover** a body circle: show tooltip.
 - **Left-click a body — descend (zoom in).** When the Circumplanetary screen is primary, clicking the anchor planet or one of its moons sets `active_body` and drills the primary down to that body's **Planetary** surface.
 - **Click the Circumplanetary minimap — ascend.** When the Circumplanetary screen is the minimap (i.e. the Planetary screen is primary), any click promotes it to primary.
-- **Pan and zoom (primary view only).** Middle mouse button pans; scroll wheel zooms, anchored at the cursor. Element sizes stay fixed; only the framing scales. View state (`circum_zoom`, `circum_pan_x/y`) lives in `ui_state`. The minimap always renders the default framing.
+- **Pan and zoom (primary view only).** Middle mouse button pans; scroll wheel zooms, anchored at the cursor. A bottom-centre **scale bar + zoom slider** (shared with the Solar canvas) sets the same factor — dragging **right zooms in**. Element sizes stay fixed; only the framing scales. View state (`circum_zoom`, `circum_pan_x/y`) lives in `ui_state`. The minimap always renders the default framing.
 - Input is only processed for the canvas the mouse is over; an ImGui panel under the cursor takes precedence.
 
 ---

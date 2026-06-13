@@ -1,26 +1,34 @@
 # Project Io — Time Controls
 
-The **time column** is a two-panel stack in the top-right corner of the shell: the **system tick** readout above the **speed controls**. Both are the same width as the minimap so the right edge stays aligned. See `LAYOUT.md` for placement.
+The **time panel** is a single panel in the top-right corner of the shell, split
+into **two columns** (25% / 75%): a compact **calendar block** on the left and the
+**speed controls** on the right. It is the same width as the minimap so the right
+edge stays aligned. See `LAYOUT.md` for placement.
 
 This document records the current implemented behaviour and is to be expanded. The authoritative pacing constants live in `src/core/sim_loop.hpp`.
 
 ---
 
-## System tick — readout (top)
+## Calendar block (left column, 25%)
 
-A permanent, non-interactive player-facing clock:
+A player-facing clock in three stacked rows:
 
-- **Calendar date** — a compact `Y1 M05 D12` line (year / month / day), derived
-  from the raw day count by `ui::fmt::short_date` (see `src/ui/format.hpp`).
-- **Quarter + day** — the in-year quarter (`Q1`–`Q4`) alongside the absolute day
-  count, e.g. `Q2  -  Day 132`.
+- **Year + quarter** — `1960 Q1` (`calendar_date::year` / `::quarter`).
+- **Month + day** — `Jan 01`, a three-letter month abbreviation
+  (`ui::fmt::month_abbrev`) and the zero-padded day.
+- **Quarter progress** — a progress bar showing how far through the current
+  in-year quarter the campaign is, labelled with the percentage
+  (`ui::fmt::quarter_progress`). The economy resolves on the quarter boundary, so
+  this doubles as a countdown to the next economy tick.
 
 The calendar completes sim_loop's tentative constants (30-day months, 3-month
-quarters) with a 4-quarter, 360-day year.
+quarters) with a 4-quarter, 360-day year. The 12 thirty-day months map to
+Jan–Dec, and the campaign epoch is set so day 0 falls on `Jan 01 1960`
+(`ui::fmt::campaign_epoch_year`).
 
-## Speed controls (below)
+## Speed controls (right column, 75%)
 
-The time controls and a raw `Sim` counter with the current multiplier:
+A raw `Sim` counter with the current multiplier, then the controls:
 
 - **`II`** — pause.
 - **`1`–`5`** — set the speed multiplier. The active speed is highlighted.

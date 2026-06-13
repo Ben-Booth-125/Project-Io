@@ -37,4 +37,22 @@ void resource(ImDrawList* dl, ImVec2 centre, float r, resource_type res);
 /// @param colour Fill colour (e.g. a faction colour).
 void unit(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw a ledger glyph — a small ruled table outline — in @p colour. Used by the
+/// navigation pane for slots that open a ledger window (e.g. the Tile Ledger).
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Stroke colour.
+void ledger(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
+/// Draw a reserved-slot placeholder glyph — a hollow rounded square — in
+/// @p colour. Used by the navigation pane for slots not yet assigned a menu.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Stroke colour.
+void placeholder(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 } // namespace ui::icons

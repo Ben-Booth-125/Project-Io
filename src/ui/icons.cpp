@@ -53,4 +53,19 @@ void unit(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     dl->AddConvexPolyFilled(v, 3, colour);
 }
 
+void ledger(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    const ImVec2 a = { centre.x - r, centre.y - r };
+    const ImVec2 b = { centre.x + r, centre.y + r };
+    dl->AddRect(a, b, colour, 2.0f, 0, 1.5f);
+    // Two ruled rows so it reads as a table rather than a plain box.
+    dl->AddLine({ a.x, centre.y - r * 0.33f }, { b.x, centre.y - r * 0.33f }, colour, 1.0f);
+    dl->AddLine({ a.x, centre.y + r * 0.33f }, { b.x, centre.y + r * 0.33f }, colour, 1.0f);
+}
+
+void placeholder(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    dl->AddRect({ centre.x - r, centre.y - r }, { centre.x + r, centre.y + r }, colour, 2.0f, 0, 1.5f);
+}
+
 } // namespace ui::icons

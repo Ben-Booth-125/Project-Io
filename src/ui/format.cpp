@@ -4,6 +4,7 @@
 
 #include <array>
 #include <cmath>
+#include <cstddef>
 #include <cstdio>
 
 namespace ui::fmt {
@@ -32,6 +33,15 @@ constexpr std::array<magnitude_suffix, 4> magnitude_suffixes = {{
     { 1e9,  "B" },
     { 1e6,  "M" },
     { 1e3,  "k" },
+}};
+
+constexpr int days_per_quarter = days_per_month * months_per_quarter; // 90
+
+// Month abbreviations, indexed 0-11 (January..December). The 12 thirty-day
+// calendar months map directly onto Jan–Dec.
+constexpr std::array<const char*, months_per_year> month_abbrevs = {{
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
 }};
 
 } // namespace
@@ -91,25 +101,31 @@ std::string percent(double fraction, int decimals)
     return buf;
 }
 
+const char* month_abbrev(int month)
+{
+    if (month < 1 || month > months_per_year)
+        return "?";
+    return month_abbrevs[static_cast<std::size_t>(month - 1)];
+}
+
 calendar_date date_from_day(uint64_t day_tick)
 {
     const uint64_t day_of_year = day_tick % static_cast<uint64_t>(days_per_year);
     const int      month_index = static_cast<int>(day_of_year) / days_per_month; // 0-11
 
     calendar_date d;
-    d.year    = static_cast<int>(day_tick / static_cast<uint64_t>(days_per_year)) + 1;
+    d.year    = static_cast<int>(day_tick / static_cast<uint64_t>(days_per_year)) + campaign_epoch_year;
     d.month   = month_index + 1;
     d.day     = static_cast<int>(day_of_year % static_cast<uint64_t>(days_per_month)) + 1;
     d.quarter = month_index / months_per_quarter + 1;
     return d;
 }
 
-std::string short_date(uint64_t day_tick)
+float quarter_progress(uint64_t day_tick)
 {
-    const calendar_date d = date_from_day(day_tick);
-    char buf[32];
-    std::snprintf(buf, sizeof(buf), "Y%d M%02d D%02d", d.year, d.month, d.day);
-    return buf;
+    const uint64_t day_of_year     = day_tick % static_cast<uint64_t>(days_per_year);
+    const int      day_of_quarter  = static_cast<int>(day_of_year) % days_per_quarter; // 0..89
+    return static_cast<float>(day_of_quarter) / static_cast<float>(days_per_quarter);
 }
 
 } // namespace ui::fmt

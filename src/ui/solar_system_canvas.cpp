@@ -1,11 +1,13 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "solar_system_canvas.hpp"
 
+#include "canvas_scale.hpp"
 #include "highlight.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <limits>
 #include <random>
 #include <vector>
 
@@ -76,6 +78,12 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
     // AU-to-pixel scale for the auto-fit framing (zoom 1). The view transform
     // below applies pan and zoom on top of this.
     const float scale = (min_dim * 0.45f) / max_radius_au;
+
+    // Zoom bounds shared by the scale/zoom slider and the scroll-wheel handler so
+    // both agree on the range. The minimum frames at most 50 AU; the maximum is
+    // the 20x cap. Defined once here in terms of the auto-fit reference radius.
+    const float zoom_min = std::max(0.2f, max_radius_au / 50.0f);
+    const float zoom_max = 20.0f;
 
     // --- View transform: pan and zoom -------------------------------------
     // Applied only when this canvas is the primary view; the minimap always
@@ -161,16 +169,38 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
 
     const ImVec2 mouse = ImGui::GetIO().MousePos;
 
-    // Track which body the mouse is over, resolved during the draw so the
-    // tooltip and click read the same hit.
-    entity_id hovered_body = null_entity;
-
     // Iterate bodies in a stable id order for deterministic overlap behaviour.
     std::vector<entity_id> body_ids;
     body_ids.reserve(w.bodies.size());
     for (const auto& [id, _] : w.bodies)
         body_ids.push_back(id);
     std::sort(body_ids.begin(), body_ids.end());
+
+    // Resolve the single hovered body up front so overlapping markers settle on
+    // one stable choice rather than each drawing its own ring (see the highlight
+    // tie convention in highlight.hpp). The body whose centre is nearest the
+    // cursor wins; the strict `<` over id-sorted bodies keeps an exact-distance
+    // tie on the lowest id, which is arbitrary but stable frame-to-frame.
+    entity_id hovered_body = null_entity;
+    if (input_enabled)
+    {
+        float best_d2 = std::numeric_limits<float>::max();
+        for (entity_id id : body_ids)
+        {
+            const body_component& body = w.bodies.at(id);
+            const float radius = std::max(2.0f, style_for(body.type).base_radius * element_scale);
+            const ImVec2 pos = to_screen(body_world(id, body_world));
+            const float dx = mouse.x - pos.x;
+            const float dy = mouse.y - pos.y;
+            const float d2 = dx * dx + dy * dy;
+            const float hit = radius + 3.0f; // small tolerance keeps minimap dots clickable
+            if (d2 <= hit * hit && d2 < best_d2)
+            {
+                best_d2 = d2;
+                hovered_body = id;
+            }
+        }
+    }
 
     for (entity_id id : body_ids)
     {
@@ -180,18 +210,7 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
 
         const ImVec2 pos = to_screen(body_world(id, body_world));
 
-        // Hit test with a small tolerance so small minimap dots stay clickable.
-        bool this_hovered = false;
-        if (input_enabled)
-        {
-            const float dx = mouse.x - pos.x;
-            const float dy = mouse.y - pos.y;
-            if (dx * dx + dy * dy <= (radius + 3.0f) * (radius + 3.0f))
-            {
-                this_hovered = true;
-                hovered_body = id;
-            }
-        }
+        const bool this_hovered = (id == hovered_body);
 
         dl->AddCircleFilled(pos, radius, style.colour);
 
@@ -220,77 +239,14 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
     }
 
     // Scale bar + zoom slider — primary view only, pinned to the bottom centre.
-    // Drawn before the input_enabled early-out so it stays put while an ImGui
-    // panel (including this slider itself) is capturing the mouse. The slider is
-    // a real ImGui widget, so it handles its own input regardless.
+    // Shared with the Circumplanetary canvas via draw_scale_zoom_overlay. Drawn
+    // before the input_enabled early-out so it stays put while an ImGui panel
+    // (including this slider itself) captures the mouse; the slider is a real
+    // ImGui widget and handles its own input regardless. `scale * zoom` is the
+    // live pixels-per-AU; the slider writes back to state.solar_zoom.
     if (apply_view)
-    {
-        // Pixels per AU at the current view. `scale` is the auto-fit AU->pixel
-        // factor at zoom 1; multiplying by zoom gives the live factor.
-        const float px_per_au = scale * zoom;
-
-        // Fixed-width scale bar (8% of the canvas width); the AU distance it
-        // spans is dynamic, shown to two decimals at the current zoom.
-        const float bar_px = size.x * 0.08f;
-        const float bar_au = bar_px / px_per_au;
-
-        const float slider_w = std::clamp(size.x * 0.12f, 120.0f, 240.0f);
-
-        // Centre the scale bar on the canvas; the slider sits to its right. The
-        // window's left edge is placed so the bar (the leading element) is
-        // screen-centred, with the slider offset rightward beyond it.
-        ImGui::SetNextWindowPos({origin.x + size.x * 0.5f - bar_px * 0.5f,
-                                 origin.y + size.y - 8.0f},
-                                ImGuiCond_Always, {0.0f, 1.0f});
-        ImGui::SetNextWindowBgAlpha(0.0f); // no fill
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{0.0f, 0.0f});
-        constexpr ImGuiWindowFlags scale_flags =
-            ImGuiWindowFlags_NoTitleBar          |
-            ImGuiWindowFlags_NoResize            |
-            ImGuiWindowFlags_NoMove              |
-            ImGuiWindowFlags_NoCollapse          |
-            ImGuiWindowFlags_NoScrollbar         |
-            ImGuiWindowFlags_NoNav               |
-            ImGuiWindowFlags_NoBringToFrontOnFocus |
-            ImGuiWindowFlags_NoSavedSettings     |
-            ImGuiWindowFlags_AlwaysAutoResize;
-        ImGui::Begin("##solar_scale", nullptr, scale_flags);
-
-        // --- Scale bar: a horizontal rule with end ticks and a centred label.
-        const ImVec2 bar_origin = ImGui::GetCursorScreenPos();
-        const float  bar_h      = ImGui::GetTextLineHeight() + 8.0f;
-        ImGui::Dummy({bar_px, bar_h});
-
-        ImDrawList* wdl = ImGui::GetWindowDrawList();
-        const ImU32 bar_col = IM_COL32(200, 205, 220, 220);
-        const float by  = bar_origin.y + bar_h - 3.0f; // bar baseline
-        const float bx0 = bar_origin.x;
-        const float bx1 = bar_origin.x + bar_px;
-        wdl->AddLine({bx0, by}, {bx1, by}, bar_col, 1.5f);
-        wdl->AddLine({bx0, by - 5.0f}, {bx0, by}, bar_col, 1.5f);
-        wdl->AddLine({bx1, by - 5.0f}, {bx1, by}, bar_col, 1.5f);
-
-        char bar_label[32];
-        std::snprintf(bar_label, sizeof(bar_label), "%.2f AU", bar_au);
-        const ImVec2 lsz = ImGui::CalcTextSize(bar_label);
-        wdl->AddText({bar_origin.x + (bar_px - lsz.x) * 0.5f, bar_origin.y}, bar_col, bar_label);
-
-        // --- Zoom slider: visible radius in AU, 0.5 (zoomed in) to 50 (out).
-        // Logarithmic so the two-decade range feels even across the track. No
-        // value text — the scale bar already reports the distance.
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(slider_w);
-        float visible_au = std::clamp(max_radius_au / zoom, 0.5f, 50.0f);
-        if (ImGui::SliderFloat("##zoom", &visible_au, 0.5f, 50.0f, "",
-                               ImGuiSliderFlags_Logarithmic))
-        {
-            state.solar_zoom = max_radius_au / visible_au;
-        }
-
-        ImGui::End();
-        ImGui::PopStyleVar(2);
-    }
+        draw_scale_zoom_overlay("solar", origin, size, scale * zoom,
+                                state.solar_zoom, zoom_min, zoom_max);
 
     if (!input_enabled)
         return;
@@ -339,9 +295,8 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
 
         if (io.MouseWheel != 0.0f)
         {
-            // Min zoom caps the view at 50 AU; max zoom is the existing 20x limit.
-            const float zoom_min = std::max(0.2f, max_radius_au / 50.0f);
-            const float new_zoom = std::clamp(zoom * std::pow(1.1f, io.MouseWheel), zoom_min, 20.0f);
+            // Same bounds as the zoom slider (min frames 50 AU; max is the 20x cap).
+            const float new_zoom = std::clamp(zoom * std::pow(1.1f, io.MouseWheel), zoom_min, zoom_max);
             // World point under the cursor, kept fixed across the zoom change.
             const ImVec2 wp = { (mouse.x - view_origin.x) / zoom,
                                 (mouse.y - view_origin.y) / zoom };

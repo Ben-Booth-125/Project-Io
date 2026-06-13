@@ -41,8 +41,9 @@ Economic and military data (supply routes, faction presence, convoy paths) are a
 | Body (asteroid) | Filled circle, radius 4 px. Colour: `(140, 110, 80)` brown. |
 | Body (station) | Filled circle, radius 4 px. Colour: `(80, 180, 160)` teal. |
 | Body label | Body name, drawn just below the body circle. Colour: white. **Planets and asteroids are labelled permanently; moons are labelled only while hovered**, to keep the crowded inner system readable. The label tracks the live body position every frame; it stays crisp because the UI font atlas is loaded with horizontal oversampling (the former sub-pixel shimmer is fixed — see `src/ui/fonts.hpp`). |
-| Selection / hover ring | Ring drawn around a body via the shared highlight convention (`src/ui/highlight.hpp`): white for the selected body, light blue for the hovered body, amber for a pinned body (pinning not yet wired). 3 px outside the body radius, constant pixel size. |
-| Hover tooltip | Body name, type string, orbital radius in AU. Shown while mouse is over a body circle. |
+| Selection / hover ring | Ring drawn around a body via the shared highlight convention (`src/ui/highlight.hpp`): white for the selected body, light blue for the hovered body, amber for a pinned body (pinning not yet wired). 3 px outside the body radius, constant pixel size. When markers overlap the cursor, **only one** body highlights — the nearest centre wins, with body id breaking exact ties (arbitrary but stable); a hit-test pass resolves the single hovered body before drawing. |
+| Hover tooltip | Body name, type string, orbital radius in AU. Shown while mouse is over a body circle (the single resolved body). |
+| Scale bar + zoom slider | Bottom-centre overlay (primary view only): a fixed-width scale bar reporting the AU it spans at the current zoom, and a logarithmic zoom slider where **right = zoomed in, left = zoomed out**. Factored into the shared `ui::draw_scale_zoom_overlay` (`src/ui/canvas_scale.hpp`), used by the Circumplanetary canvas too. |
 
 ---
 
@@ -91,7 +92,7 @@ markers embedded in it.
 - **Left-click a body — descend (zoom in).** When the Solar screen is primary, clicking a body sets `active_body` and drills the primary down one rung to that body's **Circumplanetary** view. Clicking a **planet** opens the planet's view; clicking a **moon** opens its **parent planet's** view with the moon selected. Clicking the **star** does nothing (it has no Circumplanetary view).
 - **Click the Solar minimap — ascend.** When the Solar screen is the minimap (i.e. the Circumplanetary screen is primary), any click promotes the Solar screen back to primary.
 - Input is only processed for the canvas the mouse is over; an ImGui panel under the cursor takes precedence over the canvases.
-- **Pan and zoom (primary view only).** Scroll wheel zooms, anchored at the cursor so the point under the mouse stays fixed; the middle mouse button pans. Positions and orbital rings scale with zoom, but element sizes (body/star radii, labels, selection outlines) stay the same pixel size. The default framing (zoom 1, no pan) is the auto-fit that shows all bodies. The **minimap always renders the default framing** — pan/zoom apply only when the canvas holds the primary slot. View state (`solar_zoom`, `solar_pan_x/y`) lives in `ui_state`.
+- **Pan and zoom (primary view only).** Scroll wheel zooms, anchored at the cursor so the point under the mouse stays fixed; the middle mouse button pans. A bottom-centre **zoom slider** sets the same factor — dragging **right zooms in**, left zooms out — sharing its bounds with the wheel. Positions and orbital rings scale with zoom, but element sizes (body/star radii, labels, selection outlines) stay the same pixel size. The default framing (zoom 1, no pan) is the auto-fit that shows all bodies. The **minimap always renders the default framing** — pan/zoom apply only when the canvas holds the primary slot. View state (`solar_zoom`, `solar_pan_x/y`) lives in `ui_state`.
 
 ---
 
