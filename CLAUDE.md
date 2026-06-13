@@ -33,3 +33,6 @@ a specific implementation choice was made.
 
 **`docs/ui/CANVASES.md`**
 Detailed design specification for the Solar System Canvas and Body Surface Canvas: visual language, colour palette, coordinate mapping, interaction model, and implementation approach. Authoritative reference for Layer 2 and for any later work that adds overlays to these canvases.
+
+**`docs/ui/LAYOUT.md`**
+Surface-level description of the application shell — how the screen regions (navigation pane, canvas area, time column, ledger windows) are arranged around the canvases. Read for questions about overall UI layout; CANVASES.md covers the canvas internals.

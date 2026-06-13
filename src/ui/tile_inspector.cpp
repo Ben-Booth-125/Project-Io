@@ -1,5 +1,7 @@
 #include "tile_inspector.hpp"
 
+#include "nav_pane.hpp"
+
 #include <imgui.h>
 
 #include <algorithm>
@@ -51,8 +53,12 @@ constexpr const char* resource_labels[resource_count] = {
 
 } // namespace
 
-void draw_tile_inspector(const world& w)
+void draw_tile_inspector(const world& w, bool* p_open)
 {
+    // Honour the open flag; when closed the window draws nothing at all.
+    if (p_open && !*p_open)
+        return;
+
     // Collect body IDs into a stable order for the combo box.
     std::vector<entity_id> body_ids;
     body_ids.reserve(w.bodies.size());
@@ -60,9 +66,11 @@ void draw_tile_inspector(const world& w)
         body_ids.push_back(id);
     std::sort(body_ids.begin(), body_ids.end());
 
-    ImGui::SetNextWindowPos({10, 70}, ImGuiCond_Once);
+    // Open to the right of the navigation pane on first appearance.
+    ImGui::SetNextWindowPos({nav_pane_width + 10.0f, 10.0f}, ImGuiCond_Once);
     ImGui::SetNextWindowSize({820, 560}, ImGuiCond_Once);
-    ImGui::Begin("Tile Inspector");
+    // Passing p_open gives the window a close button that clears the flag.
+    ImGui::Begin("Tile Ledger", p_open);
 
     if (body_ids.empty())
     {

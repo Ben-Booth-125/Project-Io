@@ -1,10 +1,9 @@
 -- Project Io — init.lua
 -- Loaded at startup. Confirms Lua is alive and defines global config accessible to C++.
+-- Calendar/pacing now lives in sim_loop (C++); Lua keeps only the starting speed.
 
 config = {
-    sim_hz         = 20,   -- simulation steps per second
-    econ_per_sec   = 1,    -- economy ticks per second
+    default_speed = 1,   -- initial time speed, 1x..5x (0 would start paused)
 }
 
-print(string.format("[Lua] init.lua loaded  sim_hz=%d  econ_per_sec=%d",
-    config.sim_hz, config.econ_per_sec))
+print(string.format("[Lua] init.lua loaded  default_speed=%d", config.default_speed))

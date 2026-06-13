@@ -30,6 +30,7 @@ enum class terrain_type : uint8_t
     rocky    = 1, ///< Irregular surface, moderate yield, higher build cost.
     icy      = 2, ///< Ice-dominated; high ice deposit, low habitability.
     volcanic = 3, ///< High hazard; elevated rare metal deposits.
+    water    = 4, ///< Ocean or sea surface; no land resources, high habitability.
 };
 
 /// Celestial body classification.
@@ -72,13 +73,23 @@ struct tile_component
 
 /// A celestial body — the primary unit of territorial control and the location
 /// where extraction, market activity, and conflict occur.
+///
+/// Orbital model: a body orbits the star unless `parent` is set, in which case
+/// it orbits that parent body (a moon around its planet). `orbital_radius_au`
+/// and `orbital_angle_rad` are interpreted relative to whichever centre applies.
+/// `orbital_angle_rad` advances each frame by `orbital_angular_velocity_rad_per_day`
+/// (see advance_orbits in orbital_system.hpp); the authored value is the phase
+/// at world construction.
 struct body_component
 {
     std::string name;
     body_type   type;
-    float       orbital_radius_au; ///< Distance from the system's star in AU.
-    int         grid_width;        ///< Number of tile columns.
-    int         grid_height;       ///< Number of tile rows.
+    entity_id   parent = null_entity; ///< Body this one orbits; null_entity = orbits the star directly.
+    float       orbital_radius_au;    ///< Orbital distance in AU — from the star, or from `parent` if set.
+    float       orbital_angle_rad;    ///< Current angular position, radians. 0 = right, increases counter-clockwise.
+    float       orbital_angular_velocity_rad_per_day = 0.0f; ///< Angular speed; advances orbital_angle_rad over time. 0 = stationary.
+    int         grid_width;           ///< Number of tile columns.
+    int         grid_height;          ///< Number of tile rows.
 };
 
 /// Surface installation stub. Combat and production logic are added in later
