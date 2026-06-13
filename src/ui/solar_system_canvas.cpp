@@ -194,9 +194,10 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
     {
         if (hovered_body != null_entity)
         {
-            // Select the body and bring its surface forward in a single action.
-            state.active_body        = hovered_body;
-            state.surface_is_primary = true;
+            // Select the body; the planetary minimap updates in place. The solar
+            // canvas remains primary — the player navigates to the planetary view
+            // by clicking the minimap.
+            state.active_body = hovered_body;
         }
         else if (is_minimap)
         {

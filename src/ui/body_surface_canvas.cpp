@@ -2,12 +2,16 @@
 #include "body_surface_canvas.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <unordered_set>
 
 namespace ui {
 
 namespace {
+
+constexpr float kSqrt3 = 1.7320508f;
+constexpr float kPi    = 3.14159265f;
 
 const char* terrain_name(terrain_type t)
 {
@@ -17,6 +21,7 @@ const char* terrain_name(terrain_type t)
         case terrain_type::rocky:    return "Rocky";
         case terrain_type::icy:      return "Icy";
         case terrain_type::volcanic: return "Volcanic";
+        case terrain_type::water:    return "Water";
         default:                     return "?";
     }
 }
@@ -29,6 +34,7 @@ ImU32 terrain_colour(terrain_type t)
         case terrain_type::rocky:    return IM_COL32(112, 105,  95, 255);
         case terrain_type::icy:      return IM_COL32(160, 200, 220, 255);
         case terrain_type::volcanic: return IM_COL32(135,  55,  28, 255);
+        case terrain_type::water:    return IM_COL32( 40,  80, 160, 255);
         default:                     return IM_COL32( 60,  60,  60, 255);
     }
 }
@@ -45,10 +51,32 @@ const char* body_type_name(body_type t)
     }
 }
 
-// Resource labels in resource_type order, for the hover tooltip.
 constexpr const char* resource_labels[resource_count] = {
     "Iron Ore", "Ice", "Silicates", "Rare Metals"
 };
+
+/// Fills `out[6]` with the screen-space vertices of a pointy-top hexagon
+/// centred at (cx, cy) with circumradius r.
+void hex_vertices(ImVec2 out[6], float cx, float cy, float r)
+{
+    for (int i = 0; i < 6; ++i)
+    {
+        const float angle = kPi / 6.0f + kPi / 3.0f * static_cast<float>(i);
+        out[i] = { cx + r * std::cos(angle), cy + r * std::sin(angle) };
+    }
+}
+
+/// World-space centre of a hex at (col, row) in odd-r offset coordinates,
+/// relative to the grid top-left, using the given circumradius.
+ImVec2 hex_local_centre(int col, int row, float hex_size)
+{
+    const float col_step = kSqrt3 * hex_size;
+    const float row_step = 1.5f * hex_size;
+    return {
+        col_step * static_cast<float>(col) + ((row & 1) ? col_step * 0.5f : 0.0f),
+        row_step * static_cast<float>(row),
+    };
+}
 
 } // namespace
 
@@ -56,15 +84,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
 {
     ImDrawList* dl = ImGui::GetBackgroundDrawList();
 
-    // Background fill.
     dl->AddRectFilled(origin, origin + size, IM_COL32(18, 18, 24, 255));
 
-    // This canvas is the minimap when the solar canvas holds the primary slot.
-    const bool is_minimap = !state.surface_is_primary;
-    const float min_dim = std::min(size.x, size.y);
-    const bool  draw_title = min_dim > 320.0f; // suppress the title bar on the minimap
+    const bool  is_minimap = !state.surface_is_primary;
+    const float min_dim    = std::min(size.x, size.y);
+    const bool  draw_title = min_dim > 320.0f;
 
-    // Resolve the selected body. With no selection there is nothing to draw.
     auto body_it = w.bodies.find(state.active_body);
     if (body_it == w.bodies.end())
     {
@@ -74,7 +99,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
             const ImVec2 ts = ImGui::CalcTextSize(msg);
             dl->AddText(origin + (size - ts) * 0.5f, IM_COL32(150, 150, 150, 255), msg);
         }
-        // Even with no body, an empty minimap click still swaps to primary.
         if (input_enabled && is_minimap && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
             state.surface_is_primary = true;
         return;
@@ -82,7 +106,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
 
     const body_component& body = body_it->second;
 
-    // Optional title bar showing the selected body name and type.
     float title_h = 0.0f;
     if (draw_title)
     {
@@ -96,15 +119,49 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
     const int gw = std::max(1, body.grid_width);
     const int gh = std::max(1, body.grid_height);
 
-    // Grid occupies the region below the title bar, centred in the remaining space.
+    // Grid occupies the region below the title bar.
     const ImVec2 grid_area_origin = origin + ImVec2{0.0f, title_h};
     const ImVec2 grid_area_size   = { size.x, size.y - title_h };
+    const ImVec2 canvas_centre    = grid_area_origin + grid_area_size * 0.5f;
 
-    const float cell_size = std::min(grid_area_size.x / gw, grid_area_size.y / gh);
-    const ImVec2 grid_origin =
-        grid_area_origin + (grid_area_size - ImVec2{gw * cell_size, gh * cell_size}) * 0.5f;
+    // --- Hex size at zoom=1 ---
+    // zoom=1 is defined as "the full grid height fills the canvas height." The
+    // grid width will typically exceed the canvas at this scale — the player pans
+    // horizontally. This definition makes zoom=4/3 mean exactly "3/4 of the grid
+    // height is visible" regardless of canvas size or grid aspect ratio, so the
+    // same zoom value reads correctly on both the primary view and the minimap.
+    const float fit_by_y = grid_area_size.y / (1.5f * static_cast<float>(gh) + 0.5f);
+    const float hex_size = fit_by_y * 0.95f; // 5% margin
 
-    // Tiles that carry a building, so we can mark them.
+    // Grid centre in local (unzoomed) world space — used to centre the grid
+    // on the canvas at zoom=1 with no pan.
+    const float col_step = kSqrt3 * hex_size;
+    const float row_step = 1.5f * hex_size;
+    const float grid_cx  = (static_cast<float>(gw) - 0.5f) * col_step * 0.5f;
+    const float grid_cy  = static_cast<float>(gh - 1) * row_step * 0.5f;
+
+    // --- View transform (pan/zoom) ---
+    // Both primary and minimap share the same zoom level so they stay in sync.
+    // Pan applies only when primary — the minimap centres on the grid midpoint.
+    const bool   apply_view  = !is_minimap;
+    const float  zoom        = std::max(0.1f, state.planetary_zoom);
+    const ImVec2 view_origin = apply_view
+        ? ImVec2{ canvas_centre.x + state.planetary_pan_x,
+                  canvas_centre.y + state.planetary_pan_y }
+        : canvas_centre;
+
+    // Local world space → screen space.
+    auto to_screen = [&](ImVec2 lp) -> ImVec2 {
+        return {
+            view_origin.x + (lp.x - grid_cx) * zoom,
+            view_origin.y + (lp.y - grid_cy) * zoom,
+        };
+    };
+
+    // Clip to the grid area so hexes don't overdraw the title bar or the solar canvas.
+    dl->PushClipRect(grid_area_origin, grid_area_origin + grid_area_size, true);
+
+    // Tiles that carry a building, for the building marker pass.
     std::unordered_set<entity_id> built_tiles;
     for (const auto& [id, bld] : w.buildings)
     {
@@ -116,42 +173,62 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
     const ImVec2 mouse = ImGui::GetIO().MousePos;
     entity_id hovered_tile = null_entity;
 
-    const float marker_half = std::max(2.0f, std::min(4.0f, cell_size * 0.18f));
+    // Slightly shrink the drawn hex so the background shows through as a border.
+    // Use the full circumradius for hit-testing so small hexes stay clickable.
+    const float draw_r = hex_size * zoom - 1.0f;
+    const float hit_r  = hex_size * zoom;
 
     for (const auto& [id, tile] : w.tiles)
     {
         if (tile.body != state.active_body)
             continue;
 
-        // 1 px gap on each side lets the background show through as a border.
-        const ImVec2 cell_min = grid_origin + ImVec2{tile.grid_x * cell_size + 1.0f, tile.grid_y * cell_size + 1.0f};
-        const ImVec2 cell_max = grid_origin + ImVec2{(tile.grid_x + 1) * cell_size - 1.0f, (tile.grid_y + 1) * cell_size - 1.0f};
+        const ImVec2 lc  = hex_local_centre(tile.grid_x, tile.grid_y, hex_size);
+        const ImVec2 sc  = to_screen(lc);
 
-        dl->AddRectFilled(cell_min, cell_max, terrain_colour(tile.terrain));
+        ImVec2 verts[6];
+        hex_vertices(verts, sc.x, sc.y, draw_r);
+        dl->AddConvexPolyFilled(verts, 6, terrain_colour(tile.terrain));
 
         if (built_tiles.count(id))
         {
-            const ImVec2 cell_centre = (cell_min + cell_max) * 0.5f;
-            dl->AddRectFilled(cell_centre - ImVec2{marker_half, marker_half},
-                              cell_centre + ImVec2{marker_half, marker_half},
+            const float mh = std::max(2.0f, draw_r * 0.18f);
+            dl->AddRectFilled(sc - ImVec2{mh, mh}, sc + ImVec2{mh, mh},
                               IM_COL32(255, 255, 255, 255));
         }
 
         if (id == state.active_tile)
-            dl->AddRect(cell_min, cell_max, IM_COL32(255, 255, 255, 255), 0.0f, 0, 2.0f);
-
-        if (input_enabled &&
-            mouse.x >= cell_min.x && mouse.x <= cell_max.x &&
-            mouse.y >= cell_min.y && mouse.y <= cell_max.y)
         {
-            hovered_tile = id;
+            ImVec2 outline[6];
+            hex_vertices(outline, sc.x, sc.y, draw_r);
+            dl->AddPolyline(outline, 6, IM_COL32(255, 255, 255, 255), ImDrawFlags_Closed, 2.0f);
+        }
+
+        // Hit-test: distance to hex centre < circumradius (approximate, sufficient for usability).
+        if (input_enabled)
+        {
+            const float dx = mouse.x - sc.x;
+            const float dy = mouse.y - sc.y;
+            const bool in_area = mouse.x >= grid_area_origin.x &&
+                                 mouse.x <= grid_area_origin.x + grid_area_size.x &&
+                                 mouse.y >= grid_area_origin.y &&
+                                 mouse.y <= grid_area_origin.y + grid_area_size.y;
+            if (in_area && dx * dx + dy * dy <= hit_r * hit_r)
+                hovered_tile = id;
         }
     }
+
+    // TODO (horizontal wrap): When the view is panned past the left or right
+    // edge of the grid, tiles should continue rendering seamlessly from the
+    // opposite side (infinite horizontal scroll). This requires drawing each
+    // tile at up to three x-offsets: nominal, +grid_width_px, and -grid_width_px,
+    // clipping to the canvas area. Hit-testing needs the same offset logic.
+    dl->PopClipRect();
 
     if (!input_enabled)
         return;
 
-    // Hover tooltip: coordinates, terrain, hazard, habitability, non-zero deposits.
+    // Hover tooltip.
     if (hovered_tile != null_entity)
     {
         const tile_component& tile = w.tiles.at(hovered_tile);
@@ -177,12 +254,34 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
     // Click handling.
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
     {
-        // A click anywhere in the minimap brings the surface canvas forward.
         if (is_minimap)
             state.surface_is_primary = true;
-
         if (hovered_tile != null_entity)
             state.active_tile = hovered_tile;
+    }
+
+    // Pan and zoom — primary view only. Middle mouse button pans; scroll wheel
+    // zooms, anchored at the cursor so the point under the mouse stays fixed.
+    if (apply_view)
+    {
+        ImGuiIO& io = ImGui::GetIO();
+
+        if (ImGui::IsMouseDown(ImGuiMouseButton_Middle))
+        {
+            state.planetary_pan_x += io.MouseDelta.x;
+            state.planetary_pan_y += io.MouseDelta.y;
+        }
+
+        if (io.MouseWheel != 0.0f)
+        {
+            const float new_zoom = std::clamp(zoom * std::pow(1.1f, io.MouseWheel), 0.2f, 20.0f);
+            // World point under the cursor, kept fixed across the zoom change.
+            const ImVec2 wp = { (mouse.x - view_origin.x) / zoom + grid_cx,
+                                (mouse.y - view_origin.y) / zoom + grid_cy };
+            state.planetary_pan_x = mouse.x - (wp.x - grid_cx) * new_zoom - canvas_centre.x;
+            state.planetary_pan_y = mouse.y - (wp.y - grid_cy) * new_zoom - canvas_centre.y;
+            state.planetary_zoom  = new_zoom;
+        }
     }
 }
 

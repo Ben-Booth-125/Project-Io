@@ -30,6 +30,7 @@ enum class terrain_type : uint8_t
     rocky    = 1, ///< Irregular surface, moderate yield, higher build cost.
     icy      = 2, ///< Ice-dominated; high ice deposit, low habitability.
     volcanic = 3, ///< High hazard; elevated rare metal deposits.
+    water    = 4, ///< Ocean or sea surface; no land resources, high habitability.
 };
 
 /// Celestial body classification.

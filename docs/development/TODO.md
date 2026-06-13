@@ -31,6 +31,10 @@ reminders to revisit.
   notable asteroids relate to the ring (embedded markers? separate bodies drawn
   over the band?) when implementing. See `docs/ui/CANVASES.md`.
 
+- **Default Solar view.** The default solar view should be roughly 5 au, with a
+  scale / percentage zoom at the bottom center. Zoom should be capped between
+  the existing minimum zoom, and around 50 au. Subject to change.
+
 ## Known bugs
 
 - **Body labels shimmer while moving (font sub-pixel rendering).** On the Solar

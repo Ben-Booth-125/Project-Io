@@ -10,15 +10,17 @@ namespace ui {
 /// Draw the Body Surface Canvas into the given region using the ImGui
 /// background draw list.
 ///
-/// A tile grid for state.active_body: each tile is a coloured rectangle keyed
-/// to its terrain, buildings are marked with a small square, and hovering a
-/// tile shows its full data. The grid is centred and scaled to fill the region.
+/// A pointy-top hex grid for state.active_body: each tile is a coloured
+/// hexagon keyed to its terrain, buildings are marked with a small square,
+/// and hovering a tile shows its full data. When primary, the player can pan
+/// (middle mouse) and zoom (scroll wheel). The minimap always shows the full
+/// auto-fit framing.
 ///
 /// The same function renders both the primary viewport and the inset minimap;
 /// all sizes are derived from @p size.
 ///
 /// @param w             Read-only world state.
-/// @param state         Shared UI state; mutated on tile click and minimap swap.
+/// @param state         Shared UI state; mutated on tile click, minimap swap, and pan/zoom.
 /// @param origin        Top-left of the region, in screen pixels.
 /// @param size          Width and height of the region, in screen pixels.
 /// @param input_enabled When true, hover and click are processed. The caller

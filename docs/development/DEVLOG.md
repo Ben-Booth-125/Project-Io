@@ -4,6 +4,78 @@ Entries are newest-first. Each entry covers one development session and records 
 
 ---
 
+## 2026-06-13 — Layer 2: planetary view, hex tiles, procedural terrain
+
+**Status:** Complete. Horizontal wrap rendering, pan/zoom min/max enforcement, and grid size expansion via procedural generation are the main open items.
+
+### What was built
+
+**Doc restructure — CANVASES.md → SOLAR.md + PLANETARY.md.**
+`docs/ui/CANVASES.md` was refactored from a monolithic canvas spec into a thin overview document. Per-canvas detail moved to two new files: `docs/ui/SOLAR.md` (Solar System Canvas) and `docs/ui/PLANETARY.md` (Body Surface / Planetary Canvas). CANVASES.md retains shared concerns: primary/minimap layout, region sizing, selection state struct, and the `input_enabled` dispatch model.
+
+**Hex tiles on the planetary canvas.**
+`body_surface_canvas.cpp` was rewritten from a rectangular grid to a **pointy-top hexagonal grid** using odd-r offset coordinates. Tile centres are computed via `hex_local_centre(col, row, hex_size)`. Drawing uses `ImDrawList::AddConvexPolyFilled` for filled hexes and `AddPolyline` for the selection outline. Hit-testing uses distance-to-centre (< circumradius), which is approximate but sufficient for usability. A clip rect prevents hexes bleeding over the title bar or into the solar canvas.
+
+**Water terrain type.**
+`terrain_type::water = 4` added to `components.hpp`. Colour: `(40, 80, 160)` deep blue. `terrain_name()` and `terrain_colour()` updated. No deposits, high habitability modifier. Tile data for existing hard-coded bodies is unchanged for now — water placement is deferred until grids expand.
+
+**Pan/zoom on the planetary canvas.**
+`ui_state` gained `planetary_zoom`, `planetary_pan_x`, `planetary_pan_y`. Controls match the solar canvas: middle mouse button pans, scroll wheel zooms anchored at the cursor. Both primary view and minimap use the same `planetary_zoom` value so they stay in sync; only the primary applies pan offset.
+
+**Zoom reference frame: fit-by-height.**
+The planetary `hex_size` is computed from `fit_by_y` only (canvas height / grid height) rather than `min(fit_by_x, fit_by_y)`. This means zoom=1 is defined as "full grid height fills the canvas," and zoom=4/3 is exactly "3/4 of the grid height visible" — a ratio that holds for any canvas size, including the minimap. Default `planetary_zoom = 4.0f/3.0f`.
+
+**Solar body click no longer switches canvas.**
+Previously clicking a body in the solar view set `surface_is_primary = true`. That was changed: a body click now only sets `active_body`. The planetary minimap updates immediately to show the new body; the player navigates to the planetary primary view by clicking the minimap. SOLAR.md updated to document this.
+
+**Procedural tile generation — Kepler, Cinder, Selene.**
+`hard_coded_world.cpp` gained a `generate_body_tiles()` function that:
+1. Seeds the BFS queue with the **entire centre row** so the ocean grows as a horizontal equatorial band (poles are land).
+2. BFS expands with shuffled neighbour order for an irregular coastline, stopping at 60% water coverage. Horizontal wrap is handled in `hex_neighbors()` via column modulo.
+3. Land tiles draw terrain from a per-body weighted table (barren/rocky/icy/volcanic). Hazard, habitability, and resource deposits are set by terrain type with mild random jitter.
+
+Three bodies received generated tile grids (replacing the earlier small placeholder grids):
+- **Kepler** (Earth analogue): 42 × 174. Barren/rocky dominant, some icy and volcanic. Replaced the hand-authored 4×4 tile table; buildings now attach to the first two land tiles found in raster order.
+- **Cinder** (Mercury analogue): 36 × 186. Volcanic dominant (45%), then barren and rocky.
+- **Selene** (Kepler's moon): 18 × 92. Barren dominant; smaller grid appropriate for a moon.
+- **Vesta** retains its 3×3 hand-authored tiles — small enough to curate manually.
+
+`tile_spec` / `create_tile` helpers are retained for Vesta only. The `generate_body_tiles()` function returns a flat `vector<entity_id>` in raster order (`row*gw+col`) for building placement lookup.
+
+**Two implementation TODOs filed in source.**
+- `body_surface_canvas.cpp`: horizontal wrap / infinite scroll — describes the triple-draw approach needed for seamless east/west panning.
+- `hard_coded_world.cpp`: generation rules — body ~2× wide as tall (both hemispheres), polar row truncation, zoom min (~12 tiles wide) and zoom max (~12 tiles beyond total grid height).
+
+### In-session decisions
+
+**Pointy-top hexes, odd-r offset.**
+Chosen over flat-top because rows read as latitude bands, which aligns naturally with the horizontal ocean / polar land model. Odd rows are shifted right. Column wraps for horizontal continuity; rows do not (poles are boundaries).
+
+**Water is an equatorial band, not a blob.**
+Original BFS used a single random interior seed point, producing a roughly radial blob. Changed to seeding the full centre row simultaneously; BFS then expands symmetrically up and down, producing a horizontal ocean with irregular north/south coastlines. This is consistent with the design intent that poles are at the top and bottom of the grid.
+
+**Grid sizes are slightly varied from the 40×180 target.**
+The 40×180 ratio is a design guideline, not a precise spec. Sizes were deliberately varied (42×174, 36×186, 18×92) to reflect that real bodies won't be uniform. The aspect ratio (~4:1 for planets, ~5:1 for Selene) is the constraint, not the exact count.
+
+**Zoom reference frame changed from min-fit to height-fit.**
+The earlier 4/3 multiplier on the auto-fit zoom had no meaningful effect because the wide planetary grid is always width-constrained. Redefining zoom=1 as "full grid height fills canvas" makes zoom=4/3 a geometrically correct "3/4 height visible" that works at both primary and minimap scale without per-canvas adjustment.
+
+**Both primary and minimap use the same `planetary_zoom`.**
+The solar canvas minimap always shows the default (full-system) framing regardless of solar zoom state. For the planetary canvas, the user preference is that primary and minimap are tied — both show the same zoom level. Only pan is suppressed on the minimap (it centres on the grid midpoint).
+
+**Kepler buildings re-attached by raster scan after generation.**
+The 4×4 hand-authored Kepler tiles referenced specific entity IDs. After switching to procedural generation the IDs are no longer predictable. Rather than authoring specific target coordinates (which could land on water), buildings are attached to the first two non-water tiles found scanning left-to-right, top-to-bottom. This is an acceptable heuristic for a prototype where building placement logic is deferred.
+
+### Open items
+
+- **Horizontal wrap rendering** — east/west pan currently shows blank space beyond the grid edge. The canvas TODO describes the triple-draw approach.
+- **Zoom min/max not enforced** — the generation TODO documents the intended limits (12 tiles wide min, 12 tiles beyond total height max). Currently unclamped beyond a 0.1 floor.
+- **Grid sizes for other bodies** — Bastion, Halo, Ochre, Veld, Ceres, Pallas, Forge, Cyra, Mote, Mote retain small placeholder grids (2×2 to 4×4). Expansion deferred until procedural generation is introduced.
+- **Water placement in existing small grids** — Vesta and all backdrop bodies have no water tiles. The `water` terrain type exists but is not used in any current tile data.
+- **Building placement** — raster-scan heuristic for Kepler is a placeholder. Proper authored placement should be revisited when the extraction layer (Layer 3) designs building site selection.
+
+---
+
 ## 2026-06-13 — UI shell placeholders, orbital motion, and canvas pan/zoom
 
 **Status:** Complete. Canvas refinement continues; asteroid belt (as a ring) and the parked UI items remain open — see `docs/development/TODO.md`.

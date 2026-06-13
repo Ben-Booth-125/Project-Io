@@ -23,4 +23,10 @@ struct ui_state
     float solar_zoom  = 1.0f; ///< Scroll-wheel zoom factor. 1.0 = default auto-fit framing.
     float solar_pan_x = 0.0f; ///< Pan offset of the system centre from the canvas centre, screen px.
     float solar_pan_y = 0.0f; ///< Pan offset of the system centre from the canvas centre, screen px.
+
+    // --- planetary canvas view (primary only; the minimap always shows the
+    // default framing) ---
+    float planetary_zoom  = 4.0f / 3.0f; ///< Scroll-wheel zoom factor. 4/3 shows 3/4 of the grid height on load.
+    float planetary_pan_x = 0.0f; ///< Pan offset of the grid centre from the canvas centre, screen px.
+    float planetary_pan_y = 0.0f; ///< Pan offset of the grid centre from the canvas centre, screen px.
 };
