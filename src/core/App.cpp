@@ -8,12 +8,16 @@
 #include "ui/tile_inspector.hpp"
 #include "world/hard_coded_world.hpp"
 
+#include <stdexcept>
+#include <string>
+
 static constexpr int window_w = 1280;
 static constexpr int window_h = 720;
 
 app::app()
 {
-    SDL_Init(SDL_INIT_VIDEO);
+    if (!SDL_Init(SDL_INIT_VIDEO))
+        throw std::runtime_error(std::string("SDL_Init failed: ") + SDL_GetError());
 
     m_window   = SDL_CreateWindow("Project Io", window_w, window_h, SDL_WINDOW_RESIZABLE);
     m_renderer = SDL_CreateRenderer(m_window, nullptr);
@@ -39,6 +43,15 @@ app::~app()
 int app::run()
 {
     m_lua.load("scripts/init.lua");
+
+    // Apply Lua config to the simulation loop now that the script has run.
+    // Reassigning here resets the internal timer to the current wall clock,
+    // which is the right start point — not app construction time.
+    {
+        sol::table cfg = m_lua.state()["config"];
+        m_sim_loop = sim_loop(cfg["sim_hz"], cfg["econ_per_sec"]);
+    }
+
     m_world = make_hard_coded_world();
 
     bool running = true;

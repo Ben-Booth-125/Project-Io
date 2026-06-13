@@ -20,16 +20,26 @@ SDL3 window, input, and render loop. Fixed-timestep simulation loop with accumul
 ### Layer 1 — Data model
 Define core structs: Body, Tile, Resource, Building stub, Market, Unit stub. Hard-code one or two bodies with a small number of tile types. No logic yet — only correctly shaped data that will not need to be retrofitted when later layers are added.
 
-### Layer 2 — Extraction and production
+### Layer 2 — Primary canvases
+
+Build the Solar System Canvas and Body Surface Canvas. One canvas occupies the primary viewport; the other renders as an inset minimap. Clicking the minimap swaps which is primary.
+
+See **`docs/ui/CANVASES.md`** for the full visual design, interaction spec, colour palette, coordinate mapping, and implementation approach. That document is the authoritative reference for this layer.
+
+Key data model change in this layer: add `orbital_angle_rad` (float) to `body_component`. Hard-coded authored values for the prototype bodies; not procedurally generated.
+
+ImGui draw lists are the only rendering mechanism introduced. No third-party canvas or mapping library.
+
+### Layer 3 — Extraction and production
 An extraction building reads a tile's resource deposit and adds to a stockpile each simulation step. A processing building consumes one resource type and outputs another. Workforce allocation as a scalar modifier on output rate. First observable output: stockpile numbers changing over time.
 
-### Layer 3 — Market and price resolution
+### Layer 4 — Market and price resolution
 Each market holds supply and demand quantities per good. At each economy tick, price resolves from the supply/demand ratio modulated by global rarity. Extraction output feeds supply into the local market. First closed loop: tiles produce → extraction harvests → market price responds.
 
-### Layer 4 — Supply routing
+### Layer 5 — Supply routing
 A supply convoy entity with source body, destination body, cargo, and fractional progress. Progress increments each simulation step; completion evaluates at the economy tick boundary. Delivered cargo adjusts the destination market's supply. Logistical cost is distance-based and reduces profit margin. First spatial dimension: price can now diverge between bodies.
 
-### Layer 5 — Budget
+### Layer 6 — Budget
 Revenue equals goods sold multiplied by price minus logistical cost. Outgoings equal construction and maintenance as flat per-tick costs. A running balance that can go negative. Budget should visibly reflect pressure from competing demands.
 
 ---

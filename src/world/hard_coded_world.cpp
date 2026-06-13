@@ -41,6 +41,10 @@ world make_hard_coded_world()
 {
     world w;
 
+    // Player corporation entity. Holds no component in Layer 1; the budget
+    // layer will attach a corporation_component when revenue attribution is needed.
+    w.player_entity = w.create_entity();
+
     // -----------------------------------------------------------------------
     // Kepler — temperate rocky planet
     // 4×4 tile grid, 1.0 AU from star.
@@ -118,7 +122,7 @@ world make_hard_coded_world()
     const entity_id kepler_unit = w.create_entity();
     w.units[kepler_unit] = unit_component{
         .body  = kepler,
-        .owner = null_entity, // player corporation entity is defined in a later layer
+        .owner = w.player_entity,
         .count = 50,
     };
 

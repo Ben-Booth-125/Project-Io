@@ -30,3 +30,6 @@ Testing framework (Catch2), naming conventions, documentation standards, and how
 Running session log — chronological record of what was built each session and
 in-session decisions. Consult when asked about prior work, open items, or why
 a specific implementation choice was made.
+
+**`docs/ui/CANVASES.md`**
+Detailed design specification for the Solar System Canvas and Body Surface Canvas: visual language, colour palette, coordinate mapping, interaction model, and implementation approach. Authoritative reference for Layer 2 and for any later work that adds overlays to these canvases.

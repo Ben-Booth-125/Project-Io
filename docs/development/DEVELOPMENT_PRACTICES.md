@@ -48,6 +48,8 @@ TEST_CASE("market price resolves from supply/demand ratio", "[market]") {
 
 `snake_case` throughout — types, functions, variables, files, and namespaces.
 
+Private member variables use an `m_` prefix: `m_window`, `m_sim_loop`. Applied consistently to all class members.
+
 ```cpp
 // Correct
 struct market_state { ... };
