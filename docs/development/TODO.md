@@ -9,20 +9,6 @@ Difficulty scale: **1** trivial · **2** light work · **3** medium · **4** har
 
 ---
 
-## UI shell
-
-- **[1] Pause as a toggle.** The time-controls pause button should toggle, remembering
-  the previously set speed so unpausing restores it (rather than requiring the
-  player to re-pick a speed). See `docs/ui/TIME_CONTROLS.md`.
-
-- **[1] Header budget — drop the resource variety.** The header's resource overview
-  does not need multiple distinct resources. Simplify the strip. See
-  `docs/ui/HEADER.md`.
-
-- **[1] Econ ticks measured in "Quarters".** Label economy ticks as Quarters in the
-  player-facing clock, rather than the raw `Econ` count. See
-  `docs/ui/TIME_CONTROLS.md` and `src/core/sim_loop.hpp`.
-
 ## Canvas
 
 - **[4] Asteroid belt as a textured ring, not bodies.** There is a single asteroid
@@ -33,10 +19,6 @@ Difficulty scale: **1** trivial · **2** light work · **3** medium · **4** har
   asteroid bodies and there is no ring — this is a placeholder. Decide how the
   notable asteroids relate to the ring (embedded markers? separate bodies drawn
   over the band?) when implementing. See `docs/ui/CANVASES.md`.
-
-- **[2] Default Solar view.** The default solar view should be roughly 5 au, with a
-  scale / percentage zoom at the bottom center. Zoom should be capped between
-  the existing minimum zoom, and around 50 au. Subject to change.
 
 ## Known bugs
 
