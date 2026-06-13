@@ -13,15 +13,6 @@ namespace {
 constexpr float kSqrt3 = 1.7320508f;
 constexpr float kPi    = 3.14159265f;
 
-// Zoom is normalised to grid height: at zoom = 1 the grid fills kFitMargin of the
-// canvas height. The zoom floor must therefore be derived from these constants,
-// not guessed — at the minimum the viewport spans kMinZoomHeadroom of the grid
-// height (the full grid plus ~20% headroom), i.e. zoom = 1 / (headroom * margin).
-constexpr float kFitMargin       = 0.95f; // grid fills 95% of the canvas height at zoom = 1
-constexpr float kMinZoomHeadroom = 1.2f;  // at min zoom the viewport shows ~120% of the grid height
-constexpr float kMaxZoom         = 20.0f;
-constexpr float kMinZoom         = 1.0f / (kMinZoomHeadroom * kFitMargin); // ~0.877
-
 const char* terrain_name(terrain_type t)
 {
     switch (t)
@@ -95,8 +86,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
 
     dl->AddRectFilled(origin, origin + size, IM_COL32(18, 18, 24, 255));
 
-    // The surface canvas is the bottom rung of the ladder, so it is only ever
-    // drawn as the primary view — never the minimap.
+    const bool  is_minimap = !state.surface_is_primary;
     const float min_dim    = std::min(size.x, size.y);
     const bool  draw_title = min_dim > 320.0f;
 
@@ -109,6 +99,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
             const ImVec2 ts = ImGui::CalcTextSize(msg);
             dl->AddText(origin + (size - ts) * 0.5f, IM_COL32(150, 150, 150, 255), msg);
         }
+        if (input_enabled && is_minimap && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+            state.surface_is_primary = true;
         return;
     }
 
@@ -139,7 +131,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
     // height is visible" regardless of canvas size or grid aspect ratio, so the
     // same zoom value reads correctly on both the primary view and the minimap.
     const float fit_by_y = grid_area_size.y / (1.5f * static_cast<float>(gh) + 0.5f);
-    const float hex_size = fit_by_y * kFitMargin;
+    const float hex_size = fit_by_y * 0.95f; // 5% margin
 
     // Grid centre in local (unzoomed) world space — used to centre the grid
     // on the canvas at zoom=1 with no pan.
@@ -149,10 +141,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
     const float grid_cy  = static_cast<float>(gh - 1) * row_step * 0.5f;
 
     // --- View transform (pan/zoom) ---
-    // The surface canvas is always primary, so pan and zoom always apply.
-    const float  zoom        = std::clamp(state.planetary_zoom, kMinZoom, kMaxZoom);
-    const ImVec2 view_origin = ImVec2{ canvas_centre.x + state.planetary_pan_x,
-                                       canvas_centre.y + state.planetary_pan_y };
+    // Both primary and minimap share the same zoom level so they stay in sync.
+    // Pan applies only when primary — the minimap centres on the grid midpoint.
+    const bool   apply_view  = !is_minimap;
+    const float  zoom        = std::max(0.1f, state.planetary_zoom);
+    const ImVec2 view_origin = apply_view
+        ? ImVec2{ canvas_centre.x + state.planetary_pan_x,
+                  canvas_centre.y + state.planetary_pan_y }
+        : canvas_centre;
 
     // Local world space → screen space.
     auto to_screen = [&](ImVec2 lp) -> ImVec2 {
@@ -182,70 +178,51 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
     const float draw_r = hex_size * zoom - 1.0f;
     const float hit_r  = hex_size * zoom;
 
-    // --- Infinite horizontal scroll ---
-    // The grid is a cylinder: column gw wraps onto column 0. In screen space the
-    // grid repeats every `period_px = gw * col_step * zoom`. Each tile is drawn
-    // (and hit-tested) at every integer wrap offset k whose copy falls within the
-    // canvas, so panning past either edge continues seamlessly from the far side.
-    const float period_px = static_cast<float>(gw) * col_step * zoom;
-    const float visible_left  = grid_area_origin.x - hit_r;
-    const float visible_right = grid_area_origin.x + grid_area_size.x + hit_r;
-
     for (const auto& [id, tile] : w.tiles)
     {
         if (tile.body != state.active_body)
             continue;
 
-        const ImVec2 lc   = hex_local_centre(tile.grid_x, tile.grid_y, hex_size);
-        const ImVec2 sc   = to_screen(lc);
-        const ImU32  fill = terrain_colour(tile.terrain);
-        const bool   built     = built_tiles.count(id) != 0;
-        const bool   selected  = (id == state.active_tile);
+        const ImVec2 lc  = hex_local_centre(tile.grid_x, tile.grid_y, hex_size);
+        const ImVec2 sc  = to_screen(lc);
 
-        // Range of wrap copies that land inside the canvas horizontally.
-        const int k_min = (period_px > 0.0f)
-            ? static_cast<int>(std::ceil((visible_left  - sc.x) / period_px)) : 0;
-        const int k_max = (period_px > 0.0f)
-            ? static_cast<int>(std::floor((visible_right - sc.x) / period_px)) : 0;
+        ImVec2 verts[6];
+        hex_vertices(verts, sc.x, sc.y, draw_r);
+        dl->AddConvexPolyFilled(verts, 6, terrain_colour(tile.terrain));
 
-        for (int k = k_min; k <= k_max; ++k)
+        if (built_tiles.count(id))
         {
-            const float cx = sc.x + static_cast<float>(k) * period_px;
-            const float cy = sc.y;
+            const float mh = std::max(2.0f, draw_r * 0.18f);
+            dl->AddRectFilled(sc - ImVec2{mh, mh}, sc + ImVec2{mh, mh},
+                              IM_COL32(255, 255, 255, 255));
+        }
 
-            ImVec2 verts[6];
-            hex_vertices(verts, cx, cy, draw_r);
-            dl->AddConvexPolyFilled(verts, 6, fill);
+        if (id == state.active_tile)
+        {
+            ImVec2 outline[6];
+            hex_vertices(outline, sc.x, sc.y, draw_r);
+            dl->AddPolyline(outline, 6, IM_COL32(255, 255, 255, 255), ImDrawFlags_Closed, 2.0f);
+        }
 
-            if (built)
-            {
-                const float mh = std::max(2.0f, draw_r * 0.18f);
-                dl->AddRectFilled(ImVec2{cx - mh, cy - mh}, ImVec2{cx + mh, cy + mh},
-                                  IM_COL32(255, 255, 255, 255));
-            }
-
-            if (selected)
-            {
-                ImVec2 outline[6];
-                hex_vertices(outline, cx, cy, draw_r);
-                dl->AddPolyline(outline, 6, IM_COL32(255, 255, 255, 255), ImDrawFlags_Closed, 2.0f);
-            }
-
-            // Hit-test: distance to hex centre < circumradius (approximate, sufficient for usability).
-            if (input_enabled)
-            {
-                const float dx = mouse.x - cx;
-                const float dy = mouse.y - cy;
-                const bool in_area = mouse.x >= grid_area_origin.x &&
-                                     mouse.x <= grid_area_origin.x + grid_area_size.x &&
-                                     mouse.y >= grid_area_origin.y &&
-                                     mouse.y <= grid_area_origin.y + grid_area_size.y;
-                if (in_area && dx * dx + dy * dy <= hit_r * hit_r)
-                    hovered_tile = id;
-            }
+        // Hit-test: distance to hex centre < circumradius (approximate, sufficient for usability).
+        if (input_enabled)
+        {
+            const float dx = mouse.x - sc.x;
+            const float dy = mouse.y - sc.y;
+            const bool in_area = mouse.x >= grid_area_origin.x &&
+                                 mouse.x <= grid_area_origin.x + grid_area_size.x &&
+                                 mouse.y >= grid_area_origin.y &&
+                                 mouse.y <= grid_area_origin.y + grid_area_size.y;
+            if (in_area && dx * dx + dy * dy <= hit_r * hit_r)
+                hovered_tile = id;
         }
     }
 
+    // TODO (horizontal wrap): When the view is panned past the left or right
+    // edge of the grid, tiles should continue rendering seamlessly from the
+    // opposite side (infinite horizontal scroll). This requires drawing each
+    // tile at up to three x-offsets: nominal, +grid_width_px, and -grid_width_px,
+    // clipping to the canvas area. Hit-testing needs the same offset logic.
     dl->PopClipRect();
 
     if (!input_enabled)
@@ -274,13 +251,18 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
         ImGui::EndTooltip();
     }
 
-    // Click handling — select the hovered tile. The surface is the bottom rung,
-    // so a tile click never changes the view; the player ascends via the minimap.
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && hovered_tile != null_entity)
-        state.active_tile = hovered_tile;
+    // Click handling.
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+    {
+        if (is_minimap)
+            state.surface_is_primary = true;
+        if (hovered_tile != null_entity)
+            state.active_tile = hovered_tile;
+    }
 
-    // Pan and zoom. Middle mouse button pans; scroll wheel zooms, anchored at
-    // the cursor so the point under the mouse stays fixed.
+    // Pan and zoom — primary view only. Middle mouse button pans; scroll wheel
+    // zooms, anchored at the cursor so the point under the mouse stays fixed.
+    if (apply_view)
     {
         ImGuiIO& io = ImGui::GetIO();
 
@@ -290,14 +272,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
             state.planetary_pan_y += io.MouseDelta.y;
         }
 
-        // Keep horizontal pan bounded to one grid period. The grid wraps, so
-        // this is visually identical but stops pan_x growing without limit.
-        if (period_px > 0.0f)
-            state.planetary_pan_x = std::fmod(state.planetary_pan_x, period_px);
-
         if (io.MouseWheel != 0.0f)
         {
-            const float new_zoom = std::clamp(zoom * std::pow(1.1f, io.MouseWheel), kMinZoom, kMaxZoom);
+            const float new_zoom = std::clamp(zoom * std::pow(1.1f, io.MouseWheel), 0.2f, 20.0f);
             // World point under the cursor, kept fixed across the zoom change.
             const ImVec2 wp = { (mouse.x - view_origin.x) / zoom + grid_cx,
                                 (mouse.y - view_origin.y) / zoom + grid_cy };

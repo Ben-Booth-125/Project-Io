@@ -150,7 +150,7 @@ Making the star an entity (rather than a loose `world.star_name` string) keeps i
 uniform with every other body, lets it carry a title and — later — anchor the
 Circumplanetary ladder or become selectable. **The star's name is still TBD**
 (the system is "a loose approximation of Sol" with original body names — Cinder,
-Kepler, Vesta, …; the star wants a name in the same register). This is a small
+Kepler, Selene, …; the star wants a name in the same register). This is a small
 code/data change that this UI work depends on; it is tracked as a follow-up, not
 done in this doc.
 

@@ -24,9 +24,9 @@ Stockpile readouts, market state, and workforce indicators are added in later la
 
 **Shape:** Pointy-top hexagons in odd-r offset coordinates. Odd rows are shifted right by half a column. Grid axes: columns (x) run left-to-right, rows (y) run top-to-bottom.
 
-**Target size:** ~40 rows × 180 columns per body (approximately Earth-scale). The 40×180 grids are not yet instantiated in the hard-coded world — existing bodies (Kepler, Cinder, Selene and others) use small placeholder grids. The grid sizes for Kepler, Cinder, and Selene should be expanded to 40×180 when procedural generation is introduced.
+**Target size and aspect ratio:** A body's grid is roughly **9 columns wide for every 5 rows tall** — the height is a little *under* half the width. The reasoning is geometric: the grid width spans the body's full circumference (both hemispheres), so a pole-to-pole height would be half the width; truncating the non-traversable polar caps brings it a little under half. The two planets are standardised to **180 × 84** (columns × rows); **Selene**, as a moon, uses **90 × 42** (the same ratio at half scale). Only Kepler, Cinder, and Selene exist in the prototype world — all other bodies have been removed now that the canvas perspectives are settled.
 
-**Horizontal wrap:** column indices wrap at the grid boundary so the east edge connects to the west edge, forming a cylinder. This is a generation and rendering constraint; the canvas does not currently visualise the seam.
+**Horizontal wrap:** column indices wrap at the grid boundary so the east edge connects to the west edge, forming a cylinder. Generation wraps neighbours across this seam, and the Planetary canvas renders the wrap as a seamless infinite side-scroll: panning past either edge continues into tiles drawn from the opposite side (see [Interaction](#interaction)).
 
 ---
 
@@ -93,7 +93,7 @@ for i in 0..5:
 - **Hover** a tile: show tooltip. Hit-tested by distance to hex centre (< circumradius).
 - **Left-click** a tile: set `active_tile` in selection state. (Tile clicks do not change the view rung — the Planetary screen is the bottom of the ladder.)
 - **Ascend:** clicking the minimap (which shows the Circumplanetary view) promotes it to primary.
-- **Middle mouse button drag:** pan.
+- **Middle mouse button drag:** pan. Horizontal panning is unbounded — the grid is a cylinder, so panning past the east or west edge wraps seamlessly to the opposite side. Each tile is drawn (and hit-tested) at every horizontal offset that falls within the canvas, so there is no visible seam and the column under the cursor is always correct.
 - **Scroll wheel:** zoom, anchored at the cursor position.
 
 ---
@@ -105,5 +105,4 @@ for i in 0..5:
 | Stockpile / output readout on tiles | Layer 3 (extraction) |
 | Resource deposit overlay / lens mode | Deferred indefinitely — terrain colour is sufficient for prototype |
 | Tile inspector ledger redesign (exploration system) | Post-prototype |
-| Horizontal wrap rendering (seam visualisation) | Post-prototype |
-| Water tile placement in hard-coded world bodies | When grids expand to 40×180 |
+| Seam *visualisation* (an explicit marker showing where the wrap occurs) | Post-prototype — the wrap itself is seamless and needs no marker |

@@ -12,6 +12,57 @@
 
 namespace {
 
+entity_id create_simple_body(world& w, const char* name, body_type type,
+                             entity_id parent, float radius_au, float angle_rad,
+                             int grid_w, int grid_h, float angular_velocity = -1.0f)
+{
+    const float omega = (angular_velocity >= 0.0f)
+                      ? angular_velocity
+                      : kepler_angular_velocity(radius_au);
+
+    const entity_id id = w.create_entity();
+    w.bodies[id] = body_component{
+        .name                                 = name,
+        .type                                 = type,
+        .parent                               = parent,
+        .orbital_radius_au                    = radius_au,
+        .orbital_angle_rad                    = angle_rad,
+        .orbital_angular_velocity_rad_per_day = omega,
+        .grid_width                           = grid_w,
+        .grid_height                          = grid_h,
+    };
+    return id;
+}
+
+// Kept for Vesta, which still uses hand-authored tiles.
+struct tile_spec
+{
+    int          grid_x;
+    int          grid_y;
+    terrain_type terrain;
+    float        hazard;
+    float        habitability;
+    float        iron_ore;
+    float        ice;
+    float        silicates;
+    float        rare_metals;
+};
+
+entity_id create_tile(world& w, entity_id body_id, const tile_spec& s)
+{
+    const entity_id id = w.create_entity();
+    w.tiles[id] = tile_component{
+        .body             = body_id,
+        .grid_x           = s.grid_x,
+        .grid_y           = s.grid_y,
+        .terrain          = s.terrain,
+        .resource_deposit = {s.iron_ore, s.ice, s.silicates, s.rare_metals},
+        .hazard_level     = s.hazard,
+        .habitability     = s.habitability,
+    };
+    return id;
+}
+
 // ---------------------------------------------------------------------------
 // Procedural tile generation
 // ---------------------------------------------------------------------------
@@ -71,10 +122,13 @@ std::vector<entity_id> generate_body_tiles(
 
     // --- BFS water flood fill ---
     //
-    // Body grids follow a ~9:5 width:height ratio (height a little under half the
-    // width): the width spans the full circumference (both hemispheres) and the
-    // height is pole-to-pole with the non-traversable polar caps truncated. The
-    // two planets are 180×84 and Selene (a moon) is 90×42; see PLANETARY.md.
+    // TODO (generation): Body grid dimensions should follow the rule that a body
+    // is approximately twice as wide as tall (measuring both hemispheres), with a
+    // slight row truncation at each pole (top and bottom ~5-10% of rows) that are
+    // not navigable terrain. Zoom constraints for the planetary canvas:
+    //   - Minimum zoom: ~12 tiles visible across the viewport width.
+    //   - Maximum zoom: ~12 tiles of headroom beyond the total grid height.
+    // These rules should be enforced when procedural generation is introduced.
     std::vector<bool> is_water(total, false);
     {
         // Seed the BFS from the entire centre row so the ocean grows as a
@@ -240,25 +294,9 @@ world make_hard_coded_world()
     // System layout — a loose approximation of Sol.
     // -----------------------------------------------------------------------
 
-    // Helios — the central star. A stationary body at the system centre with no
-    // surface; its name titles the Solar minimap. Drawn through the same body
-    // pass as every other body (with a star style), so it needs no special case.
-    const entity_id helios = w.create_entity();
-    w.bodies[helios] = body_component{
-        .name                                 = "Helios",
-        .type                                 = body_type::star,
-        .parent                               = null_entity,
-        .orbital_radius_au                    = 0.0f,
-        .orbital_angle_rad                    = 0.0f,
-        .orbital_angular_velocity_rad_per_day = 0.0f,
-        .grid_width                           = 0,
-        .grid_height                          = 0,
-    };
-    w.star_body = helios;
-
     // -----------------------------------------------------------------------
     // Cinder — hot inner planet (Mercury analogue, 0.39 AU)
-    // 180×84 tile grid. Mostly volcanic and barren; ~60% water.
+    // 36×186 tile grid. Mostly volcanic and barren; ~60% water.
     // -----------------------------------------------------------------------
 
     const entity_id cinder = w.create_entity();
@@ -269,17 +307,20 @@ world make_hard_coded_world()
         .orbital_radius_au                    = 0.39f,
         .orbital_angle_rad                    = 0.40f,
         .orbital_angular_velocity_rad_per_day = kepler_angular_velocity(0.39f),
-        .grid_width                           = 180,
-        .grid_height                          = 84,
+        .grid_width                           = 186,
+        .grid_height                          = 36,
     };
 
-    generate_body_tiles(w, cinder, 180, 84, 0.60f,
+    generate_body_tiles(w, cinder, 186, 36, 0.60f,
         std::vector<land_tier>{ {terrain_type::volcanic, 45}, {terrain_type::barren, 40}, {terrain_type::rocky, 15} },
         /*base_hazard=*/0.55f, /*base_habitability=*/0.20f, /*seed=*/0xC1D0001u);
 
+    // Venus analogue — backdrop body.
+    create_simple_body(w, "Veld", body_type::planet, null_entity, 0.72f, 2.60f, 3, 3);
+
     // -----------------------------------------------------------------------
     // Kepler — temperate rocky planet (Earth analogue, ~1.0 AU)
-    // 180×84 tile grid. Primary deposits: iron ore and silicates.
+    // 42×174 tile grid. Primary deposits: iron ore and silicates.
     // Two installations and a market authored after tile generation.
     // -----------------------------------------------------------------------
 
@@ -291,21 +332,18 @@ world make_hard_coded_world()
         .orbital_radius_au                    = 1.00f,
         .orbital_angle_rad                    = 1.05f,
         .orbital_angular_velocity_rad_per_day = kepler_angular_velocity(1.00f),
-        .grid_width                           = 180,
-        .grid_height                          = 84,
+        .grid_width                           = 174,
+        .grid_height                          = 42,
     };
 
-    // Kepler is the corporation's home planet — the game opens on its surface.
-    w.home_body = kepler;
-
-    auto kepler_tiles = generate_body_tiles(w, kepler, 180, 84, 0.60f,
+    auto kepler_tiles = generate_body_tiles(w, kepler, 174, 42, 0.60f,
         std::vector<land_tier>{ {terrain_type::barren, 40}, {terrain_type::rocky, 35},
                                 {terrain_type::icy, 15},    {terrain_type::volcanic, 10} },
         /*base_hazard=*/0.15f, /*base_habitability=*/0.70f, /*seed=*/0xE471001u);
 
     // Attach installations to the first two land tiles found in raster order.
     {
-        auto land = first_land_tiles(kepler_tiles, w, 180, 84, 2);
+        auto land = first_land_tiles(kepler_tiles, w, 174, 42, 2);
 
         const entity_id kepler_extraction = w.create_entity();
         w.buildings[kepler_extraction] = building_component{
@@ -344,8 +382,7 @@ world make_hard_coded_world()
 
     // -----------------------------------------------------------------------
     // Selene — Kepler's moon (Luna analogue)
-    // 90×42 tile grid (the planet ratio at half scale). Barren and rocky;
-    // ~60% water (frozen seas).
+    // 18×92 tile grid. Barren and rocky; ~60% water (frozen seas).
     // -----------------------------------------------------------------------
 
     const entity_id selene = w.create_entity();
@@ -356,13 +393,83 @@ world make_hard_coded_world()
         .orbital_radius_au                    = 0.30f,
         .orbital_angle_rad                    = 0.0f,
         .orbital_angular_velocity_rad_per_day = 0.30f,
-        .grid_width                           = 90,
-        .grid_height                          = 42,
+        .grid_width                           = 92,
+        .grid_height                          = 18,
     };
 
-    generate_body_tiles(w, selene, 90, 42, 0.60f,
+    generate_body_tiles(w, selene, 92, 18, 0.60f,
         std::vector<land_tier>{ {terrain_type::barren, 65}, {terrain_type::rocky, 30}, {terrain_type::icy, 5} },
         /*base_hazard=*/0.30f, /*base_habitability=*/0.25f, /*seed=*/0x5E1E001u);
+
+    // Mars analogue — backdrop body.
+    create_simple_body(w, "Ochre", body_type::planet, null_entity, 1.52f, 4.70f, 3, 3);
+
+    // -----------------------------------------------------------------------
+    // Vesta — important belt asteroid (~2.36 AU)
+    // 3×3 tile grid. Primary deposits: ice and rare metals.
+    // Hand-authored tiles retained — Vesta is small enough to curate manually.
+    // -----------------------------------------------------------------------
+
+    const entity_id vesta = w.create_entity();
+    w.bodies[vesta] = body_component{
+        .name                                 = "Vesta",
+        .type                                 = body_type::asteroid,
+        .parent                               = null_entity,
+        .orbital_radius_au                    = 2.36f,
+        .orbital_angle_rad                    = 3.93f,
+        .orbital_angular_velocity_rad_per_day = kepler_angular_velocity(2.36f),
+        .grid_width                           = 3,
+        .grid_height                          = 3,
+    };
+
+    const tile_spec vesta_tiles[] = {
+        // x  y   terrain                     haz    hab     Fe      ice    SiO2  rare
+        {  0, 0, terrain_type::icy,           0.30f, 0.25f,   0.0f, 300.0f, 20.0f, 15.0f },
+        {  1, 0, terrain_type::icy,           0.40f, 0.20f,   5.0f, 450.0f, 10.0f, 20.0f },
+        {  2, 0, terrain_type::rocky,         0.50f, 0.15f,  60.0f,  80.0f, 25.0f, 45.0f },
+        {  0, 1, terrain_type::icy,           0.35f, 0.22f,   0.0f, 380.0f, 15.0f, 10.0f },
+        {  1, 1, terrain_type::icy,           0.25f, 0.28f,  10.0f, 500.0f, 30.0f, 35.0f },
+        {  2, 1, terrain_type::rocky,         0.55f, 0.12f,  75.0f,  60.0f, 20.0f, 55.0f },
+        {  0, 2, terrain_type::rocky,         0.45f, 0.18f,  50.0f, 120.0f, 15.0f, 40.0f },
+        {  1, 2, terrain_type::icy,           0.38f, 0.20f,   0.0f, 420.0f, 10.0f, 25.0f },
+        {  2, 2, terrain_type::rocky,         0.60f, 0.10f,  80.0f,  50.0f, 18.0f, 70.0f },
+    };
+
+    std::vector<entity_id> vesta_tile_ids;
+    vesta_tile_ids.reserve(9);
+    for (const auto& spec : vesta_tiles)
+        vesta_tile_ids.push_back(create_tile(w, vesta, spec));
+
+    const entity_id vesta_extraction = w.create_entity();
+    w.buildings[vesta_extraction] = building_component{
+        .tile               = vesta_tile_ids[4], // [1,1]
+        .type               = building_type::extraction_site,
+        .workforce_assigned = 0.60f,
+    };
+    w.stockpiles[vesta_extraction] = stockpile_component{};
+
+    const entity_id vesta_market = w.create_entity();
+    w.markets[vesta_market] = market_component{
+        .body       = vesta,
+        .supply     = {  20.0f, 800.0f, 30.0f, 180.0f },
+        .demand     = { 150.0f, 100.0f, 80.0f,  50.0f },
+        .price      = {   2.5f,   4.0f,  3.0f,  12.0f },
+        .base_price = {   2.5f,   4.0f,  3.0f,  12.0f },
+    };
+
+    create_simple_body(w, "Ceres",  body_type::asteroid, null_entity, 2.77f, 1.80f, 3, 3);
+    create_simple_body(w, "Pallas", body_type::asteroid, null_entity, 2.55f, 5.50f, 2, 2);
+
+    // -----------------------------------------------------------------------
+    // Outer planets with parented moons — backdrop bodies.
+    // -----------------------------------------------------------------------
+
+    const entity_id bastion = create_simple_body(w, "Bastion", body_type::planet, null_entity, 5.20f, 0.70f, 4, 4);
+    create_simple_body(w, "Forge", body_type::moon, bastion, 0.35f, 1.00f, 2, 2, 0.40f);
+    create_simple_body(w, "Cyra",  body_type::moon, bastion, 0.55f, 3.50f, 2, 2, 0.25f);
+
+    const entity_id halo = create_simple_body(w, "Halo", body_type::planet, null_entity, 9.58f, 3.50f, 4, 4);
+    create_simple_body(w, "Mote", body_type::moon, halo, 0.40f, 2.00f, 2, 2, 0.35f);
 
     return w;
 }

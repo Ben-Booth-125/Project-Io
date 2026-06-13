@@ -2,6 +2,44 @@
 
 Entries are newest-first. Each entry covers one development session and records what was built, what in-session decisions were made, and what was left open. Decisions that affect the whole project permanently belong in TECH_FOUNDATIONS or a dedicated ADR; this log is for session-scoped choices and progress notes.
 
+Entries that correspond to a tagged snapshot in `backups/` carry an explicit **version** marker in their heading (e.g. *version 0.0.2*) and a **Backup** line naming the snapshot path. These are the rollback points: to revert, restore the named `backups/vX.Y.Z/` tree over `src/`.
+
+---
+
+## 2026-06-13 — version 0.0.2 — Layer 2 finalisation (standardised body grids, infinite side-scroll, zoom floor)
+
+**Status:** Complete. Builds and runs. **Tagged snapshot.**
+**Backup:** `backups/v0.0.2/` (copy of `src/` at this version — the rollback point for v0.0.2; previous snapshot is `backups/v0.0.1/`).
+
+The hard-coded world is pared to three surface bodies on standardised grids, the Planetary canvas scrolls horizontally without bound, and its zoom floor is derived correctly. Layer 2 is considered finalised at this version.
+
+### What was built
+
+**Standardised body grids (~9:5 width:height).**
+`make_hard_coded_world` now sizes the two planets at **180 × 84** (columns × rows) and Selene (Kepler's moon) at **90 × 42** — the same ratio at half scale. The height is a little under half the width by design: the width spans the full circumference (both hemispheres) and the height is pole-to-pole with the non-traversable polar caps truncated. The stale generation TODO (which described the rule as unenforced) was replaced with a comment recording the settled ratio.
+
+**Backdrop bodies removed.**
+With the canvas perspectives settled, every body except Helios, Cinder, Kepler, and Selene was deleted from the world: Veld, Ochre, Vesta, Ceres, Pallas, Bastion, Forge, Cyra, Halo, Mote. Vesta's hand-authored tiles, extraction site, and market went with it. The now-unused `create_simple_body`, `tile_spec`, and `create_tile` helpers were removed; `hard_coded_world.hpp`'s doc comment was rewritten to list the three surviving surface bodies.
+
+**Infinite horizontal scroll on the Planetary canvas.**
+`draw_body_surface_canvas` now draws each tile at every integer wrap offset `k` whose copy falls within the canvas, where the grid repeats every `period_px = gw * col_step * zoom`. The `k`-range is derived per tile from the visible x-extent, so panning past either edge continues seamlessly from the far side with no seam and no special-casing of "three offsets". Hit-testing runs inside the same copy loop, so the hovered/clicked column is always correct regardless of wrap. Horizontal pan is wrapped with `fmod(pan_x, period_px)` each frame to stop `pan_x` drifting without bound — visually identical because the grid is periodic.
+
+**Planetary zoom floor derived from the height-normalised zoom.**
+The minimum zoom was a guessed constant (`0.2f`) unrelated to the zoom definition, so it let the grid shrink to ~19% of the canvas height (viewport showing ~525% of the grid). Since zoom is normalised so the grid fills `kFitMargin` (0.95) of the canvas height at zoom 1, the floor is now derived: `kMinZoom = 1 / (kMinZoomHeadroom * kFitMargin) ≈ 0.877`, where `kMinZoomHeadroom = 1.2` means the viewport spans ~120% of the grid height at minimum zoom (full grid + ~20% headroom). Max zoom (`kMaxZoom = 20`) is unchanged; the stored zoom is clamped to `[kMinZoom, kMaxZoom]` each frame as well as in the wheel handler.
+
+### Docs
+
+- `PLANETARY.md` updated: new "Target size and aspect ratio" wording (180×84 / 90×42, the 9:5 rationale, three-body world), the horizontal-wrap and interaction sections describe the seamless side-scroll, and the deferred table now lists only seam *visualisation* (an explicit wrap marker) as post-prototype.
+- `TODO.md` gained a **"UI building blocks (decide before Layer 3)"** section capturing the rendering primitives Layers 3–6 will need but Layer 2 simplified: a tooltip/hover-card system (recorded then **deferred to difficulty 6** at the developer's call), centralised resource/palette presentation metadata, shared value/date formatting, a canvas overlay layer + mode-bar wiring, an icon/font-atlas strategy (folds in the label-shimmer fix), a shared selection/hover/pinned highlight convention, a "focus on entity" view-navigation helper, and render-time interpolation for fractional-progress entities (convoys). The stale Vesta/Ceres/Pallas reference in the asteroid-belt item was corrected to note the backdrop bodies are now removed.
+
+### Versioning / backups
+
+- This session is tagged **version 0.0.2**; `src/` is snapshotted to `backups/v0.0.2/` as the rollback point. DEVLOG headings now carry an explicit version marker + Backup line for any tagged snapshot (see the note at the top of this file). Decision on whether to split DEVLOG into per-version files: **kept as a single newest-first file** — version markers make rollback points easy to find by search, and one file preserves chronological review and grep across the whole history. Revisit only if the file becomes unwieldy.
+
+### Open items
+
+- Procedural generation still seeds water from the centre row only; with the taller 84-row grids the polar caps are land by default. Whether the caps should read as ice/barren rather than ordinary land terrain is unaddressed.
+
 ---
 
 ## 2026-06-13 — Canvas zoom ladder + Circumplanetary canvas
