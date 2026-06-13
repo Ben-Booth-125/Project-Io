@@ -65,6 +65,17 @@ int app::run()
 
     m_world = make_hard_coded_world();
 
+    // Set the initial solar zoom so the default view covers roughly 5 AU.
+    // The auto-fit scale at zoom 1 shows max_radius_au; dividing it by 5 zooms
+    // in so that 5 AU fills the same screen extent.
+    {
+        float max_radius_au = 0.0f;
+        for (const auto& [id, body] : m_world.bodies)
+            max_radius_au = std::max(max_radius_au, body.orbital_radius_au);
+        if (max_radius_au > 0.0f)
+            m_ui.solar_zoom = max_radius_au / 5.0f;
+    }
+
     // Default the surface canvas to a body that has authored tiles, so it shows
     // a populated surface before the player clicks anything. Many bodies are
     // backdrop-only (no tiles); prefer the lowest-id tiled body, falling back to
@@ -184,7 +195,7 @@ void app::render()
             ImGuiWindowFlags_NoSavedSettings;
         ImGui::Begin("##system_tick", nullptr, tick_flags);
         ImGui::Text("Day   %llu", m_sim_loop.day_tick());
-        ImGui::Text("Econ  %llu", m_sim_loop.econ_tick());
+        ImGui::Text("Q     %llu", m_sim_loop.econ_tick());
         ImGui::End();
     }
 
@@ -224,7 +235,26 @@ void app::render()
             if (active)
                 ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
             if (ImGui::Button(labels[i], {bw, 0.0f}))
-                m_sim_loop.set_speed(speeds[i]);
+            {
+                if (speeds[i] == 0)
+                {
+                    // Pause button toggles: if already paused, restore the
+                    // previous speed; otherwise save the current speed and pause.
+                    if (m_sim_loop.paused())
+                        m_sim_loop.set_speed(m_prev_speed);
+                    else
+                    {
+                        m_prev_speed = m_sim_loop.speed();
+                        m_sim_loop.set_speed(0);
+                    }
+                }
+                else
+                {
+                    // Speed button: remember it so pause can restore it later.
+                    m_prev_speed = speeds[i];
+                    m_sim_loop.set_speed(speeds[i]);
+                }
+            }
             if (active)
                 ImGui::PopStyleColor();
             if (i + 1 < n)

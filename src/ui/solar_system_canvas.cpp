@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <vector>
 
 namespace ui {
@@ -206,6 +207,21 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
         }
     }
 
+    // Zoom indicator — primary view only, bottom centre of the canvas.
+    if (apply_view)
+    {
+        // Visible radius in AU at the current zoom level.
+        const float visible_au = max_radius_au / zoom;
+        char label[32];
+        std::snprintf(label, sizeof(label), "%.1f AU", visible_au);
+        const ImVec2 text_sz = ImGui::CalcTextSize(label);
+        const ImVec2 text_pos = {
+            origin.x + size.x * 0.5f - text_sz.x * 0.5f,
+            origin.y + size.y - text_sz.y - 8.0f,
+        };
+        dl->AddText(text_pos, IM_COL32(160, 165, 180, 200), label);
+    }
+
     // Pan and zoom — primary view only. Pan with the middle mouse button; zoom
     // with the scroll wheel, anchored at the cursor so the point under the
     // mouse stays put. Element sizes are unaffected; only the framing changes.
@@ -221,7 +237,9 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
 
         if (io.MouseWheel != 0.0f)
         {
-            const float new_zoom = std::clamp(zoom * std::pow(1.1f, io.MouseWheel), 0.2f, 20.0f);
+            // Min zoom caps the view at 50 AU; max zoom is the existing 20x limit.
+            const float zoom_min = std::max(0.2f, max_radius_au / 50.0f);
+            const float new_zoom = std::clamp(zoom * std::pow(1.1f, io.MouseWheel), zoom_min, 20.0f);
             // World point under the cursor, kept fixed across the zoom change.
             const ImVec2 wp = { (mouse.x - view_origin.x) / zoom,
                                 (mouse.y - view_origin.y) / zoom };
