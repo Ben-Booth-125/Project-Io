@@ -25,3 +25,8 @@ The prototype build sequence and the constraints that govern development assista
 
 **`docs/development/DEVELOPMENT_PRACTICES.md`**
 Testing framework (Catch2), naming conventions, documentation standards, and how Claude should handle each.
+
+**`docs/development/DEVLOG.md`**
+Running session log — chronological record of what was built each session and
+in-session decisions. Consult when asked about prior work, open items, or why
+a specific implementation choice was made.
