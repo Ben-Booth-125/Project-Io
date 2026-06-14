@@ -141,6 +141,17 @@ Practical consequences:
   verify before starting the next wave. Assume nothing about an agent's self-reported
   success — verify retroactively.
 
+**Fan-out is a discretionary call, made *after* writing the tasks and the collision map —
+not a default, and not something to ask permission for each time.** By then the shape is
+clear, so decide on the evidence: **fan out** when there is a substantial wave of
+disjoint-scope work a cold agent can execute from its task text alone (e.g. several
+independent generators or audits); **stay in the main session** when the parallel win is
+marginal — a short serial dependency chain, interfaces still co-evolving, or work that keeps
+returning to shared/integration files — because each spawn starts cold and re-derives
+context, which can cost more than it saves. This paragraph is standing authorisation to use
+sub-agents at that discretion: state the call and its reason ("fanning out A/B/C — disjoint;
+keeping the D→E→F chain serial — co-evolving interfaces") rather than asking first.
+
 ### Skills
 
 These skills exist and should be used proactively rather than reinventing their steps:
