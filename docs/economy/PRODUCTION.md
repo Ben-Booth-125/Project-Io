@@ -8,17 +8,19 @@ See **`docs/economy/RESOURCES.md`** for the full resource list, tier definitions
 
 ## Extraction
 
-An extraction building placed on a tile reads the tile's deposit for its target resource and adds a fractional quantity to its own stockpile each simulation step.
+An extraction building placed on a tile reads the tile's deposit for its authored target resource (`building_component.target_resource`) and credits a fractional quantity to its corporation's stockpile pool **at each economy tick**.
 
 Output rate is the product of three factors:
 
 | Factor | Source | Effect |
 |--------|--------|--------|
-| Deposit level | `tile_component.resource_deposit[r]` | Ceiling yield; richer tiles produce faster. |
+| Deposit richness | `tile_component.resource_deposit[r]` | Linear multiplier; richer tiles produce proportionally faster. |
 | Workforce fraction | `building_component.workforce_assigned` (0–1) | Linear scalar. Zero workforce produces nothing. |
 | Hazard penalty | `tile_component.hazard_level` (0–1) | Applied as `(1 − hazard)` multiplier. High-hazard tiles cost more to operate and yield less per worker. |
 
-Deposits do not deplete in the prototype. A finite depletion model is a post-prototype feature.
+i.e. `output = base_rate × richness × workforce × (1 − hazard)`, where `base_rate` is a Lua-authored economic constant.
+
+Deposits do not deplete in the prototype: `resource_deposit[r]` is the fixed **richness** (the rate multiplier above), and a reserved **`remaining`** reserve per deposit is carried unused so the post-prototype depletion model can draw it down without a data-model retrofit. Richness sets the rate; the reserve will deplete.
 
 ### Extraction buildings
 
@@ -42,9 +44,11 @@ The Quarry and Lumber Camp exist specifically to harvest ambient resources (ston
 
 ## Processing
 
-A processing building holds a **recipe**: a set of input resources consumed per tick and a set of outputs added to its stockpile. Each recipe has a fixed conversion rate authored in Lua.
+A processing building holds a **recipe** (`building_component.recipe`, indexing the Lua recipe registry): a set of input resources consumed and a set of outputs produced per economy tick, with a fixed conversion rate authored in Lua. Recipes support multiple inputs and outputs and reagents (e.g. coal in the steel recipe is an input that yields no separate product).
 
-Processing buildings use the same workforce scalar as extraction buildings. If any required input is absent from the building's stockpile, the building idles for that step.
+Processing buildings draw inputs from — and add outputs to — the shared per-`(corporation, body)` stockpile pool (inputs are taken pool-first; any shortfall is auto-bought from the market, see § Stockpile and output flow). They use the same workforce scalar as extraction buildings.
+
+When the inputs available cannot cover a full conversion, the building does **not** simply halt: it follows a **two-threshold partial run**. If the limiting input covers at least `T_full` of one conversion, the building runs at full rate; between `T_idle` and `T_full` it scales its output down to what the limiting input allows; below `T_idle` it idles. The two thresholds are tunable economic constants.
 
 ### Recipes by building type
 
@@ -169,17 +173,19 @@ This is marked **open** and will be decided when Layer 5 (supply routing) is des
 
 Workforce is a corporation-wide pool divided across all active buildings. The `workforce_assigned` field on `building_component` (0.0–1.0) represents the fraction of that building's rated labour requirement currently staffed.
 
-The full policy allocation system — where the player sets targets and shortages cascade automatically — is a post-prototype feature. In the prototype, `workforce_assigned` is an authored constant per building, making it a fixed modifier on output rate rather than a dynamically contested resource.
+The full policy allocation system — where the player sets targets and shortages cascade automatically — is a post-prototype feature, and the corporation-wide labour pool itself is deferred to the population layer. In the prototype, `workforce_assigned` is an authored constant per building, making it a fixed modifier on output rate rather than a dynamically contested resource.
+
+Staffed workforce carries an operating cost: each building incurs a per-tick **wage** of `workforce_assigned × base_wage` (a tunable constant), charged against the corporation's balance (see § Stockpile and output flow and the Budget brief in `docs/development/TODO.md`). A sensible `base_wage` is set now and refined once population centres model labour supply.
 
 ---
 
 ## Stockpile and output flow
 
-Each building holds a `stockpile_component`. Extraction and processing outputs accumulate there each simulation step. At the economy tick boundary:
+Extraction and processing outputs accrue into a shared stockpile pool held per `(corporation, body)` (a world-level map, not the per-building `stockpile_component`, which is unused in the prototype economy). At the economy tick boundary:
 
-1. All building stockpiles on a body aggregate into the body's market supply figures.
-2. Demand is set by the total input requirements of all processing buildings on the body plus any standing convoy cargo orders (from Layer 5 onward).
-3. Market prices resolve from the supply/demand ratio (Layer 4).
+1. **Supply** is the goods each corporation lists for sale — its surplus above what its own processors will consume that tick.
+2. **Demand** is the total input shortfall auto-bought by processing buildings (inputs not covered by the corporation's own pool), plus any standing convoy cargo orders (from Layer 5 onward).
+3. **Transactions clear at base price.** Sales credit, and purchases debit, the corporation's balance at `market_component.base_price`. Price resolution from the supply/demand ratio is deferred to a discrete open Brief (TODO.md § Trade); until then `market_component.price` stays at `base_price`.
 
 ---
 
@@ -190,6 +196,9 @@ Layer 3 implements:
 - Extraction logic for Mine, Oil Platform, Farm, and Ice Extractor reading the seven prototype resources.
 - Processing logic for Smelter (iron ore → steel), Refinery (petroleum → refined fuel), and Food Processor (agricultural produce → food rations).
 - Workforce scalar applied to both extraction and processing output.
-- Stockpile quantities incrementing each simulation step, observable in the Layer 3 ImGui panel.
+- The shared per-`(corporation, body)` stockpile pool, with quantities incrementing each economy tick.
+- Per-body market supply/demand aggregation and base-price transactions (price resolution deferred).
+- A running per-corporation balance: sales income less input purchases, maintenance, and wages.
+- The Layer 3 economy panel making all of the above observable.
 
 All building type enum values for the full set above are defined in the prototype data model. Buildings outside the prototype scope have no authored placement or recipe data; they will not appear in the game until a later implementation pass.

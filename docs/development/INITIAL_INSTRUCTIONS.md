@@ -30,19 +30,30 @@ Key data model change in this layer: add `orbital_angle_rad` (float) to `body_co
 
 ImGui draw lists are the only rendering mechanism introduced. No third-party canvas or mapping library.
 
-### Layer 3 — Extraction and production
-An extraction building reads a tile's resource deposit and adds to a stockpile each simulation step. A processing building consumes one resource type and outputs another. Workforce allocation as a scalar modifier on output rate. First observable output: stockpile numbers changing over time.
+### Layer 3 — Production economy
+Layer 3 implements the full single-body economic loop: extraction, processing, the corporate stockpile, market supply/demand aggregation, and a basic money loop. *(Re-scoped 2026-06-14 — see DEVLOG; market resolution was collapsed forward from the original Layer 4. Layer 3 operates only the authored starting assets — player construction is Layer 4.)*
+
+- **Extraction.** An extraction building reads its tile's deposit for an authored target resource and credits a fractional quantity to its corporation's stockpile pool **at each economy tick**. Output is linear in deposit richness, workforce, and `(1 − hazard)`.
+- **Processing.** A processing building runs a Lua-authored recipe, consuming inputs from the shared per-`(corporation, body)` pool and adding outputs to it. Insufficient inputs scale the building down or idle it (a two-threshold partial run), rather than always halting.
+- **Workforce.** An authored `0–1` scalar modifies output rate at both stages (the corporation-wide labour pool is deferred to the population layer).
+- **Stockpile.** One pool per `(corporation, body)`, held in a world-level map; extraction and processing outputs accrue there.
+- **Market.** At each economy tick, each body's market aggregates **supply** (goods corporations list for sale) and **demand** (processor input shortfalls); transactions clear at **base price**. Price resolution from supply/demand is deferred to a discrete open Brief (TODO.md § Trade).
+- **Budget.** A running per-corporation balance: income from sales, outgoings from input purchases, per-building maintenance, and wages. The balance may go negative.
+
+First observable output: stockpile quantities, market figures, and the corporate balance changing each economy tick, surfaced in the Layer 3 economy panel.
 
 The full resource list, building types, and recipes are specified in **`docs/economy/RESOURCES.md`** and **`docs/economy/PRODUCTION.md`**. Implement the **seven-resource prototype subset** described there: four raw materials (iron ore, petroleum, water, agricultural produce), three refined goods (steel, refined fuel, food rations), and four extraction buildings (Mine, Oil Platform, Farm, Ice Extractor) plus three processing buildings (Smelter, Refinery, Food Processor). Define all 23 resource type enum values and all building type enum values from the start so no data-model retrofitting is required when the remainder are authored.
 
-### Layer 4 — Market and price resolution
-Each market holds supply and demand quantities per good. At each economy tick, price resolves from the supply/demand ratio modulated by global rarity. Extraction output feeds supply into the local market. First closed loop: tiles produce → extraction harvests → market price responds.
+### Layer 4 — Production UI and management
+*(Re-scoped 2026-06-14 from "Market and price resolution".)* A production-focused UI pass over the Layer 3 economy: building **construction** (placement, build-cost spend, terrain/deposit validation), building **management** (workforce, recipe selection, sell orders), and **market/economy ledgers**. Layer 3 operates only the authored starting assets; Layer 4 is where the player builds and manages.
+
+Price resolution from local supply/demand — the original Layer 4 content — is now a discrete open Brief (TODO.md § Trade), scheduled independently of this UI work.
 
 ### Layer 5 — Supply routing
 A supply convoy entity with source body, destination body, cargo, and fractional progress. Progress increments each simulation step; completion evaluates at the economy tick boundary. Delivered cargo adjusts the destination market's supply. Logistical cost is distance-based and reduces profit margin. First spatial dimension: price can now diverge between bodies.
 
 ### Layer 6 — Budget
-Revenue equals goods sold multiplied by price minus logistical cost. Outgoings equal construction and maintenance as flat per-tick costs. A running balance that can go negative. Budget should visibly reflect pressure from competing demands.
+*(Basic balance and income — sales revenue, input purchases, maintenance, wages — now land in Layer 3. Layer 6 extends that to the full budget once logistics and price resolution exist.)* Revenue equals goods sold multiplied by price minus logistical cost. Outgoings equal construction and maintenance as flat per-tick costs. A running balance that can go negative. Budget should visibly reflect pressure from competing demands.
 
 ---
 
