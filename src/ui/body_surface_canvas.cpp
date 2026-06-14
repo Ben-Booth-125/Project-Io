@@ -49,18 +49,6 @@ ImU32 terrain_colour(terrain_composition t)
     return IM_COL32( 60,  60,  60, 255);
 }
 
-const char* body_type_name(body_type t)
-{
-    switch (t)
-    {
-        case body_type::planet:   return "Planet";
-        case body_type::moon:     return "Moon";
-        case body_type::asteroid: return "Asteroid";
-        case body_type::station:  return "Station";
-        default:                  return "?";
-    }
-}
-
 /// Fills `out[6]` with the screen-space vertices of a pointy-top hexagon
 /// centred at (cx, cy) with circumradius r.
 void hex_vertices(ImVec2 out[6], float cx, float cy, float r)
@@ -210,7 +198,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
         const auto   built_it  = built_tiles.find(id);
         const bool   built     = built_it != built_tiles.end();
         const building_type built_type = built ? built_it->second : building_type::none;
-        const bool   selected  = (id == state.active_tile);
+        const bool   selected  = (id == state.selected_entity);
 
         // Range of wrap copies that land inside the canvas horizontally.
         const int k_min = (period_px > 0.0f)
@@ -296,10 +284,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
         ImGui::EndTooltip();
     }
 
-    // Click handling — select the hovered tile. The surface is the bottom rung,
-    // so a tile click never changes the view; the player ascends via the minimap.
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && hovered_tile != null_entity)
-        state.active_tile = hovered_tile;
+    // Click handling. The surface is the bottom rung, so there is nothing to
+    // descend into: a single left-click simply selects the hovered tile (null
+    // clears the selection on empty space) and fills the Selection info element.
+    // No view change; the player ascends via the minimap. See SELECTION.md.
+    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+        state.selected_entity = hovered_tile;
 
     // Pan and zoom. Middle mouse button pans; scroll wheel zooms, anchored at
     // the cursor so the point under the mouse stays fixed.

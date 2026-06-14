@@ -3,6 +3,7 @@
 
 #include "canvas_scale.hpp"
 #include "highlight.hpp"
+#include "presentation.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -14,19 +15,6 @@
 namespace ui {
 
 namespace {
-
-const char* body_type_name(body_type t)
-{
-    switch (t)
-    {
-        case body_type::planet:   return "Planet";
-        case body_type::moon:     return "Moon";
-        case body_type::asteroid: return "Asteroid";
-        case body_type::station:  return "Station";
-        case body_type::star:     return "Star";
-        default:                  return "?";
-    }
-}
 
 /// Visual appearance of a body, before applying the per-canvas scale factor.
 struct body_style
@@ -217,7 +205,7 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
         // Shared selection / hover / pinned ring. Pinning is not yet wired, so
         // pinned is always false here.
         draw_body_highlight(dl, pos, radius,
-            resolve_highlight(id == state.active_body, this_hovered, /*pinned=*/false));
+            resolve_highlight(id == state.selected_entity, this_hovered, /*pinned=*/false));
 
         // Labelling: planets (and other notable bodies) carry a permanent
         // label; moons are labelled only while hovered, to keep the inner
@@ -259,22 +247,30 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
             body.name.c_str(), body_type_name(body.type), body.orbital_radius_au);
     }
 
-    // Click handling — ascend when this canvas is the minimap, descend when it
-    // is primary (see MINIMAP.md / CANVASES.md, the zoom ladder).
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+    // Click handling. Single-click selects (fills the Selection info element, no
+    // view change); double-click navigates (descend). On the minimap a single
+    // click ascends. See SELECTION.md and CANVASES.md (the zoom ladder).
+    if (is_minimap)
     {
-        if (is_minimap)
-        {
-            // Solar is the minimap (Circumplanetary is primary): any click
-            // ascends back to the Solar view.
+        // Solar is the minimap (Circumplanetary is primary): any click ascends
+        // back to the Solar view. The minimap has no selection semantics.
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
             state.primary_level = canvas_level::solar;
-        }
-        else if (hovered_body != null_entity &&
-                 w.bodies.at(hovered_body).type != body_type::star)
+    }
+    else
+    {
+        // A single left-click selects whatever is hovered (null clears the
+        // selection on empty space) without moving the view.
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+            state.selected_entity = hovered_body;
+
+        // A double-click on a body navigates: descend into its circumplanetary
+        // view. A moon resolves to its parent planet's view; the star has no
+        // view of its own, so it is excluded.
+        if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
+            hovered_body != null_entity &&
+            w.bodies.at(hovered_body).type != body_type::star)
         {
-            // Descend: select the body and open its circumplanetary view. A moon
-            // resolves to its parent planet's view; the star has no view, so it
-            // is excluded above.
             state.active_body   = hovered_body;
             state.primary_level = canvas_level::circumplanetary;
         }

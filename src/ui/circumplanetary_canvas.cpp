@@ -3,6 +3,7 @@
 
 #include "canvas_scale.hpp"
 #include "highlight.hpp"
+#include "presentation.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -12,19 +13,6 @@
 namespace ui {
 
 namespace {
-
-const char* body_type_name(body_type t)
-{
-    switch (t)
-    {
-        case body_type::planet:   return "Planet";
-        case body_type::moon:     return "Moon";
-        case body_type::asteroid: return "Asteroid";
-        case body_type::station:  return "Station";
-        case body_type::star:     return "Star";
-        default:                  return "?";
-    }
-}
 
 /// Visual appearance of a body, before the per-canvas scale factor. Mirrors the
 /// solar canvas styles so a body reads the same across rungs.
@@ -195,7 +183,7 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
 
         // Shared selection / hover / pinned ring (pinning not yet wired).
         draw_body_highlight(dl, pos, radius,
-            resolve_highlight(id == state.active_body, this_hovered, /*pinned=*/false));
+            resolve_highlight(id == state.selected_entity, this_hovered, /*pinned=*/false));
 
         if (draw_labels)
         {
@@ -223,16 +211,22 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
             body.name.c_str(), body_type_name(body.type), body.orbital_radius_au);
     }
 
-    // Click handling — ascend when this canvas is the minimap, descend (to a
-    // body's surface) when it is primary.
-    if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+    // Click handling. Single-click selects (no view change); double-click
+    // navigates (descend to the body's surface). On the minimap a single click
+    // ascends. See SELECTION.md / CANVASES.md.
+    if (is_minimap)
     {
-        if (is_minimap)
-        {
-            // Circumplanetary is the minimap (Planetary is primary): ascend.
+        // Circumplanetary is the minimap (Planetary is primary): ascend.
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
             state.primary_level = canvas_level::circumplanetary;
-        }
-        else if (hovered_body != null_entity)
+    }
+    else
+    {
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+            state.selected_entity = hovered_body;
+
+        if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
+            hovered_body != null_entity)
         {
             // Descend: open the clicked body's surface.
             state.active_body   = hovered_body;

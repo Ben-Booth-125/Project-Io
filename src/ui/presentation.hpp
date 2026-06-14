@@ -43,6 +43,19 @@ const char* composition_name(terrain_composition c);
 /// @return  Null-terminated display name.
 const char* landform_name(terrain_landform l);
 
+/// Display name for a celestial body type (e.g. "Planet", "Star").
+///
+/// @param t Body type to name.
+/// @return  Null-terminated display name.
+const char* body_type_name(body_type t);
+
+/// Display name for a surface installation type (e.g. "Extraction Site").
+/// Returns "None" for building_type::none.
+///
+/// @param t Building type to name.
+/// @return  Null-terminated display name.
+const char* building_type_name(building_type t);
+
 /// Semantic palette — meaning-driven colours shared across the whole UI so the
 /// data-dense surfaces read consistently and a restyle is a one-file change.
 /// Grouped by role rather than by hue.

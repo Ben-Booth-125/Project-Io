@@ -30,6 +30,15 @@ A surface installation placed on a tile. Buildings are either **extraction** (ha
 **Canvas**
 A screen that the player navigates to inform decision making and understand what's happening on a body or in space.
 
+**Active (state)**
+The navigation **anchor** — the body or tile the canvas zoom ladder is currently framed around. Persists until the player navigates. Distinct from Selection: selecting an entity does not change what is Active. Backed by `ui_state.active_body` / `active_tile`. See `docs/ui/SELECTION.md`.
+
+**Focus (state)**
+The entity **under the pointer** in the current frame — the transient hover target that drives the tooltip / hover card. Distinct from both Active and Selection. See `docs/ui/SELECTION.md`.
+
+**Selection (state)**
+The entity the player **single-clicked to inspect**. Persists until another entity is selected (or the selection is cleared). Drives the **Selection info element** and its 'go to' target, and does not move the canvas. Backed by `ui_state.selected_entity`. See `docs/ui/SELECTION.md`.
+
 **Era**
 A named phase in the game's industrial arc, defined by the accessible territory, available buildings, and dominant strategic challenge. The game begins in **Era 0** (Terrestrial) and transitions to **Era 1** (Early Space) by meeting an explicit gate condition. See `docs/economy/ERAS.md`.
 

@@ -14,6 +14,7 @@
 #include "ui/nav_pane.hpp"
 #include "ui/overlay.hpp"
 #include "ui/profile_panel.hpp"
+#include "ui/selection_panel.hpp"
 #include "ui/solar_system_canvas.hpp"
 #include "ui/tile_inspector.hpp"
 #include "ui/view_nav.hpp"
@@ -356,6 +357,12 @@ void app::render()
     // Overlay-lens controls — a bottom-left strip from the nav-pane edge inward,
     // clear of the centred scale/zoom control. Replaces the old minimap mode bar.
     ui::draw_overlay_controls(m_ui, ui::nav_pane_width, disp.y - margin);
+
+    // Selection info element — pinned bottom-left, stacked directly above the
+    // overlay strip. Hidden until the player selects an entity. See SELECTION.md.
+    constexpr float overlay_strip_h = 40.0f; // approx height of the lens strip below
+    ui::draw_selection_panel(m_world, m_ui, ui::nav_pane_width,
+                             disp.y - margin - overlay_strip_h);
 
     ImGui::Render();
     SDL_SetRenderDrawColor(m_renderer, 15, 15, 20, 255);

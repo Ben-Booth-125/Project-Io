@@ -42,8 +42,15 @@ The minimap is **context**: it always shows the rung one step *out* (zoom-out)
 from the primary, never the rung you drill into. Movement along the ladder has
 two clear directions:
 
-- **Descend (zoom in) by clicking a body in the primary canvas.** This is the
-  load-bearing interaction.
+> **Click-model change (Selection info element).** A *single* click now
+> **selects** the clicked entity (filling the Selection info element, no view
+> change); **descend/navigate moves to a double-click**. The "click to descend"
+> wording below describes the navigate gesture, now bound to double-click. The
+> minimap ascend gesture stays a single click (the minimap has no selection).
+> See [SELECTION.md](SELECTION.md).
+
+- **Descend (zoom in) by double-clicking a body in the primary canvas.** This is
+  the load-bearing navigation interaction.
   - Solar primary, click a **planet** → its **Circumplanetary** view becomes primary.
   - Solar primary, click a **moon** → the **parent planet's** Circumplanetary view becomes primary, with the moon selected.
   - Circumplanetary primary, click the **planet or a moon** → that body's **Planetary** surface becomes primary.
@@ -52,8 +59,10 @@ two clear directions:
   zoom-out neighbour it is showing to primary (Planetary→Circumplanetary,
   Circumplanetary→Solar).
 
-Selecting a *different* body re-targets the lower rungs (`active_body`) without
-forcing the primary to change rung except on an explicit descend click.
+**Navigating** to a *different* body (double-click / 'go to') re-targets the
+lower rungs (`active_body`) without forcing the primary to change rung except on
+an explicit descend. **Selecting** a body (single-click) is independent: it fills
+the Selection info element but changes neither the Active anchor nor the framing.
 
 ### What the minimap shows at each rung
 

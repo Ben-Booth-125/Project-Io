@@ -31,8 +31,19 @@ Running session log — chronological record of what was built each session and
 in-session decisions. Consult when asked about prior work, open items, or why
 a specific implementation choice was made.
 
+**`docs/development/TODO.md`** and **`docs/development/TASKS.md`**
+The two-file backlog. TODO.md holds *described intent* — parked additions and
+deferred ideas with file pointers. TASKS.md holds the *active, prioritised,
+actionable worklist*: a TODO item is **promoted** into file-scoped, dependency-
+and parallelisation-marked tasks (the A–F style) when we decide to act on it.
+Read TODO.md § TODO vs. TASKS for the workflow before promoting or executing
+backlog work.
+
 **`docs/ui/CANVASES.md`**
 Overview of the three primary canvases — Solar, Circumplanetary, and Planetary — arranged as a **zoom ladder** (descend by clicking a body in the primary, ascend by clicking the minimap). Covers the shared layout, selection/view state, and implementation approach. Per-canvas detail lives in `SOLAR.md`, `CIRCUMPLANETARY.md`, and `PLANETARY.md`; the minimap chrome and ladder navigation are in `MINIMAP.md`. Authoritative reference for Layer 2 and for later work that adds overlays to these canvases.
+
+**`docs/ui/SELECTION.md`**
+The Selection info element — a pinned, polymorphic panel showing detail of the current selection. Defines the three interaction states (Active / Focus / Selection) and the single-click-selects / double-click-navigates click-model change shared across all canvases. Read before any work on selection state, canvas click handling, or the shared per-entity content builders (which the Tile Ledger and the future hover card also use).
 
 **`docs/ui/LAYOUT.md`**
 Surface-level description of the application shell — how the screen regions (navigation pane, canvas area, time column, ledger windows) are arranged around the canvases. Read for questions about overall UI layout; CANVASES.md covers the canvas internals.

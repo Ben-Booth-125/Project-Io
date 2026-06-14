@@ -98,6 +98,25 @@ highlighted, and clicking it again clears the overlay. This replaces the former
 minimap mode-bar dots. A default lens is active on load (the supply lens) rather
 than no overlay. See `overlay.hpp` (`draw_overlay_controls`).
 
+## Selection info element — bottom-left, above the overlay strip
+**Spec: `SELECTION.md`**
+
+A **pinned** panel docked in the bottom-left, directly **above the overlay lens /
+zoom control strip**. It shows detail about the **current selection** — whatever
+entity the player last single-clicked — and is **polymorphic by selection kind**
+(body, tile, building, market, unit, and later nation / corporation / logistics
+vessel), each rendering its own stat block.
+
+Its header carries a **'go to'** button (equivalent to a double-click on the
+selection; routes through `ui::focus_on_entity` — navigates a canvas for spatial
+entities, opens a ledger for non-spatial ones) and a **close** button (which
+*hides* the panel; it reappears on the next selection).
+
+Unlike the floating ledgers it is **not** reachable from the navigation rail —
+**selecting an entity is the only way to open it.** It introduces a click-model
+change shared across all canvases: **single-click selects** (fills this panel,
+no view change), **double-click navigates**. See `SELECTION.md` and `CANVASES.md`.
+
 ## Time panel — top-right
 **Spec: `TIME_CONTROLS.md`**
 

@@ -32,8 +32,10 @@ enum class overlay_mode
 /// minimap clicks (ascend).
 struct ui_state
 {
-    entity_id    active_body   = null_entity;         ///< Drives the lower rungs (circumplanetary anchor and surface). null_entity = nothing selected.
-    entity_id    active_tile   = null_entity;         ///< Set by a tile click; consumed by later layers.
+    entity_id    active_body   = null_entity;         ///< Navigation anchor: drives the lower rungs (circumplanetary anchor and surface). Changed by *navigation* (double-click / focus), not by selection. null_entity = no anchor.
+    entity_id    active_tile   = null_entity;         ///< Navigation anchor for the surface rung; set by a tile navigation. Distinct from the selection.
+    entity_id    selected_entity = null_entity;       ///< The entity the player single-clicked to inspect — drives the Selection info element. Distinct from the active_* anchors: selecting never moves the canvas. null_entity = nothing selected. See SELECTION.md, ui/selection.hpp.
+    entity_id    selection_hidden_for = null_entity;   ///< The selection the player dismissed with the panel's close button. The Selection info element stays hidden while selected_entity equals this; a *new* selection re-shows it. See SELECTION.md (close hides, does not destroy).
     canvas_level primary_level = canvas_level::solar; ///< Which canvas rung fills the window.
     overlay_mode overlay       = overlay_mode::supply; ///< Active canvas overlay lens; toggled by the bottom overlay control strip. Defaults to the supply lens (the first Layer 5 requirement) rather than none.
 

@@ -6,6 +6,69 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## 2026-06-14 — Selection info element + single/double-click model
+
+**Status:** Complete (code). Builds clean (Debug, no warnings). Not yet visually run — the panel is hidden until a selection is made, so a no-input screenshot would not show it.
+
+### What was built
+
+Design first: new **`docs/ui/SELECTION.md`** (the element, the three interaction
+states, the click-model change, the polymorphic content/'go-to' table, the
+shared-builders abstraction); **glossary** entries for the **Active / Focus /
+Selection** states; a **`LAYOUT.md`** region; a **`CANVASES.md`** click-model
+call-out; and the doc indexed in `CLAUDE.md`. The original single TODO item was
+split into six scoped sub-items (A–F) with a dependency/parallelisation note.
+
+Implemented A–D against that design:
+
+- **A — selection state (`src/ui/selection.{hpp,cpp}`, `ui_state.hpp`).** New
+  `ui_state::selected_entity` (and `selection_hidden_for` for the close-button
+  hide), kept distinct from the `active_*` navigation anchors. `selection_kind`
+  enum + `selection_kind_of(w, id)` resolver probing the world maps in the same
+  order as `focus_on_entity`.
+- **B — click model (all three canvases).** Single left-click **selects**
+  (`selected_entity`, null clears on empty space; no view change); **double**-click
+  **navigates** (the former descend/focus). Minimap ascend stays single-click.
+  The on-canvas highlight ring now follows `selected_entity` (was `active_body` /
+  `active_tile`) so a single click gives immediate feedback.
+- **C — shared content builders (`src/ui/entity_summary.{hpp,cpp}`).** Per-kind
+  stat blocks (`draw_{body,tile,building,market,unit}_summary`), content-only and
+  stale-id tolerant, built on the presentation layer. `body_type_name` /
+  `building_type_name` centralised into `presentation.{hpp,cpp}` (de-duplicating
+  the copies in the Tile Ledger and — during integration — all three canvases).
+  The Tile Ledger reuses the shared names; its multi-tile table stays as-is.
+- **D — the panel (`src/ui/selection_panel.{hpp,cpp}`).** Pinned bottom-left
+  above the overlay strip, hidden until a valid selection exists. Header: title +
+  kind, a **'go to'** button (`focus_on_entity`) and a **close** button (hides
+  until the next selection). Dispatches on `selection_kind` to the C builders.
+  Wired in `app.cpp`.
+
+### In-session decisions
+
+**Built in dependency order A → {B, C} → D**, with **C run as a parallel
+background sub-agent** while A/B were done in the foreground (the two independent
+roots: C's builders don't depend on A's state field; only D needs both). The one
+predicted collision — C adding `ui::body_type_name` while the canvases (B's
+files) kept their own local copies — surfaced as an ambiguous-call build error
+and was resolved at integration by deleting the three canvas-local copies and
+adding the `presentation.hpp` include. This is exactly the seam the TODO note
+flagged; keeping B and C to disjoint files made it a clean, single-point fix.
+
+**Selection ring vs. active anchor.** The canvas highlight was repointed from the
+navigation anchor to `selected_entity`. Selecting a moon now rings the moon
+rather than the always-anchored planet — the intended selection feedback.
+
+### Open items
+
+- **E — non-spatial 'go to' routing** (nation/corporation → ledger) and **F —
+  canvas hit-testing for buildings/units/markets**: left as TODO sub-items.
+  E is not actionable until those entity kinds exist; F until those entities are
+  drawn as selectable canvas markers. 'Go to' currently routes everything through
+  `focus_on_entity` (spatial only).
+- **Per-kind title icon** deferred to the hover-card work (shares the builders).
+- **Overlay-strip stacking** uses a fixed 40 px offset to sit the panel above the
+  lens strip — prototype-grade, like the rest of the shell chrome.
+
 ## 2026-06-14 — Two-axis terrain model + six-pass procedural generation
 
 **Status:** Complete (code). Builds clean; validated with a throwaway headless stats harness (since removed).

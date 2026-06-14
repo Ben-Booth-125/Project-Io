@@ -92,6 +92,31 @@ const char* landform_name(terrain_landform l)
     return "?";
 }
 
+const char* body_type_name(body_type t)
+{
+    switch (t)
+    {
+        case body_type::planet:   return "Planet";
+        case body_type::moon:     return "Moon";
+        case body_type::asteroid: return "Asteroid";
+        case body_type::station:  return "Station";
+        case body_type::star:     return "Star";
+    }
+    return "?";
+}
+
+const char* building_type_name(building_type t)
+{
+    switch (t)
+    {
+        case building_type::none:                return "None";
+        case building_type::extraction_site:     return "Extraction Site";
+        case building_type::processing_facility: return "Processing Facility";
+        case building_type::port:                return "Port";
+    }
+    return "None";
+}
+
 namespace palette {
 
 ImU32 faction_colour(int slot)

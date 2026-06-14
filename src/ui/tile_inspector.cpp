@@ -10,33 +10,6 @@
 
 namespace ui {
 
-namespace {
-
-const char* body_type_name(body_type t)
-{
-    switch (t)
-    {
-        case body_type::planet:   return "Planet";
-        case body_type::moon:     return "Moon";
-        case body_type::asteroid: return "Asteroid";
-        case body_type::station:  return "Station";
-        default:                  return "?";
-    }
-}
-
-const char* building_type_name(building_type t)
-{
-    switch (t)
-    {
-        case building_type::extraction_site:     return "Extraction Site";
-        case building_type::processing_facility: return "Processing Facility";
-        case building_type::port:                return "Port";
-        default:                                 return "None";
-    }
-}
-
-} // namespace
-
 void draw_tile_inspector(const world& w, bool* p_open)
 {
     // Honour the open flag; when closed the window draws nothing at all.
