@@ -71,7 +71,9 @@ void focus_on_entity(const world& w, ui_state& ui, entity_id entity)
 
     if (w.tiles.count(entity))
     {
-        focus_on_tile(w, ui, entity);
+        // A tile is selected from the surface it lives on, so 'go to' has nothing
+        // to descend to — the surface is already framed. Pan-to-tile is out of
+        // scope for now, so this is a deliberate no-op rather than a reframe.
         return;
     }
     if (auto b = w.buildings.find(entity); b != w.buildings.end())
@@ -90,7 +92,7 @@ void focus_on_entity(const world& w, ui_state& ui, entity_id entity)
         return;
     }
     if (w.bodies.count(entity))
-        focus_on_body(w, ui, entity);
+        focus_on_surface(w, ui, entity);
 }
 
 } // namespace ui

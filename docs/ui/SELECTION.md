@@ -70,8 +70,8 @@ Each kind renders its own content and routes its 'go to' to the right place:
 
 | Selection kind | Content (stat block) | 'Go to' target |
 |---|---|---|
-| **Body** (planet/moon/asteroid/station/star) | Name, type, orbit, parent; surface summary. | Canvas: `focus_on_body`. |
-| **Tile** | Composition × landform, hazard, habitability, deposits. | Canvas: `focus_on_tile`. |
+| **Body** (planet/moon/asteroid/station/star) | Name, type, orbit, parent; surface summary. | Canvas: `focus_on_surface` — descend to the body's **Planetary tile surface**, the most informative rung. (Not `focus_on_body` / the orbital framing: landing on a sparse circumplanetary view reads as "nothing happened", which was the *only-works-for-Kepler* symptom.) |
+| **Tile** | Composition × landform, hazard, habitability, deposits. | **No-op for now.** A tile is selected from the surface it lives on, so 'go to' has nothing to descend to; pan-to-tile is out of scope. |
 | **Building** | Type, recipe, throughput, host tile. | Canvas: `focus_on_tile` (host tile). |
 | **Market** | Body, headline prices / balances. | Canvas: `focus_on_surface`; or Market ledger. |
 | **Unit / logistics vessel** | Type, owner, location, status. | Canvas: `focus_on_surface` / vessel's position. |

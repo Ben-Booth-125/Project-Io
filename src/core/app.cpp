@@ -194,6 +194,15 @@ int app::run_verify(const std::string& script_path)
         if (b != null_entity)
             ui::focus_on_surface(m_world, m_ui, b);
     });
+    // The Selection panel's 'go to' path: routes a named body through the polymorphic
+    // focus_on_entity dispatch (not focus_on_surface directly), so a capture proves
+    // where 'go to' actually lands for that body — the durable check for the
+    // "go to only works for Kepler" symptom.
+    v.set_function("go_to", [this](const std::string& name) {
+        const entity_id b = find_body(m_world, name);
+        if (b != null_entity)
+            ui::focus_on_entity(m_world, m_ui, b);
+    });
     v.set_function("set_overlay", [this](const std::string& name) {
         m_ui.overlay = overlay_from_name(name);
     });

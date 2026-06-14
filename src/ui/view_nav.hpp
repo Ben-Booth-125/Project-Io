@@ -40,13 +40,17 @@ void focus_on_surface(const world& w, ui_state& ui, entity_id body);
 void focus_on_tile(const world& w, ui_state& ui, entity_id tile);
 
 /// Focus an arbitrary entity, resolving it to the most informative view:
-///   - tile / building → that body's surface, the tile selected
+///   - body            → focus_on_surface (its Planetary tile surface — the most
+///                       informative rung; this is what 'go to' on a body does)
+///   - tile            → no-op: a tile is selected from the surface it lives on,
+///                       so there is nothing to descend to (pan-to-tile is out of
+///                       scope for now)
+///   - building        → that building's host-tile surface
 ///   - unit / market   → that body's surface
-///   - body            → focus_on_body (orbital / local framing)
 ///
-/// This is the single call the Explorer's "jump to" and later alerts /
-/// notifications use instead of poking ui_state directly. Unknown, null, or
-/// stale ids are ignored.
+/// This is the single call the Selection panel's 'go to' button (and a
+/// double-click) routes through, and that later alerts / notifications will use
+/// instead of poking ui_state directly. Unknown, null, or stale ids are ignored.
 ///
 /// @param w      Read-only world state.
 /// @param ui     UI state to retarget.
