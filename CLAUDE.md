@@ -51,6 +51,9 @@ Surface-level description of the application shell — how the screen regions (n
 **`docs/ui/ICONS.md`**
 The icon vocabulary — every hand-drawn vector glyph in the `ui::icons` namespace (`src/ui/icons.{hpp,cpp}`, the source of truth): building markers, resource pips, unit markers, nav-rail affordances, and the map-lens glyphs. Catalogues each glyph's shape, meaning, usage, and colour source, the shared `(dl, centre, r, colour)` contract, and the recipe for adding one. Read before adding or changing any on-canvas/strip glyph; identity *colours* live in `presentation.hpp`, not here.
 
+**`docs/ui/LENSES.md`**
+The map-lens system — the overlay modes (`overlay_mode` in `src/ui/ui_state.hpp`) selectable from the canvas control strip. The **Corporation** lens is fully settled (tile ownership tint, player vs. rival colours, Planetary-only); the **Supply / Market / Faction** sections currently record existing behaviour and the proposed **Resource** lens is a stub — completing them is a TODO § Canvas item. Read before any work on overlay modes, lens rendering, or the lens icon vocabulary (which propagates to ICONS.md).
+
 **`docs/economy/RESOURCES.md`**
 The canonical resource list: all 23 resources organised into three tiers (raw → refined → product), their terrain affinity and body availability, the Era 0 / Era 1 split, and the seven-resource prototype subset. Read before any work involving resource types, tile deposits, or market goods.
 
@@ -61,7 +64,7 @@ All extraction and processing buildings: placement rules, valid terrain, output 
 The Era system — the formal phase structure of the game's industrial arc. Era 0 (Terrestrial) starts at the campaign epoch; Era 1 (Early Space) is unlocked by the Rocketry research + Launchpad + propellant gate. Read for questions about what is accessible when, and how the transition to space is structured.
 
 **`docs/economy/TILES.md`**
-Tile classification: the two-axis terrain model (composition × landform), resource deposit profiles per terrain type, ambient resource guarantee, and amenity tile concept. Read before any work involving terrain types, tile generation, or the `terrain_type`/`terrain_composition` enum. Includes an implementation note on the data model change.
+Tile classification: the two-axis terrain model (composition × landform), resource deposit profiles per terrain type, ambient resource guarantee, and amenity tile concept. Read before any work involving terrain types, tile generation, or the `terrain_composition`/`terrain_landform` enums. Includes an implementation note recording that the two-axis split is now implemented.
 
 **`docs/economy/POPULATION.md`**
 Population centres, scale/agglomeration mechanics, land-use trade-offs, and habitability feedback. Deferred from the prototype but designed here so the data model positions correctly. Read for questions about workforce, habitability, or population demand.

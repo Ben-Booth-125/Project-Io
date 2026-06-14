@@ -158,9 +158,9 @@ A tile's amenity potential can be realised directly (leaving it undeveloped as g
 
 ## Implementation note
 
-The current `terrain_type` enum in `components.hpp` is a single flat classification (barren, rocky, icy, volcanic, water). The design in this document requires two separate enums:
+This two-axis model is **implemented** (2026-06-14; see DEVLOG § "Two-axis terrain model + six-pass procedural generation"). The old single flat `terrain_type` enum was replaced in `components.hpp` by two enums, both carried on `tile_component`:
 
-- `terrain_composition` — the geological/ecological type
-- `terrain_landform` — the physical shape
+- `terrain_composition` — the geological/ecological type (11 values: barren, rocky, volcanic, icy, tundra, grassland, forest, wetland, ocean, regolith, metallic)
+- `terrain_landform` — the physical shape (7 values: plains, highland, mountain, canyon, valley, crater, rift)
 
-`tile_component` will carry both. The existing `terrain_type` enum should be renamed `terrain_composition` and expanded; `terrain_landform` is a new field. Both default to a baseline value (e.g. `barren` / `plains`) so existing hard-coded world data requires no immediate retrofit, but a generation update (see TODO.md) will apply the full model to the prototype bodies.
+The prototype bodies are generated against the full model by the six-pass pipeline in `src/world/tile_generation.cpp` (see `docs/generation/TILE_GENERATION.md`); there is no remaining retrofit. Tuning refinements that remain open are tracked in `docs/development/TODO.md` § Environment.
