@@ -77,3 +77,6 @@ The procedural nation generation strategy: Voronoi BFS territory placement over 
 
 **`docs/generation/CORPORATION_GENERATION.md`**
 The procedural corporation generation strategy: nation assignment, industrial focus, starting asset placement, and financial profile. Covers the player corporation marker, the deferred corporation selection screen, and open design items (franchising, nation-seeded privatisation, tax, Era-based sovereignty). Read before any work on faction setup or campaign initialisation.
+
+**`docs/generation/GENERATION_LEDGER.md`**
+The Generation Ledger (design only) — a tuning/analysis surface that explains *why* a tile generated as it did, reading the per-pass intermediates exposed by `generate_body_tiles`'s optional `generation_record`. Covers the per-tile derivation breadcrumb (height/ocean → band/moisture → composition → landform → deposits), per-body histograms, the regenerate-on-demand (don't-persist) data lifetime, and surfacing as a Ledger window plus a Planetary field-overlay lens. Read before building the generation ledger or any heightmap/moisture/band overlay.
