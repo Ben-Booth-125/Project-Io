@@ -242,7 +242,11 @@ lat_band band_for_row(int row, int gh, temperature_class temp)
 // Pass 4 — composition
 // ---------------------------------------------------------------------------
 
-int moisture_column(float m) { return m < 0.35f ? 0 : (m < 0.65f ? 1 : 2); }
+// Tuned 2026-06-14 (Kepler biome balance): the high-moisture cutoff was lowered
+// from 0.65 to 0.55 so more tiles reach the wet (mc==2) branches of
+// composition_atmospheric() that produce forest and wetland — these stayed sparse
+// (~1% / ~0.5%) on Kepler even after the Pass 2 ocean-bias reduction.
+int moisture_column(float m) { return m < 0.35f ? 0 : (m < 0.55f ? 1 : 2); }
 
 // 60/40 weighting toward `a`, resolved against the per-tile RNG.
 terrain_composition pick_60_40(std::mt19937& rng, terrain_composition a, terrain_composition b)
@@ -679,15 +683,15 @@ std::vector<entity_id> generate_body_tiles(
         // there without enforcing a uniform band; the noise keeps the coastline
         // irregular.
         //
-        // Tuned 2026-06-14: bias_amp lowered from 0.15 to 0.07. The old value
+        // Tuned 2026-06-14: bias_amp lowered 0.15 → 0.07 → 0.05. The old value
         // drowned most tropical/subtropical land, collapsing forest (~1%) and
-        // wetland (~0%) on Kepler. Halving-ish the bias widens the equatorial
+        // wetland (~0%) on Kepler. Reducing the bias widens the equatorial
         // landmass belt and lets high-moisture tropical/subtropical tiles reach
         // the forest/wetland branches of composition_atmospheric(). Total ocean
         // fraction is still set by the percentile threshold against water_fraction
         // (0.60 for Kepler), so ocean coverage stays correct; only the
         // land-to-water *distribution* across latitudes changes.
-        constexpr float bias_amp = 0.07f;
+        constexpr float bias_amp = 0.05f;
         std::vector<float> biased(total);
         for (int row = 0; row < gh; ++row)
         {
