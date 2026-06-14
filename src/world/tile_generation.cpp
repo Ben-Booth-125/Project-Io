@@ -210,8 +210,16 @@ lat_band band_for_row(int row, int gh, temperature_class temp)
             return lat_band::polar;
 
         case temperature_class::cold:
-            if (d >= 0.50) return lat_band::polar;
-            if (d >= 0.10) return lat_band::subpolar;
+            // Tuned 2026-06-14: polar boundary tightened from d >= 0.50 to
+            // d >= 0.70 (outer 30% of rows instead of outer 50%). At 0.50 the
+            // polar band covered half the grid and every polar-band row on a
+            // polar_frozen body (Selene) received icy composition, yielding ~52%
+            // icy coverage. At 0.70 the cap should fall to roughly ~30%, which
+            // reads as a credible but not dominant polar feature. The subpolar
+            // boundary is also shifted out (0.30 → 0.10 retained) to keep the
+            // subpolar belt proportionally sized.
+            if (d >= 0.70) return lat_band::polar;
+            if (d >= 0.30) return lat_band::subpolar;
             return lat_band::temperate;
 
         case temperature_class::scorching:
@@ -315,11 +323,18 @@ struct cluster_shape { int max_ring; float decay; };
 
 cluster_shape shape_of(feature_kind kind)
 {
+    // Tuned 2026-06-14: increased max_ring and decay to make landform clusters
+    // more prominent. Old values: mountain {2, 0.55}, rift {2, 0.55},
+    // crater {1, 0.45}. Mountains and rifts now reach a 4th ring (0-indexed),
+    // decay raised so the BFS frontier survives further from the seed. Craters
+    // gain a second ring so they read as actual impact features rather than
+    // single-tile stamps. Conservative step — integrator should histogram and
+    // adjust further if coverage is still too sparse or overshoots plains.
     switch (kind)
     {
-        case feature_kind::mountain: return { 2, 0.55f };
-        case feature_kind::rift:     return { 2, 0.55f };
-        case feature_kind::crater:   return { 1, 0.45f };
+        case feature_kind::mountain: return { 3, 0.65f };
+        case feature_kind::rift:     return { 3, 0.60f };
+        case feature_kind::crater:   return { 2, 0.55f };
     }
     return { 1, 0.5f };
 }
@@ -442,12 +457,18 @@ std::vector<int> pick_seeds(feature_kind kind, int n_seeds, int gw, int gh,
 // absolutes they collapse to near-zero coverage on the prototype's large grids.
 // Scale a base count up with grid area so feature *density* stays consistent
 // across body sizes, never below the authored count (so small bodies are
-// unaffected). The reference area is ~a 60×30 globe.
+// unaffected).
+//
+// Tuned 2026-06-14: reference_tiles lowered from 1800 to 1200 to yield a
+// higher seed count on the 180×84 prototype grids (~15k tiles). Old reference
+// gave a ~8.4× scale factor; new gives ~12.6×. Pairs with the larger
+// shape_of() clusters to produce more prominent and more numerous features.
+// Integrator should re-histogram and back this off if density overshoots.
 int scale_to_area(int base, int total_tiles)
 {
     if (base <= 0)
         return base;
-    constexpr int reference_tiles = 1800;
+    constexpr int reference_tiles = 1200;
     const long scaled = std::lround(static_cast<double>(base)
                                     * static_cast<double>(total_tiles)
                                     / static_cast<double>(reference_tiles));
@@ -657,7 +678,16 @@ std::vector<entity_id> generate_body_tiles(
         // Bias the heightmap downward toward the equator so ocean concentrates
         // there without enforcing a uniform band; the noise keeps the coastline
         // irregular.
-        constexpr float bias_amp = 0.15f;
+        //
+        // Tuned 2026-06-14: bias_amp lowered from 0.15 to 0.07. The old value
+        // drowned most tropical/subtropical land, collapsing forest (~1%) and
+        // wetland (~0%) on Kepler. Halving-ish the bias widens the equatorial
+        // landmass belt and lets high-moisture tropical/subtropical tiles reach
+        // the forest/wetland branches of composition_atmospheric(). Total ocean
+        // fraction is still set by the percentile threshold against water_fraction
+        // (0.60 for Kepler), so ocean coverage stays correct; only the
+        // land-to-water *distribution* across latitudes changes.
+        constexpr float bias_amp = 0.07f;
         std::vector<float> biased(total);
         for (int row = 0; row < gh; ++row)
         {

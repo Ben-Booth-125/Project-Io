@@ -1,0 +1,525 @@
+#include "nation_generation.hpp"
+
+#include <algorithm>
+#include <array>
+#include <cstdint>
+#include <queue>
+#include <random>
+#include <string>
+#include <utility>
+#include <vector>
+
+// ---------------------------------------------------------------------------
+// Internal helpers — all in anonymous namespace
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// ---------------------------------------------------------------------------
+// Grid utilities
+// ---------------------------------------------------------------------------
+
+/// Chebyshev distance between two grid cells with horizontal column wrapping.
+/// Row axis does not wrap (polar caps are open edges).
+int grid_distance(int c0, int r0, int c1, int r1, int gw)
+{
+    int dc = std::abs(c0 - c1);
+    if (dc > gw / 2)
+        dc = gw - dc; // wrap the shorter way around
+    const int dr = std::abs(r0 - r1);
+    return std::max(dc, dr);
+}
+
+/// Raster index for (col, row), with column wrapped into [0, gw).
+int raster_idx(int col, int row, int gw)
+{
+    return ((col % gw) + gw) % gw + row * gw;
+}
+
+/// Enumerate the four cardinal grid neighbours of (col, row).
+/// Column wraps; rows outside [0, gh) are omitted.
+void cardinal_neighbours(int col, int row, int gw, int gh,
+                         std::pair<int,int> out[4], int& count)
+{
+    const int dc[4] = {  0,  0, -1, 1 };
+    const int dr[4] = { -1,  1,  0, 0 };
+    count = 0;
+    for (int i = 0; i < 4; ++i)
+    {
+        const int nr = row + dr[i];
+        if (nr < 0 || nr >= gh)
+            continue;
+        const int nc = ((col + dc[i]) % gw + gw) % gw;
+        out[count++] = { nc, nr };
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Pass 1 — seed placement
+// ---------------------------------------------------------------------------
+
+/// Attempt to place exactly `nation_count` seeds on non-ocean tiles, each at
+/// least `min_sep` grid distance from every previously placed seed.
+/// Habitable compositions (grassland, forest, wetland) are strongly preferred.
+/// Falls back to any land tile if the preferred pool is exhausted.
+///
+/// Returns the raster indices of the chosen seed tiles.
+std::vector<int> place_seeds(const std::vector<bool>& is_ocean,
+                             const std::vector<terrain_composition>& comp,
+                             int gw, int gh,
+                             int nation_count, int min_sep,
+                             std::mt19937& rng)
+{
+    const int total = gw * gh;
+
+    // Partition land tiles into preferred (habitable) and any-land pools.
+    std::vector<int> preferred;
+    std::vector<int> any_land;
+    preferred.reserve(static_cast<std::size_t>(total) / 4);
+    any_land.reserve(static_cast<std::size_t>(total));
+
+    for (int idx = 0; idx < total; ++idx)
+    {
+        if (is_ocean[idx])
+            continue;
+        any_land.push_back(idx);
+        const terrain_composition c = comp[idx];
+        if (c == terrain_composition::grassland
+         || c == terrain_composition::forest
+         || c == terrain_composition::wetland)
+        {
+            preferred.push_back(idx);
+        }
+    }
+
+    // Shuffle both pools independently so candidate order is random.
+    std::shuffle(preferred.begin(), preferred.end(), rng);
+    std::shuffle(any_land.begin(), any_land.end(), rng);
+
+    // Build a combined candidate list: preferred tiles first, then the rest.
+    // Duplicates are fine — we check placement eligibility before accepting.
+    std::vector<int> candidates;
+    candidates.reserve(preferred.size() + any_land.size());
+    candidates.insert(candidates.end(), preferred.begin(), preferred.end());
+    for (int idx : any_land)
+    {
+        // Only add tiles not already in preferred.
+        const terrain_composition c = comp[idx];
+        if (c != terrain_composition::grassland
+         && c != terrain_composition::forest
+         && c != terrain_composition::wetland)
+        {
+            candidates.push_back(idx);
+        }
+    }
+
+    std::vector<int> seeds;
+    seeds.reserve(static_cast<std::size_t>(nation_count));
+
+    for (int idx : candidates)
+    {
+        if (static_cast<int>(seeds.size()) >= nation_count)
+            break;
+
+        const int col = idx % gw;
+        const int row = idx / gw;
+
+        // Enforce minimum separation from all already-placed seeds.
+        bool too_close = false;
+        for (int s : seeds)
+        {
+            if (grid_distance(col, row, s % gw, s / gw, gw) < min_sep)
+            {
+                too_close = true;
+                break;
+            }
+        }
+        if (!too_close)
+            seeds.push_back(idx);
+    }
+
+    return seeds;
+}
+
+// ---------------------------------------------------------------------------
+// Pass 2 — territory expansion (weighted Voronoi BFS)
+// ---------------------------------------------------------------------------
+
+/// Terrain-based expansion cost for a tile. Higher cost drains the claiming
+/// nation's budget more, so ranges naturally fall near mountain barriers.
+float expansion_cost(terrain_landform lf)
+{
+    switch (lf)
+    {
+        case terrain_landform::mountain: return 3.0f;  // hard barrier
+        case terrain_landform::highland: return 2.0f;  // soft barrier
+        case terrain_landform::rift:     return 1.5f;
+        case terrain_landform::canyon:   return 1.25f;
+        default:                         return 1.0f;
+    }
+}
+
+/// Entry for the BFS priority queue.
+struct bfs_entry
+{
+    float    cost;        ///< Accumulated weighted distance from the seed.
+    int      col;
+    int      row;
+    int      nation_idx;  ///< Index into the seeds vector.
+
+    // std::priority_queue is a max-heap; we want lowest-cost first.
+    bool operator>(const bfs_entry& o) const { return cost > o.cost; }
+};
+
+/// Expand each seed outward until every claimable land tile is assigned.
+/// Ocean tiles are never claimed. Mountains and highlands drain the budget
+/// of the claiming nation so ranges fall at or near those features.
+///
+/// @param seeds        Raster indices of the nation seeds (one per nation).
+/// @param is_ocean     Per-tile ocean flag.
+/// @param tiles        Tile components, for landform lookup.
+/// @param tile_ids     Raster-order tile entity IDs.
+/// @param gw, gh       Grid dimensions.
+/// @param rng          Seeded RNG for jitter.
+/// @return             Per-tile nation index (-1 = unclaimed/ocean). Indexed as row*gw+col.
+std::vector<int> expand_territory(const std::vector<int>& seeds,
+                                  const std::vector<bool>& is_ocean,
+                                  const world& w,
+                                  const std::vector<entity_id>& tile_ids,
+                                  int gw, int gh,
+                                  std::mt19937& rng)
+{
+    const int total = gw * gh;
+    std::vector<int>   owner(static_cast<std::size_t>(total), -1);
+    std::vector<float> dist(static_cast<std::size_t>(total), 1e9f);
+    std::vector<bool>  settled(static_cast<std::size_t>(total), false);
+
+    std::uniform_real_distribution<float> jitter(0.0f, 0.25f);
+
+    std::priority_queue<bfs_entry,
+                        std::vector<bfs_entry>,
+                        std::greater<bfs_entry>> pq;
+
+    // Seed the frontier.
+    for (int ni = 0; ni < static_cast<int>(seeds.size()); ++ni)
+    {
+        const int s = seeds[static_cast<std::size_t>(ni)];
+        dist[static_cast<std::size_t>(s)]  = 0.0f;
+        owner[static_cast<std::size_t>(s)] = ni;
+        pq.push({ 0.0f, s % gw, s / gw, ni });
+    }
+
+    while (!pq.empty())
+    {
+        const bfs_entry cur = pq.top();
+        pq.pop();
+
+        const int idx = raster_idx(cur.col, cur.row, gw);
+
+        if (settled[static_cast<std::size_t>(idx)])
+            continue;
+        settled[static_cast<std::size_t>(idx)] = true;
+
+        // Expand into cardinal neighbours.
+        std::pair<int,int> nbrs[4];
+        int n = 0;
+        cardinal_neighbours(cur.col, cur.row, gw, gh, nbrs, n);
+
+        for (int i = 0; i < n; ++i)
+        {
+            const int nc  = nbrs[i].first;
+            const int nr  = nbrs[i].second;
+            const int nidx = raster_idx(nc, nr, gw);
+
+            if (settled[static_cast<std::size_t>(nidx)] || is_ocean[static_cast<std::size_t>(nidx)])
+                continue;
+
+            // Look up the tile's landform for cost weighting.
+            const entity_id tid = tile_ids[static_cast<std::size_t>(nidx)];
+            float cost_step = 1.0f;
+            if (tid != null_entity)
+            {
+                const auto it = w.tiles.find(tid);
+                if (it != w.tiles.end())
+                    cost_step = expansion_cost(it->second.landform);
+            }
+
+            const float new_cost = cur.cost + cost_step + jitter(rng);
+
+            if (new_cost < dist[static_cast<std::size_t>(nidx)])
+            {
+                dist[static_cast<std::size_t>(nidx)]  = new_cost;
+                owner[static_cast<std::size_t>(nidx)] = cur.nation_idx;
+                pq.push({ new_cost, nc, nr, cur.nation_idx });
+            }
+        }
+    }
+
+    return owner;
+}
+
+// ---------------------------------------------------------------------------
+// Pass 3 — resource profile derivation
+// ---------------------------------------------------------------------------
+
+/// Sum each nation's tiles' resource_deposit arrays into resource_abundance.
+void derive_resource_profiles(
+    const std::vector<int>& owner_map,
+    const std::vector<entity_id>& tile_ids,
+    const world& w,
+    int gw, int gh,
+    std::vector<nation_component>& nations)
+{
+    const int total = gw * gh;
+    for (int idx = 0; idx < total; ++idx)
+    {
+        const int ni = owner_map[static_cast<std::size_t>(idx)];
+        if (ni < 0)
+            continue;
+
+        const entity_id tid = tile_ids[static_cast<std::size_t>(idx)];
+        if (tid == null_entity)
+            continue;
+
+        const auto it = w.tiles.find(tid);
+        if (it == w.tiles.end())
+            continue;
+
+        const auto& dep = it->second.resource_deposit;
+        auto& abund     = nations[static_cast<std::size_t>(ni)].resource_abundance;
+        for (std::size_t r = 0; r < resource_count; ++r)
+            abund[r] += dep[r];
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Pass 4 — political character
+// ---------------------------------------------------------------------------
+
+/// Draw ideology, expansionism, and economic_focus uniformly from the seeded RNG.
+void assign_political_character(nation_component& nc, std::mt19937& rng)
+{
+    {
+        std::uniform_int_distribution<int> d(0, 3);
+        nc.ideology = static_cast<::ideology>(d(rng));
+    }
+    {
+        std::uniform_int_distribution<int> d(0, 2);
+        nc.expansionism = static_cast<::expansionism>(d(rng));
+    }
+    {
+        std::uniform_int_distribution<int> d(0, 2);
+        nc.economic_focus = static_cast<::economic_focus>(d(rng));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Pass 5 — procedural naming
+// ---------------------------------------------------------------------------
+
+// The name bank is entirely self-contained. Names are constructed from a
+// randomly chosen structural template filled with syllables drawn from three
+// independent pools (onset, nucleus, coda). This produces names that feel
+// vaguely alien without requiring a fixed human-authored list.
+
+static const char* const k_onsets[] = {
+    "Ar", "Bel", "Cal", "Dor", "El", "Far", "Gar", "Hel", "Ir", "Jal",
+    "Kor", "Lun", "Mel", "Nor", "Or", "Par", "Qel", "Ros", "Sel", "Tar",
+    "Ul", "Vel", "Wor", "Xen", "Yar", "Zan", "Ceth", "Drath", "Eln", "Fyr",
+};
+static constexpr int k_onset_count = 30;
+
+static const char* const k_nuclei[] = {
+    "a", "e", "i", "o", "u", "an", "en", "on", "al", "el",
+    "ir", "ur", "ath", "eth", "ith",
+};
+static constexpr int k_nucleus_count = 15;
+
+static const char* const k_codas[] = {
+    "ia", "ar", "on", "us", "is", "an", "or", "ath", "el", "yn",
+    "era", "ix", "ael", "oran", "ast",
+};
+static constexpr int k_coda_count = 15;
+
+// Structural adjective pool for compound forms ("Free Lands of ...")
+static const char* const k_adjectives[] = {
+    "Free", "United", "Grand", "High", "Old", "New", "Sacred", "Iron",
+    "Silver", "Northern", "Southern", "Eastern", "Western", "Central",
+};
+static constexpr int k_adj_count = 14;
+
+// Structural noun pool for compound forms
+static const char* const k_nouns[] = {
+    "Reach", "March", "Expanse", "Dominion", "Federation", "Commonwealth",
+    "Compact", "Alliance", "Protectorate", "Principality", "Republic", "Conclave",
+};
+static constexpr int k_noun_count = 12;
+
+/// Build a single phoneme-derived word (two to three syllable clusters).
+std::string make_phoneme_word(std::mt19937& rng)
+{
+    std::uniform_int_distribution<int> pick_onset(0, k_onset_count - 1);
+    std::uniform_int_distribution<int> pick_nuc(0, k_nucleus_count - 1);
+    std::uniform_int_distribution<int> pick_coda(0, k_coda_count - 1);
+    std::uniform_int_distribution<int> pick_syl(2, 3); // syllable count
+
+    std::string word;
+    const int syllables = pick_syl(rng);
+    for (int s = 0; s < syllables; ++s)
+    {
+        if (s == 0)
+            word += k_onsets[static_cast<std::size_t>(pick_onset(rng))];
+        else
+            word += k_onsets[static_cast<std::size_t>(pick_onset(rng))];
+
+        word += k_nuclei[static_cast<std::size_t>(pick_nuc(rng))];
+    }
+    word += k_codas[static_cast<std::size_t>(pick_coda(rng))];
+    return word;
+}
+
+/// Generate a procedural nation name using one of three structural templates,
+/// chosen uniformly. Templates:
+///   0 — single phoneme word                  e.g. "Arenarath"
+///   1 — adjective + phoneme word             e.g. "Free Belonor"
+///   2 — phoneme word + noun                  e.g. "Kalorath Dominion"
+std::string make_nation_name(std::mt19937& rng)
+{
+    std::uniform_int_distribution<int> tmpl(0, 2);
+    std::uniform_int_distribution<int> pick_adj(0, k_adj_count - 1);
+    std::uniform_int_distribution<int> pick_noun(0, k_noun_count - 1);
+
+    const int form = tmpl(rng);
+    switch (form)
+    {
+        case 0:
+            return make_phoneme_word(rng);
+        case 1:
+        {
+            std::string name = k_adjectives[static_cast<std::size_t>(pick_adj(rng))];
+            name += ' ';
+            name += make_phoneme_word(rng);
+            return name;
+        }
+        default: // 2
+        {
+            std::string name = make_phoneme_word(rng);
+            name += ' ';
+            name += k_nouns[static_cast<std::size_t>(pick_noun(rng))];
+            return name;
+        }
+    }
+}
+
+} // namespace
+
+// ---------------------------------------------------------------------------
+// Public entry point
+// ---------------------------------------------------------------------------
+
+std::vector<entity_id> generate_nations(
+    world& w,
+    entity_id /* body_id */,
+    const std::vector<entity_id>& tile_ids,
+    int gw, int gh,
+    const nation_params& params,
+    uint32_t seed)
+{
+    const int total = gw * gh;
+
+    // Distinct seed offsets keep each pass's RNG stream independent.
+    const uint32_t seed_seeds  = seed ^ 0xA3B4C5D6u;
+    const uint32_t seed_expand = seed ^ 0x1F2E3D4Cu;
+    const uint32_t seed_pol    = seed ^ 0x8C7B6A59u;
+    const uint32_t seed_name   = seed ^ 0x4E5F607Au;
+
+    // --- Build flat composition and is_ocean maps from the existing tile data ---
+    std::vector<terrain_composition> comp(static_cast<std::size_t>(total),
+                                          terrain_composition::barren);
+    std::vector<bool> is_ocean(static_cast<std::size_t>(total), false);
+
+    for (int idx = 0; idx < total; ++idx)
+    {
+        const entity_id tid = tile_ids[static_cast<std::size_t>(idx)];
+        if (tid == null_entity)
+            continue;
+        const auto it = w.tiles.find(tid);
+        if (it == w.tiles.end())
+            continue;
+        comp[static_cast<std::size_t>(idx)] = it->second.composition;
+        if (it->second.composition == terrain_composition::ocean)
+            is_ocean[static_cast<std::size_t>(idx)] = true;
+    }
+
+    // --- Pass 1: seed placement ---
+    std::mt19937 seed_rng(seed_seeds);
+    const std::vector<int> seeds = place_seeds(
+        is_ocean, comp, gw, gh,
+        params.nation_count, params.min_seed_separation,
+        seed_rng);
+
+    const int nation_count = static_cast<int>(seeds.size());
+    if (nation_count == 0)
+        return {};
+
+    // --- Pass 2: territory expansion ---
+    std::mt19937 expand_rng(seed_expand);
+    const std::vector<int> owner_map = expand_territory(
+        seeds, is_ocean, w, tile_ids, gw, gh, expand_rng);
+
+    // --- Allocate nation_component stubs (populated in Passes 3–5) ---
+    std::vector<nation_component> nation_data(static_cast<std::size_t>(nation_count));
+
+    // Fill tiles lists and write tile_to_nation ownership map.
+    for (int idx = 0; idx < total; ++idx)
+    {
+        const int ni = owner_map[static_cast<std::size_t>(idx)];
+        if (ni < 0)
+            continue;
+
+        const entity_id tid = tile_ids[static_cast<std::size_t>(idx)];
+        if (tid == null_entity)
+            continue;
+
+        nation_data[static_cast<std::size_t>(ni)].tiles.push_back(tid);
+        // tile_to_nation is written below once we have the entity IDs.
+    }
+
+    // --- Pass 3: resource profile derivation ---
+    derive_resource_profiles(owner_map, tile_ids, w, gw, gh, nation_data);
+
+    // --- Pass 4: political character ---
+    std::mt19937 pol_rng(seed_pol);
+    for (int ni = 0; ni < nation_count; ++ni)
+        assign_political_character(nation_data[static_cast<std::size_t>(ni)], pol_rng);
+
+    // --- Pass 5: naming ---
+    std::mt19937 name_rng(seed_name);
+    for (int ni = 0; ni < nation_count; ++ni)
+        nation_data[static_cast<std::size_t>(ni)].name = make_nation_name(name_rng);
+
+    // --- Register nations in the world and write ownership maps ---
+    std::vector<entity_id> nation_ids;
+    nation_ids.reserve(static_cast<std::size_t>(nation_count));
+
+    for (int ni = 0; ni < nation_count; ++ni)
+    {
+        const entity_id nid = w.create_entity();
+        nation_ids.push_back(nid);
+        w.nations[nid] = std::move(nation_data[static_cast<std::size_t>(ni)]);
+    }
+
+    // Write tile_to_nation entries now that entity IDs are known.
+    for (int idx = 0; idx < total; ++idx)
+    {
+        const int ni = owner_map[static_cast<std::size_t>(idx)];
+        if (ni < 0)
+            continue;
+        const entity_id tid = tile_ids[static_cast<std::size_t>(idx)];
+        if (tid == null_entity)
+            continue;
+        w.tile_to_nation[tid] = nation_ids[static_cast<std::size_t>(ni)];
+    }
+
+    return nation_ids;
+}

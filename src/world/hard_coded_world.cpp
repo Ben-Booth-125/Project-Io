@@ -1,5 +1,7 @@
 #include "hard_coded_world.hpp"
 
+#include "corporation_generation.hpp"
+#include "nation_generation.hpp"
 #include "orbital_system.hpp"
 #include "tile_generation.hpp"
 
@@ -111,6 +113,13 @@ world make_hard_coded_world()
         },
         /*seed=*/0xE471001u);
 
+    // Kepler is the only body with a political layer in the prototype: 8–12
+    // nations placed over its land tiles. Selene/Cinder/Pallas stay unclaimed.
+    // See docs/generation/NATION_GENERATION.md.
+    generate_nations(w, kepler, kepler_tiles, 180, 84,
+        nation_params{ .nation_count = 10, .min_seed_separation = 6 },
+        /*seed=*/0x4A71012u);
+
     // Attach installations to the first two land tiles found in raster order.
     {
         auto land = first_land_tiles(kepler_tiles, w, 180, 84, 2);
@@ -166,6 +175,13 @@ world make_hard_coded_world()
                                        {resource_type::refined_fuel,          10.0f},
                                        {resource_type::food_rations,           6.0f} }),
     };
+
+    // Corporations: 6–10 actors registered in the generated nations, including
+    // the player's (which sets w.player_entity). Runs after the nations exist and
+    // after the pre-authored Kepler installations are in w.buildings, so corporate
+    // asset placement collision-avoids those tiles. See CORPORATION_GENERATION.md.
+    generate_corporations(w, corporation_params{ .corporation_count = 8 },
+        /*seed=*/0x4A71012u);
 
     // Player unit stub on Kepler.
     const entity_id kepler_unit = w.create_entity();

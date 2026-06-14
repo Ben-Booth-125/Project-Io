@@ -5,6 +5,7 @@
 #include <array>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 // ---------------------------------------------------------------------------
 // Shared enumerations
@@ -176,4 +177,115 @@ struct unit_component
     entity_id body;  ///< Body where the unit is currently located.
     entity_id owner; ///< Corporation or faction entity that controls this unit.
     int       count; ///< Number of units in the group.
+};
+
+// ---------------------------------------------------------------------------
+// Corporation enumerations
+// ---------------------------------------------------------------------------
+
+/// Primary industrial focus of a corporation. Semantically distinct from the
+/// nation-level economic_focus even though the values mirror it — they model
+/// different concepts (corporate strategy vs. national economic policy) and
+/// are intentionally kept as separate types so they can diverge independently.
+enum class industrial_focus : uint8_t
+{
+    extraction  = 0, ///< Raw-material producers; prefer resource-rich land tiles.
+    processing  = 1, ///< Refiners and converters; prefer proximity to extraction clusters.
+    trade       = 2, ///< Logistics and market operators; prefer port-adjacent tiles.
+};
+
+// ---------------------------------------------------------------------------
+// Corporation component
+// ---------------------------------------------------------------------------
+
+/// All persistent data describing a single corporation at campaign start.
+/// Corporations take no autonomous actions in the prototype; this struct is
+/// generation output only. See docs/generation/CORPORATION_GENERATION.md and
+/// docs/development/TODO.md for the deferred behaviour design.
+struct corporation_component
+{
+    /// Generated name produced by Pass 5 of the corporation generation pipeline.
+    std::string name;
+
+    /// Nation entity this corporation is legally registered in.
+    /// Set by Pass 1 (nation assignment); never null after generation.
+    entity_id home_nation = null_entity;
+
+    /// Primary industrial focus; drawn by Pass 2 (focus assignment).
+    industrial_focus focus = ::industrial_focus::extraction;
+
+    /// Starting capital in the economy's base currency unit; set by Pass 4.
+    float starting_capital = 0.0f;
+
+    /// True for exactly one corporation per campaign — the human player's
+    /// corporation. Set after all corps are generated.
+    bool is_player = false;
+
+    /// Building entity IDs owned by this corporation at campaign start.
+    /// Populated by Pass 3 (starting asset placement); each entry has a
+    /// building_component and a stockpile_component in the world.
+    std::vector<entity_id> assets;
+};
+
+// ---------------------------------------------------------------------------
+// Nation enumerations
+// ---------------------------------------------------------------------------
+
+/// Broad political orientation of a nation. Seeds the starting sentiment graph
+/// and the tone of diplomatic interactions between nations.
+enum class ideology : uint8_t
+{
+    authoritarian = 0, ///< Centralised state authority; hostile to mercantile/technocratic neighbours.
+    technocratic  = 1, ///< Governance by technical expertise; cooperative with innovation-focused peers.
+    mercantile    = 2, ///< Trade-first policy; favours open markets and corporation access.
+    isolationist  = 3, ///< Minimises external interaction; low base sentiment toward all neighbours.
+};
+
+/// Military and territorial posture of a nation at campaign start.
+enum class expansionism : uint8_t
+{
+    passive    = 0, ///< Defensive; does not initiate border pressure.
+    moderate   = 1, ///< Opportunistic; will contest resources near existing borders.
+    aggressive = 2, ///< Proactively pressures neighbours and contests unclaimed zones.
+};
+
+/// Dominant economic activity of a nation; biases infrastructure investment
+/// and the resource demands it places on corporations operating within it.
+enum class economic_focus : uint8_t
+{
+    extraction  = 0, ///< Raw-material economy; values ore and agricultural output.
+    processing  = 1, ///< Industrial economy; demands refined goods and energy inputs.
+    trade       = 2, ///< Commercial economy; prioritises port capacity and market access.
+};
+
+// ---------------------------------------------------------------------------
+// Nation component
+// ---------------------------------------------------------------------------
+
+/// All persistent data describing a single nation at campaign start. Nations
+/// take no autonomous actions in the prototype; this struct is generation output
+/// only. See docs/generation/NATION_GENERATION.md and docs/development/TODO.md
+/// for the deferred behaviour design.
+struct nation_component
+{
+    /// Generated name produced by Pass 5 of the nation generation pipeline.
+    std::string name;
+
+    /// Ordered list of tile entity IDs controlled by this nation.
+    /// Populated by Pass 2 (territory expansion) and stable thereafter.
+    std::vector<entity_id> tiles;
+
+    /// Summed resource deposit profile across all owned tiles, indexed by
+    /// static_cast<std::size_t>(resource_type). Computed in Pass 3.
+    /// A value of 0.0 means the resource is absent from the nation's territory.
+    std::array<float, resource_count> resource_abundance{};
+
+    /// Political orientation; drawn from seeded RNG in Pass 4.
+    ideology       ideology       = ::ideology::mercantile;
+
+    /// Military / territorial posture; drawn from seeded RNG in Pass 4.
+    expansionism   expansionism   = ::expansionism::passive;
+
+    /// Dominant economic activity; drawn from seeded RNG in Pass 4.
+    economic_focus economic_focus = ::economic_focus::extraction;
 };

@@ -59,6 +59,21 @@ struct world
     std::unordered_map<entity_id, market_component>    markets;
     std::unordered_map<entity_id, unit_component>      units;
 
+    /// Nation entities keyed by their entity ID. Populated by generate_nations()
+    /// after tile generation; empty until that call is made for a body.
+    std::unordered_map<entity_id, nation_component>    nations;
+
+    /// Maps a tile entity ID to the nation entity ID that owns it.
+    /// Absent entries are unclaimed (ocean tiles and bodies without nation generation).
+    /// Written by generate_nations() alongside the nation_component.tiles list.
+    std::unordered_map<entity_id, entity_id>           tile_to_nation;
+
+    /// Corporation entities keyed by their entity ID. Populated by
+    /// generate_corporations() after nation generation; empty until that call
+    /// is made. Exactly one entry will have corporation_component::is_player == true,
+    /// and world::player_entity will equal that entry's key.
+    std::unordered_map<entity_id, corporation_component> corporations;
+
 private:
     uint32_t m_next_id = 1; ///< Zero is null_entity; live IDs start at 1.
 };

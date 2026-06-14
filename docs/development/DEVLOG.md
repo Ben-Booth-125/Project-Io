@@ -6,6 +6,75 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## 2026-06-14 — version 0.0.3 — Environment: nation + corporation generation, tile tuning
+
+**Status:** Complete (code). Full app builds clean (Debug, exit 0); the two new
+`src/world/*.cpp` translation units compile and link into `ProjectIo.exe`. Logic
+verified via a throwaway headless harness (compiled with the `world/*` TUs only,
+per `reference_headless_build`); not yet visually run in the GUI.
+
+**Backup:** `backups/v0.0.3/src/` — restore this tree over `src/` to roll back.
+
+### What was built
+
+Closed out the **Environment** category for v0.0.3 — the world-generation spine.
+TODO.md's Environment section was broadened from terrain-only to the whole
+generation layer (Tile / Nation / Corporation) and the two unitemised generation
+docs were itemised, scoped, and promoted to TASKS.md as three groups.
+
+Execution used **parallel sub-agents on disjoint file scopes**, gated by the
+real collision map (the passes inside each generator share one `.cpp`, so
+within-generator parallelism was rejected; concurrency is cross-group):
+
+- **Wave 1 (concurrent):** Tile tuning (`tile_generation.cpp` only) ∥ Nation
+  pipeline (`components.hpp`, `world.{hpp,cpp}`, new `nation_generation.{hpp,cpp}`).
+- **Wave 2:** Corporation pipeline (new `corporation_generation.{hpp,cpp}` +
+  `components.hpp`/`world.hpp`), gated on the nation component existing.
+- **Integration (main session):** all `hard_coded_world.cpp` hooks, both builds,
+  and verification. Sub-agents did not build or commit.
+
+**Nation generation** (`generate_nations`): five passes — habitable-preferring
+seed placement with min-separation, weighted Voronoi BFS (ocean never claimed,
+mountains/highlands as soft cost barriers), resource-profile sum, seeded political
+character (`ideology`/`expansionism`/`economic_focus`), procedural phoneme naming.
+Stores: `world.nations`, `world.tile_to_nation`. Verified on Kepler: 10 nations,
+0 ocean claimed, 0 empty, territory 108–1843 tiles.
+
+**Corporation generation** (`generate_corporations`): five passes — nation
+assignment weighted by `economic_focus` + balancing, focus draw biased by home
+nation, collision-checked starting-asset placement (focus→building_type, seeded
+from existing `w.buildings`), seeded capital with processing/trade premium,
+corporate naming. Sets `world.player_entity` to the flagged player corp. Verified:
+8 corps, exactly 1 player, all homed, all placed a collision-free asset.
+
+**Tile tuning** (`tile_generation.cpp`): Selene icy 52%→33% (cold band outer
+50%→30% of rows); landform prominence (mountain/rift rings 2→3, crater 1→2,
+`scale_to_area` ref 1800→1200); Kepler Pass 2 `bias_amp` 0.15→0.07.
+
+### In-session decisions
+
+- **Filed nation/corp generation under Environment** (not Diplomacy), per the
+  user — keeps the v0.0.3 world-generation theme coherent; the items note they
+  *seed* the deferred Diplomacy/Budget layers.
+- **Tile→nation ownership lives in a `world.tile_to_nation` map, not a
+  `tile_component` field** — keeps the nation group's file scope disjoint from the
+  tile-tuning group so they could run concurrently.
+- **Fixed a latent compile trap:** `nation_component`/`corporation_component`
+  give members the same name as their enum type; default initialisers must use
+  global-scope qualification (`::ideology::mercantile`) or the member shadows the
+  type.
+
+### Left open
+
+- **Orphan-island assignment** — the cardinal-adjacency BFS can't cross water, so
+  ~708/6048 (~12%) of Kepler land (disconnected islands) stays unclaimed.
+  Defensible; a nearest-nation post-pass would close it if full coverage is wanted.
+  Logged in TODO.md § Environment → Nation generation.
+- **Kepler forest/wetland** still modest (~0.9% / ~0.5%) after the bias cut —
+  improved but a candidate for one more eyeball-tuning nudge.
+
+---
+
 ## 2026-06-14 — Selection info element + single/double-click model
 
 **Status:** Complete (code). Builds clean (Debug, no warnings). Not yet visually run — the panel is hidden until a selection is made, so a no-input screenshot would not show it.

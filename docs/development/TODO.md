@@ -57,6 +57,36 @@ currently hold items appear as sections below.
   icon helper (`src/ui/icons.hpp`), keeping the lens name in a hover tooltip.
   Touches `draw_overlay_controls` in `src/ui/overlay.cpp`.
 
+- **[4] Render the political layer (nations + corporations).** The v0.0.3 world
+  now *generates* nations (`world.nations`, `world.tile_to_nation`) and
+  corporations (`world.corporations`, with placed `building` assets), but **nothing
+  draws them** — the data is invisible in the app. Wire it into the existing
+  **Faction lens** on the Planetary canvas: tint/outline each tile by its owning
+  nation (stable per-nation colour keyed off the nation entity id), draw nation
+  borders where `tile_to_nation` changes between neighbours, and mark corporation
+  starting assets (their buildings) with a per-corporation glyph/marker, the player
+  corp distinguished. Make the per-nation and per-corporation summaries feed the
+  **Selection info element** (the shared per-entity content builders in
+  `entity_summary.{hpp,cpp}`) so a nation/corp can be inspected once it is
+  click-selectable. Decide the colour-assignment scheme (hash vs. palette-cycle),
+  whether borders draw on the base map or only under the Faction lens, and how the
+  legend reads. Touches `src/ui/overlay.cpp` (Faction lens path), the Planetary
+  canvas tile draw, `presentation.{hpp,cpp}` (nation/corp colour + name helpers),
+  and `entity_summary.{hpp,cpp}`. See `docs/ui/CANVASES.md`,
+  `docs/ui/SELECTION.md`, and the **Canvas hit-testing** follow-up under Ledger
+  (nations/corps are not yet canvas-selectable). Likely needs the **hover-card /
+  tooltip** work to land for rich faction read-outs.
+
+- **[2] Default view should surface the generated world.** Decide and set the
+  **opening canvas / lens** so a fresh campaign immediately shows the populated
+  world rather than a bare map — e.g. open on Kepler's Planetary surface with the
+  Faction lens active (now that there is a political layer to show), or the
+  Circumplanetary view of the home body. Depends on the political-layer render
+  above being available. Touches the initial `ui_state` (active canvas / anchor /
+  lens) set at startup — likely in `src/core/app.cpp` or wherever `ui_state` is
+  seeded. Confirm the intended first-frame framing with a quick check before
+  finalising.
+
 - **[6] Informative tooltip / hover-card system.** Deferred. The single most important
   player-communication surface for a grand strategy game. Today there is one
   ad-hoc `ImGui::BeginTooltip` inside the Planetary canvas, plus the lightweight
@@ -158,11 +188,22 @@ Remaining / follow-up intent (promote to TASKS.md when actioned):
 
 ## Environment
 
+This category covers the whole **world-generation** layer — terrain, nations, and
+corporations — the spine of v0.0.3. The terrain pass is built; the political and
+economic generation layers are net-new and described below. Design authority lives
+in `docs/generation/{TILE,NATION,CORPORATION}_GENERATION.md`.
+
+### Tile generation (terrain)
+
 The two-axis terrain model and the six-pass procedural generation are
 **implemented** (`src/world/tile_generation.{hpp,cpp}`, driven by per-body
 `body_profile`s in `hard_coded_world.cpp`; design authority in
 `docs/generation/TILE_GENERATION.md`). What remains is tuning and refinement, not
-new structure:
+new structure. The three knobs below had an **initial v0.0.3 tuning pass applied**
+(Selene icy 52%→33%; mountain/rift rings 2→3, crater 1→2, `scale_to_area` ref
+1800→1200; Kepler Pass 2 `bias_amp` 0.15→0.07). They remain live tuning levers —
+the values moved the right direction but still want eyeball tuning (Kepler forest
+~0.9% / wetland ~0.5% are improved but modest):
 
 - **[2] Landform prominence.** Mountain/rift/crater clusters are small and sparse
   by the doc's tight ring transitions, even after the area-scaling of seed counts.
@@ -186,7 +227,127 @@ new structure:
   landforms, full deposit authoring for the non-prototype resources, and coastline
   refinement (enclosed seas, archipelagos, lakes).
 
+### Nation generation
+
+**Implemented** (v0.0.3). The five-pass pipeline now runs on Kepler at world
+construction: `src/world/nation_generation.{hpp,cpp}` (`generate_nations`), with
+`nation_component` + the `ideology`/`expansionism`/`economic_focus` enums in
+`components.hpp` and the `nations` / `tile_to_nation` stores in `world.hpp`.
+Verified: 10 nations, no ocean claimed, no empty nations, varied territory. Design
+authority: `docs/generation/NATION_GENERATION.md`. The original task breakdown is
+kept below for reference; remaining open item:
+
+- **[2] Orphan-island assignment (refinement).** The cardinal-adjacency Voronoi
+  BFS cannot cross water, so landmasses disconnected from every seed stay
+  unclaimed (~708 / 6048 Kepler land tiles ≈ 12%). Defensible as "unclaimed
+  islands", but if full land coverage is wanted, add a post-pass assigning each
+  orphan island component to the nearest nation across water. `nation_generation.cpp`.
+
+- **[3] Nation data model.** Add a `nation_component` (name, owned-tile set,
+  derived resource-profile descriptor, political character) and a world store +
+  `null`-able tile→nation back-reference. Foundation for every pass below. Touches
+  `src/world/components.hpp`, `src/world/world.{hpp,cpp}`,
+  `src/world/tile_generation.hpp` (tile ownership field).
+
+- **[3] Pass 1 — seed placement.** Place `nation_count` seeds on landmass tiles,
+  preferring habitable compositions (grassland/forest/wetland) and enforcing a
+  minimum tile separation. Seeded RNG from a campaign seed. New
+  `src/world/nation_generation.{hpp,cpp}`.
+
+- **[4] Pass 2 — territory expansion (Voronoi BFS).** Grow each seed by weighted
+  Voronoi BFS: never claim ocean, decay expansion probability with distance, treat
+  high-`H` tiles (mountains/highlands) as soft barriers that drain the expansion
+  budget so ranges fall near borders. Run until all claimable land is assigned.
+  `src/world/nation_generation.cpp`.
+
+- **[3] Pass 3 — resource profile derivation.** Sum each nation's tile deposit
+  profiles (weighted by composition) into a read-only abundance descriptor
+  (`iron_ore_abundance`, `agricultural_abundance`, …) used by diplomacy init and
+  corporation generation. `src/world/nation_generation.cpp`.
+
+- **[3] Pass 4 — political character assignment.** Draw `ideology`,
+  `expansionism`, `economic_focus` per the NATION_GENERATION.md attribute table
+  from the seeded pass. (Sentiment-graph seeding is deferred with the diplomacy
+  system; only store the attributes now.) `src/world/nation_generation.cpp`,
+  `src/world/components.hpp`.
+
+- **[2] Pass 5 — naming.** Generate names from a seeded culture-flavoured template
+  bank (structural form + phoneme table); no authored name list.
+  `src/world/nation_generation.cpp`.
+
+- **[2] Campaign hook.** Run the nation pipeline for Kepler at world construction
+  (8–12, tunable), after tile generation. `src/world/hard_coded_world.cpp`.
+
+- **[6] Deferred — nation behaviour & production passes.** Per NATION_GENERATION.md
+  § Open items: the nation *system* (tax, licences, war, infrastructure), the
+  sentiment graph, historical fragmentation (exclaves/disputed zones), and
+  non-Kepler jurisdiction. Out of prototype scope.
+
+### Corporation generation
+
+**Implemented** (v0.0.3). The five-pass pipeline runs after nation generation at
+world construction: `src/world/corporation_generation.{hpp,cpp}`
+(`generate_corporations`), with `industrial_focus` + `corporation_component` in
+`components.hpp` and the `corporations` store in `world.hpp`. It now sets
+`world.player_entity` to the flagged corp (previously an unset id; the Kepler
+player unit's `owner` now resolves to it). Verified: 8 corporations, exactly one
+player, all with home nations, all placing a collision-free starting asset, diverse
+focus + capital. Design authority: `docs/generation/CORPORATION_GENERATION.md`. The
+original task breakdown is kept below for reference.
+
+- **[3] Corporation data model.** Add a `corporation_component` (name, home-nation
+  id, `industrial_focus`, starting capital, `is_player`) and a world store; reuse
+  `world.player_entity` for the flagged corp. Foundation for the passes below.
+  Touches `src/world/components.hpp`, `src/world/world.{hpp,cpp}`. Depends on the
+  nation data model.
+
+- **[3] Pass 1 — nation assignment.** Pick each corp's home nation weighted by the
+  nation's `economic_focus` and current corp distribution, with a balancing factor
+  so no nation hosts all corps. New `src/world/corporation_generation.{hpp,cpp}`.
+
+- **[2] Pass 2 — industrial focus assignment.** Draw `industrial_focus`
+  (extraction/processing/trade) with probability shaped by the home nation's
+  `economic_focus` and the running distribution. `src/world/corporation_generation.cpp`.
+
+- **[4] Pass 3 — starting asset placement.** Place opening buildings on tiles in
+  the home nation's territory per focus (high-deposit tiles for extraction,
+  high-connectivity for trade), collision-checked so no two corps share a tile.
+  Reuses the building/stockpile components. `src/world/corporation_generation.cpp`.
+
+- **[2] Pass 4 — financial profile.** Assign starting capital from a seeded range
+  with a `wealth_variance` spread; processing/trade focus gets a slight premium.
+  `src/world/corporation_generation.cpp`.
+
+- **[2] Pass 5 — naming.** Generate corporate names from a template bank
+  (structural forms + seeded identifiers / home-territory references).
+  `src/world/corporation_generation.cpp`.
+
+- **[2] Player flag & campaign hook.** Flag one generated corp `is_player` (fixed
+  assignment for now) and run the pipeline at world construction after nation
+  generation. `src/world/corporation_generation.cpp`, `src/world/hard_coded_world.cpp`.
+
+- **[6] Deferred — corporation selection screen & behaviour.** Per
+  CORPORATION_GENERATION.md § Open items: the analytical corp-selection/re-roll
+  flow, franchising, nation-seeded privatisation, automated tax, Era-based
+  sovereignty, and diplomatic posture. Out of prototype scope.
+
 ## Known Bug
+
+- **[4] Frame stutter / performance + hardware limits unconfigured.** The app
+  already **stutters intermittently**. This may be benign for now, but the cause is
+  not yet diagnosed and there is no frame-pacing or hardware-limit configuration in
+  place (vsync / target frame-rate / present mode, and the per-frame draw budget for
+  the dense tile grids — Kepler is 180×84 = 15,120 tiles redrawn each frame, plus
+  the upcoming per-tile Faction-lens tint/border pass). First **measure** before
+  optimising: is the stutter GPU present-driven (vsync/composition), CPU draw-call
+  volume (immediate-mode tile loop), or allocation churn per frame? Then settle the
+  hardware-limit config (vsync on/off, frame cap, whether to cache static tile
+  geometry / dirty-rect the canvas). **Important context:** the **market and pricing
+  logic is not implemented at all** yet — once the economy tick and per-market price
+  resolution land, the per-frame and per-tick cost profile changes materially, so
+  treat any optimisation now as provisional and re-measure after the economy is in.
+  Don't over-fit the frame loop to today's (logic-light) workload. Likely touches
+  the render/present setup (SDL3 swap / vsync) and the canvas tile-draw loops.
 
 - **[3] Selection 'go to' only works for Kepler.** The Selection info element's
   'go to' button navigates for the home planet but appears inert for other
