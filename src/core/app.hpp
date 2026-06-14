@@ -34,6 +34,14 @@ public:
 
 private:
     void process_events(bool& running);
+
+    /// Map a key-down event onto the shared canvas command vocabulary (see
+    /// docs/ui/CANVASES.md § Keyboard) and apply it, or trigger a capture (F12).
+    /// Navigation keys are ignored while ImGui is capturing the keyboard.
+    ///
+    /// @param key The SDL key-down event.
+    void handle_key_down(const SDL_KeyboardEvent& key);
+
     void render();
 
     /// Build the prototype world and frame the opening view. Shared by run() and

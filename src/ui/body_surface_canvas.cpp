@@ -137,6 +137,20 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
     // --- View transform (pan/zoom) ---
     // The surface canvas is always primary, so pan and zoom always apply.
     const float  zoom        = std::clamp(state.planetary_zoom, kMinZoom, kMaxZoom);
+
+    // Pending centre request (verify.center_tile): now that the exact grid
+    // transform is in hand, set the pan that places the requested tile's local
+    // centre on the canvas centre — pan = (grid_centre − tile_local) · zoom. This
+    // is the one place the centring math lives; Lua callers never replicate it.
+    if (state.planetary_center_pending)
+    {
+        const ImVec2 lc = hex_local_centre(state.planetary_center_col,
+                                           state.planetary_center_row, hex_size);
+        state.planetary_pan_x = (grid_cx - lc.x) * zoom;
+        state.planetary_pan_y = (grid_cy - lc.y) * zoom;
+        state.planetary_center_pending = false;
+    }
+
     const ImVec2 view_origin = ImVec2{ canvas_centre.x + state.planetary_pan_x,
                                        canvas_centre.y + state.planetary_pan_y };
 

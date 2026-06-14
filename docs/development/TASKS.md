@@ -76,8 +76,9 @@ superseded — is **cancelled** rather than left half-tracked. Cancelling a grou
 
 1. **Marks its requirements `failed`** in [`req/REQUIREMENTS.md`](req/REQUIREMENTS.md)
    (with the reason in Notes), so the failed attempt is on record. Rows genuinely met
-   before the block stalled keep their real status; the section is retained as the
-   failure record until the item is re-promoted.
+   before the block stalled keep their real status. The section is then **moved to that
+   file's Completed / cancelled archive** with a `Resolved:` line recording the
+   cancellation — it is never deleted. Re-promoting copies it back to Active.
 2. **Rewrites the group's task intent back into [`TODO.md`](TODO.md)** as described
    intent, **merging into a related existing TODO item** where one exists rather than
    duplicating.
@@ -173,10 +174,13 @@ wave. Verify retroactively — do not assume an agent's self-reported success.
 
 Completed 2026-06-14 (see DEVLOG, newest first):
 
+- *Visual-verification harness — Phase 2: shared `canvas_command` vocabulary
+  (keyboard + verify API), `verify.center_tile`/`command`/`buildings`,
+  `scripts/verify/lib.lua` helpers, `corporation_lens.lua` refactored, and the
+  `verifier-visual` skill. All V7–V12 complete.*
 - *Visual-verification harness — Phase 1: headless `--verify` capture mode, PNG
   writer, `verify` Lua API. All V1–V6 complete.*
 - *Corporation lens: re-verified with the new harness — R2–R6 confirmed
   `complete`; the cancelled group is now closed.*
 
-Remaining harness follow-ups (keyboard navigation = Phase 2; golden-image diffing)
-live in [TODO.md](TODO.md) § Canvas.
+Remaining harness follow-up (golden-image diffing) lives in [TODO.md](TODO.md) § Canvas.

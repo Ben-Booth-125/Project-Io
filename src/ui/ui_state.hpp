@@ -62,4 +62,13 @@ struct ui_state
     float planetary_zoom  = 4.0f / 3.0f; ///< Scroll-wheel zoom factor. 4/3 shows 3/4 of the grid height on load.
     float planetary_pan_x = 0.0f; ///< Pan offset of the grid centre from the canvas centre, screen px.
     float planetary_pan_y = 0.0f; ///< Pan offset of the grid centre from the canvas centre, screen px.
+
+    // --- pending centre request (verify harness) ---
+    // verify.center_tile() sets these; the Planetary canvas consumes them on its
+    // next draw, where the exact grid transform is known, and computes the pan that
+    // centres the tile. This keeps the pan-centring math in one place (the canvas)
+    // rather than replicated in Lua. See body_surface_canvas.cpp.
+    bool planetary_center_pending = false; ///< True when a centre-on-tile request is waiting to be consumed.
+    int  planetary_center_col     = 0;     ///< Grid column to centre; valid only while planetary_center_pending.
+    int  planetary_center_row     = 0;     ///< Grid row to centre; valid only while planetary_center_pending.
 };

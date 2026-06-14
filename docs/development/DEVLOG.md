@@ -6,6 +6,65 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## 2026-06-14 — Visual-verification harness (Phase 2)
+
+**Status:** Complete — V7–V12 met. Full app builds clean (Debug, exit 0); `--verify`
+runs headless and regenerates the corporation-lens captures via the new library.
+
+### What was built
+
+Phase 2 of the visual-verification harness — making a visual check no longer require
+hand-writing a bespoke `.lua` each time, across the three TODO strands (settled: shared
+command layer; one general `verifier-visual` skill).
+
+- **Shared canvas command vocabulary** (`src/ui/canvas_command.{hpp,cpp}`): an
+  `enum class canvas_command` (descend/ascend, body next/prev, pan ×4, zoom ×2, lens
+  next/prev/clear), `apply_canvas_command` (pure `ui_state` mutation), and
+  `canvas_command_from_name`. The single dispatch behind both the keys and the verify API.
+- **Keyboard navigation** (`src/core/app.cpp`, `handle_key_down`): the keybinding table
+  (CANVASES.md § Keyboard) mapped onto the command layer, guarded by
+  `ImGui::GetIO().WantCaptureKeyboard`; F12 capture unchanged.
+- **`verify.center_tile(col,row[,zoom])`** — folds the pan-centring math out of Lua.
+  Implemented as a pending-centre request on `ui_state`, consumed inside
+  `body_surface_canvas` where the exact grid transform is known (so the math lives in
+  one place). Also added `verify.command(name)` (shared dispatch) and `verify.buildings()`
+  (building positions as a Lua table, for `tour_buildings`).
+- **Reusable library** (`scripts/verify/lib.lua`): `sweep_overlays(prefix)`,
+  `tour_buildings(zoom)`, `frame_tile(col,row,zoom)`. Auto-loaded by the harness from
+  the script's directory before the script runs (no `require` — `package` is not opened).
+- **`corporation_lens.lua` refactored** onto the library — no hand-computed `set_pan`
+  literals; reproduces the Phase 1 R2–R6 captures.
+- **`verifier-visual` skill** (`.claude/skills/verifier-visual/SKILL.md`): wraps
+  `ProjectIo --verify <script>`; authorising a check = adding a `scripts/verify/*.lua`.
+- **Docs**: CANVASES.md § Keyboard, DEVELOPMENT_PRACTICES.md § Visual verification.
+
+### In-session decisions
+
+- **Shared command layer (owner's call).** Keyboard and the verify API dispatch through
+  one `canvas_command` enum, so a script reads as the player's key sequence.
+- **One general `verifier-visual` skill** rather than per-feature skills; a check is
+  authorised by adding its script.
+- **center_tile via a pending request**, not a duplicated transform: the canvas already
+  computes the exact (font/grid-dependent) metrics at draw time, so the request is
+  consumed there — no second copy of the pan math, no empirical pan constants.
+
+### Verification
+
+Ran `ProjectIo --verify scripts/verify/corporation_lens.lua`; inspected the PNGs. The
+player building tile (22,82) and a rival (42,63) each centre exactly under the
+corporation lens, with the player blue / rival coral tints and markers — matching the
+Phase 1 evidence, now produced by `frame_tile`/`sweep_overlays` with no pan math.
+
+### Open items
+
+- Keyboard injection itself is not exercised headlessly (no synthetic SDL events); the
+  shared dispatch it routes through is, via `verify.command`. A later strand could inject
+  events if end-to-end key coverage is wanted.
+- The verify capture still shows a stray hover tooltip (mouse rests at a default
+  position with input enabled) — cosmetic, pre-existing, not Phase 2 scope.
+
+---
+
 ## 2026-06-14 — Visual-verification harness (Phase 1) + Corporation lens closed
 
 **Status:** Complete — visual-harness V1–V6 met; corporation-lens R2–R6 re-verified

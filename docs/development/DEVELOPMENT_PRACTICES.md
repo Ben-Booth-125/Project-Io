@@ -54,8 +54,18 @@ ProjectIo --verify scripts/verify/<name>.lua
 - **Deterministic:** fixed window size, seeded world (`make_hard_coded_world`), sim
   paused — so a captured frame is reproducible.
 - **Driver:** the script drives view and overlay state through the `verify` Lua API
-  (`goto_surface`, `set_overlay`, `set_zoom`, `set_pan`, `add_pan`, `capture`,
-  `log_buildings`) — direct state manipulation, no synthetic input.
+  (`goto_surface`, `set_overlay`, `set_zoom`, `set_pan`, `add_pan`,
+  `center_tile(col,row[,zoom])`, `command(name)`, `capture`, `buildings`,
+  `log_buildings`) — direct state manipulation, no synthetic input. `command(name)`
+  uses the shared canvas command vocabulary (`canvas_command`) that also backs the
+  player keyboard bindings (CANVASES.md § Keyboard), so a script reads as a key
+  sequence; `center_tile` centres a Planetary tile using the canvas's own transform,
+  so scripts no longer hand-compute pan.
+- **Helpers:** `scripts/verify/lib.lua` is auto-loaded by the harness from the
+  script's directory before the script runs (no `require` — the `package` lib is not
+  opened). It provides high-level helpers — `sweep_overlays(prefix)`,
+  `tour_buildings(zoom)`, `frame_tile(col,row,zoom)` — so a new check is "call a
+  helper" rather than a from-scratch script. Prefer them over raw `set_pan` math.
 - **Capture:** `capture("name")` renders one frame and writes `screenshots/name.png`
   (in-app `SDL_RenderReadPixels` → `write_png_rgba`; nothing leaves the window).
 - **Output:** PNGs for inspection. Golden-image diffing is not yet built (deferred).
@@ -63,10 +73,11 @@ ProjectIo --verify scripts/verify/<name>.lua
 This is the standard tool for the `visual` verification class in
 [`req/REQUIREMENTS.md`](req/REQUIREMENTS.md). When a requirement's verification is
 `visual` and no other tool fits, author (or extend) a `scripts/verify/*.lua` script
-and capture the frames rather than deferring to a manual human check. Entry points:
-`app::run_verify` (`src/core/app.cpp`), `write_png_rgba` (`src/core/png_writer.cpp`).
-Full keyboard navigation (a player-facing manual drive surface) is planned
-separately — see TODO § Canvas.
+and capture the frames rather than deferring to a manual human check. A proven check
+can be promoted to the **`verifier-visual` skill** (`.claude/skills/verifier-visual/`),
+which wraps `ProjectIo --verify <script>` so re-running it is a single invocation.
+Entry points: `app::run_verify` (`src/core/app.cpp`), `write_png_rgba`
+(`src/core/png_writer.cpp`), `ui::apply_canvas_command` (`src/ui/canvas_command.hpp`).
 
 ---
 

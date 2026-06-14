@@ -8,6 +8,7 @@
 #include <SDL3/SDL.h>
 
 #include "ui/body_surface_canvas.hpp"
+#include "ui/canvas_command.hpp"
 #include "ui/circumplanetary_canvas.hpp"
 #include "ui/explorer_panel.hpp"
 #include "ui/fonts.hpp"
@@ -207,6 +208,58 @@ int app::run_verify(const std::string& script_path)
     });
     v.set_function("capture", [this](const std::string& name) { capture_frame(name); });
 
+    // Discrete navigation by the shared command vocabulary — the same dispatch the
+    // keyboard uses (see canvas_command.hpp), so a script reads as a key sequence.
+    // Unknown command names are ignored.
+    v.set_function("command", [this](const std::string& name) {
+        if (auto cmd = ui::canvas_command_from_name(name))
+            ui::apply_canvas_command(m_world, m_ui, *cmd);
+    });
+
+    // Centre a Planetary tile without replicating the canvas transform in Lua:
+    // record a pending centre request that body_surface_canvas consumes on its
+    // next draw, where the exact grid metrics are known. An optional zoom sets the
+    // framing first so the request is computed against the intended scale.
+    v.set_function("center_tile",
+        [this](int col, int row, sol::optional<float> zoom) {
+            if (zoom)
+                m_ui.planetary_zoom = *zoom;
+            m_ui.planetary_center_col     = col;
+            m_ui.planetary_center_row     = row;
+            m_ui.planetary_center_pending = true;
+        });
+
+    // Data accessor: return every corporation building as a Lua array of
+    // {corp, player, body, x, y} records, so a script (or the lib's
+    // tour_buildings helper) can centre/capture each one without hard-coding
+    // coordinates. Mirrors log_buildings, but returns data instead of logging.
+    v.set_function("buildings", [this]() {
+        sol::state& s = m_lua.state();
+        sol::table  out = s.create_table();
+        int idx = 0;
+        for (const auto& [corp_id, corp] : m_world.corporations)
+        {
+            const bool player = (corp_id == m_world.player_entity);
+            for (entity_id bld_id : corp.assets)
+            {
+                const auto bld_it = m_world.buildings.find(bld_id);
+                if (bld_it == m_world.buildings.end())
+                    continue;
+                const auto tile_it = m_world.tiles.find(bld_it->second.tile);
+                if (tile_it == m_world.tiles.end())
+                    continue;
+                sol::table rec = s.create_table();
+                rec["corp"]   = static_cast<unsigned>(corp_id);
+                rec["player"] = player;
+                rec["body"]   = static_cast<unsigned>(tile_it->second.body);
+                rec["x"]      = tile_it->second.grid_x;
+                rec["y"]      = tile_it->second.grid_y;
+                out[++idx]    = rec;
+            }
+        }
+        return out;
+    });
+
     // Diagnostic: log every corporation building's grid position and owner so a
     // script author (or Claude) can aim the pan/zoom at the corporate tiles.
     v.set_function("log_buildings", [this]() {
@@ -231,6 +284,19 @@ int app::run_verify(const std::string& script_path)
 
     try
     {
+        // Auto-load the helper library (scripts/verify/lib.lua) from the script's
+        // own directory before running it, so scripts get the high-level helpers
+        // (sweep_overlays, tour_buildings, frame_tile) without a `require` (the
+        // package lib is not opened). Loading it from the script's directory means
+        // iterating against the source path picks up the source lib, not a stale
+        // build copy. Skipped when the target *is* the library.
+        namespace fs = std::filesystem;
+        const fs::path script{script_path};
+        const fs::path lib = script.parent_path() / "lib.lua";
+        if (fs::exists(lib) &&
+            fs::weakly_canonical(lib) != fs::weakly_canonical(script))
+            m_lua.load(lib.string());
+
         m_lua.load(script_path);
     }
     catch (const std::exception& e)
@@ -256,8 +322,50 @@ void app::process_events(bool& running)
         ImGui_ImplSDL3_ProcessEvent(&event);
         if (event.type == SDL_EVENT_QUIT)
             running = false;
-        else if (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_F12)
-            m_capture_requested = true;
+        else if (event.type == SDL_EVENT_KEY_DOWN)
+            handle_key_down(event.key);
+    }
+}
+
+void app::handle_key_down(const SDL_KeyboardEvent& key)
+{
+    // F12 captures regardless of focus — the screenshot is an app concern (it
+    // needs the renderer), not a canvas_command.
+    if (key.scancode == SDL_SCANCODE_F12)
+    {
+        m_capture_requested = true;
+        return;
+    }
+
+    // Canvas navigation keys are suppressed while ImGui owns the keyboard (a text
+    // field has focus), so typing into a panel never steers the canvas.
+    if (ImGui::GetIO().WantCaptureKeyboard)
+        return;
+
+    // Map the keybinding table (CANVASES.md § Keyboard) onto the shared command
+    // vocabulary; apply_canvas_command is the same dispatch verify.command uses.
+    const bool shift = (key.mod & SDL_KMOD_SHIFT) != 0;
+    auto dispatch = [this](ui::canvas_command cmd) {
+        ui::apply_canvas_command(m_world, m_ui, cmd);
+    };
+
+    switch (key.scancode)
+    {
+        case SDL_SCANCODE_RETURN:       dispatch(ui::canvas_command::descend);   break;
+        case SDL_SCANCODE_BACKSPACE:    dispatch(ui::canvas_command::ascend);    break;
+        case SDL_SCANCODE_RIGHTBRACKET: dispatch(ui::canvas_command::body_next); break;
+        case SDL_SCANCODE_LEFTBRACKET:  dispatch(ui::canvas_command::body_prev); break;
+        case SDL_SCANCODE_LEFT:         dispatch(ui::canvas_command::pan_left);  break;
+        case SDL_SCANCODE_RIGHT:        dispatch(ui::canvas_command::pan_right); break;
+        case SDL_SCANCODE_UP:           dispatch(ui::canvas_command::pan_up);    break;
+        case SDL_SCANCODE_DOWN:         dispatch(ui::canvas_command::pan_down);  break;
+        case SDL_SCANCODE_EQUALS:       dispatch(ui::canvas_command::zoom_in);   break;
+        case SDL_SCANCODE_MINUS:        dispatch(ui::canvas_command::zoom_out);  break;
+        case SDL_SCANCODE_L:
+            dispatch(shift ? ui::canvas_command::lens_prev : ui::canvas_command::lens_next);
+            break;
+        case SDL_SCANCODE_0:            dispatch(ui::canvas_command::lens_clear); break;
+        default: break;
     }
 }
 

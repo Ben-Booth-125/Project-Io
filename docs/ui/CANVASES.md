@@ -64,6 +64,30 @@ lower rungs (`active_body`) without forcing the primary to change rung except on
 an explicit descend. **Selecting** a body (single-click) is independent: it fills
 the Selection info element but changes neither the Active anchor nor the framing.
 
+### Keyboard navigation
+
+A keyboard-only "limited access" surface drives the same canvas actions as the
+mouse, useful to real players and to the visual-verification harness alike. Every
+binding resolves to a `canvas_command` (`src/ui/canvas_command.hpp`) applied via
+`apply_canvas_command`; `app::process_events` owns the key→command map, and the
+verify API's `verify.command(name)` routes through the *same* dispatch, so a
+verification script reads as the player's key sequence. Bindings are ignored while
+ImGui is capturing the keyboard (a text field has focus).
+
+| Key | Command | Action |
+|---|---|---|
+| `Enter` | `descend` | Descend one rung (Solar → Circumplanetary → Planetary). |
+| `Backspace` | `ascend` | Ascend one rung (Planetary → Circumplanetary → Solar). |
+| `]` | `body_next` | Anchor the next body (by id) and re-frame it at the current rung. |
+| `[` | `body_prev` | Anchor the previous body. |
+| `←` `→` `↑` `↓` | `pan_left/right/up/down` | Pan the current rung's view by one step. |
+| `=` / `+` | `zoom_in` | Zoom the current rung in. |
+| `-` | `zoom_out` | Zoom the current rung out. |
+| `L` | `lens_next` | Cycle the overlay lens forward. |
+| `Shift`+`L` | `lens_prev` | Cycle the overlay lens backward. |
+| `0` | `lens_clear` | Clear the overlay lens. |
+| `F12` | *(capture)* | Save a screenshot. Capture is an app concern (it needs the renderer), not a `canvas_command`. |
+
 ### What the minimap shows at each rung
 
 | Primary | Minimap (zoom-out neighbour) | Minimap title |

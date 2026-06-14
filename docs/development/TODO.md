@@ -90,44 +90,6 @@ currently hold items appear as sections below.
   to `src/ui/icons.hpp`. Refer to `docs/ui/CANVASES.md` for rung descriptions and
   `docs/ui/LAYOUT.md` for the strip's position in the shell.
 
-- **[3] Visual-verification harness — Phase 2: reusable verification (keyboard
-  vocabulary + script library + skill promotion).** Phase 1 (the headless `--verify`
-  capture path) landed 2026-06-14 (see DEVLOG). Phase 2's goal is that **a visual check
-  no longer requires hand-writing a bespoke `.lua` each time** — most checks should be a
-  one-liner or a parameter, and a *proven* check should be promotable to a permanent,
-  reusable asset. Three strands, settle the split at promotion:
-
-  — **A. Full keyboard canvas navigation (player-facing).** A defined keybinding
-    vocabulary for every canvas action: ladder descend/ascend, cycle body, pan/zoom,
-    cycle/select lens, capture. The "limited access" manual-drive surface (keyboard +
-    in-app capture, no mouse/pixel IO), useful to real players, not just tests. Touches
-    `process_events` (`src/core/app.cpp`) and the canvas input paths. Settle the
-    keybinding table here. The same command set should back both the keys *and* the
-    verify API, so a script reads like a sequence of canvas commands.
-
-  — **B. Reusable verify-script library (so scripts aren't custom each time).** A shared
-    Lua module (e.g. `scripts/verify/lib.lua`) of high-level, parameterised helpers
-    layered over the low-level `verify` API — e.g. `sweep_overlays(prefix)` (capture the
-    active surface under each lens), `tour_buildings(zoom)` (centre+capture each corp
-    building, using `log_buildings` data), `frame_tile(x, y, zoom)` (the pan math from the
-    corporation-lens script, generalised so callers stop hand-computing pan). A new check
-    becomes "require the lib, call a helper with the body/lens you care about" rather than
-    a from-scratch script. Fold the pan-centring math into the C++ `verify` API
-    (`verify.center_tile(x, y)`) so Lua callers never replicate the canvas transform.
-
-  — **C. Promote a proven check to a permanent skill (the "authorize as a skill" path).**
-    Once a verify scenario is validated, it should be promotable to a reusable, named
-    **verifier skill** under `.claude/skills/verifier-*` (the `verify` skill already
-    auto-discovers these) that wraps `ProjectIo --verify <script>` for a given
-    feature — so re-running that visual check is a single authorised invocation, not
-    bespoke authoring, and survives across sessions. Decide the skill's shape (one
-    general `verifier-visual` that takes a script argument, vs. per-feature skills), how
-    it captures+reports evidence, and how a developer "authorises" a script into the
-    permanent set. This is the strand that most directly speeds development.
-
-  See `docs/development/DEVELOPMENT_PRACTICES.md` § Visual verification and the Phase 1
-  entry points (`app::run_verify`, `scripts/verify/corporation_lens.lua`).
-
 - **[3] Visual-verification harness — golden-image diffing (deferred).** Phase 1 outputs
   PNGs for human/Claude inspection only. A later iteration could add committed reference
   images + a pixel-tolerance diff for automatic pass/fail on the `visual` class. Needs:
