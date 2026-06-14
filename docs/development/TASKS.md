@@ -3,12 +3,12 @@
 The **active, prioritised, actionable worklist**. Unlike [`TODO.md`](TODO.md)
 (described intent), every entry here is a concrete, file-scoped,
 individually-buildable step ready to execute. Tasks are **promoted** from a
-TODO.md item (see TODO.md § TODO vs. TASKS) and cleared as they complete — this
+Brief (see TODO.md § TODO vs. TASKS) and cleared as they complete — this
 file is transient and is expected to be empty between work blocks.
 
 ## Task format
 
-List tasks in **execution order**, grouped by the TODO item they were promoted
+List tasks in **execution order**, grouped by the Brief they were promoted
 from. Each task carries:
 
 - **A group-scoped ID letter** (A, B, C, …), so dependencies and parallel pairs
@@ -31,7 +31,7 @@ integrating session run the build — sub-agents should not build or commit.
 ### Template
 
 ```
-## <Group name> (promoted from TODO § <item>)
+## <Group name> (promoted from TODO § <Brief>)
 
 Requirements: [REQUIREMENTS.md § <slug>](req/REQUIREMENTS.md#<slug>)
 
@@ -64,7 +64,7 @@ against "the code is written":
 
 A task that is implemented and builds but whose requirements have not all been
 reviewed and tested is *code-complete*, not complete. Only mark a group cleared
-(and its TODO item removed) when its requirements are complete by this definition,
+(and its Brief removed) when its requirements are complete by this definition,
 or its remaining rows are explicitly accepted as out of scope. See also
 [`../GLOSSARY.md`](../GLOSSARY.md) **Complete (task state)**.
 
@@ -80,7 +80,7 @@ superseded — is **cancelled** rather than left half-tracked. Cancelling a grou
    file's Completed / cancelled archive** with a `Resolved:` line recording the
    cancellation — it is never deleted. Re-promoting copies it back to Active.
 2. **Rewrites the group's task intent back into [`TODO.md`](TODO.md)** as described
-   intent, **merging into a related existing TODO item** where one exists rather than
+   intent, **merging into a related existing Brief** where one exists rather than
    duplicating.
 3. **Removes the task stubs** (the A–F entries) from this file.
 
@@ -93,7 +93,7 @@ TODO. See also [`../GLOSSARY.md`](../GLOSSARY.md) **Cancelled (task state)**.
 
 ## Dividing work across agents & authoring tasks
 
-This is the method used to promote a TODO item and (optionally) fan it out to
+This is the method used to promote a Brief and (optionally) fan it out to
 parallel sub-agents. It is descriptive of how the v0.0.3 Environment groups were
 run; follow it when promoting future work.
 
@@ -170,9 +170,180 @@ wave. Verify retroactively — do not assume an agent's self-reported success.
 
 ---
 
+## Archived — Layer 3 economy publish set
+
+The eight-Brief Layer 3 economy set has been **published** (all groups complete) and
+cleared from the active worklist. Its requirement tables are archived in
+[`req/REQUIREMENTS.md`](req/REQUIREMENTS.md) and the session is recorded in the DEVLOG
+(2026-06-14 — Layer 3 economy published). The detailed group breakdown below is retained
+here for one cycle as the record of how the set was decomposed and executed; it is not an
+active worklist.
+
+<details>
+<summary>Completed group breakdown (retained for reference)</summary>
+
+### Group 1 — economy-data-model (promoted from TODO § Resources, Brief 1)
+
+Requirements: [REQUIREMENTS.md § economy-data-model](req/REQUIREMENTS.md#economy-data-model)
+
+- **[3] A — Extend the component structs.** Add to `building_component` an extraction
+  `target_resource` (`resource_type`) and a processing `recipe` id (`uint16_t`, with a
+  `no_recipe` sentinel constant); add a reserved `resource_remaining` array (unused in L3)
+  to `tile_component`; add a running `balance` (`float`) to `corporation_component`. Files:
+  `src/world/components.hpp`. Deps: foundation. Satisfies: R1, R2, R3.
+- **[3] B — Add the (corp, body) stockpile pool to `world`.** A `std::map<std::pair<entity_id,
+  entity_id>, stockpile_component>` (deterministic ordering, `tile_to_nation` pattern) keyed
+  by (corporation, body), with an inline `pool_for(corp, body)` accessor that lazily inserts.
+  Files: `src/world/world.hpp`. Deps: A. Satisfies: R4.
+
+Parallelisation note: A → B (same translation-unit family, sequential). Foundation for
+every other group; must land and build before Groups 3–6 integrate.
+
+### Group 2 — recipe-registry (promoted from TODO § Resources, Brief 2)
+
+Requirements: [REQUIREMENTS.md § recipe-registry](req/REQUIREMENTS.md#recipe-registry)
+
+- **[3] A — Author the Lua data layer.** `scripts/recipes.lua` (processing recipes:
+  `{ inputs = {res=qty}, outputs = {res=qty} }`, multi-in/out + reagents) and
+  `scripts/economy.lua` (per-building-type constants: `base_rate`, `maintenance`,
+  `base_wage`, `build_cost`, plus global `t_full` / `t_idle` thresholds). Legible round
+  defaults. Files: `scripts/recipes.lua`, `scripts/economy.lua`. Deps: foundation.
+  Satisfies: R1, R5.
+- **[3] B — Build the C++ registry.** `recipe_registry` loads both scripts via sol2
+  (protected calls only) into indexed C++ tables: a `recipe` struct (input/output arrays
+  indexed by `resource_type`) addressed by the `recipe` id stored on `building_component`,
+  and an economy-constants lookup by `building_type`. Resource names in Lua map to
+  `resource_type` by a name table. Files: `src/world/recipe_registry.{hpp,cpp}`. Deps: A.
+  Satisfies: R2, R3, R4.
+
+Parallelisation note: A → B. File-disjoint from Group 1, but shares the `recipe`-id
+convention defined in Group 1.A (`uint16_t`, `no_recipe` sentinel) — keep the two in
+agreement. Depended on by Groups 3 and 5.
+
+### Group 3 — production-simulation (promoted from TODO § Resources, Brief 3)
+
+Requirements: [REQUIREMENTS.md § production-simulation](req/REQUIREMENTS.md#production-simulation)
+
+- **[4] A — Extraction + processing + workforce step.** `run_economy_step(world&, const
+  recipe_registry&)` iterates each corporation's `assets`; for **extraction_site** credits
+  the (corp, body) pool with `target_resource` at `base_rate × deposit_richness ×
+  workforce × (1 − hazard)` (no depletion); for **processing_facility** runs its `recipe`
+  pool-first with the two-threshold partial-run model (`t_full`/`t_idle`), accruing outputs
+  and recording per-building idle/active + limiting-input state for the panel. Deposits do
+  not deplete (`resource_remaining` untouched). Files: `src/world/economy_system.{hpp,cpp}`.
+  Deps: Group 1, Group 2. Satisfies: R1, R2, R3, R4, R5.
+
+Parallelisation note: single sequential group (one new file pair). Reads the registry
+(Group 2) and the pool/fields (Group 1). Input shortfalls are surfaced for Group 4 to
+auto-buy; the balance arithmetic is Group 5's.
+
+### Group 4 — market-clearing (promoted from TODO § Trade, Brief 4)
+
+Requirements: [REQUIREMENTS.md § market-clearing](req/REQUIREMENTS.md#market-clearing)
+
+- **[3] A — Per-body market clearing.** `clear_markets(world&, ...)` at the econ tick: per
+  body market, **supply** = each corp's surplus listed for sale (pool above its processors'
+  needs this tick); **demand** = processor input shortfalls auto-bought; transactions clear
+  at `base_price` (`price` stays seeded at `base_price`). Returns the per-(corp) buy/sell
+  cash-flow transactions for Group 5. Includes a no-op framework hook for player-driven sell
+  orders. Files: `src/world/market_clearing.{hpp,cpp}`. Deps: Group 1, Group 3. Satisfies:
+  R1, R2, R3, R4.
+
+Parallelisation note: single sequential group. Consumes Group 3's shortfall/surplus
+figures; emits transactions consumed by Group 5.
+
+### Group 5 — budget-system (promoted from TODO § Budget, Brief 5)
+
+Requirements: [REQUIREMENTS.md § budget-system](req/REQUIREMENTS.md#budget-system)
+
+- **[3] A — Corporate money loop.** `apply_budget(world&, const recipe_registry&, const
+  market transactions)` moves each `corporation_component.balance`: income = goods sold ×
+  `base_price`; expenditure = input purchases × `base_price` + per-building `maintenance` +
+  wages (`workforce × base_wage`). Balance may go negative. Files:
+  `src/world/budget_system.{hpp,cpp}`. Deps: Group 2, Group 4. Satisfies: R1, R2, R3.
+
+Parallelisation note: single sequential group. Reads Group 4 transactions + Group 2
+constants; writes `balance` (the field Group 1.A added).
+
+### Group 6 — economy-panel (promoted from TODO § Ledger, Brief 6)
+
+Requirements: [REQUIREMENTS.md § economy-panel](req/REQUIREMENTS.md#economy-panel)
+
+- **[3] A — The observability panel.** `draw_economy_panel(world&, ...)`: per (corp, body)
+  pool quantities; each building's current output rate + idle/active (+ limiting input for
+  processors); body market supply/demand; per-corp balance (negative flagged red). Read-only.
+  Built on `presentation.hpp` / `format.hpp` / `icons.hpp`. Files:
+  `src/ui/economy_panel.{hpp,cpp}`. Deps: Groups 1, 3, 4, 5. Satisfies: R1, R2, R3, R4.
+
+Parallelisation note: single sequential group; last to integrate. Main session wires it
+into the shell (`app.cpp` / `nav_pane.cpp`).
+
+### Group S1 — placement-rules-audit (promoted from TODO § Infrastructure, Brief S1)
+
+Requirements: [REQUIREMENTS.md § placement-rules-audit](req/REQUIREMENTS.md#placement-rules-audit)
+
+- **[3] A — Audit & fix the placement guard.** Audit `corporation_generation.cpp` Pass 3
+  (`place_starting_asset`) against `docs/economy/PRODUCTION.md` placement rules: extraction
+  only on tiles with a non-zero deposit of the target type (or valid terrain), never on
+  `ocean`. Produce a findings list; fix cheap gaps (e.g. extraction tiles with zero deposit
+  of any target); promote larger gaps. Files: `src/world/corporation_generation.cpp`. Deps:
+  independent (but coordinates with the integration authoring `target_resource` on placed
+  assets — same file, main session). Satisfies: R1, R2.
+
+Parallelisation note: independent root; same file as the field-authoring integration, so
+done in the same main-session pass as that wiring.
+
+### Group S2 — kepler-biome-balance (promoted from TODO § Environment, Brief S2)
+
+Requirements: difficulty 2 — inline. **Verification:** `headless` (regenerate Kepler and
+report forest+wetland tile fraction; target ≳ 3% combined, up from ~1.5%).
+
+- **[2] A — Widen the habitable belt.** Lower Pass 2 equatorial ocean `bias_amp` and/or
+  decouple the volcanic/forest belts from the wettest equatorial rows in
+  `tile_generation.cpp`, so forest+wetland are less starved. Files:
+  `src/world/tile_generation.cpp`. Deps: independent root.
+
+Parallelisation note: independent root; disjoint from every other group.
+
+---
+
+### Set-wide parallelisation note (Publish step 3 — collision map)
+
+| File | Groups that write it |
+|------|----------------------|
+| `src/world/components.hpp` | 1 |
+| `src/world/world.hpp` | 1 |
+| `scripts/recipes.lua`, `scripts/economy.lua` | 2 |
+| `src/world/recipe_registry.{hpp,cpp}` | 2 |
+| `src/world/economy_system.{hpp,cpp}` | 3 |
+| `src/world/market_clearing.{hpp,cpp}` | 4 |
+| `src/world/budget_system.{hpp,cpp}` | 5 |
+| `src/ui/economy_panel.{hpp,cpp}` | 6 |
+| `src/world/corporation_generation.cpp` | S1 + integration |
+| `src/world/tile_generation.cpp` | S2 |
+| `src/world/hard_coded_world.cpp`, `src/core/app.{hpp,cpp}` | integration (main session only) |
+
+**Write-sets are disjoint** across all eight groups (each owns a new file pair or one
+generator), so they are nominally parallel-safe. **Compile/data dependencies** force the
+order regardless: 1 → 2 → 3 → 4 → 5 → 6, with S1 and S2 independent. Integration hotspots
+(`hard_coded_world.cpp`, `app.cpp`, `corporation_generation.cpp` field authoring) stay in
+the main session. Per session policy no sub-agents are spawned, so the whole set runs
+sequentially in dependency order; the map confirms no same-file races when wiring.
+
+</details>
+
+---
+
 *No active groups. The worklist is empty between work blocks.*
 
 Completed 2026-06-14 (see DEVLOG, newest first):
+
+- *Layer 3 economy — publish set (8 Briefs, barrier semantics). **Completed:** data-model
+  foundation; recipe/economy registry (Lua); production simulation; per-body market clearing;
+  corporate money loop; economy observability panel; building-placement audit (S1); Kepler
+  biome balance (S2). 27/27 requirements met; verified via `tools/verify/econ_harness`,
+  `tools/verify/world_audit`, and `scripts/verify/economy_panel.lua`. One commit per Brief
+  after a doc-refactor commit. See REQUIREMENTS.md archive.*
 
 - *Publish block — Selection info element + Known Bug (six groups, barrier set).
   **Completed:** Go-to planetary landing + Kepler-only reliability (R1–R5;

@@ -6,6 +6,65 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## 2026-06-14 — Layer 3 economy published (8 Briefs)
+
+**Status:** Complete — 27/27 requirements met across seven requirement groups (S2 is
+difficulty 2, inline verification). Published as a barrier set: doc-refactor commit first,
+then one commit per Brief.
+
+The Layer 3 extraction → processing → market → money economy, plus two independent audits.
+Eight Briefs taken through the five Publish steps breadth-first.
+
+### What was built
+
+- **Data-model foundation** — `building_component` gains `target_resource` + a `recipe` id
+  (`no_recipe` sentinel); `tile_component` gains the reserved `resource_remaining` array
+  (unused in L3); `corporation_component` gains `balance`; `world` gains the
+  `(corp, body) → stockpile_component` pool map + `pool_for()`.
+- **Recipe & economy registry** — `scripts/recipes.lua` (steel / refined fuel / food
+  rations) and `scripts/economy.lua` (per-type `base_rate`/`maintenance`/`base_wage`/
+  `build_cost`, `t_full`/`t_idle`), loaded by `recipe_registry` via sol2. The registry
+  **header is pure data** (no sol2) so `world/*` economy logic stays headlessly buildable.
+- **Production / market / budget** — `run_economy_step` → `clear_markets` → `apply_budget`,
+  driven on each econ-tick boundary in `app::run` (and by `verify.econ_step`).
+- **Economy panel** — read-only observability (balances, pools, building states, market
+  supply/demand); nav-pane slot 7.
+- **S1 placement audit** + **S2 Kepler biome balance**.
+
+### In-session decisions
+
+- **Processing run model (reconciled the two stated behaviours).** The Brief specified both
+  a two-threshold partial run *and* auto-buying input shortfalls — which conflict for a
+  pure-processing corp with an empty pool (pool coverage 0 < `t_idle` → it would never
+  bootstrap). Settled: **with a market on the body the processor runs a full batch, drawing
+  pool-first and auto-buying the shortfall** (the L3 path); **without a market it falls back
+  to the two-threshold partial run from its own pool** (full ≥ `t_full`, scaled to coverage
+  between, idle below `t_idle`). Both thresholds remain load-bearing for the marketless case;
+  the constants stay tunable. Caught because the first panel capture showed every processor
+  idle (`out=0.0`).
+- **Field authoring at placement.** `corporation_generation` Pass 3 now staffs producing
+  assets (`workforce 0.5`), authors `target_resource` from the tile's richest *extractable*
+  deposit, and opens `balance` at `starting_capital`; processing recipes are assigned in
+  `app::load_economy` from the registry (the recipe id is a registry index, unknown at
+  generation). Defaults are legible round numbers, to be tuned by playtest.
+- **S1 finding.** The old Pass 3 extraction guard scored by *total* deposit (incl. ambient
+  stone/sand) and only excluded ocean, so an extraction site could land on a tile with no
+  prototype-extractable deposit → zero output. Fixed by scoring on extractable deposit and
+  authoring the target from it. `world_audit`: 0 invalid placements.
+- **S2.** forest+wetland 1.5% → **3.96%** of Kepler tiles (high-moisture cutoff 0.65→0.55,
+  ocean `bias_amp` 0.07→0.05); ocean fraction held by the percentile threshold.
+- **Verification.** Two durable headless harnesses under `tools/verify/` (`econ_harness`
+  for the economy arithmetic, `world_audit` for S1/S2) plus `scripts/verify/economy_panel.lua`
+  with the new `verify.econ_step` / `verify.dump_economy` hooks. Full `cmake` build links clean.
+
+### Open / deferred (still Briefs in TODO)
+
+Price resolution from supply/demand; player-driven sell orders & preferential purchasing
+(the framework hook is stubbed); inter-body markets; deposit depletion (the reserved
+`remaining` field is in place); the workforce pool; and the Layer 4 construction UI.
+
+---
+
 ## 2026-06-14 — "Brief" terminology + Layer 3 design Q&A and brief authoring
 
 **Status:** Complete (documentation only). No code changes. Working-tree doc edits;

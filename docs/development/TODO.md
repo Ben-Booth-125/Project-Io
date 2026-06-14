@@ -273,19 +273,6 @@ currently hold Briefs appear as sections below.
   `src/ui/tile_inspector.cpp` (read `ui_state.active_body` /
   `circumplanetary_anchor`).
 
-- **[3] Layer 3 economy observability panel.** The debugging/observation surface that
-  makes the Layer 3 economy legible — the panel INITIAL_INSTRUCTIONS requires alongside
-  the layer. Surfaces, per the 2026-06-14 Layer 3 design Q&A: each **(corporation, body)
-  pool**'s per-resource quantities; each building's **current output rate** and
-  **idle/active** state (and, for processors, the limiting input under the two-threshold
-  run model); the body **market** supply/demand figures; and the **corporation balance**
-  (with negative flagged red). Read-only — workforce and recipe are authored, not edited
-  here (see the Workforce and Production briefs). Builds on the shared presentation
-  metadata / formatters / icons (`src/ui/presentation.hpp`, `format.hpp`, `icons.hpp`).
-  Files: a new `src/ui/economy_panel.{hpp,cpp}` (or extend an existing ledger); reads the
-  world pool map, `market_component`, and `corporation_component`. Depends on the data-model
-  foundation, production, market-clearing, and budget briefs (Resources / Trade / Budget).
-
 ### Selection info element
 
 Follow-up intent for the Selection info element (design in `docs/ui/SELECTION.md`;
@@ -327,73 +314,12 @@ shared per-entity content builders in `entity_summary.{hpp,cpp}`):
   hit-testing Brief above (the marker stack it hit-tests is the same stack this
   resolves through).
 
-## Resources
-
-The extraction → processing economy (the **Layer 3** core). Direction settled in the
-2026-06-14 Layer 3 design Q&A (recorded in DEVLOG); design authority
-`docs/economy/{PRODUCTION,RESOURCES}.md`. Output accrues **at the economy-tick boundary**
-(not per simulation step) and resolves alongside the market in the same tick.
-
-- **[3] Layer 3 economic data-model foundation.** The shared field/storage additions every
-  other Layer 3 brief reads or writes — a hotspot, kept in the main session. Settled:
-  — `building_component` gains an extraction **`target_resource`** (`resource_type`) and a
-    processing **`recipe`** id (index into the recipe registry), both authored at placement.
-    `building_type` stays generic (`extraction_site` / `processing_facility`); *what a
-    building does is the field, not the type.*
-  — **Two-value deposit model.** Keep `tile_component.resource_deposit[r]` as the fixed
-    **richness** (the rate multiplier in the extraction formula) and add a reserved
-    **`remaining`** reserve per deposit, *unused in L3*, so the deferred depletion model
-    needs no retrofit. Richness sets rate; remaining will deplete.
-  — **(corporation, body) stockpile pool.** Store the shared pool as a **world-level map**
-    keyed by (corp, body) → `stockpile_component` (the `tile_to_nation` pattern), not on
-    `building_component` or the body. The per-building `stockpile_component` is unused in L3.
-  — `corporation_component` gains a running **`balance`** (opening = `starting_capital`),
-    moved by the money loop; may go negative.
-  Files: `src/world/components.hpp`, `src/world/world.hpp` (pool map + accessors). Foundation
-  for every Resources / Trade / Budget brief below. See `docs/economy/PRODUCTION.md`,
-  `docs/economy/TILES.md`.
-
-- **[3] Recipe & economy-constants registry (Lua).** A `scripts/` Lua data layer, loaded at
-  startup into a C++ registry via the embedded sol2 (protected calls only), authoring:
-  (a) processing **recipes** — `{ inputs: resource→qty, outputs: resource→qty }`,
-  multi-input / multi-output with **reagent** support (coal in the steel recipe is just an
-  input); referenced by the `recipe` id on `building_component`, fixed at construction;
-  (b) per-building-type **economic constants** — maintenance, wage rate, build cost. Magnitudes
-  are legible round defaults, iterated by playtest (not derived). Files: new `scripts/recipes.lua`
-  (+ economy constants, or a sibling `scripts/economy.lua`), new
-  `src/world/recipe_registry.{hpp,cpp}`. See PRODUCTION.md § Recipes and RESOURCES.md.
-
-- **[4] Production simulation: extraction + processing + workforce.** The per-economy-tick
-  body step (one file → one sequential group). Settled:
-  — **Extraction.** Each extraction building credits its corp-body pool with its
-    `target_resource`: `output = base_rate × deposit_richness × workforce_assigned ×
-    (1 − hazard_level)` (linear, per PRODUCTION.md). Deposits do **not** deplete (the reserved
-    `remaining` field is untouched — see the depletion brief under Environment).
-  — **Processing.** Each processing building runs its `recipe`, consuming inputs **pool-first**
-    with a **two-threshold partial-run** model: if the limiting input covers ≥ `T_full` of one
-    conversion, run full; between `T_idle` and `T_full`, scale output to the limiting input;
-    below `T_idle`, idle. Outputs accrue to the pool; any input shortfall is auto-bought from
-    the market (see Trade § market clearing). `T_full` / `T_idle` are tunable, left open.
-  — **Workforce** applies as a single linear scalar at both stages (see Workforce brief).
-  Files: new `src/world/economy_system.{hpp,cpp}` (the per-body economy step). Depends on the
-  data-model foundation and the recipe registry.
-
 ## Trade
 
 The market layer. Per the 2026-06-14 Q&A, **market resolution collapses into Layer 3** but
 **price resolution and inter-body trade stay open**. Markets are a per-body exchange,
 **distinct from corp stockpile pools**. Design authority `docs/SYSTEMS.md` § Trade,
 `docs/economy/RESOURCES.md`.
-
-- **[3] Per-body market clearing at the economy tick.** At each economy tick, on each body's
-  `market_component`: **supply** = goods each corp **lists for sale** (surplus above its own
-  processors' needs this tick); **demand** = processor input **shortfalls auto-bought** from
-  the market. Transactions clear at **`base_price`** (price resolution is deferred — see below;
-  `market.price` stays seeded at `base_price`). Emits the buy/sell cash-flow events the Budget
-  brief consumes — keep the *figures + transactions* here and the *balance arithmetic* in
-  Budget. Includes a **framework hook for player-driven sell orders** (manual sell; full UI in
-  the new Layer 4). Files: new `src/world/market_clearing.{hpp,cpp}`; reads the pool map, writes
-  `market_component.supply` / `demand`. Depends on the data-model foundation and production briefs.
 
 - **[3] Price resolution from local supply/demand (deferred).** Was the old Layer 4. Resolve
   `market_component.price` from the supply/demand ratio modulated by rarity/`base_price`, at the
@@ -409,20 +335,6 @@ The market layer. Per the 2026-06-14 Q&A, **market resolution collapses into Lay
   between bodies — each body's market currently resolves in isolation. Out of Layer 3 scope;
   couples to Supply (Layer 5 logistics / logistical cost) once convoys exist.
 
-## Budget
-
-The corporate money loop (`docs/SYSTEMS.md` § Budget — "the primary pressure point").
-
-- **[3] Corporate balance & operating costs (the money loop).** Apply the market clearing
-  brief's cash-flow events to each `corporation_component.balance`, plus costs, at the economy
-  tick. Settled: **income** = goods sold × `base_price`; **expenditure** = input purchases ×
-  `base_price` **+ per-building maintenance** (flat, authored) **+ wages** (`wage =
-  workforce_assigned × base_wage`, `base_wage` a sensible tunable constant, refined later with
-  population). Balance opens at `starting_capital`, **may go negative** (allowed, flagged red in
-  the panel — no insolvency consequence; bankruptcy rules are a separate open item). Files: new
-  `src/world/budget_system.{hpp,cpp}` (or fold into the tick step); reads market transactions +
-  building/economy constants, writes `balance`. Depends on market clearing + the constants registry.
-
 ## Workforce
 
 The labour scalar (`docs/SYSTEMS.md` § Workforce, `docs/economy/POPULATION.md`).
@@ -434,20 +346,6 @@ The labour scalar (`docs/SYSTEMS.md` § Workforce, `docs/economy/POPULATION.md`)
   authored constant 0–1, read-only, applied as a linear scalar; this brief is the upgrade path.
 
 ## Infrastructure
-
-- **[3] Verify building placement rules per building type.** Confirm that buildings are only
-  placed on terrain valid for their type, per `docs/economy/PRODUCTION.md` (§ Extraction
-  buildings / Processing): placement is valid only on tiles with a non-zero deposit of the
-  target type, or terrain where that deposit can occur — e.g. Lumber Camp on forest/wetland,
-  Oil Platform on barren, Ice Extractor on icy, never on `ocean`. Note the granularity gap:
-  PRODUCTION.md names specific buildings (Mine, Quarry, Farm, …) but the `building_type` enum
-  only has `extraction_site` / `processing_facility` / `port`, so "valid terrain" must be
-  checked at whatever resolution the code actually enforces. The live placement path today is
-  the corporation starting-asset pass (`src/world/corporation_generation.cpp`, Pass 3) — audit
-  whether its terrain/deposit guard matches the documented rules, and whether any placed asset
-  landed on invalid terrain. Produce a findings list; fix cheap gaps, promote larger ones.
-  This also seeds the (future) player build-validation rule. See `docs/economy/PRODUCTION.md`
-  and `src/world/components.hpp` (`building_type`, `tile_component`).
 
 - **[6] Building construction & management — the new Layer 4.** Per the 2026-06-14 Q&A,
   **Layer 4 is redefined** from market/price work into a production-focused **UI overhaul**:
@@ -473,11 +371,6 @@ The world-generation layer — terrain, nations, corporations. Design authority:
   ("Deposits do not deplete in the prototype").
 
 ### Tile generation (terrain)
-
-- **[2] Kepler biome balance.** Forest and wetland remain sparse on the home planet
-  (~1% / ~0.5%). Widen the habitable belt — lower the Pass 2 equatorial ocean bias
-  (`bias_amp`) further, or decouple the volcanic/forest belts from the wettest
-  equatorial rows. Lever in `tile_generation.cpp`.
 
 - **[4] Tile generation refinements (deferred).** The larger production passes
   noted in `TILE_GENERATION.md` § Deferred: solar-parameter derivation from orbital

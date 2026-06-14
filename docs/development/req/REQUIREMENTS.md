@@ -1,7 +1,7 @@
 # Project Io — Requirements
 
-One table per TODO item that has been promoted to TASKS.md. A table is created at
-promotion and **kept permanently** — when its item completes (or is cancelled) the
+One table per Brief that has been promoted to TASKS.md. A table is created at
+promotion and **kept permanently** — when its Brief completes (or is cancelled) the
 section is moved to the **Completed / cancelled** archive at the foot of this file, not
 deleted. This file is therefore a **permanent record** of every requirement the project
 has ever set and how it was resolved. The task group in TASKS.md links here by section;
@@ -17,7 +17,7 @@ tasks carry `Satisfies: Rn` fields pointing at individual rows.
 |----|-------------|--------------|--------|-------|
 
 **Columns:**
-- **ID** — sequential within the item (R1, R2, …). Referenced in TASKS.md task
+- **ID** — sequential within the Brief (R1, R2, …). Referenced in TASKS.md task
   `Satisfies:` fields and in DEVLOG status lines.
 - **Requirement** — a single testable outcome in the present tense ("The `corporation`
   glyph is declared in `icons.hpp`").
@@ -32,25 +32,25 @@ tasks carry `Satisfies: Rn` fields pointing at individual rows.
 ### Workflow
 
 1. **At promotion** — create a section under **Active requirements** named after the
-   TODO item slug. Derive requirements from the TODO description's success criteria; add
+   Brief slug. Derive requirements from the Brief description's success criteria; add
    a row per testable outcome. Link it from the TASKS.md group header as
    `Requirements: [REQUIREMENTS.md § <slug>](req/REQUIREMENTS.md#<slug>)`.
-2. **As tasks land** — update statuses. A `failed` status does not block the item:
+2. **As tasks land** — update statuses. A `failed` status does not block the Brief:
    add a note, leave the row as `pending`, refine the responsible task, and retry.
 3. **On completion** — when all rows are `complete` (or `failed` rows are accepted as
-   explicitly out of scope), remove the group from TASKS.md and the item from TODO.md,
+   explicitly out of scope), remove the group from TASKS.md and the Brief from TODO.md,
    then **move this section, intact, to the Completed / cancelled archive** at the foot
    of the file. Add a `Resolved:` line above the table (date + outcome, e.g.
    `Resolved: 2026-06-14 — complete, all rows met`). **Never delete a section** — the
    archive is the project's permanent requirement history.
 4. **On cancellation** — a cancelled group (see TASKS.md § Cancelling a task group)
    moves to the archive the same way, with a `Resolved:` line recording the cancellation
-   and reason. Its rows keep the real status they reached. If the item is later
+   and reason. Its rows keep the real status they reached. If the Brief is later
    re-promoted, copy the section back up to **Active requirements** and continue from
    there.
 
-**Scope:** apply requirements tables to items of difficulty 3 and above. For
-difficulty 1–2 items an inline `Verification:` note in the task entry is sufficient.
+**Scope:** apply requirements tables to Briefs of difficulty 3 and above. For
+difficulty 1–2 Briefs an inline `Verification:` note in the task entry is sufficient.
 
 **DEVLOG convention:** every session entry's **Status** line records the requirement
 count, e.g.:
@@ -81,7 +81,7 @@ silently downgrade it to an assumption. Instead:
 3. **Defer only when it needs design.** If establishing the method is impossible
    without non-trivial design consideration — it needs new infrastructure, an
    architectural decision, or its own scoping — do **not** block the task. Record
-   the testing-method work as a [`../TODO.md`](../TODO.md) item (with file pointers
+   the testing-method work as a [`../TODO.md`](../TODO.md) Brief (with file pointers
    and enough context to pick up), leave the requirement `pending` with the
    deferral reason in Notes, and proceed. A requirement whose method is deferred is
    **not** complete, and the task carrying it is at best *code-complete* until the
@@ -98,8 +98,7 @@ section here — it does not need the full TODO backlog or DEVLOG history in con
 ## Active requirements
 
 *No active requirements. The worklist is empty between work blocks; sections appear here
-when a TODO item is promoted, and move to the archive below on completion or
-cancellation.*
+when a Brief is promoted, and move to the archive below on completion or cancellation.*
 
 ---
 
@@ -108,6 +107,77 @@ cancellation.*
 Permanent record of resolved requirement groups, newest first. Each carries a
 `Resolved:` line and is retained verbatim; re-promote by copying a section back up to
 **Active requirements**.
+
+### Layer 3 economy publish set (economy-data-model … placement-rules-audit)
+
+`Resolved: 2026-06-15 — complete; all 27 rows across the seven groups met. Published as a
+barrier set, one commit per Brief after a doc-refactor commit. Verified via
+tools/verify/econ_harness, tools/verify/world_audit, and scripts/verify/economy_panel.lua.
+See DEVLOG § "Layer 3 economy published".`
+
+### economy-data-model
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | `building_component` declares `resource_type target_resource` and `uint16_t recipe`, with a `no_recipe` sentinel constant. | `code: target_resource` + `code: no_recipe` in components.hpp | complete | |
+| R2 | `tile_component` declares a reserved `resource_remaining` array (resource-indexed), unused in L3. | `code: resource_remaining` | complete | |
+| R3 | `corporation_component` declares a `float balance`. | `code: balance` | complete | |
+| R4 | `world` holds a `(corporation, body) → stockpile_component` pool with a `pool_for(corp, body)` accessor. | `code: pool_for` + `build` | complete | Deterministic `std::map` keyed by pair. |
+
+### recipe-registry
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | `scripts/recipes.lua` authors the prototype processing recipes (steel, refined fuel, food rations) as `{inputs, outputs}` with reagent support. | `doc: scripts/recipes.lua` | complete | |
+| R2 | `recipe_registry` loads recipes via sol2 (protected calls only) into C++ tables addressable by the `building_component.recipe` id. | `code: recipe_registry` + `code: protected_function` / safe_script | complete | |
+| R3 | A recipe is a struct of input/output quantities indexed by `resource_type`; Lua resource names map to the enum. | `code: struct recipe` | complete | |
+| R4 | Per-`building_type` economy constants (`base_rate`, `maintenance`, `base_wage`, `build_cost`) and global `t_full`/`t_idle` are queryable from the registry. | `code:` accessor + `build` | complete | |
+| R5 | `scripts/economy.lua` authors those constants with legible round defaults. | `doc: scripts/economy.lua` | complete | |
+
+### production-simulation
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | `run_economy_step` credits each extraction building's (corp, body) pool with its `target_resource` at `base_rate × richness × workforce × (1 − hazard)`. | `headless` (pool rises after a step) | complete | Method: `verify.econ_step` hook + headless harness. |
+| R2 | Processing consumes inputs pool-first and accrues outputs, using the two-threshold (`t_full`/`t_idle`) partial-run model. | `headless` | complete | |
+| R3 | A building below `t_idle` on its limiting input idles (no output, recorded idle). | `headless` | complete | |
+| R4 | Workforce applies as a single linear scalar at both stages. | `code:` + `headless` | complete | |
+| R5 | Deposits do not deplete — `resource_remaining` is untouched by the step. | `code:` (no write to resource_remaining) | complete | |
+
+### market-clearing
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | Per body market, supply = each corp's surplus listed for sale (pool above processor needs this tick). | `headless` (market.supply populated) | complete | |
+| R2 | Demand = processor input shortfalls auto-bought from the market. | `headless` | complete | |
+| R3 | Transactions clear at `base_price`; `market.price` stays at `base_price`. | `code:` + `headless` | complete | |
+| R4 | A framework hook for player-driven sell orders exists (no-op in L3). | `code:` (hook present) | complete | |
+
+### budget-system
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | Income = goods sold × `base_price` credited to `corporation.balance`. | `headless` (balance moves) | complete | |
+| R2 | Expenditure = input purchases × `base_price` + per-building maintenance + wages (`workforce × base_wage`). | `headless` | complete | |
+| R3 | Balance opens at `starting_capital` and may go negative (no insolvency consequence). | `code:` + `headless` | complete | |
+
+### economy-panel
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | The panel shows each (corp, body) pool's per-resource quantities. | `visual` | complete | Method: `scripts/verify/economy_panel.lua` after `verify.econ_step`. |
+| R2 | It shows each building's current output rate and idle/active state (+ limiting input for processors). | `visual` | complete | |
+| R3 | It shows body market supply/demand figures. | `visual` | complete | |
+| R4 | It shows the per-corporation balance, with negative values flagged red. | `visual` | complete | |
+
+### placement-rules-audit
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | A findings list records whether Pass 3 placement matches PRODUCTION.md rules (no extraction on zero-deposit/invalid terrain; never `ocean`). | `manual` (findings recorded in DEVLOG) | complete | |
+| R2 | Cheap gaps are fixed so every placed extraction asset sits on a tile with a non-zero deposit of a valid target; larger gaps promoted. | `headless` (audit assertion over a generated world) | complete | Method: headless harness checks placed assets. |
+
+---
 
 Two groups completed **2026-06-14** before this permanent-history policy was adopted, so
 their full requirement tables were deleted under the old "delete on completion" lifecycle
