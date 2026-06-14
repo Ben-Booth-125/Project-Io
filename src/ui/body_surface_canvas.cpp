@@ -28,30 +28,25 @@ constexpr float kMinZoomHeadroom = 1.2f;  // at min zoom the viewport shows ~120
 constexpr float kMaxZoom         = 20.0f;
 constexpr float kMinZoom         = 1.0f / (kMinZoomHeadroom * kFitMargin); // ~0.877
 
-const char* terrain_name(terrain_type t)
+// Identity fill colour for a tile's composition. The single source of truth for
+// surface tinting; landform is conveyed by overlay glyphs (deferred), not hue.
+ImU32 terrain_colour(terrain_composition t)
 {
     switch (t)
     {
-        case terrain_type::barren:   return "Barren";
-        case terrain_type::rocky:    return "Rocky";
-        case terrain_type::icy:      return "Icy";
-        case terrain_type::volcanic: return "Volcanic";
-        case terrain_type::water:    return "Water";
-        default:                     return "?";
+        case terrain_composition::barren:    return IM_COL32(170, 145, 100, 255);
+        case terrain_composition::rocky:     return IM_COL32(112, 105,  95, 255);
+        case terrain_composition::volcanic:  return IM_COL32(135,  55,  28, 255);
+        case terrain_composition::icy:       return IM_COL32(200, 224, 236, 255);
+        case terrain_composition::tundra:    return IM_COL32(140, 140, 118, 255);
+        case terrain_composition::grassland: return IM_COL32( 96, 150,  72, 255);
+        case terrain_composition::forest:    return IM_COL32( 48, 102,  56, 255);
+        case terrain_composition::wetland:   return IM_COL32( 78, 120,  92, 255);
+        case terrain_composition::ocean:     return IM_COL32( 40,  80, 160, 255);
+        case terrain_composition::regolith:  return IM_COL32(138, 130, 120, 255);
+        case terrain_composition::metallic:  return IM_COL32(158, 150, 140, 255);
     }
-}
-
-ImU32 terrain_colour(terrain_type t)
-{
-    switch (t)
-    {
-        case terrain_type::barren:   return IM_COL32(170, 145, 100, 255);
-        case terrain_type::rocky:    return IM_COL32(112, 105,  95, 255);
-        case terrain_type::icy:      return IM_COL32(160, 200, 220, 255);
-        case terrain_type::volcanic: return IM_COL32(135,  55,  28, 255);
-        case terrain_type::water:    return IM_COL32( 40,  80, 160, 255);
-        default:                     return IM_COL32( 60,  60,  60, 255);
-    }
+    return IM_COL32( 60,  60,  60, 255);
 }
 
 const char* body_type_name(body_type t)
@@ -211,7 +206,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
 
         const ImVec2 lc   = hex_local_centre(tile.grid_x, tile.grid_y, hex_size);
         const ImVec2 sc   = to_screen(lc);
-        const ImU32  fill = terrain_colour(tile.terrain);
+        const ImU32  fill = terrain_colour(tile.composition);
         const auto   built_it  = built_tiles.find(id);
         const bool   built     = built_it != built_tiles.end();
         const building_type built_type = built ? built_it->second : building_type::none;
@@ -283,7 +278,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
         const tile_component& tile = w.tiles.at(hovered_tile);
         ImGui::BeginTooltip();
         ImGui::Text("[%d, %d]", tile.grid_x, tile.grid_y);
-        ImGui::Text("%s", terrain_name(tile.terrain));
+        ImGui::Text("%s \xc2\xb7 %s", composition_name(tile.composition),
+                                       landform_name(tile.landform));
         ImGui::Text("Hazard: %.2f", tile.hazard_level);
         ImGui::Text("Habitability: %.2f", tile.habitability);
         bool any_deposit = false;

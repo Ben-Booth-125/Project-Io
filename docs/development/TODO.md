@@ -86,6 +86,53 @@ currently hold items appear as sections below.
   click handlers (currently a single click descends). Needs its own doc
   (`docs/ui/SELECTION.md`) and an entry in `LAYOUT.md`.
 
+- **[4] Generation Ledger.** Design a ledger that explains *why* a tile generated
+  as it did, for tuning and analysis of the procedural pass. The data seam already
+  exists: `generate_body_tiles()` takes an optional `generation_record*`
+  (`src/world/tile_generation.hpp`) that captures per-pass intermediates —
+  heightmap, moisture, latitude bands, ocean threshold — today thrown away on the
+  common path. **Design is deliberately unstarted.** Decide: what the ledger
+  presents (per-tile derivation breadcrumb: height/moisture/band → composition →
+  landform → deposits; and per-body summaries like composition/landform histograms
+  and the ocean threshold); whether history is *persisted* per body or
+  *regenerated on demand* (generation is deterministic, so regeneration is cheap
+  and avoids storing a record per tile); and how it surfaces (a dedicated Ledger
+  window, or an overlay lens over the Planetary canvas showing the heightmap /
+  moisture / band fields). Likely earns `docs/generation/GENERATION_LEDGER.md`.
+  Note the overlap with the hover-card / Selection info work — the per-tile
+  derivation is a natural section of a tile's rich card. See
+  `docs/generation/TILE_GENERATION.md` (§ Generation history hook).
+
+## Environment
+
+The two-axis terrain model and the six-pass procedural generation are
+**implemented** (`src/world/tile_generation.{hpp,cpp}`, driven by per-body
+`body_profile`s in `hard_coded_world.cpp`; design authority in
+`docs/generation/TILE_GENERATION.md`). What remains is tuning and refinement, not
+new structure:
+
+- **[2] Landform prominence.** Mountain/rift/crater clusters are small and sparse
+  by the doc's tight ring transitions, even after the area-scaling of seed counts.
+  Dial cluster radius and/or seed density up if more prominent ranges are wanted —
+  the levers are `shape_of()` (ring count + decay) and `scale_to_area()` in
+  `tile_generation.cpp`.
+
+- **[2] Kepler biome balance.** The equatorial ocean bias (`bias_amp = 0.15` in
+  Pass 2) drowns most tropical/subtropical land, so forest and wetland are sparse
+  on the home planet (~1% / ~0%). Lower the bias to widen the habitable belt, or
+  decouple the volcanic/forest belts from the wettest equatorial rows.
+
+- **[1] Selene ice cap size.** Selene reads as ~52% icy because the `cold` polar
+  band spans the outer 50% of rows (per the Pass 3 table) and every polar row ices
+  over on a polar-frozen body. Narrow the `cold` polar band, or add a tighter
+  polar-cap override distinct from the climate band, if a smaller cap is wanted.
+
+- **[4] Tile generation refinements (deferred).** The larger production passes
+  noted in `TILE_GENERATION.md` § Deferred: solar-parameter derivation from orbital
+  mechanics, smooth (noise-blended) band transitions, tectonic plate-driven
+  landforms, full deposit authoring for the non-prototype resources, and coastline
+  refinement (enclosed seas, archipelagos, lakes).
+
 ## Known Bug
 
 - **[4] Body labels move in steps, not smoothly.** Re-logged. The font-oversampling

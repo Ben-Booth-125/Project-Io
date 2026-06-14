@@ -12,18 +12,6 @@ namespace ui {
 
 namespace {
 
-const char* terrain_name(terrain_type t)
-{
-    switch (t)
-    {
-        case terrain_type::barren:   return "Barren";
-        case terrain_type::rocky:    return "Rocky";
-        case terrain_type::icy:      return "Icy";
-        case terrain_type::volcanic: return "Volcanic";
-        default:                     return "?";
-    }
-}
-
 const char* body_type_name(body_type t)
 {
     switch (t)
@@ -120,14 +108,16 @@ void draw_tile_inspector(const world& w, bool* p_open)
     const float row_height    = ImGui::GetTextLineHeightWithSpacing();
     const float table_height  = row_height * 12.0f; // show ~11 tiles before scroll
 
-    // Columns: x, y, terrain, hazard, habitability, then one per resource type.
-    const int col_count = 5 + static_cast<int>(resource_count);
+    // Columns: x, y, composition, landform, hazard, habitability, then one per
+    // resource type.
+    const int col_count = 6 + static_cast<int>(resource_count);
     if (ImGui::BeginTable("tiles", col_count, table_flags, {0.0f, table_height}))
     {
         ImGui::TableSetupScrollFreeze(0, 1);
         ImGui::TableSetupColumn("X",    ImGuiTableColumnFlags_WidthFixed, 28.0f);
         ImGui::TableSetupColumn("Y",    ImGuiTableColumnFlags_WidthFixed, 28.0f);
-        ImGui::TableSetupColumn("Terrain",     ImGuiTableColumnFlags_WidthFixed,  80.0f);
+        ImGui::TableSetupColumn("Composition", ImGuiTableColumnFlags_WidthFixed,  80.0f);
+        ImGui::TableSetupColumn("Landform",    ImGuiTableColumnFlags_WidthFixed,  72.0f);
         ImGui::TableSetupColumn("Hazard",      ImGuiTableColumnFlags_WidthFixed,  60.0f);
         ImGui::TableSetupColumn("Habitability",ImGuiTableColumnFlags_WidthFixed,  90.0f);
         for (std::size_t r = 0; r < resource_count; ++r)
@@ -153,12 +143,13 @@ void draw_tile_inspector(const world& w, bool* p_open)
             ImGui::TableNextRow();
             ImGui::TableSetColumnIndex(0); ImGui::Text("%d", tile->grid_x);
             ImGui::TableSetColumnIndex(1); ImGui::Text("%d", tile->grid_y);
-            ImGui::TableSetColumnIndex(2); ImGui::TextUnformatted(terrain_name(tile->terrain));
-            ImGui::TableSetColumnIndex(3); ImGui::Text("%.2f", tile->hazard_level);
-            ImGui::TableSetColumnIndex(4); ImGui::Text("%.2f", tile->habitability);
+            ImGui::TableSetColumnIndex(2); ImGui::TextUnformatted(composition_name(tile->composition));
+            ImGui::TableSetColumnIndex(3); ImGui::TextUnformatted(landform_name(tile->landform));
+            ImGui::TableSetColumnIndex(4); ImGui::Text("%.2f", tile->hazard_level);
+            ImGui::TableSetColumnIndex(5); ImGui::Text("%.2f", tile->habitability);
             for (std::size_t r = 0; r < resource_count; ++r)
             {
-                ImGui::TableSetColumnIndex(static_cast<int>(5 + r));
+                ImGui::TableSetColumnIndex(static_cast<int>(6 + r));
                 const float deposit = tile->resource_deposit[r];
                 if (deposit > 0.0f)
                     ImGui::Text("%.1f", deposit);

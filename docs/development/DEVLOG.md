@@ -6,6 +6,133 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## 2026-06-14 — Two-axis terrain model + six-pass procedural generation
+
+**Status:** Complete (code). Builds clean; validated with a throwaway headless stats harness (since removed).
+
+### What was built
+
+**`docs/generation/TILE_GENERATION.md`** (relocated)
+Moved out of `docs/development/` into a new `docs/generation/` area. References updated in `CLAUDE.md` and `docs/economy/TILES.md`. Implementation notes refreshed to point at the new code module and record the deviations below.
+
+**`src/world/components.hpp`** (data model)
+`resource_type` expanded from 4 to 19 values: the full Tier-1 raw set (Earth-sourced + space-sourced + ambient) plus the prototype Tier-2 refined goods, ordered by tier per `RESOURCES.md`. `terrain_type` (5-value flat enum) replaced by the two-axis model: `terrain_composition` (11 values) and `terrain_landform` (7 values), both carried on `tile_component` (the old `terrain` field is gone).
+
+**`src/world/tile_generation.{hpp,cpp}`** (new)
+The deterministic six-pass pipeline: (1) cylinder-sampled simplex heightmap, X-wrap seamless; (2) latitude-biased ocean threshold; (3) latitude bands + independent moisture map; (4) composition by (band, moisture) for atmospheric bodies, dedicated airless/metallic tables otherwise, with a geology-driven volcanic overlay; (5) BFS landform clusters (mountain/rift/crater) plus a low-ground valley fill; (6) per-tile deposits keyed on (composition, landform) with the ambient every-tile guarantee. Bodies are described by a `body_profile` (temperature/atmosphere/hydrology/geology/water_fraction/bias) — the passes branch only on these, never on body identity. A `body_profile`-driven `generation_record` out-param optionally captures per-pass intermediates (heightmap, moisture, bands, ocean threshold) as the seam for a future generation Ledger.
+
+**`src/world/hard_coded_world.cpp`** (rewired)
+Old inline weight-table generator removed. The four prototype bodies now carry authored solar profiles: Cinder (scorching/airless/high-geology), Kepler (temperate/thick/liquid 0.60/moderate), Selene (cold/airless/polar-frozen), Pallas (cold/airless/metallic-bias). Kepler market re-authored against the new resource indices via a small `resource_array` helper.
+
+**UI** — `terrain_colour` (now keyed on composition, 11 cases) updated in `body_surface_canvas.cpp`; `composition_name`/`landform_name` centralised in `presentation.{hpp,cpp}` and used by the canvas tooltip and Tile Ledger (the inspector gained a Landform column); resource presentation table expanded to 19 entries.
+
+### In-session decisions
+
+**Expanded the resource enum now (not deferred).** Faithful Pass 6 needs petroleum, water, agricultural produce, and the ambient resources, which the old 4-value enum lacked. Chosen over an interim mapping to avoid throwaway deposit work; the deposit arrays already span the full enum width so future resource authoring needs no generation change.
+
+**Seed counts scale with grid area (deviation from the doc tables).** The doc's absolute landform seed counts collapse to ~0% coverage on the prototype's 180×84 grids. `scale_to_area()` scales counts up with grid area (never below the authored count, so small bodies are unaffected) to keep feature *density* consistent. Absolute feature prominence/size remains a tuning knob — landform clusters are still intentionally tight per the doc's ring transitions.
+
+**Hazard/habitability derived, not authored.** The design tables don't specify these, but `tile_component` carries them and the inspector shows them, so they are derived from a composition base ceiling modified by landform (mountain/rift raise hazard and cut habitability; valley raises habitability).
+
+### Open items / flagged for tuning
+
+- **Generation Ledger** — filed in TODO.md. The `generation_record` hook exists; the Ledger's persistence model (capture vs. regenerate-on-demand) and UI are unstarted by request.
+- **Landform prominence** — features are small/sparse by the doc's cluster rules even after area-scaling. Dial cluster radius / seed density up if more prominent ranges are wanted.
+- **Kepler biome balance** — the equatorial ocean bias (`bias_amp = 0.15`) drowns most tropical/subtropical land, so forest/wetland are sparse (~1% / ~0%). Lower the bias to widen the habitable belt.
+- **Selene ice fraction** — ~52% icy, because the `cold` polar band spans the outer 50% of rows (doc-consistent) and all polar rows ice over on a polar-frozen body. Narrow the cold polar band or use a tighter polar-cap override if a smaller ice cap is wanted.
+
+---
+
+## 2026-06-14 — Economy design expansion: tiles, population, ambient resources, logistics note
+
+**Status:** Complete (documentation only). No code changes this session.
+
+### What was built
+
+**`docs/economy/TILES.md`** (new)
+Two-axis terrain model: `terrain_composition` (barren, rocky, volcanic, icy, tundra, grassland, forest, wetland, ocean, regolith, metallic) × `terrain_landform` (plains, highland, mountain, canyon, valley, crater, rift). Each combination has documented deposit profiles, build cost modifiers, and amenity potential. The current single `terrain_type` enum is redesigned as two separate fields on `tile_component`; existing hard-coded data does not need immediate retrofit but a generation update is filed in `TODO.md`.
+
+**`docs/economy/POPULATION.md`** (new)
+Population centres as a formal concept. Scale/agglomeration bonus model (Outpost → Metropolis: +5% to +50% processing throughput, +0% to +20% extraction yield). Land-use state system (undeveloped, extraction, urban, amenity, infrastructure): placing urban or amenity development on a tile permanently sacrifices its extraction potential — the mechanism preventing simultaneous maximisation of raw extraction and finished goods. Population demand basket (food rations, clean water, consumer goods, habitability goods). All deferred from prototype; existing fields (`habitability`, `workforce_assigned`, `market_component.demand`) are already positioned correctly.
+
+**`docs/economy/RESOURCES.md`** (updated)
+Added "value tracks" framing alongside tiers (industrial / ambient / habitability). Added Tier 1 ambient resources section: stone, timber, sand, clay, peat — every eligible tile generates a low baseline deposit of at least one ambient resource. Added habitability goods section: clean water, building materials, consumer goods, medical supplies, utilities. Prototype resource count stays at seven; full enum target revised to approximately 35–40 entries.
+
+**`docs/economy/PRODUCTION.md`** (updated)
+Extraction building table expanded: Quarry (stone/sand/clay), Lumber Camp (timber), Surface Extractor (regolith/PGMs, Era 1). Added amenity buildings section (Park, Recreation Facility, Cultural Centre) and habitability production buildings (Water Treatment Plant, Construction Yard, Consumer Goods Factory, Pharmaceutical Lab, Power Plant). Added logistics open design note: transport capacity caps supply throughput, not price — oversupplied markets that cannot ship simply stop accumulating rather than crashing in price. Storage Depot added as an infrastructure building placeholder.
+
+**`docs/development/TODO.md`** (updated)
+New Environment category with a [4] item covering the full tile generation update: enum rename/expansion, terrain_landform field, revised BFS water logic (variable-width band seeding, polar ice/tundra at poles), per-composition deposit profiles, ambient resource baseline, and landmark landform pass.
+
+### In-session decisions
+
+**Every tile must have at least one deposit.** Ambient resources (stone, timber, sand, clay, peat) fill this role. They have low base prices but ensure no tile is economically inert. Quarry and Lumber Camp extract them.
+
+**Transport capacity constrains throughput, not price.** If a body cannot export its output, production stalls before the price crashes. This is a key design nuance that affects how the market model is implemented at Layer 4 and how ports/warehouses matter at Layer 5. Marked open; to be decided when Layer 5 is designed.
+
+**Population centres are a formal system, not a modifier.** Population has a scale model with named tiers and explicit land-use trade-offs. The "can't fully develop raw extraction and finished goods" constraint is structural — urban tiles are not also extraction tiles.
+
+**Habitability is a separate value track.** Habitability goods and amenity buildings affect workforce efficiency and population growth indirectly, not profit directly. They are worth producing for productive system health, not for market margins.
+
+### Open items
+
+- Tile generation update (filed in TODO.md [4]).
+- Full enum expansion for terrain_composition, terrain_landform, and the extended resource list — to be done at the start of Layer 3 implementation.
+- Logistics throughput model — open design decision, deferred to Layer 5.
+- Population centre implementation — deferred post-prototype.
+
+---
+
+## 2026-06-14 — Layer 3 economy design: resources, production, eras
+
+**Status:** Complete (documentation only). No code changes this session.
+
+### What was built
+
+Three new documents under `docs/economy/` establishing the production system prior to Layer 3 implementation.
+
+**`docs/economy/RESOURCES.md`**
+Full resource list: 23 resources across three tiers. Tier 1 — raw materials (11): seven Earth-sourced (iron ore, coal, petroleum, silica, copper ore, rare earth ore, agricultural produce) and four space-sourced (water, iron-nickel ore, platinum group metals, regolith). Tier 2 — refined goods (7): steel, refined fuel, silicon, refined copper, REE alloy, liquid oxygen, food rations. Tier 3 — products (5): machinery, electronics, propellant, alloys, spacecraft components. Regolith is a special non-traded local-use resource. Prototype subset is seven resources (four raw, three refined); all 23 enum values are defined from the start.
+
+**`docs/economy/PRODUCTION.md`**
+All building types and recipes. Extraction: Mine (hard minerals), Oil Platform (petroleum), Farm (agricultural produce), Ice Extractor (water from ice — Era 1). Output rate is `deposit × workforce_assigned × (1 − hazard_level)`. Processing: Smelter, Refinery, Chemical Plant, Electronics Lab, Fabricator, Food Processor, Assembly Plant — each supports one or more named recipes. Infrastructure (designed, not yet implemented): Port, Launchpad, Orbital Port, Warehouse. Workforce model documented: `workforce_assigned` is a constant in the prototype; the full policy allocation system is deferred. Layer 3 scope: seven prototype resources, three processing buildings (Smelter/Refinery/Food Processor).
+
+**`docs/economy/ERAS.md`**
+Formal era system. Era 0 (Terrestrial) starts at campaign epoch 1 January 1960: heavy industry, no space access. Era 0→1 gate requires Rocketry research + a staffed Launchpad + minimum propellant reserve. Era 1 (Early Space) unlocks all solar system bodies, the Ice Extractor, Assembly Plant, and Orbital Port; the dominant challenge is closing the propellant loop via ISRU. Era 2+ is stubbed.
+
+**Existing documents updated:**
+- `CLAUDE.md` — three new economy doc entries added to the reading list.
+- `docs/GLOSSARY.md` — Building, Era, ISRU, Recipe, Resource, Stockpile defined.
+- `docs/development/INITIAL_INSTRUCTIONS.md` — Layer 3 description expanded to reference `RESOURCES.md` / `PRODUCTION.md` and the seven-resource prototype subset.
+
+### In-session decisions
+
+**Start date 1960 confirmed.** The "early industrial, space locked" era choice validates the existing campaign epoch. 1960 signals post-WWII heavy industry and a nascent-but-real electronics sector; the specific year is fictional in the game's alternate timeline.
+
+**Specialised extraction buildings.** Each extraction type targets a specific resource class (Mine → hard minerals, Oil Platform → petroleum, Farm → agricultural produce, Ice Extractor → water ice). The Mine is the broadest type: its output is determined by the tile's deposits, so the same building type works on both a volcanic Kepler tile (rare earth ore) and a metallic asteroid tile (iron-nickel ore).
+
+**Generic processing via recipes.** Processing buildings are differentiated by their active recipe, not by enum value. A Refinery can produce refined fuel, silicon, refined copper, or REE alloy depending on configuration. This keeps the building type list manageable while supporting the full recipe table.
+
+**Three-tier chain, Tier 3 deferred in prototype.** The full three-tier chain (raw → refined → product) is documented but only Tiers 1 and 2 are implemented in the prototype. Tier-3 product recipes exist in the design but have no authored tile deposits or live buildings until a later pass.
+
+**Eras are a formal system.** "Era" is a first-class game concept with defined gates, not an informal phase description. This affects future tech-tree design, tutorial pacing, and progression gating.
+
+**Food is a resource.** Agricultural produce (Era 0) is extracted by Farm and processed into food rations by the Food Processor. Off-world workforce consumes food rations; a shortage reduces effective workforce at the destination. Food production on Earth is easy; it becomes a critical logistics challenge once off-world colonies exist.
+
+**Propellant is the Era 0→1 gate good.** The Launchpad requires a propellant reserve to operate. Propellant is produced from refined fuel + liquid oxygen. Liquid oxygen requires water (Era 1 input), making the first propellant stockpile the tightest resource bottleneck in early play.
+
+**Prototype enum scope.** All 23 resource types and all building type enum values are defined in code from the start of Layer 3. Unimplemented resources have zero deposits; unimplemented buildings have no authored placements. No retrofit needed when expanding to the full set.
+
+### Open items
+
+- Prototype implementation of Layer 3 (extraction logic, processing logic, ImGui panel showing stockpile changes).
+- Lua recipe file structure: decide whether each recipe is a top-level table in `scripts/` or inline in a resource/building definition file.
+- Workforce policy allocation (how the player redistributes `workforce_assigned` in real time) — deferred, but the field is in place.
+- Deposit depletion model — deferred; the prototype treats deposits as infinite.
+- Rocketry tech unlock — designed (ERAS.md), not implemented; requires a skeleton tech system.
+
+---
+
 ## 2026-06-14 — Calendar polish + two-column time panel + TODO recategorisation
 
 **Status:** Complete. Builds (Debug, MSVC) and links; default view captured (and a

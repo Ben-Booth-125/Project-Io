@@ -31,6 +31,18 @@ const resource_presentation& presentation_of(resource_type r);
 /// @return  Null-terminated display name.
 const char* resource_name(resource_type r);
 
+/// Display name for a tile's material composition (e.g. "Grassland").
+///
+/// @param c Composition to name.
+/// @return  Null-terminated display name.
+const char* composition_name(terrain_composition c);
+
+/// Display name for a tile's landform (e.g. "Mountain").
+///
+/// @param l Landform to name.
+/// @return  Null-terminated display name.
+const char* landform_name(terrain_landform l);
+
 /// Semantic palette — meaning-driven colours shared across the whole UI so the
 /// data-dense surfaces read consistently and a restyle is a one-file change.
 /// Grouped by role rather than by hue.
