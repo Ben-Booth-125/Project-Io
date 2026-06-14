@@ -185,3 +185,64 @@ workflow is:
 
 For a larger or speculative skill that needs design rather than a quick wrap, **propose it as
 a Brief** (category: Documentation or the relevant system category) instead of improvising.
+
+#### Promoting a skill's permissions into settings.json
+
+When a skill is created or modified, its Bash commands may require entries in
+`.claude/settings.json` (`permissions.allow`) to avoid per-invocation prompts.
+**Adding a rule to settings.json is a permanent, project-wide change** — it silently
+allows any matching command in all future sessions, not just the one being tested.
+The bar for adding a rule is therefore higher than for adding the skill itself.
+
+**Required before any rule is added:**
+
+1. **Read the SKILL.md in full.** Do not infer what commands a skill runs from its
+   description alone — open `.claude/skills/<name>/SKILL.md` and read the entire
+   Procedure section. Identify every `Bash` call the skill makes.
+2. **List the exact commands and the rule that would cover them.** Write out
+   each proposed rule alongside the command it permits, so the reviewer can
+   match them one-to-one.
+3. **Request user approval.** Present the list and ask explicitly: *"May I add
+   these rules to `.claude/settings.json`?"* Do not add rules speculatively or
+   bundle them silently into a broader change.
+4. **Use the narrowest rule that works.** Prefer a prefix pattern
+   (`Bash(git *)`) over a bare tool allow (`Bash`). Prefer matching a
+   specific executable path over a wildcard if the skill always calls one binary.
+5. **Document the mapping in a comment block above the settings file** — since
+   JSON forbids inline comments, record the skill-to-rule mapping in this CLAUDE.md
+   section (below) so the rationale survives.
+
+**Do not approve a rule you have not manually traced to a specific command in
+a specific SKILL.md.** If a proposed rule covers more than the skill warrants,
+reject it and ask for a tighter alternative.
+
+#### Current settings.json rules — approved mapping
+
+`.claude/settings.json` → `permissions.allow`:
+
+| Rule | Skill(s) | Commands covered |
+|------|----------|-----------------|
+| `Bash(git status*)` | `commit`, `scoped-commit` | `git status --porcelain`, `git status --short` |
+| `Bash(git add*)` | `commit`, `scoped-commit` | `git add <paths>` |
+| `Bash(git diff*)` | `commit`, `scoped-commit` | `git diff --stat`, `git diff --cached --name-status` |
+| `Bash(git commit*)` | `commit`, `scoped-commit` | `git commit -m ...`, `git commit -F -` |
+| `Bash(git log*)` | `commit`, `scoped-commit` | `git log -1 --pretty=format:...` |
+| `Bash(git show*)` | `commit`, `scoped-commit` | `git show --stat HEAD` |
+| `Bash(git checkout*)` | `scoped-commit` | `git checkout -b <branch>` |
+| `Bash(git restore*)` | `scoped-commit` | `git restore --staged <paths>` |
+| `Bash(cmake *)` | `verifier-visual` | `cmake --build build --config Debug --target ProjectIo` |
+| `Bash(& "build*)` | `verifier-visual` | `& "build/Debug/ProjectIo.exe" --verify <script>` |
+| `Bash(.\build*)` | `verifier-visual` | `.\build\Debug\ProjectIo.exe --verify <script>` |
+| `Bash(cl *)` | `verifier-headless` | `cl /nologo /std:c++20 ...` MSVC compile (requires vcvars64 already active) |
+| `Bash(& ".\econ_harness*)` | `verifier-headless` | `& ".\econ_harness.exe"` |
+| `Bash(& ".\world_audit*)` | `verifier-headless` | `& ".\world_audit.exe"` |
+
+**Intentionally omitted — will still prompt:**
+
+- `Bash(git push*)`, `Bash(git reset*)`, `Bash(git clean*)`, `Bash(git branch*)` —
+  destructive or outbound; no current skill requires them without user oversight.
+- `Bash(cmd *)` — removed as a shell escape hatch; the `verifier-headless` vcvars64
+  compound invocation (`cmd /c "vcvars64.bat && cl ..."`) will prompt until that
+  step is wrapped in a dedicated script with a narrower allow rule.
+- New harness executables — when a new harness is added to `verifier-headless`, its
+  exe name must be explicitly added here before it runs without a prompt.

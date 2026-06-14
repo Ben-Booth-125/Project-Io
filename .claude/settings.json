@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status*)",
+      "Bash(git add*)",
+      "Bash(git diff*)",
+      "Bash(git commit*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git checkout*)",
+      "Bash(git restore*)",
+      "Bash(cmake *)",
+      "Bash(& \"build*)",
+      "Bash(.\\build*)",
+      "Bash(cl *)",
+      "Bash(& \".\\econ_harness*)",
+      "Bash(& \".\\world_audit*)"
+    ]
+  }
+}
