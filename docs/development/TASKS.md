@@ -33,13 +33,19 @@ integrating session run the build — sub-agents should not build or commit.
 ```
 ## <Group name> (promoted from TODO § <item>)
 
-- **[<difficulty>] A — <action>.** Files: `<paths>`. Deps: foundation.
-- **[<difficulty>] B — <action>.** Files: `<paths>`. Deps: A. Parallel-safe with C.
-- **[<difficulty>] C — <action>.** Files: `<paths>`. Deps: A. Parallel-safe with B.
+Requirements: [REQUIREMENTS.md § <slug>](req/REQUIREMENTS.md#<slug>)
+
+- **[<difficulty>] A — <action>.** Files: `<paths>`. Deps: foundation. Satisfies: R1, R2.
+- **[<difficulty>] B — <action>.** Files: `<paths>`. Deps: A. Parallel-safe with C. Satisfies: R3.
+- **[<difficulty>] C — <action>.** Files: `<paths>`. Deps: A. Parallel-safe with B. Satisfies: R4.
 
 Parallelisation note: A → {B, C}; B ∥ C (disjoint files). Promote D once B and C
 land; D depends on both.
 ```
+
+Requirements policy and table format are in [`req/REQUIREMENTS.md`](req/REQUIREMENTS.md).
+
+---
 
 ## Dividing work across agents & authoring tasks
 
@@ -120,6 +126,54 @@ wave. Verify retroactively — do not assume an agent's self-reported success.
 
 ---
 
-*No active tasks.* The v0.0.3 Environment / world-generation groups (Tile tuning,
-Nation generation, Corporation generation) are complete — see the 2026-06-14
-DEVLOG entry and the updated TODO.md § Environment.
+## Corporation lens (promoted from TODO § Canvas [4])
+
+Requirements: [REQUIREMENTS.md § corporation-lens](req/REQUIREMENTS.md#corporation-lens)
+
+Prerequisite: TODO § Canvas [3] "Design the lens system" should produce
+`docs/ui/LENSES.md` before task D starts. Task A writes the corporation-specific
+section regardless — stub the other lens entries if the full doc has not yet landed.
+
+- **[2] A — Settle corporation-lens semantics and write the corporation section of
+  `docs/ui/LENSES.md`.** Record these decisions: (a) a "corporate-owned tile" is any
+  tile on which a corporation holds a building (`building_component.tile` lookup via
+  `w.corporations[].assets`) — no influence radius for this iteration; (b) the lens
+  is Planetary-only; (c) the player corp uses `presentation::faction_colour(0)`,
+  rivals use the per-corp hash already used for building markers; (d) unowned tiles
+  show terrain colour with no tint. Create `docs/ui/LENSES.md` if absent; stub the
+  other four lens sections. Files: `docs/ui/LENSES.md`. Deps: foundation.
+  Satisfies: R8, R9.
+
+- **[2] B — Add the `corporation` glyph to `icons.{hpp,cpp}`.** Shape: a filled
+  square with a centred inner dot (a "seal" silhouette, distinct from the
+  extraction-site filled diamond and the port/unit filled triangle — verify against
+  ICONS.md § Open clarifications before drawing). Follow the shared `(dl, centre, r,
+  colour)` contract. Files: `src/ui/icons.{hpp,cpp}`. Deps: A. Parallel-safe with C.
+  Satisfies: R2.
+
+- **[1] C — Add `corporation` to `overlay_mode` and wire its strip button in
+  `overlay.cpp`.** If B has not yet landed, use `icons::placeholder` for the button
+  and annotate with a `// TODO: swap to icons::corporation` comment — resolved at
+  integration. Files: `src/ui/ui_state.hpp`, `src/ui/overlay.cpp`. Deps: A.
+  Parallel-safe with B. Satisfies: R1, R3.
+
+- **[3] D — Implement the corporation lens render pass in `body_surface_canvas.cpp`.**
+  Build a `tile_id → entity_id (corporation)` lookup from `w.corporations` and their
+  `assets` → `building_component.tile` at draw time (acceptable cost at prototype
+  tile counts). Under `overlay_mode::corporation`: tint owned tiles with their
+  corporation's colour; give player-corp tiles a thin border in
+  `presentation::faction_colour(0)`; render unowned tiles in terrain colour. Guard
+  the entire pass behind the `overlay_mode::corporation` branch — no render change on
+  Solar or Circumplanetary. Files: `src/ui/body_surface_canvas.cpp`. Deps: B, C.
+  Satisfies: R4, R5, R6, R7.
+
+Parallelisation note: A → {B, C} → D. B ∥ C (disjoint file scopes: icons vs.
+ui_state/overlay). D integrates both and is the canvas hotspot — run in the main
+session. If C runs as a sub-agent, it should leave a comment stub for the icon and
+let the main session swap it in at integration.
+
+---
+
+*The four earlier Canvas groups (Circumplanetary max zoom, Map lens icons,
+Political-layer render, Faction-lens default) are complete — see the 2026-06-14
+DEVLOG entry "Layer 3 foundations" and the updated TODO.md § Canvas.*
