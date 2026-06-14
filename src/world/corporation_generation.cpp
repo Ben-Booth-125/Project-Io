@@ -188,6 +188,48 @@ float total_deposit(const tile_component& tc)
     return sum;
 }
 
+// The raw resources the Layer 3 extraction buildings can actually target (Mine →
+// iron ore, Oil Platform → petroleum, Ice Extractor → water, Farm → agricultural
+// produce). An extraction site is only productive on a tile carrying one of these,
+// so placement scores and the authored target_resource key off this set rather
+// than off every deposit (which includes ambient stone/sand most land tiles have).
+// See docs/economy/PRODUCTION.md § Layer 3 prototype scope.
+constexpr resource_type k_extractable[] = {
+    resource_type::iron_ore,
+    resource_type::petroleum,
+    resource_type::water,
+    resource_type::agricultural_produce,
+};
+
+/// Summed deposit of the prototype-extractable resources on a tile.
+float extractable_deposit(const tile_component& tc)
+{
+    float sum = 0.0f;
+    for (resource_type r : k_extractable)
+        sum += tc.resource_deposit[static_cast<std::size_t>(r)];
+    return sum;
+}
+
+/// The richest prototype-extractable resource on a tile. `any` is set false when
+/// the tile carries none (the caller falls back to a default target).
+resource_type richest_extractable(const tile_component& tc, bool& any)
+{
+    resource_type best = resource_type::iron_ore;
+    float best_val = 0.0f;
+    any = false;
+    for (resource_type r : k_extractable)
+    {
+        const float v = tc.resource_deposit[static_cast<std::size_t>(r)];
+        if (v > best_val)
+        {
+            best_val = v;
+            best     = r;
+            any      = true;
+        }
+    }
+    return best;
+}
+
 /// Place one starting building for a corporation inside its home nation's tiles.
 /// Returns the entity id of the created building, or null_entity if no suitable
 /// tile could be found.
@@ -257,7 +299,10 @@ entity_id place_starting_asset(world& w,
         switch (focus)
         {
             case industrial_focus::extraction:
-                score = total_deposit(tc) + 0.01f; // break zero-deposit ties
+                // Rank by *extractable* deposit so an extraction site lands on a
+                // tile it can actually work (S1 placement fix). The tiny floor keeps
+                // a degenerate nation with no extractable tiles still placeable.
+                score = extractable_deposit(tc) + 0.001f;
                 break;
             case industrial_focus::processing:
                 // Prefer tiles with some deposit but not the absolute maximum.
@@ -314,7 +359,24 @@ entity_id place_starting_asset(world& w,
     building_component bc;
     bc.tile               = chosen;
     bc.type               = btype;
-    bc.workforce_assigned = 0.0f;
+    // Staff producing buildings so the Layer 3 economy actually runs from the
+    // authored starting assets (an unstaffed building produces nothing). Ports
+    // take no production action in L3, so they stay unstaffed.
+    bc.workforce_assigned = (btype == building_type::port) ? 0.0f : 0.5f;
+
+    // Author the extraction target from the tile's richest extractable deposit.
+    // The processing recipe is authored later from the loaded registry (the
+    // recipe id is a registry index, not known here); it stays no_recipe for now.
+    if (btype == building_type::extraction_site)
+    {
+        const auto tit = w.tiles.find(chosen);
+        if (tit != w.tiles.end())
+        {
+            bool any = false;
+            const resource_type tgt = richest_extractable(tit->second, any);
+            bc.target_resource = tgt; // defaults to iron_ore when the tile has none
+        }
+    }
     w.buildings[bld_id]  = bc;
 
     stockpile_component sc;
@@ -626,6 +688,7 @@ std::vector<entity_id> generate_corporations(
                                   home_nation_idx[static_cast<std::size_t>(c)])];
         cc.focus            = corp_focuses[static_cast<std::size_t>(c)];
         cc.starting_capital = corp_capitals[static_cast<std::size_t>(c)];
+        cc.balance          = corp_capitals[static_cast<std::size_t>(c)]; // opens at starting capital
         cc.is_player        = false;
 
         const entity_id asset = corp_assets[static_cast<std::size_t>(c)];
