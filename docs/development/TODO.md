@@ -250,6 +250,35 @@ currently hold Briefs appear as sections below.
   the **Selection info element** (Ledger) — both present per-entity detail; share
   the per-type content builders where it makes sense. See `docs/ui/LAYOUT.md`.
 
+- **[2] Time-speed curve + econ-tick progress bar.** Two settled tweaks to the time
+  column (the time panel in `src/core/app.cpp`; speed→rate mapping in `sim_loop`):
+  — **Non-linear speed curve.** The speed buttons currently map linearly to a 1×–5×
+    multiplier (`sim_loop::set_speed`, used as the per-step divisor in `step_ms`).
+    Redefine the curve so the top end fast-forwards aggressively: buttons **1–3 keep
+    their current fine-grained feel with button 3 as the 1× normal-play reference**,
+    and buttons **4 → 4× and 5 → 16×** that reference — for skipping quiet quarters to
+    the next economy tick. (Confirm at planning what 1 and 2 become if 3 is the 1×
+    reference: whether they read as slower-than-realtime, or 3 is merely relabelled
+    while 1/2/3 keep today's 1×/2×/3× rates.) Lever: the speed→multiplier mapping in
+    `sim_loop.{hpp,cpp}` (`max_speed`, the `step_ms` divisor) and the button labels in
+    the `app.cpp` time panel.
+  — **Econ-tick progress bar: drop the % text.** The quarter-progress `ImGui::ProgressBar`
+    (`app.cpp` time panel, fed by `ui::fmt::quarter_progress`) shows ImGui's default
+    `xx%` overlay; suppress it (empty overlay string) so the bar reads as a clean
+    animated fill toward the economy-tick boundary. See `docs/ui/TIME_CONTROLS.md` /
+    `LAYOUT.md`.
+
+- **[2] Player balance in the UI header + header design pass.** The top header strip
+  (`ui::draw_header_panel`, `src/ui/header_panel.cpp` — today "Budget + resource header")
+  should surface the **player corporation's running balance** now that Layer 3 moves it
+  each economy tick (`corporation_component.balance` for `w.player_entity`; negatives
+  flagged red per the economy-panel convention, `palette::negative`). Alongside it, do a
+  **header design pass** now that we know what Layer 3 produces: decide what the persistent
+  header must show *at a glance* versus what belongs in the (player-focused) ledgers — e.g.
+  balance plus last-tick net change, a compact resource/stockpile summary, and how the header
+  relates to the Economy / Balance ledgers and the time column. Keep it a *summary* surface;
+  detail lives in the ledgers. Touches `src/ui/header_panel.cpp`; see `docs/ui/LAYOUT.md`.
+
 - **[6] Clarify the time control view.** Deferred. The current two-column time
   panel (calendar block + speed controls) is a prototype-grade layout. Revisit it
   later to settle the production design: what the player needs from the clock at a
@@ -272,6 +301,31 @@ currently hold Briefs appear as sections below.
   ordering is otherwise fine. Touches the body-selector default in
   `src/ui/tile_inspector.cpp` (read `ui_state.active_body` /
   `circumplanetary_anchor`).
+
+- **[4] Market lens & the ledger family (Economy 2nd pass + Market / Balance /
+  Construction ledgers).** Build out the economy's read surfaces now that the Layer 3
+  loop runs. Likely splits into several Briefs at promotion; captured here as one family.
+  — **Economy panel — second pass.** The L3 panel (`src/ui/economy_panel.{hpp,cpp}`) is a
+    debug dump (every corp, every section). Refit it to the conventions below.
+  — **Market Ledger.** Per-body market detail — supply / demand / price per resource, the
+    player's buys and sells this tick, and listings — the on-screen counterpart of the
+    **Market lens** (`overlay_mode::market`; its per-rung specification is the lens-design
+    Brief under § Canvas). Selecting under the market lens should route to this ledger.
+  — **Balance Ledger.** The corporate money loop made legible: income vs. expenditure broken
+    down (sales, input purchases, maintenance, wages) and the running balance over recent ticks.
+  — **Construction Ledger.** The build/asset view (per the **Construction** terminology and
+    the Layer-4 building-construction Brief under § Infrastructure): the player's buildings
+    with workforce / recipe / target, output and idle/active state, and — once construction
+    exists — what is being built and its cost/progress.
+  — **Player-focused, with a corp selector.** Every ledger **defaults to the player
+    corporation** (`w.player_entity`) and offers a selector to view another corporation's
+    figures. **Cross-corporation comparison (side-by-side) is left open** — note it as a
+    later option, not in this Brief.
+  Builds on the shared presentation / format / icon helpers and the per-entity content
+  builders (overlaps the Selection element and hover-card Briefs — share the builders). Files:
+  `src/ui/economy_panel.{hpp,cpp}` + new ledger files; nav-pane slots. Reads the world pool
+  map, `market_component`, `corporation_component`, and the economy report. See
+  `docs/ui/LENSES.md`, `docs/ui/LAYOUT.md`, and `docs/SYSTEMS.md` (§ Trade / § Budget).
 
 ### Selection info element
 
@@ -307,11 +361,18 @@ shared per-entity content builders in `entity_summary.{hpp,cpp}`):
     itself. So the **Selection info element is driven by the hovered entity,
     evaluated against the current lens** — the same hover position can resolve to a
     different entity per lens.
+  — **Resolution names the ledger the selection drives.** The lens that resolves the
+    hovered entity also chooses which ledger the selection routes to — tying this Brief to
+    the **Market lens & ledger family** Brief under § Ledger. E.g. the **Market lens**
+    resolves to a market / listing and routes to the **Market Ledger**; the **Corporation
+    lens** to a corporation and the **Balance Ledger**; a building (construction view) to the
+    **Construction Ledger**; terrain (no lens) to the tile in the Tile Ledger. The 'go to'
+    routing for non-spatial kinds (above) is the same dispatch seam.
   This couples the Selection element (Focus state in `docs/ui/SELECTION.md`) to the
-  lens system (`docs/ui/LENSES.md`); both docs need the resolution rule written
-  before code. Design authority once written: `SELECTION.md` (hover/Focus resolution)
-  and `LENSES.md` (per-lens validity). Overlaps the hover-card Brief and the canvas
-  hit-testing Brief above (the marker stack it hit-tests is the same stack this
+  lens system (`docs/ui/LENSES.md`) and the ledger family; the docs need the resolution
+  rule written before code. Design authority once written: `SELECTION.md` (hover/Focus
+  resolution) and `LENSES.md` (per-lens validity). Overlaps the hover-card Brief and the
+  canvas hit-testing Brief above (the marker stack it hit-tests is the same stack this
   resolves through).
 
 ## Trade
@@ -405,6 +466,18 @@ Design authority: `docs/generation/CORPORATION_GENERATION.md`.
   seed a plausible opening balance and stockpiles. Touches
   `src/world/corporation_generation.cpp` (Pass 4 financial profile) and reuses the Resources
   economy step. Depends on the Layer 3 economy briefs landing first.
+
+- **[2] Pre-game economy ticks as the final generation step.** Run **two economy ticks
+  immediately at world setup, bypassing the simulation clock**, as the last
+  procedural-generation step — so the player opens onto a world with non-empty stockpile
+  pools, moved balances, and populated market supply/demand rather than a cold start.
+  Concretely: after generation completes and the registry is loaded, call the economy
+  pipeline (`run_economy_step` → `clear_markets` → `apply_budget`) twice before the main
+  loop begins, so the first on-screen frame already shows live figures. Lever: the
+  `app::setup_world` / `load_economy` ordering in `src/core/app.cpp` (or a `hard_coded_world`
+  post-pass), reusing the Layer 3 economy step. A lighter, concrete cousin of the deferred
+  **Model pre-game profit** Brief above (which simulates a longer operating history); this
+  one just primes a couple of ticks.
 
 - **[6] Deferred — corporation selection screen & behaviour.** Per
   CORPORATION_GENERATION.md § Open items: the analytical corp-selection/re-roll
