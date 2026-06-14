@@ -33,6 +33,8 @@ ImGui draw lists are the only rendering mechanism introduced. No third-party can
 ### Layer 3 — Extraction and production
 An extraction building reads a tile's resource deposit and adds to a stockpile each simulation step. A processing building consumes one resource type and outputs another. Workforce allocation as a scalar modifier on output rate. First observable output: stockpile numbers changing over time.
 
+The full resource list, building types, and recipes are specified in **`docs/economy/RESOURCES.md`** and **`docs/economy/PRODUCTION.md`**. Implement the **seven-resource prototype subset** described there: four raw materials (iron ore, petroleum, water, agricultural produce), three refined goods (steel, refined fuel, food rations), and four extraction buildings (Mine, Oil Platform, Farm, Ice Extractor) plus three processing buildings (Smelter, Refinery, Food Processor). Define all 23 resource type enum values and all building type enum values from the start so no data-model retrofitting is required when the remainder are authored.
+
 ### Layer 4 — Market and price resolution
 Each market holds supply and demand quantities per good. At each economy tick, price resolves from the supply/demand ratio modulated by global rarity. Extraction output feeds supply into the local market. First closed loop: tiles produce → extraction harvests → market price responds.
 
