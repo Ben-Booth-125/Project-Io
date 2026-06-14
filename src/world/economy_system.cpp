@@ -1,0 +1,211 @@
+#include "economy_system.hpp"
+
+#include <algorithm>
+#include <limits>
+#include <unordered_set>
+
+namespace {
+
+/// Body that a building sits on (via its tile). null_entity if the tile is gone.
+entity_id building_body(const world& w, const building_component& b)
+{
+    const auto it = w.tiles.find(b.tile);
+    return (it != w.tiles.end()) ? it->second.body : null_entity;
+}
+
+/// Extraction: credit the (corp, body) pool with the target resource. Output is
+/// base_rate × deposit richness × workforce × (1 − hazard). No depletion.
+building_report run_extraction(world& w, const recipe_registry& reg,
+                               entity_id corp, entity_id building_id,
+                               const building_component& b)
+{
+    building_report rep;
+    rep.building        = building_id;
+    rep.corp            = corp;
+    rep.type            = b.type;
+    rep.target_resource = b.target_resource;
+
+    const entity_id body = building_body(w, b);
+    rep.body = body;
+
+    const auto tile_it = w.tiles.find(b.tile);
+    if (body == null_entity || tile_it == w.tiles.end())
+    {
+        rep.idle = true;
+        return rep;
+    }
+
+    const tile_component& tc = tile_it->second;
+    const float richness = tc.resource_deposit[static_cast<std::size_t>(b.target_resource)];
+    const float base_rate = reg.economics(building_type::extraction_site).base_rate;
+
+    const float output = base_rate * richness * b.workforce_assigned * (1.0f - tc.hazard_level);
+
+    if (output > 0.0f)
+    {
+        w.pool_for(corp, body).quantities[static_cast<std::size_t>(b.target_resource)] += output;
+        rep.active          = true;
+        rep.output_quantity = output;
+    }
+    else
+    {
+        rep.idle = true;
+    }
+    return rep;
+}
+
+/// Processing: run the recipe pool-first under the two-threshold model, recording
+/// the auto-bought shortfall into `purchases`.
+building_report run_processing(world& w, const recipe_registry& reg,
+                               entity_id corp, entity_id building_id,
+                               const building_component& b,
+                               bool body_has_market,
+                               economy_report& out)
+{
+    building_report rep;
+    rep.building = building_id;
+    rep.corp     = corp;
+    rep.type     = b.type;
+    rep.recipe   = b.recipe;
+
+    const entity_id body = building_body(w, b);
+    rep.body = body;
+
+    const recipe* rcp = reg.get_recipe(b.recipe);
+    const float batches_full =
+        reg.economics(building_type::processing_facility).base_rate * b.workforce_assigned;
+
+    if (body == null_entity || rcp == nullptr || batches_full <= 0.0f)
+    {
+        rep.idle = true; // misconfigured, unstaffed, or detached
+        return rep;
+    }
+
+    stockpile_component& pool = w.pool_for(corp, body);
+
+    // Pool coverage of a full run = the scarcest input's pool fraction.
+    float coverage = std::numeric_limits<float>::infinity();
+    bool  has_input = false;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        const float in = rcp->inputs[r];
+        if (in <= 0.0f)
+            continue;
+        has_input = true;
+        const float need = in * batches_full;
+        const float cov  = (need > 0.0f) ? pool.quantities[r] / need : std::numeric_limits<float>::infinity();
+        if (cov < coverage)
+        {
+            coverage              = cov;
+            rep.limiting_input    = static_cast<resource_type>(r);
+            rep.has_limiting      = true;
+        }
+    }
+    if (!has_input)
+        coverage = 1.0f; // degenerate no-input recipe runs full
+
+    // Run fraction. With a market on the body the building runs a full batch,
+    // drawing inputs pool-first and auto-buying any shortfall (the Layer 3 path).
+    // Without a market it falls back to the two-threshold partial run from its
+    // own pool: full at/above t_full, scaled between t_idle and t_full, idle below.
+    float run = 0.0f;
+    if (body_has_market)
+    {
+        run = 1.0f;
+    }
+    else if (coverage >= reg.t_full())
+    {
+        run = 1.0f;
+    }
+    else if (coverage >= reg.t_idle())
+    {
+        run = coverage; // scale output to the limiting input
+    }
+    else
+    {
+        rep.idle = true; // too little to bootstrap and nowhere to buy
+        return rep;
+    }
+
+    const float batches = batches_full * run;
+
+    // Consume inputs pool-first; the remainder (only possible with a market) is
+    // auto-bought and recorded as this tick's purchases / market demand.
+    auto& bought = out.purchases[std::make_pair(corp, body)];
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        const float in = rcp->inputs[r];
+        if (in <= 0.0f)
+            continue;
+        const float need      = in * batches;
+        const float from_pool = std::min(pool.quantities[r], need);
+        pool.quantities[r] -= from_pool;
+        bought[r]          += (need - from_pool); // 0 when the pool covered it
+    }
+
+    float produced = 0.0f;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        const float outq = rcp->outputs[r] * batches;
+        if (outq <= 0.0f)
+            continue;
+        pool.quantities[r] += outq;
+        produced           += outq;
+    }
+
+    rep.active          = true;
+    rep.output_quantity = produced;
+    return rep;
+}
+
+} // namespace
+
+economy_report run_economy_step(world& w, const recipe_registry& reg)
+{
+    economy_report report;
+
+    // Bodies that host a market — a processor on one auto-buys input shortfalls
+    // rather than idling for want of pool stock (see run_processing).
+    std::unordered_set<entity_id> bodies_with_market;
+    bodies_with_market.reserve(w.markets.size());
+    for (const auto& [mid, mc] : w.markets)
+        bodies_with_market.insert(mc.body);
+
+    // Visit corporations in ascending id order for deterministic output.
+    std::vector<entity_id> corp_ids;
+    corp_ids.reserve(w.corporations.size());
+    for (const auto& kv : w.corporations)
+        corp_ids.push_back(kv.first);
+    std::sort(corp_ids.begin(), corp_ids.end());
+
+    for (const entity_id corp : corp_ids)
+    {
+        const corporation_component& cc = w.corporations.at(corp);
+        for (const entity_id building_id : cc.assets)
+        {
+            const auto bit = w.buildings.find(building_id);
+            if (bit == w.buildings.end())
+                continue;
+            const building_component& b = bit->second;
+
+            switch (b.type)
+            {
+                case building_type::extraction_site:
+                    report.buildings.push_back(run_extraction(w, reg, corp, building_id, b));
+                    break;
+                case building_type::processing_facility:
+                {
+                    const entity_id body = building_body(w, b);
+                    const bool has_market = bodies_with_market.count(body) != 0;
+                    report.buildings.push_back(
+                        run_processing(w, reg, corp, building_id, b, has_market, report));
+                    break;
+                }
+                default:
+                    break; // ports and none take no production action in L3
+            }
+        }
+    }
+
+    return report;
+}
