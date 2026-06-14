@@ -1,14 +1,15 @@
 # Project Io — TODO
 
 Parked thoughts and **described additions** — recorded but not yet actioned, and
-not yet committed designs. Each item **describes the problem or the intended
-resolution** — a change to make, a feature to build, or a doc to write — with
-enough context and file pointers to pick it up later. Items are deliberately
-deferred while higher-priority work takes precedence.
+not yet committed designs. Each **Brief** (the unit of described intent; see
+`../GLOSSARY.md`) **describes the problem or the intended resolution** — a change
+to make, a feature to build, or a doc to write — with enough context and file
+pointers to pick it up later. Briefs are deliberately deferred while
+higher-priority work takes precedence.
 
-An item does **not** carry implementation detail: how to break the work into
+A Brief does **not** carry implementation detail: how to break the work into
 steps, scope it to files, or order/parallelise it is all deferred to TASKS
-promotion (see below). A TODO entry need only carry enough — the problem, the
+promotion (see below). A Brief need only carry enough — the problem, the
 intended outcome, and rough file pointers — to *inform* that later planning.
 
 ## TODO vs. TASKS
@@ -17,9 +18,9 @@ This file (TODO.md) holds **described intent**. [`TASKS.md`](TASKS.md) holds the
 **active, prioritised, actionable worklist** — the concrete, file-scoped,
 dependency-marked A–F breakdown we execute against.
 
-The workflow is one-directional. When we decide to act on a TODO item, we
+The workflow is one-directional. When we decide to act on a Brief, we
 **promote** it into TASKS.md by breaking it into ordered, individually-scopable
-tasks. Promotion is where we do the planning a TODO entry deliberately omits:
+tasks. Promotion is where we do the planning a Brief deliberately omits:
 
 - **Decompose** the intent into the smallest independently-buildable steps
   (foundation first, then dependants).
@@ -29,68 +30,89 @@ tasks. Promotion is where we do the planning a TODO entry deliberately omits:
   files), and which must wait. Steps that edit the same files stay sequential.
 
 TODO.md is **entirely forward-facing**: it holds only intent not yet realised. When
-work lands, its item is **removed** here (the record of what was built lives in the
+work lands, its Brief is **removed** here (the record of what was built lives in the
 DEVLOG, not in TODO) — leaving behind only any genuinely open follow-up as its own
-forward item. TASKS.md is the transient execution list, cleared as tasks complete.
+forward Brief. TASKS.md is the transient execution list, cleared as tasks complete.
 See [`TASKS.md`](TASKS.md) for the task format.
+
+### Depth verbs — how far to take a Brief
+
+These verbs name *how far* an instruction should carry a Brief, so a request signals
+its own effort and nothing ambiguous is read as low-effort. Prefer them over vague
+phrasing ("look at", "do", "sort out") when the depth matters:
+
+- **Promote** — **planning depth only.** Break the Brief into TASKS.md tasks and write
+  its REQUIREMENTS.md table, then **stop**. No code is written. Use when the plan
+  should be reviewed before execution.
+- **Implement (don't commit)** — **code depth.** Promote, then write and build the
+  code, but hold the commit. The result is a *code-complete* group (built, not yet
+  fully verified or committed; see TASKS.md § Definition of "complete").
+- **Publish** — **full depth.** The entire lifecycle below, carried through to a
+  committed, verified change. Unless paired with "promote only", **publish always
+  means take it all the way to committed code** — promote, complete (implement +
+  review + verify), and commit.
+
+When a verb is not given, assume **publish** (full depth) for a single named Brief and
+ask if the scope is large; the depth verb is how you override that.
 
 ### Publish
 
-**Publish** is the full lifecycle for acting on a TODO item:
+**Publish** is the full lifecycle for acting on a Brief:
 
-1. **Create tasks** — promote the TODO item into TASKS.md: decompose into ordered,
+1. **Create tasks** — promote the Brief into TASKS.md: decompose into ordered,
    file-scoped, dependency-marked tasks (see TASKS.md § Task format).
 2. **Create requirements** — write or link requirements in
    [`req/REQUIREMENTS.md`](req/REQUIREMENTS.md) for each task group, following the
    requirements policy there.
-3. **Verify simultaneous task evaluation** — confirm which tasks are parallel-safe
-   (disjoint file scopes) and which must stay sequential. Resolve any scope collision
-   before execution begins.
+3. **Check parallel-safety** — build the collision map and resolve any scope collision
+   before execution. Tasks with **disjoint file scopes are parallel-safe — fan them out
+   to concurrent sub-agents**; only same-file (colliding) tasks stay sequential. This
+   step exists to *enable* sub-agent concurrency wherever the file schema is safe.
 4. **Complete tasks** — implement, review, and verify each task against its
    requirements (TASKS.md § Definition of "complete"). Tasks may be **cancelled**
    mid-session if they prove out of scope, blocked, or superseded; note the
    cancellation reason alongside the task entry.
 5. **Commit** — once all tasks are complete or cancelled, create a single commit
-   for the TODO item using the format below.
+   for the Brief using the format below.
 
-#### Publishing multiple items together (barrier semantics)
+#### Publishing multiple Briefs together (barrier semantics)
 
-When more than one TODO item is published in the same work block, the five steps
-above run as **barriers across the entire set**, not item-by-item. Every item in
-the set must clear step *N* before **any** item begins step *N+1*:
+When more than one Brief is published in the same work block, the five steps
+above run as **barriers across the entire set**, not Brief-by-Brief. Every Brief in
+the set must clear step *N* before **any** Brief begins step *N+1*:
 
-1. **Create tasks** for *all* items — every item is promoted into TASKS.md before
+1. **Create tasks** for *all* Briefs — every Brief is promoted into TASKS.md before
    any requirements are written.
-2. **Create requirements** for *all* items.
-3. **Verify simultaneous task evaluation** across the *combined* task set — the
-   collision map and parallel-safety analysis span every item's tasks at once, so
-   cross-item file collisions (e.g. two items both touching `selection_panel.cpp`)
-   are resolved before execution.
+2. **Create requirements** for *all* Briefs.
+3. **Check parallel-safety** across the *combined* task set — the collision map spans
+   every Brief's tasks at once, so cross-Brief file collisions (e.g. two Briefs both
+   touching `selection_panel.cpp`) are resolved before execution. Disjoint tasks
+   across the whole set are fanned out to concurrent sub-agents.
 4. **Complete tasks** — this barrier is the load-bearing one: **all** tasks across
-   **all** items must reach a terminal state (complete or cancelled) before the set
-   advances. No item is committed while another item still has a task in flight.
+   **all** Briefs must reach a terminal state (complete or cancelled) before the set
+   advances. No Brief is committed while another Brief still has a task in flight.
    A blocked or out-of-scope task is *cancelled* (per TASKS.md § Cancelling a task
    group), not left pending — the barrier closes on terminal states, not on success.
-5. **Commit** — still **one commit per TODO item** (the per-item format below), but
+5. **Commit** — still **one commit per Brief** (the per-Brief format below), but
    none of these commits is created until the step-4 barrier has closed for the
-   whole set. The commits are then made back-to-back, one per item.
+   whole set. The commits are then made back-to-back, one per Brief.
 
 The rule, stated once: *publish the set breadth-first, not depth-first.* Do not
-drive a single item end-to-end and then start the next; advance the whole set
+drive a single Brief end-to-end and then start the next; advance the whole set
 through each step together. This keeps the requirement set, the collision map, and
-the "everything builds together" guarantee coherent across the items that shipped
+the "everything builds together" guarantee coherent across the Briefs that shipped
 in one block.
 
-#### Commit format for a published TODO item
+#### Commit format for a published Brief
 
 ```
-<TODO item title>
+<Brief title>
 
 Tasks: <N completed>, <N cancelled>
 Requirements: <N completed>, <N pending>, <N failed>
 ```
 
-- The **title** is the TODO item's own title (the bold heading text, without
+- The **title** is the Brief's own title (the bold heading text, without
   difficulty prefix).
 - The **Tasks line** counts completed and cancelled tasks from the TASKS.md group;
   omit the cancelled count if zero.
@@ -107,14 +129,14 @@ prototype scope, to revisit later (its true effort is unestimated).
 
 ## Categories
 
-Every item below sits under exactly one category. The allowed categories are the
+Every Brief below sits under exactly one category. The allowed categories are the
 **UI** categories — **Canvas**, **Menu**, **Ledger**, **Documentation**,
 **Known Bug** — and the **game-system** categories mirroring `docs/SYSTEMS.md`:
 **Trade**, **Conflict**, **Budget**, **Resources**, **Supply**,
 **Infrastructure**, **Workforce**, **Exploration**, **Environment**, **Research**,
-**Policy**, **Diplomacy**. File each new item under its category heading, creating
-the heading if it is the first item for that category. Only categories that
-currently hold items appear as sections below.
+**Policy**, **Diplomacy**. File each new Brief under its category heading, creating
+the heading if it is the first Brief for that category. Only categories that
+currently hold Briefs appear as sections below.
 
 ---
 
@@ -195,10 +217,21 @@ currently hold items appear as sections below.
   (the `r` half-extent) and colour sources are consistent within a context, that no two
   glyphs collide in a shared surface, and that the catalogue in ICONS.md matches the actual
   call sites. Produce a short findings list and fix the cheap discrepancies; promote anything
-  larger to its own item. Call sites today: `body_surface_canvas.cpp` (building markers),
+  larger to its own Brief. Call sites today: `body_surface_canvas.cpp` (building markers),
   `overlay.cpp` (lens buttons), `nav_pane.cpp` (ledger/placeholder), `entity_summary.cpp` /
   `tile_inspector.cpp` (resource swatches). Touches whichever call sites drift; reference
   `docs/ui/ICONS.md`.
+
+- **[2] Reference distances for bodies are rung-relative.** A body's displayed
+  distance should be measured from the **reference point of the current rung**, not
+  always from the star. On the Solar rung the reference is the star (0 AU at the
+  centre, as today); on the **Circumplanetary** rung the reference is the **parent
+  body — 0 AU at the parent** — so a moon (or any local body) reads as its distance
+  *from its parent*, which is the meaningful figure when that view is framed on the
+  parent. Define the per-rung reference and apply it wherever a body distance is
+  surfaced (the body stat block — `draw_body_summary` in `entity_summary.cpp` — and
+  any on-canvas distance label). See `docs/ui/CIRCUMPLANETARY.md` and
+  `docs/ui/SOLAR.md`.
 
 - **[6] Informative tooltip / hover-card system.** Deferred. The single most important
   player-communication surface for a grand strategy game. Today there is one
@@ -240,6 +273,19 @@ currently hold items appear as sections below.
   `src/ui/tile_inspector.cpp` (read `ui_state.active_body` /
   `circumplanetary_anchor`).
 
+- **[3] Layer 3 economy observability panel.** The debugging/observation surface that
+  makes the Layer 3 economy legible — the panel INITIAL_INSTRUCTIONS requires alongside
+  the layer. Surfaces, per the 2026-06-14 Layer 3 design Q&A: each **(corporation, body)
+  pool**'s per-resource quantities; each building's **current output rate** and
+  **idle/active** state (and, for processors, the limiting input under the two-threshold
+  run model); the body **market** supply/demand figures; and the **corporation balance**
+  (with negative flagged red). Read-only — workforce and recipe are authored, not edited
+  here (see the Workforce and Production briefs). Builds on the shared presentation
+  metadata / formatters / icons (`src/ui/presentation.hpp`, `format.hpp`, `icons.hpp`).
+  Files: a new `src/ui/economy_panel.{hpp,cpp}` (or extend an existing ledger); reads the
+  world pool map, `market_component`, and `corporation_component`. Depends on the data-model
+  foundation, production, market-clearing, and budget briefs (Resources / Trade / Budget).
+
 ### Selection info element
 
 Follow-up intent for the Selection info element (design in `docs/ui/SELECTION.md`;
@@ -259,6 +305,134 @@ shared per-entity content builders in `entity_summary.{hpp,cpp}`):
   being drawn as selectable canvas markers first. *(Promoted then cancelled
   2026-06-14 — blocked on that marker-drawing prerequisite.)*
 
+- **[6] Lens-driven selection resolution.** Deferred — **needs documentation before
+  it is actionable.** Upgrade selection so the entity under the pointer is resolved
+  *through the active lens* rather than by a fixed kind order. Two concepts must be
+  defined first:
+  — **"Lowest valid entity" under hover.** At a given pointer position several
+    entities overlap (a building *on* a tile *on* a body). Hover should resolve to
+    the **lowest (most specific) valid** entity in that stack. "Lowest" and "valid"
+    both need a precise definition — the stack order of kinds, and what makes an
+    entity a valid hover/selection target at all.
+  — **Lens evaluates validity.** The active lens (`overlay_mode`) changes *what is
+    valid*: e.g. under the Corporation lens the meaningful target may be the owning
+    corporation, under Resource the tile's deposit, under terrain (no lens) the tile
+    itself. So the **Selection info element is driven by the hovered entity,
+    evaluated against the current lens** — the same hover position can resolve to a
+    different entity per lens.
+  This couples the Selection element (Focus state in `docs/ui/SELECTION.md`) to the
+  lens system (`docs/ui/LENSES.md`); both docs need the resolution rule written
+  before code. Design authority once written: `SELECTION.md` (hover/Focus resolution)
+  and `LENSES.md` (per-lens validity). Overlaps the hover-card Brief and the canvas
+  hit-testing Brief above (the marker stack it hit-tests is the same stack this
+  resolves through).
+
+## Resources
+
+The extraction → processing economy (the **Layer 3** core). Direction settled in the
+2026-06-14 Layer 3 design Q&A (recorded in DEVLOG); design authority
+`docs/economy/{PRODUCTION,RESOURCES}.md`. Output accrues **at the economy-tick boundary**
+(not per simulation step) and resolves alongside the market in the same tick.
+
+- **[3] Layer 3 economic data-model foundation.** The shared field/storage additions every
+  other Layer 3 brief reads or writes — a hotspot, kept in the main session. Settled:
+  — `building_component` gains an extraction **`target_resource`** (`resource_type`) and a
+    processing **`recipe`** id (index into the recipe registry), both authored at placement.
+    `building_type` stays generic (`extraction_site` / `processing_facility`); *what a
+    building does is the field, not the type.*
+  — **Two-value deposit model.** Keep `tile_component.resource_deposit[r]` as the fixed
+    **richness** (the rate multiplier in the extraction formula) and add a reserved
+    **`remaining`** reserve per deposit, *unused in L3*, so the deferred depletion model
+    needs no retrofit. Richness sets rate; remaining will deplete.
+  — **(corporation, body) stockpile pool.** Store the shared pool as a **world-level map**
+    keyed by (corp, body) → `stockpile_component` (the `tile_to_nation` pattern), not on
+    `building_component` or the body. The per-building `stockpile_component` is unused in L3.
+  — `corporation_component` gains a running **`balance`** (opening = `starting_capital`),
+    moved by the money loop; may go negative.
+  Files: `src/world/components.hpp`, `src/world/world.hpp` (pool map + accessors). Foundation
+  for every Resources / Trade / Budget brief below. See `docs/economy/PRODUCTION.md`,
+  `docs/economy/TILES.md`.
+
+- **[3] Recipe & economy-constants registry (Lua).** A `scripts/` Lua data layer, loaded at
+  startup into a C++ registry via the embedded sol2 (protected calls only), authoring:
+  (a) processing **recipes** — `{ inputs: resource→qty, outputs: resource→qty }`,
+  multi-input / multi-output with **reagent** support (coal in the steel recipe is just an
+  input); referenced by the `recipe` id on `building_component`, fixed at construction;
+  (b) per-building-type **economic constants** — maintenance, wage rate, build cost. Magnitudes
+  are legible round defaults, iterated by playtest (not derived). Files: new `scripts/recipes.lua`
+  (+ economy constants, or a sibling `scripts/economy.lua`), new
+  `src/world/recipe_registry.{hpp,cpp}`. See PRODUCTION.md § Recipes and RESOURCES.md.
+
+- **[4] Production simulation: extraction + processing + workforce.** The per-economy-tick
+  body step (one file → one sequential group). Settled:
+  — **Extraction.** Each extraction building credits its corp-body pool with its
+    `target_resource`: `output = base_rate × deposit_richness × workforce_assigned ×
+    (1 − hazard_level)` (linear, per PRODUCTION.md). Deposits do **not** deplete (the reserved
+    `remaining` field is untouched — see the depletion brief under Environment).
+  — **Processing.** Each processing building runs its `recipe`, consuming inputs **pool-first**
+    with a **two-threshold partial-run** model: if the limiting input covers ≥ `T_full` of one
+    conversion, run full; between `T_idle` and `T_full`, scale output to the limiting input;
+    below `T_idle`, idle. Outputs accrue to the pool; any input shortfall is auto-bought from
+    the market (see Trade § market clearing). `T_full` / `T_idle` are tunable, left open.
+  — **Workforce** applies as a single linear scalar at both stages (see Workforce brief).
+  Files: new `src/world/economy_system.{hpp,cpp}` (the per-body economy step). Depends on the
+  data-model foundation and the recipe registry.
+
+## Trade
+
+The market layer. Per the 2026-06-14 Q&A, **market resolution collapses into Layer 3** but
+**price resolution and inter-body trade stay open**. Markets are a per-body exchange,
+**distinct from corp stockpile pools**. Design authority `docs/SYSTEMS.md` § Trade,
+`docs/economy/RESOURCES.md`.
+
+- **[3] Per-body market clearing at the economy tick.** At each economy tick, on each body's
+  `market_component`: **supply** = goods each corp **lists for sale** (surplus above its own
+  processors' needs this tick); **demand** = processor input **shortfalls auto-bought** from
+  the market. Transactions clear at **`base_price`** (price resolution is deferred — see below;
+  `market.price` stays seeded at `base_price`). Emits the buy/sell cash-flow events the Budget
+  brief consumes — keep the *figures + transactions* here and the *balance arithmetic* in
+  Budget. Includes a **framework hook for player-driven sell orders** (manual sell; full UI in
+  the new Layer 4). Files: new `src/world/market_clearing.{hpp,cpp}`; reads the pool map, writes
+  `market_component.supply` / `demand`. Depends on the data-model foundation and production briefs.
+
+- **[3] Price resolution from local supply/demand (deferred).** Was the old Layer 4. Resolve
+  `market_component.price` from the supply/demand ratio modulated by rarity/`base_price`, at the
+  economy tick. Until this lands, price stays at `base_price` and all transactions clear there.
+  Touches `market_clearing.cpp` / a new price pass; see RESOURCES.md (base price from rarity).
+
+- **[3] Player-driven sell orders & preferential purchasing (deferred).** Build out the manual
+  side of the market the framework hook stubs: player-authored sell orders (what / how much /
+  floor price) and **preferential purchasing** (choosing counterparties rather than the flat
+  auto-buy). Surfaced in the new Layer 4 production UI. Depends on market clearing.
+
+- **[6] Inter-body / international markets (deferred).** Cross-body price linkage and trade
+  between bodies — each body's market currently resolves in isolation. Out of Layer 3 scope;
+  couples to Supply (Layer 5 logistics / logistical cost) once convoys exist.
+
+## Budget
+
+The corporate money loop (`docs/SYSTEMS.md` § Budget — "the primary pressure point").
+
+- **[3] Corporate balance & operating costs (the money loop).** Apply the market clearing
+  brief's cash-flow events to each `corporation_component.balance`, plus costs, at the economy
+  tick. Settled: **income** = goods sold × `base_price`; **expenditure** = input purchases ×
+  `base_price` **+ per-building maintenance** (flat, authored) **+ wages** (`wage =
+  workforce_assigned × base_wage`, `base_wage` a sensible tunable constant, refined later with
+  population). Balance opens at `starting_capital`, **may go negative** (allowed, flagged red in
+  the panel — no insolvency consequence; bankruptcy rules are a separate open item). Files: new
+  `src/world/budget_system.{hpp,cpp}` (or fold into the tick step); reads market transactions +
+  building/economy constants, writes `balance`. Depends on market clearing + the constants registry.
+
+## Workforce
+
+The labour scalar (`docs/SYSTEMS.md` § Workforce, `docs/economy/POPULATION.md`).
+
+- **[6] Workforce pool & population coupling (deferred).** The real model: a corporation-wide
+  (or per-body) labour **pool** with proportional contention when building demands exceed supply,
+  replacing the authored constant. **Gated on population-centre implementation** (POPULATION.md) —
+  workforce supply and wages should derive from population. In Layer 3, `workforce_assigned` is an
+  authored constant 0–1, read-only, applied as a linear scalar; this brief is the upgrade path.
+
 ## Infrastructure
 
 - **[3] Verify building placement rules per building type.** Confirm that buildings are only
@@ -275,10 +449,28 @@ shared per-entity content builders in `entity_summary.{hpp,cpp}`):
   This also seeds the (future) player build-validation rule. See `docs/economy/PRODUCTION.md`
   and `src/world/components.hpp` (`building_type`, `tile_component`).
 
+- **[6] Building construction & management — the new Layer 4.** Per the 2026-06-14 Q&A,
+  **Layer 4 is redefined** from market/price work into a production-focused **UI overhaul**:
+  player **construction** (placement, build-cost spend, terrain/deposit validation reusing the
+  placement-rules brief above), **building management** (workforce, recipe switching — the field
+  already supports it — and the sell-order UI), and **market ledgers**. Layer 3 itself operates
+  only the authored starting assets (no construction); this brief is that next layer. Build cost
+  comes from the Lua economy-constants registry (Resources). Spans Infrastructure (construction
+  logic) + Canvas/Menu (UI); see `docs/economy/PRODUCTION.md` § Infrastructure and the build
+  sequence in `docs/development/INITIAL_INSTRUCTIONS.md` (to be rewritten — see Documentation).
+
 ## Environment
 
 The world-generation layer — terrain, nations, corporations. Design authority:
 `docs/generation/{TILE,NATION,CORPORATION}_GENERATION.md`.
+
+- **[4] Deposit depletion model (deferred).** Make tile deposits finite: extraction draws down
+  the reserved **`remaining`** reserve added by the Layer 3 data-model foundation (Resources),
+  leaving **richness** as the rate multiplier. Needs an exhaustion/idle rule (a building on a
+  spent deposit idles) and a decision on refill / discovery / survey interaction (Exploration).
+  The reserved field exists precisely so this lands without a data-model retrofit. Touches the
+  extraction path in `economy_system.cpp` and `tile_component`. See PRODUCTION.md § Extraction
+  ("Deposits do not deplete in the prototype").
 
 ### Tile generation (terrain)
 
@@ -311,6 +503,15 @@ Design authority: `docs/generation/NATION_GENERATION.md`.
 ### Corporation generation
 
 Design authority: `docs/generation/CORPORATION_GENERATION.md`.
+
+- **[4] Model pre-game profit in corporation generation (deferred).** A corporation does not
+  appear from nothing — its starting `balance`/`starting_capital` and asset mix should reflect a
+  simulated **pre-game operating history** (extraction + processing + trade running for some
+  notional period) rather than flat authored values. Raised during the 2026-06-14 Layer 3 Q&A:
+  once the Layer 3 economy loop exists, the same loop can be run forward at generation time to
+  seed a plausible opening balance and stockpiles. Touches
+  `src/world/corporation_generation.cpp` (Pass 4 financial profile) and reuses the Resources
+  economy step. Depends on the Layer 3 economy briefs landing first.
 
 - **[6] Deferred — corporation selection screen & behaviour.** Per
   CORPORATION_GENERATION.md § Open items: the analytical corp-selection/re-roll

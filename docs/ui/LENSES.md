@@ -18,7 +18,7 @@ Glyph shapes live in [ICONS.md](ICONS.md); identity colours live in
 > implementation; the Corporation section is fully settled. The other four
 > sections are **stubs** — they record the current behaviour and the intended
 > direction, but the full per-lens specification (legend format, multi-rung
-> representations) is promoted from the lens-design TODO item separately.
+> representations) is promoted from the lens-design Brief separately.
 
 ---
 

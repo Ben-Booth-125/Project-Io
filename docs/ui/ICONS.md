@@ -110,7 +110,7 @@ lenses use `palette::neutral`. The lens **name** is supplied as a hover tooltip 
 ## Open clarifications
 
 Things the current set leaves ambiguous — resolve these as the icon vocabulary is
-firmed up (several feed the **lens-design** TODO item):
+firmed up (several feed the **lens-design** Brief):
 
 1. **Diamond is overloaded.** Both the *extraction-site* building marker and the
    *resource pip* render as a filled diamond, distinguished only by colour

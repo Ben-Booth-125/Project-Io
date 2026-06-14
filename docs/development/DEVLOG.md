@@ -6,6 +6,72 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## 2026-06-14 — "Brief" terminology + Layer 3 design Q&A and brief authoring
+
+**Status:** Complete (documentation only). No code changes. Working-tree doc edits;
+not yet committed.
+
+### Terminology — "Brief"
+
+Coined **Brief** as the glossary term for the unit of *described intent* in TODO.md
+(formerly the bulky "TODO item"). A Brief is the design-level view of one piece of work;
+promoting it into TASKS.md decomposes it into a **task group** (one Brief ↔ one group of
+tasks), distinct from a single **task**. Chosen from a four-option shortlist (Brief vs.
+Blueprint / Initiative / Epic). Refactored the term across the live process docs —
+`GLOSSARY.md` (new entry), `CLAUDE.md`, `TODO.md`, `TASKS.md`, `req/REQUIREMENTS.md`,
+plus two live cross-refs in `LENSES.md` / `ICONS.md`. Historical DEVLOG entries and the
+REQUIREMENTS archive were left verbatim as permanent records.
+
+### Layer 3 design Q&A — decisions
+
+A long question/answer pass settled the direction for the remaining Layer 3 core
+directives. The prerequisites (resources, tile generation, nations, corporations) are in
+place; the data model is generic (`building_type` is `extraction_site` / `processing_facility`
+/ `port`, with no per-building target/recipe), which shaped several answers.
+
+- **Extraction.** Explicit `target_resource` field on `building_component`; output
+  `= base_rate × deposit_richness × workforce × (1 − hazard)` (linear). Accrues **at the
+  economy tick**, not per simulation step. Deposits infinite in the prototype but a
+  **reserved `remaining`** field is added now (two-value deposit model: richness vs reserve).
+- **Processing.** Recipes authored in **Lua → C++ registry**; explicit `recipe` id field,
+  fixed at construction. Inputs drawn from a **shared (corp, body) stockpile pool**.
+  **Two-threshold partial-run** (full ≥ `T_full`; proportional between; idle < `T_idle`;
+  thresholds tunable/open). Recipe schema is multi-input / multi-output with reagents.
+- **Workforce.** Authored constant 0–1, read-only, linear scalar. The real **pool +
+  contention** model is deferred and **gated on population centres**.
+- **Stockpile.** One pool per **(corporation, body)**, stored as a **world-level map**
+  (the `tile_to_nation` pattern), off `building_component`. Panel shows pool totals +
+  per-building rates + market + balance.
+- **Market (re-scope).** Market resolution **collapses into Layer 3**: supply = surplus a
+  corp **lists for sale** (above own needs); demand = processor **shortfalls auto-bought**;
+  transactions clear at **`base_price`**. **Price resolution and inter-body markets stay
+  open** (Trade briefs). Markets are distinct from corp pools. A **player sell-order
+  framework hook** is included now.
+- **Budget.** Per-corp running **`balance`** opening at `starting_capital`; income from
+  sales, expenditure = input purchases + **maintenance** + **wages** (`workforce × base_wage`,
+  tunable); negative allowed and flagged. **Layer 4 is redefined** as the production UI
+  overhaul (construction, building management, market ledgers).
+
+### Briefs authored
+
+Filed the above into TODO.md as Briefs under their system categories — **Resources**
+(data-model foundation, Lua recipe/constants registry, production simulation), **Trade**
+(market clearing; deferred: price resolution, sell-orders/preferential purchasing,
+inter-body markets), **Budget** (the money loop), **Workforce** (deferred pool/population),
+**Ledger** (observability panel), **Infrastructure** (the new-Layer-4 construction/management
+UI), **Environment** (deposit depletion; corporation pre-game-profit modelling), and
+**Documentation** (rewrite the build sequence for the re-scope). Not yet promoted to TASKS.
+
+### Open items
+
+- Promote the active Layer 3 briefs (foundation → registry → production → market → budget →
+  panel) into TASKS.md and requirements when ready to build.
+- Threshold values (`T_full` / `T_idle`), base rates, `base_wage`, and the economy-tick
+  period (one quarter) are tunables to settle during implementation/playtest.
+- Full resource-enum expansion beyond the prototype subset remains a later pass.
+
+---
+
 ## 2026-06-14 — Publish block: Selection info element + Known Bug
 
 **Status:** Complete — 2/6 groups shipped (9/9 reqs met), 4/6 cancelled back to TODO.

@@ -34,7 +34,7 @@ a specific implementation choice was made.
 **`docs/development/TODO.md`** and **`docs/development/TASKS.md`**
 The two-file backlog. TODO.md holds *described intent* — parked additions and
 deferred ideas with file pointers. TASKS.md holds the *active, prioritised,
-actionable worklist*: a TODO item is **promoted** into file-scoped, dependency-
+actionable worklist*: a Brief is **promoted** into file-scoped, dependency-
 and parallelisation-marked tasks (the A–F style) when we decide to act on it.
 Read TODO.md § TODO vs. TASKS for the workflow before promoting or executing
 backlog work.
@@ -52,7 +52,7 @@ Surface-level description of the application shell — how the screen regions (n
 The icon vocabulary — every hand-drawn vector glyph in the `ui::icons` namespace (`src/ui/icons.{hpp,cpp}`, the source of truth): building markers, resource pips, unit markers, nav-rail affordances, and the map-lens glyphs. Catalogues each glyph's shape, meaning, usage, and colour source, the shared `(dl, centre, r, colour)` contract, and the recipe for adding one. Read before adding or changing any on-canvas/strip glyph; identity *colours* live in `presentation.hpp`, not here.
 
 **`docs/ui/LENSES.md`**
-The map-lens system — the overlay modes (`overlay_mode` in `src/ui/ui_state.hpp`) selectable from the canvas control strip. The **Corporation** lens is fully settled (tile ownership tint, player vs. rival colours, Planetary-only); the **Supply / Market / Faction** sections currently record existing behaviour and the proposed **Resource** lens is a stub — completing them is a TODO § Canvas item. Read before any work on overlay modes, lens rendering, or the lens icon vocabulary (which propagates to ICONS.md).
+The map-lens system — the overlay modes (`overlay_mode` in `src/ui/ui_state.hpp`) selectable from the canvas control strip. The **Corporation** lens is fully settled (tile ownership tint, player vs. rival colours, Planetary-only); the **Supply / Market / Faction** sections currently record existing behaviour and the proposed **Resource** lens is a stub — completing them is a Brief under TODO § Canvas. Read before any work on overlay modes, lens rendering, or the lens icon vocabulary (which propagates to ICONS.md).
 
 **`docs/economy/RESOURCES.md`**
 The canonical resource list: all 23 resources organised into three tiers (raw → refined → product), their terrain affinity and body availability, the Era 0 / Era 1 split, and the seven-resource prototype subset. Read before any work involving resource types, tile deposits, or market goods.
@@ -80,3 +80,79 @@ The procedural corporation generation strategy: nation assignment, industrial fo
 
 **`docs/generation/GENERATION_LEDGER.md`**
 The Generation Ledger (design only) — a tuning/analysis surface that explains *why* a tile generated as it did, reading the per-pass intermediates exposed by `generate_body_tiles`'s optional `generation_record`. Covers the per-tile derivation breadcrumb (height/ocean → band/moisture → composition → landform → deposits), per-body histograms, the regenerate-on-demand (don't-persist) data lifetime, and surfacing as a Ledger window plus a Planetary field-overlay lens. Read before building the generation ledger or any heightmap/moisture/band overlay.
+
+---
+
+## Publication pipeline
+
+The five-step **Publish** lifecycle for acting on a Brief. Full detail lives in
+`docs/development/TODO.md` § Publish and `docs/development/TASKS.md`. This is the
+condensed reference.
+
+### The five steps
+
+1. **Create tasks** — promote the Brief into TASKS.md: decompose into the smallest
+   independently-buildable steps (foundation first), scope each step to its exact files,
+   and mark dependencies and parallelisation.
+2. **Create requirements** — write or link requirements in `req/REQUIREMENTS.md` per the
+   requirements policy there.
+3. **Check parallel-safety** — build the collision map (which files each task touches) and
+   resolve any scope collisions before execution. Tasks with **disjoint file scopes are
+   parallel-safe**: fan them out to concurrent sub-agents. Only same-file (colliding) tasks
+   stay sequential.
+4. **Complete tasks** — implement, review, and verify each task against its requirements.
+   Tasks that prove blocked or out of scope are *cancelled* (intent returned to TODO, stubs
+   removed from TASKS.md) — not left in flight.
+5. **Commit** — one commit per Brief, format:
+   ```
+   <Brief title>
+
+   Tasks: <N completed>, <N cancelled>
+   Requirements: <N completed>, <N pending>, <N failed>
+   ```
+
+**When publishing multiple Briefs together**, run the five steps as **barriers across the
+whole set** (breadth-first, not depth-first): every Brief clears step *N* before any starts
+*N+1*. No Brief is committed while another still has a task in flight. Step 4 closes on
+*terminal* states (complete **or** cancelled) — a blocked task is cancelled rather than
+held open.
+
+### Parallelisation (the load-bearing rule)
+
+**Two tasks may run as concurrent sub-agents only if their file write-sets are disjoint.**
+Two agents writing the same file corrupt each other's edits.
+
+Practical consequences:
+
+- **Build the collision map first** — list every file each task will write. Hotspot files
+  (shared headers, `hard_coded_world.cpp`, the integration seam) are where parallelism dies;
+  see them before planning waves.
+- **Passes inside one generator stay sequential** — all passes of a generator share one
+  `.cpp`; give the whole group to one agent. Concurrency lives *across* groups, not within a
+  generator.
+- **Design for disjointness where it is also good design** — e.g. storing tile→nation
+  ownership in a `world` map rather than a `tile_component` field kept the nation and
+  tile-tuning groups off each other's files so they could run concurrently in v0.0.3.
+- **Keep hotspot files and integration in the main session** — the file every group
+  eventually touches is never given to a sub-agent. The main session wires hooks, runs the
+  build, and verifies after each wave. Sub-agents write code on a disjoint scope and report
+  their public signature; they do not build or commit.
+- **Group concurrent tasks into waves** — run a wave of disjoint-scope agents in parallel;
+  verify before starting the next wave. Assume nothing about an agent's self-reported
+  success — verify retroactively.
+
+### Skills
+
+Two skills exist and should be used proactively rather than reinventing their steps:
+
+- **`verifier-visual`** — runs the headless `ProjectIo --verify <script>` harness, inspects
+  PNG captures, and reports against requirements. Authorising a new visual check means adding
+  a `scripts/verify/<feature>.lua` and invoking this skill. Use for any `visual`-class
+  requirement.
+- **`scoped-commit`** — stages exactly the files belonging to the current task and commits
+  with the correct format, without bundling unrelated working-tree changes. Use whenever
+  committing, especially on the default branch or when the tree has pre-existing edits.
+
+When a task would benefit from a skill that does not yet exist, **propose it as a Brief**
+(category: Documentation or the relevant system category) rather than improvising a bespoke
+procedure. A skill becomes a permanent reusable asset; a one-off procedure is forgotten.
