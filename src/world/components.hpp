@@ -97,6 +97,11 @@ enum class building_type : uint8_t
     port                = 3,
 };
 
+/// Sentinel `building_component.recipe` value meaning "no processing recipe is
+/// assigned" — used by extraction sites and unconfigured processors. The recipe
+/// id is otherwise an index into the recipe registry (see recipe_registry.hpp).
+static constexpr uint16_t no_recipe = 0xFFFFu;
+
 // ---------------------------------------------------------------------------
 // Component structs
 // ---------------------------------------------------------------------------
@@ -113,7 +118,14 @@ struct tile_component
     int        grid_y;    ///< Row index within the body's tile grid.
     terrain_composition composition; ///< Material character (geology/ecology).
     terrain_landform    landform;    ///< Physical shape (elevation/slope).
-    std::array<float, resource_count> resource_deposit; ///< Available deposit per resource type.
+    std::array<float, resource_count> resource_deposit; ///< Fixed deposit **richness** per resource type (the extraction rate multiplier).
+
+    /// Reserved depletion reserve per resource type. **Unused in Layer 3** — the
+    /// prototype economy never draws this down (richness sets the rate; deposits
+    /// do not deplete). Carried so the deferred depletion model (TODO § Environment)
+    /// lands without a data-model retrofit. Indexed by resource_type, as above.
+    std::array<float, resource_count> resource_remaining = {};
+
     float      hazard_level;  ///< 0.0 (safe) – 1.0 (extreme hazard).
     float      habitability;  ///< 0.0 (uninhabitable) – 1.0 (hospitable).
 };
@@ -146,6 +158,16 @@ struct building_component
     entity_id     tile;               ///< Tile this building occupies.
     building_type type;
     float         workforce_assigned; ///< 0.0–1.0 fraction of allocated workforce.
+
+    /// Extraction target — the resource this building harvests from its tile's
+    /// deposit. Authored at placement; meaningful only for extraction_site.
+    /// What a building *does* is this field, not the generic building_type.
+    resource_type target_resource = resource_type::iron_ore;
+
+    /// Processing recipe id — an index into the recipe registry (recipe_registry.hpp).
+    /// Authored at placement and fixed at construction; meaningful only for
+    /// processing_facility. `no_recipe` means none assigned.
+    uint16_t      recipe = no_recipe;
 };
 
 /// Pooled resource quantities held by an entity.
@@ -216,6 +238,11 @@ struct corporation_component
 
     /// Starting capital in the economy's base currency unit; set by Pass 4.
     float starting_capital = 0.0f;
+
+    /// Running cash balance, moved by the economy money loop (budget_system.hpp).
+    /// Opens at `starting_capital`; may go negative (no insolvency consequence in
+    /// the prototype — flagged red in the economy panel).
+    float balance = 0.0f;
 
     /// True for exactly one corporation per campaign — the human player's
     /// corporation. Set after all corps are generated.

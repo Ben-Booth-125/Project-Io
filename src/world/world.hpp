@@ -2,7 +2,9 @@
 
 #include "components.hpp"
 
+#include <map>
 #include <unordered_map>
+#include <utility>
 
 /// The system's single asteroid belt — a band between two orbital radii. The
 /// belt is not a body (it owns no entity); it is rendered as a thick, translucent
@@ -73,6 +75,26 @@ struct world
     /// is made. Exactly one entry will have corporation_component::is_player == true,
     /// and world::player_entity will equal that entry's key.
     std::unordered_map<entity_id, corporation_component> corporations;
+
+    /// Shared stockpile pool keyed by (corporation, body). This is the Layer 3
+    /// economy's working store — extraction and processing credit/draw it, the
+    /// market lists surplus from it. A `std::map` (not unordered) so iteration is
+    /// deterministic, mirroring the `tile_to_nation` design rationale: keeping the
+    /// pool here off `building_component`/`body_component` lets the economy systems
+    /// stay on disjoint files. The per-building `stockpile_component` is unused in L3.
+    std::map<std::pair<entity_id, entity_id>, stockpile_component> corp_body_pools;
+
+    /// Stockpile pool for a (corporation, body) pair, inserting an empty pool on
+    /// first access. The single point through which the economy systems read and
+    /// write the shared pool.
+    ///
+    /// @param corp Corporation entity id.
+    /// @param body Body entity id.
+    /// @return     Reference to the (corp, body) stockpile, created if absent.
+    stockpile_component& pool_for(entity_id corp, entity_id body)
+    {
+        return corp_body_pools[std::make_pair(corp, body)];
+    }
 
 private:
     uint32_t m_next_id = 1; ///< Zero is null_entity; live IDs start at 1.
