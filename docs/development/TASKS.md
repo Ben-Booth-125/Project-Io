@@ -174,6 +174,16 @@ wave. Verify retroactively — do not assume an agent's self-reported success.
 
 Completed 2026-06-14 (see DEVLOG, newest first):
 
+- *Publish block — Selection info element + Known Bug (six groups, barrier set).
+  **Completed:** Go-to planetary landing + Kepler-only reliability (R1–R5;
+  `focus_on_entity` body → `focus_on_surface`, tile → no-op; `verify.go_to` +
+  `selection_go_to.lua`); Generation Ledger design (R1–R4; `GENERATION_LEDGER.md`).
+  **Cancelled back to TODO:** Non-spatial 'go to' routing (blocked — no nation/corp
+  ledgers); Canvas hit-testing (blocked — entities not drawn as selectable markers);
+  Frame stutter measurement (R1/R2 failed — verification needs live instrumentation);
+  Body labels stepping (R1 complete, R2 failed — root cause confirmed, fix +
+  temporal verification deferred). See REQUIREMENTS.md archive.*
+
 - *Visual-verification harness — Phase 2: shared `canvas_command` vocabulary
   (keyboard + verify API), `verify.center_tile`/`command`/`buildings`,
   `scripts/verify/lib.lua` helpers, `corporation_lens.lua` refactored, and the

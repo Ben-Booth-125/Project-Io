@@ -34,6 +34,72 @@ DEVLOG, not in TODO) — leaving behind only any genuinely open follow-up as its
 forward item. TASKS.md is the transient execution list, cleared as tasks complete.
 See [`TASKS.md`](TASKS.md) for the task format.
 
+### Publish
+
+**Publish** is the full lifecycle for acting on a TODO item:
+
+1. **Create tasks** — promote the TODO item into TASKS.md: decompose into ordered,
+   file-scoped, dependency-marked tasks (see TASKS.md § Task format).
+2. **Create requirements** — write or link requirements in
+   [`req/REQUIREMENTS.md`](req/REQUIREMENTS.md) for each task group, following the
+   requirements policy there.
+3. **Verify simultaneous task evaluation** — confirm which tasks are parallel-safe
+   (disjoint file scopes) and which must stay sequential. Resolve any scope collision
+   before execution begins.
+4. **Complete tasks** — implement, review, and verify each task against its
+   requirements (TASKS.md § Definition of "complete"). Tasks may be **cancelled**
+   mid-session if they prove out of scope, blocked, or superseded; note the
+   cancellation reason alongside the task entry.
+5. **Commit** — once all tasks are complete or cancelled, create a single commit
+   for the TODO item using the format below.
+
+#### Publishing multiple items together (barrier semantics)
+
+When more than one TODO item is published in the same work block, the five steps
+above run as **barriers across the entire set**, not item-by-item. Every item in
+the set must clear step *N* before **any** item begins step *N+1*:
+
+1. **Create tasks** for *all* items — every item is promoted into TASKS.md before
+   any requirements are written.
+2. **Create requirements** for *all* items.
+3. **Verify simultaneous task evaluation** across the *combined* task set — the
+   collision map and parallel-safety analysis span every item's tasks at once, so
+   cross-item file collisions (e.g. two items both touching `selection_panel.cpp`)
+   are resolved before execution.
+4. **Complete tasks** — this barrier is the load-bearing one: **all** tasks across
+   **all** items must reach a terminal state (complete or cancelled) before the set
+   advances. No item is committed while another item still has a task in flight.
+   A blocked or out-of-scope task is *cancelled* (per TASKS.md § Cancelling a task
+   group), not left pending — the barrier closes on terminal states, not on success.
+5. **Commit** — still **one commit per TODO item** (the per-item format below), but
+   none of these commits is created until the step-4 barrier has closed for the
+   whole set. The commits are then made back-to-back, one per item.
+
+The rule, stated once: *publish the set breadth-first, not depth-first.* Do not
+drive a single item end-to-end and then start the next; advance the whole set
+through each step together. This keeps the requirement set, the collision map, and
+the "everything builds together" guarantee coherent across the items that shipped
+in one block.
+
+#### Commit format for a published TODO item
+
+```
+<TODO item title>
+
+Tasks: <N completed>, <N cancelled>
+Requirements: <N completed>, <N pending>, <N failed>
+```
+
+- The **title** is the TODO item's own title (the bold heading text, without
+  difficulty prefix).
+- The **Tasks line** counts completed and cancelled tasks from the TASKS.md group;
+  omit the cancelled count if zero.
+- The **Requirements line** counts by final state: *completed* (all verifications
+  passed), *pending* (deferred — verification not yet run), *failed* (verification
+  did not pass and the task was cancelled rather than fixed). Omit pending/failed
+  counts if zero.
+- No further body text is required unless an individual task warrants a note.
+
 Difficulty scale — a rough effort estimate where **lower = easier**:
 **1** trivial · **2** easy (light work) · **3** medium · **4** hard ·
 **5** very hard. **6** is not a difficulty but a **status**: deferred / out of
@@ -179,52 +245,19 @@ currently hold items appear as sections below.
 Follow-up intent for the Selection info element (design in `docs/ui/SELECTION.md`;
 shared per-entity content builders in `entity_summary.{hpp,cpp}`):
 
-- **[3] 'Go to' should land on the planetary tile view.** Today the panel's
-  'go to' (and double-click) routes a **body** through `focus_on_entity` →
-  `focus_on_body`, which frames the **circumplanetary** view. Change it so 'go
-  to' for a body always **descends to that body's Planetary (tile) surface** —
-  the most informative rung — i.e. route bodies through `focus_on_surface` rather
-  than `focus_on_body`. For a **tile** selection, 'go to' should **do nothing for
-  now** (the surface is already shown; pan-to-tile is out of scope). Touches the
-  go-to dispatch (`src/ui/view_nav.cpp` and/or `selection_panel.cpp`) and the
-  per-kind 'go to' table in `SELECTION.md`.
-
-- **[3] 'Go to' is unreliable — appears to only work for Kepler.** Observed: the
-  'go to' button navigates correctly for the home planet (Kepler) but seems to do
-  nothing (or the wrong thing) for other bodies. Likely entangled with the
-  target-rung change above — a circumplanetary landing on a body with little
-  authored local detail can read as "nothing happened". Confirm whether this is a
-  genuine id/lookup failure or just an unhelpful landing rung; reproduce per body
-  and fix alongside the planetary-target change. Also filed under **Known Bug**.
-
 - **[2] Non-spatial 'go to' routing.** For nation / corporation selections (no
   canvas of their own), 'go to' should open the relevant ledger rather than
   navigate a canvas. The dispatch seam exists (`draw_selection_panel` →
   `focus_on_entity`); add the branches once those entity kinds and their ledgers
-  exist. Not actionable until then.
+  exist. Not actionable until then. *(Promoted then cancelled 2026-06-14 — blocked:
+  no `nation_ledger` / `corporation_ledger` target exists yet.)*
 
 - **[2] Canvas hit-testing for buildings / units / markets.** Only bodies and
   tiles are hit-tested on the canvases today; the other kinds are selectable only
   as Tile Ledger rows. Add canvas hit-testing so they can be single-click-selected
   directly (the panel already renders all five kinds). Depends on those entities
-  being drawn as selectable canvas markers first.
-
-- **[4] Generation Ledger.** Design a ledger that explains *why* a tile generated
-  as it did, for tuning and analysis of the procedural pass. The data seam already
-  exists: `generate_body_tiles()` takes an optional `generation_record*`
-  (`src/world/tile_generation.hpp`) that captures per-pass intermediates —
-  heightmap, moisture, latitude bands, ocean threshold — today thrown away on the
-  common path. **Design is deliberately unstarted.** Decide: what the ledger
-  presents (per-tile derivation breadcrumb: height/moisture/band → composition →
-  landform → deposits; and per-body summaries like composition/landform histograms
-  and the ocean threshold); whether history is *persisted* per body or
-  *regenerated on demand* (generation is deterministic, so regeneration is cheap
-  and avoids storing a record per tile); and how it surfaces (a dedicated Ledger
-  window, or an overlay lens over the Planetary canvas showing the heightmap /
-  moisture / band fields). Likely earns `docs/generation/GENERATION_LEDGER.md`.
-  Note the overlap with the hover-card / Selection info work — the per-tile
-  derivation is a natural section of a tile's rich card. See
-  `docs/generation/TILE_GENERATION.md` (§ Generation history hook).
+  being drawn as selectable canvas markers first. *(Promoted then cancelled
+  2026-06-14 — blocked on that marker-drawing prerequisite.)*
 
 ## Infrastructure
 
@@ -301,17 +334,23 @@ Design authority: `docs/generation/CORPORATION_GENERATION.md`.
   treat any optimisation now as provisional and re-measure after the economy is in.
   Don't over-fit the frame loop to today's (logic-light) workload. Likely touches
   the render/present setup (SDL3 swap / vsync) and the canvas tile-draw loops.
-
-- **[3] Selection 'go to' only works for Kepler.** The Selection info element's
-  'go to' button navigates for the home planet but appears inert for other
-  bodies. Detailed under **Ledger → Selection info element** (it is fixed
-  alongside the planetary-target change). Logged here for triage visibility.
+  **Baseline established (2026-06-14, promoted then cancelled):** vsync is on
+  (`SDL_SetRenderVSync(m_renderer, 1)`, `app.cpp:77`), with no frame cap and no
+  per-frame timing readout. The blocker is the measurement itself — classifying the
+  stutter needs frame-time instrumentation over a *live* present loop, which the
+  headless harness cannot observe; building that live instrument is the deferred
+  design work (a frame-time readout / log) that must land before R1/R2 can be run.
 
 - **[4] Body labels move in steps, not smoothly.** Re-logged. The font-oversampling
   pass (`src/ui/fonts.hpp`) improved glyph crispness but did **not** fix the motion
   artefact: body labels visibly advance only every few ticks while the body dot
-  glides. The symptom is temporal (stepped position over time), not purely the
-  sub-pixel rasterisation originally diagnosed. The label and the dot are drawn
-  from the same per-frame `pos`, so the stepping must enter via the text path
-  itself (glyph placement quantisation) or the way the label position is read —
-  compare the two paths on the Solar / Circumplanetary canvases. See `SOLAR.md`.
+  glides. **Root cause confirmed (2026-06-14, promoted then cancelled):** the label
+  position derives from the live float `pos` every frame
+  (`solar_system_canvas.cpp:218–224`, no rounding), so the stepping is
+  `ImDrawList::AddText` snapping glyphs to the integer pixel grid while the dot
+  (`AddCircleFilled`) is sub-pixel anti-aliased — the glyph-placement-quantisation
+  path, not stale position. The **fix** (sub-pixel text positioning, or accept and
+  document the limitation) and its smoothness check remain open: verifying smooth
+  motion needs live animation observation, which the headless harness cannot do, so
+  a testing method must be settled first. Same code path on the Circumplanetary
+  canvas. See `SOLAR.md`.

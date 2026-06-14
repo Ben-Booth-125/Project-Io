@@ -114,6 +114,79 @@ their full requirement tables were deleted under the old "delete on completion" 
 rather than archived. Their authoritative record lives in the DEVLOG; reconstructed
 summaries are kept here so the archive is not silent about them:
 
+### selection-go-to-planetary
+
+`Resolved: 2026-06-14 — complete, all rows (R1–R5) met.`
+
+'Go to' on a body now descends to its Planetary tile surface (`focus_on_entity` →
+`focus_on_surface`); the tile branch is a no-op. Verified with the new
+`verify.go_to` hook + `scripts/verify/selection_go_to.lua`: Kepler, Cinder, and
+Selene all land on their tile grids, so the "only works for Kepler" symptom was an
+unhelpful landing rung, not an id/lookup failure. Closed the duplicate Known Bug row
+and the two Selection rows in one change.
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | `focus_on_entity` routes a **body** selection through `focus_on_surface` (Planetary rung), not `focus_on_body`. | `code: focus_on_surface` in the body branch of `focus_on_entity` | complete | `view_nav.cpp` body branch now calls `focus_on_surface`. |
+| R2 | `focus_on_entity` does **nothing** for a **tile** selection (surface already shown; pan-to-tile out of scope). | `code:` (tile branch is a no-op / early return) | complete | Tile branch is an early `return`. |
+| R3 | 'Go to' lands on the Planetary surface for **any** body, not only Kepler. | `visual` (a non-Kepler body lands on its tile grid) | complete | `go_to_00_kepler_home` / `_01_cinder_planet` / `_02_selene_moon` all show tile grids; minimap re-anchors to each body. |
+| R4 | `docs/ui/SELECTION.md` 'go to' table + click model read "body → Planetary surface; tile → no-op". | `doc: docs/ui/SELECTION.md` | complete | Per-kind 'go to' table updated. |
+| R5 | A durable `verify.go_to(name)` hook drives `focus_on_entity`, and `scripts/verify/selection_go_to.lua` captures the landing. | `code: go_to` + `doc: scripts/verify/selection_go_to.lua` | complete | Reusable method for R3. |
+
+### generation-ledger-design
+
+`Resolved: 2026-06-14 — complete, all rows (R1–R4) met.`
+
+Design-only deliverable: `docs/generation/GENERATION_LEDGER.md` authored and indexed
+from `CLAUDE.md`. Settles the per-tile derivation breadcrumb, per-body histograms,
+regenerate-on-demand data lifetime, and surfacing (Ledger window + Planetary field
+lens), with the shared tile-derivation content builder noted against the hover-card /
+Selection overlap.
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | `docs/generation/GENERATION_LEDGER.md` exists and specifies the **per-tile derivation breadcrumb**. | `doc: docs/generation/GENERATION_LEDGER.md` | complete | § What the ledger presents → Per-tile derivation breadcrumb. |
+| R2 | It specifies **per-body summaries** (composition / landform histograms, ocean threshold). | `doc:` (§ per-body) | complete | § Per-body summaries. |
+| R3 | It settles **persist-vs-regenerate** (deterministic → regenerate on demand). | `doc:` (§ data lifetime) | complete | § Data lifetime — regenerate on demand. |
+| R4 | It settles **surfacing** (Ledger window vs. Planetary overlay lens) and notes the hover-card / Selection overlap. | `doc:` (§ surfacing) | complete | § Surfacing. |
+
+### frame-stutter-measure
+
+`Resolved: 2026-06-14 — cancelled. Verification needs live frame-time instrumentation
+that does not yet exist; the measurement method is itself the deferred design work.
+Intent refined and returned to TODO § Known Bug.`
+
+Reached the design barrier the no-tool policy (§ Verifying when no skill or tool
+exists, step 3) describes: classifying the stutter requires observing a live present
+loop, which the headless harness cannot do, and building that instrument is non-trivial
+design in its own right. Baseline established by code read: vsync is on
+(`SDL_SetRenderVSync(m_renderer, 1)`, `app.cpp:77`), there is no frame cap and no
+per-frame timing readout. Cancelled rather than left pending; the refined item carries
+this baseline and the instrument-first requirement.
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | A repeatable frame-time measurement method exists that classifies the stutter. | `manual` (live window) | failed | No headless tool observes a live present loop; building the live instrument is deferred design. |
+| R2 | The hardware-limit config (vsync / frame cap / present mode) is settled against the measurement. | `manual` | failed | Blocked on R1; provisional pre-economy regardless. |
+
+### body-label-stepping
+
+`Resolved: 2026-06-14 — cancelled. Root cause confirmed (R1 complete); the fix and its
+temporal verification are deferred. Intent refined and returned to TODO § Known Bug.`
+
+Diagnosis confirmed by code read: the label position derives from the live float `pos`
+every frame (`solar_system_canvas.cpp:218–224`, no rounding), so the stepping is
+`ImDrawList::AddText` snapping glyphs to the integer pixel grid while the dot
+(`AddCircleFilled`) is sub-pixel anti-aliased — the "glyph placement quantisation" path
+the item hypothesised, not stale position. The fix (sub-pixel text, or accept and
+document) and its smoothness check need live animation over time, which no headless tool
+can observe. Cancelled with the finding recorded; R1 kept its real `complete` status.
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | The stepping is confirmed to be `AddText` glyph-grid quantisation (label position from the live float `pos`; dot is sub-pixel AA, text is not). | `code:` (`label_pos` from float `pos`, no rounding) | complete | `solar_system_canvas.cpp:218–224`. |
+| R2 | The fix renders labels smoothly (sub-pixel text or accepted-and-documented). | `visual` over time | failed | Temporal/live; no headless tool to observe motion. Deferred to TODO. |
+
 ### visual-verification-harness-phase-2
 
 `Resolved: 2026-06-14 — complete, all rows (V7–V12) met.`

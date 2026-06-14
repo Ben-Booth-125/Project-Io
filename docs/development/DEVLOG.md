@@ -6,6 +6,55 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## 2026-06-14 — Publish block: Selection info element + Known Bug
+
+**Status:** Complete — 2/6 groups shipped (9/9 reqs met), 4/6 cancelled back to TODO.
+GT: 5/5 (R1–R5). GL: 4/4 (R1–R4). Frame stutter: 0/2 (R1/R2 failed). Body labels: 1/2
+(R1 complete, R2 failed). See REQUIREMENTS.md archive for the per-row outcomes. Full
+app builds clean (Debug, exit 0); `selection_go_to.lua` captures regenerate.
+
+### Process — first multi-item publish under barrier semantics
+
+Clarified the Publish lifecycle in TODO.md: when several items publish together, the
+five steps run as **barriers across the whole set** (breadth-first, not depth-first) —
+every item clears step *N* before any starts *N+1*, and step 4 (complete) closes only
+on *terminal* states (complete **or** cancelled). Then exercised it on the two
+sub-sections (six groups). Combined collision map: only GT (`view_nav.*`, `app.cpp`
+run_verify region, `selection_go_to.lua`) and GL (docs) landed code/docs, and their
+write-sets are disjoint, so the set was collision-free in execution.
+
+### What was built (shipped groups)
+
+- **Go-to planetary landing + Kepler-only reliability** — merged three cross-filed
+  items (Selection 'go to' → planetary, "only works for Kepler", and the duplicate
+  Known Bug row). `focus_on_entity` now routes a **body** through `focus_on_surface`
+  (Planetary tile rung) instead of `focus_on_body`, and a **tile** selection is a
+  no-op. Confirmed the Kepler-only symptom was an unhelpful landing rung, not an
+  id/lookup failure: added `verify.go_to` (drives the real `focus_on_entity` path) and
+  `scripts/verify/selection_go_to.lua`; Kepler / Cinder / Selene all land on their tile
+  grids with the minimap re-anchoring to each. `view_nav.{cpp,hpp}`, `app.cpp`,
+  `SELECTION.md`.
+- **Generation Ledger design** — authored `docs/generation/GENERATION_LEDGER.md`
+  (indexed from `CLAUDE.md`): per-tile derivation breadcrumb, per-body histograms,
+  regenerate-on-demand (don't persist) data lifetime, and surfacing as a Ledger window
+  plus a Planetary field-overlay lens, sharing the tile-derivation content builder with
+  the hover card / Selection element.
+
+### Cancelled back to TODO (terminal, no code landed)
+
+- **Non-spatial 'go to' routing** — blocked: no `nation_ledger` / `corporation_ledger`
+  target exists.
+- **Canvas hit-testing** — blocked: those entities are not yet drawn as selectable
+  canvas markers.
+- **Frame stutter measurement** — verification needs frame-time instrumentation over a
+  *live* present loop (no headless tool); baseline recorded (vsync on, no cap, no
+  readout). The live instrument is the deferred design work.
+- **Body labels stepping** — root cause confirmed (`AddText` glyph-grid quantisation vs.
+  sub-pixel dot; `solar_system_canvas.cpp:218–224`); the fix and its temporal
+  verification are deferred (no headless tool observes motion over time).
+
+---
+
 ## 2026-06-14 — Visual-verification harness (Phase 2)
 
 **Status:** Complete — V7–V12 met. Full app builds clean (Debug, exit 0); `--verify`
