@@ -73,11 +73,16 @@ silently downgrade it to an assumption. Instead:
 
 1. **Determine a method.** Define a concrete, repeatable way to test the
    requirement — what is exercised, what input, what observable pass/fail signal.
-2. **Implement it and save it for reuse.** Build the method as a durable, named
-   artifact wherever feasible — a headless harness case, a script under `scripts/`,
-   a documented procedure, or a new skill — so the next requirement of the same
-   shape reuses it rather than re-deriving it. Prefer a saved artifact over a
-   one-off manual check. Record the method (or a pointer to it) in the row's Notes.
+2. **Author it as a tool, then push it to a skill.** Build the method as a concrete
+   tool — a `tools/verify/*.cpp` headless harness, a `scripts/verify/*.lua` check, a
+   script, or a documented procedure — then **promote it to a skill** so the next
+   requirement of the same shape reuses a permanent, discoverable asset rather than
+   re-deriving it (the `verifier-visual` / `verifier-headless` skills are the model;
+   see CLAUDE.md § Skills → *Tool creation is skill creation*). **Creating a skill
+   needs user permission:** attempt to author the tool, push it to a skill; **if skill
+   creation is denied, request running the tool as a one-off** for this requirement.
+   Prefer a saved artifact over a one-off manual check. Either way, record the method
+   (or a pointer to it) in the row's Notes.
 3. **Defer only when it needs design.** If establishing the method is impossible
    without non-trivial design consideration — it needs new infrastructure, an
    architectural decision, or its own scoping — do **not** block the task. Record

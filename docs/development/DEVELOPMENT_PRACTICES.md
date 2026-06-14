@@ -79,6 +79,22 @@ which wraps `ProjectIo --verify <script>` so re-running it is a single invocatio
 Entry points: `app::run_verify` (`src/core/app.cpp`), `write_png_rgba`
 (`src/core/png_writer.cpp`), `ui::apply_canvas_command` (`src/ui/canvas_command.hpp`).
 
+### Headless logic verification (pure simulation / generation)
+
+The `world/*` translation units depend only on the standard library (no SDL / ImGui /
+Lua), so pure logic — economy arithmetic, tile generation, placement audits — is
+verified by a small headless C++ harness compiled against just those units, with no
+GUI. Harnesses live in `tools/verify/*.cpp` (outside `src/`, so the CMake
+`GLOB_RECURSE` does not pull them into the real build) and print `PASS`/`FAIL`
+assertions; their build lines are in `tools/verify/README.md`.
+
+This is the standard tool for the `headless` verification class. Author (or extend) a
+`tools/verify/*.cpp` harness and run it through the **`verifier-headless` skill**
+(`.claude/skills/verifier-headless/`). Keep `recipe_registry.hpp` pure data (sol2 only
+in its `.cpp`) so the economy logic stays harness-buildable. See memory
+`reference-headless-build` for the toolchain. Tool creation here follows the
+*tool-creation-is-skill-creation* workflow in CLAUDE.md § Skills.
+
 ---
 
 ## Code style

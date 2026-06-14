@@ -1,8 +1,13 @@
 # Headless verification harnesses
 
-Throwaway-but-kept C++ harnesses that verify pure `world/*` logic without the
-SDL/Lua/ImGui stack (see memory `reference_headless_build`). They live outside
-`src/` so the CMake `GLOB_RECURSE` does not pull them into the real build.
+C++ harnesses that verify pure `world/*` logic without the SDL/Lua/ImGui stack
+(see memory `reference_headless_build`). They live outside `src/` so the CMake
+`GLOB_RECURSE` does not pull them into the real build.
+
+These are the cases behind the **`verifier-headless`** skill
+(`.claude/skills/verifier-headless/`) — run them through it rather than re-deriving
+the build commands. Adding a `tools/verify/*.cpp` here and naming it in that skill
+is how a new headless check becomes a permanent, reusable asset.
 
 Compile and run from the repo root, after sourcing the VS BuildTools `vcvars64`:
 

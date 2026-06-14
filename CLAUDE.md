@@ -143,16 +143,34 @@ Practical consequences:
 
 ### Skills
 
-Two skills exist and should be used proactively rather than reinventing their steps:
+These skills exist and should be used proactively rather than reinventing their steps:
 
 - **`verifier-visual`** — runs the headless `ProjectIo --verify <script>` harness, inspects
   PNG captures, and reports against requirements. Authorising a new visual check means adding
   a `scripts/verify/<feature>.lua` and invoking this skill. Use for any `visual`-class
   requirement.
+- **`verifier-headless`** — compiles and runs a `tools/verify/<name>.cpp` harness over the
+  SDL/Lua-free `world/*` logic and reports its PASS/FAIL assertions. Use for any `headless`-class
+  requirement (economy arithmetic, tile generation, placement audits). Authorising a new check
+  means adding a `tools/verify/*.cpp` harness and naming it in the skill.
 - **`scoped-commit`** — stages exactly the files belonging to the current task and commits
   with the correct format, without bundling unrelated working-tree changes. Use whenever
   committing, especially on the default branch or when the tree has pre-existing edits.
 
-When a task would benefit from a skill that does not yet exist, **propose it as a Brief**
-(category: Documentation or the relevant system category) rather than improvising a bespoke
-procedure. A skill becomes a permanent reusable asset; a one-off procedure is forgotten.
+#### Tool creation is skill creation
+
+When a check or automation does not yet have a tool, **author the tool, then push it to a
+skill** — a skill is a permanent, reusable, discoverable asset; a loose tool or bespoke
+procedure is forgotten. **Creating or modifying a skill requires user permission**, so the
+workflow is:
+
+1. **Attempt to author the tool** (a `tools/verify/*.cpp` harness, a `scripts/verify/*.lua`
+   check, a script, or a documented procedure).
+2. **Push it to a skill** — wrap the capability in a `.claude/skills/<name>/SKILL.md` (the
+   `verifier-*` skills are the model), asking the user to authorise it.
+3. **If skill creation is denied, request running the tool as a one-off** — execute it this
+   session without promoting it, and note in the requirement's Notes that the method was run
+   ad hoc rather than saved.
+
+For a larger or speculative skill that needs design rather than a quick wrap, **propose it as
+a Brief** (category: Documentation or the relevant system category) instead of improvising.
