@@ -125,6 +125,30 @@ ImU32 faction_colour(int slot)
     return faction_table[s];
 }
 
+ImU32 nation_colour(entity_id id)
+{
+    // Twelve hues stepped ~30 deg around the wheel at moderate saturation/value,
+    // legible on the dark canvas and distinct from the faction palette.
+    static constexpr ImU32 nation_table[nation_slot_count] = {
+        IM_COL32(204, 102, 102, 255), // red
+        IM_COL32(204, 153, 102, 255), // orange
+        IM_COL32(204, 204, 102, 255), // yellow
+        IM_COL32(153, 204, 102, 255), // lime
+        IM_COL32(102, 204, 102, 255), // green
+        IM_COL32(102, 204, 153, 255), // spring
+        IM_COL32(102, 204, 204, 255), // cyan
+        IM_COL32(102, 153, 204, 255), // azure
+        IM_COL32(102, 102, 204, 255), // blue
+        IM_COL32(153, 102, 204, 255), // violet
+        IM_COL32(204, 102, 204, 255), // magenta
+        IM_COL32(204, 102, 153, 255), // rose
+    };
+    // Knuth multiplicative hash so consecutive nation ids (the common case) land
+    // on well-separated palette slots rather than adjacent hues.
+    const uint32_t h = static_cast<uint32_t>(id) * 2654435761u;
+    return nation_table[h % nation_slot_count];
+}
+
 } // namespace palette
 
 ImU32 value_colour(fmt::sign s)

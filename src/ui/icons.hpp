@@ -55,4 +55,42 @@ void ledger(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Stroke colour.
 void placeholder(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw the Supply-lens glyph — two parallel horizontal lines, a route/convoy
+/// shorthand — in @p colour. For the overlay-lens control strip.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Stroke colour.
+void supply(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
+/// Draw the Market-lens glyph — a three-bar ascending chart outline — in
+/// @p colour. For the overlay-lens control strip.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Stroke colour.
+void market(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
+/// Draw the Faction-lens glyph — a downward-pointing shield silhouette — in
+/// @p colour. For the overlay-lens control strip.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Fill colour.
+void faction(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
+/// Draw the Corporation-lens glyph — a filled square with a centred inner dot, a
+/// "seal" silhouette — in @p colour. Distinct from the processing-facility plain
+/// square (the inner dot), the extraction diamond, and the port/unit triangle.
+/// For the overlay-lens control strip. See LENSES.md § Corporation lens.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Fill colour of the square; the inner dot is drawn dark.
+void corporation(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 } // namespace ui::icons

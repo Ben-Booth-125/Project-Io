@@ -39,6 +39,12 @@ The entity **under the pointer** in the current frame — the transient hover ta
 **Selection (state)**
 The entity the player **single-clicked to inspect**. Persists until another entity is selected (or the selection is cleared). Drives the **Selection info element** and its 'go to' target, and does not move the canvas. Backed by `ui_state.selected_entity`. See `docs/ui/SELECTION.md`.
 
+**Complete (task state)**
+A development task is **complete** only when every requirement it satisfies has been **reviewed**, **implemented**, and **tested** — completeness is measured against the requirements, not against "the code is written". A task that is implemented and builds but whose requirements have not all been reviewed and verification-run is *code-complete*, not complete. See `docs/development/TASKS.md` (§ Definition of "complete") and `docs/development/req/REQUIREMENTS.md`.
+
+**Cancelled (task state)**
+A task group that could not be driven to *complete* in one working block and is reverted rather than left half-tracked. Cancelling marks its requirements `failed`, rewrites its intent back into `TODO.md` (merging into a related item where possible), and removes the task stubs from `TASKS.md`. It reverts *tracking*, not committed code — landed code stays in the tree; its intent returns to the backlog. A task group is always either completed or cancelled. See `docs/development/TASKS.md` (§ Cancelling a task group).
+
 **Era**
 A named phase in the game's industrial arc, defined by the accessible territory, available buildings, and dominant strategic challenge. The game begins in **Era 0** (Terrestrial) and transitions to **Era 1** (Early Space) by meeting an explicit gate condition. See `docs/economy/ERAS.md`.
 

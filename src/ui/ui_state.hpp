@@ -18,10 +18,11 @@ enum class canvas_level
 /// (mode bar), and ui/overlay.hpp.
 enum class overlay_mode
 {
-    none = 0, ///< No overlay; the plain canvas.
-    supply,   ///< Supply routes / convoy paths (Layer 5).
-    market,   ///< Market / price lens.
-    faction,  ///< Faction presence.
+    none = 0,    ///< No overlay; the plain canvas.
+    supply,      ///< Supply routes / convoy paths (Layer 5).
+    market,      ///< Market / price lens.
+    faction,     ///< Faction presence.
+    corporation, ///< Corporate-owned tiles (per-corp tint; player-corp border). See LENSES.md.
 };
 
 /// Shared selection and view state for the three primary canvases.

@@ -18,12 +18,14 @@ const char* selection_title(const world& w, selection_kind kind, entity_id id)
 {
     switch (kind)
     {
-        case selection_kind::body:     return w.bodies.at(id).name.c_str();
-        case selection_kind::building: return building_type_name(w.buildings.at(id).type);
-        case selection_kind::tile:     return "Tile";
-        case selection_kind::market:   return "Market";
-        case selection_kind::unit:     return "Unit";
-        case selection_kind::none:     return "Nothing";
+        case selection_kind::body:        return w.bodies.at(id).name.c_str();
+        case selection_kind::building:    return building_type_name(w.buildings.at(id).type);
+        case selection_kind::tile:        return "Tile";
+        case selection_kind::market:      return "Market";
+        case selection_kind::unit:        return "Unit";
+        case selection_kind::nation:      return w.nations.at(id).name.c_str();
+        case selection_kind::corporation: return w.corporations.at(id).name.c_str();
+        case selection_kind::none:        return "Nothing";
     }
     return "?";
 }
@@ -33,12 +35,14 @@ void draw_summary(const world& w, selection_kind kind, entity_id id)
 {
     switch (kind)
     {
-        case selection_kind::body:     draw_body_summary(w, id);     break;
-        case selection_kind::tile:     draw_tile_summary(w, id);     break;
-        case selection_kind::building: draw_building_summary(w, id); break;
-        case selection_kind::market:   draw_market_summary(w, id);   break;
-        case selection_kind::unit:     draw_unit_summary(w, id);     break;
-        case selection_kind::none:     break;
+        case selection_kind::body:        draw_body_summary(w, id);        break;
+        case selection_kind::tile:        draw_tile_summary(w, id);        break;
+        case selection_kind::building:    draw_building_summary(w, id);    break;
+        case selection_kind::market:      draw_market_summary(w, id);      break;
+        case selection_kind::unit:        draw_unit_summary(w, id);        break;
+        case selection_kind::nation:      draw_nation_summary(w, id);      break;
+        case selection_kind::corporation: draw_corporation_summary(w, id); break;
+        case selection_kind::none:        break;
     }
 }
 

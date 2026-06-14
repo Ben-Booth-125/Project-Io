@@ -95,8 +95,14 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
     const float scale = (min_dim * 0.40f) / max_moon_au;
 
     // Zoom bounds shared by the scale/zoom slider and the scroll-wheel handler.
+    // The deepest zoom is capped so the most zoomed-in framing spans ~0.3 AU
+    // across: at zoom z the visible half-extent is max_moon_au / z AU, so the full
+    // visible width is 2 * max_moon_au / z; setting that to 0.3 AU gives
+    // z = max_moon_au / 0.15. Derived from the per-anchor scale rather than a flat
+    // constant so the cap tracks each anchor's local extent. A moonless anchor
+    // uses the 0.5 AU floor above, giving a finite (~3.3) cap.
     constexpr float zoom_min = 0.2f;
-    constexpr float zoom_max = 20.0f;
+    const float     zoom_max = max_moon_au / 0.15f;
 
     // View transform — pan/zoom only when primary; the minimap shows the default
     // framing. Element sizes do not scale with zoom.

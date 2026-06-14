@@ -2,9 +2,14 @@
 
 #include "presentation.hpp"
 
+#include "format.hpp"
+
 #include <imgui.h>
 
+#include <algorithm>
 #include <cstddef>
+#include <utility>
+#include <vector>
 
 namespace ui {
 
@@ -22,6 +27,81 @@ void draw_resource_swatch(const resource_presentation& rp)
     ImGui::GetWindowDrawList()->AddRectFilled(swp, {swp.x + sw, swp.y + sw}, rp.colour);
     ImGui::Dummy({sw, sw});
     ImGui::SameLine();
+}
+
+/// Draw a solid colour swatch followed by SameLine — the same pip idiom as
+/// draw_resource_swatch but taking an arbitrary colour, so a nation's identity
+/// colour can prefix its name the way a resource colour prefixes a deposit.
+///
+/// @param colour The swatch fill colour.
+void draw_colour_swatch(ImU32 colour)
+{
+    const float  sw  = ImGui::GetTextLineHeight();
+    const ImVec2 swp = ImGui::GetCursorScreenPos();
+    ImGui::GetWindowDrawList()->AddRectFilled(swp, {swp.x + sw, swp.y + sw}, colour);
+    ImGui::Dummy({sw, sw});
+    ImGui::SameLine();
+}
+
+/// Display name for a nation's political ideology.
+///
+/// @param v Ideology to name.
+/// @return  Null-terminated display name.
+const char* ideology_name(::ideology v)
+{
+    switch (v)
+    {
+    case ::ideology::authoritarian: return "Authoritarian";
+    case ::ideology::technocratic:  return "Technocratic";
+    case ::ideology::mercantile:    return "Mercantile";
+    case ::ideology::isolationist:  return "Isolationist";
+    }
+    return "Unknown";
+}
+
+/// Display name for a nation's territorial posture.
+///
+/// @param v Expansionism to name.
+/// @return  Null-terminated display name.
+const char* expansionism_name(::expansionism v)
+{
+    switch (v)
+    {
+    case ::expansionism::passive:    return "Passive";
+    case ::expansionism::moderate:   return "Moderate";
+    case ::expansionism::aggressive: return "Aggressive";
+    }
+    return "Unknown";
+}
+
+/// Display name for a nation's dominant economic activity.
+///
+/// @param v Economic focus to name.
+/// @return  Null-terminated display name.
+const char* economic_focus_name(::economic_focus v)
+{
+    switch (v)
+    {
+    case ::economic_focus::extraction: return "Extraction";
+    case ::economic_focus::processing: return "Processing";
+    case ::economic_focus::trade:      return "Trade";
+    }
+    return "Unknown";
+}
+
+/// Display name for a corporation's primary industrial focus.
+///
+/// @param v Industrial focus to name.
+/// @return  Null-terminated display name.
+const char* industrial_focus_name(::industrial_focus v)
+{
+    switch (v)
+    {
+    case ::industrial_focus::extraction: return "Extraction";
+    case ::industrial_focus::processing: return "Processing";
+    case ::industrial_focus::trade:      return "Trade";
+    }
+    return "Unknown";
 }
 
 } // namespace
@@ -189,6 +269,82 @@ void draw_unit_summary(const world& w, entity_id id)
     auto body_it = w.bodies.find(u.body);
     if (body_it != w.bodies.end())
         ImGui::Text("Location: %s", body_it->second.name.c_str());
+}
+
+void draw_nation_summary(const world& w, entity_id id)
+{
+    auto it = w.nations.find(id);
+    if (it == w.nations.end())
+    {
+        ImGui::TextDisabled("\xe2\x80\x94");
+        return;
+    }
+
+    const nation_component& n = it->second;
+
+    // Title line: identity swatch, then the nation name in the selection colour.
+    draw_colour_swatch(palette::nation_colour(id));
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", n.name.c_str());
+
+    ImGui::Text("Tiles: %zu", n.tiles.size());
+    ImGui::Text("Ideology: %s", ideology_name(n.ideology));
+    ImGui::Text("Expansionism: %s", expansionism_name(n.expansionism));
+    ImGui::Text("Economic focus: %s", economic_focus_name(n.economic_focus));
+
+    // Top resources by abundance: collect non-zero entries, sort descending,
+    // and show the leading three with their identity swatches.
+    std::vector<std::pair<std::size_t, float>> ranked;
+    for (std::size_t r = 0; r < resource_count; ++r)
+        if (n.resource_abundance[r] > 0.0f)
+            ranked.emplace_back(r, n.resource_abundance[r]);
+
+    if (ranked.empty())
+    {
+        ImGui::TextDisabled("No notable resources");
+    }
+    else
+    {
+        const std::size_t top = std::min<std::size_t>(3, ranked.size());
+        std::partial_sort(ranked.begin(), ranked.begin() + top, ranked.end(),
+                          [](const auto& a, const auto& b) { return a.second > b.second; });
+        for (std::size_t i = 0; i < top; ++i)
+        {
+            const resource_presentation& rp =
+                presentation_of(static_cast<resource_type>(ranked[i].first));
+            draw_resource_swatch(rp);
+            ImGui::Text("%s: %.0f", rp.name, ranked[i].second);
+        }
+    }
+}
+
+void draw_corporation_summary(const world& w, entity_id id)
+{
+    auto it = w.corporations.find(id);
+    if (it == w.corporations.end())
+    {
+        ImGui::TextDisabled("\xe2\x80\x94");
+        return;
+    }
+
+    const corporation_component& c = it->second;
+
+    // Title line: name in the selection colour, flagged when it is the player's.
+    const bool is_player = c.is_player || id == w.player_entity;
+    if (is_player)
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
+                           "%s (Player)", c.name.c_str());
+    else
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
+                           "%s", c.name.c_str());
+
+    // Home nation, when the registration reference resolves.
+    auto nation_it = w.nations.find(c.home_nation);
+    if (nation_it != w.nations.end())
+        ImGui::Text("Nation: %s", nation_it->second.name.c_str());
+
+    ImGui::Text("Focus: %s", industrial_focus_name(c.focus));
+    ImGui::Text("Capital: %s", ui::fmt::credits(c.starting_capital).c_str());
+    ImGui::Text("Assets: %zu", c.assets.size());
 }
 
 } // namespace ui

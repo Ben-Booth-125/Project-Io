@@ -17,8 +17,10 @@ enum class selection_kind
     building, ///< A surface installation.
     market,   ///< A body's local market.
     unit,     ///< A unit / unit stack.
-    // Future kinds (nation, corporation, logistics vessel) slot in here once
-    // their component stores exist; see SELECTION.md (§ Polymorphism).
+    nation,   ///< A generated nation (political territory).
+    corporation, ///< A generated corporation (faction entity).
+    // Future kinds (logistics vessel, …) slot in here once their component
+    // stores exist; see SELECTION.md (§ Polymorphism).
 };
 
 /// Resolve the kind of @p e by probing the world's per-type component stores, in

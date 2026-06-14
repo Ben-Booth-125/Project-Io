@@ -45,6 +45,37 @@ difficulty 1–2 items an inline `Verification:` note in the task entry is suffi
 count, e.g.:
 `Status: Complete — 5/6 requirements met (R4 failed; see REQUIREMENTS.md § corporation-lens).`
 
+### Verifying when no skill or tool exists
+
+A task is only **complete** (see TASKS.md § Definition of "complete") when each of
+its requirements has actually had its **Verification** *run*. When that verification
+can be performed with an available skill or tool — a `build`, a `code:` grep, the
+headless harness, an existing visual-check skill — run it and record the result.
+
+For the `visual` class specifically, a tool now **does** exist: the headless
+visual-verification harness (`ProjectIo --verify scripts/verify/<name>.lua`; see
+DEVELOPMENT_PRACTICES.md § Visual verification). Author or extend a verify script
+and inspect the PNG captures rather than deferring to a manual human check.
+
+When **no** skill or tool exists to perform a requirement's verification, do not
+silently downgrade it to an assumption. Instead:
+
+1. **Determine a method.** Define a concrete, repeatable way to test the
+   requirement — what is exercised, what input, what observable pass/fail signal.
+2. **Implement it and save it for reuse.** Build the method as a durable, named
+   artifact wherever feasible — a headless harness case, a script under `scripts/`,
+   a documented procedure, or a new skill — so the next requirement of the same
+   shape reuses it rather than re-deriving it. Prefer a saved artifact over a
+   one-off manual check. Record the method (or a pointer to it) in the row's Notes.
+3. **Defer only when it needs design.** If establishing the method is impossible
+   without non-trivial design consideration — it needs new infrastructure, an
+   architectural decision, or its own scoping — do **not** block the task. Record
+   the testing-method work as a [`../TODO.md`](../TODO.md) item (with file pointers
+   and enough context to pick up), leave the requirement `pending` with the
+   deferral reason in Notes, and proceed. A requirement whose method is deferred is
+   **not** complete, and the task carrying it is at best *code-complete* until the
+   method lands and the verification is run.
+
 ### Agent workflow
 
 A planning agent writes both the TASKS.md group and this file's section together.
@@ -55,16 +86,7 @@ section here — it does not need the full TODO backlog or DEVLOG history in con
 
 ## Active requirements
 
-### corporation-lens
-
-| ID | Requirement | Verification | Status | Notes |
-|----|-------------|--------------|--------|-------|
-| R1 | `overlay_mode::corporation` is declared in `src/ui/ui_state.hpp` | `code: overlay_mode::corporation` | pending | |
-| R2 | `icons::corporation` is declared in `icons.hpp` and implemented in `icons.cpp` as a filled square with inner dot | `code: icons::corporation` + `visual` | pending | |
-| R3 | A corporation lens button is visible in the overlay strip on the Planetary canvas | `visual` | pending | |
-| R4 | Under the corporation lens, tiles with a corporate building are tinted in that corporation's colour | `visual` | pending | |
-| R5 | Player-corporation tiles are visually distinct from rival tiles (border or distinct colour) | `visual` | pending | |
-| R6 | Tiles with no corporate buildings render in terrain colour, not nation tint | `visual` | pending | |
-| R7 | The corporation lens render pass is guarded by `overlay_mode::corporation` and exists only in `body_surface_canvas.cpp` | `code: overlay_mode::corporation` in `body_surface_canvas.cpp`; absent from `solar_system_canvas.cpp` and `circumplanetary_canvas.cpp` | pending | |
-| R8 | `docs/ui/LENSES.md` exists and contains a Corporation lens section | `doc: docs/ui/LENSES.md` | pending | |
-| R9 | `docs/ui/LENSES.md` records the ownership definition (building-tile semantics, no influence radius) | `doc: docs/ui/LENSES.md` | pending | |
+*No active requirements. Both the visual-verification harness (Phase 1) and the
+corporation-lens groups completed 2026-06-14 — sections removed per the lifecycle
+above. See the DEVLOG entries "Visual-verification harness (Phase 1)" and
+"Corporation lens".*

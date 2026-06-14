@@ -1,15 +1,43 @@
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include "overlay.hpp"
 
+#include "icons.hpp"
+#include "presentation.hpp"
+
+#include <algorithm>
+
 namespace ui {
+
+namespace {
+
+/// Draw the lens glyph for @p m centred in @p rect with the given @p colour. The
+/// glyph half-extent is derived from the rect so the three icons read at one
+/// consistent size in the control strip.
+void draw_lens_icon(ImDrawList* dl, overlay_mode m, ImVec2 rect_min, ImVec2 rect_max, ImU32 colour)
+{
+    const ImVec2 centre = (rect_min + rect_max) * 0.5f;
+    const float  r      = std::min(rect_max.x - rect_min.x, rect_max.y - rect_min.y) * 0.5f - 2.0f;
+    switch (m)
+    {
+        case overlay_mode::supply:      icons::supply     (dl, centre, r, colour); break;
+        case overlay_mode::market:      icons::market     (dl, centre, r, colour); break;
+        case overlay_mode::faction:     icons::faction    (dl, centre, r, colour); break;
+        case overlay_mode::corporation: icons::corporation(dl, centre, r, colour); break;
+        default: break;
+    }
+}
+
+} // namespace
 
 const char* overlay_mode_name(overlay_mode m)
 {
     switch (m)
     {
-        case overlay_mode::supply:  return "Supply routes";
-        case overlay_mode::market:  return "Market";
-        case overlay_mode::faction: return "Faction presence";
-        default:                    return "None";
+        case overlay_mode::supply:      return "Supply routes";
+        case overlay_mode::market:      return "Market";
+        case overlay_mode::faction:     return "Faction presence";
+        case overlay_mode::corporation: return "Corporation ownership";
+        default:                        return "None";
     }
 }
 
@@ -17,10 +45,11 @@ const char* overlay_mode_short_name(overlay_mode m)
 {
     switch (m)
     {
-        case overlay_mode::supply:  return "Supply";
-        case overlay_mode::market:  return "Market";
-        case overlay_mode::faction: return "Faction";
-        default:                    return "None";
+        case overlay_mode::supply:      return "Supply";
+        case overlay_mode::market:      return "Market";
+        case overlay_mode::faction:     return "Faction";
+        case overlay_mode::corporation: return "Corp";
+        default:                        return "None";
     }
 }
 
@@ -31,10 +60,11 @@ void toggle_overlay(ui_state& ui, overlay_mode m)
 
 void draw_overlay_controls(ui_state& ui, float left_x, float bottom_y)
 {
-    // The three selectable lenses, in mode-bar order. overlay_mode::none is not a
+    // The selectable lenses, in mode-bar order. overlay_mode::none is not a
     // button — clicking the active lens clears back to it (toggle_overlay).
-    constexpr overlay_mode modes[3] = {
-        overlay_mode::supply, overlay_mode::market, overlay_mode::faction };
+    constexpr overlay_mode modes[4] = {
+        overlay_mode::supply, overlay_mode::market, overlay_mode::faction,
+        overlay_mode::corporation };
 
     ImGui::SetNextWindowPos({left_x, bottom_y}, ImGuiCond_Always, {0.0f, 1.0f});
     ImGui::SetNextWindowBgAlpha(0.65f);
@@ -51,16 +81,37 @@ void draw_overlay_controls(ui_state& ui, float left_x, float bottom_y)
     ImGui::Begin("##overlay_controls", nullptr, flags);
 
     ImGui::TextUnformatted("Lens:");
+
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    const float icon_size = ImGui::GetFrameHeight(); // square button matching control height
+
+    int idx = 0;
     for (overlay_mode m : modes)
     {
         ImGui::SameLine();
         const bool active = (ui.overlay == m);
-        if (active)
-            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-        if (ImGui::Button(overlay_mode_short_name(m)))
+
+        // Invisible button carries the click + hover; the glyph is drawn over its
+        // rect. The active lens gets a highlighted backing and a brighter glyph so
+        // the selected state reads without the worded label.
+        ImGui::PushID(idx++);
+        const bool clicked = ImGui::InvisibleButton("##lens", {icon_size, icon_size});
+        const ImVec2 rmin = ImGui::GetItemRectMin();
+        const ImVec2 rmax = ImGui::GetItemRectMax();
+        const bool   hovered = ImGui::IsItemHovered();
+
+        if (active || hovered)
+            dl->AddRectFilled(rmin, rmax,
+                ImGui::GetColorU32(active ? ImGuiCol_ButtonActive : ImGuiCol_ButtonHovered), 2.0f);
+
+        const ImU32 glyph = active ? palette::selection : palette::neutral;
+        draw_lens_icon(dl, m, rmin, rmax, glyph);
+
+        if (hovered)
+            ImGui::SetTooltip("%s", overlay_mode_name(m));
+        if (clicked)
             toggle_overlay(ui, m);
-        if (active)
-            ImGui::PopStyleColor();
+        ImGui::PopID();
     }
 
     ImGui::End();

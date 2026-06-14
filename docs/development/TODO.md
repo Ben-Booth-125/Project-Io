@@ -1,17 +1,21 @@
 # Project Io — TODO
 
 Parked thoughts and **described additions** — recorded but not yet actioned, and
-not yet committed designs. Each item is a *description of intent*: a change to
-make, a feature to build, or a doc to write, with enough context and file
-pointers to pick it up later. Items are deliberately deferred while
-higher-priority work takes precedence.
+not yet committed designs. Each item **describes the problem or the intended
+resolution** — a change to make, a feature to build, or a doc to write — with
+enough context and file pointers to pick it up later. Items are deliberately
+deferred while higher-priority work takes precedence.
+
+An item does **not** carry implementation detail: how to break the work into
+steps, scope it to files, or order/parallelise it is all deferred to TASKS
+promotion (see below). A TODO entry need only carry enough — the problem, the
+intended outcome, and rough file pointers — to *inform* that later planning.
 
 ## TODO vs. TASKS
 
 This file (TODO.md) holds **described intent**. [`TASKS.md`](TASKS.md) holds the
-**active, prioritised, actionable worklist** — the concrete, file-scoped
-breakdown we execute against (in the style of the A–F items the Selection info
-element was split into).
+**active, prioritised, actionable worklist** — the concrete, file-scoped,
+dependency-marked A–F breakdown we execute against.
 
 The workflow is one-directional. When we decide to act on a TODO item, we
 **promote** it into TASKS.md by breaking it into ordered, individually-scopable
@@ -24,12 +28,16 @@ tasks. Promotion is where we do the planning a TODO entry deliberately omits:
   that can run concurrently (potentially as parallel sub-agents on disjoint
   files), and which must wait. Steps that edit the same files stay sequential.
 
-A TODO item stays here (updated to note what has been done) even after parts of
-it are promoted; TASKS.md is the transient execution list, cleared as tasks
-complete. See [`TASKS.md`](TASKS.md) for the task format.
+TODO.md is **entirely forward-facing**: it holds only intent not yet realised. When
+work lands, its item is **removed** here (the record of what was built lives in the
+DEVLOG, not in TODO) — leaving behind only any genuinely open follow-up as its own
+forward item. TASKS.md is the transient execution list, cleared as tasks complete.
+See [`TASKS.md`](TASKS.md) for the task format.
 
-Difficulty scale: **1** trivial · **2** light work · **3** medium · **4** hard ·
-**5** very hard · **6** deferred
+Difficulty scale — a rough effort estimate where **lower = easier**:
+**1** trivial · **2** easy (light work) · **3** medium · **4** hard ·
+**5** very hard. **6** is not a difficulty but a **status**: deferred / out of
+prototype scope, to revisit later (its true effort is unestimated).
 
 ## Categories
 
@@ -46,46 +54,123 @@ currently hold items appear as sections below.
 
 ## Canvas
 
-- **[1] Circumplanetary max zoom.** Cap the Circumplanetary canvas so its most
-  zoomed-in framing shows roughly **0.3 AU** across. The Solar canvas zoom range
-  is fine as it currently is. Touches the zoom bound (`zoom_max`, shared with the
-  scroll wheel and `draw_scale_zoom_overlay`) in `circumplanetary_canvas.cpp` —
-  derive it from the per-anchor scale so the deepest zoom frames ~0.3 AU.
+- **[3] Design the lens system (complete the stubs).** `docs/ui/LENSES.md` now
+  exists but only the **Corporation** lens section is settled (written alongside that
+  lens's implementation); the **Supply / Market / Faction / Resource** sections are
+  **stubs** recording current behaviour only. Finish the per-lens design for those
+  four. The overlay control strip has four lenses today (`supply`, `market`,
+  `faction`, `corporation` — `overlay_mode` in `src/ui/ui_state.hpp`). Settle for
+  each remaining lens:
 
-- **[2] Map lens icons.** The overlay (map) lens control strip uses worded buttons
-  (Supply / Market / Faction). Switch them to **icons**, using the vector-glyph
-  icon helper (`src/ui/icons.hpp`), keeping the lens name in a hover tooltip.
-  Touches `draw_overlay_controls` in `src/ui/overlay.cpp`.
+  — **Per-lens specification** (what is shown, on which rung, and at what level of detail):
+    the three stubbed existing lenses (`Supply / Market / Faction`) plus the proposed
+    **Resource** lens (deposit density: colour tiles by their highest-value deposit, or by a
+    player-selected resource, with a gradient legend) — Resource still warrants its own icon
+    and entry alongside the current four.
 
-- **[4] Render the political layer (nations + corporations).** The v0.0.3 world
-  now *generates* nations (`world.nations`, `world.tile_to_nation`) and
-  corporations (`world.corporations`, with placed `building` assets), but **nothing
-  draws them** — the data is invisible in the app. Wire it into the existing
-  **Faction lens** on the Planetary canvas: tint/outline each tile by its owning
-  nation (stable per-nation colour keyed off the nation entity id), draw nation
-  borders where `tile_to_nation` changes between neighbours, and mark corporation
-  starting assets (their buildings) with a per-corporation glyph/marker, the player
-  corp distinguished. Make the per-nation and per-corporation summaries feed the
-  **Selection info element** (the shared per-entity content builders in
-  `entity_summary.{hpp,cpp}`) so a nation/corp can be inspected once it is
-  click-selectable. Decide the colour-assignment scheme (hash vs. palette-cycle),
-  whether borders draw on the base map or only under the Faction lens, and how the
-  legend reads. Touches `src/ui/overlay.cpp` (Faction lens path), the Planetary
-  canvas tile draw, `presentation.{hpp,cpp}` (nation/corp colour + name helpers),
-  and `entity_summary.{hpp,cpp}`. See `docs/ui/CANVASES.md`,
-  `docs/ui/SELECTION.md`, and the **Canvas hit-testing** follow-up under Ledger
-  (nations/corps are not yet canvas-selectable). Likely needs the **hover-card /
-  tooltip** work to land for rich faction read-outs.
+  — **Rung applicability table**: which lenses are meaningful at Solar, Circumplanetary, and
+    Planetary. Supply and Market span all three rungs (route lines on Solar, price summaries
+    at Circumplanetary, per-tile detail at Planetary); Faction/Corporation/Resource are
+    Planetary-first but may have coarser Solar/Circumplanetary representations later.
 
-- **[2] Default view should surface the generated world.** Decide and set the
-  **opening canvas / lens** so a fresh campaign immediately shows the populated
-  world rather than a bare map — e.g. open on Kepler's Planetary surface with the
-  Faction lens active (now that there is a political layer to show), or the
-  Circumplanetary view of the home body. Depends on the political-layer render
-  above being available. Touches the initial `ui_state` (active canvas / anchor /
-  lens) set at startup — likely in `src/core/app.cpp` or wherever `ui_state` is
-  seeded. Confirm the intended first-frame framing with a quick check before
-  finalising.
+  — **Icon vocabulary**: one distinct vector glyph per lens. Supply/Market/Faction/
+    Corporation glyphs exist and are ratified in ICONS.md; the **Resource** glyph is the
+    one still to spec.
+
+  — **Legend format**: how the active lens is labelled on-canvas (chip, strip, or implicit
+    via the icon highlight alone), and how a colour key is surfaced when the lens uses a
+    palette (nation colours, resource identity colours).
+
+  — **Interaction notes**: whether lenses are Planetary-only or propagate to the minimap;
+    whether multiple lenses can be active simultaneously (currently no — single `overlay_mode`
+    enum); whether any lens requires data not yet generated (e.g. Resource needs deposit data
+    already present; Corporation needs `w.corporations` which already exists).
+
+  Design authority once written: `docs/ui/LENSES.md` (this doc); icon glyphs also propagate
+  to `src/ui/icons.hpp`. Refer to `docs/ui/CANVASES.md` for rung descriptions and
+  `docs/ui/LAYOUT.md` for the strip's position in the shell.
+
+- **[3] Visual-verification harness — Phase 2: reusable verification (keyboard
+  vocabulary + script library + skill promotion).** Phase 1 (the headless `--verify`
+  capture path) landed 2026-06-14 (see DEVLOG). Phase 2's goal is that **a visual check
+  no longer requires hand-writing a bespoke `.lua` each time** — most checks should be a
+  one-liner or a parameter, and a *proven* check should be promotable to a permanent,
+  reusable asset. Three strands, settle the split at promotion:
+
+  — **A. Full keyboard canvas navigation (player-facing).** A defined keybinding
+    vocabulary for every canvas action: ladder descend/ascend, cycle body, pan/zoom,
+    cycle/select lens, capture. The "limited access" manual-drive surface (keyboard +
+    in-app capture, no mouse/pixel IO), useful to real players, not just tests. Touches
+    `process_events` (`src/core/app.cpp`) and the canvas input paths. Settle the
+    keybinding table here. The same command set should back both the keys *and* the
+    verify API, so a script reads like a sequence of canvas commands.
+
+  — **B. Reusable verify-script library (so scripts aren't custom each time).** A shared
+    Lua module (e.g. `scripts/verify/lib.lua`) of high-level, parameterised helpers
+    layered over the low-level `verify` API — e.g. `sweep_overlays(prefix)` (capture the
+    active surface under each lens), `tour_buildings(zoom)` (centre+capture each corp
+    building, using `log_buildings` data), `frame_tile(x, y, zoom)` (the pan math from the
+    corporation-lens script, generalised so callers stop hand-computing pan). A new check
+    becomes "require the lib, call a helper with the body/lens you care about" rather than
+    a from-scratch script. Fold the pan-centring math into the C++ `verify` API
+    (`verify.center_tile(x, y)`) so Lua callers never replicate the canvas transform.
+
+  — **C. Promote a proven check to a permanent skill (the "authorize as a skill" path).**
+    Once a verify scenario is validated, it should be promotable to a reusable, named
+    **verifier skill** under `.claude/skills/verifier-*` (the `verify` skill already
+    auto-discovers these) that wraps `ProjectIo --verify <script>` for a given
+    feature — so re-running that visual check is a single authorised invocation, not
+    bespoke authoring, and survives across sessions. Decide the skill's shape (one
+    general `verifier-visual` that takes a script argument, vs. per-feature skills), how
+    it captures+reports evidence, and how a developer "authorises" a script into the
+    permanent set. This is the strand that most directly speeds development.
+
+  See `docs/development/DEVELOPMENT_PRACTICES.md` § Visual verification and the Phase 1
+  entry points (`app::run_verify`, `scripts/verify/corporation_lens.lua`).
+
+- **[3] Visual-verification harness — golden-image diffing (deferred).** Phase 1 outputs
+  PNGs for human/Claude inspection only. A later iteration could add committed reference
+  images + a pixel-tolerance diff for automatic pass/fail on the `visual` class. Needs:
+  golden storage, a tolerance model (anti-aliasing / font jitter), and a CI decision.
+  Builds on `write_png_rgba` (`src/core/png_writer.cpp`) and `app::run_verify`.
+
+- **[1] Corporation lens player-tile border is redundant.** Found during the 2026-06-14
+  visual verification: under the corporation lens the player's tile is filled
+  `faction_colour(0)` *and* outlined `faction_colour(0)`, so the border is invisible
+  against its own fill (R5 still holds via the distinct fill colour, but the border adds
+  nothing). Recolour the player border for contrast — e.g. `palette::selection` (white) or
+  the dark outline — so the player's holdings pop against both their own fill and rivals.
+  Touches the corporation branch in `src/ui/body_surface_canvas.cpp`; update
+  `docs/ui/LENSES.md` § Corporation lens to match.
+
+- **[2] Resolve icon silhouette collisions & contract mismatch.** Two glyphs in
+  `src/ui/icons.cpp` share a silhouette with another, distinguished only by colour or
+  outline, and one contract is wrong (see `docs/ui/ICONS.md` § Open clarifications 1–2):
+  (a) the **extraction-site** building marker and the **resource pip** are both filled
+  diamonds; (b) the **port** building marker and the **unit/convoy** marker are both filled
+  upward triangles; and the `icons.hpp` doc for `unit` calls it "an upward **chevron**" while
+  the code draws a solid triangle. Decide per collision whether to redraw one glyph for a
+  distinct silhouette (e.g. make `unit` a true open chevron, separating it from `port`) or
+  to accept the overlap because the two never co-occur — then make the header contract and
+  the implementation agree. Touches `src/ui/icons.{hpp,cpp}` and `docs/ui/ICONS.md`.
+
+- **[2] Settle icon outline & colour conventions.** The filled-glyph dark outline is applied
+  inconsistently — `building` and `faction` carry it "for contrast on any terrain", but
+  `unit` (also canvas-drawn) does not — and the `colour` parameter means *fill* for some
+  glyphs and *stroke* for others (see `docs/ui/ICONS.md` § Open clarifications 3–4). Decide a
+  rule (e.g. every canvas-placed filled glyph outlines; document the fill-vs-stroke meaning
+  per family) and bring the implementations into line with it. Touches
+  `src/ui/icons.{hpp,cpp}` and `docs/ui/ICONS.md`.
+
+- **[2] Verify icon usage is consistent across the app.** Audit every `ui::icons::*` call
+  site against `docs/ui/ICONS.md`: that the right glyph is used for each meaning, that sizes
+  (the `r` half-extent) and colour sources are consistent within a context, that no two
+  glyphs collide in a shared surface, and that the catalogue in ICONS.md matches the actual
+  call sites. Produce a short findings list and fix the cheap discrepancies; promote anything
+  larger to its own item. Call sites today: `body_surface_canvas.cpp` (building markers),
+  `overlay.cpp` (lens buttons), `nav_pane.cpp` (ledger/placeholder), `entity_summary.cpp` /
+  `tile_inspector.cpp` (resource swatches). Touches whichever call sites drift; reference
+  `docs/ui/ICONS.md`.
 
 - **[6] Informative tooltip / hover-card system.** Deferred. The single most important
   player-communication surface for a grand strategy game. Today there is one
@@ -129,15 +214,8 @@ currently hold items appear as sections below.
 
 ### Selection info element
 
-**Implemented** (the original A–D breakdown): the pinned, polymorphic Selection
-info element, the single-click-selects / double-click-navigates click model, the
-shared per-entity content builders, and the panel itself. Design in
-`docs/ui/SELECTION.md`; the three interaction states in `docs/glossary.md`; build
-notes in the 2026-06-14 DEVLOG entry. Files: `src/ui/selection.{hpp,cpp}`,
-`entity_summary.{hpp,cpp}`, `selection_panel.{hpp,cpp}`, the three canvas click
-handlers, and `ui_state.hpp`.
-
-Remaining / follow-up intent (promote to TASKS.md when actioned):
+Follow-up intent for the Selection info element (design in `docs/ui/SELECTION.md`;
+shared per-entity content builders in `entity_summary.{hpp,cpp}`):
 
 - **[3] 'Go to' should land on the planetary tile view.** Today the panel's
   'go to' (and double-click) routes a **body** through `focus_on_entity` →
@@ -186,40 +264,33 @@ Remaining / follow-up intent (promote to TASKS.md when actioned):
   derivation is a natural section of a tile's rich card. See
   `docs/generation/TILE_GENERATION.md` (§ Generation history hook).
 
+## Infrastructure
+
+- **[3] Verify building placement rules per building type.** Confirm that buildings are only
+  placed on terrain valid for their type, per `docs/economy/PRODUCTION.md` (§ Extraction
+  buildings / Processing): placement is valid only on tiles with a non-zero deposit of the
+  target type, or terrain where that deposit can occur — e.g. Lumber Camp on forest/wetland,
+  Oil Platform on barren, Ice Extractor on icy, never on `ocean`. Note the granularity gap:
+  PRODUCTION.md names specific buildings (Mine, Quarry, Farm, …) but the `building_type` enum
+  only has `extraction_site` / `processing_facility` / `port`, so "valid terrain" must be
+  checked at whatever resolution the code actually enforces. The live placement path today is
+  the corporation starting-asset pass (`src/world/corporation_generation.cpp`, Pass 3) — audit
+  whether its terrain/deposit guard matches the documented rules, and whether any placed asset
+  landed on invalid terrain. Produce a findings list; fix cheap gaps, promote larger ones.
+  This also seeds the (future) player build-validation rule. See `docs/economy/PRODUCTION.md`
+  and `src/world/components.hpp` (`building_type`, `tile_component`).
+
 ## Environment
 
-This category covers the whole **world-generation** layer — terrain, nations, and
-corporations — the spine of v0.0.3. The terrain pass is built; the political and
-economic generation layers are net-new and described below. Design authority lives
-in `docs/generation/{TILE,NATION,CORPORATION}_GENERATION.md`.
+The world-generation layer — terrain, nations, corporations. Design authority:
+`docs/generation/{TILE,NATION,CORPORATION}_GENERATION.md`.
 
 ### Tile generation (terrain)
 
-The two-axis terrain model and the six-pass procedural generation are
-**implemented** (`src/world/tile_generation.{hpp,cpp}`, driven by per-body
-`body_profile`s in `hard_coded_world.cpp`; design authority in
-`docs/generation/TILE_GENERATION.md`). What remains is tuning and refinement, not
-new structure. The three knobs below had an **initial v0.0.3 tuning pass applied**
-(Selene icy 52%→33%; mountain/rift rings 2→3, crater 1→2, `scale_to_area` ref
-1800→1200; Kepler Pass 2 `bias_amp` 0.15→0.07). They remain live tuning levers —
-the values moved the right direction but still want eyeball tuning (Kepler forest
-~0.9% / wetland ~0.5% are improved but modest):
-
-- **[2] Landform prominence.** Mountain/rift/crater clusters are small and sparse
-  by the doc's tight ring transitions, even after the area-scaling of seed counts.
-  Dial cluster radius and/or seed density up if more prominent ranges are wanted —
-  the levers are `shape_of()` (ring count + decay) and `scale_to_area()` in
-  `tile_generation.cpp`.
-
-- **[2] Kepler biome balance.** The equatorial ocean bias (`bias_amp = 0.15` in
-  Pass 2) drowns most tropical/subtropical land, so forest and wetland are sparse
-  on the home planet (~1% / ~0%). Lower the bias to widen the habitable belt, or
-  decouple the volcanic/forest belts from the wettest equatorial rows.
-
-- **[1] Selene ice cap size.** Selene reads as ~52% icy because the `cold` polar
-  band spans the outer 50% of rows (per the Pass 3 table) and every polar row ices
-  over on a polar-frozen body. Narrow the `cold` polar band, or add a tighter
-  polar-cap override distinct from the climate band, if a smaller cap is wanted.
+- **[2] Kepler biome balance.** Forest and wetland remain sparse on the home planet
+  (~1% / ~0.5%). Widen the habitable belt — lower the Pass 2 equatorial ocean bias
+  (`bias_amp`) further, or decouple the volcanic/forest belts from the wettest
+  equatorial rows. Lever in `tile_generation.cpp`.
 
 - **[4] Tile generation refinements (deferred).** The larger production passes
   noted in `TILE_GENERATION.md` § Deferred: solar-parameter derivation from orbital
@@ -229,54 +300,13 @@ the values moved the right direction but still want eyeball tuning (Kepler fores
 
 ### Nation generation
 
-**Implemented** (v0.0.3). The five-pass pipeline now runs on Kepler at world
-construction: `src/world/nation_generation.{hpp,cpp}` (`generate_nations`), with
-`nation_component` + the `ideology`/`expansionism`/`economic_focus` enums in
-`components.hpp` and the `nations` / `tile_to_nation` stores in `world.hpp`.
-Verified: 10 nations, no ocean claimed, no empty nations, varied territory. Design
-authority: `docs/generation/NATION_GENERATION.md`. The original task breakdown is
-kept below for reference; remaining open item:
+Design authority: `docs/generation/NATION_GENERATION.md`.
 
 - **[2] Orphan-island assignment (refinement).** The cardinal-adjacency Voronoi
   BFS cannot cross water, so landmasses disconnected from every seed stay
-  unclaimed (~708 / 6048 Kepler land tiles ≈ 12%). Defensible as "unclaimed
-  islands", but if full land coverage is wanted, add a post-pass assigning each
-  orphan island component to the nearest nation across water. `nation_generation.cpp`.
-
-- **[3] Nation data model.** Add a `nation_component` (name, owned-tile set,
-  derived resource-profile descriptor, political character) and a world store +
-  `null`-able tile→nation back-reference. Foundation for every pass below. Touches
-  `src/world/components.hpp`, `src/world/world.{hpp,cpp}`,
-  `src/world/tile_generation.hpp` (tile ownership field).
-
-- **[3] Pass 1 — seed placement.** Place `nation_count` seeds on landmass tiles,
-  preferring habitable compositions (grassland/forest/wetland) and enforcing a
-  minimum tile separation. Seeded RNG from a campaign seed. New
-  `src/world/nation_generation.{hpp,cpp}`.
-
-- **[4] Pass 2 — territory expansion (Voronoi BFS).** Grow each seed by weighted
-  Voronoi BFS: never claim ocean, decay expansion probability with distance, treat
-  high-`H` tiles (mountains/highlands) as soft barriers that drain the expansion
-  budget so ranges fall near borders. Run until all claimable land is assigned.
-  `src/world/nation_generation.cpp`.
-
-- **[3] Pass 3 — resource profile derivation.** Sum each nation's tile deposit
-  profiles (weighted by composition) into a read-only abundance descriptor
-  (`iron_ore_abundance`, `agricultural_abundance`, …) used by diplomacy init and
-  corporation generation. `src/world/nation_generation.cpp`.
-
-- **[3] Pass 4 — political character assignment.** Draw `ideology`,
-  `expansionism`, `economic_focus` per the NATION_GENERATION.md attribute table
-  from the seeded pass. (Sentiment-graph seeding is deferred with the diplomacy
-  system; only store the attributes now.) `src/world/nation_generation.cpp`,
-  `src/world/components.hpp`.
-
-- **[2] Pass 5 — naming.** Generate names from a seeded culture-flavoured template
-  bank (structural form + phoneme table); no authored name list.
-  `src/world/nation_generation.cpp`.
-
-- **[2] Campaign hook.** Run the nation pipeline for Kepler at world construction
-  (8–12, tunable), after tile generation. `src/world/hard_coded_world.cpp`.
+  unclaimed (~12% of Kepler land). Defensible as "unclaimed islands", but if full
+  land coverage is wanted, add a post-pass assigning each orphan island component
+  to the nearest nation across water. `nation_generation.cpp`.
 
 - **[6] Deferred — nation behaviour & production passes.** Per NATION_GENERATION.md
   § Open items: the nation *system* (tax, licences, war, infrastructure), the
@@ -285,46 +315,7 @@ kept below for reference; remaining open item:
 
 ### Corporation generation
 
-**Implemented** (v0.0.3). The five-pass pipeline runs after nation generation at
-world construction: `src/world/corporation_generation.{hpp,cpp}`
-(`generate_corporations`), with `industrial_focus` + `corporation_component` in
-`components.hpp` and the `corporations` store in `world.hpp`. It now sets
-`world.player_entity` to the flagged corp (previously an unset id; the Kepler
-player unit's `owner` now resolves to it). Verified: 8 corporations, exactly one
-player, all with home nations, all placing a collision-free starting asset, diverse
-focus + capital. Design authority: `docs/generation/CORPORATION_GENERATION.md`. The
-original task breakdown is kept below for reference.
-
-- **[3] Corporation data model.** Add a `corporation_component` (name, home-nation
-  id, `industrial_focus`, starting capital, `is_player`) and a world store; reuse
-  `world.player_entity` for the flagged corp. Foundation for the passes below.
-  Touches `src/world/components.hpp`, `src/world/world.{hpp,cpp}`. Depends on the
-  nation data model.
-
-- **[3] Pass 1 — nation assignment.** Pick each corp's home nation weighted by the
-  nation's `economic_focus` and current corp distribution, with a balancing factor
-  so no nation hosts all corps. New `src/world/corporation_generation.{hpp,cpp}`.
-
-- **[2] Pass 2 — industrial focus assignment.** Draw `industrial_focus`
-  (extraction/processing/trade) with probability shaped by the home nation's
-  `economic_focus` and the running distribution. `src/world/corporation_generation.cpp`.
-
-- **[4] Pass 3 — starting asset placement.** Place opening buildings on tiles in
-  the home nation's territory per focus (high-deposit tiles for extraction,
-  high-connectivity for trade), collision-checked so no two corps share a tile.
-  Reuses the building/stockpile components. `src/world/corporation_generation.cpp`.
-
-- **[2] Pass 4 — financial profile.** Assign starting capital from a seeded range
-  with a `wealth_variance` spread; processing/trade focus gets a slight premium.
-  `src/world/corporation_generation.cpp`.
-
-- **[2] Pass 5 — naming.** Generate corporate names from a template bank
-  (structural forms + seeded identifiers / home-territory references).
-  `src/world/corporation_generation.cpp`.
-
-- **[2] Player flag & campaign hook.** Flag one generated corp `is_player` (fixed
-  assignment for now) and run the pipeline at world construction after nation
-  generation. `src/world/corporation_generation.cpp`, `src/world/hard_coded_world.cpp`.
+Design authority: `docs/generation/CORPORATION_GENERATION.md`.
 
 - **[6] Deferred — corporation selection screen & behaviour.** Per
   CORPORATION_GENERATION.md § Open items: the analytical corp-selection/re-roll

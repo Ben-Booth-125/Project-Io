@@ -82,6 +82,21 @@ inline constexpr int faction_slot_count = 6;
 /// @return     The faction's reserved colour.
 ImU32 faction_colour(int slot);
 
+/// Number of distinct nation identity colours. Larger than faction_slot_count
+/// because a generated world holds many nations; the Faction-lens tile tint
+/// keys off this palette via nation_colour.
+inline constexpr int nation_slot_count = 12;
+
+/// Stable on-canvas identity colour for a nation, keyed by its entity id. A
+/// multiplicative (Knuth) hash spreads sequential ids across the palette so
+/// neighbouring nations (often consecutive ids) rarely share or sit adjacent in
+/// hue. Distinct from the faction palette: nations tint territory, factions mark
+/// ownership.
+///
+/// @param id Nation entity id.
+/// @return   The nation's identity colour.
+ImU32 nation_colour(entity_id id);
+
 } // namespace palette
 
 /// Semantic colour for a value's direction: positive/negative/neutral.

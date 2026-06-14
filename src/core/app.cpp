@@ -1,5 +1,7 @@
 #include "app.hpp"
 
+#include "png_writer.hpp"
+
 #include <imgui.h>
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_sdlrenderer3.h>
@@ -22,6 +24,7 @@
 #include "world/orbital_system.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
@@ -30,6 +33,38 @@
 
 static constexpr int window_w = 1280;
 static constexpr int window_h = 720;
+
+namespace {
+
+/// Map a lens name (as used in the verify scripts) to its overlay_mode. Unknown
+/// names fall back to overlay_mode::none.
+overlay_mode overlay_from_name(const std::string& s)
+{
+    if (s == "supply")      return overlay_mode::supply;
+    if (s == "market")      return overlay_mode::market;
+    if (s == "faction")     return overlay_mode::faction;
+    if (s == "corporation") return overlay_mode::corporation;
+    return overlay_mode::none;
+}
+
+/// Find a body by case-insensitive name, or the home body for "home". Returns
+/// null_entity when no match is found.
+entity_id find_body(const world& w, const std::string& name)
+{
+    if (name == "home")
+        return w.home_body;
+    auto lower = [](std::string v) {
+        for (char& c : v) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        return v;
+    };
+    const std::string target = lower(name);
+    for (const auto& [id, body] : w.bodies)
+        if (lower(body.name) == target)
+            return id;
+    return null_entity;
+}
+
+} // namespace
 
 app::app()
 {
@@ -75,6 +110,27 @@ int app::run()
         m_sim_loop.set_speed(cfg.get_or("default_speed", 1));
     }
 
+    setup_world();
+
+    bool running = true;
+    while (running)
+    {
+        process_events(running);
+        m_sim_loop.tick();
+
+        // Advance orbital motion by the in-game days elapsed this frame. Freezes
+        // automatically while paused, since elapsed_days() stops advancing.
+        const double now_days = m_sim_loop.elapsed_days();
+        advance_orbits(m_world, now_days - m_last_orbit_days);
+        m_last_orbit_days = now_days;
+
+        render();
+    }
+    return 0;
+}
+
+void app::setup_world()
+{
     m_world = make_hard_coded_world();
 
     // Set the initial solar zoom so the default view covers roughly 5 AU.
@@ -112,21 +168,84 @@ int app::run()
     // Routed through the shared focus helper rather than poking ui_state.
     ui::focus_on_surface(m_world, m_ui, start_body);
 
-    bool running = true;
-    while (running)
+    // Open with the Faction lens active so the generated political layer (nation
+    // territory tints + borders) is visible on the first frame rather than a bare
+    // terrain map. See TODO § Canvas (political layer render).
+    m_ui.overlay = overlay_mode::faction;
+}
+
+int app::run_verify(const std::string& script_path)
+{
+    // Deterministic, non-interactive setup: fixed window (the window_w/window_h
+    // constants), seeded world, sim left paused so orbits and ticks never advance
+    // between captures. The script drives view/overlay state directly.
+    setup_world();
+    m_sim_loop.set_speed(0);
+
+    // Expose the `verify` API. Each function writes ui_state directly — the
+    // "direct state manipulation" driver — so captures are reproducible without
+    // any synthetic input. capture() renders one frame and saves it as a PNG.
+    sol::state& L = m_lua.state();
+    sol::table  v = L.create_named_table("verify");
+
+    v.set_function("goto_surface", [this](const std::string& name) {
+        const entity_id b = find_body(m_world, name);
+        if (b != null_entity)
+            ui::focus_on_surface(m_world, m_ui, b);
+    });
+    v.set_function("set_overlay", [this](const std::string& name) {
+        m_ui.overlay = overlay_from_name(name);
+    });
+    v.set_function("set_zoom", [this](float z) { m_ui.planetary_zoom = z; });
+    v.set_function("set_pan",  [this](float x, float y) {
+        m_ui.planetary_pan_x = x;
+        m_ui.planetary_pan_y = y;
+    });
+    v.set_function("add_pan",  [this](float dx, float dy) {
+        m_ui.planetary_pan_x += dx;
+        m_ui.planetary_pan_y += dy;
+    });
+    v.set_function("capture", [this](const std::string& name) { capture_frame(name); });
+
+    // Diagnostic: log every corporation building's grid position and owner so a
+    // script author (or Claude) can aim the pan/zoom at the corporate tiles.
+    v.set_function("log_buildings", [this]() {
+        for (const auto& [corp_id, corp] : m_world.corporations)
+        {
+            const bool player = (corp_id == m_world.player_entity);
+            for (entity_id bld_id : corp.assets)
+            {
+                const auto bld_it = m_world.buildings.find(bld_id);
+                if (bld_it == m_world.buildings.end())
+                    continue;
+                const auto tile_it = m_world.tiles.find(bld_it->second.tile);
+                if (tile_it == m_world.tiles.end())
+                    continue;
+                SDL_Log("verify building: corp=%u%s body=%u grid=(%d,%d)",
+                        static_cast<unsigned>(corp_id), player ? " [player]" : "",
+                        static_cast<unsigned>(tile_it->second.body),
+                        tile_it->second.grid_x, tile_it->second.grid_y);
+            }
+        }
+    });
+
+    try
     {
-        process_events(running);
-        m_sim_loop.tick();
-
-        // Advance orbital motion by the in-game days elapsed this frame. Freezes
-        // automatically while paused, since elapsed_days() stops advancing.
-        const double now_days = m_sim_loop.elapsed_days();
-        advance_orbits(m_world, now_days - m_last_orbit_days);
-        m_last_orbit_days = now_days;
-
-        render();
+        m_lua.load(script_path);
+    }
+    catch (const std::exception& e)
+    {
+        SDL_Log("verify script failed: %s", e.what());
+        return 1;
     }
     return 0;
+}
+
+void app::capture_frame(const std::string& name)
+{
+    m_capture_name      = name;
+    m_capture_requested = true;
+    render(); // composits the frame, then save_screenshot() runs before present
 }
 
 void app::process_events(bool& running)
@@ -385,20 +504,37 @@ void app::save_screenshot()
     if (!surface)
     {
         SDL_Log("Screenshot failed: %s", SDL_GetError());
+        m_capture_name.clear();
+        return;
+    }
+
+    // Normalise to a known RGBA byte layout so the PNG writer can consume the
+    // pixels directly regardless of the renderer's native backbuffer format.
+    SDL_Surface* rgba = SDL_ConvertSurface(surface, SDL_PIXELFORMAT_RGBA32);
+    SDL_DestroySurface(surface);
+    if (!rgba)
+    {
+        SDL_Log("Screenshot convert failed: %s", SDL_GetError());
+        m_capture_name.clear();
         return;
     }
 
     std::error_code ec;
     std::filesystem::create_directories("screenshots", ec);
 
-    char path[128];
-    std::snprintf(path, sizeof(path), "screenshots/io_%llu.bmp",
-        static_cast<unsigned long long>(SDL_GetTicks()));
+    char path[256];
+    if (!m_capture_name.empty())
+        std::snprintf(path, sizeof(path), "screenshots/%s.png", m_capture_name.c_str());
+    else
+        std::snprintf(path, sizeof(path), "screenshots/io_%llu.png",
+            static_cast<unsigned long long>(SDL_GetTicks()));
 
-    if (SDL_SaveBMP(surface, path))
+    if (write_png_rgba(path, rgba->w, rgba->h,
+                       static_cast<const unsigned char*>(rgba->pixels), rgba->pitch))
         SDL_Log("Screenshot saved: %s", path);
     else
-        SDL_Log("Screenshot save failed: %s", SDL_GetError());
+        SDL_Log("Screenshot save failed: %s", path);
 
-    SDL_DestroySurface(surface);
+    SDL_DestroySurface(rgba);
+    m_capture_name.clear();
 }

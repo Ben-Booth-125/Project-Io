@@ -6,6 +6,173 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## 2026-06-14 — Visual-verification harness (Phase 1) + Corporation lens closed
+
+**Status:** Complete — visual-harness V1–V6 met; corporation-lens R2–R6 re-verified
+and the cancelled group closed (all 9 rows met). Full app builds clean (Debug, exit
+0); `--verify` runs headless and exits 0.
+
+### What was built
+
+Phase 1 of the automated visual-verification harness — the tool that makes the
+`visual` requirement class runnable without a human at the screen (it had been the
+blocker that cancelled the corporation-lens group earlier this session).
+
+- **PNG writer** (`src/core/png_writer.{hpp,cpp}`): dependency-free
+  `write_png_rgba()` — stored-DEFLATE zlib + CRC32/adler32. Chosen over vendoring
+  stb_image_write (no fetch) and over keeping BMP (the Read tool reads PNG, not BMP,
+  so Claude can inspect captures directly).
+- **Capture → PNG** (`src/core/app.cpp`): `save_screenshot()` now converts the
+  `SDL_RenderReadPixels` surface to RGBA32 and writes PNG; supports a named capture
+  (F12 keeps the timestamped path).
+- **`--verify <script>` mode** (`src/core/app.{hpp,cpp}`, `src/main.cpp`):
+  `run_verify()` sets up a deterministic session (fixed window, seeded
+  `make_hard_coded_world`, sim paused), binds a `verify` Lua table
+  (`goto_surface`, `set_overlay`, `set_zoom`, `set_pan`, `add_pan`, `capture`,
+  `log_buildings`) wired straight to `ui_state` (direct-state driver), runs the
+  script, exits. `setup_world()` extracted from `run()` so both share one start state.
+- **Corporation-lens verify script** (`scripts/verify/corporation_lens.lua`):
+  captures the home surface under none/faction/corporation and zooms onto the player
+  building (22,82) and a rival (42,63).
+- **Docs** (`DEVELOPMENT_PRACTICES.md` § Visual verification, `req/REQUIREMENTS.md`
+  policy): the harness is now the standard `visual` verification method.
+
+### Verification result (corporation lens R2–R6)
+
+Ran `ProjectIo --verify`; inspected the PNGs via the Read tool. Confirmed: the
+corporation lens button (square+dot glyph) is present and active in the strip
+(R2/R3); the player tile tints `faction_colour(0)` blue and a rival tile tints a
+distinct hashed colour (coral) — R4 and R5; surrounding non-corporate tiles stay
+terrain-coloured (R6). The cancelled corporation-lens group is now closed.
+
+### In-session decisions
+
+**Driver = direct state manipulation (owner's call).** The verify API writes
+`ui_state` directly rather than injecting keys, so captures are reproducible. Full
+keyboard navigation is deferred to Phase 2 (player-facing; TODO § Canvas).
+
+**Pan aiming is empirical.** `set_pan` takes screen pixels; the pan to centre a tile
+is `(grid_centre − tile_local) · zoom`, derived/confirmed against a capture rather
+than replicating the canvas's title-bar/font-dependent transform in two places.
+
+### Open items / findings
+
+- **Player-tile border is redundant** under the corporation lens — fill and border
+  are both `faction_colour(0)`, so the border is invisible. R5 holds via the fill
+  colour; logged as a `[1]` TODO § Canvas to recolour the border for contrast.
+- A script edited after a build is stale in `build/Debug/scripts` until the next
+  build; run `--verify` against the source path (`../../scripts/...`) when iterating.
+
+---
+
+## 2026-06-14 — Corporation lens
+
+**Status:** Code-complete, then **CANCELLED** — 4/9 requirements met (R1, R7, R8, R9);
+the 5 visual rows (R2-visual, R3–R6) are `failed` (no `visual` tool; computer-use
+declined). Full app builds clean (Debug, exit 0); all changed translation units
+compile and link into `ProjectIo.exe`. The code remains in the tree. Per the new
+TASKS.md § "Cancelling a task group", the group was cancelled rather than left
+half-tracked: requirements marked `failed`, intent merged back into TODO § Canvas
+"Corporation lens — verify the landed code", task stubs removed from TASKS.md. The
+reusable verification method is TODO § Canvas "Automated visual-verification harness".
+
+### What was built
+
+Promoted and executed the **Corporation lens** group from TASKS.md (TODO § Canvas
+[4]). A → {B, C} → D; all run in the main session (the canvas integrator owns the
+hotspot file, and B/C are trivial enough not to warrant fan-out).
+
+- **A — `docs/ui/LENSES.md` created.** New design authority for the lens system.
+  The Corporation section is fully settled (ownership = a tile carrying a corporate
+  building via `w.corporations[].assets` → `building_component.tile`, **no influence
+  radius**; Planetary-only; player corp = `faction_colour(0)` + border, rivals =
+  per-corp hash; unowned = terrain colour, no nation underlay). The other four lens
+  sections are stubs recording current behaviour.
+- **B — `icons::corporation` added** (`icons.{hpp,cpp}`): a filled square with a
+  centred dark inner dot — a "seal" silhouette distinct from the processing-facility
+  plain square, the extraction diamond, and the port/unit triangle.
+- **C — `overlay_mode::corporation` added** (`ui_state.hpp`) and wired into the
+  overlay strip (`overlay.cpp`): glyph dispatch, `overlay_mode_name`
+  ("Corporation ownership"), `overlay_mode_short_name` ("Corp"), and the strip
+  `modes` array (now four lenses).
+- **D — render pass in `body_surface_canvas.cpp`.** Under `overlay_mode::corporation`:
+  owned tiles tint to their corp colour; player-corp tiles additionally get a thin
+  `faction_colour(0)` hex outline; unowned tiles stay terrain-coloured. Guarded
+  entirely behind the corporation branch — no change on Solar/Circumplanetary.
+
+### In-session decisions
+
+**Extracted a shared `corp_colour` lambda.** The building-marker pass already
+inlined the player-vs-rival colour logic (faction slot 0 for the player, a
+multiplicative hash kept off slot 0 for rivals). The lens tint must agree with the
+markers, so the logic was lifted into one lambda used by both — a single source of
+truth rather than a second copy.
+
+### Open items
+
+- Visual confirmation of R2/R3–R6 (glyph reads correctly in the strip; tints,
+  player border, and unowned-terrain fallback render as intended) still pending —
+  needs an in-GUI run.
+
+---
+
+## 2026-06-14 — Layer 3 foundations: political-layer render, lens icons, Circumplanetary zoom cap
+
+**Status:** Complete (code). Full app builds clean (Debug, exit 0); all six changed
+translation units compile and link into `ProjectIo.exe`. Not yet visually run in
+the GUI.
+
+### What was built
+
+Promoted the four sub-difficulty-6 Canvas items from TODO.md into TASKS.md and
+executed them in four waves, using **parallel sub-agents on disjoint file scopes**
+for the substantial branch and the main session for foundations, hotspots, and
+integration.
+
+- **Wave 1 (foundations, main session):** Circumplanetary `zoom_max` derived from
+  `max_moon_au / 0.15` so the deepest zoom frames ~0.3 AU
+  (`circumplanetary_canvas.cpp`); three lens glyphs `supply`/`market`/`faction`
+  added to `icons.{hpp,cpp}`; `palette::nation_colour(entity_id)` — a 12-slot hue
+  wheel keyed by a Knuth multiplicative hash — added to `presentation.{hpp,cpp}`.
+- **Wave 2 (concurrent sub-agents on disjoint files):** nation/corporation stat-block
+  builders `draw_nation_summary`/`draw_corporation_summary` (`entity_summary.{hpp,cpp}`)
+  ∥ the Faction-lens render in `body_surface_canvas.cpp` (nation tile tint + odd-r
+  neighbour borders via midpoint-perpendicular edges + per-corporation building
+  marker colours). Map-lens icon buttons wired into `overlay.cpp` inline meanwhile.
+- **Wave 3 (main session, hotspot):** `nation`/`corporation` added to
+  `selection_kind`; `selection_kind_of`, `selection_kind_name`, and the
+  `selection_panel.cpp` title/summary dispatch extended.
+- **Wave 4 (main session):** open on the Faction lens by default (`app.cpp`).
+
+This closes Canvas items **[1] Circumplanetary max zoom**, **[2] Map lens icons**,
+**[4] Render the political layer**, and **[2] Default view should surface the
+generated world** (home-surface open + Faction lens default).
+
+### In-session decisions
+
+- **Nation colours: 12-slot fixed hue wheel + Knuth hash**, distinct from the
+  6-slot faction palette — nations tint territory, factions mark ownership.
+- **Faction-lens tint is a direct replacement** of the terrain colour (no blend);
+  unclaimed tiles (absent from `tile_to_nation`, e.g. ocean) keep terrain hue.
+- **Borders draw only under the Faction lens**, via the robust midpoint-perpendicular
+  edge method (avoids per-vertex offset-row mapping). Claimed/unclaimed counts as a
+  border.
+- **Building markers are coloured by owning corporation always-on** (player corp =
+  faction slot 0; others a hashed non-zero slot), independent of the active lens.
+- **Selection summaries for nation/corp ship now**; canvas hit-testing for them
+  remains a separate Ledger follow-up (they are not yet click-selectable).
+
+### Left open
+
+- New TODO item **[3] Design the lens system** (`docs/ui/LENSES.md`): spec the five
+  lenses incl. proposed Corporation + Resource lenses, rung applicability, icon
+  vocabulary, legend format.
+- No legend/colour key for the Faction lens yet (deferred with the lens-design doc).
+- Canvas hit-testing for nations/corps (Ledger follow-up); the political-layer
+  hover read-out still waits on the deferred hover-card system.
+
+---
+
 ## 2026-06-14 — version 0.0.3 — Environment: nation + corporation generation, tile tuning
 
 **Status:** Complete (code). Full app builds clean (Debug, exit 0); the two new

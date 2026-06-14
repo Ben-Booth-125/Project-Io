@@ -56,4 +56,18 @@ void draw_market_summary(const world& w, entity_id id);
 /// @param id Entity id expected in @p w.units.
 void draw_unit_summary(const world& w, entity_id id);
 
+/// Stat block for a nation: an identity-swatched name, controlled tile count,
+/// ideology / expansionism / economic focus, and its top resources by abundance.
+///
+/// @param w  Read-only world state.
+/// @param id Entity id expected in @p w.nations.
+void draw_nation_summary(const world& w, entity_id id);
+
+/// Stat block for a corporation: name (flagged when it is the player's), home
+/// nation, industrial focus, starting capital, and starting asset count.
+///
+/// @param w  Read-only world state.
+/// @param id Entity id expected in @p w.corporations.
+void draw_corporation_summary(const world& w, entity_id id);
+
 } // namespace ui

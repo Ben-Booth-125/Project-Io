@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <iterator>
 #include <limits>
@@ -160,6 +161,54 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
             built_tiles[bld.tile] = bld.type;
     }
 
+    // Spatial index: tile id keyed by its packed (col, row) on the active body,
+    // so the Faction-lens border pass can find a tile's grid neighbours without
+    // scanning w.tiles. Key packs row-major: row * gw + col (col < gw always).
+    std::unordered_map<long long, entity_id> tile_at;
+    for (const auto& [id, tile] : w.tiles)
+    {
+        if (tile.body == state.active_body)
+            tile_at[static_cast<long long>(tile.grid_y) * gw + tile.grid_x] = id;
+    }
+
+    // Nation owner of a tile, or null_entity when the tile is absent from
+    // tile_to_nation (unclaimed). Used by the border pass to compare adjacent
+    // owners; "unclaimed" is treated as its own distinct owner.
+    auto nation_of = [&](entity_id tile_id) -> entity_id {
+        const auto it = w.tile_to_nation.find(tile_id);
+        return it != w.tile_to_nation.end() ? it->second : null_entity;
+    };
+
+    // Corporation owner of a tile, keyed by tile id. Built only when corporations
+    // exist; drives both the building-marker colour and the Corporation lens tint.
+    std::unordered_map<entity_id, entity_id> tile_to_corp;
+    if (!w.corporations.empty())
+    {
+        for (const auto& [corp_id, corp] : w.corporations)
+        {
+            for (entity_id bld_id : corp.assets)
+            {
+                const auto bld_it = w.buildings.find(bld_id);
+                if (bld_it != w.buildings.end())
+                    tile_to_corp[bld_it->second.tile] = corp_id;
+            }
+        }
+    }
+
+    // Identity colour for a corporation: the player's corp is faction slot 0;
+    // rivals get a stable per-corp slot via a multiplicative hash, kept off slot 0
+    // so a rival never collides with the player's colour. Shared by the marker
+    // pass and the Corporation lens so the two always agree.
+    auto corp_colour = [&](entity_id corp_id) -> ImU32 {
+        if (corp_id == w.player_entity)
+            return palette::faction_colour(0);
+        int slot = static_cast<int>(
+            (static_cast<uint32_t>(corp_id) * 2654435761u) % palette::faction_slot_count);
+        if (slot == 0)
+            slot = 1;
+        return palette::faction_colour(slot);
+    };
+
     const ImVec2 mouse = ImGui::GetIO().MousePos;
 
     // Hover resolves to a single tile copy. Adjacent hexes' circular hit-tests
@@ -194,7 +243,28 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
 
         const ImVec2 lc   = hex_local_centre(tile.grid_x, tile.grid_y, hex_size);
         const ImVec2 sc   = to_screen(lc);
-        const ImU32  fill = terrain_colour(tile.composition);
+
+        // Fill is the tile's terrain colour, except under the Faction lens where
+        // a tile owned by a nation is tinted that nation's identity colour. The
+        // tint is a direct replacement (no blend); unclaimed tiles — absent from
+        // tile_to_nation, e.g. ocean — keep their terrain hue so the political
+        // map still reads as terrain underneath.
+        ImU32 fill = terrain_colour(tile.composition);
+        if (state.overlay == overlay_mode::faction)
+        {
+            const auto nat_it = w.tile_to_nation.find(id);
+            if (nat_it != w.tile_to_nation.end())
+                fill = palette::nation_colour(nat_it->second);
+        }
+        // Corporation lens: tint a tile that carries a corporate building with its
+        // owning corp's colour (direct replacement, like the faction tint). Tiles
+        // with no corporate building keep their terrain hue — no nation underlay.
+        else if (state.overlay == overlay_mode::corporation)
+        {
+            const auto corp_it = tile_to_corp.find(id);
+            if (corp_it != tile_to_corp.end())
+                fill = corp_colour(corp_it->second);
+        }
         const auto   built_it  = built_tiles.find(id);
         const bool   built     = built_it != built_tiles.end();
         const building_type built_type = built ? built_it->second : building_type::none;
@@ -215,10 +285,93 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
             hex_vertices(verts, cx, cy, draw_r);
             dl->AddConvexPolyFilled(verts, 6, fill);
 
+            // Nation borders (Faction lens only). Draw a dark line on every hex
+            // edge shared with a neighbour of a different owner — including the
+            // claimed/unclaimed boundary. The grid is odd-r offset, so the six
+            // neighbour offsets differ between even and odd rows.
+            if (state.overlay == overlay_mode::faction)
+            {
+                const entity_id own_nation = nation_of(id);
+
+                // Standard odd-r neighbour offsets (col, row deltas).
+                static const int even_off[6][2] =
+                    {{+1, 0}, {0, -1}, {-1, -1}, {-1, 0}, {-1, +1}, {0, +1}};
+                static const int odd_off[6][2] =
+                    {{+1, 0}, {+1, -1}, {0, -1}, {-1, 0}, {0, +1}, {+1, +1}};
+                const int (*off)[2] = (tile.grid_y & 1) ? odd_off : even_off;
+
+                for (int n = 0; n < 6; ++n)
+                {
+                    const int nrow = tile.grid_y + off[n][1];
+                    if (nrow < 0 || nrow >= gh)
+                        continue; // Off the top/bottom edge: no neighbour tile.
+
+                    // Columns wrap on the horizontal cylinder.
+                    int ncol = (tile.grid_x + off[n][0]) % gw;
+                    if (ncol < 0)
+                        ncol += gw;
+
+                    const auto nb_it = tile_at.find(static_cast<long long>(nrow) * gw + ncol);
+                    if (nb_it == tile_at.end())
+                        continue;
+                    if (nation_of(nb_it->second) == own_nation)
+                        continue; // Same owner: interior edge, no border.
+
+                    // Draw the shared edge via the midpoint-perpendicular method:
+                    // place the segment at the midpoint of the centre-to-centre
+                    // line, perpendicular to it, with length equal to one hex side
+                    // (== circumradius draw_r for a regular hexagon). This avoids
+                    // mapping neighbour directions to per-vertex pairs, which the
+                    // offset-row vertex ordering makes error-prone. The neighbour's
+                    // screen centre is taken at the SAME wrap offset k as this tile.
+                    const ImVec2 nb_lc = hex_local_centre(ncol, nrow, hex_size);
+                    ImVec2 nb_sc = to_screen(nb_lc);
+                    nb_sc.x += static_cast<float>(k) * period_px;
+
+                    float dirx = nb_sc.x - cx;
+                    float diry = nb_sc.y - cy;
+                    const float len = std::sqrt(dirx * dirx + diry * diry);
+                    if (len <= 0.0f)
+                        continue;
+                    dirx /= len;
+                    diry /= len;
+
+                    const float mx = (cx + nb_sc.x) * 0.5f;
+                    const float my = (cy + nb_sc.y) * 0.5f;
+                    const float px = -diry; // perpendicular to the centre line
+                    const float py =  dirx;
+                    const float half = draw_r * 0.5f;
+
+                    dl->AddLine({mx - px * half, my - py * half},
+                                {mx + px * half, my + py * half},
+                                IM_COL32(20, 20, 20, 200), 1.5f);
+                }
+            }
+
+            // Corporation lens: outline the player's own tiles so the player's
+            // footprint reads at a glance against rivals' flat tints. Rival tiles
+            // are distinguished by their fill colour alone (see the fill pass).
+            if (state.overlay == overlay_mode::corporation)
+            {
+                const auto corp_it = tile_to_corp.find(id);
+                if (corp_it != tile_to_corp.end() && corp_it->second == w.player_entity)
+                    dl->AddPolyline(verts, 6, palette::faction_colour(0),
+                                    ImDrawFlags_Closed, 2.0f);
+            }
+
             if (built)
             {
                 const float mr = std::max(2.0f, draw_r * 0.22f);
-                icons::building(dl, {cx, cy}, mr, built_type, IM_COL32(255, 255, 255, 255));
+
+                // Building markers carry their owning corporation's colour (the
+                // player's corp gets faction slot 0). Always on, independent of
+                // the lens. Tiles with no corporate owner stay white.
+                ImU32 marker_col = IM_COL32(255, 255, 255, 255);
+                const auto corp_it = tile_to_corp.find(id);
+                if (corp_it != tile_to_corp.end())
+                    marker_col = corp_colour(corp_it->second);
+
+                icons::building(dl, {cx, cy}, mr, built_type, marker_col);
             }
 
             // Selection outline is drawn on every visible copy of the selected
