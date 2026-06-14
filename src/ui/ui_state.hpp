@@ -44,6 +44,7 @@ struct ui_state
     // Policy: all ledgers start closed. The player opens them deliberately from
     // the navigation pane; none are shown on a fresh session.
     bool show_tile_ledger = false; ///< Whether the Tile Ledger window is open. Toggled by the nav pane tab and the window's close button.
+    bool show_economy_panel = false; ///< Whether the Layer 3 economy panel is open. Toggled by the nav pane tab and the window's close button.
 
     // --- solar system canvas view (primary only; the minimap always shows the
     // default framing) ---

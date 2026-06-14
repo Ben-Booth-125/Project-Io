@@ -33,8 +33,9 @@ void draw_nav_pane(ui_state& state, float top_offset)
     // hover tooltip. Slot placement is temporary for Layer 2 — only the Tile
     // Ledger is wired, parked at slot 8 — while canvas work takes priority over
     // the menu layout.
-    constexpr int tab_count        = 10;
-    constexpr int tile_ledger_slot = 8; // 1-based position of the Tile Ledger
+    constexpr int tab_count         = 10;
+    constexpr int tile_ledger_slot  = 8; // 1-based position of the Tile Ledger
+    constexpr int economy_panel_slot = 7; // 1-based position of the Economy panel
 
     // Square slots; Selectable treats a nonzero size as literal, so derive the
     // rail width explicitly rather than passing -1.
@@ -43,8 +44,9 @@ void draw_nav_pane(ui_state& state, float top_offset)
 
     for (int slot = 1; slot <= tab_count; ++slot)
     {
-        const bool   is_ledger = (slot == tile_ledger_slot);
-        const ImVec2 p0        = ImGui::GetCursorScreenPos();
+        const bool   is_ledger  = (slot == tile_ledger_slot);
+        const bool   is_economy = (slot == economy_panel_slot);
+        const ImVec2 p0         = ImGui::GetCursorScreenPos();
 
         char id[16];
         std::snprintf(id, sizeof(id), "##nav%d", slot);
@@ -55,6 +57,13 @@ void draw_nav_pane(ui_state& state, float top_offset)
             if (ImGui::Selectable(id, state.show_tile_ledger, 0, {slot_size, slot_size}))
                 state.show_tile_ledger = !state.show_tile_ledger;
             ImGui::SetItemTooltip("Tile Ledger");
+        }
+        else if (is_economy)
+        {
+            // Toggles the Layer 3 economy panel open/closed.
+            if (ImGui::Selectable(id, state.show_economy_panel, 0, {slot_size, slot_size}))
+                state.show_economy_panel = !state.show_economy_panel;
+            ImGui::SetItemTooltip("Economy");
         }
         else
         {
@@ -70,6 +79,8 @@ void draw_nav_pane(ui_state& state, float top_offset)
         const float  r      = slot_size * 0.30f;
         if (is_ledger)
             icons::ledger(dl, centre, r, IM_COL32(225, 228, 235, 255));
+        else if (is_economy)
+            icons::market(dl, centre, r, IM_COL32(225, 228, 235, 255));
         else
             icons::placeholder(dl, centre, r, IM_COL32(110, 116, 132, 255));
     }

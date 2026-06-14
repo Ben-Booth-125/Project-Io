@@ -4,8 +4,11 @@
 #include "sim_loop.hpp"
 #include "scripting/lua_state.hpp"
 #include "ui/ui_state.hpp"
+#include "world/economy_system.hpp"
+#include "world/recipe_registry.hpp"
 #include "world/world.hpp"
 
+#include <cstdint>
 #include <string>
 
 /// Top-level application object. Owns the SDL window and renderer, orchestrates
@@ -48,6 +51,17 @@ private:
     /// run_verify() so both start from the same deterministic state.
     void setup_world();
 
+    /// Load the economy Lua data layer (scripts/recipes.lua + scripts/economy.lua)
+    /// into m_registry, then author processing recipes onto the generated assets
+    /// (the recipe id is a registry index, so it is assigned here, not at
+    /// generation). Shared by run() and run_verify().
+    void load_economy();
+
+    /// Run one economy tick: production → market clearing → budget, storing the
+    /// per-building report for the economy panel. Driven by the econ-tick boundary
+    /// in run() and by the verify API.
+    void step_economy();
+
     /// Render exactly one frame and write it to screenshots/<name>.png. Used by
     /// the verify Lua API's capture() to grab a deterministic frame on demand.
     ///
@@ -62,10 +76,13 @@ private:
     SDL_Window*   m_window   = nullptr;
     SDL_Renderer* m_renderer = nullptr;
 
-    sim_loop  m_sim_loop;
-    lua_state m_lua;
-    world     m_world;
-    ui_state  m_ui;
+    sim_loop        m_sim_loop;
+    lua_state       m_lua;
+    world           m_world;
+    ui_state        m_ui;
+    recipe_registry m_registry;          ///< Recipes + economy constants, loaded from Lua at startup.
+    economy_report  m_last_econ_report;  ///< Most recent economy-step report; read by the economy panel.
+    uint64_t        m_last_econ_tick = 0; ///< econ_tick() at the previous step; drives the boundary detection in run().
 
     bool        m_capture_requested = false; ///< Set by F12 / capture_frame, consumed in render().
     std::string m_capture_name;              ///< Base name for the next capture; empty = timestamped (F12).

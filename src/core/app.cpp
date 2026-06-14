@@ -10,18 +10,22 @@
 #include "ui/body_surface_canvas.hpp"
 #include "ui/canvas_command.hpp"
 #include "ui/circumplanetary_canvas.hpp"
+#include "ui/economy_panel.hpp"
 #include "ui/explorer_panel.hpp"
 #include "ui/fonts.hpp"
 #include "ui/format.hpp"
 #include "ui/header_panel.hpp"
 #include "ui/nav_pane.hpp"
 #include "ui/overlay.hpp"
+#include "ui/presentation.hpp"
 #include "ui/profile_panel.hpp"
 #include "ui/selection_panel.hpp"
 #include "ui/solar_system_canvas.hpp"
 #include "ui/tile_inspector.hpp"
 #include "ui/view_nav.hpp"
+#include "world/budget_system.hpp"
 #include "world/hard_coded_world.hpp"
+#include "world/market_clearing.hpp"
 #include "world/orbital_system.hpp"
 
 #include <algorithm>
@@ -112,6 +116,7 @@ int app::run()
     }
 
     setup_world();
+    load_economy();
 
     bool running = true;
     while (running)
@@ -125,9 +130,40 @@ int app::run()
         advance_orbits(m_world, now_days - m_last_orbit_days);
         m_last_orbit_days = now_days;
 
+        // Resolve the economy on each econ-tick (quarter) boundary the clock crosses.
+        const uint64_t econ = m_sim_loop.econ_tick();
+        while (m_last_econ_tick < econ)
+        {
+            step_economy();
+            ++m_last_econ_tick;
+        }
+
         render();
     }
     return 0;
+}
+
+void app::load_economy()
+{
+    // Load the Lua data layer, then build the registry from it (protected calls).
+    m_lua.load("scripts/recipes.lua");
+    m_lua.load("scripts/economy.lua");
+    m_registry.load_from_lua(m_lua);
+
+    // Author processing recipes onto generated assets. The recipe id is a registry
+    // index, unknown at generation time, so it is assigned here once the registry
+    // exists. Every unconfigured processor defaults to the steel recipe.
+    const uint16_t default_recipe = m_registry.recipe_id("steel");
+    for (auto& [id, b] : m_world.buildings)
+        if (b.type == building_type::processing_facility && b.recipe == no_recipe)
+            b.recipe = default_recipe;
+}
+
+void app::step_economy()
+{
+    m_last_econ_report = run_economy_step(m_world, m_registry);
+    auto flows = clear_markets(m_world, m_registry, m_last_econ_report);
+    apply_budget(m_world, m_registry, flows);
 }
 
 void app::setup_world()
@@ -181,6 +217,7 @@ int app::run_verify(const std::string& script_path)
     // constants), seeded world, sim left paused so orbits and ticks never advance
     // between captures. The script drives view/overlay state directly.
     setup_world();
+    load_economy();
     m_sim_loop.set_speed(0);
 
     // Expose the `verify` API. Each function writes ui_state directly — the
@@ -216,6 +253,16 @@ int app::run_verify(const std::string& script_path)
         m_ui.planetary_pan_y += dy;
     });
     v.set_function("capture", [this](const std::string& name) { capture_frame(name); });
+
+    // Drive the economy headlessly: run N economy ticks (production → market →
+    // budget) and open the economy panel so a capture shows live, populated data.
+    // The durable verification method for the Layer 3 economy panel's visual rows.
+    v.set_function("econ_step", [this](sol::optional<int> n) {
+        const int steps = n.value_or(1);
+        for (int i = 0; i < steps; ++i)
+            step_economy();
+        m_ui.show_economy_panel = true;
+    });
 
     // Discrete navigation by the shared command vocabulary — the same dispatch the
     // keyboard uses (see canvas_command.hpp), so a script reads as a key sequence.
@@ -267,6 +314,35 @@ int app::run_verify(const std::string& script_path)
             }
         }
         return out;
+    });
+
+    // Diagnostic: log the economy state the panel surfaces (balances, pools,
+    // market supply/demand, building run states) to stderr, so a verify run gives
+    // a textual confirmation of the same data the panel renders visually.
+    v.set_function("dump_economy", [this]() {
+        for (const auto& [cid, cc] : m_world.corporations)
+            SDL_Log("economy balance: %-26s %.1f%s",
+                    cc.name.c_str(), cc.balance,
+                    cc.balance < 0.0f ? "  [NEGATIVE]" : "");
+        for (const auto& [key, pool] : m_world.corp_body_pools)
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (pool.quantities[r] > 0.0f)
+                    SDL_Log("economy pool: corp=%u body=%u %s=%.1f",
+                            static_cast<unsigned>(key.first),
+                            static_cast<unsigned>(key.second),
+                            ui::resource_name(static_cast<resource_type>(r)),
+                            pool.quantities[r]);
+        for (const auto& [mid, mc] : m_world.markets)
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (mc.supply[r] > 0.0f || mc.demand[r] > 0.0f)
+                    SDL_Log("economy market: %s supply=%.1f demand=%.1f price=%.2f",
+                            ui::resource_name(static_cast<resource_type>(r)),
+                            mc.supply[r], mc.demand[r], mc.price[r]);
+        for (const building_report& br : m_last_econ_report.buildings)
+            SDL_Log("economy building: corp=%u %s out=%.1f %s",
+                    static_cast<unsigned>(br.corp),
+                    ui::building_type_name(br.type), br.output_quantity,
+                    br.active ? "active" : "idle");
     });
 
     // Diagnostic: log every corporation building's grid position and owner so a
@@ -589,6 +665,7 @@ void app::render()
     // Left navigation pane and the menus it opens. Starts below the profile.
     ui::draw_nav_pane(m_ui, ui::profile_panel_height);
     ui::draw_tile_inspector(m_world, &m_ui.show_tile_ledger);
+    ui::draw_economy_panel(m_world, m_registry, m_last_econ_report, &m_ui.show_economy_panel);
 
     // Overlay-lens controls — a bottom-left strip from the nav-pane edge inward,
     // clear of the centred scale/zoom control. Replaces the old minimap mode bar.
