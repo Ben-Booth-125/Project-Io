@@ -259,6 +259,135 @@ std::vector<int> expand_territory(const std::vector<int>& seeds,
 }
 
 // ---------------------------------------------------------------------------
+// Pass 2b — orphan-island assignment
+// ---------------------------------------------------------------------------
+
+/// Assign every unclaimed land tile to a nation, closing the gaps the
+/// water-blocked Voronoi BFS leaves behind on landmasses disconnected from
+/// every seed. Orphan land tiles (owner == -1 and not ocean) are grouped into
+/// connected components by cardinal adjacency (column-wrapped, rows do not
+/// wrap), and each whole component is assigned to the nation owning the nearest
+/// already-claimed land tile by `grid_distance`.
+///
+/// The pass is a pure, deterministic function of its inputs: components are
+/// discovered in raster order and "nearest" is tie-broken first by lowest
+/// distance, then by lowest nation index, then by lowest claimed-tile index. No
+/// RNG is used. If there are no claimed tiles at all, `owner_map` is left
+/// unchanged.
+///
+/// @param owner_map  Per-tile nation index (-1 = unclaimed/ocean), mutated in place.
+/// @param is_ocean   Per-tile ocean flag.
+/// @param gw, gh     Grid dimensions.
+void assign_orphan_islands(std::vector<int>& owner_map,
+                           const std::vector<bool>& is_ocean,
+                           int gw, int gh)
+{
+    const int total = gw * gh;
+
+    // Precompute the claimed-tile list once (raster order).
+    std::vector<int> claimed;
+    claimed.reserve(static_cast<std::size_t>(total));
+    for (int idx = 0; idx < total; ++idx)
+    {
+        if (owner_map[static_cast<std::size_t>(idx)] >= 0)
+            claimed.push_back(idx);
+    }
+
+    // Degenerate case: nothing claimed, nothing to anchor orphans to.
+    if (claimed.empty())
+        return;
+
+    std::vector<bool> visited(static_cast<std::size_t>(total), false);
+
+    // Discover orphan components in raster order via a cardinal flood fill.
+    for (int start = 0; start < total; ++start)
+    {
+        if (visited[static_cast<std::size_t>(start)])
+            continue;
+        if (owner_map[static_cast<std::size_t>(start)] != -1
+         || is_ocean[static_cast<std::size_t>(start)])
+        {
+            visited[static_cast<std::size_t>(start)] = true;
+            continue;
+        }
+
+        // Flood the component of orphan land tiles reachable from `start`.
+        std::vector<int> component;
+        std::queue<int> frontier;
+        frontier.push(start);
+        visited[static_cast<std::size_t>(start)] = true;
+
+        while (!frontier.empty())
+        {
+            const int idx = frontier.front();
+            frontier.pop();
+            component.push_back(idx);
+
+            const int col = idx % gw;
+            const int row = idx / gw;
+            std::pair<int,int> nbrs[4];
+            int n = 0;
+            cardinal_neighbours(col, row, gw, gh, nbrs, n);
+            for (int i = 0; i < n; ++i)
+            {
+                const int nidx = raster_idx(nbrs[i].first, nbrs[i].second, gw);
+                if (visited[static_cast<std::size_t>(nidx)])
+                    continue;
+                if (owner_map[static_cast<std::size_t>(nidx)] != -1
+                 || is_ocean[static_cast<std::size_t>(nidx)])
+                {
+                    visited[static_cast<std::size_t>(nidx)] = true;
+                    continue;
+                }
+                visited[static_cast<std::size_t>(nidx)] = true;
+                frontier.push(nidx);
+            }
+        }
+
+        // Find the nearest claimed tile to any tile in the component.
+        // Tie-break: lowest distance, then lowest nation index, then lowest
+        // claimed-tile index.
+        int  best_dist   = -1;
+        int  best_nation = -1;
+        int  best_claim  = -1;
+        for (int cidx : component)
+        {
+            const int cc = cidx % gw;
+            const int cr = cidx / gw;
+            for (int kidx : claimed)
+            {
+                const int kc = kidx % gw;
+                const int kr = kidx / gw;
+                const int d  = grid_distance(cc, cr, kc, kr, gw);
+                const int kn = owner_map[static_cast<std::size_t>(kidx)];
+
+                bool better = false;
+                if (best_dist < 0 || d < best_dist)
+                    better = true;
+                else if (d == best_dist)
+                {
+                    if (kn < best_nation)
+                        better = true;
+                    else if (kn == best_nation && kidx < best_claim)
+                        better = true;
+                }
+
+                if (better)
+                {
+                    best_dist   = d;
+                    best_nation = kn;
+                    best_claim  = kidx;
+                }
+            }
+        }
+
+        // Assign the whole component to the winning nation.
+        for (int cidx : component)
+            owner_map[static_cast<std::size_t>(cidx)] = best_nation;
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Pass 3 — resource profile derivation
 // ---------------------------------------------------------------------------
 
@@ -464,8 +593,11 @@ std::vector<entity_id> generate_nations(
 
     // --- Pass 2: territory expansion ---
     std::mt19937 expand_rng(seed_expand);
-    const std::vector<int> owner_map = expand_territory(
+    std::vector<int> owner_map = expand_territory(
         seeds, is_ocean, w, tile_ids, gw, gh, expand_rng);
+
+    // --- Pass 2b: orphan-island assignment (claim water-disconnected land) ---
+    assign_orphan_islands(owner_map, is_ocean, gw, gh);
 
     // --- Allocate nation_component stubs (populated in Passes 3–5) ---
     std::vector<nation_component> nation_data(static_cast<std::size_t>(nation_count));

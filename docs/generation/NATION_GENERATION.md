@@ -50,6 +50,19 @@ near or at borders.
 
 Expansion continues until all claimable land tiles are assigned.
 
+### Pass 2b — Orphan-island assignment
+
+The cardinal-adjacency BFS cannot cross water, so landmasses disconnected from every seed
+would otherwise stay unclaimed. A deterministic post-pass closes that gap: unclaimed
+non-ocean tiles are grouped into connected components (cardinal adjacency, column-wrapped),
+and each whole component is assigned to the nation owning the **nearest already-claimed land
+tile across the water** (by Chebyshev grid distance; ties break to the lower nation index,
+then the lower tile index). After this pass every non-ocean land tile on the body belongs to
+a nation — there are no unclaimed islands.
+
+> ⟳ Added 2026-06-15 (Brief C2): documents the new orphan-island post-pass landed in
+> `nation_generation.cpp`. Pending user review.
+
 ### Pass 3 — Resource profile derivation
 
 Each nation's resource profile is computed by summing the deposit profiles of its tiles,
