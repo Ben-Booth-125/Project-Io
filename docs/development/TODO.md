@@ -268,17 +268,6 @@ currently hold Briefs appear as sections below.
     animated fill toward the economy-tick boundary. See `docs/ui/TIME_CONTROLS.md` /
     `LAYOUT.md`.
 
-- **[2] Player balance in the UI header + header design pass.** The top header strip
-  (`ui::draw_header_panel`, `src/ui/header_panel.cpp` — today "Budget + resource header")
-  should surface the **player corporation's running balance** now that Layer 3 moves it
-  each economy tick (`corporation_component.balance` for `w.player_entity`; negatives
-  flagged red per the economy-panel convention, `palette::negative`). Alongside it, do a
-  **header design pass** now that we know what Layer 3 produces: decide what the persistent
-  header must show *at a glance* versus what belongs in the (player-focused) ledgers — e.g.
-  balance plus last-tick net change, a compact resource/stockpile summary, and how the header
-  relates to the Economy / Balance ledgers and the time column. Keep it a *summary* surface;
-  detail lives in the ledgers. Touches `src/ui/header_panel.cpp`; see `docs/ui/LAYOUT.md`.
-
 - **[6] Clarify the time control view.** Deferred. The current two-column time
   panel (calendar block + speed controls) is a prototype-grade layout. Revisit it
   later to settle the production design: what the player needs from the clock at a
@@ -294,6 +283,17 @@ currently hold Briefs appear as sections below.
   intended order before final implementation.** See `docs/ui/MENU.md`.
 
 ## Ledger
+
+- **[2] Uniform ledger-window chrome.** Bring every ledger window onto a **single
+  shared size constant and a single shared spawn-position constant** so the family reads
+  as one consistent surface, per the settled principle in `docs/ui/LAYOUT.md` § Uniform
+  ledger-window chrome. Today they diverge: the Tile Ledger opens at 820×560
+  (`tile_inspector.cpp`) and the Economy panel at 760×620 (`economy_panel.cpp`), at
+  different offsets. Introduce the two constants (anchored clear of the profile/header
+  chrome, `ImGuiCond_Once`) and point both windows — and every future ledger in the
+  **Market / Balance / Construction** family below — at them. Touches
+  `src/ui/tile_inspector.cpp`, `src/ui/economy_panel.cpp`, and wherever the shared
+  constants live (a small ledger-chrome header). Doc authority: `docs/ui/LAYOUT.md`.
 
 - **[2] Tile Ledger default body.** The Tile Ledger should default its selected
   body to the **current view's main body** — the Circumplanetary view's anchor, or
@@ -382,11 +382,6 @@ The market layer. Per the 2026-06-14 Q&A, **market resolution collapses into Lay
 **distinct from corp stockpile pools**. Design authority `docs/SYSTEMS.md` § Trade,
 `docs/economy/RESOURCES.md`.
 
-- **[3] Price resolution from local supply/demand (deferred).** Was the old Layer 4. Resolve
-  `market_component.price` from the supply/demand ratio modulated by rarity/`base_price`, at the
-  economy tick. Until this lands, price stays at `base_price` and all transactions clear there.
-  Touches `market_clearing.cpp` / a new price pass; see RESOURCES.md (base price from rarity).
-
 - **[3] Player-driven sell orders & preferential purchasing (deferred).** Build out the manual
   side of the market the framework hook stubs: player-authored sell orders (what / how much /
   floor price) and **preferential purchasing** (choosing counterparties rather than the flat
@@ -423,14 +418,6 @@ The labour scalar (`docs/SYSTEMS.md` § Workforce, `docs/economy/POPULATION.md`)
 The world-generation layer — terrain, nations, corporations. Design authority:
 `docs/generation/{TILE,NATION,CORPORATION}_GENERATION.md`.
 
-- **[4] Deposit depletion model (deferred).** Make tile deposits finite: extraction draws down
-  the reserved **`remaining`** reserve added by the Layer 3 data-model foundation (Resources),
-  leaving **richness** as the rate multiplier. Needs an exhaustion/idle rule (a building on a
-  spent deposit idles) and a decision on refill / discovery / survey interaction (Exploration).
-  The reserved field exists precisely so this lands without a data-model retrofit. Touches the
-  extraction path in `economy_system.cpp` and `tile_component`. See PRODUCTION.md § Extraction
-  ("Deposits do not deplete in the prototype").
-
 ### Tile generation (terrain)
 
 - **[4] Tile generation refinements (deferred).** The larger production passes
@@ -466,18 +453,6 @@ Design authority: `docs/generation/CORPORATION_GENERATION.md`.
   seed a plausible opening balance and stockpiles. Touches
   `src/world/corporation_generation.cpp` (Pass 4 financial profile) and reuses the Resources
   economy step. Depends on the Layer 3 economy briefs landing first.
-
-- **[2] Pre-game economy ticks as the final generation step.** Run **two economy ticks
-  immediately at world setup, bypassing the simulation clock**, as the last
-  procedural-generation step — so the player opens onto a world with non-empty stockpile
-  pools, moved balances, and populated market supply/demand rather than a cold start.
-  Concretely: after generation completes and the registry is loaded, call the economy
-  pipeline (`run_economy_step` → `clear_markets` → `apply_budget`) twice before the main
-  loop begins, so the first on-screen frame already shows live figures. Lever: the
-  `app::setup_world` / `load_economy` ordering in `src/core/app.cpp` (or a `hard_coded_world`
-  post-pass), reusing the Layer 3 economy step. A lighter, concrete cousin of the deferred
-  **Model pre-game profit** Brief above (which simulates a longer operating history); this
-  one just primes a couple of ticks.
 
 - **[6] Deferred — corporation selection screen & behaviour.** Per
   CORPORATION_GENERATION.md § Open items: the analytical corp-selection/re-roll

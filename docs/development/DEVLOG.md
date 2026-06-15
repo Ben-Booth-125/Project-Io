@@ -6,6 +6,69 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## 2026-06-15 — Layer 3 finalisation published (5 Briefs)
+
+**Status:** Complete — 13/13 requirements met across three requirement groups (C and E are
+difficulty 2, inline verification). Published as a barrier set: tasks + requirements + the
+collision map written for the whole set first, all code completed and verified together,
+then committed.
+
+Finalising the production economy: the market now reprices from supply/demand, deposits are
+finite, the world opens warm, and the player sees their money in the header. Five Briefs
+pulled (including deferred items) and taken through the five Publish steps breadth-first.
+
+### What was built
+
+- **Price resolution (A)** — `clear_markets` now accumulates supply/demand, then resolves
+  each `market_component.price[r]` toward `base_price × sqrt(demand/supply)`, clamped to
+  `[0.25×, 4×]` and EMA-eased (0.5) from the prior price. Every sale/purchase is valued at
+  the resolved price, so the budget loop follows automatically. `market_clearing.{hpp,cpp}`.
+- **Deposit depletion (B)** — `tile_generation` Pass 6 seeds `resource_remaining = richness
+  × 400`; `run_extraction` draws it down, tapers output over the last ~8 ticks of nominal
+  yield, and reports the building **`exhausted`** ("out of resources", distinct from idle)
+  below 5% of nominal. Finite — no refill. Surfaced in the economy panel's State column.
+- **Pre-game economy ticks (C)** — `app::run` primes two `step_economy()` ticks (and seeds
+  the balance history with opening capital) before the first frame, so the player opens onto
+  warm pools / moved balances / live market figures. Not run in `run_verify` (stays cold).
+- **Player balance header (D)** — `draw_header_panel` re-signatured to take the world + a
+  capped balance history; renders **BALANCE** (negatives red), **STOCKPILE** valuation
+  (player pools at market price), and **NET** (coloured ±/qtr) plus a sparkline. History is
+  maintained in `app` and pushed each `step_economy()`.
+- **Uniform ledger-window principle (E)** — the Market/Balance/Construction ledger family
+  stays deferred to Layer 4, but the single chrome rule it inherits (one size constant + one
+  spawn anchor) is settled in `LAYOUT.md`, with a `[2]` standing Brief under TODO § Ledger.
+
+### In-session decisions
+
+- **Q&A before publish.** Two rounds settled the ambiguous Briefs: price curve = damped
+  `sqrt(D/S)` with EMA smoothing and a `[0.25×, 4×]` clamp; depletion = taper-to-zero then
+  idle, reported as "out of resources", finite only; header = balance + stockpile valuation
+  + last-tick net with a sparkline; ledger family deferred but the chrome principle settled;
+  pre-game = warm-start ticks only (the heavier pre-game-profit sim stays deferred).
+- **Repricing seam.** `clear_markets` was restructured to a two-phase shape — move
+  quantities (debit pools, record sales/buys) first, resolve prices once supply/demand are
+  known, then value every movement — so the displayed price and the cash flow agree. The
+  budget step was left untouched (it reads the flows).
+- **Reserve sizing & taper are hard-coded estimates.** `deposit_reserve_factor = 400`,
+  `deposit_taper_ticks = 8`, `deposit_min_taper = 0.05` — legible, playtest-tunable; richness
+  is unchanged (still the rate multiplier), the reserve is what depletes.
+- **Stockpile valuation reads ~0 for pure extractors.** Confirmed expected: surplus is sold
+  each tick, so an extractor retains little stock; retained stock (processor reservations,
+  Layer-4 player holds) values non-zero. The figure renders correctly.
+- **Commits.** Four functional commits — A, B, (C+D merged: both edit `app.cpp` and are
+  build-coupled), E — plus a tracking close-out. Verified via `tools/verify/econ_harness`
+  (price + depletion), `tools/verify/world_audit` (reserve seeding), and the new
+  `scripts/verify/header.lua` (header capture). Full `cmake` build links clean.
+
+### Open / deferred (still Briefs in TODO)
+
+- **Player-driven sell orders & preferential purchasing**, the **Market/Balance/Construction
+  ledger family** (now carrying the uniform-chrome principle + a standing chrome Brief), the
+  **workforce pool** (population-gated), **inter-body markets** (Layer 5), and **model
+  pre-game profit** (the longer operating-history sim) all remain deferred.
+
+---
+
 ## 2026-06-14 — Layer 3 economy published (8 Briefs)
 
 **Status:** Complete — 27/27 requirements met across seven requirement groups (S2 is

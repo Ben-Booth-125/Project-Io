@@ -334,9 +334,142 @@ sequentially in dependency order; the map confirms no same-file races when wirin
 
 ---
 
+## Archived — Layer 3 finalisation publish set
+
+The five-Brief set has been **published** (all groups complete) and cleared from the
+active worklist. Requirement tables are archived in
+[REQUIREMENTS.md](req/REQUIREMENTS.md) and the session is recorded in the DEVLOG
+(2026-06-15). The breakdown below is retained for one cycle as the record of how the
+set was decomposed; it is not an active worklist.
+
+<details>
+<summary>Completed group breakdown (retained for reference)</summary>
+
+Five Briefs pulled to finalise the production economy (price resolution, deposit
+depletion, pre-game warm start, the player balance header, and the deferred-ledger
+design principle). Run as a **barrier set** (TODO § Publishing multiple Briefs together):
+all groups clear each step before any advances. Kept in the main session, sequential —
+A/B share the `econ_harness` seam and C/D co-evolve through `app.cpp`.
+
+### Group A — price-resolution (promoted from TODO § Trade)
+
+Requirements: [REQUIREMENTS.md § price-resolution](req/REQUIREMENTS.md#price-resolution)
+
+- **[3] A — Resolve price from supply/demand and clear at it.** In `clear_markets`,
+  after supply and demand are accumulated, set each market `price[r]` toward
+  `base_price[r] × sqrt(demand/supply)`, clamped to `[0.25×, 4×] base_price` and eased
+  by an EMA (smoothing 0.5) from the prior `price[r]`; value this tick's sales and
+  purchases (the returned `corp_cash_flow`) at the **resolved** price rather than
+  `base_price`. Handle the zero-supply / zero-demand edges via the clamp. Update the
+  one-line "valued at base_price" comments in `budget_system.cpp` /
+  `market_clearing.hpp` to "resolved price". Files: `src/world/market_clearing.{hpp,cpp}`,
+  `src/world/budget_system.cpp` (comment only). Deps: foundation (Layer 3 already landed).
+  Satisfies: R1, R2, R3, R4.
+
+Parallelisation note: single sequential group. Disjoint from B/D source; shares the
+`tools/verify/econ_harness.cpp` verification file with B (main session edits both).
+
+### Group B — deposit-depletion (promoted from TODO § Environment)
+
+Requirements: [REQUIREMENTS.md § deposit-depletion](req/REQUIREMENTS.md#deposit-depletion)
+
+- **[4] A — Seed reserves, draw them down with taper, report exhaustion.** Seed
+  `tile_component.resource_remaining[r] = resource_deposit[r] × deposit_reserve_factor`
+  (a hard-coded constant; richness stays the rate multiplier) in `tile_generation.cpp`
+  Pass 6. In `run_extraction`, draw the credited output from `resource_remaining`,
+  tapering output over the last `deposit_taper_ticks` of nominal yield and reporting
+  the building **exhausted** ("out of resources", a state distinct from idle) once the
+  reserve falls below `deposit_min_taper` of nominal. Add `bool exhausted` to
+  `building_report`. Surface the exhausted state in the economy panel's State column.
+  Finite only — no refill. Files: `src/world/economy_system.{hpp,cpp}`,
+  `src/world/tile_generation.cpp`, `src/ui/economy_panel.cpp`. Deps: foundation.
+  Satisfies: R1, R2, R3, R4, R5.
+
+Parallelisation note: single sequential group. Source-disjoint from A/D; shares
+`econ_harness.cpp` with A (main session).
+
+### Group C — pregame-ticks (promoted from TODO § Corporation generation)
+
+Requirements: difficulty 2 — inline. **Verification:** `headless` (running the economy
+pipeline twice from a cold world yields non-empty pools / moved balances) + `build`.
+
+- **[2] A — Prime two economy ticks at startup.** After `load_economy()` in `app::run()`
+  (not `run_verify`, which stays deterministic-cold), run `step_economy()` twice so the
+  first on-screen frame shows warm pools, moved balances, and populated market
+  supply/demand. Files: `src/core/app.cpp`. Deps: foundation. Parallel-safe in scope
+  with D except both touch `app.cpp` → sequential, same session.
+
+Parallelisation note: shares `app.cpp` with D; done in the same main-session pass.
+
+### Group D — balance-header (promoted from TODO § Canvas)
+
+Requirements: [REQUIREMENTS.md § balance-header](req/REQUIREMENTS.md#balance-header)
+
+- **[3] A — Surface the player balance, valuation, net, and trend in the header.**
+  Re-signature `draw_header_panel` to take the `world`, the player balance history, and
+  the strip bounds; render the player corporation's running **balance**
+  (`corporation_component.balance`, negatives red), an **estimated stockpile valuation**
+  (player `(corp,body)` pools summed at market price), and the **last-tick net** as a
+  coloured ±/qtr figure plus a small **sparkline** of recent balances. Maintain a
+  capped balance-history buffer in `app`, pushed each `step_economy()` (so the primed
+  ticks from C seed it). Files: `src/ui/header_panel.{hpp,cpp}`, `src/core/app.{hpp,cpp}`.
+  Deps: foundation. Shares `app.cpp` with C. Satisfies: R1, R2, R3, R4.
+
+Parallelisation note: shares `app.{hpp,cpp}` with C → sequential, same session. The
+header source itself is disjoint from A/B.
+
+### Group E — ledger-window-principle (promoted from TODO § Ledger)
+
+Requirements: difficulty 2 — inline. **Verification:** `doc` (`docs/ui/LAYOUT.md` records
+the uniform ledger-window rule; TODO § Ledger carries the standing Brief).
+
+- **[2] A — Settle the uniform ledger-window chrome rule.** Defer the Market/Balance/
+  Construction ledger family (unchanged in TODO) but record the single design principle
+  it must follow: every ledger window shares **one size constant and one spawn anchor**
+  (today `tile_inspector` is 820×560 @ +10 and `economy_panel` is 760×620 @ +40 — the
+  inconsistency this rule resolves). Write the rule into `docs/ui/LAYOUT.md`, note it on
+  the header doc cross-reference, and leave a `[2]` standing Brief under TODO § Ledger so
+  the family inherits it. Files: `docs/ui/LAYOUT.md`, `docs/ui/HEADER.md`,
+  `docs/development/TODO.md`. Deps: independent (doc-only). 
+
+Parallelisation note: documentation-only; disjoint from all code groups.
+
+---
+
+### Set-wide collision map (Publish step 3)
+
+| File | Groups |
+|------|--------|
+| `src/world/market_clearing.{hpp,cpp}` | A |
+| `src/world/budget_system.cpp` (comment) | A |
+| `src/world/economy_system.{hpp,cpp}` | B |
+| `src/world/tile_generation.cpp` | B |
+| `src/ui/economy_panel.cpp` | B |
+| `src/ui/header_panel.{hpp,cpp}` | D |
+| `src/core/app.{hpp,cpp}` | C + D (same session) |
+| `tools/verify/econ_harness.cpp` | A + B (main session) |
+| `docs/ui/LAYOUT.md`, `HEADER.md`, `docs/development/TODO.md` | E + TODO removals |
+
+Source write-sets are disjoint across A/B/D; the only shared code file is `app.cpp`
+(C + D), kept in one session. No sub-agents — the set is small and the parallel win is
+marginal. Build + run `econ_harness` / `world_audit` / a header verify script after each
+group.
+
+</details>
+
+---
+
 *No active groups. The worklist is empty between work blocks.*
 
-Completed 2026-06-14 (see DEVLOG, newest first):
+Completed 2026-06-15 / 2026-06-14 (see DEVLOG, newest first):
+
+- *Layer 3 finalisation — publish set (5 Briefs, barrier semantics). **Completed:**
+  price resolution from local supply/demand (A); deposit depletion model (B); pre-game
+  economy ticks / warm start (C); player balance header + design pass (D); uniform
+  ledger-window chrome principle (E, family deferred). 13/13 requirements met; verified
+  via `tools/verify/econ_harness`, `tools/verify/world_audit`, and
+  `scripts/verify/header.lua`. Four functional commits (C+D merged — shared `app.cpp`)
+  plus a tracking close-out. See REQUIREMENTS.md archive.*
 
 - *Layer 3 economy — publish set (8 Briefs, barrier semantics). **Completed:** data-model
   foundation; recipe/economy registry (Lua); production simulation; per-body market clearing;

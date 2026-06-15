@@ -113,6 +113,46 @@ Permanent record of resolved requirement groups, newest first. Each carries a
 `Resolved:` line and is retained verbatim; re-promote by copying a section back up to
 **Active requirements**.
 
+### price-resolution
+
+`Resolved: 2026-06-15 — complete; all 4 rows met. Verified via tools/verify/econ_harness
+(resolved iron/steel prices and corp balances at the eased sqrt(D/S) target) and the
+ProjectIo build.`
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | `clear_markets` resolves each traded `market_component.price[r]` toward `base_price[r] × sqrt(demand[r]/supply[r])` each tick. | headless | complete | econ_harness: iron S20/D4 → 1.809. |
+| R2 | The resolved price is clamped to `[0.25×, 4×] base_price[r]` and eased from the prior price by an EMA (smoothing 0.5); zero-supply pushes to the ceiling, zero-demand to the floor. | headless | complete | econ_harness: steel D0 floored then eased base 8 → 5.0. |
+| R3 | Sales income and purchase expenditure in the returned `corp_cash_flow` are valued at the **resolved** price, not `base_price`. | headless | complete | econ_harness: corp balances 1027.18 / 996.76 at resolved price. |
+| R4 | The change builds clean and the budget loop (reading the flows) reflects resolved-price cash. | build | complete | ProjectIo Debug build clean. |
+
+### deposit-depletion
+
+`Resolved: 2026-06-15 — complete; all 5 rows met. Verified via tools/verify/world_audit
+(reserve seeding over the generated world) and tools/verify/econ_harness (draw-down,
+taper, exhaustion) plus the ProjectIo build.`
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | `resource_remaining[r]` is seeded at generation to `resource_deposit[r] × deposit_reserve_factor` for every non-zero deposit; richness is unchanged. | headless | complete | world_audit: 65382 deposits, 0 mis-seeded (factor 400). |
+| R2 | Extraction draws its credited output from `resource_remaining`, decrementing it each tick. | headless | complete | econ_harness: reserve 1e6 → 1e6−20; full-rate draw at ample reserve. |
+| R3 | Output tapers down over the last `deposit_taper_ticks` of nominal yield as the reserve nears zero. | headless | complete | econ_harness: reserve 80 → output 10 (half nominal). |
+| R4 | A building whose reserve falls below `deposit_min_taper` of nominal reports `exhausted` ("out of resources") and produces nothing; the state is distinct from idle and shown in the economy panel. | headless | complete | econ_harness: reserve 5 → exhausted, output 0; panel State column. |
+| R5 | Deposits never refill (finite); the change builds clean. | build | complete | No refill path; ProjectIo Debug build clean. |
+
+### balance-header
+
+`Resolved: 2026-06-15 — complete; all 4 rows met. Verified via scripts/verify/header.lua
+(capture showed BALANCE Cr 126.3k green, STOCKPILE Cr 0, NET +810/qtr green, rising
+sparkline) and the ProjectIo build.`
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | The header renders the player corporation's running `balance`, with negatives flagged red (`palette::negative`). | visual | complete | header_populated.png: balance green (positive). |
+| R2 | The header renders an estimated stockpile valuation (player `(corp,body)` pools summed at market price). | visual | complete | header_populated.png: STOCKPILE Cr 0 (extractor sells surplus each tick; renders). |
+| R3 | The header renders the last-tick net change as a coloured signed per-quarter figure plus a sparkline of recent balances. | visual | complete | header_populated.png: NET +810/qtr green + rising sparkline. |
+| R4 | `app` maintains a capped balance-history buffer pushed each `step_economy()`; the build is clean. | build | complete | m_balance_history (cap 64); ProjectIo Debug build clean. |
+
 ### Layer 3 economy publish set (economy-data-model … placement-rules-audit)
 
 `Resolved: 2026-06-15 — complete; all 27 rows across the seven groups met. Published as a
