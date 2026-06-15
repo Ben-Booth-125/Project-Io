@@ -561,6 +561,11 @@ doc-coverage pass were all **reviewed and cleared with the user on 2026-06-15** 
   and carries a transient `> ⟳` note. Review it and remove the `⟳` note once accepted.
   `docs/generation/CORPORATION_GENERATION.md`.
 
+- **[S1] Review the GENERATION_STRATEGY substrate-generation forward pointer (B4 Q&A).** The B4
+  design-direction Q&A added a § Open cross-doc items pointer to the new substrate-generation Brief,
+  carrying a transient `> ⟳` note. Review it and remove the `⟳` note once accepted.
+  `docs/generation/GENERATION_STRATEGY.md`.
+
 _(All eight `S1` doc-review reminders from the retroactive doc-coverage pass —
 CORPORATION_GENERATION, GENERATION_STRATEGY, SYSTEMS § Cross-cutting, POPULATION, ICONS,
 CIRCUMPLANETARY, TIME_CONTROLS, SELECTION — were **reviewed and cleared with the user on
@@ -871,6 +876,25 @@ The labour scalar (`docs/SYSTEMS.md` § Workforce, `docs/economy/POPULATION.md`)
 
 The world-generation layer — terrain, nations, corporations. Design authority:
 `docs/generation/{TILE,NATION,CORPORATION}_GENERATION.md`.
+
+### Cross-cutting
+
+- **[B4 ~] Generate the saturated nation-owned background substrate.** **Raised 2026-06-15** by the
+  B4 design-direction Q&A: the user expected starting holdings to read as a *highly saturated* world,
+  but the settled premise (`GENERATION_STRATEGY.md` § The economic premise) makes corporations
+  **lean specialists** *on purpose* — the saturation is the **Nation AI's broad background
+  industry**, explicitly "not the player's playing field… not surfaced as manageable detail." That
+  substrate is currently **described but never generated**: nations get territory, resource
+  profiles, and political character, but no actual background industrial presence, so the world does
+  not yet *feel* saturated. This Brief is that missing mechanism — how the nation-owned substrate is
+  represented and generated so the map reads as a saturated earth-like economy without inflating
+  corporation holdings (which stay lean per the just-landed B4 revision). **Design owed:** what form
+  the substrate takes — abstract per-tile/per-nation productivity field, nation-owned background
+  buildings (cheap to generate, not individually managed), or a purely economic aggregate feeding
+  markets — and how it interacts with the per-body markets and the player's specialist competition.
+  Couples to NATION_GENERATION (a generation pass), the economy/market layer, and the deferred
+  building-tier item. Authority `docs/generation/GENERATION_STRATEGY.md` § The economic premise +
+  § Open / cross-cutting. *(Design-owed — settle before promoting.)*
 
 ### Tile generation (terrain)
 

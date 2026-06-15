@@ -6,6 +6,67 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## 2026-06-15 — v0.1.0 publish plan Session 1: verification + world-gen foundation (branch v0.0.5)
+
+First execution session of the ROADMAP near-term publish plan (§ Session 1). A **Batch Publish**
+of three Briefs: lay the visual-verification safety net, then take the one clean world-gen fan-out.
+Three commits, one per Brief. Build green; `world_audit` all-PASS.
+
+### Briefs published
+
+- **[F3] Visual-verification harness — golden-image diffing** *(first, alone)*. Added a PNG
+  **reader** (`read_png_rgba` — inflates the writer's own stored-block zlib) and a **diff**
+  (`diff_rgba` — per-pixel max-channel threshold `T`, caller-owned fail fraction `F`, magenta diff
+  image) to `png_writer`; a compare/bless step in `run_verify` (golden dir derived from the script
+  path's parent, so running against the **source** path reads/writes the committed tree); and a
+  `--bless` arg in `main.cpp`. **End-to-end gate proven:** a clean re-run PASSed at **0.0056%**
+  differing, a deliberately wrong golden FAILed at **56.44%** with a diff image and non-zero exit.
+  `verifier-visual` SKILL.md documents the bless flow + tolerance knobs (user-approved skill edit).
+  *Ignore-region mask deferred* (Q&A) — the fraction tolerance already absorbs the volatile counter.
+- **[C2] Orphan-island assignment** *(sub-agent A)*. A deterministic post-pass
+  (`assign_orphan_islands`) groups unclaimed non-ocean land into cardinal-adjacency components and
+  assigns each whole component to the nearest claimed tile's nation across water. `world_audit` now
+  reports **6048/6048 Kepler land tiles owned, 0 unclaimed** (was ~12% unclaimed).
+- **[B4] Revise the corporation starting-holdings shape** *(sub-agent B)*. Retired the flat
+  `k_min_holdings`/`k_max_holdings` (3–6) for a focus-shaped `holdings_range` (**extraction 3–4,
+  processing 2–3, trade 1–2**); anchor + nearest-tile clustering retained. `world_audit` confirms
+  all 8 corps within their focus ceilings (counts now 1–3) and S1 `can_place` stays PASS.
+
+### Execution notes
+
+- **Fan-out earned its cost here.** F3 ran serially in the main session (shared `png_writer`/`app`
+  seam). The two world-gen fixes were genuinely disjoint files, so **C2-A ∥ B4-A** went to two
+  concurrent sub-agents; the integrator (main session) owned the shared `world_audit.cpp` (both new
+  audits), the doc propagation, the build, and verification. Both agents' edits were verified
+  retroactively (diffs read) — clean.
+- **New `world_audit` checks:** C2 R1 (zero unclaimed land) and B4 R1 (per-corp counts within focus
+  ceiling). Folded into the harness exit code.
+- **Doc propagation:** NATION_GENERATION § Pass 2b (orphan post-pass) and CORPORATION_GENERATION
+  § Pass 3 (concrete counts) updated with transient `> ⟳` notes; three `S1` review reminders raised
+  under OPENS § Documentation.
+
+### Design-direction Q&A (closing)
+
+- **B4 holding counts.** User noted they'd expected *higher* counts "based on a highly saturated
+  generation method", but deferred the call. Verified against `GENERATION_STRATEGY.md` § The
+  economic premise: the saturation is the **Nation AI's background substrate** ("not the player's
+  playing field… not surfaced as manageable detail"), and corporations are **lean specialists** *by
+  design* — inflating them would contradict the loop-simplifying premise. **Resolution: keep the
+  lean counts**; the world's missing saturation is a *substrate-generation gap*, not a corp-holdings
+  gap. Raised a new **[B4 ~] Generate the saturated nation-owned background substrate** Brief
+  (OPENS § Environment → Cross-cutting; forward pointer added to GENERATION_STRATEGY § Open cross-doc
+  items) — design-owed: how the substrate is represented (productivity field / background buildings /
+  economic aggregate).
+- **F3 ignore-region mask.** Kept deferred (captures pass comfortably without it).
+
+### Open / next
+
+Session 1 complete. Next per the plan: **Session 2 — the lens batch** (B3 Resource lens → Market
+lens, serial on the shared `ui_state`/`overlay`/`body_surface_canvas` files), now golden-verifiable
+against Session-1 references.
+
+---
+
 ## 2026-06-15 — Finalise remaining `~` Briefs + clear S1 review notes (branch v0.0.5)
 
 Design-only session completing the long-tail `~` Briefs in the up-to-v0.0.9 window, clearing the

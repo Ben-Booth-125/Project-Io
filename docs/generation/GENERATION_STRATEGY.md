@@ -66,3 +66,10 @@ owning doc's § Open items.
 - **Post-WW2 industrial grounding.** The focus→asset-mix patterns should be grounded in research
   on the post-WW2 industries that led to space-related capability, so a specialist's holdings
   read as a plausible pathway toward off-world reach rather than an arbitrary mix.
+- **Generating the saturated substrate.** The economic premise (above) says the Nation AI owns the
+  broad background industry, but that substrate is currently *described, not generated* — so the
+  world does not yet read as saturated. How it is represented and generated (productivity field /
+  background buildings / economic aggregate) is **design-owed**; see OPENS § Environment
+  → § Cross-cutting **[B4 ~] Generate the saturated nation-owned background substrate**.
+
+> ⟳ Added 2026-06-15 (B4 Q&A): forward pointer to the new substrate-generation Brief. Pending user review.
