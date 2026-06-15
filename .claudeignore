@@ -2,7 +2,6 @@
 build/
 out/
 .cmake/
-backups/
 
 # CMake generated
 CMakeCache.txt
