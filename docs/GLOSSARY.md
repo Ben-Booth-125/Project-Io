@@ -45,9 +45,18 @@ A unit of **described intent** in the backlog (`docs/development/TODO.md`): a pr
 **Batch Publish**
 The publication of **more than one Brief in a single work block**, run breadth-first under
 **barrier semantics** — every Brief clears each Publish step before *any* Brief begins the
-next (see `docs/development/TODO.md` § Publish → Publishing multiple Briefs together). Beyond
-the single-Brief lifecycle, a Batch Publish carries a **documentation-coverage discipline** a
-lone Publish does not:
+next (see `docs/development/TODO.md` § Publish → Publishing multiple Briefs together).
+
+A Batch Publish **usually executes already-designed Briefs — it does not normally include
+design work.** Design is settled into the Briefs *beforehand*; **pausing to design is preferred
+to redesigning in place**, which is costly. The design-direction Q&A (below) catches *incidental*
+calls a batch made — it is not a substitute for up-front design. When a broken-up session forces
+**rapid redesign** of work already attempted, **refactor the in-flight tasks back into Briefs**
+(intent returned to TODO, as when cancelling a group) and make a clean **second attempt** from
+the Brief, rather than redesigning mid-batch.
+
+Beyond the single-Brief lifecycle, a Batch Publish carries a **documentation-coverage
+discipline** a lone Publish does not:
 
 - **Doc-coverage determination (first).** Before execution, determine for each Brief whether
   the design docs already record the implementation it will produce — or whether that

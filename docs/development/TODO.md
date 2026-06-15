@@ -115,6 +115,13 @@ in one block.
 
 #### Batch Publish — documentation-coverage discipline
 
+A Batch Publish **usually executes already-designed Briefs — design is not normally part of the
+batch.** Design is settled into the Briefs beforehand; **pausing to design beats redesigning in
+place** (redesign is costly). If a broken-up session forces *rapid redesign* of work already
+attempted, **refactor the in-flight tasks back into Briefs** (intent returned to TODO, as when
+cancelling a group) and make a clean **second attempt** from the Brief — do not redesign
+mid-batch. The step-5 Q&A catches *incidental* calls, not absent up-front design.
+
 A Batch Publish carries a documentation discipline a single-Brief Publish does not. It runs
 *around* the five code steps above (the determination up front, the review reminders and Q&A
 at the close):
