@@ -56,7 +56,7 @@ Water (from icy bodies), iron-nickel ore (from metallic asteroids), platinum gro
 
 ### Newly available buildings
 
-Ice Extractor, Assembly Plant, Orbital Port.
+Ice Extractor, Surface Extractor, Assembly Plant, Orbital Port.
 
 ### Era 1 → Era 2 gate
 

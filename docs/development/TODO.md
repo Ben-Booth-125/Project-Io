@@ -468,12 +468,6 @@ exchange, **distinct from corp stockpile pools**. Design authority `docs/SYSTEMS
 The resource economy's data and quality work — the substrate Layer 4 sits on. Design
 authority: `docs/economy/RESOURCES.md`, `docs/economy/PRODUCTION.md`.
 
-- **[C1] ERAS Era 1 buildings list omits the Surface Extractor.** The 2026-06-15 resource
-  realism pass made the Surface Extractor the sole Era 1 route for off-world metallic ore
-  (iron-nickel, platinum group metals), but `docs/economy/ERAS.md` § Era 1 still lists only Ice
-  Extractor / Assembly Plant / Orbital Port. Add the Surface Extractor there for coherence with
-  `PRODUCTION.md`. One-line doc fix.
-
 - **[B3] Resource generation — full-set deposit authoring + scarcity.** Generation today
   authors deposits for the seven-resource prototype subset; extend it to the full 23-resource
   set with a plausible distribution and scarcity profile (rare goods rare, ambient goods
