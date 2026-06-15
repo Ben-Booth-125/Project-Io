@@ -33,6 +33,13 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\world_audit.cpp ^
    src\world\corporation_generation.cpp src\world\placement_rules.cpp ^
    src\world\hard_coded_world.cpp src\world\orbital_system.cpp /Fe:world_audit.exe
 world_audit.exe
+
+:: Layer 4 player construction — construct_building validation, build-cost spend,
+:: component authoring, and the insufficient-funds / unknown-corp/tile guards.
+cl /nologo /std:c++20 /EHsc /I src tools\verify\construction_harness.cpp ^
+   src\world\world.cpp src\world\construction.cpp src\world\placement_rules.cpp ^
+   /Fe:construction_harness.exe
+construction_harness.exe
 ```
 
 Each exits non-zero on a failed assertion. The economy *panel* (the visual class)

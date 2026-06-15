@@ -35,6 +35,11 @@ in `tools/verify/README.md`.
   zero-deposit tiles are rejected). Links the generation TUs (`tile_generation`,
   `nation_generation`, `corporation_generation`, `placement_rules`, `hard_coded_world`,
   `orbital_system`, `world`).
+- **`construction_harness`** — Layer 4 player construction (`construct_building`):
+  `placement_rules::can_place` validation, build-cost spend from the corp balance,
+  building/stockpile authoring and asset attachment, default-recipe seeding, and the
+  insufficient-funds / unknown-corp / unknown-tile guards. Links `world.cpp`,
+  `construction.cpp`, `placement_rules.cpp` (hand-builds a `recipe_registry`).
 
 ## Procedure
 

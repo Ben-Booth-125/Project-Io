@@ -256,6 +256,7 @@ reject it and ask for a tighter alternative.
 | `Bash(& ".\econ_harness*)` | `verifier-headless` | `& ".\econ_harness.exe"` |
 | `Bash(& ".\econ_stability*)` | `verifier-headless` | `& ".\econ_stability.exe"` |
 | `Bash(& ".\world_audit*)` | `verifier-headless` | `& ".\world_audit.exe"` |
+| `Bash(& ".\construction_harness*)` | `verifier-headless` | `& ".\construction_harness.exe"` |
 
 **Intentionally omitted — will still prompt:**
 

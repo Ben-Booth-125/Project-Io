@@ -15,7 +15,8 @@
       "Bash(cl *)",
       "Bash(& \".\\econ_harness*)",
       "Bash(& \".\\econ_stability*)",
-      "Bash(& \".\\world_audit*)"
+      "Bash(& \".\\world_audit*)",
+      "Bash(& \".\\construction_harness*)"
     ]
   }
 }
