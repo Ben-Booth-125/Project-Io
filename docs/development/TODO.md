@@ -165,41 +165,16 @@ currently hold Briefs appear as sections below.
 
 ## Canvas
 
-- **[B3] Design the lens system (complete the stubs).** `docs/ui/LENSES.md` now
-  exists but only the **Corporation** lens section is settled (written alongside that
-  lens's implementation); the **Supply / Market / Faction / Resource** sections are
-  **stubs** recording current behaviour only. Finish the per-lens design for those
-  four. The overlay control strip has four lenses today (`supply`, `market`,
-  `faction`, `corporation` — `overlay_mode` in `src/ui/ui_state.hpp`). Settle for
-  each remaining lens:
-
-  — **Per-lens specification** (what is shown, on which rung, and at what level of detail):
-    the three stubbed existing lenses (`Supply / Market / Faction`) plus the proposed
-    **Resource** lens (deposit density: colour tiles by their highest-value deposit, or by a
-    player-selected resource, with a gradient legend) — Resource still warrants its own icon
-    and entry alongside the current four.
-
-  — **Rung applicability table**: which lenses are meaningful at Solar, Circumplanetary, and
-    Planetary. Supply and Market span all three rungs (route lines on Solar, price summaries
-    at Circumplanetary, per-tile detail at Planetary); Faction/Corporation/Resource are
-    Planetary-first but may have coarser Solar/Circumplanetary representations later.
-
-  — **Icon vocabulary**: one distinct vector glyph per lens. Supply/Market/Faction/
-    Corporation glyphs exist and are ratified in ICONS.md; the **Resource** glyph is the
-    one still to spec.
-
-  — **Legend format**: how the active lens is labelled on-canvas (chip, strip, or implicit
-    via the icon highlight alone), and how a colour key is surfaced when the lens uses a
-    palette (nation colours, resource identity colours).
-
-  — **Interaction notes**: whether lenses are Planetary-only or propagate to the minimap;
-    whether multiple lenses can be active simultaneously (currently no — single `overlay_mode`
-    enum); whether any lens requires data not yet generated (e.g. Resource needs deposit data
-    already present; Corporation needs `w.corporations` which already exists).
-
-  Design authority once written: `docs/ui/LENSES.md` (this doc); icon glyphs also propagate
-  to `src/ui/icons.hpp`. Refer to `docs/ui/CANVASES.md` for rung descriptions and
-  `docs/ui/LAYOUT.md` for the strip's position in the shell.
+- **[B3] Implement the Resource lens render pass.** The lens *design* is now settled
+  (`docs/ui/LENSES.md` § Resource lens, 2026-06-15) and the glyph exists
+  (`ui::icons::resource`). What remains is the **functional lens**: add
+  `overlay_mode::resource` to `src/ui/ui_state.hpp`; a strip button (calling
+  `icons::resource`) + `overlay_mode_name` entry in `src/ui/overlay.cpp`; and the guarded
+  Planetary render pass in `src/ui/body_surface_canvas.cpp` — **highest-value mode** (tint each
+  tile by its richest deposit's identity colour, opacity by magnitude, via
+  `presentation_of(res).colour`) and a **single-resource mode** (player-picked resource → density
+  heatmap) with a lens-local resource selector and the on-canvas gradient colour key the design
+  specifies. Data is already present (tile `resource_deposit`). Authority `docs/ui/LENSES.md`.
 
 - **[F3] Visual-verification harness — golden-image diffing (deferred).** Phase 1 outputs
   PNGs for human/Claude inspection only. A later iteration could add committed reference
@@ -256,23 +231,16 @@ currently hold Briefs appear as sections below.
   any on-canvas distance label). See `docs/ui/CIRCUMPLANETARY.md` and
   `docs/ui/SOLAR.md`.
 
-- **[B4] Informative tooltip / hover-card system.** The single most important
-  player-communication surface for a grand strategy game. Today there is one
-  ad-hoc `ImGui::BeginTooltip` inside the Planetary canvas, plus the lightweight
-  `ImGui::SetTooltip` body tooltips on the Solar / Circumplanetary canvases;
-  there is no shared rich card. We want a *shared* hover-card primitive with a
-  consistent structure — title line (name + type + icon), a short stat block,
-  optional sectioned detail, and room for "why" annotations (e.g. how a price or
-  yield was derived). It must work for every hoverable thing across all canvases
-  and ledgers: bodies, tiles, buildings, markets, and later convoys and routes.
-  It can now build on the shared presentation metadata, formatters, and icon
-  helpers (`src/ui/presentation.hpp`, `format.hpp`, `icons.hpp`). Decide: a single
-  `draw_hover_card(...)` helper vs. per-entity builders; instant vs. delayed
-  reveal; how a "rich card" (LAYOUT.md popup elements) differs from the lightweight
-  canvas tooltip. Likely earns its own `docs/ui/TOOLTIP.md`. Note the overlap with
-  the **Selection info element** (Ledger) — both present per-entity detail; share
-  the per-type content builders where it makes sense. Supports Layer 4 (building /
-  market detail on hover). See `docs/ui/LAYOUT.md`.
+- **[B3] Implement the hover-card primitive.** The hover-card *design* is now settled
+  (`docs/ui/TOOLTIP.md`, 2026-06-15): one `draw_hover_card` dispatcher wrapping the existing
+  `entity_summary` per-entity builders in `BeginTooltip`/`EndTooltip` (the card is SELECTION.md's
+  Focus state — share, don't duplicate, the builders); lightweight title+stat instant, the rich
+  "why"-annotated card on dwell. What remains is the **build**: the dispatcher, swapping the three
+  ad-hoc tooltip call sites (`body_surface_canvas.cpp`, the Solar / Circumplanetary canvases) to
+  it, and cross-referencing `TOOLTIP.md` from `LAYOUT.md` § UI popup elements and `SELECTION.md`.
+  Open feel decisions flagged in TOOLTIP.md (reveal delay; rich-by-default vs. dwell; "why"
+  verbosity) settle against a populated Layer 4 economy. Supports Layer 4 (building / market detail
+  on hover). Authority `docs/ui/TOOLTIP.md`.
 
 - **[C2] Time-speed curve + econ-tick progress bar.** Two settled tweaks to the time
   column (the time panel in `src/core/app.cpp`; speed→rate mapping in `sim_loop`):
@@ -361,19 +329,6 @@ currently hold Briefs appear as sections below.
 Follow-up intent for the Selection info element (design in `docs/ui/SELECTION.md`;
 shared per-entity content builders in `entity_summary.{hpp,cpp}`):
 
-- **[A3] Tile Selection element as the build front door.** The tile Selection info element
-  (the tile builder in `entity_summary.{hpp,cpp}`, `SELECTION.md`) is the natural primary
-  surface for acting on a tile, so make it the **main entry to construction**. Building on a
-  tile is a *targeted* action, so — per the broad-ledger menu principle (`docs/ui/MENU.md`) —
-  it is reached **contextually through the selection element** (and/or a transient build
-  popup), **not** a reserved menu/nav-slot: a selected tile gets a clear **"build here"**
-  affordance inline. Settle what the tile selection element shows for build context — the
-  buildable types (via `placement_rules`), the build cost (Lua economy constants), the current
-  building if the tile already holds one, and the confirm-build action. The broad buildings
-  *overview* lives in its own ledger ([F4] above); this Brief is the per-tile build entry.
-  Authority `docs/ui/{SELECTION,MENU}.md`; touches `src/ui/entity_summary.{hpp,cpp}` /
-  `src/ui/selection_panel.cpp`.
-
 - **[C2] Non-spatial 'go to' routing.** For nation / corporation selections (no
   canvas of their own), 'go to' should open the relevant ledger rather than
   navigate a canvas. The dispatch seam exists (`draw_selection_panel` →
@@ -439,6 +394,12 @@ exchange, **distinct from corp stockpile pools**. Design authority `docs/SYSTEMS
 The resource economy's data and quality work — the substrate Layer 4 sits on. Design
 authority: `docs/economy/RESOURCES.md`, `docs/economy/PRODUCTION.md`.
 
+- **[C1] ERAS Era 1 buildings list omits the Surface Extractor.** The 2026-06-15 resource
+  realism pass made the Surface Extractor the sole Era 1 route for off-world metallic ore
+  (iron-nickel, platinum group metals), but `docs/economy/ERAS.md` § Era 1 still lists only Ice
+  Extractor / Assembly Plant / Orbital Port. Add the Surface Extractor there for coherence with
+  `PRODUCTION.md`. One-line doc fix.
+
 - **[B3] Resource generation — full-set deposit authoring + scarcity.** Generation today
   authors deposits for the seven-resource prototype subset; extend it to the full 23-resource
   set with a plausible distribution and scarcity profile (rare goods rare, ambient goods
@@ -446,12 +407,6 @@ authority: `docs/economy/RESOURCES.md`, `docs/economy/PRODUCTION.md`.
   holds the generation *mechanics*; this one holds the *resource-economy* target. Touches the
   deposit pass in `src/world/tile_generation.cpp`; authority `docs/economy/RESOURCES.md`,
   `docs/generation/TILE_GENERATION.md`.
-
-- **[B2] Resource realism pass.** A design review of the resource list, tiers, recipes, and
-  per-body availability in `docs/economy/{RESOURCES,PRODUCTION}.md` for realism and coherence:
-  do the production chains make sense, are quantities plausible, are any obvious resources or
-  recipes missing or mis-tiered. Design/doc pass; feeds the generation and the economy depth
-  Layer 4 operates over.
 
 ## Workforce
 

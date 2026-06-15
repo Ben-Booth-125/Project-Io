@@ -6,6 +6,60 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## 2026-06-15 — >C Brief pass, Wave 1.2 + design wave (branch v0.0.5)
+
+Continued the priority `> C` pass. One Layer 4 core code Brief in the main session, three
+design/doc Briefs fanned out to concurrent background sub-agents (disjoint file scopes:
+resource docs / a new TOOLTIP.md / the lens+icons files). Four Briefs, committed one each plus
+a tracking close-out.
+
+### [A3] Tile Selection element as the build front door (code)
+
+Made the v0.0.5 construction scaffold **functional**. New `src/world/construction.{hpp,cpp}` —
+`construct_building(world&, reg, corp, tile, type, target, out)` validates via
+`placement_rules::can_place`, checks the corp can afford the registry build cost, then creates
+the building (+ stockpile), authors it (staffed 0.5; extraction target; a processing facility
+seeded with the default "steel" recipe), appends it to the corp's assets, and debits the cost —
+mirroring generation Pass 3 but player-driven. Both entry points enqueue a pending request on
+`ui_state.construction` that `app::render` executes against the mutable world (the const-world UI
+surfaces only enqueue): the **tile Selection element** gained a "Build here" affordance (buildable
+types + cost, affordability-gated) in `selection_panel.cpp`, and the placement-mode **canvas
+click** now enqueues instead of being a no-op. `recipe_registry::recipe_id` was inlined into the
+header so construction logic stays Lua-free (headless-buildable). New harness
+`tools/verify/construction_harness.cpp` (11/11 PASS). Stale "v0.0.5 preview / non-mutating"
+comments updated across the canvas / panel / ui_state.
+
+### [B3] Lens system design + Resource glyph (sub-agent)
+
+`docs/ui/LENSES.md`: the four stub lenses (Supply / Market / Faction / Resource) expanded to the
+Corporation section's depth — per-lens spec, rung-applicability table, legends, interaction notes.
+The **Resource lens** settled as the next to build (no data dependency): highest-value tint +
+single-resource heatmap with a gradient key. New `ui::icons::resource` glyph (three stacked
+density strata) added + catalogued in ICONS.md. The functional render pass is a new follow-on
+Brief in TODO.
+
+### [B4] Hover-card system design (sub-agent)
+
+New `docs/ui/TOOLTIP.md`: the card is SELECTION.md's Focus state; one `draw_hover_card` dispatcher
+**reusing the existing `entity_summary` builders** (share, don't duplicate); lightweight instant /
+rich "why"-annotated on dwell. The implementation is a new follow-on Brief in TODO.
+
+### [B2] Resource realism pass (sub-agent)
+
+`docs/economy/{RESOURCES,PRODUCTION}.md` realism fixes: liquid-oxygen Era-0 sourcing via cryogenic
+air separation (vs. the previous "stockpiled by other means" hand-wave); Mine (terrestrial, Era 0)
+vs. Surface Extractor (off-world metallic, Era 1) era/terrain split made coherent. Flagged: an
+ERAS.md gap (now a `[C1]` Brief), and that recipe *ratios* remain Lua-authored (no numbers invented).
+
+### Status
+
+Complete — build-front-door 6/6, lens-system-design 3/3 (REQUIREMENTS); hover-card + resource
+realism are doc-class (verified by inspection + clean build of the lens glyph). Verified via
+`tools/verify/construction_harness` (11/11 PASS) and a clean `ProjectIo` Debug build (which also
+compiles the new glyph and the inlined `recipe_id`). Three sub-agents fanned out on disjoint scopes.
+
+---
+
 ## 2026-06-15 — >C Brief pass, Wave 1.1: Workforce pool — step 1 (branch v0.0.5)
 
 First Brief of the priority `> C` pass (Layer 4 core first). Published **[A4] Workforce pool

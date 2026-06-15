@@ -111,6 +111,37 @@ Permanent record of resolved requirement groups, newest first. Each carries a
 `Resolved:` line and is retained verbatim; re-promote by copying a section back up to
 **Active requirements**.
 
+### build-front-door
+
+Resolved: 2026-06-15 — complete, all rows met. Promoted from TODO § Selection info element —
+**[A3] Tile Selection element as the build front door**. Makes the v0.0.5 construction scaffold
+functional: a single `construct_building` world function (validation + cost spend + component
+authoring), reached from the tile Selection element (the build front door) and the placement-mode
+canvas click. Verified via `tools/verify/construction_harness` (11/11 PASS) and a clean `ProjectIo`
+Debug build.
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | `construct_building` validates the tile via `placement_rules::can_place` (rejects ocean / wrong-deposit) with no mutation on failure. | `headless` | complete | C.R1 |
+| R2 | On success it creates the building (+ stockpile), authors it (target / staffing), appends it to the corp's assets, and debits the registry build cost. | `headless` | complete | C.R2 |
+| R3 | A constructed processing facility is seeded with the default recipe so it is productive. | `headless` | complete | C.R3 |
+| R4 | Construction is refused for insufficient funds (no build, no spend). | `headless` | complete | C.R4 |
+| R5 | Unknown corp / tile are rejected. | `headless` | complete | C.R5 |
+| R6 | The tile Selection element hosts a "Build here" affordance (buildable types + cost) that enqueues a request the app executes; the placement-mode canvas click enqueues the same. | `build` | complete | UI builds clean; logic shared with R1–R5 |
+
+### lens-system-design
+
+Resolved: 2026-06-15 — complete, all rows met. Promoted from TODO § Canvas — **[B3] Design the
+lens system (complete the stubs)**. Design-doc Brief plus the one new glyph. The Resource-lens
+*render pass* (enum + strip button + Planetary pass) is a new follow-on implementation Brief left
+in TODO. Verified by doc inspection + a clean build of the new glyph.
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | LENSES.md settles Supply / Market / Faction / Resource to the Corporation section's depth (per-lens spec, rung table, legend, interaction notes). | `doc: docs/ui/LENSES.md` | complete | |
+| R2 | The Resource lens is specified (deposit density: highest-value + single-resource modes, gradient legend). | `doc: docs/ui/LENSES.md` | complete | |
+| R3 | A distinct `ui::icons::resource` lens glyph is declared and implemented, and catalogued in ICONS.md. | `build` | complete | overload of the resource pip |
+
 ### workforce-pool
 
 Resolved: 2026-06-15 — complete, all rows met. Promoted from TODO § Workforce —
