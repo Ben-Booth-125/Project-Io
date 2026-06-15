@@ -111,6 +111,24 @@ Permanent record of resolved requirement groups, newest first. Each carries a
 `Resolved:` line and is retained verbatim; re-promote by copying a section back up to
 **Active requirements**.
 
+### workforce-pool
+
+Resolved: 2026-06-15 — complete, all rows met. Promoted from TODO § Workforce —
+**[A4] Workforce pool & population coupling**, step 1 (pool without population;
+POPULATION.md § Workforce model). Step 2 (population-derived supply) remains in TODO
+under the same Brief, coupled to the S4 population-centre work. Verified via
+`tools/verify/econ_harness` (WF.R2–R5 + all pre-existing Layer 3 assertions unchanged)
+and a clean `ProjectIo` Debug build.
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | `world` holds an authored per-`(corp, body)` workforce supply with a default fallback and an accessor (`workforce_supply`). | `code: workforce_supply` | complete | |
+| R2 | `run_economy_step` computes a per-`(corp, body)` contention scalar `min(1, supply/demand)` and reports it on `economy_report.workforce_contention`. | `headless` | complete | WF.R2 |
+| R3 | Effective workforce (`workforce_assigned × contention`) scales extraction and processing output, reported per building (`building_report.effective_workforce`). | `headless` | complete | WF.R3 |
+| R4 | Wages in `apply_budget` are paid on effective (allocated) workforce, not the requested target. | `headless` | complete | WF.R4 |
+| R5 | Default supply leaves single-building corps uncontended; an over-built `(corp, body)` is throttled. | `headless` | complete | WF.R5 + unchanged L3 rows |
+| R6 | The economy panel surfaces per-`(corp, body)` contention when below 1.0. | `code: contention` | complete | `draw_workforce` |
+
 ### layer4-ui-groundwork
 
 `Resolved: 2026-06-15 — complete; all 8 rows met. The fifth v0.0.5 enabler (held from the

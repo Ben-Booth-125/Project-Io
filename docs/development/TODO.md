@@ -457,13 +457,19 @@ authority: `docs/economy/RESOURCES.md`, `docs/economy/PRODUCTION.md`.
 
 The labour scalar (`docs/SYSTEMS.md` § Workforce, `docs/economy/POPULATION.md`).
 
-- **[A4] Workforce pool & population coupling.** The real model: a corporation-wide
-  (or per-body) labour **pool** with proportional contention when building demands exceed supply,
-  replacing the authored constant. Implements the **settled design** in
-  `docs/economy/POPULATION.md` § Workforce model (prototype → Layer 4) and couples to the Layer 4
-  population-centre work — workforce supply and wages derive from population. In Layer 3,
-  `workforce_assigned` is an authored constant 0–1, read-only, applied as a linear scalar; this
-  brief is the upgrade path.
+- **[A4] Workforce pool & population coupling — step 2 (population-derived supply).**
+  **Step 1 landed 2026-06-15** (per-`(corp, body)` labour pool with authored supply,
+  proportional contention scalar `min(1, supply/demand)` feeding both production and wages;
+  `world::workforce_supply` / `workforce_supply_overrides`,
+  `economy_report::workforce_contention`, `building_report::effective_workforce`, surfaced in
+  the economy panel — see DEVLOG / REQUIREMENTS § workforce-pool). **Remaining (step 2):**
+  replace the authored pool supply (`world::default_workforce_supply` / the overrides map) with
+  one **derived from population centres** — population level → labour force → the share that
+  contracts to the corporation — and let wage *level* track body habitability / population
+  pressure. Couples directly to the **[S4] Population centres** Brief (§ Infrastructure): supply
+  is a population output. Implements POPULATION.md § Workforce model step 2. Touches
+  `src/world/economy_system.cpp` (supply derivation), the population data the S4 work adds, and
+  `src/world/budget_system.cpp` (wage level). Best taken *with* or *after* S4.
 
 ## Infrastructure
 

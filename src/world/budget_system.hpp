@@ -1,22 +1,30 @@
 #pragma once
 
 #include "components.hpp"
+#include "economy_system.hpp" // economy_report.workforce_contention
 #include "market_clearing.hpp"
 #include "recipe_registry.hpp"
 #include "world.hpp"
 
+#include <map>
 #include <unordered_map>
+#include <utility>
 
 /// Apply one economy tick's money loop to every corporation balance:
 ///   balance += income − expenditure − maintenance − wages
 /// where income/expenditure are the market cash flows (goods sold / inputs bought
 /// at base_price), maintenance is each building's flat per-tick upkeep, and wages
-/// are `workforce_assigned × base_wage` per building. Balances may go negative
-/// (no insolvency consequence in the prototype).
+/// are `effective_workforce × base_wage` per building, where effective workforce is
+/// the requested target throttled by the (corp, body) labour-pool contention scalar
+/// (a building pays for the labour it actually used, not its target). Balances may go
+/// negative (no insolvency consequence in the prototype).
 ///
-/// @param w     World; corporation balances are mutated.
-/// @param reg   Loaded registry (maintenance / wage constants per building type).
-/// @param flows Per-corporation market cash flow from clear_markets().
+/// @param w          World; corporation balances are mutated.
+/// @param reg        Loaded registry (maintenance / wage constants per building type).
+/// @param flows      Per-corporation market cash flow from clear_markets().
+/// @param contention Per-(corp, body) workforce contention from run_economy_step
+///                   (`economy_report.workforce_contention`); absent keys read as 1.0.
 void apply_budget(world& w,
                   const recipe_registry& reg,
-                  const std::unordered_map<entity_id, corp_cash_flow>& flows);
+                  const std::unordered_map<entity_id, corp_cash_flow>& flows,
+                  const std::map<std::pair<entity_id, entity_id>, float>& contention);

@@ -6,6 +6,48 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## 2026-06-15 — >C Brief pass, Wave 1.1: Workforce pool — step 1 (branch v0.0.5)
+
+First Brief of the priority `> C` pass (Layer 4 core first). Published **[A4] Workforce pool
+& population coupling, step 1** — the labour-pool half of the settled POPULATION.md workforce
+model, *without* population (authored supply). Full Publish lifecycle, single sequential group
+(every file sits on the shared economy seam, so no fan-out).
+
+### What was built
+
+- **Labour pool on `world`** (`world.hpp`): `default_workforce_supply` (3.0) +
+  `workforce_supply_overrides` map + a `workforce_supply(corp, body)` accessor, held off the
+  component structs (the `corp_body_pools` rationale) so the economy stays on disjoint files.
+- **Contention in the economy step** (`economy_system.{hpp,cpp}`): per corp, demand per body =
+  Σ `workforce_assigned`; contention scalar = `min(1, supply/demand)`; reported on
+  `economy_report::workforce_contention`. Effective workforce (`workforce_assigned × contention`)
+  now scales **both** extraction and processing output and is reported per building
+  (`building_report::effective_workforce`).
+- **Wages on effective workforce** (`budget_system.{hpp,cpp}`): `apply_budget` takes the
+  contention map and bills wages on allocated, not requested, labour. Call sites updated
+  (`app.cpp` `step_economy`, the harness).
+- **Economy panel** (`economy_panel.cpp`): a "Workforce (corp × body)" section listing throttled
+  pools (scalar < 1.0) in the warning colour, else "all fully staffed".
+- **Harness** (`econ_harness.cpp`): WF.R2–R5 — uncontended single-building corp (scalar 1.0,
+  all prior L3 assertions unchanged), and an over-built corp (4 sites, demand 4 > supply 3 →
+  contention 0.75, output 15, wages on effective workforce).
+
+### Decisions
+
+- **Step 1 / step 2 split kept** — population-derived supply is *not* in this Brief; the TODO
+  Workforce Brief was rewritten to **step 2 only** (population coupling), to be taken with/after
+  **[S4] Population centres**. Authored supply (default 3.0, overridable) is the step-1 seam.
+- **Default supply 3.0** chosen so existing single-building harness corps stay uncontended
+  (assertions unchanged) while a realistically over-built body throttles — a tunable constant,
+  not a balance commitment.
+
+### Status
+
+Complete — 6/6 requirements met (REQUIREMENTS § workforce-pool). Verified via
+`tools/verify/econ_harness` (20/20 PASS) and a clean `ProjectIo` Debug build.
+
+---
+
 ## 2026-06-15 — v0.0.5 Layer 4 UI groundwork (single Brief, scaffold scope, branch v0.0.5)
 
 Second v0.0.5 block: published the **fifth enabler** that the foundations set had deliberately

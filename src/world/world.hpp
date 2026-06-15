@@ -96,6 +96,27 @@ struct world
         return corp_body_pools[std::make_pair(corp, body)];
     }
 
+    /// Authored effective workforce supply per (corp, body) — Layer 4 step 1 of the
+    /// labour-pool model (docs/economy/POPULATION.md § Workforce model). Absent
+    /// entries fall back to `default_workforce_supply`; population centres replace
+    /// this authored value with a population-derived figure in step 2. Held off the
+    /// component structs (the `corp_body_pools` rationale) so the economy stays on
+    /// disjoint files.
+    static constexpr float default_workforce_supply = 3.0f;
+    std::map<std::pair<entity_id, entity_id>, float> workforce_supply_overrides;
+
+    /// Effective workforce available to `corp` on `body` this tick. The labour the
+    /// corporation's buildings on that body contend for under the pool model.
+    ///
+    /// @param corp Corporation entity id.
+    /// @param body Body entity id.
+    /// @return     Authored supply if present, else `default_workforce_supply`.
+    float workforce_supply(entity_id corp, entity_id body) const
+    {
+        const auto it = workforce_supply_overrides.find(std::make_pair(corp, body));
+        return (it != workforce_supply_overrides.end()) ? it->second : default_workforce_supply;
+    }
+
 private:
     uint32_t m_next_id = 1; ///< Zero is null_entity; live IDs start at 1.
 };

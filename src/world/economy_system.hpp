@@ -27,6 +27,10 @@ struct building_report
     bool  exhausted = false; ///< Extraction only: the tile's deposit reserve is spent ("out of resources").
     float output_quantity = 0.0f; ///< Units credited to the pool this tick (sum of outputs for a processor).
 
+    /// Labour actually applied: `workforce_assigned × contention scalar` for the
+    /// building's (corp, body). Equals `workforce_assigned` when labour is uncontended.
+    float effective_workforce = 0.0f;
+
     bool          has_limiting   = false;               ///< Processing: a binding input exists.
     resource_type limiting_input = resource_type::iron_ore; ///< Processing: the scarcest input (pool-relative).
 };
@@ -41,6 +45,13 @@ struct economy_report
     /// Per (corporation, body): the input quantities a processor could not cover
     /// from its own pool and auto-bought from the market this tick. Resource-indexed.
     std::map<std::pair<entity_id, entity_id>, std::array<float, resource_count>> purchases;
+
+    /// Per (corporation, body): the workforce contention scalar applied this tick —
+    /// `min(1, supply/demand)`. 1.0 when the corp's labour demand on that body fits
+    /// its pool supply; below 1.0 every building on that (corp, body) is throttled
+    /// proportionally (docs/economy/POPULATION.md § Workforce model, step 1). Read by
+    /// the budget step (wages on effective workforce) and the economy panel.
+    std::map<std::pair<entity_id, entity_id>, float> workforce_contention;
 };
 
 /// Run one economy step over every corporation's buildings: extraction credits

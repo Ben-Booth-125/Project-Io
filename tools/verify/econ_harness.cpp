@@ -133,7 +133,7 @@ int main()
     // --- run one tick ---
     economy_report rep = run_economy_step(w, reg);
     auto flows = clear_markets(w, reg, rep);
-    apply_budget(w, reg, flows);
+    apply_budget(w, reg, flows, rep.workforce_contention);
 
     std::printf("Layer 3 economy harness\n");
 
@@ -227,6 +227,60 @@ int main()
         check(near(out, 10.0f) && !ex, "B.R3 output tapers as the reserve nears empty (out=10)", out, 10.0f);
         run_once(5.0f, out, ex);   // 5/160 = 0.031 < 0.05 -> exhausted
         check(near(out, 0.0f) && ex, "B.R4 reports exhausted (out of resources) below the floor", out, 0.0f);
+    }
+
+    // R5 (uncontended): the main scenario's single-building corps demand 0.5 each,
+    // well under default supply 3.0 — contention scalar is 1.0, so every assertion
+    // above (which assumed no throttling) still holds.
+    check(near(rep.workforce_contention[{corp_e, body}], 1.0f),
+          "WF.R5 single-building corp is uncontended (scalar 1.0)",
+          rep.workforce_contention[{corp_e, body}], 1.0f);
+
+    // --- Workforce pool, step 1: contention throttles an over-built (corp, body) ---
+    // Four extraction sites (workforce 1.0 each) -> demand 4.0 > default supply 3.0
+    // -> contention 3/4 = 0.75. Each building's effective workforce is 0.75, so
+    // output = base_rate 20 * richness 1 * 0.75 = 15; wages bill 1.0*0.75*base_wage.
+    {
+        world ww;
+        const entity_id wb = ww.create_entity(); ww.bodies[wb] = body_component{};
+        corporation_component cc; cc.balance = 1000.0f;
+        for (int i = 0; i < 4; ++i)
+        {
+            const entity_id t = ww.create_entity();
+            tile_component tc{}; tc.body = wb;
+            tc.resource_deposit[ri(resource_type::iron_ore)]   = 1.0f;
+            tc.resource_remaining[ri(resource_type::iron_ore)] = 1.0e6f;
+            ww.tiles[t] = tc;
+            const entity_id eb = ww.create_entity();
+            building_component b{}; b.tile = t; b.type = building_type::extraction_site;
+            b.workforce_assigned = 1.0f; b.target_resource = resource_type::iron_ore;
+            ww.buildings[eb] = b;
+            cc.assets.push_back(eb);
+        }
+        const entity_id wc = ww.create_entity();
+        ww.corporations[wc] = cc;
+
+        economy_report wr = run_economy_step(ww, reg);
+        check(near(wr.workforce_contention[{wc, wb}], 0.75f),
+              "WF.R2 contention = min(1, supply/demand) = 3/4",
+              wr.workforce_contention[{wc, wb}], 0.75f);
+
+        float each_out = 0.0f, each_eff = 0.0f;
+        for (const auto& br : wr.buildings)
+            if (br.corp == wc) { each_out = br.output_quantity; each_eff = br.effective_workforce; }
+        check(near(each_out, 15.0f), "WF.R3 output scaled by effective workforce (20*1*0.75)", each_out, 15.0f);
+        check(near(each_eff, 0.75f), "WF.R3 effective_workforce reported (1.0*0.75)", each_eff, 0.75f);
+
+        // Wages on effective workforce: 4 buildings * (1.0 * 0.75 * base_wage 8) = 24.
+        auto wf = clear_markets(ww, reg, wr);
+        const float before = ww.corporations[wc].balance;
+        apply_budget(ww, reg, wf, wr.workforce_contention);
+        // delta = sales - maint(4*5=20) - wages(24); sales valued at resolved price.
+        // Assert the wage component by reconstructing: balance fell by at least 44
+        // less whatever the (no-market) sales earned -> here no market, so income 0.
+        check(near(before - ww.corporations[wc].balance, 20.0f + 24.0f),
+              "WF.R4 wages paid on effective workforce (maint 20 + wages 24)",
+              before - ww.corporations[wc].balance, 44.0f);
     }
 
     std::printf("\n%s  (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES", g_failures, g_failures == 1 ? "" : "s");

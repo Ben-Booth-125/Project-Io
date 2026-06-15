@@ -208,6 +208,49 @@ void draw_pools(const world& w)
     }
 }
 
+// --- workforce contention ----------------------------------------------------
+// Surfaces the (corp, body) labour-pool contention from this tick's report. Only
+// the throttled pools (scalar < 1.0) are listed — an uncontended economy shows the
+// reassuring "all fully staffed" line (POPULATION.md § Workforce model, step 1).
+void draw_workforce(const world& w, const economy_report& report)
+{
+    if (!ImGui::CollapsingHeader("Workforce (corp x body)", ImGuiTreeNodeFlags_DefaultOpen))
+        return;
+
+    bool any = false;
+    for (const auto& [key, scalar] : report.workforce_contention)
+        if (scalar < 1.0f) { any = true; break; }
+
+    if (!any)
+    {
+        ImGui::TextDisabled("All buildings fully staffed (no labour contention).");
+        return;
+    }
+
+    if (ImGui::BeginTable("##workforce", 2,
+            ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
+    {
+        ImGui::TableSetupColumn("Corp @ body");
+        ImGui::TableSetupColumn("Staffing");
+        ImGui::TableHeadersRow();
+        for (const auto& [key, scalar] : report.workforce_contention)
+        {
+            if (scalar >= 1.0f)
+                continue;
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            const std::string title =
+                corp_label(w, key.first) + "  @  " + body_label(w, key.second);
+            ImGui::TextUnformatted(title.c_str());
+            ImGui::TableSetColumnIndex(1);
+            // Throttled labour reads as a warning colour and a percentage.
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative),
+                "%.0f%% (labour short)", scalar * 100.0f);
+        }
+        ImGui::EndTable();
+    }
+}
+
 // --- markets -----------------------------------------------------------------
 void draw_markets(const world& w)
 {
@@ -278,6 +321,7 @@ void draw_economy_panel(const world& w,
 
     draw_balances(w);
     draw_buildings(w, reg, report);
+    draw_workforce(w, report);
     draw_pools(w);
     draw_markets(w);
 

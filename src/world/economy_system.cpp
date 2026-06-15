@@ -28,13 +28,18 @@ entity_id building_body(const world& w, const building_component& b)
 /// minimum taper of nominal. Deposits never refill.
 building_report run_extraction(world& w, const recipe_registry& reg,
                                entity_id corp, entity_id building_id,
-                               const building_component& b)
+                               const building_component& b, float contention)
 {
     building_report rep;
     rep.building        = building_id;
     rep.corp            = corp;
     rep.type            = b.type;
     rep.target_resource = b.target_resource;
+
+    // Effective labour: the requested target throttled by the (corp, body) pool's
+    // contention scalar (POPULATION.md § Workforce model, step 1).
+    const float effective_workforce = b.workforce_assigned * contention;
+    rep.effective_workforce = effective_workforce;
 
     const entity_id body = building_body(w, b);
     rep.body = body;
@@ -52,7 +57,7 @@ building_report run_extraction(world& w, const recipe_registry& reg,
     const float base_rate = reg.economics(building_type::extraction_site).base_rate;
 
     // Rate the deposit would yield at full reserve (richness sets the rate).
-    const float nominal = base_rate * richness * b.workforce_assigned * (1.0f - tc.hazard_level);
+    const float nominal = base_rate * richness * effective_workforce * (1.0f - tc.hazard_level);
     if (nominal <= 0.0f)
     {
         rep.idle = true; // unstaffed, no deposit of the target, or fully hazardous
@@ -94,6 +99,7 @@ building_report run_processing(world& w, const recipe_registry& reg,
                                entity_id corp, entity_id building_id,
                                const building_component& b,
                                bool body_has_market,
+                               float contention,
                                economy_report& out)
 {
     building_report rep;
@@ -102,12 +108,17 @@ building_report run_processing(world& w, const recipe_registry& reg,
     rep.type     = b.type;
     rep.recipe   = b.recipe;
 
+    // Effective labour: the requested target throttled by the (corp, body) pool's
+    // contention scalar (POPULATION.md § Workforce model, step 1).
+    const float effective_workforce = b.workforce_assigned * contention;
+    rep.effective_workforce = effective_workforce;
+
     const entity_id body = building_body(w, b);
     rep.body = body;
 
     const recipe* rcp = reg.get_recipe(b.recipe);
     const float batches_full =
-        reg.economics(building_type::processing_facility).base_rate * b.workforce_assigned;
+        reg.economics(building_type::processing_facility).base_rate * effective_workforce;
 
     if (body == null_entity || rcp == nullptr || batches_full <= 0.0f)
     {
@@ -215,24 +226,60 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
     for (const entity_id corp : corp_ids)
     {
         const corporation_component& cc = w.corporations.at(corp);
+
+        // Workforce pool, step 1: sum this corp's labour demand on each body
+        // (the requested workforce_assigned of every producing building there),
+        // then derive a per-body contention scalar min(1, supply/demand). Below 1
+        // it throttles every building on that (corp, body) uniformly.
+        std::map<entity_id, float> demand_by_body;
         for (const entity_id building_id : cc.assets)
         {
             const auto bit = w.buildings.find(building_id);
             if (bit == w.buildings.end())
                 continue;
             const building_component& b = bit->second;
+            if (b.type != building_type::extraction_site &&
+                b.type != building_type::processing_facility)
+                continue; // ports and none demand no labour in L3
+            const entity_id body = building_body(w, b);
+            if (body != null_entity)
+                demand_by_body[body] += b.workforce_assigned;
+        }
+
+        std::map<entity_id, float> contention_by_body;
+        for (const auto& [body, demand] : demand_by_body)
+        {
+            const float supply = w.workforce_supply(corp, body);
+            const float scalar = (demand > supply && demand > 0.0f) ? supply / demand : 1.0f;
+            contention_by_body[body] = scalar;
+            report.workforce_contention[std::make_pair(corp, body)] = scalar;
+        }
+
+        auto contention_for = [&](entity_id body) {
+            const auto it = contention_by_body.find(body);
+            return (it != contention_by_body.end()) ? it->second : 1.0f;
+        };
+
+        for (const entity_id building_id : cc.assets)
+        {
+            const auto bit = w.buildings.find(building_id);
+            if (bit == w.buildings.end())
+                continue;
+            const building_component& b = bit->second;
+            const entity_id body = building_body(w, b);
 
             switch (b.type)
             {
                 case building_type::extraction_site:
-                    report.buildings.push_back(run_extraction(w, reg, corp, building_id, b));
+                    report.buildings.push_back(
+                        run_extraction(w, reg, corp, building_id, b, contention_for(body)));
                     break;
                 case building_type::processing_facility:
                 {
-                    const entity_id body = building_body(w, b);
                     const bool has_market = bodies_with_market.count(body) != 0;
                     report.buildings.push_back(
-                        run_processing(w, reg, corp, building_id, b, has_market, report));
+                        run_processing(w, reg, corp, building_id, b, has_market,
+                                       contention_for(body), report));
                     break;
                 }
                 default:
