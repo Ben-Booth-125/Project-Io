@@ -6,6 +6,12 @@ individually-buildable step ready to execute. Tasks are **promoted** from a
 Brief (see TODO.md § TODO vs. TASKS) and cleared as they complete — this
 file is transient and is expected to be empty between work blocks.
 
+> **Proportionality (see CLAUDE.md § Proportionality and session boundaries).** Promoting a
+> Brief into this file is for *substantial* work. A quick low-risk high-value change — a
+> one-file fix, an obvious cleanup, a cheap optimisation — does **not** need a task group or a
+> REQUIREMENTS table: make and verify it directly, then commit. Reach for the full lifecycle
+> only where its coordination cost pays back; applying it to trivial work is over-engineering.
+
 ## Task format
 
 List tasks in **execution order**, grouped by the Brief they were promoted
@@ -89,6 +95,28 @@ Cancelling reverts *tracking*, not committed code — code already landed stays 
 tree; its intent simply returns to the backlog to be re-promoted later. A group is
 thus always in one of two terminal states: **completed**, or **cancelled** back to
 TODO. See also [`../GLOSSARY.md`](../GLOSSARY.md) **Cancelled (task state)**.
+
+## Pausing a task group (deliberate handoff)
+
+Driving a group to *complete* in one block is the default, **not** a mandate (see CLAUDE.md
+§ Proportionality and session boundaries). When ending a session early serves the work — the
+batch is large, context is drifting, or a natural checkpoint is reached — **pause** the group
+rather than force completion or cancel it. A paused group is a deliberate scoping choice,
+distinct from a *cancelled* one (which reverts intent to TODO): the tasks stay in this file,
+ready for the next session to resume.
+
+Pausing is only legitimate if the stop is **clean and resumable**:
+
+1. **TASKS.md is true to state** — completed tasks marked done, the in-flight task marked as
+   the resume point, untouched tasks left as-is. No silent half-edits.
+2. **The build is green, or the breakage is noted** — if the tree does not build, say exactly
+   why and what the next session must finish to green it.
+3. **A one-line handoff** records where to resume ("resume here: D — wire the panel into
+   `app.cpp`; B/C landed and verified").
+
+A paused group is therefore *not* a terminal state — it is an explicit, recorded intermission.
+The barrier semantics for a multi-Brief set still hold *within* a session; pausing is how a
+session boundary is drawn *between* them.
 
 ---
 

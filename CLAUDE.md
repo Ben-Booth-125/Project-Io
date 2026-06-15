@@ -117,6 +117,25 @@ whole set** (breadth-first, not depth-first): every Brief clears step *N* before
 *terminal* states (complete **or** cancelled) — a blocked task is cancelled rather than
 held open.
 
+### Proportionality and session boundaries
+
+Two standing guidelines temper the lifecycle above. They are reasserted operationally in
+`docs/development/TASKS.md`.
+
+- **Proportionality — the procedure is a guideline, not a fixed ceremony.** Treat the
+  documented procedure as proportional to the work. Before promoting, ask: substantial Brief,
+  or quick low-risk high-value change? For the latter — a one-file fix, an obvious cleanup, a
+  cheap optimisation — skip the TASKS/REQUIREMENTS ceremony, make and verify the change
+  directly, commit. The five-step lifecycle exists for work whose coordination cost it pays
+  back; applying it to trivial changes is the over-engineering this guards against.
+
+- **Session boundaries — pausing is a legitimate outcome.** Driving a group to *complete* in
+  one block is the default, not a mandate. When ending a session early serves the work — the
+  batch is large, context is drifting, or a natural checkpoint is reached — **pause** the group
+  rather than force completion or cancel it: leave it clean and resumable (TASKS.md true to
+  state, build green or breakage noted, a short "resume here" handoff line). A paused group is a
+  deliberate scoping choice, distinct from a *cancelled* one, which reverts intent to TODO.
+
 ### Parallelisation (the load-bearing rule)
 
 **Two tasks may run as concurrent sub-agents only if their file write-sets are disjoint.**
