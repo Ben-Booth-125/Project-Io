@@ -552,6 +552,15 @@ doc-coverage pass were all **reviewed and cleared with the user on 2026-06-15** 
   Remaining owed: the LAYOUT.md ledger-family note and the Supply/Layer-5 § Supply + `SUPPLY.md`
   settle. Preferential purchasing is intentionally left for the agent reworking its clearing model.
 
+- **[S1] Review the NATION_GENERATION § Pass 2b doc change (Session 1 batch).** The orphan-island
+  post-pass (Brief C2) added a § Pass 2b paragraph carrying a transient `> ⟳` note. Review it and
+  remove the `⟳` note once accepted. `docs/generation/NATION_GENERATION.md`.
+
+- **[S1] Review the CORPORATION_GENERATION § Pass 3 doc change (Session 1 batch).** The lean
+  focus-shaped holdings revision (Brief B4) fixed the concrete per-focus ranges (3–4 / 2–3 / 1–2)
+  and carries a transient `> ⟳` note. Review it and remove the `⟳` note once accepted.
+  `docs/generation/CORPORATION_GENERATION.md`.
+
 _(All eight `S1` doc-review reminders from the retroactive doc-coverage pass —
 CORPORATION_GENERATION, GENERATION_STRATEGY, SYSTEMS § Cross-cutting, POPULATION, ICONS,
 CIRCUMPLANETARY, TIME_CONTROLS, SELECTION — were **reviewed and cleared with the user on
@@ -885,12 +894,6 @@ The world-generation layer — terrain, nations, corporations. Design authority:
 
 Design authority: `docs/generation/NATION_GENERATION.md`.
 
-- **[C2 ✓] Orphan-island assignment (refinement).** The cardinal-adjacency Voronoi
-  BFS cannot cross water, so landmasses disconnected from every seed stay
-  unclaimed (~12% of Kepler land). Defensible as "unclaimed islands", but if full
-  land coverage is wanted, add a post-pass assigning each orphan island component
-  to the nearest nation across water. `nation_generation.cpp`.
-
 - **[F5 ~] Deferred — nation behaviour & production passes.** Per NATION_GENERATION.md
   § Open items: the nation *system* (tax, licences, war, infrastructure), the
   sentiment graph, historical fragmentation (exclaves/disputed zones), and
@@ -900,21 +903,11 @@ Design authority: `docs/generation/NATION_GENERATION.md`.
 
 Design authority: `docs/generation/CORPORATION_GENERATION.md`.
 
-- **[B4 ✓] Revise the corporation starting-holdings shape.** **Design now settled (2026-06-15);
-  code revision pending.** The target shape is recorded in CORPORATION_GENERATION.md § Pass 3
-  and grounded in the new GENERATION_STRATEGY.md premise (saturated earth-like base; Nation AI
-  owns the broad industry; corporations are **specialists**). The settled direction: holdings are
-  a **lean, focus-coherent** set (not a flat 3–6 generic spread), **count shaped by focus**, and
-  **clustered to the home nation** (the rigid anchor + nearest-tile pack is dropped). **Remaining
-  work is execution + tuning:** fix the concrete prototype counts per focus and the within-nation
-  cluster tightness, then revise `place_starting_assets` in
-  `src/world/corporation_generation.cpp` (retire `k_min_holdings`/`k_max_holdings` flat range)
-  and the `world_audit` expectations. `src/`-changing → needs a brief-spanning requirement at
-  promotion. Couples to the [S1] doc-review Brief under § Documentation (holds the transient note
-  until this lands). Open follow-ons recorded in CORPORATION_GENERATION.md § Open items: building
-  tiers/levels, allied-corp/franchise origin, post-WW2 asset-mix grounding, the analytical
-  corp-selection/re-roll flow, franchising, nation-seeded privatisation, automated tax, Era-based
-  sovereignty, and diplomatic posture. Out of prototype scope.
+Open follow-ons recorded in CORPORATION_GENERATION.md § Open items (out of prototype scope):
+building tiers/levels, allied-corp/franchise origin, post-WW2 asset-mix grounding, the analytical
+corp-selection/re-roll flow, franchising, nation-seeded privatisation, automated tax, Era-based
+sovereignty, and diplomatic posture. *(The lean focus-shaped starting-holdings revision [B4]
+landed 2026-06-15 — see DEVLOG and the CORPORATION_GENERATION § Pass 3 doc change.)*
 
 ## Known Bug
 

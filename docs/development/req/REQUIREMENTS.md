@@ -100,30 +100,6 @@ section here — it does not need the full OPENS backlog or DEVLOG history in co
 
 ---
 
-## orphan-island-assignment
-
-Promoted from OPENS § Environment / Nation generation — **[C2] Orphan-island assignment**.
-Brief-spanning requirement: R1.
-
-| ID | Requirement | Verification | Status | Notes |
-|----|-------------|--------------|--------|-------|
-| R1 | After `generate_nations`, every non-ocean land tile on Kepler is assigned to a nation (zero unclaimed land). | `headless` (world_audit orphan-land count == 0) | pending | brief-spanning gate |
-| R2 | Each orphan land component is assigned, whole, to the nearest nation measured across water (deterministic, seed-stable). | `headless` + `code` | pending | |
-
-## corp-starting-holdings
-
-Promoted from OPENS § Environment / Corporation generation — **[B4] Revise the corporation starting-holdings shape**.
-Brief-spanning requirement: R1.
-
-| ID | Requirement | Verification | Status | Notes |
-|----|-------------|--------------|--------|-------|
-| R1 | Corporations open with a **lean, focus-shaped** holding set — per-focus counts smaller than the retired flat 3–6 spread. | `headless` (world_audit per-corp counts within focus bounds) | pending | brief-spanning gate |
-| R2 | The flat `k_min_holdings`/`k_max_holdings` range is retired in favour of a focus-shaped count. | `code` (range constants gone) | pending | |
-| R3 | Every placed asset still passes `placement_rules::can_place` — no placement regression. | `headless` (world_audit S1 stays PASS) | pending | |
-| R4 | Holdings remain clustered within the home nation's territory. | `code` + `headless` | pending | |
-
----
-
 *No active requirements. The worklist is empty between work blocks; sections appear here
 when a Brief is promoted, and move to the archive below on completion or cancellation.*
 
@@ -134,6 +110,34 @@ when a Brief is promoted, and move to the archive below on completion or cancell
 Permanent record of resolved requirement groups, newest first. Each carries a
 `Resolved:` line and is retained verbatim; re-promote by copying a section back up to
 **Active requirements**.
+
+### orphan-island-assignment
+
+Resolved: 2026-06-15 — complete, all rows met. Promoted from OPENS § Nation generation —
+**[C2] Orphan-island assignment**. A deterministic post-pass (`assign_orphan_islands` in
+`nation_generation.cpp`) groups unclaimed non-ocean land into cardinal-adjacency components and
+assigns each whole component to the nearest claimed tile's nation across water. `world_audit`
+reports **6048/6048 Kepler land tiles owned, 0 unclaimed** (was ~12% unclaimed).
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | After `generate_nations`, every non-ocean land tile on Kepler is assigned to a nation (zero unclaimed land). | `headless` (world_audit orphan-land count == 0) | complete | 0 unclaimed of 6048 |
+| R2 | Each orphan land component is assigned, whole, to the nearest nation measured across water (deterministic, seed-stable). | `headless` + `code` | complete | no RNG; raster-order, distance/index tie-break |
+
+### corp-starting-holdings
+
+Resolved: 2026-06-15 — complete, all rows met. Promoted from OPENS § Corporation generation —
+**[B4] Revise the corporation starting-holdings shape**. The flat `k_min_holdings`/`k_max_holdings`
+range was retired for a focus-shaped `holdings_range` (extraction 3–4, processing 2–3, trade 1–2);
+the anchor + nearest-tile clustering is retained. `world_audit` confirms all 8 corps sit within
+their focus ceilings (counts now 1–3, was 3–6) and the S1 `can_place` placement check stays PASS.
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | Corporations open with a **lean, focus-shaped** holding set — per-focus counts smaller than the retired flat 3–6 spread. | `headless` (world_audit per-corp counts within focus bounds) | complete | 8/8 corps within ceiling |
+| R2 | The flat `k_min_holdings`/`k_max_holdings` range is retired in favour of a focus-shaped count. | `code` (range constants gone) | complete | replaced by `holdings_range` |
+| R3 | Every placed asset still passes `placement_rules::can_place` — no placement regression. | `headless` (world_audit S1 stays PASS) | complete | S1 R2 + seam checks PASS |
+| R4 | Holdings remain clustered within the home nation's territory. | `code` + `headless` | complete | anchor/neighbourhood logic unchanged |
 
 ### golden-image-diff
 

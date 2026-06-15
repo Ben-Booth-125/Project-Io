@@ -188,16 +188,35 @@ float total_deposit(const tile_component& tc)
 // --- Holdings footprint ------------------------------------------------------
 //
 // A corporation is an industrial power, not a single shed: it opens with a small
-// *cluster* of assets rather than one building. We target 3–6 buildings per corp
-// (k_min_holdings..k_max_holdings). The lower bound keeps even a cramped nation
-// readable as a going concern; the upper bound is deliberately modest so that
-// eight corps placing 3–6 assets each (~24–48 tiles) sit comfortably inside
-// Kepler's tile budget alongside the pre-authored installations, and no corp
-// monopolises its nation's land. The mix within that count is shaped by focus
-// (below) and the tiles cluster around a single anchor so a corp's holdings read
-// as one contiguous operation, not a scatter across the body.
-constexpr int k_min_holdings = 3;
-constexpr int k_max_holdings = 6;
+// *cluster* of assets rather than one building. Corporations are specialists, so
+// the holdings *count* is shaped by focus rather than a single flat range
+// (holdings_range, below): an extractor wants a few deposit tiles (3–4), a
+// processor pairs with a little feed (2–3), and a trade operator wants ~one depot
+// (1–2). These lean counts keep even the busiest body (eight corps drawing from
+// these ranges, ~16–32 tiles total) comfortably inside Kepler's tile budget
+// alongside the pre-authored installations, and no corp monopolises its nation's
+// land. The mix within that count is shaped by focus (focus_asset_pattern, below)
+// and the tiles still cluster around a single focus-scored anchor — the lean
+// counts ride on top of the retained anchor/neighbourhood clustering, so a corp's
+// holdings read as one contiguous operation, not a scatter across the body.
+
+/// Inclusive holdings-count range a corporation of the given focus opens with.
+/// Counts are lean and focus-shaped (specialists, not generalists): extraction
+/// corps want a few deposit tiles, processors a little feed, trade operators about
+/// one depot. See docs/generation/CORPORATION_GENERATION.md § Pass 3.
+///
+/// @param focus Corporate industrial focus.
+/// @return      {min, max} holdings count, inclusive on both ends.
+std::pair<int, int> holdings_range(industrial_focus focus)
+{
+    switch (focus)
+    {
+    case industrial_focus::extraction: return { 3, 4 };
+    case industrial_focus::processing: return { 2, 3 };
+    case industrial_focus::trade:      return { 1, 2 };
+    }
+    return { 1, 2 }; // defensive default — keep a corp a going concern
+}
 
 /// The building-type mix a corporation of the given focus opens with, expressed
 /// as the order in which asset slots are filled. The first entry is the anchor
@@ -420,7 +439,8 @@ std::vector<entity_id> place_starting_assets(world& w,
               });
 
     // --- holdings count and the remaining slots -------------------------------
-    std::uniform_int_distribution<int> count_pick(k_min_holdings, k_max_holdings);
+    const auto [count_min, count_max] = holdings_range(focus);
+    std::uniform_int_distribution<int> count_pick(count_min, count_max);
     const int target_count = count_pick(rng);
 
     std::size_t cursor_tile = 0;

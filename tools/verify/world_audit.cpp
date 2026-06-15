@@ -12,6 +12,7 @@
 
 #include <cstdio>
 #include <map>
+#include <utility>
 
 static std::size_t ri(resource_type r) { return static_cast<std::size_t>(r); }
 
@@ -157,5 +158,68 @@ int main()
     std::printf("  B R1 resource_remaining = richness * %.0f for every deposit: %s\n",
                 reserve_factor, seed_bad == 0 ? "PASS" : "FAIL");
 
-    return (fw_frac >= 3.0f && bad == 0 && seed_bad == 0 && seam_bad == 0) ? 0 : 1;
+    // --- C2 (orphan-island assignment, R1): every non-ocean Kepler land tile is
+    // owned by a nation after the orphan-island post-pass. ---
+    int kepler_land = 0, unclaimed_land = 0;
+    for (const auto& [tid, tc] : w.tiles)
+    {
+        if (tc.body != kepler || tc.composition == terrain_composition::ocean)
+            continue;
+        ++kepler_land;
+        if (w.tile_to_nation.find(tid) == w.tile_to_nation.end())
+            ++unclaimed_land;
+    }
+    std::printf("Kepler land ownership: %d land tiles, %d unclaimed\n", kepler_land, unclaimed_land);
+    std::printf("  C2 R1 every non-ocean land tile assigned to a nation: %s\n",
+                unclaimed_land == 0 ? "PASS" : "FAIL");
+
+    // --- B4 (corp starting-holdings, R1/R3): each corp opens with a lean,
+    // focus-shaped holding count — no corp exceeds its focus ceiling, and every
+    // corp is a going concern (>= 1 asset). Counts below the focus minimum are
+    // legitimate on a cramped, deposit-poor nation, so they are reported but do
+    // not fail. Focus ceilings mirror holdings_range in corporation_generation.cpp:
+    // extraction 3..4, processing 2..3, trade 1..2. ---
+    auto focus_bounds = [](industrial_focus f) -> std::pair<int,int> {
+        switch (f)
+        {
+            case industrial_focus::extraction: return { 3, 4 };
+            case industrial_focus::processing: return { 2, 3 };
+            case industrial_focus::trade:      return { 1, 2 };
+        }
+        return { 1, 2 };
+    };
+    auto focus_name = [](industrial_focus f) -> const char* {
+        switch (f)
+        {
+            case industrial_focus::extraction: return "extraction";
+            case industrial_focus::processing: return "processing";
+            case industrial_focus::trade:      return "trade";
+        }
+        return "?";
+    };
+    int holdings_bad = 0;
+    for (const auto& [cid, corp] : w.corporations)
+    {
+        const int count = static_cast<int>(corp.assets.size());
+        const auto [lo, hi] = focus_bounds(corp.focus);
+        const bool over  = count > hi;
+        const bool empty = count < 1;
+        if (over || empty)
+        {
+            ++holdings_bad;
+            std::printf("  BAD: corp=%u focus=%s holdings=%d outside [1,%d]\n",
+                        static_cast<unsigned>(cid), focus_name(corp.focus), count, hi);
+        }
+        else
+        {
+            std::printf("  corp=%u focus=%s holdings=%d (range %d..%d%s)\n",
+                        static_cast<unsigned>(cid), focus_name(corp.focus), count, lo, hi,
+                        count < lo ? ", below min — cramped nation" : "");
+        }
+    }
+    std::printf("  B4 R1 every corp holding count within its focus ceiling (>=1): %s\n",
+                holdings_bad == 0 ? "PASS" : "FAIL");
+
+    return (fw_frac >= 3.0f && bad == 0 && seed_bad == 0 && seam_bad == 0
+            && unclaimed_land == 0 && holdings_bad == 0) ? 0 : 1;
 }

@@ -76,12 +76,16 @@ not a broad presence across the nation.
 
 - **Count — lean and specialisation-shaped.** A corporation opens with a **small** holding set
   rather than the earlier flat 3–6 generic spread. The count is **shaped by focus** (a specialist
-  occupies the footprint its slice needs — e.g. an extractor wants a few deposit tiles; a trade
-  operator wants one depot) rather than a single number applied to all. The concrete prototype
-  numbers are fixed when [B4] is promoted; the design target is *lean and focus-coherent*.
-- **Cluster to the home nation.** Holdings sit **within the home nation's territory** as the
-  clustering frame. (How tightly they pack within the nation is a tuning call settled at
-  promotion; the rigid anchor + nearest-tile pack is no longer prescribed.)
+  occupies the footprint its slice needs). The concrete prototype ranges (inclusive,
+  `holdings_range` in `corporation_generation.cpp`) are: **extraction 3–4** (a few deposit tiles),
+  **processing 2–3** (processors plus a little feed), **trade 1–2** (about one depot). A nation
+  too cramped or deposit-poor to host the drawn count yields fewer — the count is a ceiling the
+  placement walks up to, not a guarantee.
+- **Cluster to the home nation.** Holdings sit **within the home nation's territory** and pack
+  around a single focus-scored **anchor** tile, the remaining slots filling the nearest valid
+  unoccupied tiles by grid distance — so a corp's holdings read as one contiguous operation. The
+  lean counts ride on top of this retained clustering; with the smaller counts the cluster is
+  naturally tighter than the earlier 3–6 spread.
 - **Mix follows focus.** The asset mix is shaped by `industrial_focus` — an extraction corp
   places extractors on its richest deposits, a processing corp pairs processors with feed, a
   trade corp a depot. The prototype retains this pattern (applied over the lean counts); the
@@ -91,6 +95,9 @@ not a broad presence across the nation.
 
 Placement is collision-checked against already-placed assets from other corporations.
 No two corporations begin on the same tile.
+
+> ⟳ Updated 2026-06-15 (Brief B4): fixed the concrete per-focus holdings ranges (3–4 / 2–3 /
+> 1–2) and recorded that the anchor + nearest-tile clustering is retained. Pending user review.
 
 ### Pass 4 — Financial profile
 
