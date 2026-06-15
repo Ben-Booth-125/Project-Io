@@ -185,162 +185,275 @@ float total_deposit(const tile_component& tc)
     return sum;
 }
 
-/// Place one starting building for a corporation inside its home nation's tiles.
-/// Returns the entity id of the created building, or null_entity if no suitable
-/// tile could be found.
+// --- Holdings footprint ------------------------------------------------------
+//
+// A corporation is an industrial power, not a single shed: it opens with a small
+// *cluster* of assets rather than one building. We target 3–6 buildings per corp
+// (k_min_holdings..k_max_holdings). The lower bound keeps even a cramped nation
+// readable as a going concern; the upper bound is deliberately modest so that
+// eight corps placing 3–6 assets each (~24–48 tiles) sit comfortably inside
+// Kepler's tile budget alongside the pre-authored installations, and no corp
+// monopolises its nation's land. The mix within that count is shaped by focus
+// (below) and the tiles cluster around a single anchor so a corp's holdings read
+// as one contiguous operation, not a scatter across the body.
+constexpr int k_min_holdings = 3;
+constexpr int k_max_holdings = 6;
+
+/// The building-type mix a corporation of the given focus opens with, expressed
+/// as the order in which asset slots are filled. The first entry is the anchor
+/// (the corp's defining asset — placed on the best-scoring tile); later entries
+/// are the supporting mix and repeat to fill out the holdings count. The mix
+/// reflects the focus: extraction corps are mostly extraction sites with a single
+/// processor to consume some of their own output; processors are mostly
+/// processing facilities fed by a couple of their own mines; trade corps centre
+/// on ports with light extraction/processing to give the port something to move.
+/// See docs/generation/CORPORATION_GENERATION.md § Pass 2 (asset type table).
 ///
-/// Placement rules:
-///   extraction   → prefer highest-deposit land tile (non-ocean).
-///   processing   → prefer a land tile adjacent to or within extraction clusters;
-///                  in the prototype falls back to any non-ocean land tile.
-///   trade        → prefer low-deposit coastal-adjacent tiles or any land tile.
+/// @param focus Corporate industrial focus.
+/// @return      Ordered building-type slots; index 0 is the anchor type. Cycled
+///              (with wrap) when more slots are needed than the pattern lists.
+const std::vector<building_type>& focus_asset_pattern(industrial_focus focus)
+{
+    static const std::vector<building_type> extraction_mix = {
+        building_type::extraction_site,     // anchor
+        building_type::extraction_site,
+        building_type::extraction_site,
+        building_type::processing_facility, // consumes some own output
+    };
+    static const std::vector<building_type> processing_mix = {
+        building_type::processing_facility, // anchor
+        building_type::processing_facility,
+        building_type::extraction_site,     // feeds the processors
+        building_type::extraction_site,
+    };
+    static const std::vector<building_type> trade_mix = {
+        building_type::port,                // anchor
+        building_type::extraction_site,
+        building_type::processing_facility,
+        building_type::port,
+    };
+    switch (focus)
+    {
+        case industrial_focus::extraction: return extraction_mix;
+        case industrial_focus::processing: return processing_mix;
+        case industrial_focus::trade:      return trade_mix;
+    }
+    return extraction_mix;
+}
+
+/// Score one tile for hosting a building of `btype`, higher is better. Mirrors the
+/// per-focus preference the single-asset placer used: extraction wants the richest
+/// *extractable* deposit (a site must be able to work its tile), processing/port
+/// want any workable land but lean mildly toward some deposit nearby; every type
+/// shies away from hazardous tiles. Returns a strictly positive score for any
+/// non-ocean tile so a candidate is always placeable.
 ///
-/// Collision: never places on a tile already in `occupied_tiles`.
+/// @param tc    The candidate tile.
+/// @param btype The building type proposed for it.
+/// @return      A positive placement score; larger is more preferred.
+float tile_score_for(const tile_component& tc, building_type btype)
+{
+    float score = 1.0f;
+    switch (btype)
+    {
+        case building_type::extraction_site:
+            // Rank by extractable deposit so the site lands where it can work;
+            // tiny floor keeps a deposit-poor tile still placeable (it will fail
+            // can_place separately and be skipped there).
+            score = placement_rules::extractable_deposit(tc) + 0.001f;
+            break;
+        case building_type::processing_facility:
+            // Mild lean toward tiles with some deposit (own feedstock nearby).
+            score = total_deposit(tc) * 0.5f + 1.0f;
+            break;
+        case building_type::port:
+        case building_type::none:
+            score = 1.0f;
+            break;
+    }
+    // Avoid volcanic hellscapes for every type.
+    score *= (1.0f - tc.hazard_level * 0.3f);
+    return std::max(score, 0.001f);
+}
+
+/// Author a building of `btype` onto `tid` for the world, including the extraction
+/// target (richest extractable resource on the tile) for extraction sites. Marks
+/// the tile occupied. Assumes the tile already passed `placement_rules::can_place`.
+///
+/// @param w     World to write the new entity into.
+/// @param tid   Tile to place on (must be a valid, unoccupied land tile).
+/// @param btype Building type to author.
+/// @param occupied_tiles Occupancy set; `tid` is inserted.
+/// @return      Entity id of the created building.
+entity_id author_building(world& w,
+                          entity_id tid,
+                          building_type btype,
+                          std::unordered_set<entity_id>& occupied_tiles)
+{
+    const entity_id bld_id = w.create_entity();
+
+    building_component bc;
+    bc.tile               = tid;
+    bc.type               = btype;
+    // Staff producing buildings so the Layer 3 economy runs from the authored
+    // assets (an unstaffed building produces nothing). Ports take no production
+    // action in L3, so they stay unstaffed.
+    bc.workforce_assigned = (btype == building_type::port) ? 0.0f : 0.5f;
+
+    if (btype == building_type::extraction_site)
+    {
+        const auto tit = w.tiles.find(tid);
+        if (tit != w.tiles.end())
+        {
+            bool any = false;
+            bc.target_resource = placement_rules::richest_extractable(tit->second, any);
+        }
+    }
+    // Processing recipes are authored later from the loaded registry (the recipe id
+    // is a registry index, unknown here); the field stays no_recipe until
+    // app::load_economy assigns the default.
+
+    w.buildings[bld_id]  = bc;
+    w.stockpiles[bld_id] = stockpile_component{};
+    occupied_tiles.insert(tid);
+    return bld_id;
+}
+
+/// Place a clustered set of starting buildings for one corporation inside its home
+/// nation's territory. An *anchor* tile is chosen first (focus-weighted, richest
+/// for extraction); the remaining assets are placed on the valid, unoccupied tiles
+/// nearest the anchor in grid space, so a corporation's holdings group spatially
+/// rather than scatter across the body. Every placed asset is validated with
+/// `placement_rules::can_place` (never ocean; an extraction site only on a tile
+/// carrying a matching extractable deposit) — tiles that fail are skipped, so a
+/// deposit-poor anchor neighbourhood simply yields fewer extraction sites.
 ///
 /// @param w              World to write the new entities into.
 /// @param home_nation    The nation_component of the home nation.
-/// @param focus          Corporate industrial focus (determines building_type and tile preference).
-/// @param occupied_tiles Set of tile entity ids already occupied by another building.
-/// @param rng            Seeded RNG for tie-breaking.
-/// @return               Entity id of the placed building, or null_entity.
-entity_id place_starting_asset(world& w,
-                                const nation_component& home_nation,
-                                industrial_focus focus,
-                                std::unordered_set<entity_id>& occupied_tiles,
-                                std::mt19937& rng)
+/// @param focus          Corporate industrial focus (determines the asset mix and tile preference).
+/// @param occupied_tiles Tiles already taken by another building; never reused.
+/// @param rng            Seeded RNG for the anchor weighted draw and holdings count.
+/// @return               Entity ids of every building placed (may be empty for a
+///                       degenerate nation with no usable land).
+std::vector<entity_id> place_starting_assets(world& w,
+                                             const nation_component& home_nation,
+                                             industrial_focus focus,
+                                             std::unordered_set<entity_id>& occupied_tiles,
+                                             std::mt19937& rng)
 {
+    std::vector<entity_id> placed;
     if (home_nation.tiles.empty())
-        return null_entity;
+        return placed;
 
-    // Determine which building_type to place.
-    building_type btype = building_type::none;
-    switch (focus)
-    {
-        case industrial_focus::extraction:  btype = building_type::extraction_site;     break;
-        case industrial_focus::processing:  btype = building_type::processing_facility; break;
-        case industrial_focus::trade:       btype = building_type::port;                break;
-    }
+    const std::vector<building_type>& pattern = focus_asset_pattern(focus);
+    const building_type anchor_type = pattern.front();
 
-    // Score every tile in the home nation; skip ocean and already-occupied tiles.
-    // Score semantics differ by focus:
-    //   extraction — higher total deposit is better.
-    //   processing — lower deposit (near but not on the richest spots) is fine;
-    //                use a moderate score based on deposit / hazard.
-    //   trade      — neutral; score = 1 everywhere land is available, so the
-    //                pick is effectively random among valid tiles.
-
-    struct candidate
-    {
-        entity_id tid;
-        float     score;
-    };
-    std::vector<candidate> candidates;
-    candidates.reserve(home_nation.tiles.size());
-
+    // --- choose the anchor tile (weighted by anchor-type score) ---------------
+    // Candidates are the nation's non-ocean, unoccupied tiles that can validly host
+    // the anchor type. The nation's `tiles` vector is stored in a stable order, so
+    // building the candidate list by iterating it is deterministic.
+    struct candidate { entity_id tid; float score; };
+    std::vector<candidate> anchors;
+    anchors.reserve(home_nation.tiles.size());
     for (entity_id tid : home_nation.tiles)
     {
         if (occupied_tiles.count(tid))
             continue;
-
         const auto it = w.tiles.find(tid);
         if (it == w.tiles.end())
             continue;
-
         const tile_component& tc = it->second;
-        if (placement_rules::is_ocean_tile(tc.composition))
+        // An extraction anchor must sit on a workable deposit; for processing/port
+        // anchors can_place reduces to "non-ocean land".
+        bool any = false;
+        const resource_type tgt = placement_rules::richest_extractable(tc, any);
+        if (!placement_rules::can_place(tc, anchor_type, tgt))
             continue;
-
-        float score = 1.0f;
-        switch (focus)
-        {
-            case industrial_focus::extraction:
-                // Rank by *extractable* deposit so an extraction site lands on a
-                // tile it can actually work (S1 placement fix). The tiny floor keeps
-                // a degenerate nation with no extractable tiles still placeable.
-                score = placement_rules::extractable_deposit(tc) + 0.001f;
-                break;
-            case industrial_focus::processing:
-                // Prefer tiles with some deposit but not the absolute maximum.
-                // A moderate positive score keeps candidates reasonably uniform.
-                score = total_deposit(tc) * 0.5f + 1.0f;
-                break;
-            case industrial_focus::trade:
-                // Trade buildings just need any land tile.
-                score = 1.0f;
-                break;
-        }
-
-        // Penalise very hazardous tiles slightly so we avoid volcanic hellscapes.
-        score *= (1.0f - tc.hazard_level * 0.3f);
-
-        candidates.push_back({ tid, score });
+        anchors.push_back({ tid, tile_score_for(tc, anchor_type) });
     }
+    if (anchors.empty())
+        return placed; // no valid anchor in this nation — corp opens asset-light
 
-    if (candidates.empty())
-        return null_entity;
-
-    // Weighted random sample: compute cumulative weights, draw uniformly.
     float total_w = 0.0f;
-    for (const auto& c : candidates)
+    for (const auto& c : anchors)
         total_w += c.score;
 
-    entity_id chosen = null_entity;
-    if (total_w > 0.0f)
+    entity_id anchor_tid = anchors.back().tid;
+    std::uniform_real_distribution<float> draw(0.0f, total_w);
+    float cursor = draw(rng);
+    for (const auto& c : anchors)
     {
-        std::uniform_real_distribution<float> draw(0.0f, total_w);
-        float cursor = draw(rng);
-        for (const auto& c : candidates)
-        {
-            cursor -= c.score;
-            if (cursor <= 0.0f)
-            {
-                chosen = c.tid;
-                break;
-            }
-        }
-        if (chosen == null_entity)
-            chosen = candidates.back().tid; // floating-point fallback
-    }
-    else
-    {
-        // All scores are zero (degenerate world); pick uniformly.
-        std::uniform_int_distribution<std::size_t> pick(0, candidates.size() - 1);
-        chosen = candidates[pick(rng)].tid;
+        cursor -= c.score;
+        if (cursor <= 0.0f) { anchor_tid = c.tid; break; }
     }
 
-    // Create the building entity and populate components.
-    const entity_id bld_id = w.create_entity();
+    const tile_component& anchor_tc = w.tiles.at(anchor_tid);
+    const int anchor_x = anchor_tc.grid_x;
+    const int anchor_y = anchor_tc.grid_y;
 
-    building_component bc;
-    bc.tile               = chosen;
-    bc.type               = btype;
-    // Staff producing buildings so the Layer 3 economy actually runs from the
-    // authored starting assets (an unstaffed building produces nothing). Ports
-    // take no production action in L3, so they stay unstaffed.
-    bc.workforce_assigned = (btype == building_type::port) ? 0.0f : 0.5f;
+    placed.push_back(author_building(w, anchor_tid, anchor_type, occupied_tiles));
 
-    // Author the extraction target from the tile's richest extractable deposit.
-    // The processing recipe is authored later from the loaded registry (the
-    // recipe id is a registry index, not known here); it stays no_recipe for now.
-    if (btype == building_type::extraction_site)
+    // --- order the rest of the nation's tiles by distance to the anchor -------
+    // Squared grid distance keeps holdings contiguous; ties break on tile id so
+    // the order is fully deterministic. We only need the cluster neighbourhood, so
+    // the whole sorted list is the search space for the remaining asset slots.
+    struct ring { long long dist2; entity_id tid; };
+    std::vector<ring> neighbourhood;
+    neighbourhood.reserve(home_nation.tiles.size());
+    for (entity_id tid : home_nation.tiles)
     {
-        const auto tit = w.tiles.find(chosen);
-        if (tit != w.tiles.end())
+        if (tid == anchor_tid || occupied_tiles.count(tid))
+            continue;
+        const auto it = w.tiles.find(tid);
+        if (it == w.tiles.end())
+            continue;
+        if (placement_rules::is_ocean_tile(it->second.composition))
+            continue;
+        const long long dx = it->second.grid_x - anchor_x;
+        const long long dy = it->second.grid_y - anchor_y;
+        neighbourhood.push_back({ dx * dx + dy * dy, tid });
+    }
+    std::sort(neighbourhood.begin(), neighbourhood.end(),
+              [](const ring& a, const ring& b) {
+                  if (a.dist2 != b.dist2) return a.dist2 < b.dist2;
+                  return a.tid < b.tid;
+              });
+
+    // --- holdings count and the remaining slots -------------------------------
+    std::uniform_int_distribution<int> count_pick(k_min_holdings, k_max_holdings);
+    const int target_count = count_pick(rng);
+
+    std::size_t cursor_tile = 0;
+    int slot = 1; // slot 0 was the anchor
+    while (static_cast<int>(placed.size()) < target_count
+           && cursor_tile < neighbourhood.size())
+    {
+        const building_type btype =
+            pattern[static_cast<std::size_t>(slot) % pattern.size()];
+
+        // Walk outward from the anchor for the next tile that can host this type.
+        bool placed_this_slot = false;
+        for (; cursor_tile < neighbourhood.size(); ++cursor_tile)
         {
+            const entity_id tid = neighbourhood[cursor_tile].tid;
+            if (occupied_tiles.count(tid))
+                continue;
+            const tile_component& tc = w.tiles.at(tid);
             bool any = false;
-            const resource_type tgt = placement_rules::richest_extractable(tit->second, any);
-            bc.target_resource = tgt; // defaults to iron_ore when the tile has none
+            const resource_type tgt = placement_rules::richest_extractable(tc, any);
+            if (!placement_rules::can_place(tc, btype, tgt))
+                continue; // e.g. extraction slot on a deposit-poor tile — try next ring
+            placed.push_back(author_building(w, tid, btype, occupied_tiles));
+            ++cursor_tile;
+            placed_this_slot = true;
+            break;
         }
+        if (!placed_this_slot)
+            break; // ran out of valid tiles in the neighbourhood
+        ++slot;
     }
-    w.buildings[bld_id]  = bc;
 
-    stockpile_component sc;
-    w.stockpiles[bld_id] = sc;
-
-    // Mark tile as occupied so later corps do not land here.
-    occupied_tiles.insert(chosen);
-
-    return bld_id;
+    return placed;
 }
 
 // ---------------------------------------------------------------------------
@@ -571,8 +684,8 @@ std::vector<entity_id> generate_corporations(
     for (const auto& kv : w.buildings)
         occupied_tiles.insert(kv.second.tile);
 
-    // corp_assets[c] = building entity id placed for corp c (or null_entity).
-    std::vector<entity_id> corp_assets(static_cast<std::size_t>(corp_count), null_entity);
+    // corp_assets[c] = building entity ids placed for corp c (a clustered set).
+    std::vector<std::vector<entity_id>> corp_assets(static_cast<std::size_t>(corp_count));
 
     for (int c = 0; c < corp_count; ++c)
     {
@@ -583,13 +696,11 @@ std::vector<entity_id> generate_corporations(
         if (it == w.nations.end())
             continue;
 
-        const entity_id bld_id = place_starting_asset(
+        corp_assets[static_cast<std::size_t>(c)] = place_starting_assets(
             w, it->second,
             corp_focuses[static_cast<std::size_t>(c)],
             occupied_tiles,
             asset_rng);
-
-        corp_assets[static_cast<std::size_t>(c)] = bld_id;
     }
 
     // ---------------------------------------------------------------------------
@@ -646,14 +757,17 @@ std::vector<entity_id> generate_corporations(
         cc.balance          = corp_capitals[static_cast<std::size_t>(c)]; // opens at starting capital
         cc.is_player        = false;
 
-        const entity_id asset = corp_assets[static_cast<std::size_t>(c)];
-        if (asset != null_entity)
-            cc.assets.push_back(asset);
+        cc.assets = std::move(corp_assets[static_cast<std::size_t>(c)]);
 
         const entity_id corp_id = w.create_entity();
         corp_ids.push_back(corp_id);
         w.corporations[corp_id] = std::move(cc);
     }
+
+    // Pre-game profit (a simulated operating history seeding opening balances and
+    // pools) is applied at app startup as the *long* economy warm-start — after the
+    // Lua economy data is loaded, so it reuses the real registry rather than a
+    // duplicated one. See app::run() (TODO § Corporation generation — [C3]).
 
     // ---------------------------------------------------------------------------
     // Player corporation flag — deterministic pick (seeded first-corp selection)
