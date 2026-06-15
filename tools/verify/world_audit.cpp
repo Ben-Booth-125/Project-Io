@@ -7,6 +7,7 @@
 
 #include "world/components.hpp"
 #include "world/hard_coded_world.hpp"
+#include "world/placement_rules.hpp"
 #include "world/world.hpp"
 
 #include <cstdio>
@@ -79,6 +80,50 @@ int main()
     std::printf("  S1 R2 all extraction assets on a valid extractable deposit: %s\n",
                 bad == 0 ? "PASS" : "FAIL");
 
+    // --- placement-rules seam (v0.0.5 R3/R4): every placed extraction asset
+    // passes the reusable can_place() check; an ocean tile and a zero-deposit
+    // tile are rejected. ---
+    int seam_bad = 0;
+    for (const auto& [cid, corp] : w.corporations)
+    {
+        for (entity_id bid : corp.assets)
+        {
+            const auto bit = w.buildings.find(bid);
+            if (bit == w.buildings.end() || bit->second.type != building_type::extraction_site)
+                continue;
+            const auto tit = w.tiles.find(bit->second.tile);
+            if (tit == w.tiles.end()
+                || !placement_rules::can_place(tit->second,
+                                               building_type::extraction_site,
+                                               bit->second.target_resource))
+            {
+                ++seam_bad;
+                std::printf("  BAD: placed extraction asset corp=%u fails can_place\n",
+                            static_cast<unsigned>(cid));
+            }
+        }
+    }
+    // Negative controls: ocean and zero-deposit tiles must be rejected.
+    tile_component ocean_tile{};
+    ocean_tile.composition = terrain_composition::ocean;
+    ocean_tile.resource_deposit[ri(resource_type::iron_ore)] = 10.0f; // deposit present, but ocean
+    const bool ocean_rejected = !placement_rules::can_place(
+        ocean_tile, building_type::extraction_site, resource_type::iron_ore);
+
+    tile_component dry_tile{};
+    dry_tile.composition = terrain_composition::barren; // land, but no iron deposit
+    const bool zero_rejected = !placement_rules::can_place(
+        dry_tile, building_type::extraction_site, resource_type::iron_ore);
+    // A processing facility on the same dry land tile is valid (target ignored).
+    const bool proc_ok = placement_rules::can_place(
+        dry_tile, building_type::processing_facility, resource_type::iron_ore);
+
+    if (!ocean_rejected) { ++seam_bad; std::printf("  BAD: can_place accepted an ocean tile\n"); }
+    if (!zero_rejected)  { ++seam_bad; std::printf("  BAD: can_place accepted a zero-deposit extraction tile\n"); }
+    if (!proc_ok)        { ++seam_bad; std::printf("  BAD: can_place rejected a valid processing tile\n"); }
+    std::printf("  v0.0.5 R3/R4 placement_rules::can_place agrees with placement + negative controls: %s\n",
+                seam_bad == 0 ? "PASS" : "FAIL");
+
     // --- Deposit depletion (Brief B, R1): resource_remaining seeded from richness ---
     // Generation seeds resource_remaining[r] = resource_deposit[r] * deposit_reserve_factor
     // (400.0) for every non-zero deposit; absent deposits stay at zero.
@@ -112,5 +157,5 @@ int main()
     std::printf("  B R1 resource_remaining = richness * %.0f for every deposit: %s\n",
                 reserve_factor, seed_bad == 0 ? "PASS" : "FAIL");
 
-    return (fw_frac >= 3.0f && bad == 0 && seed_bad == 0) ? 0 : 1;
+    return (fw_frac >= 3.0f && bad == 0 && seed_bad == 0 && seam_bad == 0) ? 0 : 1;
 }

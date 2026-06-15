@@ -1,5 +1,7 @@
 #include "corporation_generation.hpp"
 
+#include "world/placement_rules.hpp"
+
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -172,62 +174,15 @@ industrial_focus pick_focus(economic_focus nation_ef,
 // Pass 3 helpers — starting asset placement
 // ---------------------------------------------------------------------------
 
-/// True if the given terrain_composition is ocean (buildings never placed here).
-bool is_ocean_tile(terrain_composition comp)
-{
-    return comp == terrain_composition::ocean;
-}
-
 /// Total resource deposit score for a tile — used to rank tiles by richness
-/// when placing extraction sites.
+/// when placing extraction sites. (The ocean check and the extractable-deposit
+/// helpers now live in the reusable `placement_rules` seam.)
 float total_deposit(const tile_component& tc)
 {
     float sum = 0.0f;
     for (std::size_t r = 0; r < resource_count; ++r)
         sum += tc.resource_deposit[r];
     return sum;
-}
-
-// The raw resources the Layer 3 extraction buildings can actually target (Mine →
-// iron ore, Oil Platform → petroleum, Ice Extractor → water, Farm → agricultural
-// produce). An extraction site is only productive on a tile carrying one of these,
-// so placement scores and the authored target_resource key off this set rather
-// than off every deposit (which includes ambient stone/sand most land tiles have).
-// See docs/economy/PRODUCTION.md § Layer 3 prototype scope.
-constexpr resource_type k_extractable[] = {
-    resource_type::iron_ore,
-    resource_type::petroleum,
-    resource_type::water,
-    resource_type::agricultural_produce,
-};
-
-/// Summed deposit of the prototype-extractable resources on a tile.
-float extractable_deposit(const tile_component& tc)
-{
-    float sum = 0.0f;
-    for (resource_type r : k_extractable)
-        sum += tc.resource_deposit[static_cast<std::size_t>(r)];
-    return sum;
-}
-
-/// The richest prototype-extractable resource on a tile. `any` is set false when
-/// the tile carries none (the caller falls back to a default target).
-resource_type richest_extractable(const tile_component& tc, bool& any)
-{
-    resource_type best = resource_type::iron_ore;
-    float best_val = 0.0f;
-    any = false;
-    for (resource_type r : k_extractable)
-    {
-        const float v = tc.resource_deposit[static_cast<std::size_t>(r)];
-        if (v > best_val)
-        {
-            best_val = v;
-            best     = r;
-            any      = true;
-        }
-    }
-    return best;
 }
 
 /// Place one starting building for a corporation inside its home nation's tiles.
@@ -292,7 +247,7 @@ entity_id place_starting_asset(world& w,
             continue;
 
         const tile_component& tc = it->second;
-        if (is_ocean_tile(tc.composition))
+        if (placement_rules::is_ocean_tile(tc.composition))
             continue;
 
         float score = 1.0f;
@@ -302,7 +257,7 @@ entity_id place_starting_asset(world& w,
                 // Rank by *extractable* deposit so an extraction site lands on a
                 // tile it can actually work (S1 placement fix). The tiny floor keeps
                 // a degenerate nation with no extractable tiles still placeable.
-                score = extractable_deposit(tc) + 0.001f;
+                score = placement_rules::extractable_deposit(tc) + 0.001f;
                 break;
             case industrial_focus::processing:
                 // Prefer tiles with some deposit but not the absolute maximum.
@@ -373,7 +328,7 @@ entity_id place_starting_asset(world& w,
         if (tit != w.tiles.end())
         {
             bool any = false;
-            const resource_type tgt = richest_extractable(tit->second, any);
+            const resource_type tgt = placement_rules::richest_extractable(tit->second, any);
             bc.target_resource = tgt; // defaults to iron_ore when the tile has none
         }
     }
