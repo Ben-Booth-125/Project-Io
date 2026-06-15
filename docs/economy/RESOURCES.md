@@ -28,6 +28,25 @@ Price volatility and trade margins increase with tier. Raw materials are abundan
 
 Ambient and habitability resources exist at the edges of the market. They are worth producing and trading, but rarely the primary profit driver. Their value is to ensure every tile is economically meaningful in some way and that population welfare has a supply chain behind it.
 
+### Deposit rarity & scarcity (design direction — v0.2 solar generation)
+
+Extending deposit authoring from the seven-resource prototype subset to the full 23-resource set
+is driven by a **per-resource rarity scalar** — a **seeded decimal in `[0, 1]`** (0 = effectively
+absent / trace, 1 = near-universal ambient). Settled rules:
+
+- **Raw-tier (Tier 1) resources only carry a rarity scalar.** Refined and product resources are
+  *made, not mined* — they receive no tile deposits, so scarcity does not apply to them.
+- The scalar **modulates deposit frequency and magnitude** on top of the existing terrain
+  affinity: a low scalar (e.g. platinum-group metals ≈ rare) keeps deposits sparse and small even
+  on affine terrain; a high scalar (ambient stone/sand) approaches the every-tile ambient floor.
+- The scalar is **seeded**, so a campaign's exact distribution varies but the rarity *ordering*
+  (rare goods rare, ambient goods abundant) is stable, matching each resource's base-price
+  rarity already noted in the Tier 1 tables.
+
+This is the *resource-economy target*; the *generation mechanics* that consume the scalar live in
+[TILE_GENERATION.md](../generation/TILE_GENERATION.md) § Deferred (Full deposit authoring), the
+same v0.2 pass.
+
 ---
 
 ## Tier 1 — Raw materials

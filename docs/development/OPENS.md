@@ -335,23 +335,50 @@ currently hold Briefs appear as sections below.
 ## Menu
 
 - **[B3 ✓] Define the menu items from the systems.** **Design settled (2026-06-15).** The
-  ten-slot menu set and its **gameplay-loop ordering** are now recorded in `docs/ui/MENU.md`
-  § Menu set and ordering (Corporation overview anchor → manage → trade & world → strategy
-  clusters). Remaining is **implementation** (promote when the L4 ledger family lands): wire
-  slots 2–6 to the [A4] ledgers, move the Tile Ledger from slot 8 to slot 6, and add the
-  reserved placeholders + cluster separators. `src/`-changing → brief-spanning requirement at
-  promotion. Files: `src/ui/nav_pane.cpp`, `src/ui/icons.{hpp,cpp}` (per-menu glyphs).
+  **nine-slot** menu set and its **curated player-facing order** are recorded in `docs/ui/MENU.md`
+  § Menu set and ordering (Corporation overview · Budget · Workforce/Population · Research · Market
+  Ledger · Construction · Corp. Strategy · Diplomacy · History; Exploration off-rail). Remaining is
+  **implementation** (promote when the L4 ledger family lands): wire the slots to their ledgers in
+  the curated order, apply the three renames (Budget / Corp. Strategy / History), drop the
+  Exploration slot, and add the reserved placeholders. `src/`-changing → brief-spanning requirement
+  at promotion. Files: `src/ui/nav_pane.cpp`, `src/ui/icons.{hpp,cpp}` (per-menu glyphs).
 
-- **[B3 ~] Corporation overview dashboard — design.** Slot 1 of the nav rail (`docs/ui/MENU.md`)
-  is a new top-level **at-a-glance roll-up** (balance, holdings, alerts) above the per-system
-  ledgers. **Design owed before implementation:** what it summarises, how it links into
-  the per-system ledgers, and whether it is a floating window or persistent panel. Authority
-  `docs/ui/MENU.md`, `docs/ui/LAYOUT.md`; reads `w.player_entity`, the economy report.
+- **[B3 ✓] Corporation overview dashboard.** Slot 1 of the nav rail (`docs/ui/MENU.md`) is a new
+  top-level **at-a-glance roll-up** above the per-system ledgers. **Design settled (inline,
+  2026-06-15):**
+  — **What it summarises (four blocks, read-only).** (1) **Money** — running balance (negatives
+    red), last-tick net ±/qtr, and the recent-balance sparkline already maintained for the header
+    (`app` balance-history buffer); (2) **Holdings** — building count by type/state
+    (active / idle / exhausted) and estimated stockpile valuation (player `(corp,body)` pools at
+    market price), the same figures the header values; (3) **Production** — top output goods this
+    tick and the limiting-input bottleneck count (from `economy_report` / `building_report`);
+    (4) **Alerts** — a short derived list (idle/exhausted buildings, negative balance, unmet
+    market demand on a player-sold good, workforce contention < 1). It is a *roll-up of figures
+    the per-system ledgers own*, not a new data source.
+  — **How it links.** Each block is a **launcher**: clicking Money opens the Balance Ledger,
+    Holdings/Production the Construction Ledger, Alerts routes to the relevant ledger per alert
+    kind (reuses the `focus_on_entity` non-spatial routing seam, § Selection). The dashboard never
+    duplicates a ledger's detail — it summarises and hands off.
+  — **Form.** A **floating ledger window** like the others (honours *ledgers-start-closed*), using
+    the uniform `ledger_chrome` size/anchor. Not a persistent panel — the persistent at-a-glance
+    surface is already the header; the dashboard is the openable deep version.
+  Files: new `src/ui/corporation_panel.{hpp,cpp}`, nav-rail slot 1 wiring (`nav_pane.cpp`,
+  `app.cpp`), per-block glyphs (`icons.{hpp,cpp}`). Reads `w.player_entity`, the economy report,
+  the player balance history. `src/`-changing → brief-spanning requirement at promotion.
+  *(Design settled inline; authority-doc propagation to `docs/ui/MENU.md` tracked under
+  § Documentation.)*
 
-- **[C1 ~] Canonical nav-rail ordering rule.** The rail is ordered by *gameplay-loop grouping*
-  for now (`docs/ui/MENU.md`). **Design owed:** settle a **canonical, self-documenting ordering
-  rule** later (e.g. strict SYSTEMS.md tier order) so the order is principled rather than ad hoc.
-  Low priority; doc-only. See `docs/ui/MENU.md` § Open questions.
+- **[C1 ✓] Canonical nav-rail ordering rule.** **Settled by Q&A (2026-06-15):** the canonical
+  order is the **curated player-facing sequence** the user fixed directly, now recorded in
+  `docs/ui/MENU.md` § Menu set and ordering — a **nine-slot rail** (Exploration drops off and
+  routes to the Explorer surface). Order: Corporation overview · Budget · Workforce/Population ·
+  Research · Market Ledger · Construction · Corp. Strategy · Diplomacy · History. It is a
+  deliberate workflow order, not strict SYSTEMS.md tier order; the `tier-idx` column in MENU.md
+  keeps it auditable against the tier list. Three slots are **renamed with broadened scope** —
+  **Budget** (was Balance Ledger → full budget system), **Corp. Strategy** (was Policy → standing
+  laws/strategy, possibly goals later), **History** (was Tile Ledger → generation history +
+  post-generation advisory) — each scope settled in MENU.md. Doc-only → no `src/` change; settled
+  into `docs/ui/MENU.md`.
 
 ## Ledger
 
@@ -362,46 +389,68 @@ currently hold Briefs appear as sections below.
   `src/ui/tile_inspector.cpp` (read `ui_state.active_body` /
   `circumplanetary_anchor`).
 
-- **[A4 ~] Market lens & the ledger family (Economy 2nd pass + Market / Balance /
-  Construction ledgers).** Build out the economy's read surfaces now that the Layer 3
-  loop runs — the Layer 4 read-surface layer. **Design owed:** likely splits into several
-  Briefs at promotion (decompose the family), and the per-rung **Market lens** spec is its
-  own undesigned lens Brief; settle both before promoting. Captured here as one family.
-  — **Economy panel — second pass.** The L3 panel (`src/ui/economy_panel.{hpp,cpp}`) is a
-    debug dump (every corp, every section). Refit it to the conventions below.
-  — **Market Ledger.** Per-body market detail — supply / demand / price per resource, the
-    player's buys and sells this tick, and listings — the on-screen counterpart of the
-    **Market lens** (`overlay_mode::market`; its per-rung specification is the lens-design
-    Brief under § Canvas). Selecting under the market lens should route to this ledger.
-  — **Balance Ledger.** The corporate money loop made legible: income vs. expenditure broken
-    down (sales, input purchases, maintenance, wages) and the running balance over recent ticks.
-  — **Construction Ledger.** The build/asset view (per the **Construction** terminology and
-    the Layer-4 building-construction Brief under § Infrastructure): the player's buildings
-    with workforce / recipe / target, output and idle/active state, and — once construction
-    exists — what is being built and its cost/progress.
-  — **Player-focused, with a corp selector.** Every ledger **defaults to the player
-    corporation** (`w.player_entity`) and offers a selector to view another corporation's
-    figures. **Cross-corporation comparison (side-by-side) is left open** — note it as a
-    later option, not in this Brief.
-  Builds on the shared presentation / format / icon helpers and the per-entity content
-  builders (overlaps the Selection element and hover-card Briefs — share the builders). Files:
-  `src/ui/economy_panel.{hpp,cpp}` + new ledger files; nav-pane slots. Reads the world pool
-  map, `market_component`, `corporation_component`, and the economy report. See
-  `docs/ui/LENSES.md`, `docs/ui/LAYOUT.md`, and `docs/SYSTEMS.md` (§ Trade / § Budget).
+**The Layer-4 read-surface family (decomposed 2026-06-15).** The single "Market lens & ledger
+family" Brief is now **decomposed into the five discrete Briefs below** — four ledgers plus the
+Market lens render pass. They share design conventions, stated once here so each Brief need not
+repeat them:
 
-- **[F4 ~] Buildings overview ledger — design revision needed (deferred).** The earlier
-  "tile build ledger / primary build path" framing is **deferred pending a design revision**.
-  A nav-rail menu must be a **broad** ledger (see `docs/ui/MENU.md` § Menus are broad ledgers),
-  so this menu has to function as an **overview of all the player's buildings** — every
-  building across the player's holdings, with type / target / recipe / workforce / output /
-  state, filterable; the standing management surface — **not** a per-tile targeted build menu.
-  Building on *one* tile is a targeted action reached through the **tile Selection element**
-  ([A3] below), which needs no reserved UI. **Design owed before promotion:** settle what the
-  overview shows and how it filters/sorts; its relationship to the Construction panel built in
-  v0.0.5 (`src/ui/construction_panel.{hpp,cpp}` — likely *becomes* this overview, refit from the
-  current scaffold); and how it relates to the Construction Ledger in the [A4] ledger-family
-  Brief above (probably the same surface). Authority `docs/ui/{MENU,LAYOUT,SELECTION}.md`,
-  `docs/economy/PRODUCTION.md`; reuses `src/world/placement_rules.hpp`.
+- **Player-focused, with a corp selector.** Every ledger **defaults to the player corporation**
+  (`w.player_entity`) and offers a selector to view another corporation's figures.
+  Cross-corporation side-by-side comparison is **left open** (a later option, not in these Briefs).
+- **Shared substrate.** All build on the presentation / format / icon helpers and the per-entity
+  content builders (`entity_summary.{hpp,cpp}` — shared with the Selection element and hover-card
+  Briefs; *share, do not duplicate*), the uniform `ledger_chrome` size/anchor, and
+  *ledgers-start-closed*. They read the world `(corp,body)` pool map, `market_component`,
+  `corporation_component`, and the economy report.
+- **Promotion order.** Economy-panel refit is the foundation (the others lift its conventions);
+  Market / Balance / Construction ledgers are then disjoint-file dependents (parallel-safe at
+  promotion); the Market lens is independent of all four. Each `src/`-changing Brief takes a
+  brief-spanning requirement at promotion. *(Design settled inline; propagation to
+  `docs/ui/{LENSES,LAYOUT}.md` tracked under § Documentation.)*
+
+- **[A3 ✓] Economy panel — second pass (foundation refit).** The L3 panel
+  (`src/ui/economy_panel.{hpp,cpp}`) is a debug dump (every corp, every section). Refit it to the
+  family conventions above: player-default with a corp selector, `ledger_chrome` chrome, and the
+  shared content builders — so it becomes the convention reference the other three ledgers lift
+  from rather than a parallel debug surface. Scope: presentation only, no new economy data. Files:
+  `src/ui/economy_panel.{hpp,cpp}`.
+
+- **[A4 ✓] Market Ledger.** Per-body market detail — supply / demand / **resolved price** per
+  resource, the player's buys and sells this tick, and the player's standing sell-orders
+  (`ui_state.sell_orders`) with their floor prices. The on-screen counterpart of the **Market
+  lens**; selecting under the market lens routes here (§ Selection resolution). **Body selector
+  defaults to the current view's main body** (the Tile Ledger pattern). Files: new
+  `src/ui/market_ledger.{hpp,cpp}`, nav-rail slot 5. Reads `market_component`, the economy report.
+
+- **[A4 ✓] Balance Ledger.** The corporate money loop made legible: income vs. expenditure broken
+  down (sales, input purchases, maintenance, wages — the four `apply_budget` flows) and the running
+  balance over recent ticks (the same capped history the header sparkline uses). The deep view the
+  Corporation dashboard Money block launches into. Files: new `src/ui/balance_ledger.{hpp,cpp}`,
+  nav-rail slot 2. Reads `corporation_component.balance`, the budget flows, the balance history.
+
+- **[A4 ✓] Construction Ledger (construction-in-progress only).** **Scope settled by Q&A
+  (2026-06-15): there is no broad buildings-overview ledger.** A standalone all-buildings overview
+  proved more "good to know" than goal-driving, so building *inventory* is read where the player
+  cares about it — **own** buildings in the Corporation dashboard's holdings roll-up ("good for
+  me"), **competitors'** buildings in the Market Ledger ("competition") — not in a dedicated slot.
+  What this slot *is*: the **active-construction** view — the build queue, with **what is being
+  built, its cost, and progress** per the construction system; building on *one* tile stays a
+  targeted action through the tile Selection element ([A3] § Selection). **Relationship to the
+  v0.0.5 scaffold:** the Construction panel (`src/ui/construction_panel.{hpp,cpp}`) **becomes** this
+  in-progress view — refit the scaffold's armed-placement Build section, drop the broad-overview
+  table ambition. Files: `src/ui/construction_panel.{hpp,cpp}` (refit/rename), nav-rail slot 6 (per
+  the curated order, § Menu). Reads the player assets, `building_report`,
+  `src/world/placement_rules.hpp`. *(Settled into `docs/ui/MENU.md`.)*
+
+- **[B3 ✓] Market lens render pass.** Build the **Market lens** (`overlay_mode::market`) to the
+  spec already settled in `docs/ui/LENSES.md` § Market lens: **Planetary** per-tile diverging
+  warm↔cool price tint for the player-selected good (warm = dear vs. body mean, cool = cheap),
+  with the on-canvas gradient key and good-selector (shared in form with the Resource lens's
+  picker); plus the **Circumplanetary** per-body price summary strip. Mirrors the Resource-lens
+  build (add `overlay_mode::market`, strip button + `overlay_mode_name`, guarded render passes).
+  **No data dependency remains** — price resolution landed in v0.0.4. Files:
+  `src/ui/ui_state.hpp`, `src/ui/overlay.cpp`, `src/ui/body_surface_canvas.cpp`,
+  `src/ui/solar_system_canvas.cpp` (Circumplanetary summary). Authority `docs/ui/LENSES.md`.
 
 ### Selection info element
 
@@ -423,34 +472,40 @@ shared per-entity content builders in `entity_summary.{hpp,cpp}`):
   being drawn as selectable canvas markers first. *(Designed; blocked on that
   marker-drawing prerequisite — promoted then cancelled 2026-06-14.)*
 
-- **[F4 ~] Lens-driven selection resolution.** Deferred — **needs documentation before
-  it is actionable.** Upgrade selection so the entity under the pointer is resolved
-  *through the active lens* rather than by a fixed kind order. Two concepts must be
-  defined first:
-  — **"Lowest valid entity" under hover.** At a given pointer position several
-    entities overlap (a building *on* a tile *on* a body). Hover should resolve to
-    the **lowest (most specific) valid** entity in that stack. "Lowest" and "valid"
-    both need a precise definition — the stack order of kinds, and what makes an
-    entity a valid hover/selection target at all.
-  — **Lens evaluates validity.** The active lens (`overlay_mode`) changes *what is
-    valid*: e.g. under the Corporation lens the meaningful target may be the owning
-    corporation, under Resource the tile's deposit, under terrain (no lens) the tile
-    itself. So the **Selection info element is driven by the hovered entity,
-    evaluated against the current lens** — the same hover position can resolve to a
-    different entity per lens.
-  — **Resolution names the ledger the selection drives.** The lens that resolves the
-    hovered entity also chooses which ledger the selection routes to — tying this Brief to
-    the **Market lens & ledger family** Brief under § Ledger. E.g. the **Market lens**
-    resolves to a market / listing and routes to the **Market Ledger**; the **Corporation
-    lens** to a corporation and the **Balance Ledger**; a building (construction view) to the
-    **Construction Ledger**; terrain (no lens) to the tile in the Tile Ledger. The 'go to'
-    routing for non-spatial kinds (above) is the same dispatch seam.
-  This couples the Selection element (Focus state in `docs/ui/SELECTION.md`) to the
-  lens system (`docs/ui/LENSES.md`) and the ledger family; the docs need the resolution
-  rule written before code. Design authority once written: `SELECTION.md` (hover/Focus
-  resolution) and `LENSES.md` (per-lens validity). Overlaps the hover-card Brief and the
-  canvas hit-testing Brief above (the marker stack it hit-tests is the same stack this
-  resolves through).
+- **[B4 ✓] Lens-driven selection resolution.** Resolve the entity under the pointer *through the
+  active lens* rather than by a fixed kind order. **Design settled (2026-06-15)** — re-rated up
+  from F because the ledger family above depends on this routing rule. The two concepts left open
+  are now defined:
+  — **The kind stack and "lowest valid".** At a pointer position the candidate entities form a
+    fixed **specificity stack**, most-specific first: *building → market-listing → tile → body*.
+    "Lowest valid" = the **first entity in that order that is both present at the position and
+    *valid under the active lens*** (next bullet). "Present" means hit-tested at the position
+    (buildings/listings require the marker-drawing prerequisite — the canvas-hit-testing Brief
+    below — until then only tile/body are present). The plain canvas (no lens) resolves to the
+    **tile** (today's behaviour), with **body** as the fallback when no tile is under the pointer.
+  — **The lens defines validity (the resolution table).** The active `overlay_mode` selects which
+    stack kinds are valid, and the lowest valid one wins:
+
+    | Lens | Valid kinds (lowest-first) | Resolves to | Routes to |
+    |---|---|---|---|
+    | none (terrain) | tile → body | tile | Tile Ledger |
+    | Corporation | building → tile → body | owning **corporation** of the building/tile | Balance Ledger |
+    | Faction | tile → body | owning **nation** of the tile | (nation ledger — deferred) |
+    | Resource | tile → body | tile (its **deposit** profile) | Tile Ledger |
+    | Market | market-listing → tile → body | **market / listing** | Market Ledger |
+    | Supply | building → tile → body | route/stockpile at the tile | (supply view — Layer 5) |
+
+    So the same hover position resolves to a *different* entity per lens (the Corporation lens
+    reads a building's owner, the Market lens the tile's market), and the resolving lens **also
+    names the ledger the selection routes to** — the same `focus_on_entity` dispatch seam the
+    non-spatial 'go to' routing (above) uses. Rows whose target ledger does not exist yet
+    (nation, supply) degrade to selecting the underlying tile until that ledger lands.
+  Couples the Selection element (Focus state, `docs/ui/SELECTION.md`) to the lens system
+  (`docs/ui/LENSES.md`) and the ledger family. **Build-blocked on** the canvas-hit-testing Brief
+  (building/listing markers) for the lens rows that need them; the tile/body rows are buildable
+  now. Files at promotion: the selection-resolution seam (`draw_selection_panel` / hover dispatch),
+  reads `overlay_mode`. *(Design settled inline; propagation to `docs/ui/{SELECTION,LENSES}.md`
+  tracked under § Documentation.)*
 
 ## Documentation
 
@@ -459,6 +514,26 @@ Standing **`S`-tier review reminders** raised by the 2026-06-15 retroactive doc-
 landed without a doc update; each carries a **transient "what was changed" note** in the doc
 itself. **Review the change, then remove the transient note** and clear the Brief. *(These are
 review actions, not design — marked `✓`.)*
+
+- **[A3 ✓] Propagate the 2026-06-15 v0.1.0 design pass into the authority docs.** The inline
+  OPENS designs are being settled into their authority docs. **Most propagated in the 2026-06-15
+  design-Q&A pass** (these were reviewed live with the user — no transient `⟳` note needed, per
+  `DEVELOPMENT_PRACTICES.md` § Design-direction Q&A). Status:
+
+  | Settled Brief | Authority doc | Status |
+  |---|---|---|
+  | Corporation overview dashboard; nav-rail ordering (9-slot, renames) | `docs/ui/MENU.md` | **propagated** |
+  | Lens-driven selection resolution | `docs/ui/SELECTION.md`, `docs/ui/LENSES.md` | **propagated** |
+  | Inter-body markets (convoy-coupled, Selene example) | `docs/SYSTEMS.md` § Trade | **propagated** |
+  | Resource generation scarcity (seeded 0–1, v0.2) | `docs/economy/RESOURCES.md`, `docs/generation/TILE_GENERATION.md` | **propagated** |
+  | Known-bug fixes (frame-stutter HUD, body-label) | new `docs/development/KNOWN_BUGS.md` | **propagated** (relocated out of OPENS) |
+  | Market lens render pass | `docs/ui/LENSES.md` | already present (§ Market lens) |
+  | Ledger family decomposition | `docs/ui/LAYOUT.md` | **owed** |
+  | Preferential purchasing | `docs/SYSTEMS.md` § Trade | **deferred** — under active redesign, left to the owning agent |
+  | Supply routing (Layer 5) | `docs/SYSTEMS.md` § Supply + new `docs/economy/SUPPLY.md` | **owed** |
+
+  Remaining owed: the LAYOUT.md ledger-family note and the Supply/Layer-5 § Supply + `SUPPLY.md`
+  settle. Preferential purchasing is intentionally left for the agent reworking its clearing model.
 
 - **[S1 ✓] CORPORATION_GENERATION.md — revised holdings shape (specialist, lean).** Pass 3, the
   design principles, and § Open items were revised (2026-06-15) to the settled **specialist /
@@ -475,10 +550,6 @@ review actions, not design — marked `✓`.)*
   cross-cutting note (2026-06-15) recording that nations own the broad economy and corporations
   are specialists, pointing to GENERATION_STRATEGY.md. Review the wording, then remove the
   transient HTML comment in `docs/SYSTEMS.md` § Cross-cutting notes.
-
-- **[S1 ✓] MENU.md — defined menu set & ordering.** Added § Menu set and ordering (2026-06-15):
-  the ten-slot set, gameplay-loop grouping, and slot mapping to systems. Review it, then remove
-  the transient `> ⟳` note in `docs/ui/MENU.md` § Menu set and ordering.
 
 - **[S1 ✓] POPULATION.md — population centres now in scope + decomposed.** Reconciled the stale
   "deferred for the prototype" framing to v0.0.6 static-MVP scope; added § Generation
@@ -503,10 +574,8 @@ review actions, not design — marked `✓`.)*
   Confirm the framing (targeted build via the tile element vs. the broad nav-rail overview),
   then remove the transient note at the top of `docs/ui/SELECTION.md`.
 
-- **[S1 ✓] Review SYSTEMS.md § Trade — standing sell-orders reconcile.** Added the standing
-  sell-order / floor-price sentence (and the deferred-counterparty note) to § Trade. Confirm
-  the wording matches the intended market design, then remove the transient HTML comment in
-  `docs/SYSTEMS.md` § Trade.
+_(The MENU.md menu-set and SYSTEMS.md § Trade review reminders were cleared in the 2026-06-15
+design-Q&A pass — both docs were reviewed live with the user and their transient notes removed.)_
 
 ## Trade
 
@@ -515,35 +584,130 @@ price resolution has now landed; **inter-body trade stays open**. Markets are a 
 exchange, **distinct from corp stockpile pools**. Design authority `docs/SYSTEMS.md` § Trade,
 `docs/economy/RESOURCES.md`.
 
-- **[B4 ~] Preferential purchasing (choosing counterparties).** Split from the sell-orders
-  Brief (the **sell-orders** half landed 2026-06-15: `ui_state.sell_orders` authored from the
-  building-management panel, honoured at clearing with a floor price, the auto path yielding
-  player-controlled resources — see DEVLOG / REQUIREMENTS § player-sell-orders). What remains is
-  letting the buyer **choose counterparties** rather than the flat anonymous auto-buy. **Blocked
-  on architecture, design owed:** `clear_markets` is an *anonymous pooled* exchange — supply and
-  demand aggregate per resource and clear at one resolved price, with no per-seller matching.
-  Preferential purchasing needs a **matched order book** (buyers see and pick sellers), which is a
-  clearing restructure that couples to the Market Ledger family (§ Ledger) and to Supply/logistics
-  (Layer 5, who you *can* reach). Design the matching model before promoting. Touches
-  `src/world/market_clearing.{hpp,cpp}`; authority `docs/SYSTEMS.md` § Trade.
+- **[B4 ✓] Preferential purchasing (choosing counterparties).** Split from the sell-orders Brief
+  (the **sell-orders** half landed 2026-06-15). What remains is letting the buyer **choose
+  counterparties** rather than the flat anonymous auto-buy. **Design settled (2026-06-15) — the
+  matched order-book model:**
+  — **From pooled clearing to a matched book.** `clear_markets` today aggregates supply/demand per
+    resource and clears at one resolved price with no per-seller identity. Replace the per-resource
+    clear with a **per-(body, resource) order book**: sell orders (seller corp, qty, floor price —
+    `ui_state.sell_orders` already carries the player's) and buy orders (buyer corp, qty, max
+    price). **Matching = price-time priority** — cheapest seller first, then earliest, against the
+    highest bidder; trades clear at the seller's ask, advancing toward the same EMA-eased resolved
+    price (preserve the v0.0.4 price curve as the *reference/anchor* price, not the clearing
+    mechanism). The anonymous auto-buy/auto-sell become **default orders** the AI emits, so the
+    book degrades to today's behaviour when no one expresses a preference.
+  — **The preference itself.** A buyer's order carries an optional **counterparty preference** — a
+    ranked/avoid list of seller corps — applied as a matching bias: a preferred seller wins ties
+    and tolerates a configurable price premium; an avoided seller is matched only as last resort.
+    Surfaced later through the Market Ledger (§ Ledger) where the player sees and picks sellers.
+  — **Order fields + v0.2.0 notes (Q&A 2026-06-15).** Full-order-book scope **confirmed** (the
+    original sell-order Brief was ambiguous). Every order carries a **price min/max** *and* the
+    counterparty preference above. **Deferred to the v0.2.0 roadmap** (out of prototype scope):
+    **corporate contracts** (standing bilateral supply agreements) and **international tariffs**
+    (nation-imposed cross-border trade cost).
+  — **Couples to Layer 5.** A counterparty is only reachable if logistics can connect buyer and
+    seller — so this lands **with or after** the Supply layer (the [S5] Supply-routing Brief
+    below): reachability/logistical cost is an input to the matching bias.
+  **Build-blocked on Layer 5** (reachability), but the matching model is now settled. Touches
+  `src/world/market_clearing.{hpp,cpp}`; authority `docs/SYSTEMS.md` § Trade. *(Design settled
+  inline; propagation to `docs/SYSTEMS.md` § Trade tracked under § Documentation.)*
 
-- **[F4 ~] Inter-body / international markets (deferred).** Cross-body price linkage and trade
-  between bodies — each body's market currently resolves in isolation. Out of Layer 3/4 scope;
-  couples to Supply (Layer 5 logistics / logistical cost) once convoys exist. Design owed when picked up.
+- **[A4 ✓] Inter-body / international markets.** Cross-body price linkage and trade between bodies —
+  required by the v0.1.0 done-definition (*price diverges spatially; logistics affects margin*),
+  re-rated up from F. **Design settled (2026-06-15):** each body keeps its **own** market and its
+  own locally-resolved price (no global clearing) — divergence is the *point*. Bodies are linked
+  **only through Supply convoys** ([S5] below): a convoy moving good *g* from body A to body B adds
+  its cargo to B's supply at delivery and removed it from A's at dispatch, so prices converge or
+  diverge purely as a function of what logistics actually carry, net of logistical cost. There is
+  **no abstract price-coupling term** — the convoy *is* the coupling. A profitable arbitrage is
+  therefore A-price + per-unit logistical cost < B-price, which the player reads off the two
+  bodies' Market Ledgers / the Market lens. **Refined (Q&A 2026-06-15): the coupling is
+  market-to-market, not body-to-body** — a convoy links two *markets*, carries a **mode**
+  (land / sea / air / space) each gated on its infrastructure, and **space distance is Euclidean,
+  centre-to-centre between the markets' parent bodies**. **Build-blocked on Layer 5** (no convoys
+  yet); the model is settled. Authority `docs/SYSTEMS.md` § Trade / § Supply.
+  — **Prototype scope (2026-06-15) — feasibility probe, not space gameplay.** We are **not scoping
+    space gameplay**: no corporation and no nation on Selene (or any off-Earth body). The first build
+    is a **minimal probe of the inter-body market logic alone** — the bare market-to-market coupling
+    on the existing bodies — explicitly to test whether it is **feasible or whether it triggers
+    data-creep** (markets / pools / convoys multiplying per body). Defer the convoy-mode +
+    infrastructure richness ([B4 ~] logistics network, § Infrastructure) and any off-Earth faction
+    presence until the probe proves the model carries its weight.
+  *(Design settled inline; propagation tracked under § Documentation.)*
+
+## Supply
+
+The logistics layer (Layer 5) — the physical movement of goods between bodies. **Newly authored
+2026-06-15** to close the v0.1.0 done-definition gap (*goods move between bodies via supply
+convoys*); the layer previously had no Brief, only the gated Supply-lens spec and the deferred
+inter-body-market note. Design authority `docs/SYSTEMS.md` § Supply, `docs/ui/LENSES.md` § Supply.
+
+- **[S5 ✓] Supply routing — convoys (Layer 5).** The spatial-strategic layer that makes price
+  diverge between bodies. **Design settled at prototype depth (2026-06-15); umbrella — splits into
+  Briefs at promotion.** The model:
+  — **Convoy entity.** A convoy carries `(source market, destination market, mode {land|sea|air|
+    space}, cargo {resource, qty}, progress 0–1, speed)` — the coupling is **market-to-market**, and
+    the **mode** (each gated on its infrastructure) is settled by the source/destination pair (space
+    for inter-body, land/sea/air for intra-body / terrestrial). It is created when goods are
+    dispatched from a source pool toward a
+    destination market/pool; it advances a fixed fraction of `progress` per Tick (linear, no
+    orbital mechanics in the prototype); on arrival it credits the destination `(corp,body)` pool
+    / market supply and is retired. Cargo leaves the source pool at **dispatch**, not arrival
+    (goods in transit are committed). New component on the world; deterministic per-Tick advance
+    alongside the economy step.
+  — **Logistical cost.** Each convoy costs **per-unit-distance** budget (a `base_logistics_cost ×
+    distance × qty` term from the Lua economy-constants registry; for space convoys **distance is
+    Euclidean, body-centre to body-centre** between the markets' parent bodies). The cost is a budget
+    outflow at dispatch (or amortised per Tick) — this is
+    the term that makes a distant arbitrage marginal and grounds *logistics affects margin*.
+  — **Dispatch trigger (Q&A 2026-06-15: auto is the rule, player-direction the exception).** The
+    **auto path** is the default — it fills a destination shortfall from the cheapest reachable
+    source so the loop runs without micromanagement; standing player-direction of *every* convoy is
+    **deprecated** as a baseline. Player-direction remains for a sell order / buy match whose
+    counterparty is on another body (couples to the [B4] preferential-purchasing book). **Exception
+    (open note):** Era 0 (perhaps Era 1) **space launches / missions MUST be player-directed** —
+    leaving the gravity well is an explicit decision, never auto-dispatched; terrestrial
+    (land/sea/air) convoys auto-dispatch. Reachability = both bodies known (Exploration is a
+    data-model stub in the prototype, so treat all prototype bodies as reachable).
+  — **Surfaces.** Unlocks the **Supply lens** (`docs/ui/LENSES.md` § Supply — the one all-rung
+    lens: Solar route lines, Circumplanetary throughput badge, Planetary per-tile segment) and the
+    inter-body half of the **Market** read surfaces. Folds into the Construction/Market ledgers per
+    `docs/ui/MENU.md` (no own nav slot).
+  — **Decomposition at promotion (foundation-first):** (1) convoy component + per-Tick advance;
+    (2) logistical-cost budget term + economy-constants entries; (3) dispatch triggers (auto, then
+    player-directed); (4) destination crediting + inter-body market effect ([A4] inter-body
+    markets); (5) Supply lens render passes. 1→2→3→4 serial (shared economy/budget seam); 5
+    disjoint. Each `src/`-changing → brief-spanning requirement at promotion.
+  Files at promotion: new `src/world/supply_system.{hpp,cpp}`, `src/world/components.hpp` (convoy),
+  `src/world/budget_system.cpp` (cost), `scripts/economy.lua` (constants),
+  `src/world/market_clearing.{hpp,cpp}` (delivery), the canvas render passes (Supply lens).
+  **The largest remaining v0.1.0 build** — a `5`; treat as v0.0.7's whole theme. *(Design settled
+  inline at prototype depth; a fuller settle into `docs/SYSTEMS.md` § Supply + a new
+  `docs/economy/SUPPLY.md` is owed and tracked under § Documentation.)*
 
 ## Resources
 
 The resource economy's data and quality work — the substrate Layer 4 sits on. Design
 authority: `docs/economy/RESOURCES.md`, `docs/economy/PRODUCTION.md`.
 
-- **[B3 ~] Resource generation — full-set deposit authoring + scarcity.** Generation today
-  authors deposits for the seven-resource prototype subset; extend it to the full 23-resource
-  set with a plausible distribution and scarcity profile (rare goods rare, ambient goods
-  near-universal). **Design owed:** the per-resource distribution + scarcity profile is a design
-  call, not just a mechanical extension. Overlaps the tile-generation refinements Brief
-  (§ Environment) — that one holds the generation *mechanics*; this one holds the
-  *resource-economy* target. Touches the deposit pass in `src/world/tile_generation.cpp`;
-  authority `docs/economy/RESOURCES.md`, `docs/generation/TILE_GENERATION.md`.
+- **[B3 ✓] Resource generation — full-set deposit authoring + scarcity (direction settled; v0.2).**
+  Generation today authors deposits for the seven-resource prototype subset; extend it to the full
+  raw-material set with a plausible distribution and scarcity profile. **Design direction settled
+  (2026-06-15), scheduled to the v0.2 solar-generation roadmap** (with the tile-generation
+  refinement passes, § Environment): a **seeded per-resource rarity scalar** — a decimal in
+  `[0, 1]` (0 = trace/absent, 1 = near-universal ambient), **raw-tier resources only** (refined and
+  product goods are made, not mined, so carry no deposits). The scalar **modulates deposit
+  frequency and magnitude** on top of the existing terrain affinity, so a low scalar keeps a good
+  sparse even on affine terrain and a high one approaches the every-tile ambient floor; it is
+  **seeded** so a campaign's exact distribution varies while the rarity *ordering* (consistent with
+  each good's `RESOURCES.md` base-price rarity) stays stable. This is the *resource-economy* target;
+  the generation *mechanics* that consume the scalar are the tile-generation Brief (§ Environment),
+  the same v0.2 pass. Settled into `docs/economy/RESOURCES.md` § Deposit rarity & scarcity and
+  `docs/generation/TILE_GENERATION.md` § Deferred. Touches the deposit pass in
+  `src/world/tile_generation.cpp` (data-only — the deposit arrays already carry full enum width).
+  `src/`-changing → brief-spanning requirement (a `headless` deposit-distribution audit) at
+  promotion.
 
 ## Workforce
 
@@ -565,7 +729,20 @@ The labour scalar (`docs/SYSTEMS.md` § Workforce, `docs/economy/POPULATION.md`)
 
 ## Infrastructure
 
-- **[S5 ~] Layer 4 — population centres + building management.** The next layer,
+- **[B4 ~] Logistics network & infrastructure model (design owed).** Surfaced by the 2026-06-15
+  Q&A: the convoy-mode model ([S5] Supply, [A4] inter-body markets) makes each convoy mode —
+  **land / sea / air / space** — depend on infrastructure, but the infrastructure layer itself is
+  **undesigned**. **Open questions to settle:** what a **road** is (a tile attribute? a built
+  network? a per-edge capacity term?); whether **sea routes** are implicit (any navigable water
+  path) or built (ports + lanes); **airfields**; and the **launchpad / spaceport** that gates the
+  **space** mode (already named by the Era-1 gate in `docs/economy/ERAS.md`). Settle how each piece
+  of infrastructure **gates and costs** its convoy mode and how it feeds the convoy
+  logistical-cost term ([S5]). **Not on the immediate prototype path** — the inter-body market
+  feasibility probe ([A4] § Trade) deliberately sidesteps it; this is the design that makes the
+  full Supply layer real. Authority `docs/SYSTEMS.md` § Infrastructure / § Supply; couples to the
+  [S5] convoy Brief. *(Design owed — a settle-into-the-doc pass before promotion.)*
+
+- **[S5 ✓] Layer 4 — population centres + building management (index).** The next layer,
   **rescoped** from a pure production-UI overhaul into two coupled systems:
   **population centres** (the deferred `docs/economy/POPULATION.md` model — population
   scale / agglomeration, land-use trade-offs, habitability feedback, and the labour supply
@@ -573,12 +750,15 @@ The labour scalar (`docs/SYSTEMS.md` § Workforce, `docs/economy/POPULATION.md`)
   build-cost spend + terrain/deposit validation via the placement-rules seam above),
   **recipe / workforce control**, and the **sell-order UI** — surfaced through the production
   UI (§ Canvas) and the market / balance / construction ledgers (§ Ledger). Build cost comes
-  from the Lua economy-constants registry. **Umbrella Brief — not directly promotable;** it
-  splits into several Briefs at promotion (the **population-centre half is now its own [S4]
-  Brief**, and the build UI is being reframed around the per-tile build ledger, § Ledger).
-  Depends on the pre-L4 enablers (placement-rules seam, workforce-model design, the
-  economy-test harness). See `docs/economy/{PRODUCTION,POPULATION}.md` and the milestone map in
-  `docs/development/ROADMAP.md` (v0.0.6 — building management + population).
+  from the Lua economy-constants registry. **Umbrella Brief — an index, not promotable;** it is
+  **now fully decomposed (2026-06-15)** into promote-ready children: the **population half** is the
+  [S4 ✓] static-MVP + [A4 ✓] dynamic-half Briefs below; the **workforce pool** is [A4 ✓] § Workforce;
+  the **building-management read surfaces** are the decomposed [A3/A4 ✓] ledger family (§ Ledger);
+  player **construction** is the Construction/Buildings-overview ledger refit there + the tile
+  Selection element ([A3] § Selection). No design is owed at this level — the umbrella stays only
+  as the v0.0.6 index. Depends on the pre-L4 enablers (placement-rules seam, workforce-model
+  design, the economy-test harness — all landed). See `docs/economy/{PRODUCTION,POPULATION}.md` and
+  the milestone map in `docs/development/ROADMAP.md` (v0.0.6 — building management + population).
 
 - **[S4 ✓] Population centres — static MVP (Briefs 1–5).** **Decomposed (2026-06-15);** the
   foundation-first sequence is in `docs/economy/POPULATION.md` § Implementation decomposition.
@@ -600,6 +780,41 @@ The labour scalar (`docs/SYSTEMS.md` § Workforce, `docs/economy/POPULATION.md`)
   pool are live. Authority `docs/economy/POPULATION.md` § Implementation decomposition,
   § Habitability and workforce efficiency.
 
+- **[A4 ✓] Building management — functional recipe & workforce control.** The **interaction** half
+  of "manage buildings" named in the v0.1.0 done-definition (`docs/development/ROADMAP.md`),
+  distinct from the read-only Construction/Buildings-overview Ledger (§ Ledger) which *displays*
+  these fields. **Newly authored 2026-06-15** — the done-definition's "recipe and workforce control"
+  had no Brief; only the [S5] umbrella index and the construction-panel scaffold's *disabled*
+  management stubs (`src/ui/construction_panel.{hpp,cpp}`, v0.0.5) referenced it. **Design settled
+  (prototype depth):**
+  — **Recipe control.** A processing facility's `recipe` (on `building_component`, today authored at
+    generation) becomes player-settable via a **recipe selector** offering the recipes valid for
+    that `building_type` (from `recipe_registry`). Setting it writes `building_component.recipe`;
+    it takes effect at the next econ Tick. Constraint: only `building_type`-valid recipes; the
+    `no_recipe` sentinel idles the facility.
+  — **Workforce control.** Add a per-building **workforce target/cap** (new
+    `building_component` field, 0..max) the player throttles. It feeds the existing contention
+    scalar ([A4] § Workforce) — production and wages both scale by it — so throttling a building
+    cuts its wage draw and frees pooled labour for contended neighbours. Target 0 = *idled by the
+    player* (a state distinct from input-starved idle and from exhausted).
+  — **Decommission (cost model settled, Q&A 2026-06-15).** Remove a building from the corp's
+    `assets` and free its tile. Build cost splits into **labour + material**; decommission **refunds
+    material** (minus a small pure-loss fraction) and **charges labour** for the teardown. Ripples to
+    the build-cost representation — today a single Lua constant per `building_type`; it splits into
+    **labour / material components** in `scripts/economy.lua`, which also re-grounds the construction
+    spend ([A3] § Selection build front door) on the same two-part cost.
+  — **Surface (settled, per menus-are-broad-ledgers).** These are **targeted** per-building
+    actions → they live in the **tile Selection element building view** (`SELECTION.md`, the build
+    front door), *not* a nav slot. The broad Construction Ledger shows each building's state and
+    **links** to this control surface; it does not host the controls itself.
+  Files at promotion: `src/world/components.hpp` (workforce-target field), the Selection-element
+  building view / a building-management popup, `src/world/economy_system.cpp` (honour recipe +
+  target), `src/world/budget_system.cpp` (wages off the target), the construction-panel scaffold
+  refit. `src/`-changing → brief-spanning requirement at promotion. The interaction core of v0.0.6
+  building management, alongside the [A4] ledger family (read) and [S4] population. *(Design settled
+  inline; propagation to `docs/SYSTEMS.md` § Workforce / § Infrastructure, `docs/economy/PRODUCTION.md`,
+  and `docs/ui/SELECTION.md` tracked under § Documentation.)*
+
 ## Environment
 
 The world-generation layer — terrain, nations, corporations. Design authority:
@@ -607,13 +822,21 @@ The world-generation layer — terrain, nations, corporations. Design authority:
 
 ### Tile generation (terrain)
 
-- **[B4 ~] Tile generation refinements.** The larger production passes
-  noted in `TILE_GENERATION.md` § Deferred: solar-parameter derivation from orbital
-  mechanics, smooth (noise-blended) band transitions, tectonic plate-driven
-  landforms, full deposit authoring for the non-prototype resources (the *mechanics*
-  side of the Resource generation Brief under § Resources), and coastline
-  refinement (enclosed seas, archipelagos, lakes). **Design owed:** each pass needs its
-  model settled (the orbital-derivation formula, the plate model) before it is buildable.
+- **[F4 ~] Tile generation refinements (deferred — deep models owed).** The larger production
+  passes noted in `TILE_GENERATION.md` § Deferred. **Triaged 2026-06-15** — these are *not* part
+  of v0.1.0 design completion (they do not advance the prototype's economy loop) and each deserves
+  its own focused settle pass:
+  — **Full deposit authoring (the data half) is now covered** by the settled [B3 ✓] Resource
+    generation Brief (§ Resources) — band table + affinity gates. This Brief keeps only the
+    *generation-mechanics* passes below.
+  — **Smooth (noise-blended) band transitions** and **coastline refinement** (enclosed seas,
+    archipelagos, lakes) — buildable now (no new model needed), but cosmetic; deferred behind the
+    economy work.
+  — **Solar-parameter derivation from orbital mechanics** and **tectonic plate-driven landforms**
+    — **genuinely speculative; design still owed** (the orbital-derivation formula, the plate
+    model). These belong to a procedural-campaign milestone *beyond* the prototype, not v0.1.0.
+  Kept as one deferred holder; promote individual passes only when a campaign needs them. Touches
+  `src/world/tile_generation.cpp`; authority `docs/generation/TILE_GENERATION.md` § Deferred.
 
 ### Nation generation
 
@@ -652,35 +875,8 @@ Design authority: `docs/generation/CORPORATION_GENERATION.md`.
 
 ## Known Bug
 
-- **[B4 ~] Frame stutter / performance + hardware limits unconfigured.** The app
-  already **stutters intermittently**. This may be benign for now, but the cause is
-  not yet diagnosed and there is no frame-pacing or hardware-limit configuration in
-  place (vsync / target frame-rate / present mode, and the per-frame draw budget for
-  the dense tile grids — Kepler is 180×84 = 15,120 tiles redrawn each frame, plus
-  the upcoming per-tile Faction-lens tint/border pass). Worth headroom before Layer 4's
-  denser UI piles on. First **measure** before optimising: is the stutter GPU
-  present-driven (vsync/composition), CPU draw-call volume (immediate-mode tile loop), or
-  allocation churn per frame? Then settle the hardware-limit config (vsync on/off, frame
-  cap, whether to cache static tile geometry / dirty-rect the canvas). Likely touches
-  the render/present setup (SDL3 swap / vsync) and the canvas tile-draw loops.
-  **Baseline established (2026-06-14, promoted then cancelled):** vsync is on
-  (`SDL_SetRenderVSync(m_renderer, 1)`, `app.cpp:77`), with no frame cap and no
-  per-frame timing readout. **Design owed:** the blocker is the measurement itself —
-  classifying the stutter needs frame-time instrumentation over a *live* present loop,
-  which the headless harness cannot observe; building that live instrument is the deferred
-  design work (a frame-time readout / log) that must land before R1/R2 can be run.
-
-- **[C3 ~] Body labels move in steps, not smoothly.** Re-logged. The font-oversampling
-  pass (`src/ui/fonts.hpp`) improved glyph crispness but did **not** fix the motion
-  artefact: body labels visibly advance only every few ticks while the body dot
-  glides. **Root cause confirmed (2026-06-14, promoted then cancelled):** the label
-  position derives from the live float `pos` every frame
-  (`solar_system_canvas.cpp:218–224`, no rounding), so the stepping is
-  `ImDrawList::AddText` snapping glyphs to the integer pixel grid while the dot
-  (`AddCircleFilled`) is sub-pixel anti-aliased — the glyph-placement-quantisation
-  path, not stale position. **Design owed:** the **fix** (sub-pixel text positioning, or
-  accept and document the limitation) and its smoothness check remain open — verifying
-  smooth motion needs live animation observation, which the headless harness cannot do, so
-  a testing method must be settled first. Same code path on the Circumplanetary
-  canvas. See `SOLAR.md`.
-</content>
+Known defects have moved out of OPENS into [`KNOWN_BUGS.md`](KNOWN_BUGS.md) — a known bug is a
+*reported defect with a settled or owed fix*, not a unit of design intent, so it does not belong in
+the Brief backlog. The **frame stutter / performance** entry (with the settled frame-time-HUD
+measurement instrument) and the **body-label stepping** entry (accept-and-document with the
+step-together mitigation) now live there.

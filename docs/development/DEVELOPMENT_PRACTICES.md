@@ -68,7 +68,28 @@ ProjectIo --verify scripts/verify/<name>.lua
   helper" rather than a from-scratch script. Prefer them over raw `set_pan` math.
 - **Capture:** `capture("name")` renders one frame and writes `screenshots/name.png`
   (in-app `SDL_RenderReadPixels` → `write_png_rgba`; nothing leaves the window).
-- **Output:** PNGs for inspection. Golden-image diffing is not yet built (deferred).
+- **Output:** PNGs for inspection. Golden-image diffing is not yet built — its **tolerance model
+  is now designed** (below); the build stays deferred.
+
+#### Golden-image diffing — tolerance model (designed 2026-06-15, [F3]; build deferred)
+
+When automatic pass/fail is built, it diffs each freshly-captured `screenshots/<name>.png` against
+a committed reference. The settled model:
+
+- **Golden storage.** Reference images live beside their script under
+  `scripts/verify/goldens/<name>.png`, committed to the repo. A `--update-goldens` flag on the
+  verify harness rewrites them deliberately (never silently), so a golden change is a reviewable
+  diff in version control.
+- **Tolerance (perceptual, not exact).** Exact-match is too brittle — anti-aliasing and font
+  rasterisation jitter by a pixel. The model is a **two-threshold budget**: a per-pixel RGB delta
+  ignored below a small magnitude (`ε_channel`), and a cap on the **fraction of pixels** allowed
+  to exceed it (`ε_area`). A frame passes when the differing-pixel fraction stays under `ε_area`.
+- **Masked regions.** Zones known to jitter (text glyphs, sub-pixel-animated markers — see the
+  body-label stepping note in OPENS § Known Bug) may carry an optional **ignore mask** per golden,
+  excluded from the budget, so legitimate text-AA noise never fails a structural check.
+- **CI decision.** It runs as a **local pre-commit / on-demand** check first, not gated in CI —
+  there is no rendering-capable CI runner today. Promotion into CI is a later call once a headless
+  GPU/software-raster runner exists; the harness is designed to run identically in both.
 
 This is the standard tool for the `visual` verification class in
 [`req/REQUIREMENTS.md`](req/REQUIREMENTS.md). When a requirement's verification is
@@ -164,6 +185,13 @@ catches a wrong call while the context is fresh, before it ossifies into "docume
 **Keep it proportional.** This is a guideline, not ceremony — skip the Q&A for a batch that
 surfaced nothing worth asking, and keep the questions few. The point is to catch the one
 genuine fork, not to manufacture questions.
+
+**A formal Q&A is itself the review — no transient `⟳` note needed.** The `> ⟳` "pending review"
+blockquote exists to flag a design call the user has *not yet* seen (the Batch Publish
+documentation discipline; see OPENS § Publish). When a design call is settled **through a formal
+Q&A with the user** — the user chose the direction live — that review has already happened, so the
+resulting doc change **does not carry a `⟳` note**. Write the settled design directly. Reserve
+`⟳` for calls made on the user's behalf that still await their eyes.
 
 ### Inline comments
 

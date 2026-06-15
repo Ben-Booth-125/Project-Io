@@ -6,6 +6,116 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## 2026-06-15 — Design-direction Q&A: v0.1.0 design pass (branch v0.0.5)
+
+Closing Q&A for the v0.1.0 design-completion pass below (the Batch Publish § design-direction
+discipline — `DEVELOPMENT_PRACTICES.md` § Design-direction Q&A). Four genuine forks put to the
+user; the answers confirm direction and open several new notes. No `src/` change — outcomes folded
+into the affected OPENS Briefs (§ Trade, § Supply, § Infrastructure) and recorded here.
+
+### Outcomes
+
+- **Market model — full order book confirmed, with refinements.** The matched price-time order book
+  is the right prototype scope (the original sell-order Brief was ambiguous; now settled). Every
+  order carries a **price min/max** *and* the counterparty preference. New **v0.2.0 roadmap** notes
+  opened (not prototype): **corporate contracts** (standing bilateral supply agreements) and
+  **international tariffs** (nation-imposed cross-border trade cost). → [B4] Preferential purchasing.
+- **Price coupling — convoy-only confirmed, reframed to inter-*market*.** Divergence arises only
+  from logistics, no abstract term — but the coupling is **market-to-market**, not body-to-body. A
+  convoy gains a **mode** (land / sea / air / space), each **dependent on infrastructure**. Space
+  distance is **Euclidean, body-centre to body-centre** (the market's parent body). → [A4] Inter-body
+  markets, [S5] Supply routing.
+- **Supply control — auto is the rule; player-direction is the exception.** Standing player-direction
+  of *every* convoy is **deprecated** as the default — the auto path (fill a shortfall from the
+  cheapest reachable source) runs the loop. **Exception (open note):** Era 0 (perhaps Era 1) **space
+  launches / missions MUST be player-directed** — leaving the gravity well is an explicit decision,
+  never auto-dispatched. → [S5] Supply routing.
+- **Decommission — labour + material cost model.** Build cost splits into **labour + material**.
+  Decommission **refunds material** (minus a small pure-loss fraction) and **charges labour** for the
+  teardown. Ripples to the build-cost representation (today a single Lua constant per type). → [A4]
+  Building management.
+
+These fold into the pending [A3] propagation (§ Documentation): § Trade, § Supply + `SUPPLY.md`,
+`PRODUCTION.md` (build-cost split) now also carry the Q&A refinements.
+
+### Follow-up (same session) — infrastructure gap + flag-2 scoping
+
+- **Logistics network is undesigned (new `~` Brief).** The convoy-mode model surfaced a real gap:
+  modes (land/sea/air/space) depend on infrastructure that has no design — roads, sea routes,
+  airfields, the launchpad/spaceport. Opened **`[B4 ~]` Logistics network & infrastructure model**
+  in OPENS § Infrastructure, with open notes added to `SYSTEMS.md` § Supply / § Infrastructure.
+- **Flag #2 scoping — no space gameplay; inter-body market is a feasibility probe.** Per the user:
+  we are **not scoping space gameplay** (no corp, no nation on Selene or any off-Earth body). The
+  inter-body work is a **minimal build of the market-to-market logic alone**, to test feasibility
+  vs. **data-creep** (markets/pools/convoys multiplying per body). The convoy-mode + infrastructure
+  richness is deliberately deferred ([B4 ~] above). Recorded as a **Prototype scope** note on the
+  [A4] inter-body markets Brief.
+
+## 2026-06-15 — v0.1.0 design-completion pass (OPENS only, branch v0.0.5)
+
+A design-only session (no `src/` change). Goal: complete the **design** of v0.1.0 by settling the
+design-owed (`~`) Briefs against the current docs/code state. Scoped to **`OPENS.md` only** — a
+second agent was reading the file concurrently, so the later additions were pure insertions and no
+authority doc was touched this session.
+
+### What changed (`OPENS.md` only)
+
+- **Settled ~13 design-owed Briefs `~`→`✓`**, capturing each design *inline in the Brief*:
+  - **Menu** — Corporation overview dashboard (4-block roll-up: money/holdings/production/alerts,
+    launcher links, floating window); nav-rail ordering rule (gameplay-loop grouping ruled
+    canonical, SYSTEMS tier as tie-break — open question closed).
+  - **Ledger** — decomposed the single *Market-lens-&-ledger family* Brief into **five discrete
+    Briefs** (economy-panel refit foundation, Market / Balance / Construction ledgers, Market lens
+    render pass); the former [F4] buildings-overview Brief was **absorbed** into the Construction
+    ledger. Settled the **lens-driven selection resolution** rule (specificity stack
+    *building→listing→tile→body* + a per-lens validity/routing table).
+  - **Trade** — preferential purchasing (matched price-time **order-book** model); inter-body
+    markets (divergence **via convoys**, no abstract coupling term).
+  - **Resources** — full-set deposit **scarcity** model (four bands keyed to rarity↔base-price,
+    affinity-gated, rare goods presence-gated).
+  - **Known Bug** — frame-stutter **measurement instrument** (a live frame-time HUD — the blocker
+    was the instrument, now designed); body-label stepping **fix** (accept + dot/label co-snap).
+- **Authored two net-new Briefs** for genuine done-definition gaps that had no Brief:
+  - **[S5 ✓] Supply routing — convoys (Layer 5)** under a new **§ Supply** — the layer had no
+    Brief, only the gated Supply-lens spec. Settled at prototype depth (convoy entity, per-unit
+    logistical cost, auto+player dispatch, 5-Brief decomposition). The largest remaining build (a
+    `5`; v0.0.7's whole theme).
+  - **[A4 ✓] Building management — functional recipe & workforce control** — the done-definition's
+    "recipe and workforce control" interaction half, previously only referenced by the [S5] index
+    and the disabled v0.0.5 scaffold stubs. Settled to live in the **tile Selection element**
+    (targeted action), with the broad Construction ledger linking to it.
+- **Added [A3 ✓] propagation Brief** (§ Documentation) with a doc map: because the session wrote
+  OPENS only, the normal `~`→`✓` *settle-into-the-authority-doc* step is **owed** as a follow-up.
+  Every settled Brief carries an inline "propagation tracked under § Documentation" pointer.
+- **Re-rated** along the way: inter-body markets and lens-driven selection lifted from `F` (they
+  serve the done-definition / ledger routing); tile-gen refinements pushed to `[F4]` with its deep
+  models (orbital derivation, tectonic plates) flagged **beyond the prototype**; the [S5] Layer-4
+  umbrella marked a fully-decomposed **index**.
+
+### Decisions
+
+- **Design captured inline in OPENS, not the authority docs** — forced by the OPENS-only +
+  concurrent-reader constraint, but also a deliberate review gate: the design direction is
+  reviewable in one place before it propagates. Tracked by the [A3] propagation Brief rather than
+  left implicit.
+- **Inter-body price coupling *is* the convoy** — no separate price-linkage term; a body's market
+  stays locally resolved and divergence/convergence is purely what logistics carry, net of cost.
+  Keeps the spatial-arbitrage signal honest and avoids a second, redundant coupling mechanism.
+- **Per-building control is a targeted action → Selection element, not a nav slot** — consistent
+  with menus-are-broad-ledgers; the Construction ledger stays a *read/overview* surface and links
+  out to the control.
+- **Stopped short of over-creating.** After a full done-definition sweep, only one hard gap existed
+  (recipe/workforce control). Era 1 access and save/load were surfaced as **scope questions**, not
+  pre-emptively authored; the user then ruled both **out of scope** (early playtest, no saves).
+
+### Open
+
+- **[A3] propagation** is the next documentation session — settle this pass's inline designs into
+  their authority docs (`MENU`, `LENSES`, `LAYOUT`, `SELECTION`, `SYSTEMS` §Trade/§Supply, a new
+  `SUPPLY.md`, `RESOURCES`, `TILE_GENERATION`, `SOLAR`) before any doc-changing publish.
+- Remaining `~` Briefs are the four `F`-priority, out-of-prototype items (golden-image diffing,
+  time-control rework, tile-gen deep models, nation behaviour) — no design owed for v0.1.0.
+
 ## 2026-06-15 — TODO → OPENS rename + Brief design-state model (branch v0.0.5)
 
 A backlog-structure session (no `src/` change). Renamed the backlog and gave every Brief an

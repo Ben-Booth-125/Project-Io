@@ -192,6 +192,29 @@ is active.
 price resolution**, neither implemented yet — no interim stub. When prices exist,
 build Circumplanetary summary and Planetary tint together.
 
+## Per-lens selection validity & routing (settled 2026-06-15, [F4])
+
+The active lens does not only re-skin the canvas — it also **defines what the pointer resolves
+to**. Each lens answers "what is the meaningful target under this pointer?" differently, so the
+same position resolves to a different entity (and routes to a different ledger) per lens. The
+Selection element walks the kind stack (SELECTION.md) and returns the first entity this lens calls
+valid:
+
+| Lens | Valid target under the pointer | Routes selection to |
+|---|---|---|
+| **none** | the lowest drawn entity (marker, else tile) | Tile Ledger |
+| **Corporation** | the **owning corporation** of the tile/building | Balance Ledger |
+| **Faction** | the **owning nation** of the tile | Nation ledger |
+| **Resource** | the tile's **deposit** profile | Tile Ledger (deposit detail) |
+| **Market** | the body's **market** / the listing under the pointer | Market Ledger |
+| **Supply** *(Layer 5)* | the **route segment / stockpile** under the pointer | (Supply surface) |
+
+A lens skips kinds it does not validate: under the Corporation lens a hovered *building* resolves
+*through* to its owning corporation, not to the building, because the corporation is the lens's
+unit of meaning. Under no lens that same building resolves to itself. This is the per-lens
+*validity* function the resolution rule consumes; the gating on data/geometry per lens (Market,
+Supply) applies here too — a lens whose data does not yet exist contributes no valid target.
+
 ## Resource lens *(settled — next to build; no data dependency)*
 
 **Intent.** Read the map as a *deposit-density surface*: where the body's mineral

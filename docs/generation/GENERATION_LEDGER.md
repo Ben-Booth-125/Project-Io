@@ -10,6 +10,13 @@ Design authority for the generator it inspects: [`TILE_GENERATION.md`](TILE_GENE
 design authority for the ledger itself; it is **design only** — nothing here is
 built yet.
 
+**Player-facing relation — the History slot.** The nav rail's **History** slot
+([`../ui/MENU.md`](../ui/MENU.md) § Menu set and ordering, slot 9) is the *player-facing*
+counterpart of this developer surface: it presents the **procedural generation as a
+number-crunch** plus **post-generation advisory** on the resource/workforce state, gated by
+exploration. This ledger (developer tuning) and the History slot (player advisory) likely share
+the same `generation_record` seam — see MENU.md for the History scope.
+
 See also: [`docs/ui/SELECTION.md`](../ui/SELECTION.md) and the deferred hover-card
 item in [`docs/development/OPENS.md`](../development/OPENS.md) — the per-tile breadcrumb
 is a natural section of a tile's rich card, so the content builder is shared (below).

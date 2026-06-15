@@ -48,7 +48,7 @@ building and managing them. Closing that gap is the spine of the road to v0.1.0.
 
 ## The road to v0.1.0
 
-Four minor versions, then the cut. Each is a single theme; v0.0.6 is the likely split point.
+Five minor versions, then the cut. Each is a single theme; v0.0.6 is the likely split point.
 
 ### v0.0.5 — Layer 4 foundations
 
@@ -82,6 +82,36 @@ running balance under competing pressure); the shared hover-card system; complet
 lens system; the menu vocabulary; and the standing known-bug and icon-consistency work. No new
 systems — this minor consolidates and hardens what Layers 4–5 built.
 
+### v0.0.9 — Code quality, performance & data-creep audit
+
+*Theme: prove it holds up before the cut.* No new systems — a dedicated pass to **measure and
+harden** what Layers 4–6 built, so v0.1.0 is cut on evidence rather than hope. Three things to
+assess, each with a rough target a non-specialist can read straight off an instrument:
+
+- **Frame budget (lag).** 60 FPS gives a **~16.7 ms** per-frame budget. The frame-time HUD (the
+  [B4] known-bug instrument in OPENS) reads last / avg / max ms plus the **1% lows** — the worst
+  1% of frames, which is what a player actually feels as a stutter. Rough targets: **avg < 8 ms,
+  max < 16.7 ms** while panning the dense Kepler grid (180×84 = 15,120 tiles). If max spikes, the
+  HUD's job is to say *why* — GPU present (vsync/compositor), draw-call volume (the immediate-mode
+  tile loop), or per-frame allocation churn.
+- **Econ-tick cost (scaling).** One economy tick should be invisible — **target well under 1 ms**
+  for the prototype world. Extend the existing `econ_stability` harness to print the tick time and
+  watch how it grows as bodies / corps / markets multiply. The thing to catch: a tick that grows
+  **faster than linearly** in (bodies × corps) — that is an algorithm quietly going quadratic.
+- **Data creep (the inter-body worry).** The concern flagged during the supply Q&A: structures
+  multiplying *per body* — the `(corp, body)` stockpile map, per-body markets, live convoys. Add
+  simple **counters** (entity count, pool entries, market entries, live convoys) and a **memory
+  readout** (RSS — the resident memory the process holds), then run the harness long (100 → 1000+
+  ticks): counts and memory should **plateau**, not climb without bound. A steady climb over a long
+  *idle* run is the signature of a leak or unbounded growth, and points straight at the structure
+  that is growing.
+
+Plus the cheap hygiene that needs no instrument: the build stays **warning-clean**, a **one-off
+static-analysis run** (cppcheck, or MSVC `/analyze`) read for genuine findings, and the headless
+harnesses kept green. None of this requires benchmarking expertise — it is reading three numbers
+off an instrument and checking they sit under a threshold. The detailed Briefs (what each
+instrument prints, the exact harness extensions) are settled in OPENS when this minor is designed.
+
 ### v0.1.0 — Cut the prototype
 
 *Theme: validate and release.* No new systems. A final verification pass against the
@@ -104,6 +134,8 @@ cut when all of the following hold:
   markets, balances, and construction legible at a glance.
 - The build is **green** and the loop is **verified** (headless economy/generation harnesses
   and visual capture checks).
+- **Performance and data growth hold** (the v0.0.9 audit): frame and econ-tick budgets met, and
+  counts/memory plateau over a long run rather than creeping.
 - Excluded throughout, by scope: Conflict, Research, Policy, and Diplomacy beyond the
   data-model stub.
 

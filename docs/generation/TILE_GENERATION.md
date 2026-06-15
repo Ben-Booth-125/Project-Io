@@ -305,7 +305,9 @@ Modifiers apply multiplicatively to the upper bound of the base range.
 
 ## Deferred
 
-The following are noted here as future work. None are in scope for the prototype.
+The following are noted here as future work. None are in scope for the prototype. **Each is a
+separate v0.2 pass** — design its model (the orbital-derivation formula, the plate model, the
+deposit-rarity profile) before promoting; do not take them as one Brief.
 
 **Solar parameter derivation.** In the prototype, `temperature_class`,
 `atmosphere_class`, and `geological_activity` are authored per body. A future

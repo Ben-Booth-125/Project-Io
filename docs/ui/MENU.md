@@ -44,29 +44,28 @@ slot (see `docs/development/OPENS.md` § Ledger / § Selection info element).
 
 ## Menu set and ordering (2026-06-15)
 
-> **⟳ Pending review (2026-06-15) — transient.** Defined the ten-slot menu set and its
-> gameplay-loop ordering ([B3]). The **ordering principle is gameplay-loop grouping** for now; a
-> low-priority Brief tracks settling a *canonical* ordering rule later (OPENS § Menu). The
-> **Corporation overview dashboard** (slot 1) is a new surface that still needs its own design
-> Brief. Remove this note once reviewed.
-
-The ten slots are derived from the game systems (`docs/SYSTEMS.md`), filtered through the
+The slots are derived from the game systems (`docs/SYSTEMS.md`), filtered through the
 **menus-are-broad-ledgers** rule above: each slot is a broad overview surface, never a targeted
-action. They are **grouped by gameplay loop** (not by SYSTEMS.md tier order — see open question
-below), with a thin visual separator between clusters:
+action. The **settled order is the curated player-facing sequence below** (2026-06-15, [C1] — a
+deliberate gameplay order, not strict SYSTEMS.md tier order). It is a **nine-slot rail**:
+Exploration drops off the rail (it routes to the Explorer surface, `EXPLORER.md`, rather than
+opening a ledger). The `tier-idx` column records each slot's position in the SYSTEMS.md tier
+list, so the curation is auditable.
 
-| # | Slot | System / source | Cluster |
+| # | Slot | tier-idx | System / source |
 |---|---|---|---|
-| 1 | **Corporation overview** (dashboard) | the player corporation at a glance | *anchor* |
-| 2 | **Balance Ledger** | Budget ([A4]) | **manage** |
-| 3 | **Construction / Buildings overview** | Infrastructure ([A4]/[F4]) | **manage** |
-| 4 | **Workforce / Population Ledger** | Workforce ([A4]) / Population ([S4]) | **manage** |
-| 5 | **Market Ledger** | Trade ([A4]) | **trade & world** |
-| 6 | **Tile Ledger** | Environment (exists; moves here from slot 8) | **trade & world** |
-| 7 | **Research** | Research | **strategy** |
-| 8 | **Policy** | Policy | **strategy** |
-| 9 | **Diplomacy** | Diplomacy | **strategy** |
-| 10 | **Exploration** | Exploration (may instead route to the Explorer surface, `EXPLORER.md`) | **strategy** |
+| 1 | **Corporation overview** (dashboard) | 0 | the player corporation at a glance |
+| 2 | **Budget** *(was Balance Ledger — scope Q&A)* | 2 | Budget ([A4]) |
+| 3 | **Workforce / Population Ledger** | 4 | Workforce ([A4]) / Population ([S4]) |
+| 4 | **Research** | 7 | Research |
+| 5 | **Market Ledger** | 1 | Trade ([A4]) |
+| 6 | **Construction / Buildings** *(identity Q&A — buildings folded out)* | 3 | Infrastructure |
+| 7 | **Corp. Strategy** *(was Policy — scope Q&A)* | 8 | Policy |
+| 8 | **Diplomacy** | 9 | Diplomacy |
+| 9 | **History** *(was Tile Ledger — scope Q&A)* | 6 | Environment |
+
+Three slots are **renamed from their source-ledger name**, each broadening scope (Budget,
+Corp. Strategy, History); those scope changes are settled in a Q&A and recorded per-slot below.
 
 Notes on the mapping:
 
@@ -74,20 +73,55 @@ Notes on the mapping:
   Market and Tile ledgers; Supply (Layer 5 logistics) folds into Construction/Market when it
   exists; Conflict has no broad ledger yet. The rail scales with *systems that have a broad
   surface*, per the menus-are-broad-ledgers rule.
-- **Slot 1 — Corporation overview dashboard.** A top-level roll-up (balance, holdings, alerts)
-  above the per-system ledgers. It is a **new surface needing its own design** before
-  implementation — tracked as a Brief under OPENS § Menu.
-- **Layer-4 ledgers** (slots 2–6) are the near-term build (the [A4] ledger family); slots 7–10
-  are reserved placeholders until their systems land, following the *ledgers-start-closed* and
+- **Slot 1 — Corporation overview dashboard (design settled 2026-06-15, [B3]).** A top-level
+  roll-up opened as a **floating window** (consistent with the ledger family; no permanent chrome
+  cost). The MVP surfaces four roll-ups: **balance + last-tick delta**, a **holdings roll-up**
+  (building count / bodies present — this is where the player reads *their own* buildings; see
+  the buildings note below), **workforce contention**, and **alerts** (idle buildings, unsold
+  output, negative cashflow — note this introduces an *alert* concept). A **fuller dashboard
+  design pass is flagged for v0.1.1** — the four roll-ups are the MVP set, not the final
+  composition. Its lines are intended to **click through** into the relevant per-system ledger.
+
+- **Buildings have no dedicated ledger (settled 2026-06-15, [F4]).** A standalone buildings
+  overview proved more "good to know" than goal-driving, so it is **dropped as a reserved slot**.
+  Buildings are read in the two places a player cares about them: **own buildings** ("good for
+  me") in the **Corporation overview dashboard** (slot 1, the holdings roll-up); **competitors'
+  buildings** ("competition") in the **Market Ledger**. This collapses the old slot-3
+  "Construction / Buildings overview" — the slot table above predates this call and is reconciled
+  in the pending **nav-rail ordering** pass (OPENS § Menu); construction *in progress* still needs
+  a home, folded into the dashboard/market surfaces rather than its own ledger.
+- **Layer-4 ledgers** are the near-term build (the [A4] ledger family — Budget, Workforce,
+  Market, and the Corporation dashboard); the strategy slots (Corp. Strategy, Diplomacy) are
+  reserved placeholders until their systems land, following the *ledgers-start-closed* and
   reserved-placeholder conventions above.
+- **Scope-changing renames (settled by Q&A 2026-06-15).**
+  — **Budget** (slot 2, was Balance Ledger): broadens to the full **Budget-system** surface —
+    income vs expenditure broken down (sales, input purchases, maintenance, wages) **plus budget
+    allocation** across research / military / workforce contracts, not just the running balance.
+    Supersedes the [A4] "Balance Ledger" framing: same money-loop data, wider remit.
+  — **Corp. Strategy** (slot 7, was Policy): broadens Policy into a **standing-strategy** surface
+    — the player's "laws" / pre-set options, with **wage levels** and **military posture** the
+    archetypal levers, and **possibly a goal / quest system** later. Scope deliberately left
+    **open** beyond the standing-rules core.
+  — **History** (slot 9, was Tile Ledger): **generation history**, not a live event log. For
+    v0.1.0 it surfaces the **procedural generation as a number-crunch** — the world as generated.
+    It also gives **post-generation advisory** detail: reading the state of resources and
+    workforce after generation and approaching *advice* from it. **Gated by exploration** (you
+    see the history of what you have explored) but a **distinct informational set**. Closely
+    relates to the **Generation Ledger** (`../generation/GENERATION_LEDGER.md`) — likely the same
+    rail surface. **Open note:** lengthen the pre-game generation phase and design how that
+    history is *presented*; per-tile environment inspection moves to the tile Selection element.
+  — **Construction / Buildings** (slot 6): **construction-in-progress only** — a build-queue /
+    progress surface (what is being built, its cost and progress). Own-building *inventory* stays
+    in the dashboard holdings roll-up; this slot is the *active construction* view (the
+    Construction Ledger of the [A4] family).
 
 ## Open questions
 
-- **Canonical ordering rule (low priority).** The current order is *gameplay-loop grouping*; a
-  canonical, self-documenting rule (e.g. strict SYSTEMS.md tier order) is deferred. Tracked as a
-  low-priority Brief under OPENS § Menu.
 - Whether all menus open floating windows, or some become docked/persistent panels.
-- Relationship to the explorer (`EXPLORER.md`) — the pane is fixed navigation; the explorer is curated navigation. Slot 10 (Exploration) may route to it rather than open a ledger.
+- Relationship to the explorer (`EXPLORER.md`) — the pane is fixed navigation; the explorer is
+  curated navigation. **Exploration is off the rail** (slot dropped) and routes to the Explorer
+  surface rather than opening a ledger.
 
 ## Related
 

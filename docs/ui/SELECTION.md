@@ -145,6 +145,51 @@ caller, the *content* does not.
 
 ---
 
+## Lens-driven hover & selection resolution (settled 2026-06-15, [F4])
+
+A single pointer position overlaps a **stack** of entities — a building sits *on* a tile sits *on*
+a body. Both Focus (hover) and Selection (click) resolve that stack to exactly one entity. The
+rule has two parts: a fixed stack order, and a lens-evaluated validity filter over it.
+
+**The kind stack (most-specific → least).** At a pointer position the candidate entities are
+ordered:
+
+```
+building → market → unit  →  tile  →  body
+```
+
+(the marker kinds first, then the tile they occupy, then the body that hosts it). "Lowest" means
+**most-specific** — earliest in that order.
+
+**Lowest *valid* entity.** Resolution walks the stack from most-specific and returns the **first
+entity the active lens deems valid**. Validity is not fixed: it is **the active lens's question**
+(§ Per-lens validity in LENSES.md). With **no lens** every drawn kind is valid, so resolution
+returns the literal lowest entity (a building over a tile resolves to the building; bare terrain
+resolves to the tile). Under a lens, kinds the lens does not care about are *skipped*, so the same
+pointer position can resolve to a **different entity per lens**.
+
+**The lens names the ledger the selection drives.** Resolving the entity and choosing its 'go to'
+ledger are the *same* decision — the lens that validates the entity also routes it:
+
+| Active lens | Resolves to | 'Go to' / routes to |
+|---|---|---|
+| **none** (terrain) | the tile (or the lowest drawn marker on it) | Tile Ledger |
+| **Corporation** | the owning **corporation** of the hovered tile/building | Balance Ledger |
+| **Resource** | the hovered tile's **deposit** | Tile Ledger (deposit detail) |
+| **Market** | the body's **market** / listing | Market Ledger |
+| **Faction** | the owning **nation** | Nation ledger |
+| **Supply** *(Layer 5)* | the **route / stockpile** under the pointer | (Supply surface, when it exists) |
+
+This couples the Selection element's Focus state to the lens system (LENSES.md) and the ledger
+family (OPENS § Ledger): the 'go to' dispatch seam (`focus_on_entity`) is unchanged — the lens
+only changes *which entity id and which target* are handed to it. The same dispatch carries the
+non-spatial 'go to' routing (nation/corporation → ledger) already specified above.
+
+**Wiring order.** This is the design rule; it lands once its prerequisites exist — canvas
+hit-testing for the marker kinds (§ Open questions below) and the per-lens ledgers (the [A4]
+family). Until then the rule is dormant: with no lens and no marker hit-testing, resolution
+degrades to today's tile/body behaviour, which is the `none`-lens row above.
+
 ## Open questions / deferred
 
 - **Multi-select.** Out of scope; the model is single-selection. A future

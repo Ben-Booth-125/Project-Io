@@ -66,10 +66,32 @@ play continues between updates.
 These constants are authored in `src/core/sim_loop.hpp`; the speed-multiplier curve above is the
 settled mapping.
 
+## Production clock view (settled 2026-06-15, [F3])
+
+The prototype two-column layout is provisional; the **production design** is settled to what the
+player actually needs from the clock at a glance, in priority order:
+
+1. **Where we are** — year + quarter (the strategic unit), then month + day (the fine unit).
+2. **When the economy next resolves** — the econ tick is the load-bearing beat, so it is surfaced
+   **explicitly**, not left implicit in the progress bar. The calendar block carries a **days-until
+   -next-quarter countdown** (e.g. `Q2 in 47d`) beside the quarter-progress fill, so the player
+   reads both the analogue fill and the digital count. The progress bar keeps its clean overlay
+   -less fill ([C2]); the countdown is the worded companion.
+3. **How fast** — the current speed (the 1–5 curve above) and pause state.
+
+**Keyboard shortcuts (settled).** `Space` toggles pause/resume; `1`–`5` set the speed multiplier,
+mirroring the on-screen buttons. These route through the shared canvas-command vocabulary
+(`canvas_command`) so they read as key bindings, consistent with the canvas keyboard model
+(CANVASES.md § Keyboard).
+
+The panel's relationship to the rest of the shell chrome is unchanged — it stays the top-right
+clock aligned to the minimap width (LAYOUT.md). The two-column split is an implementation
+detail free to change when this is built; the *content* above is the settled requirement.
+
 ## Open questions
 
-- Whether pause and speed gain keyboard shortcuts.
-- Surfacing the economy-tick countdown (how long until the next quarter resolves).
+- Production polish only: exact countdown phrasing and whether to show the absolute next-quarter
+  date alongside the relative count.
 
 ## Related
 
