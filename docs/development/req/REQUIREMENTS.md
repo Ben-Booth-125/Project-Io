@@ -111,6 +111,21 @@ Permanent record of resolved requirement groups, newest first. Each carries a
 `Resolved:` line and is retained verbatim; re-promote by copying a section back up to
 **Active requirements**.
 
+### player-sell-orders
+
+Resolved: 2026-06-15 — complete, all rows met. Promoted from TODO § Trade —
+**[A3] Player-driven sell orders & preferential purchasing**. The **sell-orders** half is
+done; **preferential purchasing** is split out as its own deferred Brief (it needs a matched
+order-book the anonymous pooled clearing lacks). Verified via `tools/verify/econ_harness`
+(SO.1–3) and a clean `ProjectIo` Debug build.
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | `sell_order` is storable as player game-state (`ui_state.sell_orders`) and passed to `clear_markets` each tick. | `build` | complete | moved to components.hpp; wired in `app::step_economy` |
+| R2 | A standing player sell order sells up to its quantity from the (corp, body) pool, valued at `max(resolved_price, floor_price)`. | `headless` | complete | SO.2 |
+| R3 | The auto-surplus path yields a resource the player has a standing order for (manual control overrides the greedy auto-sell). | `headless` | complete | SO.2/SO.3 (order sells, pool debited) |
+| R4 | The building-management UI authors orders (resource / quantity / floor) on the in-view body and lists/removes them. | `build` | complete | `draw_sell_orders_section` |
+
 ### build-front-door
 
 Resolved: 2026-06-15 — complete, all rows met. Promoted from TODO § Selection info element —

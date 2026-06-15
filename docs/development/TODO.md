@@ -379,11 +379,17 @@ price resolution has now landed; **inter-body trade stays open**. Markets are a 
 exchange, **distinct from corp stockpile pools**. Design authority `docs/SYSTEMS.md` § Trade,
 `docs/economy/RESOURCES.md`.
 
-- **[A3] Player-driven sell orders & preferential purchasing.** Build out the manual
-  side of the market the framework hook stubs: player-authored sell orders (what / how much /
-  floor price) and **preferential purchasing** (choosing counterparties rather than the flat
-  auto-buy). Surfaced in the Layer 4 building-management UI. Depends on market clearing (the
-  `sell_order` hook already exists in `market_clearing.{hpp,cpp}`).
+- **[B4] Preferential purchasing (choosing counterparties).** Split from the sell-orders
+  Brief (the **sell-orders** half landed 2026-06-15: `ui_state.sell_orders` authored from the
+  building-management panel, honoured at clearing with a floor price, the auto path yielding
+  player-controlled resources — see DEVLOG / REQUIREMENTS § player-sell-orders). What remains is
+  letting the buyer **choose counterparties** rather than the flat anonymous auto-buy. **Blocked
+  on architecture:** `clear_markets` is an *anonymous pooled* exchange — supply and demand
+  aggregate per resource and clear at one resolved price, with no per-seller matching. Preferential
+  purchasing needs a **matched order book** (buyers see and pick sellers), which is a clearing
+  restructure that couples to the Market Ledger family (§ Ledger) and to Supply/logistics (Layer 5,
+  who you *can* reach). Design the matching model before promoting. Touches
+  `src/world/market_clearing.{hpp,cpp}`; authority `docs/SYSTEMS.md` § Trade.
 
 - **[F4] Inter-body / international markets (deferred).** Cross-body price linkage and trade
   between bodies — each body's market currently resolves in isolation. Out of Layer 3/4 scope;

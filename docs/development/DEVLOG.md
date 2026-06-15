@@ -6,6 +6,41 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## 2026-06-15 — >C Brief pass, Wave 1.3: Player sell orders (branch v0.0.5)
+
+Layer 4 core code Brief — **[A3] Player-driven sell orders & preferential purchasing**, the
+sell-orders half. The `sell_order` clearing hook already existed (floor-price honoured); this
+Brief made it usable.
+
+### What was built
+
+- **`sell_order` moved to `components.hpp`** so both `ui_state` and `clear_markets` can name it
+  without an include cycle; the Layer 3 "framework hook" comments removed.
+- **`ui_state.sell_orders`** — standing player orders as game-intent, passed to `clear_markets`
+  by `app::step_economy`.
+- **Auto path yields to player control** (`market_clearing.cpp`): a (corp, body, resource) with a
+  standing order is skipped by the greedy auto-surplus sell, so the player's order (and its floor)
+  governs that resource — otherwise the auto path would dump the stock at market price first.
+- **Authoring UI** (`construction_panel.cpp` § Sell orders): lists the player's orders on the
+  in-view body with a remove, and a form (resource combo over traded goods + quantity + floor +
+  add). Replaced the old disabled "Create sell order" stub.
+- **Harness** (`econ_harness.cpp`): SO.1–3 — price floors+eases to 5.0; a qty-10 floor-6 order
+  sells all 10 at max(5,6)=6 (income 60); pool debited.
+
+### Decisions
+
+- **Preferential purchasing split out + deferred** — true counterparty choice needs a *matched
+  order book*; the prototype clearing is an *anonymous pooled* exchange (aggregate supply/demand,
+  one resolved price, no per-seller matching). Carved into its own `[B4]` Brief (TODO § Trade) with
+  the architectural blocker recorded, rather than forced into the pooled model.
+
+### Status
+
+Complete — 4/4 requirements met (REQUIREMENTS § player-sell-orders). Verified via
+`tools/verify/econ_harness` (SO.1–3 + all prior assertions) and a clean `ProjectIo` Debug build.
+
+---
+
 ## 2026-06-15 — >C Brief pass, Wave 1.2 + design wave (branch v0.0.5)
 
 Continued the priority `> C` pass. One Layer 4 core code Brief in the main session, three
