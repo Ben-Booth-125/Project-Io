@@ -51,6 +51,9 @@ A task group that could not be driven to *complete* in one working block and is 
 **Paused (task state)**
 A task group deliberately stopped at a session boundary before completion, as a scoping choice rather than a failure. Unlike *cancelled*, a paused group stays in `TASKS.md` for the next session to resume; it is legitimate only when the stop is **clean and resumable** — `TASKS.md` is true to state (the in-flight task marked as the resume point), the build is green or the breakage is noted, and a one-line handoff records where to resume. A paused group is an explicit, recorded intermission, not a terminal state. See `docs/development/TASKS.md` (§ Pausing a task group) and `CLAUDE.md` (§ Proportionality and session boundaries).
 
+**Cut (release process)**
+The ritual of finalising a version: merge the working branch into `main`, snapshot `src/` to a local `backups/vX.Y.Z/`, stamp `CHANGELOG.md` and the README "Latest release" line, commit, apply an annotated git tag (`vX.Y.Z`), and push with `--follow-tags`. The **tag** is the authoritative version-history record; the local backup is a convenience rollback point, not the record. "Cutting v0.0.5." See `docs/development/DEVELOPMENT_PRACTICES.md` (§ Cutting a release).
+
 **Era**
 A named phase in the game's industrial arc, defined by the accessible territory, available buildings, and dominant strategic challenge. The game begins in **Era 0** (Terrestrial) and transitions to **Era 1** (Early Space) by meeting an explicit gate condition. See `docs/economy/ERAS.md`.
 

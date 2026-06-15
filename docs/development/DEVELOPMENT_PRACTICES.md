@@ -169,6 +169,28 @@ ImGui panel code is an exception — brief section comments are encouraged there
 
 ---
 
+## Cutting a release
+
+A **Cut** finalises a version. Replaces the old versioned-backup scheme: the authoritative
+record is now an annotated git tag (`vX.Y.Z`), recoverable forever with `git checkout vX.Y.Z`;
+the local `backups/vX.Y.Z/` snapshot is kept only as a convenience and is gitignored.
+
+Work starts on a `feature/*` branch. To cut version `vX.Y.Z`:
+
+1. **Finalize** — build green; fill the `[Unreleased]` section of `CHANGELOG.md`; pick the version.
+2. **Merge** the working branch into `main` locally.
+3. **Backup** — copy `src/` to `backups/vX.Y.Z/` (local-only, gitignored — belt-and-braces).
+4. **Stamp** — move `CHANGELOG.md`'s `[Unreleased]` entries under `## [vX.Y.Z] — <date>`, refresh
+   its compare links, and update the README "Latest release" summary.
+5. **Commit** the stamp on `main`.
+6. **Tag** — `git tag -a vX.Y.Z -m "<one-line summary>"` on that commit. *This is the version history.*
+7. **Push** — `git push origin main --follow-tags` (pushes the commit and its tag together).
+8. **(optional)** `gh release create vX.Y.Z --notes-file -` with the changelog section for a
+   browsable GitHub release page.
+
+Tags are the source of truth — no `previous`/`stable` branch is maintained. Every released
+version is reachable by its tag, not just the most recent one.
+
 ## Lua files
 
 Data definition files in Lua follow the same spirit as the C++ standards:
