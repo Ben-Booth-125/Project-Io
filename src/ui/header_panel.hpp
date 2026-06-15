@@ -1,19 +1,34 @@
 #pragma once
 
+#include "world/world.hpp"
+
+#include <vector>
+
 namespace ui {
 
-/// Draw the budget + resource overview header.
+/// Draw the player's persistent financial header strip.
 ///
 /// A full-width strip across the top of the canvas area, between the profile
-/// (top-left) and the time column (top-right). It is the player's persistent
-/// financial and material dashboard: the treasury balance and a deliberately
-/// scarce strip of headline stockpiles. Layer 2 is a placeholder showing
-/// zeroed figures — the values are not yet wired to the economy. See
-/// docs/ui/HEADER.md.
+/// (top-left) and the time column (top-right). It is the player's glanceable
+/// financial dashboard — always visible, never opened or closed. It surfaces the
+/// three figures the player needs without opening a ledger (see docs/ui/HEADER.md):
+///   - the player corporation's running **balance** (negatives flagged red);
+///   - an **estimated stockpile valuation** — the player's `(corp, body)` pools
+///     summed at each body's market price;
+///   - the **last-tick net** change as a coloured per-quarter figure plus a
+///     sparkline of recent balances.
 ///
-/// @param left  Left edge of the strip (clear of the navigation pane).
-/// @param right Right edge of the strip (clear of the time column).
-void draw_header_panel(float left, float right);
+/// Detail lives in the ledgers; this stays a summary surface.
+///
+/// @param w               Read-only world (player corporation, pools, markets).
+/// @param balance_history Recent player balances, oldest→newest, one per economy
+///                        tick; drives the net figure and the sparkline.
+/// @param left            Left edge of the strip (clear of the navigation pane).
+/// @param right           Right edge of the strip (clear of the time column).
+void draw_header_panel(const world& w,
+                       const std::vector<float>& balance_history,
+                       float left,
+                       float right);
 
 /// Height of the header strip in pixels.
 inline constexpr float header_panel_height = 52.0f;

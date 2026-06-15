@@ -10,6 +10,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 /// Top-level application object. Owns the SDL window and renderer, orchestrates
 /// the simulation and economy loops, and holds the Lua state for the lifetime
@@ -83,6 +84,7 @@ private:
     recipe_registry m_registry;          ///< Recipes + economy constants, loaded from Lua at startup.
     economy_report  m_last_econ_report;  ///< Most recent economy-step report; read by the economy panel.
     uint64_t        m_last_econ_tick = 0; ///< econ_tick() at the previous step; drives the boundary detection in run().
+    std::vector<float> m_balance_history;  ///< Recent player balances (one per econ tick, capped); feeds the header net + sparkline.
 
     bool        m_capture_requested = false; ///< Set by F12 / capture_frame, consumed in render().
     std::string m_capture_name;              ///< Base name for the next capture; empty = timestamped (F12).

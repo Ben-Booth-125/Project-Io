@@ -118,6 +118,17 @@ int app::run()
     setup_world();
     load_economy();
 
+    // Pre-game warm start: seed the balance history with the opening capital, then
+    // run the economy a couple of ticks before the first frame so the player opens
+    // onto non-empty pools, moved balances, and live market figures rather than a
+    // cold zero state (TODO § Corporation generation — pre-game economy ticks).
+    {
+        const auto pit = m_world.corporations.find(m_world.player_entity);
+        m_balance_history.push_back(pit != m_world.corporations.end() ? pit->second.balance : 0.0f);
+    }
+    step_economy();
+    step_economy();
+
     bool running = true;
     while (running)
     {
@@ -164,6 +175,16 @@ void app::step_economy()
     m_last_econ_report = run_economy_step(m_world, m_registry);
     auto flows = clear_markets(m_world, m_registry, m_last_econ_report);
     apply_budget(m_world, m_registry, flows);
+
+    // Record the player's post-tick balance for the header net figure + sparkline.
+    // Capped so the buffer stays small; the sparkline shows the most recent window.
+    {
+        const auto cit = m_world.corporations.find(m_world.player_entity);
+        m_balance_history.push_back(cit != m_world.corporations.end() ? cit->second.balance : 0.0f);
+        constexpr std::size_t max_history = 64;
+        if (m_balance_history.size() > max_history)
+            m_balance_history.erase(m_balance_history.begin());
+    }
 }
 
 void app::setup_world()
@@ -649,7 +670,7 @@ void app::render()
     {
         const float header_left  = ui::profile_panel_width;
         const float header_right = (disp.x - margin - tick_w) - margin;
-        ui::draw_header_panel(header_left, header_right);
+        ui::draw_header_panel(m_world, m_balance_history, header_left, header_right);
     }
 
     // Explorer — right edge, between the time panel and the minimap.
