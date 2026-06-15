@@ -60,9 +60,6 @@ tile across the water** (by Chebyshev grid distance; ties break to the lower nat
 then the lower tile index). After this pass every non-ocean land tile on the body belongs to
 a nation — there are no unclaimed islands.
 
-> ⟳ Added 2026-06-15 (Brief C2): documents the new orphan-island post-pass landed in
-> `nation_generation.cpp`. Pending user review.
-
 ### Pass 3 — Resource profile derivation
 
 Each nation's resource profile is computed by summing the deposit profiles of its tiles,

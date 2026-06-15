@@ -6,6 +6,58 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## 2026-06-16 — v0.1.0 Session 2 open: S1 doc-review + substrate design Q&A (branch v0.0.5)
+
+Opening of **Session 2 (the lens batch)**. Started with the carried-over housekeeping: the three
+Session-1 doc-review `S1` reminders parked in OPENS § Documentation, each carrying a transient
+`> ⟳` "pending review" note. Ran a review Q&A on all three.
+
+### S1 doc-review outcomes
+
+- **NATION_GENERATION § Pass 2b (orphan-island post-pass)** — **accepted as written**; whole-component
+  assignment to the nearest claimed land across water (Chebyshev; tie → lower nation index, then lower
+  tile index) confirmed sound. `⟳` note removed.
+- **CORPORATION_GENERATION § Pass 3 (lean holdings ranges)** — **accepted as written**; the per-focus
+  ranges (extraction 3–4 / processing 2–3 / trade 1–2) and retained anchor + nearest-tile clustering
+  confirmed. `⟳` note removed.
+- **GENERATION_STRATEGY substrate forward pointer** — **accepted**, but the user chose to **open a
+  design Q&A to settle the [B4 ~] substrate-generation Brief** rather than just rubber-stamp the
+  pointer. `⟳` note removed after that Q&A (a formal Q&A is itself the review, per
+  DEVELOPMENT_PRACTICES § Design-direction Q&A); the pointer text updated to the settled direction.
+
+### Design-direction Q&A — [B4 ~] saturated nation-owned substrate
+
+A scope addition beyond the Session-2 handoff (which had parked B4 for a later design pass), taken at
+the user's request. **Documentation only — no code this session.** Settled to a **best-guess primary
+direction**, with the speculative parts kept as open notes in the Brief (OPENS § Environment →
+§ Cross-cutting):
+
+- **Form:** per-tile **industry/productivity field** → **per-(nation, body) market aggregate**. No
+  background-building entities (sidesteps the inter-body data-creep worry).
+- **Generation:** field **consumes shared tile building-slots + resources** (saturation is a real
+  shared budget, not a cosmetic tint). **Leading approach (open):** the user's population-seeded
+  ripple — manufacturing dense at population centres, weakening outward.
+- **Market coupling:** **both supply and demand** into the per-body markets (liquidity both ways).
+- **Dynamic, not static:** grows into **unsaturated, resource-available** tiles over Ticks, gated by
+  **resource discovery & research**; avoids already-saturated tiles.
+- **Player interaction:** **competitive** — the player can displace / buy out substrate-occupied
+  slots, converting background capacity into managed holdings (kept as *reclaiming slots*, not new
+  managed detail).
+- **Visibility:** **map-lens overlay** (industry density); final visual treatment **the user will
+  personally flag for v0.2.0**.
+- **Open notes recorded:** generation home (population sub-pass vs. standalone), dynamic growth model,
+  slot/capacity budget split (the displacement seam), lens treatment, and a suggestion to seed the
+  field from **population × deposit profile** as a single source the lens/markets/displacement share.
+
+### Open / next
+
+Housekeeping complete; tree carries doc-only edits (NATION_GENERATION, CORPORATION_GENERATION,
+GENERATION_STRATEGY, OPENS, DEVLOG). Next per the plan: the **lens batch** — [B3] Resource lens then
+[B3] Market lens, strictly serial on the shared `ui_state` / `overlay` / `body_surface_canvas` files,
+golden-verifiable against the Session-1 references.
+
+---
+
 ## 2026-06-15 — v0.1.0 publish plan Session 1: verification + world-gen foundation (branch v0.0.5)
 
 First execution session of the ROADMAP near-term publish plan (§ Session 1). A **Batch Publish**

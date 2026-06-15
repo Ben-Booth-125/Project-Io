@@ -96,9 +96,6 @@ not a broad presence across the nation.
 Placement is collision-checked against already-placed assets from other corporations.
 No two corporations begin on the same tile.
 
-> ⟳ Updated 2026-06-15 (Brief B4): fixed the concrete per-focus holdings ranges (3–4 / 2–3 /
-> 1–2) and recorded that the anchor + nearest-tile clustering is retained. Pending user review.
-
 ### Pass 4 — Financial profile
 
 Each corporation receives starting capital drawn from a seeded range. A tunable

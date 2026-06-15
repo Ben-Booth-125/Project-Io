@@ -68,8 +68,8 @@ owning doc's § Open items.
   read as a plausible pathway toward off-world reach rather than an arbitrary mix.
 - **Generating the saturated substrate.** The economic premise (above) says the Nation AI owns the
   broad background industry, but that substrate is currently *described, not generated* — so the
-  world does not yet read as saturated. How it is represented and generated (productivity field /
-  background buildings / economic aggregate) is **design-owed**; see OPENS § Environment
-  → § Cross-cutting **[B4 ~] Generate the saturated nation-owned background substrate**.
-
-> ⟳ Added 2026-06-15 (B4 Q&A): forward pointer to the new substrate-generation Brief. Pending user review.
+  world does not yet read as saturated. The representation is now settled to a **best-guess primary
+  direction** (a per-tile industry/productivity field that consumes shared tile building-slots +
+  resources, aggregated into the per-body markets on both supply and demand, surfaced as a map-lens
+  overlay, and player-displaceable) with residual sub-design left as open notes; see OPENS
+  § Environment → § Cross-cutting **[B4 ~] Generate the saturated nation-owned background substrate**.
