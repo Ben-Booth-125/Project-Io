@@ -120,16 +120,21 @@ int app::run()
     setup_world();
     load_economy();
 
-    // Pre-game warm start: seed the balance history with the opening capital, then
-    // run the economy a couple of ticks before the first frame so the player opens
-    // onto non-empty pools, moved balances, and live market figures rather than a
-    // cold zero state (TODO § Corporation generation — pre-game economy ticks).
+    // Pre-game warm start ([C3] pre-game profit): seed the balance history with the
+    // opening capital, then run the real economy loop forward a notional operating
+    // history before the first frame, so every corp opens onto non-empty pools,
+    // moved balances, and live market figures rather than a cold zero state. Run
+    // here (after load_economy) so it reuses the loaded registry rather than a
+    // duplicated one; run_verify stays deterministically cold and does not warm up.
+    // ~3 in-game years of quarterly econ ticks — long enough for a plausible history,
+    // short enough not to diverge under the prototype's un-tuned economy.
+    constexpr int pre_game_ticks = 12;
     {
         const auto pit = m_world.corporations.find(m_world.player_entity);
         m_balance_history.push_back(pit != m_world.corporations.end() ? pit->second.balance : 0.0f);
     }
-    step_economy();
-    step_economy();
+    for (int t = 0; t < pre_game_ticks; ++t)
+        step_economy();
 
     bool running = true;
     while (running)
