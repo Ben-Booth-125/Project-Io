@@ -88,6 +88,12 @@ discipline** a lone Publish does not:
   recorded with the session in the DEVLOG (see `docs/development/DEVELOPMENT_PRACTICES.md`
   § Design-direction Q&A). Skipped for a batch that surfaced nothing worth asking.
 
+A Batch Publish is a **publishing *strategy*, not a code-sprint**: collision mapping (which file
+write-sets may fan out vs. stay serial) and **session boundaries as checkpoints** (a large set is
+*paused* at a clean, resumable boundary rather than forced to complete — TASKS.md § Pausing a task
+group) are first-class parts of it, not afterthoughts. When a set spans more than one work block,
+the standing slice plan is `docs/development/ROADMAP.md` § Near-term publish plan.
+
 Distinct from a single-Brief **Publish**, which carries no batch-level doc-coverage step. See
 `docs/development/OPENS.md` § Publish and `CLAUDE.md` § Publication pipeline.
 

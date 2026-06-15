@@ -141,3 +141,107 @@ cut when all of the following hold:
 
 When these hold, the prototype has validated what it set out to validate, and v0.1.0 is the
 milestone that says so.
+
+---
+
+## Near-term publish plan — sequencing the unblocked backlog
+
+The milestone map above is **theme-level** and deliberately Brief-free. This section is the
+**operational layer beneath it**: how the *currently-unblocked* Briefs in [`OPENS.md`](OPENS.md)
+are sliced into work sessions and published. It names Briefs (which the map above does not) but
+**does not duplicate their design** — each Brief's detail stays in OPENS; this is only the
+*sequencing*. Treat it as the standing reference a session opens with, and update the slice list
+as sessions complete. *(If it churns enough to feel out of place inside the lean roadmap, graduate
+it to its own `PUBLISH_PLAN.md` and cross-link — for now it lives here so there is one place to
+look.)*
+
+### Batch Publish is a strategy, not a code-sprint
+
+A **Batch Publish** ([`../GLOSSARY.md`](../GLOSSARY.md)) is the whole *process* of moving many
+Briefs from intent to committed code — **collision mapping, checkpoints, and session boundaries
+included** — not just "write a lot of code." Its load-bearing parts:
+
+- **Barrier semantics** — the set advances breadth-first; every Brief clears a Publish step
+  before any starts the next (OPENS § Publishing multiple Briefs together).
+- **Collision mapping** — the file write-sets that decide what can fan out and what stays serial
+  (built *per session*, not frozen here — see below).
+- **Session boundaries as checkpoints** — a large set is **paused** at a clean, resumable
+  boundary rather than forced to complete (TASKS.md § Pausing a task group). The slices below
+  *are* those boundaries.
+
+### Cross-cutting rules (read once, apply every session)
+
+- **Golden-image diffing lands first.** Until the F3 golden-image Brief lands, every `visual`
+  check is **eyeball-only** — a Brief can pass with a hidden bug. Publishing F3 first upgrades
+  every later visual check to automated pass/fail, so it pays back across the whole plan. This is
+  the real lever against silent bugs — **not** more frequent builds.
+- **Build per commit, not per wave.** One commit per Brief already means a green tree at each
+  commit. The only *extra* build worth inserting is right after editing a shared/integration file
+  (`app.cpp`, `ui_state.hpp`, `overlay.cpp`). A green build proves it *links*, not that it is
+  *correct* — correctness rides on the requirement verification, not the compiler.
+- **Fan-out is rare here.** Most unblocked work is UI and **collides on shared files**, so it
+  serialises in the main session. The DEVLOG bears this out: even the disjoint 8-Brief Layer 3 set
+  ran sequentially. Reach for sub-agents only where file scopes are genuinely disjoint (the
+  world-gen fixes; the self-contained harness).
+- **Hotspot files** (perennial collision points — plan around them, keep single-writer in the
+  main session): `body_surface_canvas.cpp` (border + Resource lens + Market lens + hover-card),
+  `icons.{hpp,cpp}` (every icon Brief), `app.cpp`, `ui_state.hpp`, `overlay.cpp`.
+
+### The sessions
+
+Ordered; each is a clean checkpoint. A session may itself pause mid-slice if context drifts.
+
+**Session 1 — verification + world-gen foundation.** *Lay the safety net; take the one clean
+fan-out.*
+- F3 golden-image harness (`png_writer`, `app.cpp`, the `verifier-visual` skill) — **first,
+  alone.**
+- Then fan out the two disjoint world-gen fixes: C2 orphan-island (`nation_generation.cpp`) ∥ B4
+  corp starting-holdings (`corporation_generation.cpp`) — disjoint files, both with headless
+  audits. The one place sub-agents earn their cost.
+
+**Session 2 — the lens batch.** *The two unblocked overlay modes, now golden-verifiable.*
+- B3 Resource lens → B3 Market lens. **Serial** — both write `ui_state.hpp`, `overlay.cpp`,
+  `body_surface_canvas.cpp`. Verify against Session-1 goldens. (Fold B3 hover-card in here if
+  taken early — same hotspot file.)
+
+**Session 3 — UI polish (serial, main session).** *Clear the cheap unblocked polish.*
+- Icons together (C2 collisions + C2 conventions — same files) → C2 icon audit → C2 reference
+  distances → C2 time-speed curve → F3 clarify time-control → C2 tile-ledger default → C1 border
+  recolour. All serial on shared files; build at each commit.
+
+**Session 4 — L4 ledger foundation.** *De-risk v0.0.6 without entering it.*
+- A3 economy-panel refit (`economy_panel.{hpp,cpp}`) — **alone.** It is the convention reference
+  the v0.0.6 ledger family lifts from; landing it now is foundation, but the rest of that family
+  stays in v0.0.6.
+
+### Roadmap note — this pulls v0.0.8 polish forward
+
+Sessions 2–3 publish work the map above files under **v0.0.8** (lens completion, hover-card,
+menu/icon polish). That is a deliberate, eyes-open reorder: the work is unblocked and low-risk, so
+clearing it early frees the deck for the v0.0.6 building/population build. It does **not** move the
+v0.0.6/0.7 *themes* — those Briefs stay gated (below).
+
+### Out of scope for this plan (gated — do not pull in)
+
+- **v0.0.6**: corporation dashboard, Market/Balance/Construction ledgers, population (S4 +
+  dynamic), building management, workforce step 2.
+- **Selection trio**: non-spatial routing, canvas hit-testing, lens-driven resolution — blocked
+  on markers / ledgers existing.
+- **v0.0.7+**: supply convoys (S5), inter-body markets, preferential purchasing,
+  logistics/infrastructure — all blocked on Layer 5.
+- **Design-owed (`~`)**: tile-gen refinements, nation behaviour — these need a *design* pass, not
+  a publish.
+- **v0.2**: resource-generation scarcity, full deposit authoring.
+
+*(Two entries — C1 nav-rail ordering, A3 design-pass propagation — read as largely doc-only and
+self-describe as already settled into their authority docs; check whether they are stale entries
+to **remove** rather than work to publish, before slotting either into a session.)*
+
+### Collision maps: built per session, not frozen here
+
+A deliberate choice. This plan records the **durable** facts — the slices, their order, and the
+**hotspot files** — but **not** the fine-grained per-task collision table. That table is a derived
+artifact that goes stale the moment a file is restructured or a Brief re-scoped, so it is **built
+fresh at promotion** in TASKS.md (§ Dividing work across agents, step 1), where it is actually
+consumed. A session reads the hotspot list here, then maps its own slice. Documenting the full map
+here would only rot; documenting the hotspots is what carries between sessions.
