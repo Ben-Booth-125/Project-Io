@@ -20,6 +20,22 @@ player opens them from the navigation pane. This keeps the canvas unobstructed
 by default and makes opening a ledger a deliberate act. New ledgers added later
 must follow this — default their open-state to closed.
 
+## Menus are broad ledgers
+
+A nav-rail slot is **reserved UI**, and reserved UI is justified only by a **broad** ledger —
+a surface that gives an overview *across many entities*: all of the player's buildings, all of
+a body's market, the whole budget. **Specific, targeted ledgers do not get a reserved menu
+slot.** A targeted action — building on *one* tile, inspecting *one* market listing, managing
+*one* building — is reached **contextually**, through the Selection info element
+(`SELECTION.md`) or a transient popup (`LAYOUT.md` § UI popup elements), not through the rail.
+
+The test when deciding whether a new surface earns a slot: *is this a broad overview, or a
+targeted action?* Broad → a ledger with a slot. Targeted → the Selection element / a popup,
+no slot. This keeps the ten slots scaling with the *systems* the game has, not with the number
+of things a player can do to a single entity — e.g. the per-tile "build here" flow lives in the
+tile Selection element, while the broad **buildings overview** is what earns the construction
+slot (see `docs/development/TODO.md` § Ledger / § Selection info element).
+
 ## Layer 2 state
 
 - Only one slot is wired: the **Tile Ledger** (a ruled-table glyph), parked at slot 8. It opens the Tile Ledger window — body selector, per-tile table, building list, and market readout.

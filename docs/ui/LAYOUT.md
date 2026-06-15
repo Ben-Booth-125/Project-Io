@@ -155,6 +155,8 @@ Menus opened from the nav pane appear as floating, movable, closable ImGui windo
 
 **All ledgers start closed** on a fresh session — none are shown until the player opens them from the pane (see the policy in `MENU.md`).
 
+Only **broad** ledgers (overviews across many entities) earn a nav-rail slot; targeted, per-entity actions are reached contextually through the Selection info element or a popup, not the rail (see `MENU.md` § Menus are broad ledgers).
+
 ### Uniform ledger-window chrome (settled principle)
 
 Every ledger window obeys a **single chrome rule**: they all share **one size and one

@@ -342,10 +342,37 @@ currently hold Briefs appear as sections below.
   map, `market_component`, `corporation_component`, and the economy report. See
   `docs/ui/LENSES.md`, `docs/ui/LAYOUT.md`, and `docs/SYSTEMS.md` (§ Trade / § Budget).
 
+- **[F4] Buildings overview ledger — design revision needed (deferred).** The earlier
+  "tile build ledger / primary build path" framing is **deferred pending a design revision**.
+  A nav-rail menu must be a **broad** ledger (see `docs/ui/MENU.md` § Menus are broad ledgers),
+  so this menu has to function as an **overview of all the player's buildings** — every
+  building across the player's holdings, with type / target / recipe / workforce / output /
+  state, filterable; the standing management surface — **not** a per-tile targeted build menu.
+  Building on *one* tile is a targeted action reached through the **tile Selection element**
+  ([A3] below), which needs no reserved UI. Revise the design before promotion: settle what the
+  overview shows and how it filters/sorts; its relationship to the Construction panel built in
+  v0.0.5 (`src/ui/construction_panel.{hpp,cpp}` — likely *becomes* this overview, refit from the
+  current scaffold); and how it relates to the Construction Ledger in the [A4] ledger-family
+  Brief above (probably the same surface). Authority `docs/ui/{MENU,LAYOUT,SELECTION}.md`,
+  `docs/economy/PRODUCTION.md`; reuses `src/world/placement_rules.hpp`.
+
 ### Selection info element
 
 Follow-up intent for the Selection info element (design in `docs/ui/SELECTION.md`;
 shared per-entity content builders in `entity_summary.{hpp,cpp}`):
+
+- **[A3] Tile Selection element as the build front door.** The tile Selection info element
+  (the tile builder in `entity_summary.{hpp,cpp}`, `SELECTION.md`) is the natural primary
+  surface for acting on a tile, so make it the **main entry to construction**. Building on a
+  tile is a *targeted* action, so — per the broad-ledger menu principle (`docs/ui/MENU.md`) —
+  it is reached **contextually through the selection element** (and/or a transient build
+  popup), **not** a reserved menu/nav-slot: a selected tile gets a clear **"build here"**
+  affordance inline. Settle what the tile selection element shows for build context — the
+  buildable types (via `placement_rules`), the build cost (Lua economy constants), the current
+  building if the tile already holds one, and the confirm-build action. The broad buildings
+  *overview* lives in its own ledger ([F4] above); this Brief is the per-tile build entry.
+  Authority `docs/ui/{SELECTION,MENU}.md`; touches `src/ui/entity_summary.{hpp,cpp}` /
+  `src/ui/selection_panel.cpp`.
 
 - **[C2] Non-spatial 'go to' routing.** For nation / corporation selections (no
   canvas of their own), 'go to' should open the relevant ledger rather than
@@ -449,9 +476,21 @@ The labour scalar (`docs/SYSTEMS.md` § Workforce, `docs/economy/POPULATION.md`)
   **recipe / workforce control**, and the **sell-order UI** — surfaced through the production
   UI (§ Canvas) and the market / balance / construction ledgers (§ Ledger). Build cost comes
   from the Lua economy-constants registry. Large and multi-part; splits into several Briefs at
-  promotion. Depends on the pre-L4 enablers (placement-rules seam, workforce-model design, the
-  economy-test harness). See `docs/economy/{PRODUCTION,POPULATION}.md` and the milestone map
-  in `docs/development/ROADMAP.md` (v0.0.6 — building management + population).
+  promotion — the **population-centre half is now its own Brief** ([S4] below) and the build
+  UI is being reframed around the per-tile build ledger (§ Ledger). Depends on the pre-L4
+  enablers (placement-rules seam, workforce-model design, the economy-test harness). See
+  `docs/economy/{PRODUCTION,POPULATION}.md` and the milestone map in
+  `docs/development/ROADMAP.md` (v0.0.6 — building management + population).
+
+- **[S4] Population centres.** Implement the population-centre model designed in
+  `docs/economy/POPULATION.md`: population **scale / agglomeration**, **land-use trade-offs**,
+  **habitability feedback**, and the **labour supply** that grounds workforce. Split out of
+  [S5] as its own Brief so the population half is tracked and prioritised independently of
+  building management. It grounds the workforce pool ([A4] § Workforce — wages and demand
+  derive from population) and is the population half of the v0.0.6 theme. Designed
+  independently of the build UI but couples to it through workforce. Authority
+  `docs/economy/POPULATION.md`, `docs/SYSTEMS.md` § Workforce; see
+  `docs/development/ROADMAP.md` (v0.0.6).
 
 ## Environment
 
@@ -485,6 +524,19 @@ Design authority: `docs/generation/NATION_GENERATION.md`.
 ### Corporation generation
 
 Design authority: `docs/generation/CORPORATION_GENERATION.md`.
+
+- **[B4] Revise the corporation generation strategy — larger holdings + realism.** A
+  corporation currently starts with only a small handful of placed assets (Pass 3,
+  `corporation_generation.cpp`), which reads thin for an entity meant to be an industrial
+  power. **Increase the number of tiles / assets** a corporation holds at campaign start to a
+  more plausible footprint, and review the **realism** of the whole strategy as part of the
+  same item: the holdings-size distribution, the asset mix vs. the corp's `industrial_focus`,
+  spatial **clustering** of a corp's tiles (holdings should plausibly group, not scatter),
+  and how the larger footprint interacts with the pre-game profit model ([C3] below). Decide a
+  target holdings count (or range) and the placement rules that keep every asset valid (reuse
+  the `placement_rules` seam). Touches `corporation_generation.cpp` (Pass 3 asset placement,
+  possibly Pass 4 financial profile); authority `docs/generation/CORPORATION_GENERATION.md`.
+  Coordinate with [C3] (pre-game profit) — same file/passes.
 
 - **[C3] Model pre-game profit in corporation generation.** A corporation does not
   appear from nothing — its starting `balance`/`starting_capital` and asset mix should reflect a
