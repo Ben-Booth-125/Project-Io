@@ -51,12 +51,13 @@ This is a static identity readout in the prototype — no interaction beyond, ev
 ## Header — top
 **Spec: `HEADER.md`**
 
-A full-width strip across the top of the canvas area, between the profile and the time column. It is the player's persistent financial and material dashboard:
+A full-width strip across the top of the canvas area, between the profile and the time column. It is the player's persistent financial dashboard, wired to the live economy as of the Layer 3 finalisation:
 
-- **Budget** — current treasury balance and, eventually, net income/expenditure per economy tick.
-- **Resource overview** — a quick strip of the player's headline stockpiles. For the prototype this is **deliberately scarce**: a small handful of resources, summed across all holdings, shown as icon + quantity.
+- **Balance** — the player corporation's running treasury balance (negatives flagged red).
+- **Stockpile valuation** — an estimated liquid value of everything the player holds: its `(corporation, body)` pools summed at each body's current market price. A single money figure, not a per-resource inventory.
+- **Net + trend** — the last economy tick's net change as a coloured per-quarter figure, alongside a small sparkline of recent balances.
 
-The header answers "can I afford this, and what do I have?" without opening a ledger. Detailed, per-body breakdowns stay in their respective ledgers.
+The header answers "can I afford this, and which way is it trending?" without opening a ledger. Detailed, per-body breakdowns stay in their respective ledgers.
 
 ---
 
@@ -153,6 +154,23 @@ Not implemented in the prototype; specified here to reserve the region and the i
 Menus opened from the nav pane appear as floating, movable, closable ImGui windows over the canvas area (rather than docking into the pane). The only one present in Layer 2 is the **Tile Ledger** (opened by tab 8): body selector, per-tile table, building list, and market readout. Its **✕** fully closes it; reopen from the tab. The set of menus that open these windows is described in **`MENU.md`**.
 
 **All ledgers start closed** on a fresh session — none are shown until the player opens them from the pane (see the policy in `MENU.md`).
+
+### Uniform ledger-window chrome (settled principle)
+
+Every ledger window obeys a **single chrome rule**: they all share **one size and one
+spawn anchor**. A ledger opens at the same on-screen position and the same default
+extent as every other, so the family reads as one consistent surface rather than a
+scatter of differently-sized windows. Concretely, the prototype should drive the
+floating ledgers from **one shared size constant and one shared spawn-position
+constant** (anchored clear of the profile/header chrome, `ImGuiCond_Once` so the player
+may then move/resize freely), rather than each ledger hard-coding its own.
+
+This is the standing design constraint the **Market / Balance / Construction ledger
+family** (deferred to Layer 4 — TODO § Ledger) inherits when it is built. It also
+records and resolves a current inconsistency: the **Tile Ledger** opens at 820×560 and
+the **Economy panel** at 760×620 at different offsets; bringing them onto the shared
+constants is part of adopting this rule. The header is exempt — it is persistent chrome,
+not a ledger.
 
 ---
 
