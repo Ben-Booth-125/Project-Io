@@ -142,6 +142,8 @@ void draw_buildings(const world& w, const recipe_registry& reg, const economy_re
             ImGui::TableSetColumnIndex(4);
             if (br.active)
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::positive), "active");
+            else if (br.exhausted)
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative), "out of resources");
             else
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::neutral), "idle");
 

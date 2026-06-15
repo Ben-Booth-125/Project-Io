@@ -77,6 +77,8 @@ int main()
         tc.body = body;
         tc.composition = terrain_composition::rocky;
         tc.resource_deposit[ri(resource_type::iron_ore)] = 2.0f;
+        // Ample reserve so this tick runs at full rate (depletion taper untouched).
+        tc.resource_remaining[ri(resource_type::iron_ore)] = 1.0e6f;
         tc.hazard_level = 0.0f;
         w.tiles[tile_e] = tc;
     }
@@ -151,21 +153,29 @@ int main()
     check(near(rep.purchases[{corp_p, body}][ri(resource_type::iron_ore)], 4.0f),
           "R4.2 auto-bought shortfall = need - pool = 4", rep.purchases[{corp_p, body}][ri(resource_type::iron_ore)], 4.0f);
 
-    // resource_remaining untouched (R3.5)
-    check(near(w.tiles[tile_e].resource_remaining[ri(resource_type::iron_ore)], 0.0f),
-          "R3.5 deposits do not deplete (resource_remaining untouched)");
+    // Deposit depletion (Brief B, R2): the reserve is drawn down by the output.
+    check(near(w.tiles[tile_e].resource_remaining[ri(resource_type::iron_ore)], 1.0e6f - 20.0f),
+          "B.R2 extraction draws the reserve down by its output",
+          w.tiles[tile_e].resource_remaining[ri(resource_type::iron_ore)], 1.0e6f - 20.0f);
 
     // Market supply/demand (R4.1/R4.2): steel supply 4, iron demand 4.
     const market_component& m = w.markets[market];
     check(near(m.supply[ri(resource_type::steel)], 4.0f), "R4.1 market supply = listed surplus (steel 4)", m.supply[ri(resource_type::steel)], 4.0f);
     check(near(m.demand[ri(resource_type::iron_ore)], 4.0f), "R4.2 market demand = auto-bought (iron 4)", m.demand[ri(resource_type::iron_ore)], 4.0f);
-    check(near(m.price[ri(resource_type::steel)], m.base_price[ri(resource_type::steel)]), "R4.3 price stays at base_price");
 
-    // Budget (R5):
-    //   E: income 20*2.5=50, maint 5, wage 0.5*8=4 -> +41 -> 1041
-    //   P: income 4*8=32, expend 4*2.5=10, maint 10, wage 0.5*12=6 -> +6 -> 1006
-    check(near(w.corporations[corp_e].balance, 1041.0f), "R5 extraction corp balance = +41", w.corporations[corp_e].balance, 1041.0f);
-    check(near(w.corporations[corp_p].balance, 1006.0f), "R5 processing corp balance = +6", w.corporations[corp_p].balance, 1006.0f);
+    // Price resolution (Brief A, R1/R2): target = base*sqrt(D/S), clamped, EMA from base.
+    //   iron: S=20 D=4  -> base2.5 * sqrt(0.2)=1.118; EMA 2.5 + 0.5*(1.118-2.5) = 1.809
+    //   steel: S=4 D=0  -> target 0 -> floor 0.25*8=2.0; EMA 8 + 0.5*(2-8) = 5.0
+    check(near(m.price[ri(resource_type::iron_ore)], 1.809017f),
+          "A.R1/R2 iron price eased toward base*sqrt(D/S)", m.price[ri(resource_type::iron_ore)], 1.809017f);
+    check(near(m.price[ri(resource_type::steel)], 5.0f),
+          "A.R2 steel price floored (no demand) and eased from base", m.price[ri(resource_type::steel)], 5.0f);
+
+    // Budget (Brief A, R3 + L3 R5): cash flows valued at the resolved price.
+    //   E: income 20*1.809017=36.180, maint 5, wage 0.5*8=4 -> +27.180 -> 1027.180
+    //   P: income 4*5=20, expend 4*1.809017=7.236, maint 10, wage 0.5*12=6 -> -3.236 -> 996.764
+    check(near(w.corporations[corp_e].balance, 1027.180f), "A.R3 extraction corp balance at resolved price", w.corporations[corp_e].balance, 1027.180f);
+    check(near(w.corporations[corp_p].balance, 996.764f),  "A.R3 processing corp balance at resolved price", w.corporations[corp_p].balance, 996.764f);
 
     // R3.3 idle below t_idle: zero P's workforce-pool scenario -> empty pool, run again.
     {
@@ -184,6 +194,39 @@ int main()
         bool idle = false;
         for (const auto& br : r.buildings) if (br.building == pb) idle = br.idle;
         check(idle, "R3.3 processor idles below t_idle (empty pool)");
+    }
+
+    // --- Brief B: deposit depletion taper + exhaustion (R3, R4) ---
+    // nominal = base_rate 20 * richness 1 * workforce 1 * (1-hazard) = 20.
+    // taper_band = deposit_taper_ticks(8) * nominal = 160; exhausted below 5% -> remaining < 8.
+    {
+        auto run_once = [&](float remaining, float& out, bool& exhausted)
+        {
+            world wd;
+            const entity_id bd = wd.create_entity(); wd.bodies[bd] = body_component{};
+            const entity_id td = wd.create_entity();
+            tile_component tc{}; tc.body = bd;
+            tc.resource_deposit[ri(resource_type::iron_ore)]   = 1.0f;
+            tc.resource_remaining[ri(resource_type::iron_ore)] = remaining;
+            wd.tiles[td] = tc;
+            const entity_id eb = wd.create_entity();
+            building_component b{}; b.tile = td; b.type = building_type::extraction_site;
+            b.workforce_assigned = 1.0f; b.target_resource = resource_type::iron_ore;
+            wd.buildings[eb] = b;
+            const entity_id ec = wd.create_entity();
+            corporation_component cc; cc.assets.push_back(eb); wd.corporations[ec] = cc;
+            economy_report r = run_economy_step(wd, reg);
+            out = 0.0f; exhausted = false;
+            for (const auto& br : r.buildings) if (br.building == eb) { out = br.output_quantity; exhausted = br.exhausted; }
+        };
+
+        float out = 0.0f; bool ex = false;
+        run_once(400.0f, out, ex); // 400/160 clamps to 1 -> full rate
+        check(near(out, 20.0f) && !ex, "B.R2 full-rate draw at ample reserve (out=20)", out, 20.0f);
+        run_once(80.0f, out, ex);  // 80/160 = 0.5 -> half rate
+        check(near(out, 10.0f) && !ex, "B.R3 output tapers as the reserve nears empty (out=10)", out, 10.0f);
+        run_once(5.0f, out, ex);   // 5/160 = 0.031 < 0.05 -> exhausted
+        check(near(out, 0.0f) && ex, "B.R4 reports exhausted (out of resources) below the floor", out, 0.0f);
     }
 
     std::printf("\n%s  (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES", g_failures, g_failures == 1 ? "" : "s");

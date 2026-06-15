@@ -6,6 +6,14 @@
 
 namespace {
 
+// --- Deposit depletion constants (TODO § Environment, settled 2026-06-15) ---
+// Each deposit carries a finite reserve (tile_component.resource_remaining, seeded
+// at generation to richness × a reserve factor). Extraction draws the reserve down;
+// as it nears empty the output tapers, then the building reports "out of resources".
+// Hard-coded sensible estimates, iterated by playtest — not derived.
+constexpr float deposit_taper_ticks = 8.0f;  ///< Output tapers over the last ~8 ticks of nominal yield.
+constexpr float deposit_min_taper   = 0.05f; ///< Below 5% of nominal the reserve reads as exhausted.
+
 /// Body that a building sits on (via its tile). null_entity if the tile is gone.
 entity_id building_body(const world& w, const building_component& b)
 {
@@ -13,8 +21,11 @@ entity_id building_body(const world& w, const building_component& b)
     return (it != w.tiles.end()) ? it->second.body : null_entity;
 }
 
-/// Extraction: credit the (corp, body) pool with the target resource. Output is
-/// base_rate × deposit richness × workforce × (1 − hazard). No depletion.
+/// Extraction: credit the (corp, body) pool with the target resource and draw the
+/// same amount from the tile's finite reserve. Nominal output is
+/// base_rate × richness × workforce × (1 − hazard); it tapers as the reserve nears
+/// empty and the building reports `exhausted` once the reserve falls below the
+/// minimum taper of nominal. Deposits never refill.
 building_report run_extraction(world& w, const recipe_registry& reg,
                                entity_id corp, entity_id building_id,
                                const building_component& b)
@@ -35,21 +46,44 @@ building_report run_extraction(world& w, const recipe_registry& reg,
         return rep;
     }
 
-    const tile_component& tc = tile_it->second;
-    const float richness = tc.resource_deposit[static_cast<std::size_t>(b.target_resource)];
+    tile_component& tc = tile_it->second;
+    const std::size_t ri = static_cast<std::size_t>(b.target_resource);
+    const float richness = tc.resource_deposit[ri];
     const float base_rate = reg.economics(building_type::extraction_site).base_rate;
 
-    const float output = base_rate * richness * b.workforce_assigned * (1.0f - tc.hazard_level);
+    // Rate the deposit would yield at full reserve (richness sets the rate).
+    const float nominal = base_rate * richness * b.workforce_assigned * (1.0f - tc.hazard_level);
+    if (nominal <= 0.0f)
+    {
+        rep.idle = true; // unstaffed, no deposit of the target, or fully hazardous
+        return rep;
+    }
+
+    float& remaining = tc.resource_remaining[ri];
+
+    // Taper output as the reserve approaches empty: full until the last
+    // (taper_ticks × nominal) of reserve, then linearly down toward the floor.
+    const float taper_band = deposit_taper_ticks * nominal;
+    const float taper = std::clamp(remaining / taper_band, 0.0f, 1.0f);
+    if (taper < deposit_min_taper)
+    {
+        rep.exhausted = true; // out of resources — the reserve is spent
+        return rep;
+    }
+
+    // Never extract more than the reserve still holds.
+    const float output = std::min(nominal * taper, remaining);
+    remaining -= output;
 
     if (output > 0.0f)
     {
-        w.pool_for(corp, body).quantities[static_cast<std::size_t>(b.target_resource)] += output;
+        w.pool_for(corp, body).quantities[ri] += output;
         rep.active          = true;
         rep.output_quantity = output;
     }
     else
     {
-        rep.idle = true;
+        rep.exhausted = true;
     }
     return rep;
 }

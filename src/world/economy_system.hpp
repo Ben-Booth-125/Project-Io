@@ -22,8 +22,9 @@ struct building_report
     resource_type target_resource = resource_type::iron_ore; ///< Extraction only.
     uint16_t      recipe          = no_recipe;                ///< Processing only.
 
-    bool  active = false; ///< Produced output this tick.
-    bool  idle   = false; ///< Produced nothing (no workforce / no deposit / below t_idle / misconfigured).
+    bool  active    = false; ///< Produced output this tick.
+    bool  idle      = false; ///< Produced nothing (no workforce / no deposit / below t_idle / misconfigured).
+    bool  exhausted = false; ///< Extraction only: the tile's deposit reserve is spent ("out of resources").
     float output_quantity = 0.0f; ///< Units credited to the pool this tick (sum of outputs for a processor).
 
     bool          has_limiting   = false;               ///< Processing: a binding input exists.
@@ -43,10 +44,11 @@ struct economy_report
 };
 
 /// Run one economy step over every corporation's buildings: extraction credits
-/// the (corp, body) pool with its target resource; processing runs its recipe
-/// pool-first under the two-threshold partial-run model (registry t_full/t_idle),
-/// accruing outputs and recording the auto-bought shortfall. Deposits never
-/// deplete (tile resource_remaining is not touched). Deterministic: corporations
+/// the (corp, body) pool with its target resource and draws the same amount from
+/// the tile's finite `resource_remaining` reserve (tapering as it nears empty,
+/// then reporting the building exhausted); processing runs its recipe pool-first
+/// under the two-threshold partial-run model (registry t_full/t_idle), accruing
+/// outputs and recording the auto-bought shortfall. Deterministic: corporations
 /// are visited in ascending id order, assets in their stored order.
 ///
 /// @param w   World; the (corp, body) pools are mutated in place.

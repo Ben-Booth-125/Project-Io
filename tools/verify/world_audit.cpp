@@ -79,5 +79,38 @@ int main()
     std::printf("  S1 R2 all extraction assets on a valid extractable deposit: %s\n",
                 bad == 0 ? "PASS" : "FAIL");
 
-    return (fw_frac >= 3.0f && bad == 0) ? 0 : 1;
+    // --- Deposit depletion (Brief B, R1): resource_remaining seeded from richness ---
+    // Generation seeds resource_remaining[r] = resource_deposit[r] * deposit_reserve_factor
+    // (400.0) for every non-zero deposit; absent deposits stay at zero.
+    constexpr float reserve_factor = 400.0f;
+    int deposits_checked = 0, seed_bad = 0;
+    for (const auto& [tid, tc] : w.tiles)
+    {
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            const float dep = tc.resource_deposit[r];
+            const float rem = tc.resource_remaining[r];
+            if (dep > 0.0f)
+            {
+                ++deposits_checked;
+                const float want = dep * reserve_factor;
+                if (rem < want - 1e-2f || rem > want + 1e-2f)
+                {
+                    if (seed_bad < 5)
+                        std::printf("  BAD: tile %u res %zu remaining=%.3f want=%.3f\n",
+                                    static_cast<unsigned>(tid), r, rem, want);
+                    ++seed_bad;
+                }
+            }
+            else if (rem != 0.0f)
+            {
+                ++seed_bad; // a reserve with no deposit is wrong too
+            }
+        }
+    }
+    std::printf("Deposit reserves: %d non-zero deposits, %d mis-seeded\n", deposits_checked, seed_bad);
+    std::printf("  B R1 resource_remaining = richness * %.0f for every deposit: %s\n",
+                reserve_factor, seed_bad == 0 ? "PASS" : "FAIL");
+
+    return (fw_frac >= 3.0f && bad == 0 && seed_bad == 0) ? 0 : 1;
 }

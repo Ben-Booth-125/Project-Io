@@ -12,6 +12,12 @@ namespace {
 
 constexpr double k_two_pi = 6.283185307179586;
 
+// Finite-deposit reserve size: resource_remaining is seeded to richness × this
+// factor. With extraction at ~base_rate × richness per tick, the reserve lasts on
+// the order of (factor / base_rate / workforce) ticks before depletion tapers in
+// (see economy_system.cpp). A hard-coded sensible estimate, iterated by playtest.
+constexpr float deposit_reserve_factor = 400.0f;
+
 // ---------------------------------------------------------------------------
 // Seedable 3D simplex noise
 //
@@ -822,19 +828,28 @@ std::vector<entity_id> generate_body_tiles(
             if (!is_ocean[idx])
                 generate_deposits(comp[idx], land[idx], deposits, tile_rng);
 
+            // Seed the finite extraction reserve from richness. Richness stays the
+            // rate multiplier; the reserve is what depletion (economy_system.cpp)
+            // draws down. Scaled so a typical deposit lasts dozens of economy ticks.
+            std::array<float, resource_count> remaining{};
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (deposits[r] > 0.0f)
+                    remaining[r] = deposits[r] * deposit_reserve_factor;
+
             float hazard = 0.0f, habitability = 0.0f;
             derive_environment(comp[idx], land[idx], hazard, habitability, tile_rng);
 
             const entity_id tile_id = w.create_entity();
             w.tiles[tile_id] = tile_component{
-                .body             = body_id,
-                .grid_x           = col,
-                .grid_y           = row,
-                .composition      = comp[idx],
-                .landform         = land[idx],
-                .resource_deposit = deposits,
-                .hazard_level     = hazard,
-                .habitability     = habitability,
+                .body               = body_id,
+                .grid_x             = col,
+                .grid_y             = row,
+                .composition        = comp[idx],
+                .landform           = land[idx],
+                .resource_deposit   = deposits,
+                .resource_remaining = remaining,
+                .hazard_level       = hazard,
+                .habitability       = habitability,
             };
             tile_ids[idx] = tile_id;
         }
