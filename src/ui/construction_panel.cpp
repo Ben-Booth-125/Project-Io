@@ -150,8 +150,109 @@ void draw_selected_section(const world& w, const recipe_registry& reg, const ui_
     float workforce = b.workforce_assigned;
     ImGui::SliderFloat("Workforce##stub", &workforce, 0.0f, 1.0f, "%.2f");
 
-    ImGui::Button("Create sell order");
+    ImGui::EndDisabled();
+}
 
+// --- Sell orders (player) ----------------------------------------------------
+// The manual market side: standing player sell orders (resource / quantity /
+// floor price) on a target body, held in ui_state.sell_orders and passed to
+// clear_markets each tick. Lists the player's current orders with a remove, and a
+// small form to add one. Target body = the active surface body (else the home
+// body). See docs/SYSTEMS.md § Trade; market_clearing.cpp honours the floor.
+void draw_sell_orders_section(const world& w, const recipe_registry& reg, ui_state& state)
+{
+    (void)reg;
+    if (!ImGui::CollapsingHeader("Sell orders", ImGuiTreeNodeFlags_DefaultOpen))
+        return;
+
+    const entity_id corp = w.player_entity;
+    const entity_id body = (w.bodies.count(state.active_body) != 0) ? state.active_body
+                                                                    : w.home_body;
+    if (body == null_entity)
+    {
+        ImGui::TextDisabled("No body in view to trade on.");
+        return;
+    }
+
+    // The resources traded on this body's market (base_price > 0), for the add-form.
+    const market_component* market = nullptr;
+    for (const auto& [mid, mc] : w.markets)
+        if (mc.body == body) { market = &mc; break; }
+
+    ImGui::TextDisabled("Body: %s", w.bodies.at(body).name.c_str());
+
+    // --- existing orders for the player on this body ---
+    bool any = false;
+    for (std::size_t i = 0; i < state.sell_orders.size(); ++i)
+    {
+        const sell_order& o = state.sell_orders[i];
+        if (o.corp != corp || o.body != body)
+            continue;
+        any = true;
+        ImGui::PushID(static_cast<int>(i));
+        ImGui::Text("%s  x%.0f  >= %.1f",
+            resource_name(o.resource), o.quantity, o.floor_price);
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Remove"))
+        {
+            state.sell_orders.erase(state.sell_orders.begin() + static_cast<long>(i));
+            ImGui::PopID();
+            break; // indices shifted; redraw next frame
+        }
+        ImGui::PopID();
+    }
+    if (!any)
+        ImGui::TextDisabled("No sell orders on this body.");
+
+    // --- add-order form ---
+    if (market == nullptr)
+    {
+        ImGui::TextDisabled("This body has no market.");
+        return;
+    }
+
+    ImGui::Separator();
+    static int   add_resource = -1;     // index into resource_type, -1 = unset
+    static float add_quantity = 10.0f;
+    static float add_floor     = 0.0f;
+
+    // Default the resource to the first traded one.
+    if (add_resource < 0 || market->base_price[static_cast<std::size_t>(add_resource)] <= 0.0f)
+    {
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (market->base_price[r] > 0.0f) { add_resource = static_cast<int>(r); break; }
+    }
+
+    const char* preview = (add_resource >= 0)
+        ? resource_name(static_cast<resource_type>(add_resource)) : "-";
+    if (ImGui::BeginCombo("Resource", preview))
+    {
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            if (market->base_price[r] <= 0.0f)
+                continue;
+            const bool sel = (add_resource == static_cast<int>(r));
+            if (ImGui::Selectable(resource_name(static_cast<resource_type>(r)), sel))
+                add_resource = static_cast<int>(r);
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::InputFloat("Quantity / tick", &add_quantity, 1.0f, 10.0f, "%.0f");
+    ImGui::InputFloat("Floor price", &add_floor, 0.1f, 1.0f, "%.1f");
+    if (add_quantity < 0.0f) add_quantity = 0.0f;
+    if (add_floor < 0.0f)    add_floor    = 0.0f;
+
+    ImGui::BeginDisabled(add_resource < 0 || add_quantity <= 0.0f);
+    if (ImGui::Button("Add sell order"))
+    {
+        sell_order o;
+        o.corp        = corp;
+        o.body        = body;
+        o.resource    = static_cast<resource_type>(add_resource);
+        o.quantity    = add_quantity;
+        o.floor_price = add_floor;
+        state.sell_orders.push_back(o);
+    }
     ImGui::EndDisabled();
 }
 
@@ -174,6 +275,8 @@ void draw_construction_panel(const world& w,
     draw_build_section(state);
     ImGui::Spacing();
     draw_selected_section(w, reg, state);
+    ImGui::Spacing();
+    draw_sell_orders_section(w, reg, state);
 
     ImGui::End();
 }

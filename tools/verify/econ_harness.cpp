@@ -283,6 +283,37 @@ int main()
               before - ww.corporations[wc].balance, 44.0f);
     }
 
+    // --- Player sell orders: floor price honoured, auto-path yields control ---
+    // A corp pool holds 10 steel on a body whose market trades steel at base 8 with
+    // no demand. Resolved price floors: target base*sqrt(0/10)=0 -> 0.25*8=2, EMA
+    // from prior 8 -> 5.0. A player order (qty 10, floor 6) sells all 10 at max(5,6)=6.
+    {
+        world ws;
+        const entity_id b = ws.create_entity(); ws.bodies[b] = body_component{};
+        const entity_id m = ws.create_entity();
+        market_component mc{}; mc.body = b;
+        mc.base_price[ri(resource_type::steel)] = 8.0f;
+        mc.price = mc.base_price;
+        ws.markets[m] = mc;
+        const entity_id corp = ws.create_entity();
+        { corporation_component cc; cc.balance = 0.0f; ws.corporations[corp] = cc; }
+        ws.pool_for(corp, b).quantities[ri(resource_type::steel)] = 10.0f;
+
+        std::vector<sell_order> orders;
+        sell_order o; o.corp = corp; o.body = b; o.resource = resource_type::steel;
+        o.quantity = 10.0f; o.floor_price = 6.0f;
+        orders.push_back(o);
+
+        economy_report empty; // no production this scenario
+        auto f = clear_markets(ws, reg, empty, orders);
+        check(near(ws.markets[m].price[ri(resource_type::steel)], 5.0f),
+              "SO.1 steel price floored+eased to 5.0", ws.markets[m].price[ri(resource_type::steel)], 5.0f);
+        check(near(f[corp].income, 60.0f),
+              "SO.2 player order sells 10 at floor 6 (income 60)", f[corp].income, 60.0f);
+        check(near(ws.pool_for(corp, b).quantities[ri(resource_type::steel)], 0.0f),
+              "SO.3 pool debited by the order", ws.pool_for(corp, b).quantities[ri(resource_type::steel)], 0.0f);
+    }
+
     std::printf("\n%s  (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES", g_failures, g_failures == 1 ? "" : "s");
     return g_failures == 0 ? 0 : 1;
 }

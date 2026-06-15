@@ -192,6 +192,22 @@ struct market_component
     std::array<float, resource_count> base_price; ///< Rarity-derived floor; authored at world creation.
 };
 
+/// A player-authored standing sell order — the manual side of the market. Each
+/// economy tick the order lists up to `quantity` of `resource` from the (corp,
+/// body) pool for sale at no less than `floor_price` (the order clears at
+/// `max(resolved_price, floor_price)`; an unmet floor simply means less or nothing
+/// sells that tick). Held in `ui_state.sell_orders` and passed to `clear_markets`.
+/// Defined here (rather than in market_clearing.hpp) so both the UI state and the
+/// clearing system can name it without an include cycle.
+struct sell_order
+{
+    entity_id     corp        = null_entity;
+    entity_id     body        = null_entity;
+    resource_type resource    = resource_type::iron_ore;
+    float         quantity    = 0.0f;
+    float         floor_price = 0.0f; ///< Minimum acceptable unit price; 0 = sell at the market price.
+};
+
 /// Deployable unit stub. Combat rules, faction AI, and transport are deferred;
 /// this struct exists so the field-level data model is in place.
 struct unit_component

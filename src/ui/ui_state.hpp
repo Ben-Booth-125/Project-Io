@@ -1,9 +1,10 @@
 #pragma once
 
-#include "world/components.hpp" // building_type / resource_type for construction_state
+#include "world/components.hpp" // building_type / resource_type / sell_order
 #include "world/entity.hpp"
 
 #include <string>
+#include <vector>
 
 /// Which rung of the canvas zoom ladder currently fills the primary viewport.
 /// The minimap shows the rung one step *out* (towards solar) from this.
@@ -79,6 +80,12 @@ struct ui_state
 
     /// Building-placement interaction state (Layer 4 UI groundwork scaffold). See construction_state.
     construction_state construction;
+
+    /// Player-authored standing sell orders (the manual market side). Re-evaluated
+    /// every economy tick — passed to `clear_markets` by `app::step_economy`. Held
+    /// here as player game-intent; authored from the construction / building-
+    /// management panel. See sell_order, docs/SYSTEMS.md § Trade.
+    std::vector<sell_order> sell_orders;
 
     // --- solar system canvas view (primary only; the minimap always shows the
     // default framing) ---

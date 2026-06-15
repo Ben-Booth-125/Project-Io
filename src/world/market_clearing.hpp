@@ -8,17 +8,8 @@
 #include <unordered_map>
 #include <vector>
 
-/// A player-authored sell order — the Layer 3 framework hook for the manual side
-/// of the market. The full authoring UI (what / how much / floor price) lands in
-/// the new Layer 4; in Layer 3 no orders are issued and the auto-supply path runs.
-struct sell_order
-{
-    entity_id     corp     = null_entity;
-    entity_id     body     = null_entity;
-    resource_type resource = resource_type::iron_ore;
-    float         quantity = 0.0f;
-    float         floor_price = 0.0f; ///< Minimum acceptable unit price; ignored while price == base_price.
-};
+// `sell_order` (the manual market side) is defined in components.hpp so both the
+// UI state and this clearing system can name it without an include cycle.
 
 /// Per-corporation cash-flow figures from one market clearing, valued at the
 /// price resolved this tick (base_price modulated by supply/demand). The balance

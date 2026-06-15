@@ -175,7 +175,7 @@ void app::load_economy()
 void app::step_economy()
 {
     m_last_econ_report = run_economy_step(m_world, m_registry);
-    auto flows = clear_markets(m_world, m_registry, m_last_econ_report);
+    auto flows = clear_markets(m_world, m_registry, m_last_econ_report, m_ui.sell_orders);
     apply_budget(m_world, m_registry, flows, m_last_econ_report.workforce_contention);
 
     // Record the player's post-tick balance for the header net figure + sparkline.

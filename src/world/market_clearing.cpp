@@ -121,6 +121,18 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     std::vector<cleared_flow> sales; // surplus + player orders (income, priced at max(price, floor))
     std::vector<cleared_flow> buys;  // auto-bought shortfalls (expenditure, priced at price)
 
+    // A (corp, body, resource) the player has a standing sell order for is under
+    // *manual* control: the auto-surplus path yields it so the player's order (and
+    // its floor price) governs that resource's sale rather than the greedy auto path
+    // dumping it at the market price first.
+    auto player_controls = [&player_orders](entity_id corp, entity_id body, std::size_t r) {
+        for (const sell_order& o : player_orders)
+            if (o.corp == corp && o.body == body &&
+                static_cast<std::size_t>(o.resource) == r && o.quantity > 0.0f)
+                return true;
+        return false;
+    };
+
     // --- Supply: each corp lists its pool surplus above processor reservations ---
     // Visit pools in their (deterministic) map order; debit the pool now, value later.
     for (auto& [key, pool] : w.corp_body_pools)
@@ -141,6 +153,8 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         {
             if (mc.base_price[r] <= 0.0f)
                 continue; // untraded (e.g. regolith) — never listed
+            if (player_controls(corp, body, r))
+                continue; // a standing player order governs this resource's sale
 
             const float surplus = pool.quantities[r] - reserve[r];
             if (surplus <= 0.0f)
@@ -152,8 +166,10 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         }
     }
 
-    // --- Player sell orders (Layer 3 framework hook) ---
-    // No orders are issued in Layer 3; the loop is the seam Layer 4 fills in.
+    // --- Player sell orders (the manual market side) ---
+    // Each standing order sells up to its quantity from the (corp, body) pool — the
+    // auto path above yielded these resources — listed as supply and valued at
+    // max(resolved price, floor) in the final pass.
     for (const sell_order& order : player_orders)
     {
         const auto mit = markets.find(order.body);
