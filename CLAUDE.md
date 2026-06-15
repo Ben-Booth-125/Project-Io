@@ -34,7 +34,11 @@ a specific implementation choice was made.
 **`docs/development/OPENS.md`** and **`docs/development/TASKS.md`**
 The two-file backlog. OPENS.md (the **open items**) holds *described intent* — parked
 additions and deferred ideas with file pointers — and is **design-focused**: each Brief
-carries a **design-state glyph** (`✓` designed/promote-ready, `~` design still owed). TASKS.md
+carries a **design-state glyph** (`✓` designed/promote-ready, `~` design still owed).
+OPENS is also the **design authority for an open Brief**: while the work is unrealised,
+the settled design lives in the Brief (OPENS is the most up-to-date source), and only
+propagates into the subject's authority doc when the work lands and the Brief is removed
+(authority time-slices — see OPENS.md § Design state). TASKS.md
 holds the *active, prioritised, actionable worklist*: a `✓` Brief is **promoted** into
 file-scoped, dependency- and parallelisation-marked tasks (the A–F style) when we decide to
 act on it. Read OPENS.md § OPENS vs. TASKS for the workflow before promoting or executing

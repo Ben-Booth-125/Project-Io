@@ -33,9 +33,23 @@ state is about *readiness to promote*, orthogonal to priority (importance) and
 difficulty (size): an urgent Brief can still be `~`, a parked one can be `✓`.
 
 **Design happens here, not mid-flight.** Pausing to settle a `~` Brief's design (into
-its authority doc) beats redesigning during a publish — redesign in place is costly
+the Brief itself) beats redesigning during a publish — redesign in place is costly
 (see CLAUDE.md § Design-direction Q&A and the Batch Publish documentation discipline).
 A `~` Brief is the signal that a design pass is owed *before* the work is actionable.
+
+**OPENS is the design authority while a design is open.** A settled design lives in
+the Brief — not in a downstream authority doc — for as long as the work is unrealised.
+OPENS is where the question was actually answered, so it carries the freshest
+rationale and context and is **by definition more up-to-date** than any authority doc
+on that subject. The `~ → ✓` flip therefore settles the design **into the Brief**, not
+into the authority doc. Authority **time-slices**: exactly one place is authoritative
+at any moment — **OPENS while the Brief is open, the subject's authority doc once the
+work lands and the Brief is removed**. The hand-off happens at implementation, not at
+the flip: propagating the settled design into its authority doc is **part of landing
+the work**, not a separate debt carried while the Brief is still open. The consequence
+to keep honest: an authority doc therefore *lags* OPENS for any subject with an open
+Brief, so that doc should **point forward** to the open Brief rather than imply its
+pre-design state is current.
 
 ## OPENS vs. TASKS
 
@@ -55,11 +69,13 @@ tasks. Promotion is where we do the planning a Brief deliberately omits:
   files), and which must wait. Steps that edit the same files stay sequential.
 
 **Only `✓` (designed) Briefs are promotable.** A `~` Brief is designed first — its
-design pass settles into the authority doc and flips it to `✓` — and only then is it
+design pass settles **into the Brief** and flips it to `✓` — and only then is it
 promoted. OPENS.md is **entirely forward-facing**: it holds only intent not yet
-realised. When work lands, its Brief is **removed** here (the record of what was built
-lives in the DEVLOG, not in OPENS) — leaving behind only any genuinely open follow-up
-as its own forward Brief. TASKS.md is the transient execution list, cleared as tasks
+realised, and is the **design authority** for that intent while it is open (see
+§ Design state). When work lands, its Brief is **removed** here (the record of what was
+built lives in the DEVLOG, not in OPENS) and the settled design is propagated into the
+subject's authority doc as part of landing the work — leaving behind only any genuinely
+open follow-up as its own forward Brief. TASKS.md is the transient execution list, cleared as tasks
 complete. See [`TASKS.md`](TASKS.md) for the task format.
 
 ### Depth verbs — how far to take a Brief
@@ -68,9 +84,10 @@ These verbs name *how far* an instruction should carry a Brief, so a request sig
 its own effort and nothing ambiguous is read as low-effort. Prefer them over vague
 phrasing ("look at", "do", "sort out") when the depth matters:
 
-- **Design** — **design depth only.** Settle a `~` Brief's open questions into its
-  authority doc and flip it to `✓`, then **stop**. No tasks, no code. Use when a Brief
-  is not yet promotable and the design is the next action.
+- **Design** — **design depth only.** Settle a `~` Brief's open questions **into the
+  Brief** and flip it to `✓`, then **stop**. No tasks, no code, no authority-doc edit
+  (that propagation happens later, when the work lands). Use when a Brief is not yet
+  promotable and the design is the next action.
 - **Promote** — **planning depth only.** Break a `✓` Brief into TASKS.md tasks and write
   its REQUIREMENTS.md table, then **stop**. No code is written. Use when the plan
   should be reviewed before execution.
