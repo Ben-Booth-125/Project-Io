@@ -137,14 +137,16 @@ advances it ranks higher; fixes to past work and minor future-note tweaks that d
 advance it rank lower, however tidy they would be. *(Goal as of 2026-06-15: getting
 Layer 4 — population centres + building management — working.)*
 
-**Difficulty** (1–5) is an approximate *time-to-do*, not a measure of importance:
+**Difficulty** (1–5) is an approximate *time-to-do*, not a measure of importance. The
+scale is **non-linear** — each step is roughly 3–4× the last:
 
-- **1** — trivial: up to ~1 hour. One file, no design decisions.
-- **2** — light: ~2–4 hours (a half-session). One system, light design.
-- **3** — medium: ~a focused session (about a day). One subsystem end-to-end with verification.
-- **4** — hard: ~2–3 sessions. Multiple files or real design plus new verification.
-- **5** — very hard: ~a week or more — a large multi-part build that usually wants
-  splitting into several Briefs at promotion.
+- **1** — **~5 minutes.** A trivial one-file tweak, no design decisions.
+- **2** — **~20 minutes.** A small, contained change in one system; light design.
+- **3** — **~1 hour.** One subsystem taken end-to-end with verification.
+- **4** — **~3 hours.** Multiple files or real design plus new verification.
+- **5** — **~12+ hours.** A large multi-part build. **A `5` should normally be broken
+  down** into smaller Briefs (or promoted into a multi-group TASKS set) rather than taken
+  on whole — treat it as a flag that the intent is still too big to act on directly.
 
 There is no difficulty 6; "deferred" is the **`F`** priority, not a difficulty.
 

@@ -15,8 +15,9 @@ difficulty into a **`[<priority><difficulty>]`** pair:
   (replaces the old difficulty-6 status); `SSS` is *do immediately*. Re-rated every Brief
   against the current goal — **getting Layer 4 working** — so enablers rank high and
   fixes/future-note tweaks rank low.
-- **Difficulty** (1–5) is now an approximate *time-to-do* (1 ≈ <1h … 5 ≈ a week+), not a
-  vague effort score. Difficulty 6 removed.
+- **Difficulty** (1–5) is now an approximate *time-to-do* on a **non-linear** scale
+  (~5 min / ~20 min / ~1 h / ~3 h / ~12 h+, each step ≈ 3–4× the last); a `5` is a flag to
+  break the Brief down. Difficulty 6 removed.
 
 **Layer 4 rescoped** from "production UI overhaul" to **population centres + building
 management** (the deferred POPULATION.md model coupled with construction / recipe-workforce
