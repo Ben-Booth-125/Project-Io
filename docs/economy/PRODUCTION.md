@@ -28,7 +28,7 @@ Each building type targets a specific class of resource. Placement is valid only
 
 | Building | Target resources | Valid terrain | Era |
 |----------|-----------------|---------------|-----|
-| Mine | Iron ore, coal, silica, copper ore, rare earth ore, peat, iron-nickel ore, platinum group metals | Barren, rocky, volcanic, tundra, metallic | 0 |
+| Mine | Iron ore, coal, silica, copper ore, rare earth ore, peat | Barren, rocky, volcanic, tundra | 0 |
 | Oil Platform | Petroleum | Barren (geological deposit) | 0 |
 | Quarry | Stone, sand, clay | All non-water compositions | 0 |
 | Lumber Camp | Timber | Forest, wetland | 0 |
@@ -36,7 +36,7 @@ Each building type targets a specific class of resource. Placement is valid only
 | Ice Extractor | Water (from ice deposits) | Icy | 1 |
 | Surface Extractor | Regolith, iron-nickel ore, platinum group metals | Regolith, metallic | 1 |
 
-The Mine covers all hard-mineral deposits and adjusts its output to whatever the tile holds. The same building type on a Kepler volcanic tile yields rare earth ore; on a metallic asteroid tile it yields iron-nickel ore or platinum group metals. The distinction between deposit types is in the tile data, not the building type.
+The Mine covers all terrestrial hard-mineral deposits and adjusts its output to whatever the tile holds: the same building type on one volcanic tile yields rare earth ore and on another yields copper ore. The distinction between deposit types is in the tile data, not the building type. Off-world metallic deposits (iron-nickel ore, platinum group metals) are harvested by the Surface Extractor, the Era 1 airless-body counterpart to the Mine; both feed the same smelting chain, so the distinction is one of era and deployment environment, not of downstream product.
 
 The Quarry and Lumber Camp exist specifically to harvest ambient resources (stone, timber, sand, clay) that are present at low levels on most tiles. They ensure every tile can be productive in some capacity, even if only as a local construction material source. They share the same workforce and hazard scalar model as other extraction buildings.
 
@@ -77,9 +77,10 @@ Coal is consumed as a process fuel and reagent but does not appear as a separate
 | Inputs | Output | Era |
 |--------|--------|-----|
 | Refined fuel + liquid oxygen | Propellant | 0 |
+| Atmospheric air (no stockpiled input) | Liquid oxygen | 0 |
 | Water | Liquid oxygen | 1 |
 
-The Chemical Plant requires Era 1 water to produce liquid oxygen, but propellant production is available in Era 0 using Earth-sourced refined fuel combined with liquid oxygen stockpiled by other means. In practice, propellant at scale is an Era 1 capability once in-situ water enables liquid oxygen production.
+On a body with an atmosphere, liquid oxygen is produced in Era 0 by cryogenic air separation — the Chemical Plant draws oxygen from the local atmosphere and consumes no stockpiled input (energy cost only, abstracted into the recipe rate). Propellant is therefore an Era 0 capability anywhere refined fuel is available. On airless bodies there is no atmosphere to separate, so the Era 1 water-electrolysis recipe is the only liquid-oxygen route off-world; closing the in-situ propellant loop there (water → liquid oxygen, refined fuel shipped or synthesised) is the defining Era 1 logistical problem.
 
 #### Electronics Lab
 

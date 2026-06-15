@@ -88,7 +88,7 @@ Refined goods are the primary goods in inter-body trade during the early game.
 | Silicon | Silica | Refinery |
 | Refined copper | Copper ore | Smelter |
 | REE alloy | Rare earth ore | Refinery |
-| Liquid oxygen | Water | Chemical Plant |
+| Liquid oxygen | Atmospheric air (Era 0) or water (Era 1) | Chemical Plant |
 | Food rations | Agricultural produce | Food Processor |
 
 ---
