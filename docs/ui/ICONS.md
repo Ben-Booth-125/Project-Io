@@ -83,6 +83,7 @@ silhouette reads the building **type** and the fill reads **who owns it**.
 | **Market** | `market(…, colour)` | Three ascending bars (price chart), outlined | Caller stroke | `overlay_mode::market` |
 | **Faction** | `faction(…, colour)` | Downward shield silhouette + outline | Caller fill | `overlay_mode::faction` |
 | **Corporation** | `corporation(…, colour)` | Filled square + dark inner dot ("seal") | Caller fill | `overlay_mode::corporation` |
+| **Resource** | `resource(…, colour)` | Three stacked horizontal strata, widening + deepening top-to-bottom (gradient / density motif) | Caller fill (per-stratum alpha) | `overlay_mode::resource` |
 
 In the strip ([`overlay.cpp`](../../src/ui/overlay.cpp), `draw_overlay_controls`)
 each lens is an invisible button with its glyph drawn over the rect; the active
@@ -135,10 +136,12 @@ firmed up (several feed the **lens-design** Brief):
    as a fill. This is fine but undocumented per-call; the catalogue's Colour column
    is the current truth.
 
-5. **The lens set is incomplete.** Four lens glyphs now exist
-   (supply/market/faction/**corporation**); the **Corporation** glyph was ratified
-   in [LENSES.md](LENSES.md) and added above. The proposed **Resource** lens still
-   needs a glyph — spec it in LENSES.md and add it here once ratified.
+5. **The lens set is now complete.** Five lens glyphs exist
+   (supply/market/faction/corporation/**resource**); all five are ratified in
+   [LENSES.md](LENSES.md) and catalogued above. Note `resource` is **overloaded**:
+   `resource(…, resource_type)` is the identity-coloured *pip* (a diamond), while
+   `resource(…, ImU32)` is the *lens* glyph (the strata motif) — same name,
+   disambiguated by the final argument type and by context (strip vs. canvas pip).
 
 6. **No dedicated nation / corporation entity glyph.** The political layer conveys
    nations by tile *tint* (`palette::nation_colour`) and corporations by building

@@ -93,4 +93,16 @@ void faction(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Fill colour of the square; the inner dot is drawn dark.
 void corporation(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw the Resource-lens glyph — a stack of three short horizontal strata of
+/// increasing width (a gradient / deposit-density motif) — in @p colour. Reads
+/// as layered density, distinct from the supply pair of full-width rules, the
+/// market ascending bars, and the resource *pip* diamond. For the overlay-lens
+/// control strip. See LENSES.md § Resource lens.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Fill colour of the strata (drawn at descending opacity).
+void resource(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 } // namespace ui::icons

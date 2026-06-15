@@ -117,4 +117,25 @@ void corporation(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     dl->AddCircleFilled(centre, std::max(1.0f, r * 0.35f), outline);
 }
 
+void resource(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // Three stacked horizontal strata, widening top-to-bottom and deepening in
+    // opacity — a gradient / deposit-density motif. Distinct from the supply
+    // pair of thin full-width rules, the market vertical bars, and the resource
+    // pip diamond. The fill alpha is scaled per stratum to read as a gradient.
+    const float gap = r * 0.18f;          // vertical gap between strata
+    const float th  = r * 0.42f;          // stratum thickness
+    const float widths[3]  = { r * 0.45f, r * 0.72f, r };          // top → bottom
+    const float alphas[3]  = { 0.40f, 0.70f, 1.00f };              // top → bottom
+    const float top = centre.y - r;
+    for (int i = 0; i < 3; ++i)
+    {
+        const float y0 = top + static_cast<float>(i) * (th + gap);
+        const float w  = widths[i];
+        const ImU32 c  = (colour & 0x00FFFFFFu)
+                       | (static_cast<ImU32>(((colour >> 24) & 0xFFu) * alphas[i]) << 24);
+        dl->AddRectFilled({ centre.x - w, y0 }, { centre.x + w, y0 + th }, c, th * 0.4f);
+    }
+}
+
 } // namespace ui::icons
