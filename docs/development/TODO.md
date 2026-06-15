@@ -496,8 +496,8 @@ The labour scalar (`docs/SYSTEMS.md` § Workforce, `docs/economy/POPULATION.md`)
   UI (§ Canvas) and the market / balance / construction ledgers (§ Ledger). Build cost comes
   from the Lua economy-constants registry. Large and multi-part; splits into several Briefs at
   promotion. Depends on the pre-L4 enablers (placement-rules seam, workforce-model design, the
-  economy-test harness). See `docs/economy/{PRODUCTION,POPULATION}.md` and the build sequence
-  in `docs/development/INITIAL_INSTRUCTIONS.md` (to be rewritten — see Documentation).
+  economy-test harness). See `docs/economy/{PRODUCTION,POPULATION}.md` and the milestone map
+  in `docs/development/ROADMAP.md` (v0.0.6 — building management + population).
 
 ## Environment
 

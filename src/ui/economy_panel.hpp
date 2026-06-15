@@ -7,7 +7,7 @@
 namespace ui {
 
 /// Draw the Layer 3 economy observability panel — the read-only surface that makes
-/// the economy legible (INITIAL_INSTRUCTIONS). Surfaces, per the Layer 3 design:
+/// the economy legible (see ROADMAP.md). Surfaces, per the Layer 3 design:
 ///   - each corporation's running balance (negative flagged red);
 ///   - each (corporation, body) pool's per-resource quantities;
 ///   - each building's current output rate and idle/active state, and for

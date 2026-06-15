@@ -6,7 +6,40 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
-## 2026-06-15 — TODO restructure: priority/difficulty split, Layer 4 rescope
+## 2026-06-15 — Roadmap to v0.1.0; INITIAL_INSTRUCTIONS retired
+
+Documentation-only. Replaced the layer-list build sequence with a proper milestone map and
+split the retired file's content to its right homes.
+
+### What changed
+
+- **New `docs/development/ROADMAP.md`** (indexed in `CLAUDE.md`) — a lean, forward-facing
+  milestone map: the versioning grain (one coherent theme per minor), the current position
+  (v0.0.4, Layer 3 economy complete), the four forward minors, and the v0.1.0 done-definition.
+  Sits above TODO/TASKS — names each minor's *theme*, not its Briefs (the lean choice, to
+  avoid Brief duplication that drifts).
+- **`docs/development/INITIAL_INSTRUCTIONS.md` removed** (`git rm`). Its build sequence is
+  superseded by ROADMAP.md; its scope/exclusions already lived in TECH_FOUNDATIONS; its
+  development rules migrated (below).
+- **`DEVELOPMENT_PRACTICES.md`** gained three migrated sections — the per-milestone **ImGui
+  panel** rule, the standing **development constraints** ("do not" list), and the
+  **tone/approach** guidance — plus the layer reference in § Testing now points at ROADMAP.md.
+- **Reference fixes**: `CLAUDE.md` doc index (new ROADMAP entry, expanded PRACTICES entry),
+  the § Infrastructure L4 Brief in `TODO.md` (now points at ROADMAP v0.0.6), and the
+  `economy_panel.hpp` header comment. The historical DEVLOG reference (2026-06-14 entry) was
+  left verbatim as a permanent record.
+
+### Decisions (Q&A before drafting)
+
+- **Four minors, compressed.** v0.0.5 (L4 foundations) → v0.0.6 (building management **+**
+  population, folded) → v0.0.7 (supply, L5) → v0.0.8 (budget + hardening, L6 + polish) → cut
+  **v0.1.0**. v0.0.6 is the acknowledged likely split point.
+- **v0.1.0 = full economy loop** — construction, population, inter-body supply, full budget,
+  legible read surfaces; Conflict/Research/Policy/Diplomacy excluded by scope.
+- **Constraints migrate to practices**, scope prose disregarded (already owned by
+  TECH_FOUNDATIONS), roadmap kept **lean** (no Brief enumeration).
+
+
 
 Backlog-only change (no code). Reworked the TODO Brief marker from a single 1–6
 difficulty into a **`[<priority><difficulty>]`** pair:

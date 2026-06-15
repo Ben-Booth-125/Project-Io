@@ -20,11 +20,11 @@ Canonical definitions for all project terms. Use these terms consistently. If a 
 **`docs/tech/TECH_FOUNDATIONS.md`**
 All settled technical decisions: language, framework, architecture, tick model, data model, UI approach, and serialisation. Read this before writing any code or making any architectural suggestion. It also defines the prototype scope and what is explicitly excluded.
 
-**`docs/development/INITIAL_INSTRUCTIONS.md`**
-The prototype build sequence and the constraints that govern development assistance. Read this alongside TECH_FOUNDATIONS when working on implementation.
+**`docs/development/ROADMAP.md`**
+The milestone map from the current state to v0.1.0 (the finished prototype): the version sequence, the theme of each minor, and the v0.1.0 done-definition. Forward-facing and lean — it sits above TODO/TASKS, naming which theme each minor carries, not the individual Briefs. Read this for questions about sequence, what comes when, or whether a feature belongs in the prototype's remaining arc.
 
 **`docs/development/DEVELOPMENT_PRACTICES.md`**
-Testing framework (Catch2), naming conventions, documentation standards, and how Claude should handle each.
+Testing framework (Catch2), naming conventions, documentation standards, the per-milestone ImGui panel rule, the standing development constraints, the tone/approach guidance, and how to cut a release. Read this alongside TECH_FOUNDATIONS when working on implementation.
 
 **`docs/development/DEVLOG.md`**
 Running session log — chronological record of what was built each session and

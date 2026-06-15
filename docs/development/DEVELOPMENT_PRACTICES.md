@@ -8,7 +8,7 @@ This document defines the coding standards, documentation conventions, and testi
 
 The project uses **Catch2** for unit testing.
 
-Tests are written alongside the layer they cover, not deferred to the end. Each layer in `development/INITIAL_INSTRUCTIONS.md` should have tests for its core logic before the next layer begins.
+Tests are written alongside the layer they cover, not deferred to the end. Each milestone in `development/ROADMAP.md` should have tests for its core logic before the next begins.
 
 ### What to test
 
@@ -166,6 +166,40 @@ progress += delta;
 ```
 
 ImGui panel code is an exception — brief section comments are encouraged there since panels serve as the functional specification for the production UI and will be read as reference material.
+
+### ImGui panels — one per milestone, as it is built
+
+Wire an ImGui panel alongside each milestone as it is built, not at the end. Each panel needs
+only to make that milestone's state observable — a tile inspector, a market price readout, a
+convoy list, a budget line. These panels are debugging tools *and* the functional
+specification for the production UI. Write ImGui code clearly, not cleverly — it is reference
+material as much as working code.
+
+---
+
+## Development constraints
+
+Standing prohibitions for the prototype, migrated from the retired build-sequence doc. The
+full scope and its exclusions are owned by [`../tech/TECH_FOUNDATIONS.md`](../tech/TECH_FOUNDATIONS.md);
+these are the recurring "do not" rules that come up while building:
+
+- Do not suggest or implement anything outside the prototype scope in TECH_FOUNDATIONS.
+- Do not design or implement a milestone that depends on an earlier one not yet complete. If
+  asked to, flag it (see `ROADMAP.md` for the sequence).
+- Do not expose individual tile data to Lua.
+- Do not use unprotected sol2 calls where errors can occur.
+- Do not add SQLite — flat binary serialisation is correct for now.
+- Do not build AI faction behaviour beyond the data-model minimum stub.
+- Do not introduce a retained-mode UI framework in place of ImGui for the prototype.
+
+---
+
+## Tone and approach
+
+- Every system should justify its existence by feeding into **Trade** or **Conflict**. Favour
+  solutions that are legible and composable over solutions that are locally clever but opaque.
+- When the right approach is uncertain, state the uncertainty and present options with
+  trade-offs rather than picking one silently. Stay the advisor — the developer makes the calls.
 
 ---
 
