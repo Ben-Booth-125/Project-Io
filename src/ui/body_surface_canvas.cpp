@@ -423,11 +423,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
     if (have_hover && !hovered_selected)
         draw_hex_highlight(dl, hover_verts, highlight::hovered);
 
-    // Layer 4 scaffold: building-placement ghost preview. When construction mode
-    // is active and a tile is hovered, draw a translucent-intent marker of the
-    // chosen building type at the hovered copy's centre, tinted green when the
-    // placement-rules seam accepts the tile and red when it rejects it. This is a
-    // pure preview — it reads placement_rules::can_place and mutates nothing. The
+    // Building-placement ghost preview. When construction mode is active and a tile
+    // is hovered, draw a translucent-intent marker of the chosen building type at the
+    // hovered copy's centre, tinted green when the placement-rules seam accepts the
+    // tile and red when it rejects it. The marker reads placement_rules::can_place
+    // and mutates nothing — the click below is what enqueues the build. The
     // hovered copy's centre is the centroid of its six vertices (the wrap copy the
     // cursor actually resolved to); the marker radius mirrors the built-marker pass.
     if (have_hover && state.construction.active)
@@ -490,9 +490,18 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
     {
         if (!state.construction.active)
+        {
             state.selected_entity = hovered_tile;
-        // Layer 4 scaffold: placement-mode click is a non-mutating seam — v0.0.6
-        // will construct here. No world/selection mutation in v0.0.5.
+        }
+        else if (hovered_tile != null_entity)
+        {
+            // Placement mode: queue a construction request on the hovered tile.
+            // app::render executes it against the mutable world (this canvas holds
+            // only const world&) and clears it. See SELECTION.md / construction.hpp.
+            state.construction.pending_tile   = hovered_tile;
+            state.construction.pending_type   = state.construction.type;
+            state.construction.pending_target = state.construction.target;
+        }
     }
 
     // Pan and zoom. Middle mouse button pans; scroll wheel zooms, anchored at

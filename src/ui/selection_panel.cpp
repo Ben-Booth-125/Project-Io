@@ -5,11 +5,112 @@
 #include "selection.hpp"
 #include "view_nav.hpp"
 
+#include "world/placement_rules.hpp"
+
 #include <imgui.h>
 
 namespace ui {
 
 namespace {
+
+// --- Build front door (tile Selection element) -------------------------------
+// The per-tile entry to construction (docs/ui/SELECTION.md): offers the buildable
+// types + cost and, on click, enqueues a construction request on this tile for the
+// player corporation. The request is executed by app against the mutable world —
+// here we only read and enqueue. Reached only for a selected tile.
+void draw_build_front_door(const world& w, const recipe_registry& reg,
+                           ui_state& ui, entity_id tile)
+{
+    const auto tit = w.tiles.find(tile);
+    if (tit == w.tiles.end())
+        return;
+    const tile_component& tc = tit->second;
+
+    ImGui::Separator();
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Build here");
+
+    if (placement_rules::is_ocean_tile(tc.composition))
+    {
+        ImGui::TextDisabled("Cannot build on water.");
+        return;
+    }
+
+    // Player balance gates affordability (a building the corp cannot pay for is
+    // offered disabled, so the cost is still legible).
+    float balance = 0.0f;
+    const auto pit = w.corporations.find(w.player_entity);
+    if (pit != w.corporations.end())
+        balance = pit->second.balance;
+
+    // Enqueue helper — sets the pending request app executes this frame.
+    auto enqueue = [&ui, tile](building_type type, resource_type target) {
+        ui.construction.pending_tile   = tile;
+        ui.construction.pending_type   = type;
+        ui.construction.pending_target = target;
+    };
+
+    // --- Extraction: only the extractable resources actually deposited here ---
+    bool any_extractable = false;
+    for (const resource_type r : placement_rules::k_extractable)
+        if (tc.resource_deposit[static_cast<std::size_t>(r)] > 0.0f)
+            any_extractable = true;
+
+    if (any_extractable)
+    {
+        // A compact target picker over the deposits present, writing construction.target.
+        if (!placement_rules::is_extractable(ui.construction.target) ||
+            tc.resource_deposit[static_cast<std::size_t>(ui.construction.target)] <= 0.0f)
+        {
+            // Default the target to the first present extractable so the button is valid.
+            for (const resource_type r : placement_rules::k_extractable)
+                if (tc.resource_deposit[static_cast<std::size_t>(r)] > 0.0f)
+                { ui.construction.target = r; break; }
+        }
+        for (const resource_type r : placement_rules::k_extractable)
+        {
+            if (tc.resource_deposit[static_cast<std::size_t>(r)] <= 0.0f)
+                continue;
+            const bool sel = (ui.construction.target == r);
+            if (ImGui::RadioButton(resource_name(r), sel))
+                ui.construction.target = r;
+            ImGui::SameLine();
+        }
+        ImGui::NewLine();
+
+        const float cost = reg.economics(building_type::extraction_site).build_cost;
+        ImGui::BeginDisabled(balance < cost);
+        if (ImGui::Button("Build extraction site"))
+            enqueue(building_type::extraction_site, ui.construction.target);
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        ImGui::TextDisabled("(%.0f)", cost);
+    }
+    else
+    {
+        ImGui::TextDisabled("No extractable deposit here.");
+    }
+
+    // --- Processing facility + Port: any non-ocean land tile ---
+    const float pc = reg.economics(building_type::processing_facility).build_cost;
+    ImGui::BeginDisabled(balance < pc);
+    if (ImGui::Button("Build processing facility"))
+        enqueue(building_type::processing_facility, resource_type::iron_ore);
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    ImGui::TextDisabled("(%.0f)", pc);
+
+    const float portc = reg.economics(building_type::port).build_cost;
+    ImGui::BeginDisabled(balance < portc);
+    if (ImGui::Button("Build port"))
+        enqueue(building_type::port, resource_type::iron_ore);
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    ImGui::TextDisabled("(%.0f)", portc);
+
+    // Outcome of the most recent attempt, if any.
+    if (!ui.construction.last_message.empty())
+        ImGui::TextDisabled("%s", ui.construction.last_message.c_str());
+}
 
 // Headline label for a selected entity. Bodies carry a name; the other kinds
 // have none, so their kind doubles as the title and the stat block supplies the
@@ -48,7 +149,8 @@ void draw_summary(const world& w, selection_kind kind, entity_id id)
 
 } // namespace
 
-void draw_selection_panel(const world& w, ui_state& ui, float left_x, float bottom_y)
+void draw_selection_panel(const world& w, const recipe_registry& reg, ui_state& ui,
+                          float left_x, float bottom_y)
 {
     const selection_kind kind = selection_kind_of(w, ui.selected_entity);
 
@@ -102,6 +204,10 @@ void draw_selection_panel(const world& w, ui_state& ui, float left_x, float bott
 
     // --- Body: polymorphic content for the selected kind ---
     draw_summary(w, kind, ui.selected_entity);
+
+    // Build front door — only for a selected tile (the per-tile construction entry).
+    if (kind == selection_kind::tile)
+        draw_build_front_door(w, reg, ui, ui.selected_entity);
 
     ImGui::End();
 }

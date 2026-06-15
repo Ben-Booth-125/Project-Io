@@ -58,14 +58,6 @@ void read_resource_map(const sol::table& src, std::array<float, resource_count>&
 
 } // namespace
 
-uint16_t recipe_registry::recipe_id(const std::string& name) const
-{
-    for (std::size_t i = 0; i < m_recipes.size(); ++i)
-        if (m_recipes[i].name == name)
-            return static_cast<uint16_t>(i);
-    return no_recipe;
-}
-
 void recipe_registry::load_from_lua(lua_state& lua)
 {
     sol::state& s = lua.state();

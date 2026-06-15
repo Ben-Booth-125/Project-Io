@@ -3,6 +3,8 @@
 #include "world/components.hpp" // building_type / resource_type for construction_state
 #include "world/entity.hpp"
 
+#include <string>
+
 /// Which rung of the canvas zoom ladder currently fills the primary viewport.
 /// The minimap shows the rung one step *out* (towards solar) from this.
 enum class canvas_level
@@ -26,17 +28,31 @@ enum class overlay_mode
     corporation, ///< Corporate-owned tiles (per-corp tint; player-corp border). See LENSES.md.
 };
 
-/// Construction (building-placement) interaction state — the Layer 4 UI groundwork
-/// scaffold. When `active`, the Planetary canvas enters placement mode: a ghost
-/// marker of `type` follows the cursor, tinted by `placement_rules::can_place`, and
-/// the select-on-click is suppressed. In v0.0.5 this is a *non-mutating scaffold* —
-/// the click is a no-op seam; the functional construction loop (build-cost spend,
-/// world mutation) lands in v0.0.6 (TODO § Infrastructure [S5]).
+/// Construction (building-placement) interaction state. When `active`, the
+/// Planetary canvas enters placement mode: a ghost marker of `type` follows the
+/// cursor, tinted by `placement_rules::can_place`, and the select-on-click is
+/// suppressed; a click enqueues a construction request (see `pending_tile`) the
+/// app executes against the world (build-cost spend + world mutation, via
+/// construction.hpp). The per-tile build entry also lives on the tile Selection
+/// element (the build front door, SELECTION.md).
 struct construction_state
 {
     bool          active = false;                          ///< Whether placement mode is engaged (set by the construction panel's Build section).
     building_type type   = building_type::extraction_site; ///< The building type being placed.
     resource_type target = resource_type::iron_ore;        ///< Extraction target for the placed building; meaningful only for extraction_site.
+
+    /// Pending construction request — set by the build front door (the tile
+    /// Selection element, SELECTION.md) or a placement-mode canvas click, and
+    /// executed by `app::render` against the mutable world (the UI surfaces hold
+    /// only `const world&`, so the mutation is centralised in app). `null_entity`
+    /// = nothing pending; `pending_type` / `pending_target` carry the request.
+    entity_id     pending_tile   = null_entity;
+    building_type pending_type   = building_type::extraction_site;
+    resource_type pending_target = resource_type::iron_ore;
+
+    /// Last construction outcome, set by app after executing a request — a short
+    /// human string shown by the build UI ("Built.", "Can't afford it.", …).
+    std::string   last_message;
 };
 
 /// Shared selection and view state for the three primary canvases.

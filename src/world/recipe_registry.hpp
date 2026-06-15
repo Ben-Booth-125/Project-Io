@@ -53,8 +53,16 @@ public:
     }
 
     /// Recipe id for a recipe name, or `no_recipe` if none matches. Used at
-    /// placement to author building_component.recipe from a stable name.
-    uint16_t recipe_id(const std::string& name) const;
+    /// placement to author building_component.recipe from a stable name. Inline
+    /// (pure data) so player-construction logic stays headless-buildable without
+    /// linking the Lua-bound translation unit.
+    uint16_t recipe_id(const std::string& name) const
+    {
+        for (std::size_t i = 0; i < m_recipes.size(); ++i)
+            if (m_recipes[i].name == name)
+                return static_cast<uint16_t>(i);
+        return no_recipe;
+    }
 
     /// Economy constants for a building type.
     const building_economics& economics(building_type type) const

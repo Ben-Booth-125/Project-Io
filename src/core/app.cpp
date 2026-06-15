@@ -25,6 +25,7 @@
 #include "ui/tile_inspector.hpp"
 #include "ui/view_nav.hpp"
 #include "world/budget_system.hpp"
+#include "world/construction.hpp"
 #include "world/hard_coded_world.hpp"
 #include "world/market_clearing.hpp"
 #include "world/orbital_system.hpp"
@@ -727,8 +728,36 @@ void app::render()
     // Selection info element — pinned bottom-left, stacked directly above the
     // overlay strip. Hidden until the player selects an entity. See SELECTION.md.
     constexpr float overlay_strip_h = 40.0f; // approx height of the lens strip below
-    ui::draw_selection_panel(m_world, m_ui, ui::nav_pane_width,
+    ui::draw_selection_panel(m_world, m_registry, m_ui, ui::nav_pane_width,
                              disp.y - margin - overlay_strip_h);
+
+    // Execute any construction request queued this frame by the build front door
+    // (tile Selection element) or a placement-mode canvas click. Centralised here
+    // so the const-world UI surfaces only enqueue; the world mutation happens once,
+    // against app's mutable world. See construction.hpp / SELECTION.md.
+    if (m_ui.construction.pending_tile != null_entity)
+    {
+        entity_id built = null_entity;
+        const construction_result r = construct_building(
+            m_world, m_registry, m_world.player_entity,
+            m_ui.construction.pending_tile, m_ui.construction.pending_type,
+            m_ui.construction.pending_target, built);
+        switch (r)
+        {
+            case construction_result::placed:
+                m_ui.construction.last_message    = "Built.";
+                m_ui.selected_entity              = built;        // inspect the new building
+                m_ui.selection_hidden_for         = null_entity;  // re-show the panel
+                break;
+            case construction_result::invalid_tile:
+                m_ui.construction.last_message = "Can't build there."; break;
+            case construction_result::insufficient_funds:
+                m_ui.construction.last_message = "Can't afford it."; break;
+            default:
+                m_ui.construction.last_message = "Construction failed."; break;
+        }
+        m_ui.construction.pending_tile = null_entity; // consume the request
+    }
 
     ImGui::Render();
     SDL_SetRenderDrawColor(m_renderer, 15, 15, 20, 255);

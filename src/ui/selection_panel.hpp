@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ui_state.hpp"
+#include "world/recipe_registry.hpp"
 #include "world/world.hpp"
 
 namespace ui {
@@ -19,11 +20,19 @@ namespace ui {
 /// selection has been dismissed. It is anchored by its **bottom** edge, matching
 /// draw_overlay_controls' convention, so the caller passes the y to sit above.
 ///
+/// For a selected **tile** the panel also hosts the **build front door**
+/// (docs/ui/SELECTION.md): the buildable types (via placement_rules), their cost,
+/// and a build action that enqueues a construction request on that tile (executed
+/// by app against the mutable world). This is the contextual, per-tile entry to
+/// construction — distinct from the broad buildings overview, which earns a menu.
+///
 /// @param w        Read-only world state (the content source).
-/// @param ui       UI state; read for the selection, written by 'go to' (focus)
-///                 and by the close button (hide).
+/// @param reg      Loaded registry — build costs for the build front door.
+/// @param ui       UI state; read for the selection, written by 'go to' (focus),
+///                 the close button (hide), and the build front door (enqueue).
 /// @param left_x   Left edge of the panel, screen pixels (the nav-pane inner edge).
 /// @param bottom_y Bottom edge to anchor the panel against, screen pixels.
-void draw_selection_panel(const world& w, ui_state& ui, float left_x, float bottom_y);
+void draw_selection_panel(const world& w, const recipe_registry& reg, ui_state& ui,
+                          float left_x, float bottom_y);
 
 } // namespace ui

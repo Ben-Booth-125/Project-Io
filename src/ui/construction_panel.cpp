@@ -14,10 +14,10 @@ namespace ui {
 namespace {
 
 // --- Build section -----------------------------------------------------------
-// Arms placement mode by writing the shared construction_state. Nothing here
-// mutates the world: in v0.0.5 placement is a preview seam (the Planetary canvas
-// reads construction.active and draws a ghost marker); the functional construct
-// loop lands in v0.0.6.
+// Arms placement mode by writing the shared construction_state. The Planetary
+// canvas reads construction.active and draws a ghost marker; a placement-mode
+// click enqueues a construction request the app executes (build cost spent). The
+// per-tile build entry also lives on the tile Selection element (the front door).
 void draw_build_section(ui_state& state)
 {
     if (!ImGui::CollapsingHeader("Build", ImGuiTreeNodeFlags_DefaultOpen))
@@ -72,10 +72,10 @@ void draw_build_section(ui_state& state)
         if (ImGui::Button("Cancel"))
             state.construction.active = false;
 
-        // Helper line: click a tile to place. v0.0.5 is a preview only — the click
-        // is a non-mutating seam; no construction is actually committed yet.
-        ImGui::TextDisabled("Click a tile on the surface to place it.");
-        ImGui::TextDisabled("(v0.0.5 preview - placement does not build yet.)");
+        // Click a tile to construct: the placement-mode click enqueues a build
+        // request the app executes against the world (build cost is spent).
+        ImGui::TextDisabled("Click a tile on the surface to build it.");
+        ImGui::TextDisabled("(Or use 'Build here' on a selected tile.)");
     }
     else
     {
