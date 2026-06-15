@@ -91,6 +91,11 @@ condensed reference.
 
 ### The five steps
 
+0. **Brief-spanning requirement (gate — if the Brief changes `src/`).** Before decomposing a
+   `src/`-changing Brief into tasks, write a **brief-spanning requirement** in
+   `req/REQUIREMENTS.md` — one requirement covering the whole Brief, **usually a
+   visual-verification (`visual`) requirement**. It is the end-to-end acceptance gate and is
+   written first so the decomposition is shaped by it. Doc-only Briefs are exempt.
 1. **Create tasks** — promote the Brief into TASKS.md: decompose into the smallest
    independently-buildable steps (foundation first), scope each step to its exact files,
    and mark dependencies and parallelisation.
@@ -111,11 +116,21 @@ condensed reference.
    Requirements: <N completed>, <N pending>, <N failed>
    ```
 
-**When publishing multiple Briefs together**, run the five steps as **barriers across the
-whole set** (breadth-first, not depth-first): every Brief clears step *N* before any starts
-*N+1*. No Brief is committed while another still has a task in flight. Step 4 closes on
-*terminal* states (complete **or** cancelled) — a blocked task is cancelled rather than
-held open.
+**When publishing multiple Briefs together** (a **Batch Publish**; see GLOSSARY), run the five
+steps as **barriers across the whole set** (breadth-first, not depth-first): every Brief clears
+step *N* before any starts *N+1*. No Brief is committed while another still has a task in flight.
+Step 4 closes on *terminal* states (complete **or** cancelled) — a blocked task is cancelled
+rather than held open.
+
+A Batch Publish also runs a **documentation-coverage discipline** around the five steps (full
+detail in `docs/development/TODO.md` § Publish): up front, **determine per Brief whether the
+docs already record the implementation** (or it is a direct consequence of documented
+behaviour) — Briefs that fail are doc-changing and get a **per-Brief doc collision map** with
+**sub-agent fan-out** across disjoint docs; every changed doc carries a **minor transient
+"what was changed" note** (a visible `> ⟳` blockquote, removed once reviewed); and the batch
+**always adds an `S`-tier review Brief per changed doc** and, when it made non-trivial design
+calls, **closes with a proportional design-direction Q&A** (recorded in DEVLOG; see
+`docs/development/DEVELOPMENT_PRACTICES.md` § Design-direction Q&A).
 
 ### Proportionality and session boundaries
 

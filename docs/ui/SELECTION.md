@@ -1,5 +1,11 @@
 # Project Io — Selection Info Element
 
+> **⟳ Pending review (2026-06-15) — transient.** Reconciled with code landed in the >C Brief
+> pass: recorded the tile Selection element's **"Build here" front door** (new § The tile
+> element is the build front door) — the player-construction affordance that landed but was
+> not in this design doc. Remove this note once reviewed. See TODO § Documentation
+> [S-tier review].
+
 The **Selection info element** is a pinned, polymorphic panel that shows detail
 about the **current selection** — whatever entity the player last single-clicked.
 It is the persistent "what is this?" surface that complements the transient
@@ -82,6 +88,18 @@ So 'go to' is itself polymorphic: spatial entities navigate a canvas;
 non-spatial entities (nation, corporation) open the relevant ledger. For the
 prototype the spatial kinds (body, tile, building) are wired first; the rest are
 designed here and stubbed.
+
+### The tile element is the build front door
+
+Beyond its stat block, the **Tile** selection carries a **"Build here" affordance** — the
+player's primary construction entry point. It lists the building types placeable on the
+selected tile (gated by `placement_rules::can_place`) with their registry build cost,
+affordability-gated against the player corporation's balance; choosing one enqueues a
+construction request that the mutable-world pass executes (`construct_building`). This is the
+deliberate design choice that **building on one tile is a targeted action reached through the
+tile Selection element**, not a reserved menu — the nav-rail construction surface stays a
+broad overview (see `docs/ui/MENU.md`, TODO § Ledger). The equivalent placement-mode canvas
+click enqueues the same request.
 
 ---
 

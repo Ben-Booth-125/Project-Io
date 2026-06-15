@@ -150,6 +150,21 @@ All public interfaces are documented with **Doxygen-style comments**. This appli
 float resolve_price(float supply, float demand, float base_price);
 ```
 
+### Design-direction Q&A (Batch Publish)
+
+A **Batch Publish** (multiple Briefs in one block; see GLOSSARY) that made non-trivial or
+ambiguous design calls **closes by raising a short design-direction Q&A** — the open questions
+and the calls made on the user's behalf — and **records the outcome in the DEVLOG** with the
+session. No dedicated log file: DEVLOG is the home, the way the 2026-06-14 Layer 3 Q&A was kept.
+
+**Rationale:** code lands faster than design intent is pinned, so a batch quietly makes calls
+(what shape a generated thing takes, which of two mechanics wins). Surfacing them at the close
+catches a wrong call while the context is fresh, before it ossifies into "documented".
+
+**Keep it proportional.** This is a guideline, not ceremony — skip the Q&A for a batch that
+surfaced nothing worth asking, and keep the questions few. The point is to catch the one
+genuine fork, not to manufacture questions.
+
 ### Inline comments
 
 Use inline comments to explain **why**, not what. If the code requires a comment to explain what it is doing, rewrite the code first.

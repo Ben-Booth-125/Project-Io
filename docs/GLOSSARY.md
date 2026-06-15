@@ -42,6 +42,34 @@ The entity the player **single-clicked to inspect**. Persists until another enti
 **Brief**
 A unit of **described intent** in the backlog (`docs/development/TODO.md`): a problem to solve, a feature to build, or a doc to write, captured with enough context and file pointers to plan later — but deliberately carrying *no* implementation breakdown. A Brief is the design-level view of a single piece of work; **promoting** it into `docs/development/TASKS.md` decomposes it into a **task group** (one Brief ↔ one group of tasks). Distinct from a **task**, which is one file-scoped, individually-buildable step within that group. See `docs/development/TODO.md` (§ TODO vs. TASKS).
 
+**Batch Publish**
+The publication of **more than one Brief in a single work block**, run breadth-first under
+**barrier semantics** — every Brief clears each Publish step before *any* Brief begins the
+next (see `docs/development/TODO.md` § Publish → Publishing multiple Briefs together). Beyond
+the single-Brief lifecycle, a Batch Publish carries a **documentation-coverage discipline** a
+lone Publish does not:
+
+- **Doc-coverage determination (first).** Before execution, determine for each Brief whether
+  the design docs already record the implementation it will produce — or whether that
+  implementation is a **direct consequence of already-documented behaviour**. Briefs that
+  pass need no doc work; Briefs that fail are flagged **doc-changing**.
+- **Per-Brief documentation collision map.** For each doc-changing Brief, build a collision map
+  of the **documents** it will change (the doc analogue of the source-file collision map).
+  Disjoint-doc Briefs are parallel-safe — **fan out sub-agents to write the doc changes**;
+  Briefs touching the same doc stay sequential.
+- **Transient change note per doc.** Every changed doc carries a **minor transient
+  "what was changed" note** — a dated breadcrumb (a **visible `> ⟳` blockquote**, the standard
+  form) recording the edit, removed once the user has reviewed it.
+- **Standing review reminders.** A Batch Publish **always adds an `S`-tier Brief** (one per
+  changed doc) under TODO § Documentation, reminding the user to review the doc changes.
+- **Design-direction Q&A (proportional).** When the batch made non-trivial or ambiguous design
+  calls, it **closes by raising a Q&A** clarifying the design direction those calls surfaced,
+  recorded with the session in the DEVLOG (see `docs/development/DEVELOPMENT_PRACTICES.md`
+  § Design-direction Q&A). Skipped for a batch that surfaced nothing worth asking.
+
+Distinct from a single-Brief **Publish**, which carries no batch-level doc-coverage step. See
+`docs/development/TODO.md` § Publish and `CLAUDE.md` § Publication pipeline.
+
 **Complete (task state)**
 A development task is **complete** only when every requirement it satisfies has been **reviewed**, **implemented**, and **tested** — completeness is measured against the requirements, not against "the code is written". A task that is implemented and builds but whose requirements have not all been reviewed and verification-run is *code-complete*, not complete. See `docs/development/TASKS.md` (§ Definition of "complete") and `docs/development/req/REQUIREMENTS.md`.
 

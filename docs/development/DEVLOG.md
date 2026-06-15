@@ -6,6 +6,51 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## 2026-06-15 — Batch Publish process + retroactive doc-coverage reconcile (branch v0.0.5)
+
+A process/documentation session (no `src/` change) following the >C Brief pass. Defined the
+**Batch Publish** discipline, corrected the **Publish** lifecycle, and retroactively reconciled
+the design docs the >C pass left stale.
+
+### What was built (docs only)
+
+- **Batch Publish defined** (`GLOSSARY.md`, `TODO.md` § Publish, `CLAUDE.md` § Publication
+  pipeline): a multi-Brief publish carries a documentation-coverage discipline — an up-front
+  **doc-coverage determination** (do the docs already record the implementation, or is it a
+  direct consequence of documented behaviour?), a **per-Brief doc collision map** with
+  **sub-agent fan-out** across disjoint docs, a **transient `> ⟳` blockquote note** in each
+  changed doc (removed once reviewed), an **`S`-tier review Brief per changed doc**, and a
+  **proportional design-direction Q&A**.
+- **Publish corrected** (`TODO.md`, `CLAUDE.md`): added the **brief-spanning requirement gate**
+  — before a `src/`-changing Brief is decomposed into tasks, a Brief-wide requirement (usually
+  `visual` verification) is written first, shaping the decomposition and acting as the
+  end-to-end acceptance gate.
+- **Design-direction Q&A practice** (`DEVELOPMENT_PRACTICES.md` § Design-direction Q&A): short
+  rationale, recorded in DEVLOG (no dedicated log), kept proportional.
+- **Retroactive reconcile** (transient notes added to each): `CORPORATION_GENERATION.md`
+  Pass 3 → clustered 3–6 focus-shaped holdings + Pass 4 pre-game operating-history;
+  `SELECTION.md` → the tile "Build here" front door; `SYSTEMS.md` § Trade → standing
+  sell-orders / floor price. Three `S1` review Briefs logged under TODO § Documentation.
+
+### Design-direction Q&A (outcomes)
+
+- **Transient-note form:** a **visible `> ⟳` blockquote** everywhere (standardised SYSTEMS.md
+  off its HTML comment).
+- **Corporation holdings shape:** **flagged wrong** — the landed clustered 3–6 holdings is to
+  be **revised** (target shape still to settle). Logged as `[B4]` under § Environment →
+  Corporation generation; the doc stays accurate to current code with a *pending-rework*
+  transient note.
+- **Q&A recording:** a **dev practice with short rationale** in DEVELOPMENT_PRACTICES, recorded
+  in DEVLOG — no dedicated Q&A log (judged overkill); the Q&A step is **proportional**, not
+  mechanical.
+
+### Status
+
+Complete — docs only, no build impact. Three S-tier doc reviews + one corp-gen revision Brief
+left open in TODO.
+
+---
+
 ## 2026-06-15 — >C Brief pass, Wave 1.4: Corporation generation revision (branch v0.0.5)
 
 Two coordinated Briefs on the corp-generation passes — **[B4] larger holdings + realism** and

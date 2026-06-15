@@ -11,7 +11,11 @@ Systems are grouped into three supporting tiers below the pillars.
 ## Pillars
 
 ### Trade
-The player's corporation sells goods from any location to any market. Markets are pooled exchanges — buyers and sellers anywhere can transact — but logistical cost determines whether a sale is profitable. Base prices are set by global rarity; local supply and demand shift them each Tick. The player exploits price differentials by controlling production locations and minimising the cost of getting goods to market.
+> **⟳ Pending review (2026-06-15) — transient.** Added the standing sell-order sentence below
+> to record the player-sell-order mechanic landed in the >C pass. Remove once reviewed.
+> See TODO § Documentation [S-tier review].
+
+The player's corporation sells goods from any location to any market. Markets are pooled exchanges — buyers and sellers anywhere can transact — but logistical cost determines whether a sale is profitable. Base prices are set by global rarity; local supply and demand shift them each Tick. The player exploits price differentials by controlling production locations and minimising the cost of getting goods to market. The player can also place **standing sell orders** — a per-(body, resource) quantity with a **floor price** — which are honoured at market clearing and take precedence over the anonymous auto-sell path, so the player governs how their controlled stock is released rather than dumping it at the resolved price. *(Choosing **counterparties** preferentially is deferred — it needs a matched order book the pooled clearing lacks; see TODO § Trade.)*
 
 ### Conflict
 The player claims, defends, and invades territory through military force. Combat runs concurrently with the economy: supply routes are live targets, and active conflict on a body inhibits its trade connections. Territorial control is both a strategic objective and a source of ongoing economic pressure on opponents.

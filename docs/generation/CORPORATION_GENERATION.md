@@ -1,5 +1,13 @@
 # Project Io — Corporation Generation
 
+> **⟳ Pending rework (2026-06-15) — transient.** Reconciled with code landed in the >C Brief
+> pass: **Pass 3** rewritten to record the clustered, focus-shaped 3–6-holding placement
+> (anchor + nearest-tile fill, `placement_rules`-gated) that replaced the single vague
+> placement; **Pass 4** gained the pre-game operating-history note. **This describes the
+> current code, but the holdings *shape* was flagged wrong on review (2026-06-15) and is to be
+> revised** — see TODO § Environment → Corporation generation [B4] and § Documentation [S1].
+> Keep this note until the revision lands.
+
 Corporations are the primary actors in the simulation. They extract resources, build
 infrastructure, trade goods, and eventually project power off-world. At campaign start,
 all corporations — including the player's — are generated procedurally and are present
@@ -62,10 +70,21 @@ without enforcing a strict quota.
 
 ### Pass 3 — Starting asset placement
 
-Each corporation receives an opening set of buildings placed on tiles within their home
-nation's territory. Asset count and type follow from `industrial_focus`. Tile selection
-prefers high-deposit tiles for extraction corporations and high-connectivity tiles (near
-ports, adjacent to roads or markets) for trade corporations.
+Each corporation receives a **clustered, focus-shaped set of holdings** placed on tiles
+within their home nation's territory:
+
+- **Count.** A corporation opens with **3–6 buildings** (`k_min_holdings` / `k_max_holdings`),
+  not a single asset.
+- **Anchor, then cluster.** Placement chooses a **focus-weighted anchor tile** first, then
+  fills the remaining slots from the home nation's tiles **nearest that anchor** (squared grid
+  distance, tile-id tie-break), so a corporation's holdings form a **geographic cluster**
+  rather than scattering across the nation.
+- **Mix follows focus.** The asset mix is shaped by `industrial_focus` (`focus_asset_pattern`)
+  — an extraction corp clusters extractors on its richest deposits, a processing corp pairs
+  processors with feed, etc.
+- **Validity-gated.** Every placement is gated by `placement_rules::can_place` (the shared
+  placement seam), so no asset lands on invalid terrain or a zero-deposit tile. The
+  `world_audit` harness confirms **0 invalid placements** across the generated set.
 
 Placement is collision-checked against already-placed assets from other corporations.
 No two corporations begin on the same tile.
@@ -76,6 +95,13 @@ Each corporation receives starting capital drawn from a seeded range. A tunable
 `wealth_variance` parameter controls spread. Corporations with `processing` or `trade`
 focus receive slightly higher starting capital to offset their lack of direct resource
 access.
+
+**Pre-game operating history.** Corporations do not open cold. At campaign start the economy
+is run forward a fixed number of **pre-game ticks** (currently 12, at app startup after the
+economy registry loads) so every corporation enters turn one with a **multi-tick operating
+history** — warm stockpile pools and a balance already moved by production, wages, and trade,
+rather than the seeded capital alone. The headless `--verify` path stays deterministically
+cold (no pre-game ticks) so generation audits remain reproducible.
 
 ### Pass 5 — Naming
 

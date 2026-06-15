@@ -59,6 +59,15 @@ ask if the scope is large; the depth verb is how you override that.
 
 **Publish** is the full lifecycle for acting on a Brief:
 
+0. **Brief-spanning requirement (gate — if the Brief changes `src/`).** *Before* a Brief
+   that will modify `src/` is decomposed into tasks, write a **brief-spanning requirement**
+   in [`req/REQUIREMENTS.md`](req/REQUIREMENTS.md) — one requirement covering the Brief *as a
+   whole* rather than a single task. This is **usually a visual-verification requirement** (the
+   `visual` class — a `scripts/verify/<feature>.lua` check); for a Brief with no visible
+   surface it is the equivalent end-to-end `headless` check. It is the acceptance gate the
+   finished Brief is verified against, and it is written first so decomposition (step 1) is
+   shaped by how the whole Brief will be proven. Doc-only Briefs are exempt; per-task
+   requirements still follow in step 2.
 1. **Create tasks** — promote the Brief into TASKS.md: decompose into ordered,
    file-scoped, dependency-marked tasks (see TASKS.md § Task format).
 2. **Create requirements** — write or link requirements in
@@ -75,9 +84,10 @@ ask if the scope is large; the depth verb is how you override that.
 5. **Commit** — once all tasks are complete or cancelled, create a single commit
    for the Brief using the format below.
 
-#### Publishing multiple Briefs together (barrier semantics)
+#### Publishing multiple Briefs together (Batch Publish — barrier semantics)
 
-When more than one Brief is published in the same work block, the five steps
+Publishing more than one Brief in the same work block is a **Batch Publish** (see
+[`../GLOSSARY.md`](../GLOSSARY.md) **Batch Publish**). The five steps
 above run as **barriers across the entire set**, not Brief-by-Brief. Every Brief in
 the set must clear step *N* before **any** Brief begins step *N+1*:
 
@@ -102,6 +112,37 @@ drive a single Brief end-to-end and then start the next; advance the whole set
 through each step together. This keeps the requirement set, the collision map, and
 the "everything builds together" guarantee coherent across the Briefs that shipped
 in one block.
+
+#### Batch Publish — documentation-coverage discipline
+
+A Batch Publish carries a documentation discipline a single-Brief Publish does not. It runs
+*around* the five code steps above (the determination up front, the review reminders and Q&A
+at the close):
+
+1. **Doc-coverage determination (up front).** For each Brief in the set, decide whether the
+   design docs **already record** the implementation it will produce — or whether that
+   implementation is a **direct consequence of already-documented behaviour**. Briefs that
+   pass need no doc work. Briefs that fail are flagged **doc-changing** and carry the steps
+   below. *(This step exists because the >C pass shipped code — e.g. the clustered
+   corporation-holdings revision — whose design doc was left stale; the determination is the
+   guard against that.)*
+2. **Per-Brief documentation collision map.** For each doc-changing Brief, map the **documents**
+   it will change — the doc analogue of the source-file collision map (step 3 above). Briefs
+   with **disjoint doc scopes are parallel-safe**: **fan out sub-agents to write the doc
+   changes** concurrently; Briefs touching the same doc stay sequential. Encourage the fan-out
+   wherever the doc scopes are disjoint.
+3. **Transient change note per doc.** Every changed doc carries a **minor transient
+   "what was changed" note** — a **visible `> ⟳` blockquote** at the point of change (the
+   standard form, so the reviewer sees it in any rendered view) recording the edit and that it
+   is pending user review. The note is **removed once the user has reviewed** the change (it is
+   transient, not permanent doc content).
+4. **Standing review reminders (`S`-tier).** The Batch Publish **always adds an `S`-tier Brief
+   per changed doc** under § Documentation, so the user is reminded to review each doc change.
+5. **Design-direction Q&A (proportional).** When the batch made **non-trivial or ambiguous
+   design calls**, it closes by raising a **Q&A** clarifying the design direction those calls
+   surfaced, recorded with the session in the DEVLOG (see
+   `docs/development/DEVELOPMENT_PRACTICES.md` § Design-direction Q&A). Skip it for a batch that
+   made no calls worth surfacing — the step is proportional, not mechanical.
 
 #### Commit format for a published Brief
 
@@ -372,6 +413,33 @@ shared per-entity content builders in `entity_summary.{hpp,cpp}`):
   canvas hit-testing Brief above (the marker stack it hit-tests is the same stack this
   resolves through).
 
+## Documentation
+
+Standing **`S`-tier review reminders** raised by the 2026-06-15 retroactive doc-coverage pass
+(the Batch Publish § documentation discipline). Each names a doc reconciled with code that had
+landed without a doc update; each carries a **transient "what was changed" note** in the doc
+itself. **Review the change, then remove the transient note** and clear the Brief.
+
+- **[S1] CORPORATION_GENERATION.md — clustered-holdings reconcile + strategy flagged for
+  revision.** Pass 3 was rewritten to record the landed clustered, focus-shaped 3–6-holding
+  placement (anchor + nearest-tile fill, `placement_rules`-gated); Pass 4 gained the pre-game
+  operating-history note. **2026-06-15 design-direction verdict: the clustered-holdings *shape*
+  is wrong** and is to be revised (the doc accurately describes the *current code*, but the
+  strategy itself needs rework). The target shape needs the user's direction before it can be
+  promoted — see the [B4] revision Brief under § Environment → Corporation generation. Keep the
+  transient note until the revision lands (it now flags rework, not just review).
+
+- **[S1] Review SELECTION.md — tile "Build here" front door reconcile.** Added § The tile
+  element is the build front door, recording the player-construction affordance
+  (`construct_building`, placement-gated, affordability-gated) that landed without a doc entry.
+  Confirm the framing (targeted build via the tile element vs. the broad nav-rail overview),
+  then remove the transient note at the top of `docs/ui/SELECTION.md`.
+
+- **[S1] Review SYSTEMS.md § Trade — standing sell-orders reconcile.** Added the standing
+  sell-order / floor-price sentence (and the deferred-counterparty note) to § Trade. Confirm
+  the wording matches the intended market design, then remove the transient HTML comment in
+  `docs/SYSTEMS.md` § Trade.
+
 ## Trade
 
 The market layer. Per the 2026-06-14 Q&A, **market resolution collapses into Layer 3** and
@@ -492,7 +560,16 @@ Design authority: `docs/generation/NATION_GENERATION.md`.
 
 Design authority: `docs/generation/CORPORATION_GENERATION.md`.
 
-- **[F4] Deferred — corporation selection screen & behaviour.** Per
+- **[B4] Revise the corporation starting-holdings shape.** The 2026-06-15 >C pass landed a
+  clustered, focus-shaped **3–6-holding** placement (anchor + nearest-tile fill,
+  `placement_rules`-gated; documented in CORPORATION_GENERATION.md § Pass 3). The user flagged
+  the **shape as wrong** on review (2026-06-15 design-direction Q&A). **Needs the target shape
+  settled before promotion** — open questions: should holding *count* scale (with starting
+  capital, home-nation size, or focus) rather than a flat 3–6? Should the *spread* be tighter
+  or looser than nearest-tile clustering? Should the focus→asset-mix pattern change? Settle the
+  intended shape with the user, then revise `place_starting_assets` in
+  `src/world/corporation_generation.cpp` and update the doc. Couples to the [S1] doc-review
+  Brief under § Documentation (which holds the transient note until this lands).
   CORPORATION_GENERATION.md § Open items: the analytical corp-selection/re-roll
   flow, franchising, nation-seeded privatisation, automated tax, Era-based
   sovereignty, and diplomatic posture. Out of prototype scope.
