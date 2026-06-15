@@ -2,8 +2,56 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
+#include <vector>
 
 namespace {
+
+// --- Price resolution constants (TODO § Trade, settled 2026-06-15) ---------
+// Price is anchored to the rarity-derived base_price and pushed by this tick's
+// supply/demand ratio. A damped (sqrt) elasticity keeps swings readable; the
+// move is clamped to a band around base and eased across ticks so a single tick's
+// imbalance cannot snap the price.
+constexpr float price_floor_mult = 0.25f; ///< Lowest a price may fall: 0.25× base.
+constexpr float price_ceil_mult  = 4.0f;  ///< Highest a price may rise: 4× base.
+constexpr float price_smoothing  = 0.5f;  ///< EMA factor toward the tick's target price.
+
+/// Resolve one resource's price for a market this tick. The target is
+/// `base × sqrt(demand/supply)` (damped elasticity), clamped to the band and
+/// reached by an exponential moving average from the prior price. Untraded
+/// resources (`base <= 0`) keep their prior price.
+float resolve_price(float prior, float base, float supply, float demand)
+{
+    if (base <= 0.0f)
+        return prior; // never traded here — leave it (stays 0)
+
+    float target;
+    if (supply <= 0.0f && demand <= 0.0f)
+        target = base; // no signal this tick — pull gently back toward base
+    else if (supply <= 0.0f)
+        target = base * price_ceil_mult; // demand with no supply — top of the band
+    else
+        target = base * std::sqrt(demand / supply); // demand 0 → target 0 → floored below
+
+    const float lo = base * price_floor_mult;
+    const float hi = base * price_ceil_mult;
+    target = std::clamp(target, lo, hi);
+
+    const float next = prior + price_smoothing * (target - prior);
+    return std::clamp(next, lo, hi);
+}
+
+/// One cleared movement of a resource on a body, valued after prices resolve.
+/// `floor` is the seller's minimum unit price (player sell orders); 0 for the
+/// automatic surplus path and for purchases.
+struct cleared_flow
+{
+    entity_id   corp;
+    entity_id   body;
+    std::size_t r;
+    float       qty;
+    float       floor;
+};
 
 /// Map each body that has a market to its market entity id. Layer 3 authors only
 /// Kepler's market; bodies without one are skipped by clearing.
@@ -61,15 +109,20 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     std::unordered_map<entity_id, corp_cash_flow> flows;
     const auto markets = body_to_market(w);
 
-    // Recompute market supply/demand from this tick; price stays at base_price.
+    // Recompute market supply/demand from scratch this tick. Quantities move now;
+    // price resolves once supply and demand are known, and the cash value of every
+    // movement is settled at that resolved price in a final pass.
     for (auto& [mid, mc] : w.markets)
     {
         mc.supply.fill(0.0f);
         mc.demand.fill(0.0f);
     }
 
+    std::vector<cleared_flow> sales; // surplus + player orders (income, priced at max(price, floor))
+    std::vector<cleared_flow> buys;  // auto-bought shortfalls (expenditure, priced at price)
+
     // --- Supply: each corp lists its pool surplus above processor reservations ---
-    // Visit pools in their (deterministic) map order.
+    // Visit pools in their (deterministic) map order; debit the pool now, value later.
     for (auto& [key, pool] : w.corp_body_pools)
     {
         const entity_id corp = key.first;
@@ -83,12 +136,10 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
 
         market_component& mc = w.markets.at(mit->second);
         const auto reserve = processor_reservation(w, reg, corp, body);
-        corp_cash_flow& flow = flows[corp];
 
         for (std::size_t r = 0; r < resource_count; ++r)
         {
-            const float base_price = mc.base_price[r];
-            if (base_price <= 0.0f)
+            if (mc.base_price[r] <= 0.0f)
                 continue; // untraded (e.g. regolith) — never listed
 
             const float surplus = pool.quantities[r] - reserve[r];
@@ -97,7 +148,7 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
 
             pool.quantities[r] -= surplus;
             mc.supply[r]       += surplus;
-            flow.income        += surplus * base_price;
+            sales.push_back({corp, body, r, surplus, 0.0f});
         }
     }
 
@@ -110,17 +161,18 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
             continue;
         market_component& mc = w.markets.at(mit->second);
         const std::size_t r = static_cast<std::size_t>(order.resource);
-        const float price = std::max(mc.base_price[r], order.floor_price);
         auto pkit = w.corp_body_pools.find(std::make_pair(order.corp, order.body));
         if (pkit == w.corp_body_pools.end())
             continue;
         const float sold = std::min(order.quantity, pkit->second.quantities[r]);
+        if (sold <= 0.0f)
+            continue;
         pkit->second.quantities[r] -= sold;
         mc.supply[r]               += sold;
-        flows[order.corp].income   += sold * price;
+        sales.push_back({order.corp, order.body, r, sold, order.floor_price});
     }
 
-    // --- Demand: processor input shortfalls auto-bought at base_price ---
+    // --- Demand: processor input shortfalls auto-bought this tick ---
     for (const auto& [key, bought] : report.purchases)
     {
         const entity_id corp = key.first;
@@ -131,16 +183,32 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
             continue;
 
         market_component& mc = w.markets.at(mit->second);
-        corp_cash_flow& flow = flows[corp];
 
         for (std::size_t r = 0; r < resource_count; ++r)
         {
             const float qty = bought[r];
             if (qty <= 0.0f)
                 continue;
-            mc.demand[r]      += qty;
-            flow.expenditure  += qty * mc.base_price[r];
+            mc.demand[r] += qty;
+            buys.push_back({corp, body, r, qty, 0.0f});
         }
+    }
+
+    // --- Resolve price from the now-known supply/demand, eased from the prior price ---
+    for (auto& [mid, mc] : w.markets)
+        for (std::size_t r = 0; r < resource_count; ++r)
+            mc.price[r] = resolve_price(mc.price[r], mc.base_price[r], mc.supply[r], mc.demand[r]);
+
+    // --- Value every movement at the resolved price (player orders honour their floor) ---
+    for (const cleared_flow& s : sales)
+    {
+        const float price = w.markets.at(markets.at(s.body)).price[s.r];
+        flows[s.corp].income += s.qty * std::max(price, s.floor);
+    }
+    for (const cleared_flow& b : buys)
+    {
+        const float price = w.markets.at(markets.at(b.body)).price[b.r];
+        flows[b.corp].expenditure += b.qty * price;
     }
 
     return flows;

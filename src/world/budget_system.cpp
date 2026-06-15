@@ -8,7 +8,8 @@ void apply_budget(world& w,
     {
         float delta = 0.0f;
 
-        // Market cash flow (sales income less input purchases), valued at base_price.
+        // Market cash flow (sales income less input purchases), valued at the
+        // price resolved this tick by clear_markets.
         const auto fit = flows.find(corp);
         if (fit != flows.end())
             delta += fit->second.income - fit->second.expenditure;
