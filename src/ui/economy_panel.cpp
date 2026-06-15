@@ -1,8 +1,8 @@
 #include "economy_panel.hpp"
 
 #include "format.hpp"
+#include "ledger_chrome.hpp" // shared ledger-window size + spawn anchor
 #include "presentation.hpp"
-#include "profile_panel.hpp" // profile_panel_width/height — spawn clear of the profile
 
 #include <imgui.h>
 
@@ -271,9 +271,9 @@ void draw_economy_panel(const world& w,
     if (p_open && !*p_open)
         return;
 
-    ImGui::SetNextWindowPos({profile_panel_width + 40.0f, profile_panel_height + 40.0f},
-                            ImGuiCond_Once);
-    ImGui::SetNextWindowSize({760, 620}, ImGuiCond_Once);
+    // Shared ledger-window chrome (docs/ui/LAYOUT.md § Uniform ledger-window chrome).
+    ImGui::SetNextWindowPos(ledger_window_spawn, ImGuiCond_Once);
+    ImGui::SetNextWindowSize(ledger_window_size, ImGuiCond_Once);
     ImGui::Begin("Economy", p_open);
 
     draw_balances(w);

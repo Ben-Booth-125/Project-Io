@@ -165,12 +165,15 @@ floating ledgers from **one shared size constant and one shared spawn-position
 constant** (anchored clear of the profile/header chrome, `ImGuiCond_Once` so the player
 may then move/resize freely), rather than each ledger hard-coding its own.
 
-This is the standing design constraint the **Market / Balance / Construction ledger
-family** (deferred to Layer 4 — TODO § Ledger) inherits when it is built. It also
-records and resolves a current inconsistency: the **Tile Ledger** opens at 820×560 and
-the **Economy panel** at 760×620 at different offsets; bringing them onto the shared
-constants is part of adopting this rule. The header is exempt — it is persistent chrome,
-not a ledger.
+This is now **implemented**: the shared constants `ledger_window_size` and
+`ledger_window_spawn` live in `src/ui/ledger_chrome.hpp` (the spawn anchor derived from
+the profile-panel dimensions so it clears the top-left chrome), and both the **Tile
+Ledger** (`tile_inspector.cpp`) and the **Economy panel** (`economy_panel.cpp`) drive
+their `SetNextWindowSize`/`SetNextWindowPos` from them with `ImGuiCond_Once`. This
+resolved the prior inconsistency (Tile Ledger 820×560, Economy panel 760×620, at
+different offsets). The **Market / Balance / Construction ledger family** (deferred to
+Layer 4 — TODO § Ledger) inherits the same two constants when it is built. The header is
+exempt — it is persistent chrome, not a ledger.
 
 ---
 

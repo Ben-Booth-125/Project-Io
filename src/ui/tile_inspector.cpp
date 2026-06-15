@@ -1,7 +1,7 @@
 #include "tile_inspector.hpp"
 
+#include "ledger_chrome.hpp" // shared ledger-window size + spawn anchor
 #include "presentation.hpp"
-#include "profile_panel.hpp" // profile_panel_width/height — spawn clear of the profile
 
 #include <imgui.h>
 
@@ -23,11 +23,10 @@ void draw_tile_inspector(const world& w, bool* p_open)
         body_ids.push_back(id);
     std::sort(body_ids.begin(), body_ids.end());
 
-    // Open clear of the profile (top-left) on first appearance — to its right and
-    // below the header strip. The window is movable thereafter.
-    ImGui::SetNextWindowPos({profile_panel_width + 10.0f, profile_panel_height + 10.0f},
-                            ImGuiCond_Once);
-    ImGui::SetNextWindowSize({820, 560}, ImGuiCond_Once);
+    // Shared ledger-window chrome: one size + one spawn anchor for the whole
+    // ledger family (docs/ui/LAYOUT.md § Uniform ledger-window chrome).
+    ImGui::SetNextWindowPos(ledger_window_spawn, ImGuiCond_Once);
+    ImGui::SetNextWindowSize(ledger_window_size, ImGuiCond_Once);
     // Passing p_open gives the window a close button that clears the flag.
     ImGui::Begin("Tile Ledger", p_open);
 
