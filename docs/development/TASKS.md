@@ -488,6 +488,63 @@ group.
 
 ---
 
+## Session 1 — verification + world-gen foundation (Batch Publish)
+
+Three Briefs, barrier semantics. F3 lands **first, alone** (golden-image diffing pays back
+across every later visual check); then the two disjoint world-gen fixes fan out.
+
+### Group F3 — golden-image-diff — ✅ COMPLETE (committed)
+
+Done and committed; see REQUIREMENTS.md archive § golden-image-diff.
+
+### Group C2 — orphan-island-assignment (promoted from OPENS § Nation generation)
+
+Requirements: [REQUIREMENTS.md § orphan-island-assignment](req/REQUIREMENTS.md#orphan-island-assignment)
+
+- **[2] A — Orphan-island post-pass.** After the BFS, find connected components of unclaimed
+  non-ocean land and assign each whole component to the nearest nation across water (nearest
+  claimed tile by wrapped grid distance; deterministic tie-break). Files:
+  `src/world/nation_generation.cpp`. Deps: foundation. Parallel-safe with B4-A (disjoint).
+  Satisfies: R2.
+- **[1] B — Audit: zero unclaimed land.** Extend `world_audit` to count Kepler non-ocean tiles
+  with no `tile_to_nation` entry; PASS at 0. Files: `tools/verify/world_audit.cpp` (main
+  session — shared with B4-B). Deps: A. Satisfies: R1.
+
+### Group B4 — corp-starting-holdings (promoted from OPENS § Corporation generation)
+
+Requirements: [REQUIREMENTS.md § corp-starting-holdings](req/REQUIREMENTS.md#corp-starting-holdings)
+
+- **[2] A — Focus-shaped lean counts.** Retire `k_min_holdings`/`k_max_holdings`; add a
+  per-focus holdings range (extraction 3–4, processing 2–3, trade 1–2) driving the count; keep
+  the within-nation cluster. Files: `src/world/corporation_generation.cpp`. Deps: foundation.
+  Parallel-safe with C2-A (disjoint). Satisfies: R1, R2, R4.
+- **[1] B — Audit: per-corp counts + no regression.** Extend `world_audit` to report each
+  corp's holding count against its focus bounds and confirm the S1 can_place check stays PASS.
+  Files: `tools/verify/world_audit.cpp` (main session — shared with C2-B). Deps: A.
+  Satisfies: R1, R3.
+- **[1] C — Doc: concrete counts into § Pass 3.** Record the fixed per-focus counts + retained
+  clustering in `CORPORATION_GENERATION.md` § Pass 3, with a transient `⟳` review note. Files:
+  `docs/generation/CORPORATION_GENERATION.md`. Deps: A.
+
+### Set-wide collision map (Publish step 3)
+
+| File | Group |
+|------|-------|
+| `src/core/png_writer.{hpp,cpp}` | F3-A |
+| `src/core/app.{hpp,cpp}`, `src/main.cpp` | F3-B |
+| `scripts/verify/golden/`, `verifier-visual/SKILL.md` | F3-C |
+| `src/world/nation_generation.cpp` | C2-A |
+| `src/world/corporation_generation.cpp` | B4-A |
+| `tools/verify/world_audit.cpp` | C2-B + B4-B (main session) |
+| `docs/generation/CORPORATION_GENERATION.md` | B4-C |
+| `docs/generation/NATION_GENERATION.md` | C2 doc (§ Pass 2) |
+
+**Wave plan.** F3 first, serial, main session, committed. Then **wave: C2-A ∥ B4-A** fanned out
+to two sub-agents (disjoint generation `.cpp` files). The integrator (main session) owns the
+shared `world_audit.cpp` (C2-B, B4-B), the docs, builds, and verifies. One commit per Brief.
+
+---
+
 *No active groups. The worklist is empty between work blocks.*
 
 Completed 2026-06-15 / 2026-06-14 (see DEVLOG, newest first):

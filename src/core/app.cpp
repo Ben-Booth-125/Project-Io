@@ -34,9 +34,11 @@
 #include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <filesystem>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 static constexpr int window_w = 1280;
 static constexpr int window_h = 720;
@@ -239,7 +241,7 @@ void app::setup_world()
     m_ui.overlay = overlay_mode::faction;
 }
 
-int app::run_verify(const std::string& script_path)
+int app::run_verify(const std::string& script_path, bool bless)
 {
     // Deterministic, non-interactive setup: fixed window (the window_w/window_h
     // constants), seeded world, sim left paused so orbits and ticks never advance
@@ -247,6 +249,12 @@ int app::run_verify(const std::string& script_path)
     setup_world();
     load_economy();
     m_sim_loop.set_speed(0);
+
+    // Golden-image diffing: goldens live in a "golden" directory beside the verify
+    // script, so running against the source script path (the skill's iteration
+    // mode) reads/writes the committed source tree, not a stale build copy.
+    m_verify_bless = bless;
+    m_golden_dir   = (std::filesystem::path{script_path}.parent_path() / "golden").string();
 
     // Expose the `verify` API. Each function writes ui_state directly — the
     // "direct state manipulation" driver — so captures are reproducible without
@@ -445,6 +453,14 @@ int app::run_verify(const std::string& script_path)
     catch (const std::exception& e)
     {
         SDL_Log("verify script failed: %s", e.what());
+        return 1;
+    }
+
+    // Non-zero exit if any capture failed its golden diff, so the harness/skill
+    // reads an advisory PASS/FAIL off the process result as well as the logs.
+    if (m_verify_failures > 0)
+    {
+        SDL_Log("verify: %d capture(s) failed golden diff", m_verify_failures);
         return 1;
     }
     return 0;
@@ -816,6 +832,78 @@ void app::save_screenshot()
     else
         SDL_Log("Screenshot save failed: %s", path);
 
+    // Golden-image diffing (run_verify only — m_golden_dir is empty for an
+    // interactive F12 capture). Bless overwrites the golden; otherwise, if a
+    // golden exists, compare against it and emit an advisory PASS/FAIL + a diff
+    // image. No golden present = capture-only, today's behaviour.
+    if (!m_golden_dir.empty() && !m_capture_name.empty())
+        compare_to_golden(m_capture_name, rgba);
+
     SDL_DestroySurface(rgba);
     m_capture_name.clear();
+}
+
+void app::compare_to_golden(const std::string& name, SDL_Surface* rgba)
+{
+    // Tolerance knobs (OPENS § Canvas [F3]): a pixel differs when its max R/G/B
+    // channel delta exceeds T; the capture fails when the differing fraction
+    // exceeds F. Per-check overrides via the Lua API are a future follow-on.
+    constexpr int   k_pixel_threshold    = 8;      // T (0..255)
+    constexpr float k_fail_fraction      = 0.005f; // F (0.5 %)
+
+    const std::filesystem::path golden = std::filesystem::path{m_golden_dir} / (name + ".png");
+
+    // Pack the captured surface into a contiguous stride = width*4 buffer (the
+    // backbuffer pitch may carry row padding the diff/writer do not expect).
+    const int w = rgba->w;
+    const int h = rgba->h;
+    std::vector<unsigned char> packed(static_cast<std::size_t>(w) * h * 4);
+    const auto* src = static_cast<const unsigned char*>(rgba->pixels);
+    for (int y = 0; y < h; ++y)
+        std::memcpy(packed.data() + static_cast<std::size_t>(y) * w * 4,
+                    src + static_cast<std::size_t>(y) * rgba->pitch,
+                    static_cast<std::size_t>(w) * 4);
+
+    if (m_verify_bless)
+    {
+        std::error_code ec;
+        std::filesystem::create_directories(m_golden_dir, ec);
+        if (write_png_rgba(golden.string(), w, h, packed.data(), w * 4))
+            SDL_Log("Golden blessed: %s", golden.string().c_str());
+        else
+            SDL_Log("Golden bless failed: %s", golden.string().c_str());
+        return;
+    }
+
+    std::vector<unsigned char> ref;
+    int rw = 0, rh = 0;
+    if (!read_png_rgba(golden.string(), ref, rw, rh))
+    {
+        SDL_Log("Golden compare: no golden for '%s' (capture-only)", name.c_str());
+        return;
+    }
+    if (rw != w || rh != h)
+    {
+        SDL_Log("Golden FAIL %s: size mismatch (capture %dx%d vs golden %dx%d)",
+                name.c_str(), w, h, rw, rh);
+        ++m_verify_failures;
+        return;
+    }
+
+    std::error_code ec;
+    std::filesystem::create_directories("screenshots/diff", ec);
+    const std::string diff_path = "screenshots/diff/" + name + ".png";
+    const float frac = diff_rgba(packed.data(), ref.data(), w, h, k_pixel_threshold, diff_path);
+
+    if (frac > k_fail_fraction)
+    {
+        SDL_Log("Golden FAIL %s: %.4f%% differing (> %.4f%%); diff: %s",
+                name.c_str(), frac * 100.0f, k_fail_fraction * 100.0f, diff_path.c_str());
+        ++m_verify_failures;
+    }
+    else
+    {
+        SDL_Log("Golden PASS %s: %.4f%% differing (<= %.4f%%)",
+                name.c_str(), frac * 100.0f, k_fail_fraction * 100.0f);
+    }
 }

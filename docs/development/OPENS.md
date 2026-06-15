@@ -273,36 +273,6 @@ currently hold Briefs appear as sections below.
   heatmap) with a lens-local resource selector and the on-canvas gradient colour key the design
   specifies. Data is already present (tile `resource_deposit`). Authority `docs/ui/LENSES.md`.
 
-- **[F3 ✓] Visual-verification harness — golden-image diffing.** Phase 1 outputs
-  PNGs for human/Claude inspection only; this adds committed reference images + a pixel-tolerance
-  diff for automatic pass/fail on the `visual` class. **Design settled (2026-06-15):**
-  — **Golden storage.** One committed reference PNG per named capture, beside the verify scripts:
-    `scripts/verify/golden/<feature>_<capture>.png`. Small, deterministic captures — committed to
-    the repo. Determinism is a precondition (fixed seed, fixed window size, headless — already true
-    of `app::run_verify`); a non-deterministic capture cannot have a golden.
-  — **Tolerance model (two knobs, absorbs AA / font jitter).** Exact match is too brittle, so the
-    diff is **fraction-of-differing-pixels over a per-pixel threshold**: a pixel *differs* when its
-    **max channel delta > `T`** (e.g. `T = 8/255`, which absorbs anti-aliasing gradient and
-    sub-pixel font jitter); the capture **fails** when the **fraction of differing pixels > `F`**
-    (e.g. `F = 0.5%`, which absorbs small localised text reflow). Both knobs are per-check
-    overridable (a volatile-heavy capture can loosen `F`). An optional **ignore-region mask**
-    blanks known-volatile rects (the raw `Sim` counter, the frame-time HUD) before diffing.
-  — **Workflow.** `app::run_verify` gains a compare step: after writing each capture, if a golden
-    exists, diff against it, emit **PASS/FAIL** + a **diff image** (differing pixels highlighted) to
-    `build/Debug/verify/diff/`. A **`--bless` update mode** regenerates goldens when a change is
-    intentional (the developer eyeballs, then blesses). No golden present = capture-only (today's
-    behaviour), so the upgrade is incremental per check.
-  — **CI decision (settled): no CI gate in the prototype.** Solo project, no CI exists — the diff is
-    an **advisory local PASS/FAIL** the developer reads via the `verifier-visual` skill, not a
-    blocking gate. Revisit a CI gate if/when a CI pipeline lands (a v0.2.0+ note, not prototype
-    scope).
-  Builds on `write_png_rgba` (`src/core/png_writer.cpp`) — add a PNG **reader** + a diff function
-  there — and `app::run_verify`. Self-contained; upgrades the harness everything visual leans on.
-  Files at promotion: `src/core/png_writer.{hpp,cpp}` (reader + diff), `src/core/app.cpp`
-  (`run_verify` compare/bless step), `scripts/verify/golden/`, and the `verifier-visual`
-  SKILL.md (document the bless flow + tolerance knobs). *(Self-contained — no authority-doc
-  propagation; the design lives here and in the skill when built.)*
-
 - **[C1 ✓] Corporation lens player-tile border is redundant.** Found during the 2026-06-14
   visual verification: under the corporation lens the player's tile is filled
   `faction_colour(0)` *and* outlined `faction_colour(0)`, so the border is invisible

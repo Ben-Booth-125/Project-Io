@@ -100,6 +100,30 @@ section here — it does not need the full OPENS backlog or DEVLOG history in co
 
 ---
 
+## orphan-island-assignment
+
+Promoted from OPENS § Environment / Nation generation — **[C2] Orphan-island assignment**.
+Brief-spanning requirement: R1.
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | After `generate_nations`, every non-ocean land tile on Kepler is assigned to a nation (zero unclaimed land). | `headless` (world_audit orphan-land count == 0) | pending | brief-spanning gate |
+| R2 | Each orphan land component is assigned, whole, to the nearest nation measured across water (deterministic, seed-stable). | `headless` + `code` | pending | |
+
+## corp-starting-holdings
+
+Promoted from OPENS § Environment / Corporation generation — **[B4] Revise the corporation starting-holdings shape**.
+Brief-spanning requirement: R1.
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | Corporations open with a **lean, focus-shaped** holding set — per-focus counts smaller than the retired flat 3–6 spread. | `headless` (world_audit per-corp counts within focus bounds) | pending | brief-spanning gate |
+| R2 | The flat `k_min_holdings`/`k_max_holdings` range is retired in favour of a focus-shaped count. | `code` (range constants gone) | pending | |
+| R3 | Every placed asset still passes `placement_rules::can_place` — no placement regression. | `headless` (world_audit S1 stays PASS) | pending | |
+| R4 | Holdings remain clustered within the home nation's territory. | `code` + `headless` | pending | |
+
+---
+
 *No active requirements. The worklist is empty between work blocks; sections appear here
 when a Brief is promoted, and move to the archive below on completion or cancellation.*
 
@@ -110,6 +134,23 @@ when a Brief is promoted, and move to the archive below on completion or cancell
 Permanent record of resolved requirement groups, newest first. Each carries a
 `Resolved:` line and is retained verbatim; re-promote by copying a section back up to
 **Active requirements**.
+
+### golden-image-diff
+
+Resolved: 2026-06-15 — complete, all rows met. Promoted from OPENS § Canvas —
+**[F3] Visual-verification harness — golden-image diffing**. PNG reader + diff added to
+`png_writer`; `run_verify` gained a compare/bless step and a golden dir derived from the
+script path; `--bless` added to `main.cpp`. End-to-end gate (R5) verified: a clean re-run
+PASSed at 0.0056% differing, a deliberately wrong golden FAILed at 56.44% with a diff image
+and a non-zero exit. `verifier-visual` SKILL.md documents the bless flow + tolerance knobs.
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | `png_writer` exposes `read_png_rgba` that reads a PNG produced by `write_png_rgba` back to byte-identical RGBA pixels (stored-block zlib only — the writer's own output). | `headless` (round-trip via golden compare) | complete | round-trip exercised by the PASS run (0.0056%) |
+| R2 | `png_writer` exposes a diff that counts a pixel as differing when its max channel delta > `T`, fails when the differing fraction > `F`, and can emit a highlighted diff image; both knobs are caller-overridable. | `headless` + `code: diff_rgba` | complete | `diff_rgba` takes `T`; `F` owned at the call site |
+| R3 | `run_verify` compares each capture against `scripts/verify/golden/<name>.png` when present, logs PASS/FAIL, and writes a diff image to `screenshots/diff/<name>.png`; absent golden = capture-only (today's behaviour). | `code` + visual run | complete | diff written to `screenshots/diff/` |
+| R4 | A `--bless` mode writes captures into the golden directory instead of comparing, so an intentional change regenerates goldens. | `code` + run | complete | `header_populated` golden blessed |
+| R5 | End-to-end: a golden check PASSes against a blessed golden and FAILs against a deliberately altered capture (the tolerance knobs discriminate). | `headless`/visual harness run | complete | PASS 0.0056% / FAIL 56.44%, exit 0 / 1 |
 
 ### corporation-generation-revision
 

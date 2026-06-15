@@ -40,6 +40,34 @@ feature name (e.g. `corporation_lens`). If omitted, list the available scripts i
    report what each frame shows against the requirement being checked. Cite the
    capture file names.
 
+## Golden-image diffing (automatic PASS/FAIL)
+
+A capture can be checked automatically against a committed **golden** reference
+image instead of eyeballed (OPENS § Canvas [F3]). Goldens live in a `golden/`
+directory **beside the verify scripts** — `scripts/verify/golden/<capture>.png`,
+one per named `capture()`.
+
+- **Compare (default).** When a golden exists for a capture, `--verify` diffs the
+  captured frame against it, logs `Golden PASS <name>: …%` or `Golden FAIL <name>: …%`,
+  and writes a highlighted diff image to `build/Debug/screenshots/diff/<name>.png`
+  (differing pixels flagged magenta over a dimmed base). The process **exits non-zero**
+  if any capture fails. No golden present = capture-only (the original behaviour), so
+  the upgrade is incremental per check.
+- **Bless (regenerate goldens).** When a change is intentional, eyeball the captures
+  then regenerate the goldens with `--bless`:
+  ```
+  build/Debug/ProjectIo.exe --verify scripts/verify/<name>.lua --bless
+  ```
+  Each capture is written into `scripts/verify/golden/` instead of compared. **Run
+  the bless (and the iterating compare) against the source script path** so the
+  golden dir resolves to the committed source tree, not a stale build copy — the
+  golden directory is always derived from the script path's own parent.
+- **Tolerance knobs.** A pixel *differs* when its max R/G/B channel delta exceeds
+  `T` (currently 8/255 — absorbs anti-aliasing and sub-pixel font jitter); a capture
+  *fails* when the differing fraction exceeds `F` (currently 0.5%). These absorb
+  benign jitter (a clean re-run typically diffs ~0.01%); per-check overrides via the
+  Lua API are a future follow-on.
+
 ## Notes
 
 - The session is deterministic (seeded world, sim paused, fixed 1280×720 window),

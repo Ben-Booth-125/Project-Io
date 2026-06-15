@@ -33,8 +33,12 @@ public:
     /// See docs/development/DEVELOPMENT_PRACTICES.md and TODO § Canvas.
     ///
     /// @param script_path Path to the .lua verification script.
-    /// @return 0 on a clean run; non-zero if the script failed to load/execute.
-    int run_verify(const std::string& script_path);
+    /// @param bless       When true, each capture is written into the golden
+    ///                    directory (regenerating references) instead of being
+    ///                    compared against an existing golden.
+    /// @return 0 on a clean run with no golden-diff failures; non-zero if the
+    ///         script failed to load/execute or any capture failed its golden diff.
+    int run_verify(const std::string& script_path, bool bless = false);
 
 private:
     void process_events(bool& running);
@@ -74,6 +78,15 @@ private:
     /// the end of render(), after the frame is composited but before present.
     void save_screenshot();
 
+    /// Compare a just-captured frame against its golden reference (or, in bless
+    /// mode, overwrite the golden). Called from save_screenshot during a verify
+    /// run; a no-op for interactive captures (m_golden_dir empty). Emits an
+    /// advisory PASS/FAIL log + a diff image, and bumps m_verify_failures on fail.
+    ///
+    /// @param name The capture's base name (matches the golden file stem).
+    /// @param rgba The captured RGBA surface (read, not retained).
+    void compare_to_golden(const std::string& name, SDL_Surface* rgba);
+
     SDL_Window*   m_window   = nullptr;
     SDL_Renderer* m_renderer = nullptr;
 
@@ -88,6 +101,12 @@ private:
 
     bool        m_capture_requested = false; ///< Set by F12 / capture_frame, consumed in render().
     std::string m_capture_name;              ///< Base name for the next capture; empty = timestamped (F12).
+
+    // Golden-image diffing (run_verify only; empty m_golden_dir = interactive F12,
+    // no compare). See OPENS § Canvas [F3] and the verifier-visual skill.
+    std::string m_golden_dir;            ///< Directory holding golden reference PNGs (script dir / "golden").
+    bool        m_verify_bless = false;  ///< When true, captures overwrite the golden instead of comparing.
+    int         m_verify_failures = 0;   ///< Count of captures that failed their golden diff; sets the exit code.
     int  m_prev_speed = 1; ///< Speed remembered across a pause, so unpausing restores it.
 
     double m_last_orbit_days = 0.0; ///< elapsed_days at the previous orbit advance; gives the per-frame delta.
