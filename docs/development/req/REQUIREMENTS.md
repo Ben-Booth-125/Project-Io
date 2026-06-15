@@ -100,8 +100,6 @@ section here — it does not need the full TODO backlog or DEVLOG history in con
 
 ---
 
-## Active requirements
-
 *No active requirements. The worklist is empty between work blocks; sections appear here
 when a Brief is promoted, and move to the archive below on completion or cancellation.*
 
@@ -112,6 +110,26 @@ when a Brief is promoted, and move to the archive below on completion or cancell
 Permanent record of resolved requirement groups, newest first. Each carries a
 `Resolved:` line and is retained verbatim; re-promote by copying a section back up to
 **Active requirements**.
+
+### layer4-ui-groundwork
+
+`Resolved: 2026-06-15 — complete; all 8 rows met. The fifth v0.0.5 enabler (held from the
+original Layer 4 foundations set), published scaffold-only on branch v0.0.5. Verified via the
+ProjectIo Debug build, code grep, and scripts/verify/construction_panel.lua (panel capture).`
+
+The fifth v0.0.5 enabler: the Layer 4 building-management **interaction scaffold** — seams and
+panel shells, **no economic mutation** (the functional loop is v0.0.6). Promoted from TODO § Canvas [A4].
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | `ui_state` carries a `construction_state` placement sub-state: an `active` flag, a `building_type`, and a `resource_type` target. | `code: struct construction_state` + `build` | complete | `ui_state.hpp:35`. |
+| R2 | `ui_state` carries `show_construction_panel`, defaulting **false** (ledgers start closed, per MENU.md). | `code: show_construction_panel = false` | complete | `ui_state.hpp:62`. |
+| R3 | When placement mode is active, the Planetary canvas draws a ghost building marker at the hovered tile, coloured by validity (positive=valid / negative=invalid via `placement_rules::can_place`). | `visual` + `code: can_place` | complete | Code-verified (`body_surface_canvas.cpp:433-451`). The ghost is hover-driven; the headless harness has no synthetic mouse, so the on-canvas capture is not feasible — same harness limit recorded for the body-label and frame-stutter checks. |
+| R4 | A left-click in placement mode mutates neither the world nor the selection (scaffold seam); tile selection occurs only when placement mode is inactive. | `code: !state.construction.active` + `build` | complete | `body_surface_canvas.cpp:492-495`. |
+| R5 | The construction panel renders with the shared ledger chrome (`ledger_window_size`/`ledger_window_spawn`, `ImGuiCond_Once`) and defaults closed. | `code: ledger_window_size` + `visual` | complete | `construction_panel.cpp:169-170`; screenshots/construction_panel_build.png. |
+| R6 | The panel's Build section sets the placement-mode state (building type + extraction target) and offers a Cancel that clears it. | `code` + `visual` | complete | Capture shows "Placing: Extraction Site → Iron Ore" + target list + Cancel. |
+| R7 | The panel shows read-only detail for the building on the selected tile (type / target / recipe / workforce / cost) with **disabled** stub recipe / workforce / sell-order controls. | `visual` + `code: BeginDisabled` | complete | Disabled stubs `construction_panel.cpp:142-155`; panel shell + empty-state captured (no tile-selection verify hook exists to drive a populated capture headlessly). |
+| R8 | The panel is reachable from a nav-rail slot and wired into `app::render`, with `verify` API hooks driving it headlessly. | `code` + `build` + `visual` | complete | nav slot 6 (`nav_pane.cpp`), `app.cpp` render call + `show_construction`/`place_mode` hooks; capture shows the panel open and the nav glyph. |
 
 ### v0.0.5 Layer 4 foundations publish set (placement-rules-seam … uniform-ledger-chrome)
 

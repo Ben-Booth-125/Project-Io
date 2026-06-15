@@ -1,5 +1,6 @@
 #pragma once
 
+#include "world/components.hpp" // building_type / resource_type for construction_state
 #include "world/entity.hpp"
 
 /// Which rung of the canvas zoom ladder currently fills the primary viewport.
@@ -25,6 +26,19 @@ enum class overlay_mode
     corporation, ///< Corporate-owned tiles (per-corp tint; player-corp border). See LENSES.md.
 };
 
+/// Construction (building-placement) interaction state — the Layer 4 UI groundwork
+/// scaffold. When `active`, the Planetary canvas enters placement mode: a ghost
+/// marker of `type` follows the cursor, tinted by `placement_rules::can_place`, and
+/// the select-on-click is suppressed. In v0.0.5 this is a *non-mutating scaffold* —
+/// the click is a no-op seam; the functional construction loop (build-cost spend,
+/// world mutation) lands in v0.0.6 (TODO § Infrastructure [S5]).
+struct construction_state
+{
+    bool          active = false;                          ///< Whether placement mode is engaged (set by the construction panel's Build section).
+    building_type type   = building_type::extraction_site; ///< The building type being placed.
+    resource_type target = resource_type::iron_ore;        ///< Extraction target for the placed building; meaningful only for extraction_site.
+};
+
 /// Shared selection and view state for the three primary canvases.
 ///
 /// Held by app and passed by reference to the canvas drawing functions. The
@@ -45,6 +59,10 @@ struct ui_state
     // the navigation pane; none are shown on a fresh session.
     bool show_tile_ledger = false; ///< Whether the Tile Ledger window is open. Toggled by the nav pane tab and the window's close button.
     bool show_economy_panel = false; ///< Whether the Layer 3 economy panel is open. Toggled by the nav pane tab and the window's close button.
+    bool show_construction_panel = false; ///< Whether the Layer 4 construction / building-management panel is open. Toggled by the nav pane tab and the window's close button.
+
+    /// Building-placement interaction state (Layer 4 UI groundwork scaffold). See construction_state.
+    construction_state construction;
 
     // --- solar system canvas view (primary only; the minimap always shows the
     // default framing) ---

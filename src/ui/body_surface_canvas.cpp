@@ -4,6 +4,7 @@
 #include "highlight.hpp"
 #include "icons.hpp"
 #include "presentation.hpp"
+#include "world/placement_rules.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -422,6 +423,34 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
     if (have_hover && !hovered_selected)
         draw_hex_highlight(dl, hover_verts, highlight::hovered);
 
+    // Layer 4 scaffold: building-placement ghost preview. When construction mode
+    // is active and a tile is hovered, draw a translucent-intent marker of the
+    // chosen building type at the hovered copy's centre, tinted green when the
+    // placement-rules seam accepts the tile and red when it rejects it. This is a
+    // pure preview — it reads placement_rules::can_place and mutates nothing. The
+    // hovered copy's centre is the centroid of its six vertices (the wrap copy the
+    // cursor actually resolved to); the marker radius mirrors the built-marker pass.
+    if (have_hover && state.construction.active)
+    {
+        float gx = 0.0f, gy = 0.0f;
+        for (const ImVec2& v : hover_verts)
+        {
+            gx += v.x;
+            gy += v.y;
+        }
+        gx /= 6.0f;
+        gy /= 6.0f;
+
+        const float mr = std::max(2.0f, draw_r * 0.22f);
+
+        const tile_component& hovered = w.tiles.at(hovered_tile);
+        const bool placeable = placement_rules::can_place(
+            hovered, state.construction.type, state.construction.target);
+        const ImU32 ghost_col = placeable ? palette::positive : palette::negative;
+
+        icons::building(dl, {gx, gy}, mr, state.construction.type, ghost_col);
+    }
+
     dl->PopClipRect();
 
     if (!input_enabled)
@@ -455,8 +484,16 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
     // descend into: a single left-click simply selects the hovered tile (null
     // clears the selection on empty space) and fills the Selection info element.
     // No view change; the player ascends via the minimap. See SELECTION.md.
+    // Construction mode suppresses selection: in placement mode a left-click is a
+    // construction gesture, not a selection one, so it must not retarget the
+    // Selection info element.
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
-        state.selected_entity = hovered_tile;
+    {
+        if (!state.construction.active)
+            state.selected_entity = hovered_tile;
+        // Layer 4 scaffold: placement-mode click is a non-mutating seam — v0.0.6
+        // will construct here. No world/selection mutation in v0.0.5.
+    }
 
     // Pan and zoom. Middle mouse button pans; scroll wheel zooms, anchored at
     // the cursor so the point under the mouse stays fixed.

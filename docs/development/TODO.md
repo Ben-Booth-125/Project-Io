@@ -165,14 +165,6 @@ currently hold Briefs appear as sections below.
 
 ## Canvas
 
-- **[A4] Layer 4 UI groundwork.** Mature the prototype ImGui shell toward what Layer 4's
-  building-management interactions need: a **click-to-place construction flow** on the
-  Planetary canvas, a **building-management panel** (recipe / workforce / sell-order
-  controls), and the wiring of these into the nav rail and ledgers. The current shell is
-  explicitly "debugging-grade" (`docs/ui/LAYOUT.md`); this is the interaction/shell pass
-  Layer 4 piles onto. Overlaps the ledger family and the menu-items Brief — coordinate at
-  promotion. See `docs/ui/{LAYOUT,MENU}.md` and the Layer 4 Brief under § Infrastructure.
-
 - **[B3] Design the lens system (complete the stubs).** `docs/ui/LENSES.md` now
   exists but only the **Corporation** lens section is settled (written alongside that
   lens's implementation); the **Supply / Market / Faction / Resource** sections are

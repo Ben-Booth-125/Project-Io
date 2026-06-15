@@ -492,6 +492,17 @@ group.
 
 Completed 2026-06-15 / 2026-06-14 (see DEVLOG, newest first):
 
+- *v0.0.5 Layer 4 UI groundwork — single Brief, scaffold scope (branch v0.0.5). **Completed:**
+  the held fifth v0.0.5 enabler — construction interaction state on `ui_state`
+  (`construction_state` + `show_construction_panel`); a hover-driven ghost placement marker
+  and non-mutating click seam on the Planetary canvas (`body_surface_canvas.cpp`); the
+  construction / building-management panel shell with armed-placement Build section and
+  disabled management stubs (`src/ui/construction_panel.{hpp,cpp}`); nav-rail slot 6 + shell
+  wiring + `verify` hooks (`nav_pane.cpp`, `app.cpp`). **No economic mutation** — the functional
+  loop stays in v0.0.6. 8/8 requirements met; verified via the ProjectIo Debug build, code
+  grep, and `scripts/verify/construction_panel.lua`. B ∥ C fanned out to two concurrent
+  sub-agents. See REQUIREMENTS.md archive.*
+
 - *v0.0.5 Layer 4 foundations — publish set (4 Briefs, barrier semantics, branch v0.0.5).
   **Completed:** reusable placement-rules seam (`src/world/placement_rules.{hpp,cpp}`, Pass 3
   re-pointed, no behaviour change); multi-tick economy-stability harness

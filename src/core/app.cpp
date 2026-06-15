@@ -10,6 +10,7 @@
 #include "ui/body_surface_canvas.hpp"
 #include "ui/canvas_command.hpp"
 #include "ui/circumplanetary_canvas.hpp"
+#include "ui/construction_panel.hpp"
 #include "ui/economy_panel.hpp"
 #include "ui/explorer_panel.hpp"
 #include "ui/fonts.hpp"
@@ -284,6 +285,36 @@ int app::run_verify(const std::string& script_path)
             step_economy();
         m_ui.show_economy_panel = true;
     });
+
+    // Open the Layer 4 construction / building-management panel so a capture shows
+    // the building surface. The scaffold panel takes no economy state to populate.
+    v.set_function("show_construction", [this]() {
+        m_ui.show_construction_panel = true;
+    });
+
+    // Arm placement mode for a building type (and optional extraction target) so a
+    // capture shows the Planetary ghost marker. Names mirror the UI vocabulary;
+    // unknown names leave the mode unchanged. Non-mutating — this is the v0.0.5
+    // placement scaffold (no construction is committed).
+    v.set_function("place_mode",
+        [this](const std::string& type, sol::optional<std::string> target) {
+            building_type bt = building_type::none;
+            if (type == "extraction")      bt = building_type::extraction_site;
+            else if (type == "processing") bt = building_type::processing_facility;
+            else if (type == "port")       bt = building_type::port;
+            if (bt == building_type::none)
+                return;
+            m_ui.construction.active = true;
+            m_ui.construction.type   = bt;
+            if (target)
+            {
+                const std::string& t = *target;
+                if (t == "iron_ore")             m_ui.construction.target = resource_type::iron_ore;
+                else if (t == "petroleum")       m_ui.construction.target = resource_type::petroleum;
+                else if (t == "water")           m_ui.construction.target = resource_type::water;
+                else if (t == "agricultural_produce") m_ui.construction.target = resource_type::agricultural_produce;
+            }
+        });
 
     // Discrete navigation by the shared command vocabulary — the same dispatch the
     // keyboard uses (see canvas_command.hpp), so a script reads as a key sequence.
@@ -687,6 +718,7 @@ void app::render()
     ui::draw_nav_pane(m_ui, ui::profile_panel_height);
     ui::draw_tile_inspector(m_world, &m_ui.show_tile_ledger);
     ui::draw_economy_panel(m_world, m_registry, m_last_econ_report, &m_ui.show_economy_panel);
+    ui::draw_construction_panel(m_world, m_registry, m_ui, &m_ui.show_construction_panel);
 
     // Overlay-lens controls — a bottom-left strip from the nav-pane edge inward,
     // clear of the centred scale/zoom control. Replaces the old minimap mode bar.

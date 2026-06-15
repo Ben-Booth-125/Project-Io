@@ -6,6 +6,51 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## 2026-06-15 — v0.0.5 Layer 4 UI groundwork (single Brief, scaffold scope, branch v0.0.5)
+
+Second v0.0.5 block: published the **fifth enabler** that the foundations set had deliberately
+held — A4 Layer 4 UI groundwork — scoped explicitly as a **non-mutating scaffold** (the
+functional construction loop stays in v0.0.6). Single Brief, full Publish lifecycle.
+
+### What was built
+
+- **Construction interaction state** on `ui_state` (`src/ui/ui_state.hpp`): a nested
+  `construction_state` (`active` / `building_type` / `resource_type target`) and a
+  `show_construction_panel` flag (defaults false — ledgers start closed).
+- **Ghost placement marker + non-mutating click seam** on the Planetary canvas
+  (`body_surface_canvas.cpp`): when placement mode is active a ghost `icons::building` glyph of
+  the chosen type follows the hovered tile, tinted `palette::positive`/`negative` by
+  `placement_rules::can_place`. The select-on-click is guarded behind `!construction.active`; in
+  placement mode the click is a documented no-op seam (v0.0.6 will construct there).
+- **Construction / building-management panel shell** (new `src/ui/construction_panel.{hpp,cpp}`):
+  shared `ledger_chrome` window; a **Build** section whose buttons arm placement mode (extraction
+  offers a target from `placement_rules::k_extractable`) with a Cancel; a **Selected building**
+  section showing the building on the selected tile read-only (type / target / recipe / workforce
+  / cost) with **disabled** stub controls (recipe combo, workforce slider, sell-order button).
+- **Shell wiring + verify hooks**: nav-rail slot 6 (building glyph) toggles the panel; `app::render`
+  draws it; `app::run_verify` gains `show_construction` / `place_mode` so the panel and placement
+  mode are drivable headlessly.
+
+### Decisions
+
+- **Scaffold, not functional** (user call) — no build-cost spend, no world mutation, no
+  recipe/workforce/sell-order writes. Keeps v0.0.5 true to "foundations"; the management controls
+  are present but disabled, wired to v0.0.6 logic later.
+- **B ∥ C fanned out to two concurrent sub-agents** (disjoint: `body_surface_canvas.cpp` vs. the
+  new panel files) after the `ui_state` foundation landed; the `ui_state` header and the
+  nav/`app.cpp` integration stayed in the main session.
+- **R3/R7 visual limits recorded, not faked** — the ghost is hover-driven and there is no
+  tile-selection verify hook, so those captures are not headlessly drivable; both verified by
+  code grep with the limitation noted (the same harness boundary already logged for the
+  body-label and frame-stutter checks).
+
+### Status
+
+Complete — 8/8 requirements met (see REQUIREMENTS.md § layer4-ui-groundwork archive). Verified via
+the ProjectIo Debug build, code grep, and `scripts/verify/construction_panel.lua`.
+
+---
+
 ## 2026-06-15 — v0.0.5 Layer 4 foundations (publish set, branch v0.0.5)
 
 First v0.0.5 work block. Branched `v0.0.5` off `main` and published four of the five
