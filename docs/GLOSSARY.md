@@ -45,6 +45,15 @@ A unit of **described intent** in the backlog (`docs/development/OPENS.md` — t
 **Design state (Brief)**
 Whether a **Brief**'s design is settled, marked by a glyph in its `[<priority><difficulty> <state>]` marker. **`✓` — designed, not implemented:** the design is settled and the Brief is **promote-ready** (it may still be *blocked* on a dependency existing — a sequencing fact, not a design gap). **`~` — not designed, not implemented:** design is still owed and must be settled (a **design** pass into the authority doc, flipping it to `✓`) *before* the Brief is promoted. Orthogonal to priority and difficulty. Only `✓` Briefs are promotable. See `docs/development/OPENS.md` (§ Design state — the two open states).
 
+**Open (adjective)**
+Of an item or Brief: **not yet implemented**. An open Brief describes intent that has not landed in `src/` — it lives in `docs/development/OPENS.md` (the **open items**). An open Brief may additionally be **owed** to design (its explanation debt is unpaid; see below), or already settled. See `docs/development/OPENS.md`.
+
+**Owed (adjective)**
+Of a Brief: one that **owes the design documentation an explanation** — the design behind it has not yet been written into the subject's authority doc. An owed Brief carries the unpaid explanation debt itself (OPENS is the most up-to-date design source while the debt stands). Contrast **settled**. See `docs/development/OPENS.md` (§ Design state).
+
+**Settled (adjective)**
+Of a Brief: one that has **repaid its explanation debt** — the design has been written into the authority doc, so the documentation now carries the explanation rather than the Brief. Contrast **owed**. See `docs/development/OPENS.md` (§ Design state).
+
 **Batch Publish**
 The publication of **more than one Brief in a single work block**, run breadth-first under
 **barrier semantics** — every Brief clears each Publish step before *any* Brief begins the
