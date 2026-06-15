@@ -239,24 +239,20 @@ currently hold Briefs appear as sections below.
   Touches the corporation branch in `src/ui/body_surface_canvas.cpp`; update
   `docs/ui/LENSES.md` § Corporation lens to match.
 
-- **[C2] Resolve icon silhouette collisions & contract mismatch.** Two glyphs in
-  `src/ui/icons.cpp` share a silhouette with another, distinguished only by colour or
-  outline, and one contract is wrong (see `docs/ui/ICONS.md` § Open clarifications 1–2):
-  (a) the **extraction-site** building marker and the **resource pip** are both filled
-  diamonds; (b) the **port** building marker and the **unit/convoy** marker are both filled
-  upward triangles; and the `icons.hpp` doc for `unit` calls it "an upward **chevron**" while
-  the code draws a solid triangle. Decide per collision whether to redraw one glyph for a
-  distinct silhouette (e.g. make `unit` a true open chevron, separating it from `port`) or
-  to accept the overlap because the two never co-occur — then make the header contract and
-  the implementation agree. Touches `src/ui/icons.{hpp,cpp}` and `docs/ui/ICONS.md`.
+- **[C2] Resolve icon silhouette collisions & contract mismatch.** **Design settled
+  (2026-06-15) in `docs/ui/ICONS.md` § Open clarifications 1–2:** (a) redraw the
+  **extraction-site** marker to a distinct **faceted ore/mineral silhouette** (off the
+  gem-diamond pip); (b) redraw **unit/convoy** as a **true open chevron (V)**, separating it from
+  the filled `port` triangle *and* matching the header's "chevron" wording. Remaining is the
+  `icons.cpp` redraw + header contract sync. Touches `src/ui/icons.{hpp,cpp}`; `docs/ui/ICONS.md`.
 
-- **[C2] Settle icon outline & colour conventions.** The filled-glyph dark outline is applied
-  inconsistently — `building` and `faction` carry it "for contrast on any terrain", but
-  `unit` (also canvas-drawn) does not — and the `colour` parameter means *fill* for some
-  glyphs and *stroke* for others (see `docs/ui/ICONS.md` § Open clarifications 3–4). Decide a
-  rule (e.g. every canvas-placed filled glyph outlines; document the fill-vs-stroke meaning
-  per family) and bring the implementations into line with it. Touches
-  `src/ui/icons.{hpp,cpp}` and `docs/ui/ICONS.md`.
+- **[C2] Settle icon outline & colour conventions.** **Design settled (2026-06-15) in
+  `docs/ui/ICONS.md` § Shared conventions:** *every canvas-placed filled marker outlines* (so
+  `unit` gains the dark outline; the resource pip is the documented outline-less exception), and
+  `colour` is **fill** for the building/faction/corporation/unit/pip families, **stroke** for
+  supply/market/ledger/placeholder/resource-lens. Remaining is bringing `icons.cpp` into line.
+  Touches `src/ui/icons.{hpp,cpp}` and `docs/ui/ICONS.md`. *(Can land with the collision Brief —
+  same files.)*
 
 - **[C2] Verify icon usage is consistent across the app.** Audit every `ui::icons::*` call
   site against `docs/ui/ICONS.md`: that the right glyph is used for each meaning, that sizes
@@ -268,16 +264,12 @@ currently hold Briefs appear as sections below.
   `tile_inspector.cpp` (resource swatches). Touches whichever call sites drift; reference
   `docs/ui/ICONS.md`.
 
-- **[C2] Reference distances for bodies are rung-relative.** A body's displayed
-  distance should be measured from the **reference point of the current rung**, not
-  always from the star. On the Solar rung the reference is the star (0 AU at the
-  centre, as today); on the **Circumplanetary** rung the reference is the **parent
-  body — 0 AU at the parent** — so a moon (or any local body) reads as its distance
-  *from its parent*, which is the meaningful figure when that view is framed on the
-  parent. Define the per-rung reference and apply it wherever a body distance is
-  surfaced (the body stat block — `draw_body_summary` in `entity_summary.cpp` — and
-  any on-canvas distance label). See `docs/ui/CIRCUMPLANETARY.md` and
-  `docs/ui/SOLAR.md`.
+- **[C2] Reference distances for bodies are rung-relative.** **Design settled (2026-06-15)** in
+  `docs/ui/SOLAR.md` and `docs/ui/CIRCUMPLANETARY.md`: Solar rung → star at 0 AU; Circumplanetary
+  rung → parent body at 0 AU (moon reads distance from its parent). Remaining is implementation:
+  make `draw_body_summary` (`entity_summary.cpp`) read the reference from the current rung rather
+  than hard-coding the star, and apply to any on-canvas distance label. The Circumplanetary hover
+  tooltip already does this. Touches `src/ui/entity_summary.cpp`.
 
 - **[B3] Implement the hover-card primitive.** The hover-card *design* is now settled
   (`docs/ui/TOOLTIP.md`, 2026-06-15): one `draw_hover_card` dispatcher wrapping the existing
@@ -290,23 +282,15 @@ currently hold Briefs appear as sections below.
   verbosity) settle against a populated Layer 4 economy. Supports Layer 4 (building / market detail
   on hover). Authority `docs/ui/TOOLTIP.md`.
 
-- **[C2] Time-speed curve + econ-tick progress bar.** Two settled tweaks to the time
-  column (the time panel in `src/core/app.cpp`; speed→rate mapping in `sim_loop`):
-  — **Non-linear speed curve.** The speed buttons currently map linearly to a 1×–5×
-    multiplier (`sim_loop::set_speed`, used as the per-step divisor in `step_ms`).
-    Redefine the curve so the top end fast-forwards aggressively: buttons **1–3 keep
-    their current fine-grained feel with button 3 as the 1× normal-play reference**,
-    and buttons **4 → 4× and 5 → 16×** that reference — for skipping quiet quarters to
-    the next economy tick. (Confirm at planning what 1 and 2 become if 3 is the 1×
-    reference: whether they read as slower-than-realtime, or 3 is merely relabelled
-    while 1/2/3 keep today's 1×/2×/3× rates.) Lever: the speed→multiplier mapping in
-    `sim_loop.{hpp,cpp}` (`max_speed`, the `step_ms` divisor) and the button labels in
-    the `app.cpp` time panel.
-  — **Econ-tick progress bar: drop the % text.** The quarter-progress `ImGui::ProgressBar`
-    (`app.cpp` time panel, fed by `ui::fmt::quarter_progress`) shows ImGui's default
-    `xx%` overlay; suppress it (empty overlay string) so the bar reads as a clean
-    animated fill toward the economy-tick boundary. See `docs/ui/TIME_CONTROLS.md` /
-    `LAYOUT.md`.
+- **[C2] Time-speed curve + econ-tick progress bar.** **Design settled (2026-06-15)** in
+  `docs/ui/TIME_CONTROLS.md` § Speed curve. Two implementation tweaks remain:
+  — **Non-linear speed curve.** Map the five buttons to **1 → 0.25×, 2 → 0.5×, 3 → 1× (normal-play
+    reference), 4 → 4×, 5 → 16×** — slow-motion at the bottom, aggressive fast-forward at the top.
+    Lever: the speed→multiplier mapping in `sim_loop.{hpp,cpp}` (`max_speed`, the `step_ms`
+    divisor) and the button labels in the `app.cpp` time panel.
+  — **Econ-tick progress bar: drop the % text.** Suppress the quarter-progress `ImGui::ProgressBar`
+    `xx%` overlay (empty overlay string) in the `app.cpp` time panel so it reads as a clean
+    animated fill. See `docs/ui/TIME_CONTROLS.md` / `LAYOUT.md`.
 
 - **[F3] Clarify the time control view.** Deferred. The current two-column time
   panel (calendar block + speed controls) is a prototype-grade layout. Revisit it
@@ -318,10 +302,24 @@ currently hold Briefs appear as sections below.
 
 ## Menu
 
-- **[B3] Define the menu items from the systems.** Work out the important menu items
-  driven by the game systems (`docs/SYSTEMS.md`), then **get feedback on the
-  intended order before final implementation.** Layer 4 adds building-management and
-  ledger menus, so the rail's content matters for it. See `docs/ui/MENU.md`.
+- **[B3] Define the menu items from the systems.** **Design settled (2026-06-15).** The
+  ten-slot menu set and its **gameplay-loop ordering** are now recorded in `docs/ui/MENU.md`
+  § Menu set and ordering (Corporation overview anchor → manage → trade & world → strategy
+  clusters). Remaining is **implementation** (promote when the L4 ledger family lands): wire
+  slots 2–6 to the [A4] ledgers, move the Tile Ledger from slot 8 to slot 6, and add the
+  reserved placeholders + cluster separators. `src/`-changing → brief-spanning requirement at
+  promotion. Files: `src/ui/nav_pane.cpp`, `src/ui/icons.{hpp,cpp}` (per-menu glyphs).
+
+- **[B3] Corporation overview dashboard — design.** Slot 1 of the nav rail (`docs/ui/MENU.md`)
+  is a new top-level **at-a-glance roll-up** (balance, holdings, alerts) above the per-system
+  ledgers. It needs its own design before implementation: what it summarises, how it links into
+  the per-system ledgers, and whether it is a floating window or persistent panel. Authority
+  `docs/ui/MENU.md`, `docs/ui/LAYOUT.md`; reads `w.player_entity`, the economy report.
+
+- **[C1] Canonical nav-rail ordering rule.** The rail is ordered by *gameplay-loop grouping*
+  for now (`docs/ui/MENU.md`). Settle a **canonical, self-documenting ordering rule** later
+  (e.g. strict SYSTEMS.md tier order) so the order is principled rather than ad hoc. Low
+  priority; doc-only. See `docs/ui/MENU.md` § Open questions.
 
 ## Ledger
 
@@ -427,14 +425,42 @@ Standing **`S`-tier review reminders** raised by the 2026-06-15 retroactive doc-
 landed without a doc update; each carries a **transient "what was changed" note** in the doc
 itself. **Review the change, then remove the transient note** and clear the Brief.
 
-- **[S1] CORPORATION_GENERATION.md — clustered-holdings reconcile + strategy flagged for
-  revision.** Pass 3 was rewritten to record the landed clustered, focus-shaped 3–6-holding
-  placement (anchor + nearest-tile fill, `placement_rules`-gated); Pass 4 gained the pre-game
-  operating-history note. **2026-06-15 design-direction verdict: the clustered-holdings *shape*
-  is wrong** and is to be revised (the doc accurately describes the *current code*, but the
-  strategy itself needs rework). The target shape needs the user's direction before it can be
-  promoted — see the [B4] revision Brief under § Environment → Corporation generation. Keep the
-  transient note until the revision lands (it now flags rework, not just review).
+- **[S1] CORPORATION_GENERATION.md — revised holdings shape (specialist, lean).** Pass 3, the
+  design principles, and § Open items were revised (2026-06-15) to the settled **specialist /
+  lean / cluster-to-nation** shape, deriving from GENERATION_STRATEGY.md. The doc now describes
+  the *design target*; the *code* still places the old flat 3–6 cluster until [B4] is promoted.
+  Review the revised framing, then remove the transient `> ⟳` note at the top of
+  `docs/generation/CORPORATION_GENERATION.md`.
+
+- **[S1] GENERATION_STRATEGY.md — new generation-overview doc.** New doc (2026-06-15) holding the
+  saturated-base / specialist-corporation premise and summarising the `generation/` family;
+  registered in CLAUDE.md's doc map. Review it, then remove its transient `> ⟳` note.
+
+- **[S1] SYSTEMS.md § Cross-cutting notes — specialist-corporation premise stub.** Added a
+  cross-cutting note (2026-06-15) recording that nations own the broad economy and corporations
+  are specialists, pointing to GENERATION_STRATEGY.md. Review the wording, then remove the
+  transient HTML comment in `docs/SYSTEMS.md` § Cross-cutting notes.
+
+- **[S1] MENU.md — defined menu set & ordering.** Added § Menu set and ordering (2026-06-15):
+  the ten-slot set, gameplay-loop grouping, and slot mapping to systems. Review it, then remove
+  the transient `> ⟳` note in `docs/ui/MENU.md` § Menu set and ordering.
+
+- **[S1] POPULATION.md — population centres now in scope + decomposed.** Reconciled the stale
+  "deferred for the prototype" framing to v0.0.6 static-MVP scope; added § Generation
+  (nation-seeded, habitability-clustered) and § Implementation decomposition (2026-06-15).
+  Review, then remove the transient `> ⟳` note at the top of `docs/economy/POPULATION.md`.
+
+- **[S1] ICONS.md — icon clarifications 1–4 settled.** Recorded the extraction-site redraw,
+  unit→chevron, the outline rule, and the fill-vs-stroke per-family rule (2026-06-15). Review,
+  then remove the transient `> ⟳` note in `docs/ui/ICONS.md` § Shared conventions.
+
+- **[S1] SOLAR.md / CIRCUMPLANETARY.md — rung-relative reference distance.** Added the
+  rung-relative distance rule to both canvas docs (2026-06-15). Review, then remove the transient
+  `> ⟳` note in `docs/ui/CIRCUMPLANETARY.md`.
+
+- **[S1] TIME_CONTROLS.md — speed curve + progress-bar settled.** Added § Speed curve (non-linear,
+  1×=button 3) and the dropped-%-text note (2026-06-15). Review, then remove the transient
+  `> ⟳` note in `docs/ui/TIME_CONTROLS.md` § Speed curve.
 
 - **[S1] Review SELECTION.md — tile "Build here" front door reconcile.** Added § The tile
   element is the build front door, recording the player-construction affordance
@@ -518,15 +544,24 @@ The labour scalar (`docs/SYSTEMS.md` § Workforce, `docs/economy/POPULATION.md`)
   `docs/economy/{PRODUCTION,POPULATION}.md` and the milestone map in
   `docs/development/ROADMAP.md` (v0.0.6 — building management + population).
 
-- **[S4] Population centres.** Implement the population-centre model designed in
-  `docs/economy/POPULATION.md`: population **scale / agglomeration**, **land-use trade-offs**,
-  **habitability feedback**, and the **labour supply** that grounds workforce. Split out of
-  [S5] as its own Brief so the population half is tracked and prioritised independently of
-  building management. It grounds the workforce pool ([A4] § Workforce — wages and demand
-  derive from population) and is the population half of the v0.0.6 theme. Designed
-  independently of the build UI but couples to it through workforce. Authority
-  `docs/economy/POPULATION.md`, `docs/SYSTEMS.md` § Workforce; see
-  `docs/development/ROADMAP.md` (v0.0.6).
+- **[S4] Population centres — static MVP (Briefs 1–5).** **Decomposed (2026-06-15);** the
+  foundation-first sequence is in `docs/economy/POPULATION.md` § Implementation decomposition.
+  The **static-MVP scope** is: **(1) land-use foundation** (`land_use` enum/field on
+  `tile_component` + transition rules via `placement_rules`), **(2) population-centre model +
+  the nation-seeded, habitability-clustered generation pass** (§ Generation), **(3) population
+  demand** into `market_component.demand`, and **(5) agglomeration/scale bonus** on production.
+  Brief **(4) workforce supply derivation** is [A4] § Workforce step 2 — it stays there, grounded
+  by this. 1→2 is the serial foundation; 3 and 5 are disjoint dependents of 2 (parallel-safe).
+  Each is `src/`-changing → brief-spanning requirements at promotion. Grounds the workforce pool
+  and is the population half of v0.0.6. Authority `docs/economy/POPULATION.md`, `docs/SYSTEMS.md`
+  § Workforce; `docs/development/ROADMAP.md` (v0.0.6).
+
+- **[A4] Population centres — dynamic half (Briefs 6–7, v0.0.6 follow-up).** Deferred from the
+  static MVP above: **(6) habitability aggregate + feedback** (body habitability from urban/amenity
+  tiles → workforce efficiency) and **(7) population growth** (habitability/met-demand → level
+  change over Ticks). The first indirect feedback loop in the economy. Best taken after the static
+  MVP and the workforce pool are live. Authority `docs/economy/POPULATION.md` § Implementation
+  decomposition, § Habitability and workforce efficiency.
 
 ## Environment
 
@@ -561,16 +596,19 @@ Design authority: `docs/generation/NATION_GENERATION.md`.
 
 Design authority: `docs/generation/CORPORATION_GENERATION.md`.
 
-- **[B4] Revise the corporation starting-holdings shape.** The 2026-06-15 >C pass landed a
-  clustered, focus-shaped **3–6-holding** placement (anchor + nearest-tile fill,
-  `placement_rules`-gated; documented in CORPORATION_GENERATION.md § Pass 3). The user flagged
-  the **shape as wrong** on review (2026-06-15 design-direction Q&A). **Needs the target shape
-  settled before promotion** — open questions: should holding *count* scale (with starting
-  capital, home-nation size, or focus) rather than a flat 3–6? Should the *spread* be tighter
-  or looser than nearest-tile clustering? Should the focus→asset-mix pattern change? Settle the
-  intended shape with the user, then revise `place_starting_assets` in
-  `src/world/corporation_generation.cpp` and update the doc. Couples to the [S1] doc-review
-  Brief under § Documentation (which holds the transient note until this lands).
+- **[B4] Revise the corporation starting-holdings shape.** **Design now settled (2026-06-15);
+  code revision pending.** The target shape is recorded in CORPORATION_GENERATION.md § Pass 3
+  and grounded in the new GENERATION_STRATEGY.md premise (saturated earth-like base; Nation AI
+  owns the broad industry; corporations are **specialists**). The settled direction: holdings are
+  a **lean, focus-coherent** set (not a flat 3–6 generic spread), **count shaped by focus**, and
+  **clustered to the home nation** (the rigid anchor + nearest-tile pack is dropped). **Remaining
+  work is execution + tuning:** fix the concrete prototype counts per focus and the within-nation
+  cluster tightness, then revise `place_starting_assets` in
+  `src/world/corporation_generation.cpp` (retire `k_min_holdings`/`k_max_holdings` flat range)
+  and the `world_audit` expectations. `src/`-changing → needs a brief-spanning requirement at
+  promotion. Couples to the [S1] doc-review Brief under § Documentation (holds the transient note
+  until this lands). Open follow-ons recorded in CORPORATION_GENERATION.md § Open items: building
+  tiers/levels, allied-corp/franchise origin, post-WW2 asset-mix grounding.
   CORPORATION_GENERATION.md § Open items: the analytical corp-selection/re-roll
   flow, franchising, nation-seeded privatisation, automated tax, Era-based
   sovereignty, and diplomatic posture. Out of prototype scope.

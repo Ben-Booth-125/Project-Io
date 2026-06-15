@@ -1,6 +1,13 @@
 # Project Io — Population and Development
 
-Population is the human layer of the economy — the source of workforce, the driver of consumer demand, and the reason habitability matters. Development is the act of improving a tile or region in ways that affect population, efficiency, or amenity rather than raw extraction. Both are deferred for the prototype but are designed here so that future implementation extends the existing model rather than replacing it.
+> **⟳ Pending review (2026-06-15) — transient.** Population centres are **no longer deferred** —
+> they are **v0.0.6 scope** (ROADMAP § v0.0.6; current goal "Layer 4 working"). Added: the
+> § Generation pass (habitability-seeded), and § Implementation decomposition (v0.0.6) recording
+> the **static-MVP-first** cut. The stale "deferred for the prototype" framing throughout is
+> reconciled to "first implemented as a static MVP in v0.0.6". Remove this note once reviewed.
+> See TODO § Infrastructure [S4] and its child Briefs.
+
+Population is the human layer of the economy — the source of workforce, the driver of consumer demand, and the reason habitability matters. Development is the act of improving a tile or region in ways that affect population, efficiency, or amenity rather than raw extraction. Population centres are **first implemented in v0.0.6 as a static MVP** (seeded fixed-level centres producing workforce supply, demand, and the agglomeration bonus); the **dynamic half** (habitability feedback and growth) follows as a v0.0.6 follow-up. The full model is designed here so each implementation step extends it rather than replacing it.
 
 ---
 
@@ -13,7 +20,29 @@ A **population centre** is a cluster of inhabited tiles on a body, characterised
 - Generates demand for food rations, consumer goods, and habitability goods each Tick.
 - Has a habitability score that reflects its amenity, infrastructure, and input supply (food, clean water, utilities).
 
-Population centres do not exist in the prototype. The prototype treats workforce as an authored constant (`workforce_assigned`) on each building. The population model is designed here to ensure that the workforce field, the habitability tile property, and the demand side of the market are all positioned correctly for the later implementation.
+## Generation
+
+Population centres are **placed at campaign start by a deterministic generation pass**, run
+after nation and corporation generation (it reads finished territory and tile data; see
+`docs/generation/GENERATION_STRATEGY.md`). Nations own the broad economy, so the population
+that staffs it is seeded onto **their** territory:
+
+- **One or more centres per nation**, placed on **habitability-clustered** tiles — the pass
+  prefers high-`tile_component.habitability` compositions (grassland, forest) and grows a centre
+  outward across contiguous habitable tiles within the nation.
+- **Level is derived, not authored** — a centre's tier (Outpost → Metropolis) follows from the
+  size and mean habitability of its tile cluster, so fertile, large territories carry cities and
+  marginal ones carry outposts. Deterministic from the campaign seed.
+- The pass sets each occupied tile's **`land_use`** to `urban` (or `amenity`), which removes its
+  deposit from extraction per § Land use — population and extraction compete for the same tiles
+  from turn one.
+
+The exact tier thresholds and per-nation centre counts are tuning targets fixed at promotion;
+the decisions here are *nation-seeded, habitability-clustered, level-derived*.
+
+---
+
+Until v0.0.6, the prototype treats workforce as an authored constant (`workforce_assigned`) on each building. The population model is designed here to ensure that the workforce field, the habitability tile property, and the demand side of the market are all positioned correctly for the implementation.
 
 ---
 
@@ -172,6 +201,27 @@ The migration is additive, so nothing in Layer 3 is retrofitted destructively:
 The data already in place that this path reuses (and must not be retrofitted): the
 `workforce_assigned` field, `market_component.demand`, and `tile_component.habitability`
 (see Prototype notes below).
+
+## Implementation decomposition (v0.0.6)
+
+The [S4] Population-centres Brief decomposes into the foundation-first sequence below. The
+**static MVP is Briefs 1–5** (seeded fixed-level centres that produce workforce supply, demand,
+and the agglomeration bonus); **Briefs 6–7 (the dynamic half — habitability feedback and growth)
+are a v0.0.6 follow-up**, deferred from the first pass so the load-bearing L4 workforce/demand
+grounding lands without building the whole feedback economy at once.
+
+| # | Brief | Depends on | MVP |
+|---|-------|-----------|-----|
+| 1 | **Land-use foundation** — add `land_use` enum + field to `tile_component`; transition rules (extraction occupies; urban/amenity displaces deposit) through `placement_rules`. | — | ✓ |
+| 2 | **Population-centre model + generation** — the centre entity (attached tiles, derived level tier) and the nation-seeded, habitability-clustered generation pass (§ Generation). | 1 | ✓ |
+| 3 | **Population demand** — per-Tick basket (food / water / consumer / habitability goods) consumed from the body market, feeding `market_component.demand`. | 2 | ✓ |
+| 4 | **Workforce supply derivation** — population level → labour force → contracted corp share. *This is [A4] § Workforce step 2* — it stays its own Brief there, grounded by this work. | 2 | ✓ |
+| 5 | **Agglomeration / scale bonus** — centre level → production bonus (processing throughput + extraction yield), per § Scale bonus model. | 2 | ✓ |
+| 6 | **Habitability aggregate + feedback** — body habitability from urban/amenity tiles → workforce efficiency (and the growth input for 7). | 3 | follow-up |
+| 7 | **Population growth** — habitability / met-demand → level change over Ticks. | 6 | follow-up |
+
+Briefs 3, 4, and 5 are **disjoint dependents of 2** (different systems: market demand, workforce
+pool, production bonus) — parallel-safe once the model exists. 1 → 2 is the serial foundation.
 
 ## Prototype notes
 

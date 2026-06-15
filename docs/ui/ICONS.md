@@ -39,13 +39,21 @@ void glyph(ImDrawList* dl, ImVec2 centre, float r, /* colour or type */);
 - **colour** — either a caller-supplied `ImU32`, or *derived* (the `resource`
   glyph pulls its colour from `presentation_of`). See the catalogue for which.
 
-Two visual sub-conventions, applied inconsistently across the set today (see
-**Open clarifications**):
+> **⟳ Pending review (2026-06-15) — transient.** Settled the icon Open clarifications 1–4
+> (extraction-site redraw, unit→chevron, the outline rule, the fill-vs-stroke per-family rule).
+> These are *design decisions*; the glyph redraws in `icons.cpp` land when the [C2] icon Briefs
+> are promoted. Remove this note once reviewed. See TODO § Canvas.
 
-- **Filled glyphs carry a dark outline** (`IM_COL32(20, 22, 28, 255)`, the
-  file-local `outline`) so they read on any terrain colour.
-- **Stroke-only glyphs** use the supplied `colour` as the line colour and have no
-  fill.
+Two settled visual sub-conventions (the resolution of former Open clarifications 3–4):
+
+- **Every canvas-placed filled marker carries the dark outline** (`IM_COL32(20, 22, 28, 255)`,
+  the file-local `outline`) so it reads on any terrain colour — this covers the whole entity-marker
+  family (`building`, `unit`). The resource **pip** is the single documented exception: as a
+  strip/swatch/deposit glyph it stays **outline-less**.
+- **`colour` means fill or stroke per family, fixed:** the filled families
+  (`building`, `faction`, `corporation`, `unit`, resource `pip`) treat `colour` as the **fill**;
+  the stroke families (`supply`, `market`, `ledger`, `placeholder`, resource-**lens**) treat it as
+  the **stroke** line colour and have no fill.
 
 ---
 
@@ -57,12 +65,12 @@ Glyphs fall into three families by role.
 
 | Glyph | Function | Shape | Colour | Drawn for / where |
 |---|---|---|---|---|
-| **Extraction site** | `building(…, extraction_site, fill)` | Filled diamond + outline | Caller `fill` | Building marker, Planetary canvas |
+| **Extraction site** | `building(…, extraction_site, fill)` | Faceted ore/mineral silhouette + outline (distinct from the gem-diamond pip) | Caller `fill` | Building marker, Planetary canvas |
 | **Processing facility** | `building(…, processing_facility, fill)` | Filled square + outline | Caller `fill` | Building marker, Planetary canvas |
 | **Port** | `building(…, port, fill)` | Filled upward triangle + outline | Caller `fill` | Building marker, Planetary canvas |
 | **Building (none/other)** | `building(…, none, fill)` | Filled circle (dot) | Caller `fill` | Fallback building marker |
 | **Resource pip** | `resource(…, res)` | Filled diamond (no outline) | **Derived** — `presentation_of(res).colour` | Resource strips, deposit markers |
-| **Unit / convoy** | `unit(…, colour)` | Filled upward triangle (no outline) | Caller `colour` (e.g. a faction colour) | Unit stacks, Layer 5 convoy heads |
+| **Unit / convoy** | `unit(…, colour)` | Open upward chevron (V) + outline — true chevron, distinct from the filled `port` triangle | Caller `colour` (e.g. a faction colour) | Unit stacks, Layer 5 convoy heads |
 
 On the Planetary canvas the **building** glyph's `fill` now encodes the *owning
 corporation* (player corp = faction slot 0; rivals a hashed slot), so the
@@ -113,28 +121,23 @@ lenses use `palette::neutral`. The lens **name** is supplied as a hover tooltip 
 Things the current set leaves ambiguous — resolve these as the icon vocabulary is
 firmed up (several feed the **lens-design** Brief):
 
-1. **Diamond is overloaded.** Both the *extraction-site* building marker and the
-   *resource pip* render as a filled diamond, distinguished only by colour
-   (caller fill vs. resource identity colour) and outline (building has one, the
-   pip does not). They appear in different contexts today, but if a resource pip
-   and an extraction marker ever sit near each other the silhouette is identical.
-   Decide whether extraction should get a more mineral-specific glyph.
+1. **Diamond overload — RESOLVED (2026-06-15): redraw extraction-site.** The *extraction-site*
+   building marker gets a distinct **faceted ore/mineral silhouette** so it never reads as the
+   gem-diamond *resource pip*. The pip keeps the diamond (gem = resource). Glyph redraw in
+   `icons.cpp` lands with the [C2] icon-collision Brief.
 
-2. **Upward triangle is overloaded — and the contract mislabels it.** The *port*
-   building marker and the *unit/convoy* marker are both filled upward triangles,
-   differing only by the port's outline. The header describes `unit` as "an upward
-   **chevron**", but the implementation draws a solid triangle. Either redraw
-   `unit` as a true chevron (open V) to separate it from port, or correct the
-   header text.
+2. **Triangle overload + contract mislabel — RESOLVED (2026-06-15): unit → true chevron.** The
+   *unit/convoy* marker is redrawn as a true **open upward chevron (V)**, separating it from the
+   filled *port* triangle and matching the header's existing "chevron" wording (so the contract
+   and implementation agree). Redraw lands with the [C2] icon-collision Brief.
 
-3. **Outline is applied inconsistently.** `building` and `faction` carry the dark
-   outline "for contrast on any terrain", but `unit` (also canvas-drawn) does not.
-   Decide whether every canvas-placed filled glyph should outline.
+3. **Outline rule — RESOLVED (2026-06-15).** *Every canvas-placed filled marker carries the dark
+   outline* (so `unit` gains it); the resource **pip** is the documented exception (strip/swatch
+   glyph, outline-less). See § Shared conventions.
 
-4. **`colour` means fill for some glyphs and stroke for others.** Supply/market/
-   ledger/placeholder treat it as a stroke colour; building/faction/unit treat it
-   as a fill. This is fine but undocumented per-call; the catalogue's Colour column
-   is the current truth.
+4. **Fill-vs-stroke — RESOLVED (2026-06-15): fixed per family.** Documented in § Shared
+   conventions: `building`/`faction`/`corporation`/`unit`/`pip` → `colour` is fill;
+   `supply`/`market`/`ledger`/`placeholder`/resource-lens → stroke.
 
 5. **The lens set is now complete.** Five lens glyphs exist
    (supply/market/faction/corporation/**resource**); all five are ratified in

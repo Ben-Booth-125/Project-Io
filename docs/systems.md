@@ -74,3 +74,14 @@ Each faction maintains a sentiment value toward every other, shaped by trade his
 **Environment is load-bearing but silent.** Procedurally generated per tile, it sets the difficulty and character of every other system's operation locally, and directly drives replay variance.
 
 **Budget is the primary pressure point.** All systems compete for it. Allocation decisions — research versus military versus infrastructure — define strategic identity and vulnerability to both loss conditions.
+
+**The broad economy is the nations'; corporations are specialists.** The campaign opens on a
+saturated, earth-like economy whose bulk industrial base is owned and run by the **Nation AI**
+as background. The player and the major AI rivals are **specialist corporations** occupying a
+focused slice of the chain, differentiated by an interest in expanding to space — which is what
+keeps the loop a contest between a few space-interested specialists rather than a full-economy
+management game. Detail and the generation consequences live in
+`docs/generation/GENERATION_STRATEGY.md`.
+<!-- ⟳ Pending review (2026-06-15) — transient. New cross-cutting note recording the
+     saturated-base / specialist-corporation premise; detailed in GENERATION_STRATEGY.md.
+     Remove once reviewed. See TODO § Documentation [S1]. -->

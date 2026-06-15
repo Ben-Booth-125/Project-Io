@@ -42,12 +42,52 @@ slot (see `docs/development/TODO.md` § Ledger / § Selection info element).
 - The other nine slots are reserved, **disabled placeholders** (a neutral hollow-square glyph).
 - Slot glyphs and placement are **temporary** — the real per-menu icons follow once the menu set is defined; menu design is deprioritised while canvas work takes priority.
 
+## Menu set and ordering (2026-06-15)
+
+> **⟳ Pending review (2026-06-15) — transient.** Defined the ten-slot menu set and its
+> gameplay-loop ordering ([B3]). The **ordering principle is gameplay-loop grouping** for now; a
+> low-priority Brief tracks settling a *canonical* ordering rule later (TODO § Menu). The
+> **Corporation overview dashboard** (slot 1) is a new surface that still needs its own design
+> Brief. Remove this note once reviewed.
+
+The ten slots are derived from the game systems (`docs/SYSTEMS.md`), filtered through the
+**menus-are-broad-ledgers** rule above: each slot is a broad overview surface, never a targeted
+action. They are **grouped by gameplay loop** (not by SYSTEMS.md tier order — see open question
+below), with a thin visual separator between clusters:
+
+| # | Slot | System / source | Cluster |
+|---|---|---|---|
+| 1 | **Corporation overview** (dashboard) | the player corporation at a glance | *anchor* |
+| 2 | **Balance Ledger** | Budget ([A4]) | **manage** |
+| 3 | **Construction / Buildings overview** | Infrastructure ([A4]/[F4]) | **manage** |
+| 4 | **Workforce / Population Ledger** | Workforce ([A4]) / Population ([S4]) | **manage** |
+| 5 | **Market Ledger** | Trade ([A4]) | **trade & world** |
+| 6 | **Tile Ledger** | Environment (exists; moves here from slot 8) | **trade & world** |
+| 7 | **Research** | Research | **strategy** |
+| 8 | **Policy** | Policy | **strategy** |
+| 9 | **Diplomacy** | Diplomacy | **strategy** |
+| 10 | **Exploration** | Exploration (may instead route to the Explorer surface, `EXPLORER.md`) | **strategy** |
+
+Notes on the mapping:
+
+- **Resources, Supply, and Conflict do not get their own slot.** Resource detail lives in the
+  Market and Tile ledgers; Supply (Layer 5 logistics) folds into Construction/Market when it
+  exists; Conflict has no broad ledger yet. The rail scales with *systems that have a broad
+  surface*, per the menus-are-broad-ledgers rule.
+- **Slot 1 — Corporation overview dashboard.** A top-level roll-up (balance, holdings, alerts)
+  above the per-system ledgers. It is a **new surface needing its own design** before
+  implementation — tracked as a Brief under TODO § Menu.
+- **Layer-4 ledgers** (slots 2–6) are the near-term build (the [A4] ledger family); slots 7–10
+  are reserved placeholders until their systems land, following the *ledgers-start-closed* and
+  reserved-placeholder conventions above.
+
 ## Open questions
 
-- The final set of menus and what each contains (the ten slots are not yet assigned meaning beyond slot 8).
-- Ordering and grouping of menus once the set is known.
+- **Canonical ordering rule (low priority).** The current order is *gameplay-loop grouping*; a
+  canonical, self-documenting rule (e.g. strict SYSTEMS.md tier order) is deferred. Tracked as a
+  low-priority Brief under TODO § Menu.
 - Whether all menus open floating windows, or some become docked/persistent panels.
-- Relationship to the explorer (`EXPLORER.md`) — the pane is fixed navigation; the explorer is curated navigation.
+- Relationship to the explorer (`EXPLORER.md`) — the pane is fixed navigation; the explorer is curated navigation. Slot 10 (Exploration) may route to it rather than open a ledger.
 
 ## Related
 

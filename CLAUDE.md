@@ -69,6 +69,9 @@ Tile classification: the two-axis terrain model (composition × landform), resou
 **`docs/economy/POPULATION.md`**
 Population centres, scale/agglomeration mechanics, land-use trade-offs, and habitability feedback. Deferred from the prototype but designed here so the data model positions correctly. Read for questions about workforce, habitability, or population demand.
 
+**`docs/generation/GENERATION_STRATEGY.md`**
+The map of the generation layer — how the per-subject generation docs (tile / nation / corporation / ledger) relate, and the home of the **economic premise**: a saturated, earth-like base whose broad industry the Nation AI owns, with the player and major AI as **specialist** space-interested corporations. Read first for questions spanning more than one generation doc, or about why corporations start lean. Cross-cutting open items (building tiers, allied-corp/franchise origin, post-WW2 grounding) live here.
+
 **`docs/generation/TILE_GENERATION.md`**
 The procedural tile generation strategy and six-pass pipeline used in `hard_coded_world.cpp`. Covers solar parameters (temperature class, atmosphere class, hydrological state, geological activity), prototype body profiles, the hybrid terrain / noise-banded ocean / cluster landform approach, and deposit generation rules. Read before any work on tile generation or the terrain enum expansion.
 

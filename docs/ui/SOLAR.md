@@ -11,6 +11,8 @@ shared selection state, implementation approach).
 
 The star sits at the centre. Each body orbits it at a position derived from `orbital_radius_au` and `orbital_angle_rad`. Orbital rings mark each body's distance from the star. Bodies are labelled.
 
+**Reference distance is rung-relative (2026-06-15).** On the Solar rung the distance reference is the **star — 0 AU at the centre** (as today), so a body's surfaced distance is its distance from the star. This is the Solar-rung case of the shared rung-relative rule; on the Circumplanetary rung the reference is the parent body instead (see CIRCUMPLANETARY.md). The body stat block (`draw_body_summary`) reads the reference from the current rung rather than hard-coding the star.
+
 The **star is a body entity** (`body_type::star`) at the system centre
 (`orbital_radius_au = 0`, no parent, stationary) — not a hard-coded circle. It
 carries a `name`, which the canvas labels and which the minimap shows as its

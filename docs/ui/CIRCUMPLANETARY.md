@@ -64,6 +64,16 @@ Moon orbital radii are **not** true scale — real moon distances would render o
 top of the planet — they use a visible offset, consistent with how moons are
 drawn on the Solar screen.
 
+> **⟳ Pending review (2026-06-15) — transient.** Added the rung-relative reference-distance rule
+> below ([C2]). Remove once reviewed. See TODO § Canvas.
+
+**Reference distance is rung-relative.** On the Circumplanetary rung the distance reference is
+the **parent body — 0 AU at the parent** — so a moon's surfaced distance is its distance *from
+its parent*, the meaningful figure when the view is framed on the parent. This already holds for
+the hover tooltip; it must also apply to the **body stat block** (`draw_body_summary` in
+`entity_summary.cpp`), which today always measures from the star. The reference is chosen by the
+current rung, not hard-coded to the star (see SOLAR.md for the Solar-rung reference).
+
 ---
 
 ## Coordinate mapping

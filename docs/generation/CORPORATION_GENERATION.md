@@ -1,12 +1,12 @@
 # Project Io — Corporation Generation
 
-> **⟳ Pending rework (2026-06-15) — transient.** Reconciled with code landed in the >C Brief
-> pass: **Pass 3** rewritten to record the clustered, focus-shaped 3–6-holding placement
-> (anchor + nearest-tile fill, `placement_rules`-gated) that replaced the single vague
-> placement; **Pass 4** gained the pre-game operating-history note. **This describes the
-> current code, but the holdings *shape* was flagged wrong on review (2026-06-15) and is to be
-> revised** — see TODO § Environment → Corporation generation [B4] and § Documentation [S1].
-> Keep this note until the revision lands.
+> **⟳ Pending review (2026-06-15) — transient.** The holdings *shape* design (Pass 3) was
+> revised: corporations are now **specialists** placing a **lean, focus-coherent** holding set
+> clustered in their home nation, deriving from the saturated-base premise in
+> `GENERATION_STRATEGY.md` (and stubbed in `SYSTEMS.md`). This is the *design* target; the
+> code (`place_starting_assets`) still places the old flat-3–6 cluster and is brought into line
+> when [B4] is promoted. Remove this note once reviewed. See TODO § Environment → Corporation
+> generation [B4] and § Documentation [S1].
 
 Corporations are the primary actors in the simulation. They extract resources, build
 infrastructure, trade goods, and eventually project power off-world. At campaign start,
@@ -27,6 +27,13 @@ The relationship is legally binding but operationally loose: corporations can op
 borders, hold foreign assets, and act against their home nation's interests. The legal
 binding primarily means the home nation has authority to tax, licence, and — potentially —
 seize the corporation's domestic assets.
+
+**Corporations are specialists.** The broad industrial base of the saturated, earth-like home
+economy is owned by the Nation AI as background (see `GENERATION_STRATEGY.md` § The economic
+premise). A corporation is **not** a full-chain industrialist reproducing the whole economy; it
+occupies a **focused slice** of the chain and is differentiated by an interest in expanding to
+space. This is why its opening position is a **lean, focus-coherent holding set**, not a broad
+spread — the player competes as a specialist, not by out-building an entire economy.
 
 **Industrial focus drives differentiation.** Each corporation has a primary focus along
 the resource chain: extraction, refining, or manufactured products. This shapes their
@@ -70,21 +77,25 @@ without enforcing a strict quota.
 
 ### Pass 3 — Starting asset placement
 
-Each corporation receives a **clustered, focus-shaped set of holdings** placed on tiles
-within their home nation's territory:
+Each corporation receives a **lean, focus-coherent set of holdings** placed on tiles
+within their home nation's territory. Because corporations are **specialists** (above), the
+opening set is small and thematically tight — it reads as a foothold in one slice of the chain,
+not a broad presence across the nation.
 
-- **Count.** A corporation opens with **3–6 buildings** (`k_min_holdings` / `k_max_holdings`),
-  not a single asset.
-- **Anchor, then cluster.** Placement chooses a **focus-weighted anchor tile** first, then
-  fills the remaining slots from the home nation's tiles **nearest that anchor** (squared grid
-  distance, tile-id tie-break), so a corporation's holdings form a **geographic cluster**
-  rather than scattering across the nation.
-- **Mix follows focus.** The asset mix is shaped by `industrial_focus` (`focus_asset_pattern`)
-  — an extraction corp clusters extractors on its richest deposits, a processing corp pairs
-  processors with feed, etc.
+- **Count — lean and specialisation-shaped.** A corporation opens with a **small** holding set
+  rather than the earlier flat 3–6 generic spread. The count is **shaped by focus** (a specialist
+  occupies the footprint its slice needs — e.g. an extractor wants a few deposit tiles; a trade
+  operator wants one depot) rather than a single number applied to all. The concrete prototype
+  numbers are fixed when [B4] is promoted; the design target is *lean and focus-coherent*.
+- **Cluster to the home nation.** Holdings sit **within the home nation's territory** as the
+  clustering frame. (How tightly they pack within the nation is a tuning call settled at
+  promotion; the rigid anchor + nearest-tile pack is no longer prescribed.)
+- **Mix follows focus.** The asset mix is shaped by `industrial_focus` — an extraction corp
+  places extractors on its richest deposits, a processing corp pairs processors with feed, a
+  trade corp a depot. The prototype retains this pattern (applied over the lean counts); the
+  patterns themselves are an open item to ground in post-WW2 industrial history (§ Open items).
 - **Validity-gated.** Every placement is gated by `placement_rules::can_place` (the shared
-  placement seam), so no asset lands on invalid terrain or a zero-deposit tile. The
-  `world_audit` harness confirms **0 invalid placements** across the generated set.
+  placement seam), so no asset lands on invalid terrain or a zero-deposit tile.
 
 Placement is collision-checked against already-placed assets from other corporations.
 No two corporations begin on the same tile.
@@ -138,6 +149,21 @@ data model is designed so that AI behaviour can be added without restructuring i
 ---
 
 ## Open items
+
+**Building tiers / levels.** A level/tier axis for buildings — **distinct from production
+methods (recipes)**. A specialist's footprint may be characterised as much by the *tier* of its
+assets as by their count, which bears directly on the lean-holdings shape above. Unsettled;
+interacts with `docs/economy/PRODUCTION.md`. Cross-doc item — also in `GENERATION_STRATEGY.md`.
+
+**International relations & corporate origin.** Whether **allied nations share corporations**,
+or **prefer generated franchises** across borders, is open — it couples nation diplomacy to the
+clustering frame (holdings cluster to the home nation today) and to the Franchise item below.
+Cross-doc item — also in `GENERATION_STRATEGY.md`.
+
+**Post-WW2 industrial grounding for the asset mix.** The focus→asset-mix patterns should be
+grounded in research on the post-WW2 industries that led to space-related capability, so a
+specialist's holdings read as a plausible pathway toward off-world reach. Cross-doc item — also
+in `GENERATION_STRATEGY.md`.
 
 **Franchise generation.** A franchising model is a candidate alternative origin for some
 corporations: rather than generating all corporations as independent entities, some could
