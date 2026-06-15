@@ -13,7 +13,8 @@ from. Each task carries:
 
 - **A group-scoped ID letter** (A, B, C, …), so dependencies and parallel pairs
   can be named.
-- **A difficulty** in brackets (the TODO.md 1–6 scale).
+- **A difficulty** in brackets (the TODO.md 1–5 time scale; tasks carry difficulty
+  only — priority is a TODO-level triage concept, not a per-task field).
 - **A one-line action** — imperative; what to change.
 - **File scope** — the files the task is expected to touch. This is what makes
   collisions between tasks visible.

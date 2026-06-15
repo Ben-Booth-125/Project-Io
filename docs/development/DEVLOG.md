@@ -6,6 +6,31 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## 2026-06-15 — TODO restructure: priority/difficulty split, Layer 4 rescope
+
+Backlog-only change (no code). Reworked the TODO Brief marker from a single 1–6
+difficulty into a **`[<priority><difficulty>]`** pair:
+
+- **Priority** (importance, ascending): `F · C · B · A · S · SSS`. `F` is *deferred*
+  (replaces the old difficulty-6 status); `SSS` is *do immediately*. Re-rated every Brief
+  against the current goal — **getting Layer 4 working** — so enablers rank high and
+  fixes/future-note tweaks rank low.
+- **Difficulty** (1–5) is now an approximate *time-to-do* (1 ≈ <1h … 5 ≈ a week+), not a
+  vague effort score. Difficulty 6 removed.
+
+**Layer 4 rescoped** from "production UI overhaul" to **population centres + building
+management** (the deferred POPULATION.md model coupled with construction / recipe-workforce
+control / sell-order UI).
+
+**Six new pre-Layer-4 Briefs** added (important, but not cleanly Layer 3 or 4):
+placement-rules seam (`SSS2`, Infrastructure), automated economy-tick stability harness
+(`S2`, Resources), workforce-model design (`S3`, Workforce), resource generation (`B3`) and
+resource realism pass (`B2`, Resources), and Layer 4 UI groundwork (`A4`, Canvas). The
+existing workforce-pool and ledger-family Briefs were re-rated up (`A4`) as L4 substrate.
+TASKS.md note updated (tasks carry difficulty only; priority is TODO-level triage).
+
+---
+
 ## 2026-06-15 — Layer 3 finalisation published (5 Briefs)
 
 **Status:** Complete — 13/13 requirements met across three requirement groups (C and E are

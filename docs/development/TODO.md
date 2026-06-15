@@ -112,8 +112,8 @@ Tasks: <N completed>, <N cancelled>
 Requirements: <N completed>, <N pending>, <N failed>
 ```
 
-- The **title** is the Brief's own title (the bold heading text, without
-  difficulty prefix).
+- The **title** is the Brief's own title (the bold heading text, without the
+  `[<priority><difficulty>]` marker).
 - The **Tasks line** counts completed and cancelled tasks from the TASKS.md group;
   omit the cancelled count if zero.
 - The **Requirements line** counts by final state: *completed* (all verifications
@@ -122,10 +122,31 @@ Requirements: <N completed>, <N pending>, <N failed>
   counts if zero.
 - No further body text is required unless an individual task warrants a note.
 
-Difficulty scale — a rough effort estimate where **lower = easier**:
-**1** trivial · **2** easy (light work) · **3** medium · **4** hard ·
-**5** very hard. **6** is not a difficulty but a **status**: deferred / out of
-prototype scope, to revisit later (its true effort is unestimated).
+### Priority and difficulty
+
+Every Brief carries a **`[<priority><difficulty>]`** marker — e.g. `[A3]`, `[SSS2]`,
+`[F4]`. The leading letter(s) are the **priority** (importance); the trailing digit is
+the **difficulty** (a rough time estimate). The two are independent: a trivial Brief can
+be urgent, and a large one can be parked.
+
+**Priority** ranks importance, ascending: **`F` · `C` · `B` · `A` · `S` · `SSS`**.
+`F` is **deferred** — parked, out of current scope, revisit later (it replaces the old
+difficulty-6 status). `SSS` is **do immediately**. `C → B → A → S` is the ordinary
+working gradient from low to high. Re-rate against the **current goal**: a Brief that
+advances it ranks higher; fixes to past work and minor future-note tweaks that do not
+advance it rank lower, however tidy they would be. *(Goal as of 2026-06-15: getting
+Layer 4 — population centres + building management — working.)*
+
+**Difficulty** (1–5) is an approximate *time-to-do*, not a measure of importance:
+
+- **1** — trivial: up to ~1 hour. One file, no design decisions.
+- **2** — light: ~2–4 hours (a half-session). One system, light design.
+- **3** — medium: ~a focused session (about a day). One subsystem end-to-end with verification.
+- **4** — hard: ~2–3 sessions. Multiple files or real design plus new verification.
+- **5** — very hard: ~a week or more — a large multi-part build that usually wants
+  splitting into several Briefs at promotion.
+
+There is no difficulty 6; "deferred" is the **`F`** priority, not a difficulty.
 
 ## Categories
 
@@ -142,7 +163,15 @@ currently hold Briefs appear as sections below.
 
 ## Canvas
 
-- **[3] Design the lens system (complete the stubs).** `docs/ui/LENSES.md` now
+- **[A4] Layer 4 UI groundwork.** Mature the prototype ImGui shell toward what Layer 4's
+  building-management interactions need: a **click-to-place construction flow** on the
+  Planetary canvas, a **building-management panel** (recipe / workforce / sell-order
+  controls), and the wiring of these into the nav rail and ledgers. The current shell is
+  explicitly "debugging-grade" (`docs/ui/LAYOUT.md`); this is the interaction/shell pass
+  Layer 4 piles onto. Overlaps the ledger family and the menu-items Brief — coordinate at
+  promotion. See `docs/ui/{LAYOUT,MENU}.md` and the Layer 4 Brief under § Infrastructure.
+
+- **[B3] Design the lens system (complete the stubs).** `docs/ui/LENSES.md` now
   exists but only the **Corporation** lens section is settled (written alongside that
   lens's implementation); the **Supply / Market / Faction / Resource** sections are
   **stubs** recording current behaviour only. Finish the per-lens design for those
@@ -178,13 +207,13 @@ currently hold Briefs appear as sections below.
   to `src/ui/icons.hpp`. Refer to `docs/ui/CANVASES.md` for rung descriptions and
   `docs/ui/LAYOUT.md` for the strip's position in the shell.
 
-- **[3] Visual-verification harness — golden-image diffing (deferred).** Phase 1 outputs
+- **[F3] Visual-verification harness — golden-image diffing (deferred).** Phase 1 outputs
   PNGs for human/Claude inspection only. A later iteration could add committed reference
   images + a pixel-tolerance diff for automatic pass/fail on the `visual` class. Needs:
   golden storage, a tolerance model (anti-aliasing / font jitter), and a CI decision.
   Builds on `write_png_rgba` (`src/core/png_writer.cpp`) and `app::run_verify`.
 
-- **[1] Corporation lens player-tile border is redundant.** Found during the 2026-06-14
+- **[C1] Corporation lens player-tile border is redundant.** Found during the 2026-06-14
   visual verification: under the corporation lens the player's tile is filled
   `faction_colour(0)` *and* outlined `faction_colour(0)`, so the border is invisible
   against its own fill (R5 still holds via the distinct fill colour, but the border adds
@@ -193,7 +222,7 @@ currently hold Briefs appear as sections below.
   Touches the corporation branch in `src/ui/body_surface_canvas.cpp`; update
   `docs/ui/LENSES.md` § Corporation lens to match.
 
-- **[2] Resolve icon silhouette collisions & contract mismatch.** Two glyphs in
+- **[C2] Resolve icon silhouette collisions & contract mismatch.** Two glyphs in
   `src/ui/icons.cpp` share a silhouette with another, distinguished only by colour or
   outline, and one contract is wrong (see `docs/ui/ICONS.md` § Open clarifications 1–2):
   (a) the **extraction-site** building marker and the **resource pip** are both filled
@@ -204,7 +233,7 @@ currently hold Briefs appear as sections below.
   to accept the overlap because the two never co-occur — then make the header contract and
   the implementation agree. Touches `src/ui/icons.{hpp,cpp}` and `docs/ui/ICONS.md`.
 
-- **[2] Settle icon outline & colour conventions.** The filled-glyph dark outline is applied
+- **[C2] Settle icon outline & colour conventions.** The filled-glyph dark outline is applied
   inconsistently — `building` and `faction` carry it "for contrast on any terrain", but
   `unit` (also canvas-drawn) does not — and the `colour` parameter means *fill* for some
   glyphs and *stroke* for others (see `docs/ui/ICONS.md` § Open clarifications 3–4). Decide a
@@ -212,7 +241,7 @@ currently hold Briefs appear as sections below.
   per family) and bring the implementations into line with it. Touches
   `src/ui/icons.{hpp,cpp}` and `docs/ui/ICONS.md`.
 
-- **[2] Verify icon usage is consistent across the app.** Audit every `ui::icons::*` call
+- **[C2] Verify icon usage is consistent across the app.** Audit every `ui::icons::*` call
   site against `docs/ui/ICONS.md`: that the right glyph is used for each meaning, that sizes
   (the `r` half-extent) and colour sources are consistent within a context, that no two
   glyphs collide in a shared surface, and that the catalogue in ICONS.md matches the actual
@@ -222,7 +251,7 @@ currently hold Briefs appear as sections below.
   `tile_inspector.cpp` (resource swatches). Touches whichever call sites drift; reference
   `docs/ui/ICONS.md`.
 
-- **[2] Reference distances for bodies are rung-relative.** A body's displayed
+- **[C2] Reference distances for bodies are rung-relative.** A body's displayed
   distance should be measured from the **reference point of the current rung**, not
   always from the star. On the Solar rung the reference is the star (0 AU at the
   centre, as today); on the **Circumplanetary** rung the reference is the **parent
@@ -233,7 +262,7 @@ currently hold Briefs appear as sections below.
   any on-canvas distance label). See `docs/ui/CIRCUMPLANETARY.md` and
   `docs/ui/SOLAR.md`.
 
-- **[6] Informative tooltip / hover-card system.** Deferred. The single most important
+- **[B4] Informative tooltip / hover-card system.** The single most important
   player-communication surface for a grand strategy game. Today there is one
   ad-hoc `ImGui::BeginTooltip` inside the Planetary canvas, plus the lightweight
   `ImGui::SetTooltip` body tooltips on the Solar / Circumplanetary canvases;
@@ -248,9 +277,10 @@ currently hold Briefs appear as sections below.
   reveal; how a "rich card" (LAYOUT.md popup elements) differs from the lightweight
   canvas tooltip. Likely earns its own `docs/ui/TOOLTIP.md`. Note the overlap with
   the **Selection info element** (Ledger) — both present per-entity detail; share
-  the per-type content builders where it makes sense. See `docs/ui/LAYOUT.md`.
+  the per-type content builders where it makes sense. Supports Layer 4 (building /
+  market detail on hover). See `docs/ui/LAYOUT.md`.
 
-- **[2] Time-speed curve + econ-tick progress bar.** Two settled tweaks to the time
+- **[C2] Time-speed curve + econ-tick progress bar.** Two settled tweaks to the time
   column (the time panel in `src/core/app.cpp`; speed→rate mapping in `sim_loop`):
   — **Non-linear speed curve.** The speed buttons currently map linearly to a 1×–5×
     multiplier (`sim_loop::set_speed`, used as the per-step divisor in `step_ms`).
@@ -268,7 +298,7 @@ currently hold Briefs appear as sections below.
     animated fill toward the economy-tick boundary. See `docs/ui/TIME_CONTROLS.md` /
     `LAYOUT.md`.
 
-- **[6] Clarify the time control view.** Deferred. The current two-column time
+- **[F3] Clarify the time control view.** Deferred. The current two-column time
   panel (calendar block + speed controls) is a prototype-grade layout. Revisit it
   later to settle the production design: what the player needs from the clock at a
   glance (date, quarter/economy-tick countdown, speed), whether to surface the
@@ -278,13 +308,14 @@ currently hold Briefs appear as sections below.
 
 ## Menu
 
-- **[6] Define the menu items from the systems.** Work out the important menu items
+- **[B3] Define the menu items from the systems.** Work out the important menu items
   driven by the game systems (`docs/SYSTEMS.md`), then **get feedback on the
-  intended order before final implementation.** See `docs/ui/MENU.md`.
+  intended order before final implementation.** Layer 4 adds building-management and
+  ledger menus, so the rail's content matters for it. See `docs/ui/MENU.md`.
 
 ## Ledger
 
-- **[2] Uniform ledger-window chrome.** Bring every ledger window onto a **single
+- **[B2] Uniform ledger-window chrome.** Bring every ledger window onto a **single
   shared size constant and a single shared spawn-position constant** so the family reads
   as one consistent surface, per the settled principle in `docs/ui/LAYOUT.md` § Uniform
   ledger-window chrome. Today they diverge: the Tile Ledger opens at 820×560
@@ -295,16 +326,17 @@ currently hold Briefs appear as sections below.
   `src/ui/tile_inspector.cpp`, `src/ui/economy_panel.cpp`, and wherever the shared
   constants live (a small ledger-chrome header). Doc authority: `docs/ui/LAYOUT.md`.
 
-- **[2] Tile Ledger default body.** The Tile Ledger should default its selected
+- **[C2] Tile Ledger default body.** The Tile Ledger should default its selected
   body to the **current view's main body** — the Circumplanetary view's anchor, or
   the Planetary view's body — rather than the lowest id. The existing default
   ordering is otherwise fine. Touches the body-selector default in
   `src/ui/tile_inspector.cpp` (read `ui_state.active_body` /
   `circumplanetary_anchor`).
 
-- **[4] Market lens & the ledger family (Economy 2nd pass + Market / Balance /
+- **[A4] Market lens & the ledger family (Economy 2nd pass + Market / Balance /
   Construction ledgers).** Build out the economy's read surfaces now that the Layer 3
-  loop runs. Likely splits into several Briefs at promotion; captured here as one family.
+  loop runs — the Layer 4 read-surface layer. Likely splits into several Briefs at
+  promotion; captured here as one family.
   — **Economy panel — second pass.** The L3 panel (`src/ui/economy_panel.{hpp,cpp}`) is a
     debug dump (every corp, every section). Refit it to the conventions below.
   — **Market Ledger.** Per-body market detail — supply / demand / price per resource, the
@@ -332,21 +364,21 @@ currently hold Briefs appear as sections below.
 Follow-up intent for the Selection info element (design in `docs/ui/SELECTION.md`;
 shared per-entity content builders in `entity_summary.{hpp,cpp}`):
 
-- **[2] Non-spatial 'go to' routing.** For nation / corporation selections (no
+- **[C2] Non-spatial 'go to' routing.** For nation / corporation selections (no
   canvas of their own), 'go to' should open the relevant ledger rather than
   navigate a canvas. The dispatch seam exists (`draw_selection_panel` →
   `focus_on_entity`); add the branches once those entity kinds and their ledgers
-  exist. Not actionable until then. *(Promoted then cancelled 2026-06-14 — blocked:
-  no `nation_ledger` / `corporation_ledger` target exists yet.)*
+  exist (they arrive with the Layer 4 ledger family). *(Promoted then cancelled
+  2026-06-14 — blocked: no `nation_ledger` / `corporation_ledger` target exists yet.)*
 
-- **[2] Canvas hit-testing for buildings / units / markets.** Only bodies and
+- **[C2] Canvas hit-testing for buildings / units / markets.** Only bodies and
   tiles are hit-tested on the canvases today; the other kinds are selectable only
   as Tile Ledger rows. Add canvas hit-testing so they can be single-click-selected
   directly (the panel already renders all five kinds). Depends on those entities
   being drawn as selectable canvas markers first. *(Promoted then cancelled
   2026-06-14 — blocked on that marker-drawing prerequisite.)*
 
-- **[6] Lens-driven selection resolution.** Deferred — **needs documentation before
+- **[F4] Lens-driven selection resolution.** Deferred — **needs documentation before
   it is actionable.** Upgrade selection so the entity under the pointer is resolved
   *through the active lens* rather than by a fixed kind order. Two concepts must be
   defined first:
@@ -377,41 +409,93 @@ shared per-entity content builders in `entity_summary.{hpp,cpp}`):
 
 ## Trade
 
-The market layer. Per the 2026-06-14 Q&A, **market resolution collapses into Layer 3** but
-**price resolution and inter-body trade stay open**. Markets are a per-body exchange,
-**distinct from corp stockpile pools**. Design authority `docs/SYSTEMS.md` § Trade,
+The market layer. Per the 2026-06-14 Q&A, **market resolution collapses into Layer 3** and
+price resolution has now landed; **inter-body trade stays open**. Markets are a per-body
+exchange, **distinct from corp stockpile pools**. Design authority `docs/SYSTEMS.md` § Trade,
 `docs/economy/RESOURCES.md`.
 
-- **[3] Player-driven sell orders & preferential purchasing (deferred).** Build out the manual
+- **[A3] Player-driven sell orders & preferential purchasing.** Build out the manual
   side of the market the framework hook stubs: player-authored sell orders (what / how much /
   floor price) and **preferential purchasing** (choosing counterparties rather than the flat
-  auto-buy). Surfaced in the new Layer 4 production UI. Depends on market clearing.
+  auto-buy). Surfaced in the Layer 4 building-management UI. Depends on market clearing (the
+  `sell_order` hook already exists in `market_clearing.{hpp,cpp}`).
 
-- **[6] Inter-body / international markets (deferred).** Cross-body price linkage and trade
-  between bodies — each body's market currently resolves in isolation. Out of Layer 3 scope;
+- **[F4] Inter-body / international markets (deferred).** Cross-body price linkage and trade
+  between bodies — each body's market currently resolves in isolation. Out of Layer 3/4 scope;
   couples to Supply (Layer 5 logistics / logistical cost) once convoys exist.
+
+## Resources
+
+The resource economy's data and quality work — the substrate Layer 4 sits on. Design
+authority: `docs/economy/RESOURCES.md`, `docs/economy/PRODUCTION.md`.
+
+- **[S2] Automated economy-tick testing (multi-tick stability).** A headless harness
+  (`tools/verify/*.cpp`, per the `verifier-headless` skill) that runs the economy loop —
+  `run_economy_step` → `clear_markets` → `apply_budget` — over many ticks (e.g. 50–100) on a
+  small fixed world and asserts it stays sane: prices stay within the `[0.25×, 4×]` clamp band
+  and do not oscillate, no NaN/Inf, deposits deplete monotonically toward exhaustion, balances
+  do not diverge unboundedly. Cheap insurance before Layer 4 builds UI on top of the loop; the
+  existing `econ_harness` exercises only a single tick. Name the new harness in the
+  `verifier-headless` skill and add its exe to the settings allow-list.
+
+- **[B3] Resource generation — full-set deposit authoring + scarcity.** Generation today
+  authors deposits for the seven-resource prototype subset; extend it to the full 23-resource
+  set with a plausible distribution and scarcity profile (rare goods rare, ambient goods
+  near-universal). Overlaps the tile-generation refinements Brief (§ Environment) — that one
+  holds the generation *mechanics*; this one holds the *resource-economy* target. Touches the
+  deposit pass in `src/world/tile_generation.cpp`; authority `docs/economy/RESOURCES.md`,
+  `docs/generation/TILE_GENERATION.md`.
+
+- **[B2] Resource realism pass.** A design review of the resource list, tiers, recipes, and
+  per-body availability in `docs/economy/{RESOURCES,PRODUCTION}.md` for realism and coherence:
+  do the production chains make sense, are quantities plausible, are any obvious resources or
+  recipes missing or mis-tiered. Design/doc pass; feeds the generation and the economy depth
+  Layer 4 operates over.
 
 ## Workforce
 
 The labour scalar (`docs/SYSTEMS.md` § Workforce, `docs/economy/POPULATION.md`).
 
-- **[6] Workforce pool & population coupling (deferred).** The real model: a corporation-wide
+- **[S3] Workforce model design.** Settle the workforce model *before* Layer 4 building
+  management exposes it. Today `workforce_assigned` is a flat authored 0–1 constant; L4 needs
+  to know what the player actually controls. Design: the corporation-wide (or per-body) labour
+  **pool**, contention when building demand exceeds supply, how wages and supply derive from
+  population centres (couples to the Layer 4 population work), and what the player *sets* vs.
+  what the system *allocates*. Design only — the implementation is the pool-coupling Brief
+  below. Authority: `docs/economy/POPULATION.md`, `docs/SYSTEMS.md` § Workforce.
+
+- **[A4] Workforce pool & population coupling.** The real model: a corporation-wide
   (or per-body) labour **pool** with proportional contention when building demands exceed supply,
-  replacing the authored constant. **Gated on population-centre implementation** (POPULATION.md) —
-  workforce supply and wages should derive from population. In Layer 3, `workforce_assigned` is an
-  authored constant 0–1, read-only, applied as a linear scalar; this brief is the upgrade path.
+  replacing the authored constant. Implements the design Brief above and couples to the Layer 4
+  population-centre work — workforce supply and wages derive from population. In Layer 3,
+  `workforce_assigned` is an authored constant 0–1, read-only, applied as a linear scalar; this
+  brief is the upgrade path.
 
 ## Infrastructure
 
-- **[6] Building construction & management — the new Layer 4.** Per the 2026-06-14 Q&A,
-  **Layer 4 is redefined** from market/price work into a production-focused **UI overhaul**:
-  player **construction** (placement, build-cost spend, terrain/deposit validation reusing the
-  placement-rules brief above), **building management** (workforce, recipe switching — the field
-  already supports it — and the sell-order UI), and **market ledgers**. Layer 3 itself operates
-  only the authored starting assets (no construction); this brief is that next layer. Build cost
-  comes from the Lua economy-constants registry (Resources). Spans Infrastructure (construction
-  logic) + Canvas/Menu (UI); see `docs/economy/PRODUCTION.md` § Infrastructure and the build
-  sequence in `docs/development/INITIAL_INSTRUCTIONS.md` (to be rewritten — see Documentation).
+- **[SSS2] Extract a reusable placement-rules seam.** Building-placement validation
+  (terrain/deposit rules: extraction only on a non-zero deposit of the target type, never on
+  ocean, valid terrain per building type) currently lives *inside*
+  `corporation_generation.cpp` Pass 3 (`place_starting_asset`). Layer 4 player construction
+  needs the exact same check, so pull it into a reusable
+  `src/world/placement_rules.{hpp,cpp}` (tile + building_type + target_resource → valid?),
+  call it from Pass 3 (no behaviour change there), and headless-test it. Designing this
+  decoupled from a screen, *before* L4, avoids a mid-build refactor — the single most useful
+  prep for Layer 4. See `docs/economy/PRODUCTION.md` § Extraction (placement rules) and the
+  S1 placement audit in the DEVLOG.
+
+- **[S5] Layer 4 — population centres + building management.** The next layer,
+  **rescoped** from a pure production-UI overhaul into two coupled systems:
+  **population centres** (the deferred `docs/economy/POPULATION.md` model — population
+  scale / agglomeration, land-use trade-offs, habitability feedback, and the labour supply
+  that grounds workforce) and **building management** — player **construction** (placement +
+  build-cost spend + terrain/deposit validation via the placement-rules seam above),
+  **recipe / workforce control**, and the **sell-order UI** — surfaced through the production
+  UI (§ Canvas) and the market / balance / construction ledgers (§ Ledger). Build cost comes
+  from the Lua economy-constants registry. Large and multi-part; splits into several Briefs at
+  promotion. Depends on the pre-L4 enablers (placement-rules seam, workforce-model design, the
+  economy-test harness). See `docs/economy/{PRODUCTION,POPULATION}.md` and the build sequence
+  in `docs/development/INITIAL_INSTRUCTIONS.md` (to be rewritten — see Documentation).
 
 ## Environment
 
@@ -420,23 +504,24 @@ The world-generation layer — terrain, nations, corporations. Design authority:
 
 ### Tile generation (terrain)
 
-- **[4] Tile generation refinements (deferred).** The larger production passes
+- **[B4] Tile generation refinements.** The larger production passes
   noted in `TILE_GENERATION.md` § Deferred: solar-parameter derivation from orbital
   mechanics, smooth (noise-blended) band transitions, tectonic plate-driven
-  landforms, full deposit authoring for the non-prototype resources, and coastline
+  landforms, full deposit authoring for the non-prototype resources (the *mechanics*
+  side of the Resource generation Brief under § Resources), and coastline
   refinement (enclosed seas, archipelagos, lakes).
 
 ### Nation generation
 
 Design authority: `docs/generation/NATION_GENERATION.md`.
 
-- **[2] Orphan-island assignment (refinement).** The cardinal-adjacency Voronoi
+- **[C2] Orphan-island assignment (refinement).** The cardinal-adjacency Voronoi
   BFS cannot cross water, so landmasses disconnected from every seed stay
   unclaimed (~12% of Kepler land). Defensible as "unclaimed islands", but if full
   land coverage is wanted, add a post-pass assigning each orphan island component
   to the nearest nation across water. `nation_generation.cpp`.
 
-- **[6] Deferred — nation behaviour & production passes.** Per NATION_GENERATION.md
+- **[F5] Deferred — nation behaviour & production passes.** Per NATION_GENERATION.md
   § Open items: the nation *system* (tax, licences, war, infrastructure), the
   sentiment graph, historical fragmentation (exclaves/disputed zones), and
   non-Kepler jurisdiction. Out of prototype scope.
@@ -445,36 +530,32 @@ Design authority: `docs/generation/NATION_GENERATION.md`.
 
 Design authority: `docs/generation/CORPORATION_GENERATION.md`.
 
-- **[4] Model pre-game profit in corporation generation (deferred).** A corporation does not
+- **[C3] Model pre-game profit in corporation generation.** A corporation does not
   appear from nothing — its starting `balance`/`starting_capital` and asset mix should reflect a
   simulated **pre-game operating history** (extraction + processing + trade running for some
   notional period) rather than flat authored values. Raised during the 2026-06-14 Layer 3 Q&A:
-  once the Layer 3 economy loop exists, the same loop can be run forward at generation time to
-  seed a plausible opening balance and stockpiles. Touches
-  `src/world/corporation_generation.cpp` (Pass 4 financial profile) and reuses the Resources
-  economy step. Depends on the Layer 3 economy briefs landing first.
+  the Layer 3 economy loop now exists, so the same loop can be run forward at generation time to
+  seed a plausible opening balance and stockpiles (the cheap two-tick warm-start already lands;
+  this is the longer-history version). Touches `src/world/corporation_generation.cpp` (Pass 4
+  financial profile) and reuses the economy step. Not blocking Layer 4.
 
-- **[6] Deferred — corporation selection screen & behaviour.** Per
+- **[F4] Deferred — corporation selection screen & behaviour.** Per
   CORPORATION_GENERATION.md § Open items: the analytical corp-selection/re-roll
   flow, franchising, nation-seeded privatisation, automated tax, Era-based
   sovereignty, and diplomatic posture. Out of prototype scope.
 
 ## Known Bug
 
-- **[4] Frame stutter / performance + hardware limits unconfigured.** The app
+- **[B4] Frame stutter / performance + hardware limits unconfigured.** The app
   already **stutters intermittently**. This may be benign for now, but the cause is
   not yet diagnosed and there is no frame-pacing or hardware-limit configuration in
   place (vsync / target frame-rate / present mode, and the per-frame draw budget for
   the dense tile grids — Kepler is 180×84 = 15,120 tiles redrawn each frame, plus
-  the upcoming per-tile Faction-lens tint/border pass). First **measure** before
-  optimising: is the stutter GPU present-driven (vsync/composition), CPU draw-call
-  volume (immediate-mode tile loop), or allocation churn per frame? Then settle the
-  hardware-limit config (vsync on/off, frame cap, whether to cache static tile
-  geometry / dirty-rect the canvas). **Important context:** the **market and pricing
-  logic is not implemented at all** yet — once the economy tick and per-market price
-  resolution land, the per-frame and per-tick cost profile changes materially, so
-  treat any optimisation now as provisional and re-measure after the economy is in.
-  Don't over-fit the frame loop to today's (logic-light) workload. Likely touches
+  the upcoming per-tile Faction-lens tint/border pass). Worth headroom before Layer 4's
+  denser UI piles on. First **measure** before optimising: is the stutter GPU
+  present-driven (vsync/composition), CPU draw-call volume (immediate-mode tile loop), or
+  allocation churn per frame? Then settle the hardware-limit config (vsync on/off, frame
+  cap, whether to cache static tile geometry / dirty-rect the canvas). Likely touches
   the render/present setup (SDL3 swap / vsync) and the canvas tile-draw loops.
   **Baseline established (2026-06-14, promoted then cancelled):** vsync is on
   (`SDL_SetRenderVSync(m_renderer, 1)`, `app.cpp:77`), with no frame cap and no
@@ -483,7 +564,7 @@ Design authority: `docs/generation/CORPORATION_GENERATION.md`.
   headless harness cannot observe; building that live instrument is the deferred
   design work (a frame-time readout / log) that must land before R1/R2 can be run.
 
-- **[4] Body labels move in steps, not smoothly.** Re-logged. The font-oversampling
+- **[C3] Body labels move in steps, not smoothly.** Re-logged. The font-oversampling
   pass (`src/ui/fonts.hpp`) improved glyph crispness but did **not** fix the motion
   artefact: body labels visibly advance only every few ticks while the body dot
   glides. **Root cause confirmed (2026-06-14, promoted then cancelled):** the label
