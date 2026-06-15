@@ -500,7 +500,60 @@ owned `world_audit.cpp`, the docs, the build, and verification.
 
 ---
 
-*No active groups. The worklist is empty between work blocks.*
+## Session 2 — the lens batch (Batch Publish, strictly serial)
+
+Two Briefs, both promoted from OPENS § Canvas. **No fan-out:** both write the same hotspot
+files (`ui_state.hpp`, `overlay.cpp`, `body_surface_canvas.cpp`; Market also
+`circumplanetary_canvas.cpp`), so disjoint scopes don't exist — kept in the main session,
+sequential. Resource lands first (it builds the shared selector + on-canvas-key infrastructure
+Market reuses), then Market. One commit per Brief.
+
+### Group R — resource-lens-render (promoted from OPENS § Canvas — [B3] Resource lens render pass)
+
+Requirements: [REQUIREMENTS.md § resource-lens-render](req/REQUIREMENTS.md#resource-lens-render)
+
+- **[2] R-A — Enum + selector state.** Add `overlay_mode::resource`; add `bool resource_lens_single`
+  and `resource_type lens_resource` (shared with Market). Files: `src/ui/ui_state.hpp`. Deps: foundation.
+  Satisfies: R2, R4.
+- **[3] R-B — Strip wiring + lens-local selector.** Add `resource` to `draw_lens_icon`, `overlay_mode_name`
+  ("Resource density"), `overlay_mode_short_name`, and `modes[]`; draw the lens-local resource/good
+  selector combo (shown when the resource **or** market lens is active) bound to `lens_resource`, plus a
+  Resource mode toggle (highest-value / single). Files: `src/ui/overlay.cpp`. Deps: R-A. Satisfies: R2, R4.
+- **[4] R-C — Planetary render pass + on-canvas key.** Add the `overlay_mode::resource` fill branch
+  (per-body max-richness pre-pass for opacity normalisation; highest-value + single-resource modes) and the
+  shared on-canvas key helper (gradient bar + swatch/name). Files: `src/ui/body_surface_canvas.cpp`. Deps:
+  R-A. Satisfies: R1, R3, R5.
+- **[2] R-D — Verify hook + name mapping.** Add `resource` to `overlay_from_name`; add `verify.set_lens_resource`
+  / `verify.set_resource_mode` hooks. Files: `src/core/app.cpp`. Deps: R-A. Satisfies: R6.
+- **[2] R-E — Doc + golden.** LENSES.md § Resource lens (weight-deferral + selector note); author
+  `scripts/verify/resource_lens.lua` and bless its golden. Files: `docs/ui/LENSES.md`,
+  `scripts/verify/resource_lens.lua`, `scripts/verify/golden/*`. Deps: R-B, R-C, R-D. Satisfies: R1, R6.
+
+Parallelisation note: R-A → {R-B, R-C, R-D} (all touch different files, but the chain is short and the
+interfaces co-evolve, so kept serial in the main session); R-E closes after the code lands. No sub-agents.
+
+### Group M — market-lens-render (promoted from OPENS § Canvas — [B3] Market lens render pass)
+
+Requirements: [REQUIREMENTS.md § market-lens-render](req/REQUIREMENTS.md#market-lens-render)
+
+- **[4] M-A — Planetary market wash + key.** Add the `overlay_mode::market` fill branch (body-wide
+  diverging warm↔cool tint keyed to `price[g]/base_price[g]`) and extend the on-canvas key helper with the
+  market diverging key + good name. Files: `src/ui/body_surface_canvas.cpp`. Deps: Group R (selector + key
+  helper). Satisfies: R2, R3, R4.
+- **[3] M-B — Circumplanetary per-body price strip.** When the Market lens is active, draw a compact
+  good→price strip for the anchor body's market, selected good highlighted. Files:
+  `src/ui/circumplanetary_canvas.cpp`. Deps: Group R. Satisfies: R5.
+- **[2] M-C — Doc + golden.** LENSES.md § Market lens (per-body wash + base-price normalisation + the
+  circumplanetary-file correction); author `scripts/verify/market_lens.lua` (econ_step → capture) and bless
+  its golden. Files: `docs/ui/LENSES.md`, `scripts/verify/market_lens.lua`, `scripts/verify/golden/*`. Deps:
+  M-A, M-B. Satisfies: R1, R6.
+
+Parallelisation note: M-A → M-B share no file but co-evolve through the shared key/selector from Group R;
+serial in the main session. M-C closes the group. No sub-agents.
+
+---
+
+*No active groups beyond Session 2.*
 
 Completed 2026-06-15 / 2026-06-14 (see DEVLOG, newest first):
 

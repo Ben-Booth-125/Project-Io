@@ -38,6 +38,7 @@
 #include <filesystem>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 static constexpr int window_w = 1280;
@@ -53,7 +54,37 @@ overlay_mode overlay_from_name(const std::string& s)
     if (s == "market")      return overlay_mode::market;
     if (s == "faction")     return overlay_mode::faction;
     if (s == "corporation") return overlay_mode::corporation;
+    if (s == "resource")    return overlay_mode::resource;
     return overlay_mode::none;
+}
+
+/// Map a resource enum-slug to its `resource_type`, for the verify lens hooks. The
+/// full prototype set so a check can name any good; unknown names fall back to iron_ore.
+resource_type resource_from_name(const std::string& s)
+{
+    static const std::unordered_map<std::string, resource_type> m = {
+        {"iron_ore", resource_type::iron_ore},
+        {"coal", resource_type::coal},
+        {"petroleum", resource_type::petroleum},
+        {"silica", resource_type::silica},
+        {"copper_ore", resource_type::copper_ore},
+        {"rare_earth_ore", resource_type::rare_earth_ore},
+        {"agricultural_produce", resource_type::agricultural_produce},
+        {"water", resource_type::water},
+        {"iron_nickel_ore", resource_type::iron_nickel_ore},
+        {"platinum_group_metals", resource_type::platinum_group_metals},
+        {"regolith", resource_type::regolith},
+        {"stone", resource_type::stone},
+        {"timber", resource_type::timber},
+        {"sand", resource_type::sand},
+        {"clay", resource_type::clay},
+        {"peat", resource_type::peat},
+        {"steel", resource_type::steel},
+        {"refined_fuel", resource_type::refined_fuel},
+        {"food_rations", resource_type::food_rations},
+    };
+    const auto it = m.find(s);
+    return it != m.end() ? it->second : resource_type::iron_ore;
 }
 
 /// Find a body by case-insensitive name, or the home body for "home". Returns
@@ -278,6 +309,14 @@ int app::run_verify(const std::string& script_path, bool bless)
     });
     v.set_function("set_overlay", [this](const std::string& name) {
         m_ui.overlay = overlay_from_name(name);
+    });
+    // Drive the Resource/Market lens-local selector headlessly so a golden can pick
+    // the displayed good and (Resource) the highest-value / single-resource mode.
+    v.set_function("set_lens_resource", [this](const std::string& name) {
+        m_ui.lens_resource = resource_from_name(name);
+    });
+    v.set_function("set_resource_mode", [this](bool single) {
+        m_ui.resource_lens_single = single;
     });
     v.set_function("set_zoom", [this](float z) { m_ui.planetary_zoom = z; });
     v.set_function("set_pan",  [this](float x, float y) {

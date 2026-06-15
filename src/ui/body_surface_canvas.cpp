@@ -7,12 +7,14 @@
 #include "world/placement_rules.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <iterator>
 #include <limits>
 #include <unordered_map>
+#include <vector>
 
 namespace ui {
 
@@ -72,6 +74,88 @@ ImVec2 hex_local_centre(int col, int row, float hex_size)
         col_step * static_cast<float>(col) + ((row & 1) ? col_step * 0.5f : 0.0f),
         row_step * static_cast<float>(row),
     };
+}
+
+/// Per-channel linear blend of two opaque colours: result = a·(1−t) + b·t, alpha
+/// forced opaque. Used by the Resource lens to composite a deposit hue over terrain
+/// at a magnitude-driven opacity, and by the Market lens's diverging wash.
+ImU32 lerp_colour(ImU32 a, ImU32 b, float t)
+{
+    t = std::clamp(t, 0.0f, 1.0f);
+    const float u = 1.0f - t;
+    auto ch = [](ImU32 c, int shift) -> float { return static_cast<float>((c >> shift) & 0xFFu); };
+    const int r = static_cast<int>(ch(a, IM_COL32_R_SHIFT) * u + ch(b, IM_COL32_R_SHIFT) * t);
+    const int g = static_cast<int>(ch(a, IM_COL32_G_SHIFT) * u + ch(b, IM_COL32_G_SHIFT) * t);
+    const int bl= static_cast<int>(ch(a, IM_COL32_B_SHIFT) * u + ch(b, IM_COL32_B_SHIFT) * t);
+    return IM_COL32(r, g, bl, 255);
+}
+
+/// On-canvas legend for the Resource lens, drawn top-right of the grid area. A
+/// sparse→dense gradient bar (the first lens to carry a real colour key, LENSES.md
+/// § Resource lens § Legend); in single-resource mode it shows the selected
+/// resource's name + swatch, in highest-value mode the body's present-resource
+/// swatches. Pure ImDrawList — no ImGui widget state.
+void draw_resource_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size,
+                       const ui_state& state, const std::vector<resource_type>& present)
+{
+    const float pad    = 8.0f;
+    const float box_w  = 156.0f;
+    const float line_h = ImGui::GetTextLineHeight();
+    const float bar_h  = 10.0f;
+    const bool  single = state.resource_lens_single;
+    const int   rows   = single ? 1 : static_cast<int>(present.size());
+
+    const float body_h = pad + line_h + 4.0f + bar_h + 2.0f + line_h + 4.0f +
+                         static_cast<float>(std::max(0, rows)) * (line_h + 2.0f) + pad;
+    // Left edge, vertically centred: clear of the Selection panel (top-left), the
+    // header/Explorer (top-right) and the lens control strip (bottom-left).
+    const ImVec2 p0 = { area_origin.x + pad,
+                        area_origin.y + std::max(pad, (area_size.y - body_h) * 0.5f) };
+    const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
+    dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
+    dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
+
+    const float x     = p0.x + pad;
+    const float bar_w = box_w - 2.0f * pad;
+    float       y     = p0.y + pad * 0.5f;
+
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Resource density");
+    y += line_h + 4.0f;
+
+    // Sparse→dense gradient: dark substrate to the carried hue (the selected
+    // resource in single mode, neutral white in highest-value mode).
+    const ImU32 hue = single ? presentation_of(state.lens_resource).colour
+                             : IM_COL32(220, 220, 220, 255);
+    constexpr int segs = 24;
+    for (int i = 0; i < segs; ++i)
+    {
+        const float t0 = static_cast<float>(i) / segs;
+        const ImU32 c  = lerp_colour(IM_COL32(40, 40, 48, 255), hue, 0.2f + 0.7f * t0);
+        dl->AddRectFilled({ x + bar_w * t0, y },
+                          { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
+    }
+    y += bar_h + 2.0f;
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "sparse");
+    const ImVec2 dts = ImGui::CalcTextSize("dense");
+    dl->AddText({x + bar_w - dts.x, y}, IM_COL32(170, 175, 185, 255), "dense");
+    y += line_h + 4.0f;
+
+    if (single)
+    {
+        dl->AddRectFilled({x, y + 2.0f}, {x + 10.0f, y + 12.0f},
+                          presentation_of(state.lens_resource).colour);
+        dl->AddText({x + 14.0f, y}, IM_COL32(235, 235, 235, 255),
+                    presentation_of(state.lens_resource).name);
+    }
+    else
+    {
+        for (resource_type r : present)
+        {
+            dl->AddRectFilled({x, y + 2.0f}, {x + 10.0f, y + 12.0f}, presentation_of(r).colour);
+            dl->AddText({x + 14.0f, y}, IM_COL32(220, 220, 220, 255), presentation_of(r).name);
+            y += line_h + 2.0f;
+        }
+    }
 }
 
 } // namespace
@@ -224,6 +308,40 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
         return palette::faction_colour(slot);
     };
 
+    // Resource lens pre-pass: per-body normalisation maxima for the magnitude→opacity
+    // map, and the present-resource set for the highest-value key. `res_max_top` is the
+    // richest single deposit on any tile (highest-value mode); `res_max_sel` the richest
+    // deposit of the selected resource (single-resource mode). Computed once per draw,
+    // only when the lens is active, so the common path pays nothing.
+    float res_max_top = 0.0f;
+    float res_max_sel = 0.0f;
+    std::vector<resource_type> res_present;
+    if (state.overlay == overlay_mode::resource)
+    {
+        const std::size_t sel = static_cast<std::size_t>(state.lens_resource);
+        std::array<bool, resource_count> seen{};
+        for (const auto& [id, tile] : w.tiles)
+        {
+            if (tile.body != state.active_body)
+                continue;
+            float top = 0.0f;
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                const float v = tile.resource_deposit[r];
+                top = std::max(top, v);
+                if (v > 0.0f)
+                    seen[r] = true;
+            }
+            res_max_top = std::max(res_max_top, top);
+            res_max_sel = std::max(res_max_sel, tile.resource_deposit[sel]);
+        }
+        // Present-resource swatches for the highest-value key, capped so the legend
+        // stays bounded on resource-rich bodies (enum order; the cap drops the tail).
+        for (std::size_t r = 0; r < resource_count && res_present.size() < 10; ++r)
+            if (seen[r])
+                res_present.push_back(static_cast<resource_type>(r));
+    }
+
     const ImVec2 mouse = ImGui::GetIO().MousePos;
 
     // Hover resolves to a single tile copy. Adjacent hexes' circular hit-tests
@@ -279,6 +397,38 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
             const auto corp_it = tile_to_corp.find(id);
             if (corp_it != tile_to_corp.end())
                 fill = corp_colour(corp_it->second);
+        }
+        // Resource lens: tint a tile by deposit density. Hue carries identity, opacity
+        // carries magnitude — the hue is composited over terrain (lerp), so a richer
+        // deposit reads stronger and a trace one barely tints. Highest-value mode uses
+        // the tile's single richest deposit; single-resource mode uses only the selected
+        // resource. A tile with no relevant deposit keeps its terrain hue.
+        else if (state.overlay == overlay_mode::resource)
+        {
+            int   res_idx = -1;
+            float mag     = 0.0f;
+            float norm    = 1.0f;
+            if (state.resource_lens_single)
+            {
+                res_idx = static_cast<int>(state.lens_resource);
+                mag     = tile.resource_deposit[static_cast<std::size_t>(res_idx)];
+                norm    = res_max_sel;
+            }
+            else
+            {
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    if (tile.resource_deposit[r] > mag)
+                    {
+                        mag     = tile.resource_deposit[r];
+                        res_idx = static_cast<int>(r);
+                    }
+                norm = res_max_top;
+            }
+            if (res_idx >= 0 && mag > 0.0f && norm > 0.0f)
+            {
+                const float t = 0.2f + 0.7f * std::clamp(mag / norm, 0.0f, 1.0f);
+                fill = lerp_colour(fill, presentation_of(static_cast<resource_type>(res_idx)).colour, t);
+            }
         }
         const auto   built_it  = built_tiles.find(id);
         const bool   built     = built_it != built_tiles.end();
@@ -452,6 +602,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
     }
 
     dl->PopClipRect();
+
+    // On-canvas lens key (drawn unclipped, top-right of the grid area, before the
+    // input early-out so it shows in headless captures too). Resource is the first
+    // lens to carry a colour key; Market's diverging key is added alongside.
+    if (state.overlay == overlay_mode::resource)
+        draw_resource_key(dl, grid_area_origin, grid_area_size, state, res_present);
 
     if (!input_enabled)
         return;

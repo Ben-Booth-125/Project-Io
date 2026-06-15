@@ -100,8 +100,42 @@ section here — it does not need the full OPENS backlog or DEVLOG history in co
 
 ---
 
-*No active requirements. The worklist is empty between work blocks; sections appear here
-when a Brief is promoted, and move to the archive below on completion or cancellation.*
+### resource-lens-render
+
+Promoted from OPENS § Canvas — **[B3] Resource lens render pass**. The Planetary
+`overlay_mode::resource` pass: per-tile tint by the richest deposit's identity colour
+(opacity = magnitude), a single-resource heatmap mode with a lens-local selector, and an
+on-canvas gradient key. Design `docs/ui/LENSES.md` § Resource lens.
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | **Brief-spanning:** under the Resource lens the Planetary surface tints tiles by deposit density (highest-value default + single-resource heatmap), shows an on-canvas gradient key, and the resource strip button is present — golden-verified against a blessed reference. | `visual` (`scripts/verify/resource_lens.lua` golden) | complete | 4/4 goldens PASS ≤0.0088%, exit 0 |
+| R2 | `overlay_mode::resource` exists and is wired: a strip button (the `icons::resource` glyph), `overlay_mode_name` ("Resource density"), short name, `overlay_from_name`, and the strip `modes[]` list. | `code` + `build` | complete | enum + `overlay.cpp` + `app.cpp`; build clean |
+| R3 | Highest-value mode: each tile tints to its richest deposit's `presentation_of(res).colour` at an opacity scaled by that deposit's magnitude (normalised per body); zero-deposit tiles keep terrain. | `code` + `visual` | complete | per-body normalised; `lerp_colour` composite; ranks by richness (weight deferred — LENSES.md note) |
+| R4 | Single-resource mode: a lens-local selector picks a resource; every tile tints that resource's colour at its per-tile magnitude (zero → terrain). | `code` + `visual` | complete | iron/coal heatmaps captured; shared combo with Market |
+| R5 | An on-canvas key renders: a sparse→dense gradient bar, plus the selected resource's name+swatch (single mode) or a swatch list of the body's present resources (highest-value mode). | `visual` | complete | left-edge key, clear of chrome |
+| R6 | A `verify` hook drives the lens mode + selected resource headlessly so the golden is reproducible; the lua check is named in the `verifier-visual` skill or run via it. | `code` + `doc` | complete | `verify.set_lens_resource` / `set_resource_mode`; run via `verifier-visual` |
+
+### market-lens-render
+
+Promoted from OPENS § Canvas — **[B3] Market lens render pass**. The `overlay_mode::market`
+pass: Planetary diverging warm↔cool price tint for a selected good + on-canvas key +
+good-selector; Circumplanetary per-body price strip. Design `docs/ui/LENSES.md` § Market lens.
+**Data reality:** markets are per-**body** (`market_component`), so the Planetary tint is a
+body-wide wash, and the diverging gradient is keyed to `price[g]/base_price[g]` (scarcity vs
+floor), not a basket "body mean" — recorded as a LENSES.md refinement.
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | **Brief-spanning:** under the Market lens the Planetary surface washes the body by the selected good's relative price (warm = dear, cool = cheap), shows an on-canvas diverging key + good-selector, and the Circumplanetary rung shows a per-body price strip — golden-verified. | `visual` (`scripts/verify/market_lens.lua` golden) | pending | end-to-end gate |
+| R2 | Planetary: a diverging warm↔cool tint keyed to `price[g]/base_price[g]` (neutral at the floor ratio 1.0), uniform across the active body (per-body market). | `code` + `visual` | pending | body wash, not per-tile (per-body market) |
+| R3 | An on-canvas diverging key (cheap ↔ dear) renders with the selected good's name. | `visual` | pending | |
+| R4 | The good-selector (shared in form with the Resource selector, bound to `lens_resource`) picks the displayed good. | `code` + `visual` | pending | |
+| R5 | Circumplanetary: when the Market lens is active, a per-body price strip lists the anchor body's market prices with the selected good highlighted. | `visual` | pending | `circumplanetary_canvas.cpp` (not solar — Solar has no market surface) |
+| R6 | The golden runs `verify.econ_step` first so prices diverge from base, then captures; the market pass reads the resolved `market_component.price`. | `visual` + `doc` | pending | deterministic given fixed seed + tick count |
+
+*Sections appear here when a Brief is promoted, and move to the archive below on completion
+or cancellation.*
 
 ---
 

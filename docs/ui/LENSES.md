@@ -36,11 +36,11 @@ but its build is gated on a dependency (named in the lens section).
 | Market | — | (later) per-body price summary | (later) per-tile price/scarcity tint |
 | Faction | — | — | ✓ tile tint + owner borders |
 | **Corporation** | — | — | **✓ tile tint + player border** |
-| **Resource** | — | — | **(next) deposit-density tint + gradient legend** |
+| **Resource** | — | — | **✓ deposit-density tint + gradient key** |
 
-**Resource** is the next lens to build: unlike Supply and Market it has **no data
-dependency** (tile `resource_deposit` is already generated), so it is buildable
-immediately behind a Planetary render pass. See its section for the full spec.
+**Resource** is **built** (2026-06-16): unlike Supply and Market it had **no data
+dependency** (tile `resource_deposit` is already generated), so it landed directly as a
+Planetary render pass. See its section for the full spec.
 
 Interaction notes shared by all lenses: lenses are **Planetary-first** in this
 prototype, single-select (one `overlay_mode` at a time), and do not yet propagate
@@ -229,10 +229,13 @@ profile directly at draw time; **no new data is generated**.
 
 **Two modes (settled).**
 - **Highest-value (default).** Each tile is tinted by the **identity colour of its
-  single highest-value deposit** (value = deposit richness × the resource's
-  presentation weight), at an **opacity scaled by that deposit's magnitude** — so
-  a rich iron tile and a trace iron tile share the iron hue but differ in
-  intensity. Tiles with no deposit (below the ambient floor) render plain terrain.
+  single highest-value deposit**, at an **opacity scaled by that deposit's
+  magnitude** — so a rich iron tile and a trace iron tile share the iron hue but
+  differ in intensity. Tiles with no deposit (below the ambient floor) render plain
+  terrain. *(Implementation note: "value" ranks by **deposit richness alone**. The
+  spec's richness × **presentation weight** product is deferred — `resource_presentation`
+  carries only name/abbrev/colour today, no weight field; adding a 19-entry weight
+  table is out of this render Brief's scope. Revisit when a weight lands.)*
 - **Single-resource (player-selected).** When the player picks a specific resource
   from the lens's resource selector, every tile is tinted that resource's identity
   colour at an opacity scaled by that resource's deposit magnitude **on that
@@ -268,3 +271,13 @@ colour key — the per-faction key for Corporation/Faction is still a follow-up.
 lens-local control (proposed: a dropdown in the control strip when the Resource
 lens is active, shared in form with the Market good-selector). Default mode
 requires no selection. No new data, no tick dependency — buildable immediately.
+
+> ⟳ Implemented 2026-06-16 (Resource lens render Brief). `overlay_mode::resource`
+> Planetary pass in `body_surface_canvas.cpp`: opacity = magnitude **normalised per
+> body** (against the body's richest deposit, so each body's heatmap auto-scales); the
+> hue is composited over terrain (`lerp_colour`), not a flat replacement, so density
+> reads. The lens-local control is a **"Single" mode checkbox + a shared resource combo**
+> bound to `ui_state.lens_resource` in `overlay.cpp` (the same combo the Market good-selector
+> uses). The on-canvas key sits at the **left edge, vertically centred** (clear of the
+> Selection panel, header/Explorer, and lens strip). Verified by `scripts/verify/resource_lens.lua`
+> against blessed goldens. Pending user review.

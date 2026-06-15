@@ -23,7 +23,50 @@ void draw_lens_icon(ImDrawList* dl, overlay_mode m, ImVec2 rect_min, ImVec2 rect
         case overlay_mode::market:      icons::market     (dl, centre, r, colour); break;
         case overlay_mode::faction:     icons::faction    (dl, centre, r, colour); break;
         case overlay_mode::corporation: icons::corporation(dl, centre, r, colour); break;
+        case overlay_mode::resource:    icons::resource   (dl, centre, r, colour); break;
         default: break;
+    }
+}
+
+/// Draw the lens-local resource/good selector for the Resource and Market lenses.
+/// Both lenses pick "which resource" from the same `lens_resource` field (LENSES.md
+/// says the two selectors share a form), so one combo serves both; the Resource lens
+/// additionally exposes its highest-value / single-resource mode toggle. Drawn inline
+/// in the control strip only while one of those two lenses is active.
+void draw_lens_selector(ui_state& ui)
+{
+    if (ui.overlay != overlay_mode::resource && ui.overlay != overlay_mode::market)
+        return;
+
+    // Resource lens: a mode toggle. Highest-value needs no selection; single-resource
+    // reveals the picker. The Market lens always shows the picker (it has no "all goods").
+    if (ui.overlay == overlay_mode::resource)
+    {
+        ImGui::SameLine();
+        ImGui::Checkbox("Single", &ui.resource_lens_single);
+    }
+
+    const bool show_picker =
+        (ui.overlay == overlay_mode::market) ||
+        (ui.overlay == overlay_mode::resource && ui.resource_lens_single);
+    if (!show_picker)
+        return;
+
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(140.0f);
+    const char* current = presentation_of(ui.lens_resource).name;
+    if (ImGui::BeginCombo("##lens_resource", current))
+    {
+        for (std::size_t i = 0; i < resource_count; ++i)
+        {
+            const resource_type r = static_cast<resource_type>(i);
+            const bool selected = (r == ui.lens_resource);
+            if (ImGui::Selectable(presentation_of(r).name, selected))
+                ui.lens_resource = r;
+            if (selected)
+                ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
     }
 }
 
@@ -34,9 +77,10 @@ const char* overlay_mode_name(overlay_mode m)
     switch (m)
     {
         case overlay_mode::supply:      return "Supply routes";
-        case overlay_mode::market:      return "Market";
+        case overlay_mode::market:      return "Market prices";
         case overlay_mode::faction:     return "Faction presence";
         case overlay_mode::corporation: return "Corporation ownership";
+        case overlay_mode::resource:    return "Resource density";
         default:                        return "None";
     }
 }
@@ -49,6 +93,7 @@ const char* overlay_mode_short_name(overlay_mode m)
         case overlay_mode::market:      return "Market";
         case overlay_mode::faction:     return "Faction";
         case overlay_mode::corporation: return "Corp";
+        case overlay_mode::resource:    return "Resource";
         default:                        return "None";
     }
 }
@@ -62,9 +107,9 @@ void draw_overlay_controls(ui_state& ui, float left_x, float bottom_y)
 {
     // The selectable lenses, in mode-bar order. overlay_mode::none is not a
     // button — clicking the active lens clears back to it (toggle_overlay).
-    constexpr overlay_mode modes[4] = {
+    constexpr overlay_mode modes[5] = {
         overlay_mode::supply, overlay_mode::market, overlay_mode::faction,
-        overlay_mode::corporation };
+        overlay_mode::corporation, overlay_mode::resource };
 
     ImGui::SetNextWindowPos({left_x, bottom_y}, ImGuiCond_Always, {0.0f, 1.0f});
     ImGui::SetNextWindowBgAlpha(0.65f);
@@ -113,6 +158,10 @@ void draw_overlay_controls(ui_state& ui, float left_x, float bottom_y)
             toggle_overlay(ui, m);
         ImGui::PopID();
     }
+
+    // Lens-local controls: the Resource/Market resource-or-good selector (and the
+    // Resource mode toggle) appear inline after the lens buttons when their lens is active.
+    draw_lens_selector(ui);
 
     ImGui::End();
 }

@@ -24,9 +24,10 @@ enum class overlay_mode
 {
     none = 0,    ///< No overlay; the plain canvas.
     supply,      ///< Supply routes / convoy paths (Layer 5).
-    market,      ///< Market / price lens.
+    market,      ///< Market / price lens (per-body price wash; see LENSES.md § Market lens).
     faction,     ///< Faction presence.
     corporation, ///< Corporate-owned tiles (per-corp tint; player-corp border). See LENSES.md.
+    resource,    ///< Deposit-density tint (richest-deposit hue, magnitude opacity). See LENSES.md § Resource lens.
 };
 
 /// Construction (building-placement) interaction state. When `active`, the
@@ -70,6 +71,13 @@ struct ui_state
     entity_id    selection_hidden_for = null_entity;   ///< The selection the player dismissed with the panel's close button. The Selection info element stays hidden while selected_entity equals this; a *new* selection re-shows it. See SELECTION.md (close hides, does not destroy).
     canvas_level primary_level = canvas_level::solar; ///< Which canvas rung fills the window.
     overlay_mode overlay       = overlay_mode::supply; ///< Active canvas overlay lens; toggled by the bottom overlay control strip. Defaults to the supply lens (the first Layer 5 requirement) rather than none.
+
+    // --- lens-local selector state (Resource / Market lenses) ---
+    // One shared "which resource" selection drives both the Resource lens's
+    // single-resource heatmap and the Market lens's price surface (LENSES.md says
+    // the two selectors share a form). Only the active lens reads it.
+    resource_type lens_resource        = resource_type::iron_ore; ///< Selected resource (Resource single-mode heatmap) / good (Market price surface).
+    bool          resource_lens_single = false;                   ///< Resource lens: false = highest-value tint, true = single-resource heatmap of lens_resource.
 
     // --- navigation pane state ---
     // Policy: all ledgers start closed. The player opens them deliberately from
