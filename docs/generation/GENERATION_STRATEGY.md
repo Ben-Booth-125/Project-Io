@@ -1,11 +1,5 @@
 # Project Io — Generation Strategy
 
-> **⟳ Pending review (2026-06-15) — transient.** New overview doc created to hold the
-> "saturated earth-like base / specialised corporations" generation premise in detail and to
-> summarise the `generation/` family. Stubbed from `docs/SYSTEMS.md` § Cross-cutting notes and
-> referenced from `CORPORATION_GENERATION.md`. Remove this note once reviewed.
-> See OPENS § Documentation [S1] and § Environment → Corporation generation [B4].
-
 This document is the **map of the generation layer** — the strategy that ties the
 per-subject generation docs together — and the home of the **economic premise** the whole
 campaign setup derives from. Each subject below has its own authoritative doc; this one

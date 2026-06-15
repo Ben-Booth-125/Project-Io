@@ -1,11 +1,5 @@
 # Project Io — Selection Info Element
 
-> **⟳ Pending review (2026-06-15) — transient.** Reconciled with code landed in the >C Brief
-> pass: recorded the tile Selection element's **"Build here" front door** (new § The tile
-> element is the build front door) — the player-construction affordance that landed but was
-> not in this design doc. Remove this note once reviewed. See OPENS § Documentation
-> [S-tier review].
-
 The **Selection info element** is a pinned, polymorphic panel that shows detail
 about the **current selection** — whatever entity the player last single-clicked.
 It is the persistent "what is this?" surface that complements the transient

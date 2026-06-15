@@ -39,11 +39,6 @@ void glyph(ImDrawList* dl, ImVec2 centre, float r, /* colour or type */);
 - **colour** — either a caller-supplied `ImU32`, or *derived* (the `resource`
   glyph pulls its colour from `presentation_of`). See the catalogue for which.
 
-> **⟳ Pending review (2026-06-15) — transient.** Settled the icon Open clarifications 1–4
-> (extraction-site redraw, unit→chevron, the outline rule, the fill-vs-stroke per-family rule).
-> These are *design decisions*; the glyph redraws in `icons.cpp` land when the [C2] icon Briefs
-> are promoted. Remove this note once reviewed. See OPENS § Canvas.
-
 Two settled visual sub-conventions (the resolution of former Open clarifications 3–4):
 
 - **Every canvas-placed filled marker carries the dark outline** (`IM_COL32(20, 22, 28, 255)`,

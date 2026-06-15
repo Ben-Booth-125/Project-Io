@@ -1,13 +1,5 @@
 # Project Io — Corporation Generation
 
-> **⟳ Pending review (2026-06-15) — transient.** The holdings *shape* design (Pass 3) was
-> revised: corporations are now **specialists** placing a **lean, focus-coherent** holding set
-> clustered in their home nation, deriving from the saturated-base premise in
-> `GENERATION_STRATEGY.md` (and stubbed in `SYSTEMS.md`). This is the *design* target; the
-> code (`place_starting_assets`) still places the old flat-3–6 cluster and is brought into line
-> when [B4] is promoted. Remove this note once reviewed. See OPENS § Environment → Corporation
-> generation [B4] and § Documentation [S1].
-
 Corporations are the primary actors in the simulation. They extract resources, build
 infrastructure, trade goods, and eventually project power off-world. At campaign start,
 all corporations — including the player's — are generated procedurally and are present

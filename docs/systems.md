@@ -35,7 +35,9 @@ Raw materials are extracted from bodies and processed into higher-tier goods thr
 ### Supply
 The physical movement of goods, materiel, and forces through space. Supply is cheap on Earth but becomes costly and vulnerable with distance and conflict. A disrupted route halts production, construction, and operations at the destination. The player cannot project power or sustain a colony beyond what their logistics can support.
 
-> **Open design note (2026-06-15).** A convoy carries a **mode** — land / sea / air / space — and each mode rides the **infrastructure** that supports it (see § Infrastructure note below). The space mode's distance is Euclidean, body-centre to body-centre. The convoy/supply model is settled at prototype depth in OPENS § Supply [S5]; the infrastructure that *gates* the modes is not yet designed.
+> **Open design note (2026-06-15).** A convoy carries a **mode** — land / sea / air / space — and each mode rides the **infrastructure** that supports it (see § Infrastructure note below). The space mode's distance is Euclidean, body-centre to body-centre. The convoy/supply model is settled at prototype depth in OPENS § Supply [S5]; the infrastructure that *gates* the modes is settled at feasibility-probe depth in OPENS § Infrastructure [B4].
+
+> **Design-reference note — the target logistics feel (2026-06-15).** The long-term direction for the **land / sea / air** logistic-strength model is an **emanation / cross-section "fuel" model**: supply radiates from sources and **attenuates across distance and terrain** (a continuous supply *field*, contested along its path), and the same logistics carry **goods, unit supply, and population supply** — not just discrete point-to-point goods convoys. **Space is a separate, larger consideration** (the convoy/launch model stands for it). The reference for the desired feel — despite the genre, theme, and tonal difference — is **Shadow Empire**'s logistics. This is a durable design-direction note, not yet a Brief; the prototype keeps the simple per-mode-cost convoy model (OPENS § Supply [S5] / § Infrastructure [B4]) and grows toward this.
 
 ### Infrastructure
 The physical substrate that makes all other systems possible: surface installations, orbital facilities, ports, and relay stations. Infrastructure determines the efficiency and capacity of every system in a given location. Damage has cascading consequences distinct from battlefield losses, and construction cost is shaped by local environment.
@@ -87,6 +89,3 @@ focused slice of the chain, differentiated by an interest in expanding to space 
 keeps the loop a contest between a few space-interested specialists rather than a full-economy
 management game. Detail and the generation consequences live in
 `docs/generation/GENERATION_STRATEGY.md`.
-<!-- ⟳ Pending review (2026-06-15) — transient. New cross-cutting note recording the
-     saturated-base / specialist-corporation premise; detailed in GENERATION_STRATEGY.md.
-     Remove once reviewed. See OPENS § Documentation [S1]. -->

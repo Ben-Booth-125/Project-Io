@@ -273,11 +273,35 @@ currently hold Briefs appear as sections below.
   heatmap) with a lens-local resource selector and the on-canvas gradient colour key the design
   specifies. Data is already present (tile `resource_deposit`). Authority `docs/ui/LENSES.md`.
 
-- **[F3 ~] Visual-verification harness — golden-image diffing (deferred).** Phase 1 outputs
-  PNGs for human/Claude inspection only. A later iteration could add committed reference
-  images + a pixel-tolerance diff for automatic pass/fail on the `visual` class. **Design owed:**
-  golden storage, a tolerance model (anti-aliasing / font jitter), and a CI decision.
-  Builds on `write_png_rgba` (`src/core/png_writer.cpp`) and `app::run_verify`.
+- **[F3 ✓] Visual-verification harness — golden-image diffing.** Phase 1 outputs
+  PNGs for human/Claude inspection only; this adds committed reference images + a pixel-tolerance
+  diff for automatic pass/fail on the `visual` class. **Design settled (2026-06-15):**
+  — **Golden storage.** One committed reference PNG per named capture, beside the verify scripts:
+    `scripts/verify/golden/<feature>_<capture>.png`. Small, deterministic captures — committed to
+    the repo. Determinism is a precondition (fixed seed, fixed window size, headless — already true
+    of `app::run_verify`); a non-deterministic capture cannot have a golden.
+  — **Tolerance model (two knobs, absorbs AA / font jitter).** Exact match is too brittle, so the
+    diff is **fraction-of-differing-pixels over a per-pixel threshold**: a pixel *differs* when its
+    **max channel delta > `T`** (e.g. `T = 8/255`, which absorbs anti-aliasing gradient and
+    sub-pixel font jitter); the capture **fails** when the **fraction of differing pixels > `F`**
+    (e.g. `F = 0.5%`, which absorbs small localised text reflow). Both knobs are per-check
+    overridable (a volatile-heavy capture can loosen `F`). An optional **ignore-region mask**
+    blanks known-volatile rects (the raw `Sim` counter, the frame-time HUD) before diffing.
+  — **Workflow.** `app::run_verify` gains a compare step: after writing each capture, if a golden
+    exists, diff against it, emit **PASS/FAIL** + a **diff image** (differing pixels highlighted) to
+    `build/Debug/verify/diff/`. A **`--bless` update mode** regenerates goldens when a change is
+    intentional (the developer eyeballs, then blesses). No golden present = capture-only (today's
+    behaviour), so the upgrade is incremental per check.
+  — **CI decision (settled): no CI gate in the prototype.** Solo project, no CI exists — the diff is
+    an **advisory local PASS/FAIL** the developer reads via the `verifier-visual` skill, not a
+    blocking gate. Revisit a CI gate if/when a CI pipeline lands (a v0.2.0+ note, not prototype
+    scope).
+  Builds on `write_png_rgba` (`src/core/png_writer.cpp`) — add a PNG **reader** + a diff function
+  there — and `app::run_verify`. Self-contained; upgrades the harness everything visual leans on.
+  Files at promotion: `src/core/png_writer.{hpp,cpp}` (reader + diff), `src/core/app.cpp`
+  (`run_verify` compare/bless step), `scripts/verify/golden/`, and the `verifier-visual`
+  SKILL.md (document the bless flow + tolerance knobs). *(Self-contained — no authority-doc
+  propagation; the design lives here and in the skill when built.)*
 
 - **[C1 ✓] Corporation lens player-tile border is redundant.** Found during the 2026-06-14
   visual verification: under the corporation lens the player's tile is filled
@@ -341,13 +365,20 @@ currently hold Briefs appear as sections below.
     `xx%` overlay (empty overlay string) in the `app.cpp` time panel so it reads as a clean
     animated fill. See `docs/ui/TIME_CONTROLS.md` / `LAYOUT.md`.
 
-- **[F3 ~] Clarify the time control view.** Deferred. The current two-column time
-  panel (calendar block + speed controls) is a prototype-grade layout. **Design owed:** revisit it
-  later to settle the production design — what the player needs from the clock at a
-  glance (date, quarter/economy-tick countdown, speed), whether to surface the
-  economy-tick boundary more explicitly, keyboard shortcuts for pause/speed, and
-  how the panel relates to the rest of the shell chrome. See `docs/ui/TIME_CONTROLS.md`
-  / `docs/ui/LAYOUT.md`.
+- **[F3 ✓] Clarify the time control view.** **Design settled (2026-06-15)** in
+  `docs/ui/TIME_CONTROLS.md` § Production clock view — the production clock is fixed to what the
+  player needs at a glance, in priority order: **where we are** (year+quarter, then month+day);
+  **when the economy next resolves** — the econ tick surfaced **explicitly** as a worded
+  **days-until-next-quarter countdown** (`Q2 in 47d`) beside the clean overlay-less quarter
+  fill ([C2]); and **how fast** (the 1–5 speed curve + pause). **Keyboard shortcuts settled:**
+  `Space` toggles pause/resume, `1`–`5` set the multiplier, routed through the shared
+  `canvas_command` vocabulary (consistent with `CANVASES.md` § Keyboard). The two-column split is
+  a free-to-change implementation detail; the *content* is the requirement. What remains is
+  **implementation** (v0.0.8 UI polish): the countdown readout in the `app.cpp` time panel, and the
+  `Space`/`1`–`5` bindings through `canvas_command`. Only production-polish open questions remain
+  (exact countdown phrasing; whether to also show the absolute next-quarter date — noted in
+  TIME_CONTROLS.md § Open questions). `src/`-changing → brief-spanning requirement at promotion.
+  See `docs/ui/TIME_CONTROLS.md` / `docs/ui/LAYOUT.md`.
 
 ## Menu
 
@@ -526,11 +557,10 @@ shared per-entity content builders in `entity_summary.{hpp,cpp}`):
 
 ## Documentation
 
-Standing **`S`-tier review reminders** raised by the 2026-06-15 retroactive doc-coverage pass
-(the Batch Publish § documentation discipline). Each names a doc reconciled with code that had
-landed without a doc update; each carries a **transient "what was changed" note** in the doc
-itself. **Review the change, then remove the transient note** and clear the Brief. *(These are
-review actions, not design — marked `✓`.)*
+Propagation-tracking for the 2026-06-15 v0.1.0 design pass — which settled designs have reached
+their authority docs. *(The standing `S`-tier review reminders raised by the retroactive
+doc-coverage pass were all **reviewed and cleared with the user on 2026-06-15** — their transient
+`> ⟳` notes removed from the eight docs; see the closing note below.)*
 
 - **[A3 ✓] Propagate the 2026-06-15 v0.1.0 design pass into the authority docs.** The inline
   OPENS designs are being settled into their authority docs. **Most propagated in the 2026-06-15
@@ -552,47 +582,11 @@ review actions, not design — marked `✓`.)*
   Remaining owed: the LAYOUT.md ledger-family note and the Supply/Layer-5 § Supply + `SUPPLY.md`
   settle. Preferential purchasing is intentionally left for the agent reworking its clearing model.
 
-- **[S1 ✓] CORPORATION_GENERATION.md — revised holdings shape (specialist, lean).** Pass 3, the
-  design principles, and § Open items were revised (2026-06-15) to the settled **specialist /
-  lean / cluster-to-nation** shape, deriving from GENERATION_STRATEGY.md. The doc now describes
-  the *design target*; the *code* still places the old flat 3–6 cluster until [B4] is promoted.
-  Review the revised framing, then remove the transient `> ⟳` note at the top of
-  `docs/generation/CORPORATION_GENERATION.md`.
-
-- **[S1 ✓] GENERATION_STRATEGY.md — new generation-overview doc.** New doc (2026-06-15) holding the
-  saturated-base / specialist-corporation premise and summarising the `generation/` family;
-  registered in CLAUDE.md's doc map. Review it, then remove its transient `> ⟳` note.
-
-- **[S1 ✓] SYSTEMS.md § Cross-cutting notes — specialist-corporation premise stub.** Added a
-  cross-cutting note (2026-06-15) recording that nations own the broad economy and corporations
-  are specialists, pointing to GENERATION_STRATEGY.md. Review the wording, then remove the
-  transient HTML comment in `docs/SYSTEMS.md` § Cross-cutting notes.
-
-- **[S1 ✓] POPULATION.md — population centres now in scope + decomposed.** Reconciled the stale
-  "deferred for the prototype" framing to v0.0.6 static-MVP scope; added § Generation
-  (nation-seeded, habitability-clustered) and § Implementation decomposition (2026-06-15).
-  Review, then remove the transient `> ⟳` note at the top of `docs/economy/POPULATION.md`.
-
-- **[S1 ✓] ICONS.md — icon clarifications 1–4 settled.** Recorded the extraction-site redraw,
-  unit→chevron, the outline rule, and the fill-vs-stroke per-family rule (2026-06-15). Review,
-  then remove the transient `> ⟳` note in `docs/ui/ICONS.md` § Shared conventions.
-
-- **[S1 ✓] SOLAR.md / CIRCUMPLANETARY.md — rung-relative reference distance.** Added the
-  rung-relative distance rule to both canvas docs (2026-06-15). Review, then remove the transient
-  `> ⟳` note in `docs/ui/CIRCUMPLANETARY.md`.
-
-- **[S1 ✓] TIME_CONTROLS.md — speed curve + progress-bar settled.** Added § Speed curve (non-linear,
-  1×=button 3) and the dropped-%-text note (2026-06-15). Review, then remove the transient
-  `> ⟳` note in `docs/ui/TIME_CONTROLS.md` § Speed curve.
-
-- **[S1 ✓] Review SELECTION.md — tile "Build here" front door reconcile.** Added § The tile
-  element is the build front door, recording the player-construction affordance
-  (`construct_building`, placement-gated, affordability-gated) that landed without a doc entry.
-  Confirm the framing (targeted build via the tile element vs. the broad nav-rail overview),
-  then remove the transient note at the top of `docs/ui/SELECTION.md`.
-
-_(The MENU.md menu-set and SYSTEMS.md § Trade review reminders were cleared in the 2026-06-15
-design-Q&A pass — both docs were reviewed live with the user and their transient notes removed.)_
+_(All eight `S1` doc-review reminders from the retroactive doc-coverage pass —
+CORPORATION_GENERATION, GENERATION_STRATEGY, SYSTEMS § Cross-cutting, POPULATION, ICONS,
+CIRCUMPLANETARY, TIME_CONTROLS, SELECTION — were **reviewed and cleared with the user on
+2026-06-15**, and their transient `> ⟳` notes removed. The earlier MENU.md menu-set and
+SYSTEMS.md § Trade reminders were likewise cleared in the 2026-06-15 design-Q&A pass.)_
 
 ## Trade
 
@@ -746,18 +740,80 @@ The labour scalar (`docs/SYSTEMS.md` § Workforce, `docs/economy/POPULATION.md`)
 
 ## Infrastructure
 
-- **[B4 ~] Logistics network & infrastructure model (design owed).** Surfaced by the 2026-06-15
+- **[B4 ✓] Logistics network & infrastructure model.** Surfaced by the 2026-06-15
   Q&A: the convoy-mode model ([S5] Supply, [A4] inter-body markets) makes each convoy mode —
-  **land / sea / air / space** — depend on infrastructure, but the infrastructure layer itself is
-  **undesigned**. **Open questions to settle:** what a **road** is (a tile attribute? a built
-  network? a per-edge capacity term?); whether **sea routes** are implicit (any navigable water
-  path) or built (ports + lanes); **airfields**; and the **launchpad / spaceport** that gates the
-  **space** mode (already named by the Era-1 gate in `docs/economy/ERAS.md`). Settle how each piece
-  of infrastructure **gates and costs** its convoy mode and how it feeds the convoy
-  logistical-cost term ([S5]). **Not on the immediate prototype path** — the inter-body market
-  feasibility probe ([A4] § Trade) deliberately sidesteps it; this is the design that makes the
-  full Supply layer real. Authority `docs/SYSTEMS.md` § Infrastructure / § Supply; couples to the
-  [S5] convoy Brief. *(Design owed — a settle-into-the-doc pass before promotion.)*
+  **land / sea / air / space** — depend on infrastructure, but the infrastructure layer itself was
+  **undesigned**. **Design settled (2026-06-15), at feasibility-probe depth** — it positions the
+  data model and names the gates/costs, deliberately *not* a full space-logistics build (no space
+  gameplay; the [A4] inter-body probe sidesteps all of this but the Era gate).
+
+  **The unifying rule — infrastructure *gates* and *costs* a mode.** Each convoy mode carries two
+  infrastructure relationships, both feeding the [S5] convoy model:
+  — **Gate.** Mode *M* is available between markets *A* and *B* **iff** *M*'s required endpoint
+    infrastructure exists (and, where relevant, operates) at **both** *A* and *B*. The
+    source/destination pair selects the mode (per [S5]): inter-body → **space**; intra-body →
+    **land** by default, **sea** when the route must cross water, **air** where airfields exist.
+  — **Cost.** Each mode carries a `base_logistics_cost` multiplier in the Lua economy-constants
+    registry (`scripts/economy.lua`), ordered **land < sea < air < space**, feeding [S5]'s
+    `base_logistics_cost × distance × qty` term. Infrastructure *modulates* this (a road tile
+    lowers the land term; see below).
+
+  **The four modes, each open question settled:**
+  — **Land — a road is a *tile attribute*, and land mode is *ungated*.** Of the three options
+    (tile attribute / built network / per-edge capacity), settle on a **tile attribute** — a
+    `road_level` on `tile_component` — **not** a graph or per-edge structure (a deliberate
+    data-creep guard: it stays inside the existing tile data model with no new topology). Land mode
+    is **always available across contiguous land intra-body** with no built prerequisite; a road is
+    an **optional cost-reducer** — a road tile multiplies the per-unit-distance land cost *down*
+    when a route crosses it. Roads are a **deferred tuning follow-on**: the prototype land mode
+    works without them. *(Confirmed by Q&A 2026-06-15.)*
+
+  **Open consideration — the logistic-strength model is not fully settled (Q&A 2026-06-15).** The
+  per-mode cost term above is the *prototype* model, but logistics will eventually carry more than
+  point-to-point goods convoys: it must also feed **unit supply** and **population supply**. That
+  points toward a richer **emanation / cross-section "fuel" model** for the **land / air / sea**
+  modes — supply *radiates* from sources and **attenuates across distance and terrain** (a supply
+  *field* with a per-tile/per-cross-section strength), rather than only discrete convoy legs — so a
+  position's reachable supply is a continuous quantity that thins with distance and is contested
+  along its path. **Space is a separate, larger consideration** (the convoy/launch model above
+  stands for it). The target *feel* is **Shadow Empire's** logistics (despite the genre/theme/tonal
+  difference) — recorded as a durable design-reference note in `docs/SYSTEMS.md` § Supply. This is
+  an **open follow-on**, not settled here: the prototype keeps the simple per-mode-cost convoy
+  model; the emanation model is the direction to grow toward (it couples to unit supply [Conflict]
+  and population supply [Workforce / Population] when those land).
+  — **Sea — implicit water path, *gated on the Port building*.** The water route itself is
+    **implicit** (any navigable water between the two endpoints — no built lanes, no pathing graph
+    in the prototype). Sea mode is **gated on a `Port`** (already in the Era 0 building set,
+    `docs/economy/ERAS.md`) at **both** endpoints; the Port is the sea-logistics access node and
+    the natural carrier of per-node throughput capacity later.
+  — **Air — gated on an *Airfield* (a new, deferred building).** Air mode is gated on an
+    **Airfield** building at both endpoints: **fast, low-capacity, high per-unit cost**. The
+    Airfield is **not in the prototype building set** — air mode is **designed but unbuilt**, so
+    prototype intra-body logistics uses land (and sea, once Ports are placed) only. Adding the
+    Airfield building is the open follow-on.
+  — **Space — gated by the existing Era-1 infrastructure.** Space mode requires a **`Launchpad`**
+    operational at the **origin** (gates leaving the gravity well — Era 0 *build*, Era 1 *operate*,
+    per `ERAS.md`) and an **`Orbital Port`** at the **destination** (receiving). The Era 0→1 gate
+    (`ERAS.md`) already controls whether any space body is reachable; the space mode adds only the
+    endpoint-building requirement. Space launches **MUST be player-directed** (per [S5]) — leaving
+    the gravity well is never auto-dispatched.
+
+  **Capacity is deferred.** Per-node throughput cap (a bigger Port / Orbital Port carries more per
+  Tick) is the natural infrastructure tuning lever but is **out of prototype scope** — named here so
+  the Port/Orbital Port data model positions for it, not built.
+
+  **Prototype reality.** The only infrastructure that actually *gates* in the prototype is the
+  **Era-1 space gate** (already built, `ERAS.md`); land is ungated. **Open follow-ons (deferred):**
+  the `road_level` tile attribute + land cost-reducer; the **Airfield** building + air mode; and
+  per-node throughput **capacity**. **Build-couples to** the [S5] convoy Brief (it consumes the
+  per-mode `base_logistics_cost` and the gates) — land with or before [S5]; sea/air/space
+  endpoint-gating folds in as the buildings land. Files at promotion: `scripts/economy.lua`
+  (per-mode cost constants), `src/world/components.hpp` (`road_level` on `tile_component`, when the
+  road follow-on lands), `src/world/placement_rules.hpp` (Airfield, when it lands), the [S5]
+  convoy mode-selection/gating seam. Authority `docs/SYSTEMS.md` § Infrastructure / § Supply (the
+  two durable `> Open design note` blocks there fold in when this lands); couples to the [S5] convoy
+  Brief. *(Design settled inline; propagation to `docs/SYSTEMS.md` tracked under § Documentation
+  when the work lands.)*
 
 - **[S5 ✓] Layer 4 — population centres + building management (index).** The next layer,
   **rescoped** from a pure production-UI overhaul into two coupled systems:

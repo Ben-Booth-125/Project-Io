@@ -36,10 +36,6 @@ A raw `Sim` counter with the current multiplier, then the controls:
 
 ## Speed curve (settled 2026-06-15, [C2])
 
-> **⟳ Pending review (2026-06-15) — transient.** Redefined the five-button speed curve
-> (non-linear; button 3 is the 1× reference; buttons 1–2 are slower-than-realtime). Implementation
-> lands when the [C2] time-speed Brief is promoted. Remove once reviewed. See OPENS § Canvas.
-
 The five speed buttons map **non-linearly**, with **button 3 as the 1× normal-play reference**.
 Buttons 1–2 are genuine slow-motion (for watching detail) and 4–5 fast-forward aggressively (for
 skipping quiet quarters to the next economy tick):

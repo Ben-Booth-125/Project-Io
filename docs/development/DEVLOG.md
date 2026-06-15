@@ -6,6 +6,53 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## 2026-06-15 — Finalise remaining `~` Briefs + clear S1 review notes (branch v0.0.5)
+
+Design-only session completing the long-tail `~` Briefs in the up-to-v0.0.9 window, clearing the
+retroactive doc-coverage review notes, and a closing design-direction Q&A. No `src/` change.
+
+### Briefs settled (`~ → ✓`)
+
+- **[B4] Logistics network & infrastructure model** — the item with active downstream pull (the
+  convoy-mode model). Settled at **feasibility-probe depth**: the unifying **gate + cost** rule
+  (a mode is available iff its endpoint infrastructure exists at both ends; per-mode
+  `base_logistics_cost` ordered land < sea < air < space, feeding [S5]). The four modes:
+  **land** (road = `road_level` *tile attribute*, mode ungated, road is a cost-reducer), **sea**
+  (Port-gated, implicit water path), **air** (Airfield-gated — a deferred building), **space**
+  (Launchpad@origin + Orbital Port@dest, Era-1 gated, player-directed). **Capacity deferred.** Only
+  the Era-1 space gate actually gates in the prototype.
+- **[F3] Clarify the time control view** — design was already settled in `TIME_CONTROLS.md`
+  § Production clock view; flipped the stale Brief to ✓ (implementation-only remaining).
+- **[F3] Golden-image diffing** — settled golden storage (`scripts/verify/golden/`), the two-knob
+  tolerance model (per-pixel `T`, failing-fraction `F`, ignore-region mask), the `--bless`
+  workflow, and **no CI gate in the prototype** (advisory local PASS/FAIL via `verifier-visual`).
+
+Deferred to **v0.2.0**: [F4] tile-gen deep passes (orbital derivation, tectonic plates) and [F5]
+nation behaviour — both F-priority, beyond prototype scope. v0.0.9 code-quality Briefs left
+unauthored per user scope ("leave code quality for after").
+
+### Doc-coverage notes cleared
+
+All eight `S1` retroactive-doc-coverage review reminders were **reviewed with the user and
+cleared**, their transient `> ⟳` notes removed from the eight docs (CORPORATION_GENERATION,
+GENERATION_STRATEGY, SYSTEMS § Cross-cutting, POPULATION, ICONS, CIRCUMPLANETARY, TIME_CONTROLS,
+SELECTION). OPENS § Documentation now holds only the [A3] propagation tracker.
+
+### Design-direction Q&A (closing)
+
+Three forks on the [B4] logistics calls made on the user's behalf:
+
+- **Road = tile attribute — confirmed**, *with* an open direction: logistics will also carry
+  **unit supply** and **population supply**, pointing toward an **emanation / cross-section "fuel"
+  model** (supply radiates from sources, attenuates across distance/terrain) for land/sea/air —
+  space a separate, larger consideration. Target feel: **Shadow Empire**'s logistics. Recorded as
+  a durable design-reference note in `SYSTEMS.md` § Supply and an open consideration in [B4]. Not a
+  Brief yet; the prototype keeps the simple per-mode-cost convoy model and grows toward this.
+- **Air mode — designed-but-deferred (Airfield building) confirmed.**
+- **Per-node throughput capacity — deferred confirmed.**
+
+---
+
 ## 2026-06-15 — Design-direction Q&A: v0.1.0 design pass (branch v0.0.5)
 
 Closing Q&A for the v0.1.0 design-completion pass below (the Batch Publish § design-direction
