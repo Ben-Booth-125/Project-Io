@@ -254,6 +254,7 @@ reject it and ask for a tighter alternative.
 | `Bash(.\build*)` | `verifier-visual` | `.\build\Debug\ProjectIo.exe --verify <script>` |
 | `Bash(cl *)` | `verifier-headless` | `cl /nologo /std:c++20 ...` MSVC compile (requires vcvars64 already active) |
 | `Bash(& ".\econ_harness*)` | `verifier-headless` | `& ".\econ_harness.exe"` |
+| `Bash(& ".\econ_stability*)` | `verifier-headless` | `& ".\econ_stability.exe"` |
 | `Bash(& ".\world_audit*)` | `verifier-headless` | `& ".\world_audit.exe"` |
 
 **Intentionally omitted — will still prompt:**

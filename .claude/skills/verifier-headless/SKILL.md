@@ -24,10 +24,17 @@ in `tools/verify/README.md`.
 - **`econ_harness`** — Layer 3 economy arithmetic (production → market clearing →
   budget) against a hand-built world + registry. Links `world.cpp`,
   `economy_system.cpp`, `market_clearing.cpp`, `budget_system.cpp`.
+- **`econ_stability`** — runs the economy loop (production → market clearing →
+  budget) over 100 ticks on a small fixed world and asserts multi-tick stability:
+  prices stay in the `[0.25×, 4×]` band, no NaN/Inf, deposit reserves decrease
+  monotonically, balances stay bounded. Links the same TUs as `econ_harness`
+  (`world.cpp`, `economy_system.cpp`, `market_clearing.cpp`, `budget_system.cpp`).
 - **`world_audit`** — builds the hard-coded world and audits Kepler biome balance
-  (forest + wetland fraction) and extraction-asset placement. Links the generation
-  TUs (`tile_generation`, `nation_generation`, `corporation_generation`,
-  `hard_coded_world`, `orbital_system`, `world`).
+  (forest + wetland fraction), extraction-asset placement, deposit-reserve seeding,
+  and the reusable `placement_rules::can_place` seam (placed assets pass it; ocean /
+  zero-deposit tiles are rejected). Links the generation TUs (`tile_generation`,
+  `nation_generation`, `corporation_generation`, `placement_rules`, `hard_coded_world`,
+  `orbital_system`, `world`).
 
 ## Procedure
 
