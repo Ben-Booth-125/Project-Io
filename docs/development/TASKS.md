@@ -1,9 +1,9 @@
 # Project Io — TASKS
 
-The **active, prioritised, actionable worklist**. Unlike [`TODO.md`](TODO.md)
+The **active, prioritised, actionable worklist**. Unlike [`OPENS.md`](OPENS.md)
 (described intent), every entry here is a concrete, file-scoped,
 individually-buildable step ready to execute. Tasks are **promoted** from a
-Brief (see TODO.md § TODO vs. TASKS) and cleared as they complete — this
+designed (`✓`) Brief (see OPENS.md § OPENS vs. TASKS) and cleared as they complete — this
 file is transient and is expected to be empty between work blocks.
 
 > **Proportionality (see CLAUDE.md § Proportionality and session boundaries).** Promoting a
@@ -19,8 +19,8 @@ from. Each task carries:
 
 - **A group-scoped ID letter** (A, B, C, …), so dependencies and parallel pairs
   can be named.
-- **A difficulty** in brackets (the TODO.md 1–5 time scale; tasks carry difficulty
-  only — priority is a TODO-level triage concept, not a per-task field).
+- **A difficulty** in brackets (the OPENS.md 1–5 time scale; tasks carry difficulty
+  only — priority is an OPENS-level triage concept, not a per-task field).
 - **A one-line action** — imperative; what to change.
 - **File scope** — the files the task is expected to touch. This is what makes
   collisions between tasks visible.
@@ -38,7 +38,7 @@ integrating session run the build — sub-agents should not build or commit.
 ### Template
 
 ```
-## <Group name> (promoted from TODO § <Brief>)
+## <Group name> (promoted from OPENS § <Brief>)
 
 Requirements: [REQUIREMENTS.md § <slug>](req/REQUIREMENTS.md#<slug>)
 
@@ -86,7 +86,7 @@ superseded — is **cancelled** rather than left half-tracked. Cancelling a grou
    before the block stalled keep their real status. The section is then **moved to that
    file's Completed / cancelled archive** with a `Resolved:` line recording the
    cancellation — it is never deleted. Re-promoting copies it back to Active.
-2. **Rewrites the group's task intent back into [`TODO.md`](TODO.md)** as described
+2. **Rewrites the group's task intent back into [`OPENS.md`](OPENS.md)** as described
    intent, **merging into a related existing Brief** where one exists rather than
    duplicating.
 3. **Removes the task stubs** (the A–F entries) from this file.
@@ -94,7 +94,7 @@ superseded — is **cancelled** rather than left half-tracked. Cancelling a grou
 Cancelling reverts *tracking*, not committed code — code already landed stays in the
 tree; its intent simply returns to the backlog to be re-promoted later. A group is
 thus always in one of two terminal states: **completed**, or **cancelled** back to
-TODO. See also [`../GLOSSARY.md`](../GLOSSARY.md) **Cancelled (task state)**.
+OPENS. See also [`../GLOSSARY.md`](../GLOSSARY.md) **Cancelled (task state)**.
 
 ## Pausing a task group (deliberate handoff)
 
@@ -102,7 +102,7 @@ Driving a group to *complete* in one block is the default, **not** a mandate (se
 § Proportionality and session boundaries). When ending a session early serves the work — the
 batch is large, context is drifting, or a natural checkpoint is reached — **pause** the group
 rather than force completion or cancel it. A paused group is a deliberate scoping choice,
-distinct from a *cancelled* one (which reverts intent to TODO): the tasks stay in this file,
+distinct from a *cancelled* one (which reverts intent to OPENS): the tasks stay in this file,
 ready for the next session to resume.
 
 Pausing is only legitimate if the stop is **clean and resumable**:
@@ -547,4 +547,4 @@ Completed 2026-06-15 / 2026-06-14 (see DEVLOG, newest first):
 - *Corporation lens: re-verified with the new harness — R2–R6 confirmed
   `complete`; the cancelled group is now closed.*
 
-Remaining harness follow-up (golden-image diffing) lives in [TODO.md](TODO.md) § Canvas.
+Remaining harness follow-up (golden-image diffing) lives in [OPENS.md](OPENS.md) § Canvas.

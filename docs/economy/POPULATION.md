@@ -5,7 +5,7 @@
 > § Generation pass (habitability-seeded), and § Implementation decomposition (v0.0.6) recording
 > the **static-MVP-first** cut. The stale "deferred for the prototype" framing throughout is
 > reconciled to "first implemented as a static MVP in v0.0.6". Remove this note once reviewed.
-> See TODO § Infrastructure [S4] and its child Briefs.
+> See OPENS § Infrastructure [S4] and its child Briefs.
 
 Population is the human layer of the economy — the source of workforce, the driver of consumer demand, and the reason habitability matters. Development is the act of improving a tile or region in ways that affect population, efficiency, or amenity rather than raw extraction. Population centres are **first implemented in v0.0.6 as a static MVP** (seeded fixed-level centres producing workforce supply, demand, and the agglomeration bonus); the **dynamic half** (habitability feedback and growth) follows as a v0.0.6 follow-up. The full model is designed here so each implementation step extends it rather than replacing it.
 
@@ -131,7 +131,7 @@ constant in `[0, 1]`, read-only, applied as a single linear scalar at both the e
 and processing stages (see PRODUCTION.md § Workforce). This section settles the **real
 model** so Layer 4 building management exposes a coherent system rather than a constant —
 and so the data model positions for it now. It is design only; the implementation is the
-**Workforce pool & population coupling** Brief (TODO § Workforce).
+**Workforce pool & population coupling** Brief (OPENS § Workforce).
 
 ### The labour pool
 

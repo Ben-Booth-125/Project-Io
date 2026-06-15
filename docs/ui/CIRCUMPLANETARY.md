@@ -65,7 +65,7 @@ top of the planet — they use a visible offset, consistent with how moons are
 drawn on the Solar screen.
 
 > **⟳ Pending review (2026-06-15) — transient.** Added the rung-relative reference-distance rule
-> below ([C2]). Remove once reviewed. See TODO § Canvas.
+> below ([C2]). Remove once reviewed. See OPENS § Canvas.
 
 **Reference distance is rung-relative.** On the Circumplanetary rung the distance reference is
 the **parent body — 0 AU at the parent** — so a moon's surfaced distance is its distance *from

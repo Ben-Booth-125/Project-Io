@@ -174,7 +174,7 @@ Ledger** (`tile_inspector.cpp`) and the **Economy panel** (`economy_panel.cpp`) 
 their `SetNextWindowSize`/`SetNextWindowPos` from them with `ImGuiCond_Once`. This
 resolved the prior inconsistency (Tile Ledger 820×560, Economy panel 760×620, at
 different offsets). The **Market / Balance / Construction ledger family** (deferred to
-Layer 4 — TODO § Ledger) inherits the same two constants when it is built. The header is
+Layer 4 — OPENS § Ledger) inherits the same two constants when it is built. The header is
 exempt — it is persistent chrome, not a ledger.
 
 ---

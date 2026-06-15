@@ -163,4 +163,4 @@ This two-axis model is **implemented** (2026-06-14; see DEVLOG § "Two-axis terr
 - `terrain_composition` — the geological/ecological type (11 values: barren, rocky, volcanic, icy, tundra, grassland, forest, wetland, ocean, regolith, metallic)
 - `terrain_landform` — the physical shape (7 values: plains, highland, mountain, canyon, valley, crater, rift)
 
-The prototype bodies are generated against the full model by the six-pass pipeline in `src/world/tile_generation.cpp` (see `docs/generation/TILE_GENERATION.md`); there is no remaining retrofit. Tuning refinements that remain open are tracked in `docs/development/TODO.md` § Environment.
+The prototype bodies are generated against the full model by the six-pass pipeline in `src/world/tile_generation.cpp` (see `docs/generation/TILE_GENERATION.md`); there is no remaining retrofit. Tuning refinements that remain open are tracked in `docs/development/OPENS.md` § Environment.

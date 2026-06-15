@@ -194,7 +194,7 @@ per-entity detail** in different frames. They must **share, not duplicate**:
 ## Layer 4 support
 
 Layer 4 brings building and market detail to the fore (the Market / Balance /
-Construction ledger family, per ROADMAP / TODO § Ledger). The hover card is the
+Construction ledger family, per ROADMAP / OPENS § Ledger). The hover card is the
 **low-friction inspection path** for that data:
 
 - **Building hover** surfaces recipe, throughput, and the **yield derivation**

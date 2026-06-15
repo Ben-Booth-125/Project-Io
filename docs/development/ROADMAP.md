@@ -3,9 +3,9 @@
 The milestone map from the current state to **v0.1.0**, the finished prototype. This
 document is **forward-facing and lean**: it names the version sequence, the *theme* of each
 minor, and the done-definition for v0.1.0. It deliberately does **not** enumerate individual
-Briefs — that lives in [`TODO.md`](TODO.md) (described intent) and [`TASKS.md`](TASKS.md)
+Briefs — that lives in [`OPENS.md`](OPENS.md) (described intent) and [`TASKS.md`](TASKS.md)
 (the active worklist). The roadmap sits *above* both: it says which theme each minor carries;
-TODO/TASKS say what work realises it.
+OPENS/TASKS say what work realises it.
 
 The prototype validates the **economy loop only**. The full scope and its exclusions
 (Conflict, Research, Policy, Diplomacy beyond a data-model stub) are owned by

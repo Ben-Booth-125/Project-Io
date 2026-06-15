@@ -9,7 +9,7 @@ Runs the headless visual-verification harness (Phase 1 + Phase 2) for a named
 check and reports the captured frames. This wraps `ProjectIo --verify <script>`
 so re-running a proven visual check is a single invocation rather than bespoke
 authoring. Design context: `docs/development/DEVELOPMENT_PRACTICES.md`
-§ Visual verification; `docs/development/TODO.md` § Canvas.
+§ Visual verification; `docs/development/OPENS.md` § Canvas.
 
 ## Argument
 

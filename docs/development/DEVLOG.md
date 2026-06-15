@@ -6,6 +6,53 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## 2026-06-15 — TODO → OPENS rename + Brief design-state model (branch v0.0.5)
+
+A backlog-structure session (no `src/` change). Renamed the backlog and gave every Brief an
+explicit **design state**, in preparation for a run of design rounds to finish the roadmap's
+documentation/design before further code.
+
+### What changed (docs only)
+
+- **`TODO.md` → `OPENS.md` (git mv, history preserved).** The file was never a checklist of
+  small actions — it is a backlog of *described intent*. "Opens" (the open items) reads as a
+  noun (a list), where "Open" read as a verb. Reframed the intro as **design-focused**: a Brief
+  is the high-level framework from which tasks are later cut.
+- **Two open states, per-Brief glyph.** Every Brief is *not yet implemented*; what varies is
+  whether its design is settled. Added a **`✓` designed / promote-ready** vs **`~` design owed**
+  state, carried as a glyph in the marker — `[<priority><difficulty> <state>]` (e.g. `[B3 ✓]`,
+  `[F4 ~]`). Orthogonal to priority/difficulty. **Only `✓` Briefs are promotable;** a `~` Brief
+  is *designed* first (a settle-into-the-doc pass flips it to `✓`). Added a matching **Design**
+  depth verb above Promote.
+- **Classified every active Brief.** Walked the whole backlog: the many "Design settled
+  (2026-06-15)" Briefs → `✓`; the design-revision / "design X before promoting" Briefs (Market
+  lens & ledger family, Buildings overview, Preferential purchasing, Lens-driven selection,
+  Corporation overview dashboard, tile-gen refinements, full-set resource scarcity, both Known
+  Bugs, the time-control rework, golden-image diffing) → `~`. Blocked-on-dependency Briefs
+  (non-spatial go-to, canvas hit-testing) stay `✓` — sequencing, not a design gap.
+- **Glossary.** Reworked the **Brief** entry to OPENS and added a **Design state (Brief)** entry.
+- **Cross-references.** Updated all *live* forward pointers (`CLAUDE.md` doc map + Publication
+  pipeline, `TASKS.md` / `REQUIREMENTS.md` policy prose, `ROADMAP.md`, `GLOSSARY.md`, the
+  `verifier-visual` skill, and the `See TODO §…` pointers in the design docs) to OPENS. **Frozen
+  historical records left as-is**: prior DEVLOG entries, the archived TASKS.md `<details>` group
+  breakdowns, and the REQUIREMENTS.md resolved-archive lines all correctly name the file as it
+  was at the time. Literal `TODO:` code comments in `src/` were untouched.
+
+### Decisions
+
+- **Filename `OPENS.md`** (user call) over `OPEN.md` — "open" reads as a verb; "opens" as a list
+  of open items.
+- **Glyph in the marker** (not a word tag or a per-state section split) — one character, no new
+  sections, scannable, and reuses the existing marker grammar rather than adding a parallel
+  system. Keeps the change low-overhead rather than a new ceremony.
+- **OPENS holds both states.** The file name means "open/unrealised", not "undesigned"; the
+  glyph carries the designed-vs-undesigned nuance, so promote-ready Briefs are not mislabelled.
+
+### Open
+
+- The `~` Briefs are the queue for the upcoming **design rounds** — each is a *design* pass
+  (settle into its authority doc, flip to `✓`) before any promotion.
+
 ## 2026-06-15 — Batch Publish process + retroactive doc-coverage reconcile (branch v0.0.5)
 
 A process/documentation session (no `src/` change) following the >C Brief pass. Defined the

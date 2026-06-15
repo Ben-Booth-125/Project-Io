@@ -11,7 +11,7 @@ design authority for the ledger itself; it is **design only** — nothing here i
 built yet.
 
 See also: [`docs/ui/SELECTION.md`](../ui/SELECTION.md) and the deferred hover-card
-item in [`docs/development/TODO.md`](../development/TODO.md) — the per-tile breadcrumb
+item in [`docs/development/OPENS.md`](../development/OPENS.md) — the per-tile breadcrumb
 is a natural section of a tile's rich card, so the content builder is shared (below).
 
 ---
@@ -70,7 +70,7 @@ For a whole body, the aggregate shape of the generation:
 - **Composition histogram** — tile count per `terrain_composition` (ocean / barren /
   grassland / forest / wetland / volcanic / metallic / icy …), with percentages. The
   surface for spotting "forest and wetland remain sparse on Kepler (~1% / ~0.5%)"
-  (TODO § Tile generation — Kepler biome balance) without eyeballing the map.
+  (OPENS § Tile generation — Kepler biome balance) without eyeballing the map.
 - **Landform histogram** — tile count per `terrain_landform`.
 - **Key thresholds** — `ocean_threshold`, `ocean_tiles` and the resulting water
   fraction vs. the profile's target `water_fraction`; band boundaries for the body's
@@ -109,7 +109,7 @@ Two complementary presentations, because the two questions differ:
 - **Per-body summaries → a dedicated Ledger window.** The histograms and thresholds
   are tabular and belong in a floating ledger alongside the Tile Ledger, reached from
   the navigation rail. Body selector defaults to the current view's main body (mirrors
-  the Tile Ledger default, TODO § Ledger).
+  the Tile Ledger default, OPENS § Ledger).
 - **Per-tile breadcrumb → both the ledger and a Planetary overlay lens.** In the
   ledger it is the detail panel for the selected tile. As a **lens** (a new
   `overlay_mode` over the Planetary canvas, see [`docs/ui/LENSES.md`](../ui/LENSES.md))

@@ -5,7 +5,7 @@
 > clustered in their home nation, deriving from the saturated-base premise in
 > `GENERATION_STRATEGY.md` (and stubbed in `SYSTEMS.md`). This is the *design* target; the
 > code (`place_starting_assets`) still places the old flat-3–6 cluster and is brought into line
-> when [B4] is promoted. Remove this note once reviewed. See TODO § Environment → Corporation
+> when [B4] is promoted. Remove this note once reviewed. See OPENS § Environment → Corporation
 > generation [B4] and § Documentation [S1].
 
 Corporations are the primary actors in the simulation. They extract resources, build

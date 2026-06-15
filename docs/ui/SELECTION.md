@@ -3,7 +3,7 @@
 > **⟳ Pending review (2026-06-15) — transient.** Reconciled with code landed in the >C Brief
 > pass: recorded the tile Selection element's **"Build here" front door** (new § The tile
 > element is the build front door) — the player-construction affordance that landed but was
-> not in this design doc. Remove this note once reviewed. See TODO § Documentation
+> not in this design doc. Remove this note once reviewed. See OPENS § Documentation
 > [S-tier review].
 
 The **Selection info element** is a pinned, polymorphic panel that shows detail
@@ -18,7 +18,7 @@ rail — the only way to open it is to select something.
 
 See also: [LAYOUT.md](LAYOUT.md) (where it sits in the shell), [CANVASES.md](CANVASES.md)
 (the click model it revises), the deferred hover-card item in
-`docs/development/TODO.md`, and `src/ui/view_nav.hpp` (`focus_on_entity`, the
+`docs/development/OPENS.md`, and `src/ui/view_nav.hpp` (`focus_on_entity`, the
 'go to' target).
 
 ---
@@ -98,7 +98,7 @@ affordability-gated against the player corporation's balance; choosing one enque
 construction request that the mutable-world pass executes (`construct_building`). This is the
 deliberate design choice that **building on one tile is a targeted action reached through the
 tile Selection element**, not a reserved menu — the nav-rail construction surface stays a
-broad overview (see `docs/ui/MENU.md`, TODO § Ledger). The equivalent placement-mode canvas
+broad overview (see `docs/ui/MENU.md`, OPENS § Ledger). The equivalent placement-mode canvas
 click enqueues the same request.
 
 ---

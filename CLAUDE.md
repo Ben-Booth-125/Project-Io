@@ -21,7 +21,7 @@ Canonical definitions for all project terms. Use these terms consistently. If a 
 All settled technical decisions: language, framework, architecture, tick model, data model, UI approach, and serialisation. Read this before writing any code or making any architectural suggestion. It also defines the prototype scope and what is explicitly excluded.
 
 **`docs/development/ROADMAP.md`**
-The milestone map from the current state to v0.1.0 (the finished prototype): the version sequence, the theme of each minor, and the v0.1.0 done-definition. Forward-facing and lean — it sits above TODO/TASKS, naming which theme each minor carries, not the individual Briefs. Read this for questions about sequence, what comes when, or whether a feature belongs in the prototype's remaining arc.
+The milestone map from the current state to v0.1.0 (the finished prototype): the version sequence, the theme of each minor, and the v0.1.0 done-definition. Forward-facing and lean — it sits above OPENS/TASKS, naming which theme each minor carries, not the individual Briefs. Read this for questions about sequence, what comes when, or whether a feature belongs in the prototype's remaining arc.
 
 **`docs/development/DEVELOPMENT_PRACTICES.md`**
 Testing framework (Catch2), naming conventions, documentation standards, the per-milestone ImGui panel rule, the standing development constraints, the tone/approach guidance, and how to cut a release. Read this alongside TECH_FOUNDATIONS when working on implementation.
@@ -31,12 +31,13 @@ Running session log — chronological record of what was built each session and
 in-session decisions. Consult when asked about prior work, open items, or why
 a specific implementation choice was made.
 
-**`docs/development/TODO.md`** and **`docs/development/TASKS.md`**
-The two-file backlog. TODO.md holds *described intent* — parked additions and
-deferred ideas with file pointers. TASKS.md holds the *active, prioritised,
-actionable worklist*: a Brief is **promoted** into file-scoped, dependency-
-and parallelisation-marked tasks (the A–F style) when we decide to act on it.
-Read TODO.md § TODO vs. TASKS for the workflow before promoting or executing
+**`docs/development/OPENS.md`** and **`docs/development/TASKS.md`**
+The two-file backlog. OPENS.md (the **open items**) holds *described intent* — parked
+additions and deferred ideas with file pointers — and is **design-focused**: each Brief
+carries a **design-state glyph** (`✓` designed/promote-ready, `~` design still owed). TASKS.md
+holds the *active, prioritised, actionable worklist*: a `✓` Brief is **promoted** into
+file-scoped, dependency- and parallelisation-marked tasks (the A–F style) when we decide to
+act on it. Read OPENS.md § OPENS vs. TASKS for the workflow before promoting or executing
 backlog work.
 
 **`docs/ui/CANVASES.md`**
@@ -52,7 +53,7 @@ Surface-level description of the application shell — how the screen regions (n
 The icon vocabulary — every hand-drawn vector glyph in the `ui::icons` namespace (`src/ui/icons.{hpp,cpp}`, the source of truth): building markers, resource pips, unit markers, nav-rail affordances, and the map-lens glyphs. Catalogues each glyph's shape, meaning, usage, and colour source, the shared `(dl, centre, r, colour)` contract, and the recipe for adding one. Read before adding or changing any on-canvas/strip glyph; identity *colours* live in `presentation.hpp`, not here.
 
 **`docs/ui/LENSES.md`**
-The map-lens system — the overlay modes (`overlay_mode` in `src/ui/ui_state.hpp`) selectable from the canvas control strip. The **Corporation** lens is fully settled (tile ownership tint, player vs. rival colours, Planetary-only); the **Supply / Market / Faction** sections currently record existing behaviour and the proposed **Resource** lens is a stub — completing them is a Brief under TODO § Canvas. Read before any work on overlay modes, lens rendering, or the lens icon vocabulary (which propagates to ICONS.md).
+The map-lens system — the overlay modes (`overlay_mode` in `src/ui/ui_state.hpp`) selectable from the canvas control strip. The **Corporation** lens is fully settled (tile ownership tint, player vs. rival colours, Planetary-only); the **Supply / Market / Faction** sections currently record existing behaviour and the proposed **Resource** lens is a stub — completing them is a Brief under OPENS § Canvas. Read before any work on overlay modes, lens rendering, or the lens icon vocabulary (which propagates to ICONS.md).
 
 **`docs/economy/RESOURCES.md`**
 The canonical resource list: all 23 resources organised into three tiers (raw → refined → product), their terrain affinity and body availability, the Era 0 / Era 1 split, and the seven-resource prototype subset. Read before any work involving resource types, tile deposits, or market goods.
@@ -89,7 +90,7 @@ The Generation Ledger (design only) — a tuning/analysis surface that explains 
 ## Publication pipeline
 
 The five-step **Publish** lifecycle for acting on a Brief. Full detail lives in
-`docs/development/TODO.md` § Publish and `docs/development/TASKS.md`. This is the
+`docs/development/OPENS.md` § Publish and `docs/development/TASKS.md`. This is the
 condensed reference.
 
 ### The five steps
@@ -109,7 +110,7 @@ condensed reference.
    parallel-safe**: fan them out to concurrent sub-agents. Only same-file (colliding) tasks
    stay sequential.
 4. **Complete tasks** — implement, review, and verify each task against its requirements.
-   Tasks that prove blocked or out of scope are *cancelled* (intent returned to TODO, stubs
+   Tasks that prove blocked or out of scope are *cancelled* (intent returned to OPENS, stubs
    removed from TASKS.md) — not left in flight.
 5. **Commit** — one commit per Brief, format:
    ```
@@ -126,7 +127,7 @@ Step 4 closes on *terminal* states (complete **or** cancelled) — a blocked tas
 rather than held open.
 
 A Batch Publish also runs a **documentation-coverage discipline** around the five steps (full
-detail in `docs/development/TODO.md` § Publish): up front, **determine per Brief whether the
+detail in `docs/development/OPENS.md` § Publish): up front, **determine per Brief whether the
 docs already record the implementation** (or it is a direct consequence of documented
 behaviour) — Briefs that fail are doc-changing and get a **per-Brief doc collision map** with
 **sub-agent fan-out** across disjoint docs; every changed doc carries a **minor transient
@@ -152,7 +153,7 @@ Two standing guidelines temper the lifecycle above. They are reasserted operatio
   batch is large, context is drifting, or a natural checkpoint is reached — **pause** the group
   rather than force completion or cancel it: leave it clean and resumable (TASKS.md true to
   state, build green or breakage noted, a short "resume here" handoff line). A paused group is a
-  deliberate scoping choice, distinct from a *cancelled* one, which reverts intent to TODO.
+  deliberate scoping choice, distinct from a *cancelled* one, which reverts intent to OPENS.
 
 ### Parallelisation (the load-bearing rule)
 

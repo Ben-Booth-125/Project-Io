@@ -38,7 +38,7 @@ tasks carry `Satisfies: Rn` fields pointing at individual rows.
 2. **As tasks land** — update statuses. A `failed` status does not block the Brief:
    add a note, leave the row as `pending`, refine the responsible task, and retry.
 3. **On completion** — when all rows are `complete` (or `failed` rows are accepted as
-   explicitly out of scope), remove the group from TASKS.md and the Brief from TODO.md,
+   explicitly out of scope), remove the group from TASKS.md and the Brief from OPENS.md,
    then **move this section, intact, to the Completed / cancelled archive** at the foot
    of the file. Add a `Resolved:` line above the table (date + outcome, e.g.
    `Resolved: 2026-06-14 — complete, all rows met`). **Never delete a section** — the
@@ -86,7 +86,7 @@ silently downgrade it to an assumption. Instead:
 3. **Defer only when it needs design.** If establishing the method is impossible
    without non-trivial design consideration — it needs new infrastructure, an
    architectural decision, or its own scoping — do **not** block the task. Record
-   the testing-method work as a [`../TODO.md`](../TODO.md) Brief (with file pointers
+   the testing-method work as a [`../OPENS.md`](../OPENS.md) Brief (with file pointers
    and enough context to pick up), leave the requirement `pending` with the
    deferral reason in Notes, and proceed. A requirement whose method is deferred is
    **not** complete, and the task carrying it is at best *code-complete* until the
@@ -96,7 +96,7 @@ silently downgrade it to an assumption. Instead:
 
 A planning agent writes both the TASKS.md group and this file's section together.
 An implementation agent reads only its task group (from TASKS.md) and the matching
-section here — it does not need the full TODO backlog or DEVLOG history in context.
+section here — it does not need the full OPENS backlog or DEVLOG history in context.
 
 ---
 

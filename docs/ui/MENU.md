@@ -34,7 +34,7 @@ targeted action?* Broad → a ledger with a slot. Targeted → the Selection ele
 no slot. This keeps the ten slots scaling with the *systems* the game has, not with the number
 of things a player can do to a single entity — e.g. the per-tile "build here" flow lives in the
 tile Selection element, while the broad **buildings overview** is what earns the construction
-slot (see `docs/development/TODO.md` § Ledger / § Selection info element).
+slot (see `docs/development/OPENS.md` § Ledger / § Selection info element).
 
 ## Layer 2 state
 
@@ -46,7 +46,7 @@ slot (see `docs/development/TODO.md` § Ledger / § Selection info element).
 
 > **⟳ Pending review (2026-06-15) — transient.** Defined the ten-slot menu set and its
 > gameplay-loop ordering ([B3]). The **ordering principle is gameplay-loop grouping** for now; a
-> low-priority Brief tracks settling a *canonical* ordering rule later (TODO § Menu). The
+> low-priority Brief tracks settling a *canonical* ordering rule later (OPENS § Menu). The
 > **Corporation overview dashboard** (slot 1) is a new surface that still needs its own design
 > Brief. Remove this note once reviewed.
 
@@ -76,7 +76,7 @@ Notes on the mapping:
   surface*, per the menus-are-broad-ledgers rule.
 - **Slot 1 — Corporation overview dashboard.** A top-level roll-up (balance, holdings, alerts)
   above the per-system ledgers. It is a **new surface needing its own design** before
-  implementation — tracked as a Brief under TODO § Menu.
+  implementation — tracked as a Brief under OPENS § Menu.
 - **Layer-4 ledgers** (slots 2–6) are the near-term build (the [A4] ledger family); slots 7–10
   are reserved placeholders until their systems land, following the *ledgers-start-closed* and
   reserved-placeholder conventions above.
@@ -85,7 +85,7 @@ Notes on the mapping:
 
 - **Canonical ordering rule (low priority).** The current order is *gameplay-loop grouping*; a
   canonical, self-documenting rule (e.g. strict SYSTEMS.md tier order) is deferred. Tracked as a
-  low-priority Brief under TODO § Menu.
+  low-priority Brief under OPENS § Menu.
 - Whether all menus open floating windows, or some become docked/persistent panels.
 - Relationship to the explorer (`EXPLORER.md`) — the pane is fixed navigation; the explorer is curated navigation. Slot 10 (Exploration) may route to it rather than open a ledger.
 

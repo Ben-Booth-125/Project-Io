@@ -18,7 +18,7 @@ are not defined here — they live in [`presentation.hpp`](../../src/ui/presenta
 (`presentation_of`, the `palette` namespace). See also
 [CANVASES.md](CANVASES.md) (where markers are drawn), [SELECTION.md](SELECTION.md)
 (the summaries that reuse swatches), and the **lens-design** item in
-`docs/development/TODO.md` (the lens glyphs below feed it).
+`docs/development/OPENS.md` (the lens glyphs below feed it).
 
 ---
 
@@ -42,7 +42,7 @@ void glyph(ImDrawList* dl, ImVec2 centre, float r, /* colour or type */);
 > **⟳ Pending review (2026-06-15) — transient.** Settled the icon Open clarifications 1–4
 > (extraction-site redraw, unit→chevron, the outline rule, the fill-vs-stroke per-family rule).
 > These are *design decisions*; the glyph redraws in `icons.cpp` land when the [C2] icon Briefs
-> are promoted. Remove this note once reviewed. See TODO § Canvas.
+> are promoted. Remove this note once reviewed. See OPENS § Canvas.
 
 Two settled visual sub-conventions (the resolution of former Open clarifications 3–4):
 
