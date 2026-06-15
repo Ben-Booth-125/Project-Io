@@ -95,6 +95,84 @@ Habitability is reduced by:
 
 ---
 
+## Workforce model (prototype → Layer 4)
+
+The prototype ships a placeholder: `building_component.workforce_assigned` is an authored
+constant in `[0, 1]`, read-only, applied as a single linear scalar at both the extraction
+and processing stages (see PRODUCTION.md § Workforce). This section settles the **real
+model** so Layer 4 building management exposes a coherent system rather than a constant —
+and so the data model positions for it now. It is design only; the implementation is the
+**Workforce pool & population coupling** Brief (TODO § Workforce).
+
+### The labour pool
+
+Workforce is a **pool**, not a per-building free parameter. The pool is held **per `(corp,
+body)`** — the same granularity as the stockpile pool — because labour does not cross
+bodies without transport, and a corporation's contention is local to where its buildings
+sit. (A corporation-wide pool was considered and rejected: it would let a labour surplus on
+one body silently staff buildings on another, which the spatial economy must not allow.)
+Each pool has:
+
+- a **supply** — the total effective workforce available to that corporation on that body,
+  and
+- a **demand** — the sum of the labour its buildings on that body want this Tick.
+
+In the prototype, supply is a fixed authored figure per `(corp, body)`; once population
+centres exist (the rest of this document), **supply derives from the population centres on
+the body**: population level → labour force → the share that contracts to the corporation.
+
+### Contention
+
+When **demand ≤ supply**, every building is fully staffed and runs at its requested level.
+When **demand > supply**, the pool is **rationed proportionally**: each building receives
+`supply / demand` of its request (a single contention scalar applied uniformly), so a
+corporation that over-builds relative to its labour force sees *every* building throttled
+rather than some starved to zero. This proportional rule is the workforce counterpart of
+the two-threshold input model in PRODUCTION.md, and is deliberately simple — priority
+weighting between buildings is a later refinement, noted but not committed here.
+
+The contention scalar multiplies the existing linear `workforce_assigned` term, so the
+production arithmetic gains a factor rather than changing shape:
+`effective_workforce = workforce_assigned × contention_scalar`.
+
+### Player-set vs. system-allocated
+
+The split, stated once:
+
+- **The player sets** the *target* staffing of each building — the `workforce_assigned`
+  request (how hard they want it run) — and, later, standing allocation **policy** (which
+  buildings get priority under contention; SYSTEMS.md § Policy).
+- **The system allocates** the actual labour: it computes pool supply from population,
+  sums demand from the player's targets, derives the contention scalar, and applies it.
+  The player never hand-assigns headcount; they express intent and the pool resolves it.
+
+### Wages
+
+Wages are paid from the pool's **effective** (allocated) workforce, not the requested
+target — a throttled building pays for the labour it actually used. The per-building wage
+stays `effective_workforce × base_wage` (the L3 budget term), so the budget loop is
+unchanged in shape; only the workforce figure feeding it becomes pool-resolved. Wage
+*level* derives from body habitability and population pressure once population is live
+(higher demand for scarce labour raises the clearing wage); in the prototype `base_wage`
+is the authored constant it is today.
+
+### Upgrade path from the authored constant
+
+The migration is additive, so nothing in Layer 3 is retrofitted destructively:
+
+1. **L3 (today):** `workforce_assigned` authored per building; `contention_scalar = 1`
+   implicitly (no pool). The field stays.
+2. **L4 step 1 — pool without population:** introduce the per-`(corp, body)` pool with an
+   authored supply; compute demand and the contention scalar; feed `effective_workforce`
+   into production and wages. `workforce_assigned` becomes the player-set *target*.
+3. **L4 step 2 — population coupling:** replace the authored pool supply with one derived
+   from population centres (level → labour force → contracted share), and let wage level
+   track habitability/population pressure.
+
+The data already in place that this path reuses (and must not be retrofitted): the
+`workforce_assigned` field, `market_component.demand`, and `tile_component.habitability`
+(see Prototype notes below).
+
 ## Prototype notes
 
 Population centres, land use transitions, and the agglomeration bonus are all **deferred** from the prototype. The following are in place and must not be retrofitted when population is implemented:
