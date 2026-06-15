@@ -111,6 +111,23 @@ Permanent record of resolved requirement groups, newest first. Each carries a
 `Resolved:` line and is retained verbatim; re-promote by copying a section back up to
 **Active requirements**.
 
+### corporation-generation-revision
+
+Resolved: 2026-06-15 — complete, all rows met. Promoted from TODO § Corporation generation —
+**[B4] Revise the corporation generation strategy** + **[C3] Model pre-game profit** (coordinated,
+same passes). Drafted by a sub-agent (holdings) then revised in the main session: the agent's
+pre-game warm-start hand-built a *duplicate* economy registry inside generation — excised in favour
+of the existing app-startup warm-start (which reuses the loaded registry). Verified via
+`tools/verify/world_audit` and a clean `ProjectIo` Debug build.
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | Each corporation opens with a clustered set of multiple assets (target 3–6), not a single building. | `headless` | complete | world_audit: 15 extraction assets across 8 corps, all valid |
+| R2 | The asset mix reflects the corp's `industrial_focus` (extraction/processing/trade anchored). | `manual` | complete | `focus_asset_pattern`; reviewed |
+| R3 | Holdings cluster spatially around a focus-weighted anchor (nearest-first placement). | `manual` | complete | distance-sorted neighbourhood; reviewed |
+| R4 | Every placed asset passes `placement_rules::can_place` (never ocean / never a deposit-less extraction site). | `headless` | complete | world_audit: 0 invalid placements |
+| R5 | Opening balances and (corp, body) pools reflect a multi-tick operating history, seeded without duplicating the economy constants. | `build` | complete | app warm-start 2→12 ticks, reuses the loaded registry |
+
 ### player-sell-orders
 
 Resolved: 2026-06-15 — complete, all rows met. Promoted from TODO § Trade —

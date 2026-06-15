@@ -492,28 +492,6 @@ Design authority: `docs/generation/NATION_GENERATION.md`.
 
 Design authority: `docs/generation/CORPORATION_GENERATION.md`.
 
-- **[B4] Revise the corporation generation strategy — larger holdings + realism.** A
-  corporation currently starts with only a small handful of placed assets (Pass 3,
-  `corporation_generation.cpp`), which reads thin for an entity meant to be an industrial
-  power. **Increase the number of tiles / assets** a corporation holds at campaign start to a
-  more plausible footprint, and review the **realism** of the whole strategy as part of the
-  same item: the holdings-size distribution, the asset mix vs. the corp's `industrial_focus`,
-  spatial **clustering** of a corp's tiles (holdings should plausibly group, not scatter),
-  and how the larger footprint interacts with the pre-game profit model ([C3] below). Decide a
-  target holdings count (or range) and the placement rules that keep every asset valid (reuse
-  the `placement_rules` seam). Touches `corporation_generation.cpp` (Pass 3 asset placement,
-  possibly Pass 4 financial profile); authority `docs/generation/CORPORATION_GENERATION.md`.
-  Coordinate with [C3] (pre-game profit) — same file/passes.
-
-- **[C3] Model pre-game profit in corporation generation.** A corporation does not
-  appear from nothing — its starting `balance`/`starting_capital` and asset mix should reflect a
-  simulated **pre-game operating history** (extraction + processing + trade running for some
-  notional period) rather than flat authored values. Raised during the 2026-06-14 Layer 3 Q&A:
-  the Layer 3 economy loop now exists, so the same loop can be run forward at generation time to
-  seed a plausible opening balance and stockpiles (the cheap two-tick warm-start already lands;
-  this is the longer-history version). Touches `src/world/corporation_generation.cpp` (Pass 4
-  financial profile) and reuses the economy step. Not blocking Layer 4.
-
 - **[F4] Deferred — corporation selection screen & behaviour.** Per
   CORPORATION_GENERATION.md § Open items: the analytical corp-selection/re-roll
   flow, franchising, nation-seeded privatisation, automated tax, Era-based

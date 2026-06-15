@@ -6,6 +6,41 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## 2026-06-15 — >C Brief pass, Wave 1.4: Corporation generation revision (branch v0.0.5)
+
+Two coordinated Briefs on the corp-generation passes — **[B4] larger holdings + realism** and
+**[C3] pre-game profit**. The holdings rewrite was drafted by a background sub-agent (disjoint
+file `corporation_generation.cpp`) and revised in the main session.
+
+### What was built
+
+- **Clustered, focus-shaped holdings** (`corporation_generation.cpp`): `place_starting_asset`
+  (one building) replaced by `place_starting_assets` — a focus-weighted **anchor** tile, then the
+  remaining slots filled from the nation's tiles **nearest the anchor** (squared grid distance,
+  id tie-break) so a corp's holdings cluster. Count 3–6 (`k_min/max_holdings`); the asset **mix
+  follows `industrial_focus`** (`focus_asset_pattern`). Every placement gated by
+  `placement_rules::can_place` — `world_audit` reports 0 invalid placements across 15 extraction
+  assets.
+- **Pre-game profit** (`app.cpp`): the existing startup warm-start extended 2 → 12 ticks, so every
+  corp opens onto a multi-tick operating history (moved balances, non-empty pools).
+
+### Decisions
+
+- **Rejected the sub-agent's in-generation warm-start** — it hand-built a *duplicate* economy
+  registry inside `corporation_generation.cpp` (a second copy of the Lua constants) and authored
+  recipe ids at generation. The agent flagged both. Excised: `[C3]` is implemented at app startup
+  (after `load_economy`) where the **real loaded registry** already exists — no duplication, no
+  generation-time recipe authoring (`load_economy` assigns default recipes as before). `run_verify`
+  stays deterministically cold.
+
+### Status
+
+Complete — 5/5 requirements met (REQUIREMENTS § corporation-generation-revision). Verified via
+`tools/verify/world_audit` (0 invalid placements; biome + reserves still green) and a clean
+`ProjectIo` Debug build.
+
+---
+
 ## 2026-06-15 — >C Brief pass, Wave 1.3: Player sell orders (branch v0.0.5)
 
 Layer 4 core code Brief — **[A3] Player-driven sell orders & preferential purchasing**, the
