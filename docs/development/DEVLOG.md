@@ -6,6 +6,55 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## 2026-06-15 — v0.0.5 Layer 4 foundations (publish set, branch v0.0.5)
+
+First v0.0.5 work block. Branched `v0.0.5` off `main` and published four of the five
+enablers the roadmap names for the *make-the-economy-buildable-on* theme, as a barrier set
+(all groups clear each Publish step before any advances). The fifth enabler — A4 Layer 4 UI
+groundwork — was deliberately **held** for its own pass: it is heavier and bleeds into v0.0.6
+construction UI, so keeping it out preserved the batch's "low-risk, largely disjoint" shape.
+
+### What was built
+
+- **Reusable placement-rules seam** (TODO § Infrastructure, `[SSS2]`). Pulled the
+  terrain/deposit placement logic out of `corporation_generation.cpp` Pass 3 into a
+  screen-independent `src/world/placement_rules.{hpp,cpp}`: the prototype-extractable set,
+  `is_ocean_tile` / `is_extractable` / `extractable_deposit` / `richest_extractable`, and the
+  load-bearing `can_place(tile, building_type, target) → bool`. Pass 3 re-pointed at the seam
+  with **no behaviour change** (world_audit: still 3 extraction assets, 0 invalid). The single
+  most useful Layer 4 prep — player construction now shares one validity check with generation.
+- **Multi-tick economy-stability harness** (TODO § Resources, `[S2]`). New
+  `tools/verify/econ_stability.cpp` runs production → market clearing → budget over 100 ticks
+  on a small fixed world and asserts: prices stay in the `[0.25×, 4×]` band, no NaN/Inf,
+  deposit reserves decrease monotonically (1200 → 7.42), balances stay bounded. Named in the
+  `verifier-headless` skill; settings.json allow rule added (user-approved).
+- **Workforce model design** (TODO § Workforce, `[S3]`). Settled `POPULATION.md` § Workforce
+  model (prototype → Layer 4): per-`(corp, body)` labour pool, proportional contention scalar
+  (`supply/demand`), population-derived supply/wages, the player-sets-target vs.
+  system-allocates split, and a 3-step additive upgrade path from the L3 authored
+  `workforce_assigned` constant. Design only; implementation stays the `[A4]` pool-coupling Brief.
+- **Uniform ledger-window chrome** (TODO § Ledger, `[B2]`). New `src/ui/ledger_chrome.hpp`
+  holds `ledger_window_size` / `ledger_window_spawn`; the Tile Ledger and Economy panel both
+  drive their window size/pos from it (resolving the prior 820×560 vs. 760×620 divergence). The
+  future Market / Balance / Construction family inherits the two constants.
+
+### Decisions
+
+- **Four enablers, not five** — A4 UI groundwork held for a dedicated pass (user call), to keep
+  the batch disjoint and low-risk.
+- **Pool granularity per-`(corp, body)`**, not corporation-wide — labour does not cross bodies
+  without transport, and contention is local; a corp-wide pool was considered and rejected.
+- **`can_place` is the strict L4 check**; Pass 3 keeps its weighted scoring and reuses the
+  seam's helpers, so generation behaviour is byte-for-byte unchanged while the seam is ready
+  for player construction.
+
+Status: Complete — 16/16 requirements met across the four groups (see REQUIREMENTS.md archive
+§ v0.0.5 Layer 4 foundations publish set). Verified via the ProjectIo Debug build,
+`tools/verify/econ_stability`, and `tools/verify/world_audit`. One commit per Brief plus a
+tracking close-out.
+
+---
+
 ## 2026-06-15 — Roadmap to v0.1.0; INITIAL_INSTRUCTIONS retired
 
 Documentation-only. Replaced the layer-list build sequence with a proper milestone map and

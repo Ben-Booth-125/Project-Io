@@ -317,17 +317,6 @@ currently hold Briefs appear as sections below.
 
 ## Ledger
 
-- **[B2] Uniform ledger-window chrome.** Bring every ledger window onto a **single
-  shared size constant and a single shared spawn-position constant** so the family reads
-  as one consistent surface, per the settled principle in `docs/ui/LAYOUT.md` § Uniform
-  ledger-window chrome. Today they diverge: the Tile Ledger opens at 820×560
-  (`tile_inspector.cpp`) and the Economy panel at 760×620 (`economy_panel.cpp`), at
-  different offsets. Introduce the two constants (anchored clear of the profile/header
-  chrome, `ImGuiCond_Once`) and point both windows — and every future ledger in the
-  **Market / Balance / Construction** family below — at them. Touches
-  `src/ui/tile_inspector.cpp`, `src/ui/economy_panel.cpp`, and wherever the shared
-  constants live (a small ledger-chrome header). Doc authority: `docs/ui/LAYOUT.md`.
-
 - **[C2] Tile Ledger default body.** The Tile Ledger should default its selected
   body to the **current view's main body** — the Circumplanetary view's anchor, or
   the Planetary view's body — rather than the lowest id. The existing default
@@ -431,15 +420,6 @@ exchange, **distinct from corp stockpile pools**. Design authority `docs/SYSTEMS
 The resource economy's data and quality work — the substrate Layer 4 sits on. Design
 authority: `docs/economy/RESOURCES.md`, `docs/economy/PRODUCTION.md`.
 
-- **[S2] Automated economy-tick testing (multi-tick stability).** A headless harness
-  (`tools/verify/*.cpp`, per the `verifier-headless` skill) that runs the economy loop —
-  `run_economy_step` → `clear_markets` → `apply_budget` — over many ticks (e.g. 50–100) on a
-  small fixed world and asserts it stays sane: prices stay within the `[0.25×, 4×]` clamp band
-  and do not oscillate, no NaN/Inf, deposits deplete monotonically toward exhaustion, balances
-  do not diverge unboundedly. Cheap insurance before Layer 4 builds UI on top of the loop; the
-  existing `econ_harness` exercises only a single tick. Name the new harness in the
-  `verifier-headless` skill and add its exe to the settings allow-list.
-
 - **[B3] Resource generation — full-set deposit authoring + scarcity.** Generation today
   authors deposits for the seven-resource prototype subset; extend it to the full 23-resource
   set with a plausible distribution and scarcity profile (rare goods rare, ambient goods
@@ -458,33 +438,15 @@ authority: `docs/economy/RESOURCES.md`, `docs/economy/PRODUCTION.md`.
 
 The labour scalar (`docs/SYSTEMS.md` § Workforce, `docs/economy/POPULATION.md`).
 
-- **[S3] Workforce model design.** Settle the workforce model *before* Layer 4 building
-  management exposes it. Today `workforce_assigned` is a flat authored 0–1 constant; L4 needs
-  to know what the player actually controls. Design: the corporation-wide (or per-body) labour
-  **pool**, contention when building demand exceeds supply, how wages and supply derive from
-  population centres (couples to the Layer 4 population work), and what the player *sets* vs.
-  what the system *allocates*. Design only — the implementation is the pool-coupling Brief
-  below. Authority: `docs/economy/POPULATION.md`, `docs/SYSTEMS.md` § Workforce.
-
 - **[A4] Workforce pool & population coupling.** The real model: a corporation-wide
   (or per-body) labour **pool** with proportional contention when building demands exceed supply,
-  replacing the authored constant. Implements the design Brief above and couples to the Layer 4
+  replacing the authored constant. Implements the **settled design** in
+  `docs/economy/POPULATION.md` § Workforce model (prototype → Layer 4) and couples to the Layer 4
   population-centre work — workforce supply and wages derive from population. In Layer 3,
   `workforce_assigned` is an authored constant 0–1, read-only, applied as a linear scalar; this
   brief is the upgrade path.
 
 ## Infrastructure
-
-- **[SSS2] Extract a reusable placement-rules seam.** Building-placement validation
-  (terrain/deposit rules: extraction only on a non-zero deposit of the target type, never on
-  ocean, valid terrain per building type) currently lives *inside*
-  `corporation_generation.cpp` Pass 3 (`place_starting_asset`). Layer 4 player construction
-  needs the exact same check, so pull it into a reusable
-  `src/world/placement_rules.{hpp,cpp}` (tile + building_type + target_resource → valid?),
-  call it from Pass 3 (no behaviour change there), and headless-test it. Designing this
-  decoupled from a screen, *before* L4, avoids a mid-build refactor — the single most useful
-  prep for Layer 4. See `docs/economy/PRODUCTION.md` § Extraction (placement rules) and the
-  S1 placement audit in the DEVLOG.
 
 - **[S5] Layer 4 — population centres + building management.** The next layer,
   **rescoped** from a pure production-UI overhaul into two coupled systems:

@@ -113,6 +113,49 @@ Permanent record of resolved requirement groups, newest first. Each carries a
 `Resolved:` line and is retained verbatim; re-promote by copying a section back up to
 **Active requirements**.
 
+### v0.0.5 Layer 4 foundations publish set (placement-rules-seam … uniform-ledger-chrome)
+
+`Resolved: 2026-06-15 — complete; all 16 rows across the four groups met. Published as a
+barrier set on branch v0.0.5, one commit per Brief plus a tracking close-out. Verified via
+the ProjectIo Debug build, tools/verify/econ_stability (100-tick stability), and
+tools/verify/world_audit (placement seam + negative controls).`
+
+### placement-rules-seam
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | A screen-independent `src/world/placement_rules.{hpp,cpp}` declares the prototype-extractable resource set and an `is_ocean_tile` / `richest_extractable` helper family. | `code: placement_rules` + `build` | complete | ProjectIo Debug build clean. |
+| R2 | `can_place(const tile_component&, building_type, resource_type target) → bool` enforces: extraction only on a non-zero deposit of the target / valid terrain, never ocean; processing/port on any non-ocean land. | `code: can_place` + `build` | complete | world_audit negative controls (ocean / zero-deposit rejected, processing accepted). |
+| R3 | `corporation_generation.cpp` Pass 3 (`place_starting_asset`) calls the seam with no behaviour change to generation (same placements). | `headless` (world_audit placement counts unchanged) | complete | world_audit: 3 extraction assets, 0 invalid (unchanged from S1). |
+| R4 | `world_audit` asserts every placed extraction asset passes `can_place`, and ocean / zero-deposit tiles fail it. | `headless` | complete | world_audit: "can_place agrees with placement + negative controls: PASS". |
+
+### econ-stability-harness
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | `tools/verify/econ_stability.cpp` runs `run_economy_step → clear_markets → apply_budget` over 100 ticks on a small fixed world. | `headless` | complete | econ_stability: "ran 100 ticks without tripping a stability assertion". |
+| R2 | Over the run, every market price stays within `[0.25×, 4×] base_price` and does not diverge/oscillate unboundedly. | `headless` | complete | econ_stability R2 PASS. |
+| R3 | No NaN/Inf appears in any price, pool quantity, or balance across the run. | `headless` | complete | econ_stability R3 PASS. |
+| R4 | Deposit reserves decrease monotonically toward exhaustion; balances do not diverge unboundedly. | `headless` | complete | econ_stability: reserve 1200 → 7.42 monotonic; balances bounded. |
+| R5 | `econ_stability` is named in the `verifier-headless` skill and its exe has a settings.json allow rule. | `doc: .claude/skills/verifier-headless/SKILL.md` | complete | Skill + README updated; `Bash(& ".\econ_stability*)` added to settings.json (user-approved) and the CLAUDE.md mapping. |
+
+### workforce-model-design
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | `docs/economy/POPULATION.md` specifies the corporation-wide (or per-body) labour **pool** model. | `doc: docs/economy/POPULATION.md` | complete | § Workforce model → The labour pool (settled per-`(corp, body)`). |
+| R2 | It specifies proportional **contention** when total building workforce demand exceeds pool supply. | `doc:` | complete | § Contention (uniform `supply/demand` scalar). |
+| R3 | It specifies how workforce **supply and wages derive from population centres**, and the split between what the player **sets** vs. what the system **allocates**. | `doc:` | complete | § Player-set vs. system-allocated + § Wages. |
+| R4 | It records the upgrade path from the L3 authored `workforce_assigned` constant to the pool model. | `doc:` | complete | § Upgrade path from the authored constant (3-step additive migration). |
+
+### uniform-ledger-chrome
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | `src/ui/ledger_chrome.hpp` declares one shared ledger-window **size** constant and one shared **spawn-anchor** constant, anchored clear of the profile/header chrome. | `code: ledger_chrome` + `build` | complete | `ledger_window_size` / `ledger_window_spawn`; build clean. |
+| R2 | Both the Tile Ledger (`tile_inspector.cpp`) and the Economy panel (`economy_panel.cpp`) use the shared constants with `ImGuiCond_Once` (no per-window literal size/offset). | `code:` (no 820/560/760/620 literals remain) + `build` | complete | Both re-pointed; literals removed; build clean. |
+| R3 | `docs/ui/LAYOUT.md` § Uniform ledger-window chrome references the shared constants. | `doc: docs/ui/LAYOUT.md` | complete | Section now records the implemented constants. |
+
 ### price-resolution
 
 `Resolved: 2026-06-15 — complete; all 4 rows met. Verified via tools/verify/econ_harness

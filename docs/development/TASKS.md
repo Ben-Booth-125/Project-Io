@@ -492,6 +492,16 @@ group.
 
 Completed 2026-06-15 / 2026-06-14 (see DEVLOG, newest first):
 
+- *v0.0.5 Layer 4 foundations — publish set (4 Briefs, barrier semantics, branch v0.0.5).
+  **Completed:** reusable placement-rules seam (`src/world/placement_rules.{hpp,cpp}`, Pass 3
+  re-pointed, no behaviour change); multi-tick economy-stability harness
+  (`tools/verify/econ_stability.cpp`, 100 ticks); workforce-model design
+  (`POPULATION.md` § Workforce model); uniform ledger-window chrome
+  (`src/ui/ledger_chrome.hpp`, both ledgers re-pointed). 16/16 requirements met; verified via
+  the ProjectIo build, `tools/verify/econ_stability`, and `tools/verify/world_audit`. One commit
+  per Brief plus a tracking close-out. The roadmap's fifth v0.0.5 enabler (A4 Layer 4 UI
+  groundwork) was deliberately held for a later pass. See REQUIREMENTS.md archive.*
+
 - *Layer 3 finalisation — publish set (5 Briefs, barrier semantics). **Completed:**
   price resolution from local supply/demand (A); deposit depletion model (B); pre-game
   economy ticks / warm start (C); player balance header + design pass (D); uniform
