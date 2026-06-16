@@ -720,6 +720,27 @@
       "authority_doc": "docs/generation/NATION_GENERATION.md",
       "summary": "The nation SYSTEM (tax, licences, war, infrastructure), sentiment graph, historical fragmentation (exclaves/disputed zones), non-Kepler jurisdiction. Out of prototype scope; design owed when in scope.",
       "design": "@BACKLOG.md"
+    },
+    {
+      "id": "BL-055",
+      "short_name": "NAV_SLOT_PANEL_SYNC",
+      "category": "Menu",
+      "title": "Nav slot open/close colour not in sync when panel closed via X button",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 2,
+      "parked": false,
+      "waits_on": [],
+      "blocked_on": [],
+      "written": "2026-06-16",
+      "files": [
+        "src/ui/nav_pane.cpp",
+        "src/ui/ui_state.hpp"
+      ],
+      "authority_doc": "docs/ui/MENU.md",
+      "summary": "Nav rail slots show an active (highlighted) state driven by show_* booleans in ui_state. When a ledger panel is closed via its X button, ImGui sets the bool false one frame later so the slot de-highlights correctly. However, if a second panel opens while a first is already open, neither closes the other — both slots show active simultaneously. Fix: when a nav slot is toggled ON, clear all other show_* panel booleans so at most one panel is active at a time (exclusive-open model), OR document that simultaneous panels are intended and the highlight is per-panel not per-slot.",
+      "design": "Two sub-options:\n\nA) **Exclusive model (recommended for now):** In , when a slot is toggled ON, set all other  panel flags to false before setting the new one to true. This matches the expected accordion-style behaviour the user observed.\n\nB) **Permissive model:** Document that multiple panels can be open simultaneously and the nav slot simply reflects each panel's own open state. Requires no code change but may feel wrong to players.\n\nPrefer A. The ledger windows are floating and re-openable; the nav slot is the toggle, not a tab bar. Implementation: in the switch statement that handles each slot, before , add a  helper that clears all show_* flags, then set the target one based on the prior state (if it was open, close it; if closed, open it — genuine toggle)."
     }
   ]
 }
