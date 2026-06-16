@@ -15,18 +15,73 @@ namespace ui {
 
 namespace {
 
+// --- Queue overview table ----------------------------------------------------
+// Section 1: all active construction items across all bodies. Progress cell is
+// colour-coded: dim (<25%) grey, mid (25–75%) yellow, high (>75%) green.
+// The construction queue data model is not yet authored (BL-029 precedes the
+// queue backend); until that lands, this always shows the empty-state message.
+void draw_queue_section(const world& /*w*/)
+{
+    if (!ImGui::CollapsingHeader("Queue", ImGuiTreeNodeFlags_DefaultOpen))
+        return;
+
+    // When the queue backend lands, iterate the queue here.
+    // For now the queue is always empty — show the placeholder.
+    const bool any_items = false;
+
+    if (!any_items)
+    {
+        ImGui::TextDisabled("No active construction.");
+        return;
+    }
+
+    constexpr ImGuiTableFlags table_flags =
+        ImGuiTableFlags_BordersOuter |
+        ImGuiTableFlags_BordersInnerV |
+        ImGuiTableFlags_RowBg |
+        ImGuiTableFlags_SizingStretchProp;
+
+    if (!ImGui::BeginTable("##construction_queue", 5, table_flags))
+        return;
+
+    ImGui::TableSetupColumn("Body",             ImGuiTableColumnFlags_WidthStretch, 1.5f);
+    ImGui::TableSetupColumn("Building",         ImGuiTableColumnFlags_WidthStretch, 2.0f);
+    ImGui::TableSetupColumn("Progress",         ImGuiTableColumnFlags_WidthStretch, 1.5f);
+    ImGui::TableSetupColumn("Est. ticks left",  ImGuiTableColumnFlags_WidthStretch, 1.5f);
+    ImGui::TableSetupColumn("Cost remaining",   ImGuiTableColumnFlags_WidthStretch, 1.5f);
+    ImGui::TableHeadersRow();
+
+    // Placeholder loop — replace with real queue iteration when the backend lands.
+    // Example shape:
+    //   for (const auto& item : w.construction_queue) {
+    //       const float pct = item.progress_0_to_1;
+    //       ImGui::TableNextRow();
+    //       ImGui::TableSetColumnIndex(0);
+    //       ImGui::TextUnformatted(w.bodies.at(item.body).name.c_str());
+    //       ImGui::TableSetColumnIndex(1);
+    //       ImGui::TextUnformatted(building_type_name(item.type));
+    //       ImGui::TableSetColumnIndex(2);
+    //       ImU32 cell_colour;
+    //       if      (pct < 0.25f) cell_colour = IM_COL32(80, 80, 80, 160);
+    //       else if (pct < 0.75f) cell_colour = IM_COL32(200, 180, 0, 160);
+    //       else                  cell_colour = IM_COL32(0, 160, 80, 160);
+    //       ImGui::TableSetBgColor(ImGuiTableBgTarget_CellBg, cell_colour);
+    //       ImGui::Text("%.0f%%", pct * 100.0f);
+    //       ImGui::TableSetColumnIndex(3);
+    //       ImGui::Text("%d", item.ticks_remaining);
+    //       ImGui::TableSetColumnIndex(4);
+    //       ImGui::Text("%.1f", item.cost_remaining);
+    //   }
+
+    ImGui::EndTable();
+}
+
 // --- Build section -----------------------------------------------------------
-// Arms placement mode by writing the shared construction_state. The Planetary
-// canvas reads construction.active and draws a ghost marker; a placement-mode
-// click enqueues a construction request the app executes (build cost spent). The
-// per-tile build entry also lives on the tile Selection element (the front door).
 void draw_build_section(ui_state& state)
 {
     if (!ImGui::CollapsingHeader("Build", ImGuiTreeNodeFlags_DefaultOpen))
         return;
 
-    // A Build button arms placement mode for its type. extraction_site keeps the
-    // current target; the other types ignore it (placement_rules::can_place does too).
     auto arm = [&state](building_type type) {
         state.construction.active = true;
         state.construction.type   = type;
@@ -41,9 +96,6 @@ void draw_build_section(ui_state& state)
     if (ImGui::Button("Port"))
         arm(building_type::port);
 
-    // Target-resource selector — meaningful only when placing an extraction site.
-    // Offers the prototype-extractable resources straight from the single source
-    // of truth (placement_rules::k_extractable), writing construction.target.
     if (state.construction.type == building_type::extraction_site)
     {
         ImGui::Spacing();
@@ -51,7 +103,6 @@ void draw_build_section(ui_state& state)
         for (const resource_type r : placement_rules::k_extractable)
         {
             const bool selected = (state.construction.target == r);
-            // A small toggle row; the armed target is highlighted via the selectable.
             if (ImGui::Selectable(resource_name(r), selected, 0, ImVec2(160.0f, 0.0f)))
                 state.construction.target = r;
         }
@@ -59,7 +110,6 @@ void draw_build_section(ui_state& state)
 
     ImGui::Spacing();
 
-    // Current placement-mode status + a Cancel that disarms.
     if (state.construction.active)
     {
         if (state.construction.type == building_type::extraction_site)
@@ -74,8 +124,6 @@ void draw_build_section(ui_state& state)
         if (ImGui::Button("Cancel"))
             state.construction.active = false;
 
-        // Click a tile to construct: the placement-mode click enqueues a build
-        // request the app executes against the world (build cost is spent).
         ImGui::TextDisabled("Click a tile on the surface to build it.");
         ImGui::TextDisabled("(Or use 'Build here' on a selected tile.)");
     }
@@ -115,16 +163,13 @@ void draw_selected_section(world& w, const recipe_registry& reg, const ui_state&
     const building_economics&  eco = reg.economics(b.type);
     const recipe*              rcp = reg.get_recipe(b.recipe);
 
-    // --- read-only detail ---
     ImGui::Text("Type: %s", building_type_name(b.type));
 
-    // Target resource is meaningful only for extraction sites.
     if (b.type == building_type::extraction_site)
         ImGui::Text("Target: %s", resource_name(b.target_resource));
     else
         ImGui::TextDisabled("Target: -");
 
-    // Recipe name; "-" when no recipe is assigned (no_recipe / unconfigured).
     if (rcp != nullptr && !rcp->name.empty())
         ImGui::Text("Recipe: %s", rcp->name.c_str());
     else
@@ -149,8 +194,6 @@ void draw_selected_section(world& w, const recipe_registry& reg, const ui_state&
     const int n_recipes = reg.recipe_count(b.type);
     if (n_recipes > 1)
     {
-        // Build the combo item list from the registry.
-        // active_recipe_index drives the combo; update b.recipe to keep them in sync.
         b.active_recipe_index = std::clamp(b.active_recipe_index, 0, n_recipes - 1);
         const recipe& cur_rcp = reg.recipe_at(b.type, b.active_recipe_index);
         const char* combo_preview = cur_rcp.name.empty() ? "-" : cur_rcp.name.c_str();
@@ -163,7 +206,6 @@ void draw_selected_section(world& w, const recipe_registry& reg, const ui_state&
                 if (ImGui::Selectable(r.name.empty() ? "-" : r.name.c_str(), sel))
                 {
                     b.active_recipe_index = i;
-                    // Sync the registry-wide recipe id used by the economy system.
                     b.recipe = reg.recipe_id(r.name);
                 }
                 if (sel)
@@ -190,11 +232,6 @@ void draw_selected_section(world& w, const recipe_registry& reg, const ui_state&
 }
 
 // --- Sell orders (player) ----------------------------------------------------
-// The manual market side: standing player sell orders (resource / quantity /
-// floor price) on a target body, held in ui_state.sell_orders and passed to
-// clear_markets each tick. Lists the player's current orders with a remove, and a
-// small form to add one. Target body = the active surface body (else the home
-// body). See docs/SYSTEMS.md § Trade; market_clearing.cpp honours the floor.
 void draw_sell_orders_section(const world& w, const recipe_registry& reg, ui_state& state)
 {
     (void)reg;
@@ -203,21 +240,19 @@ void draw_sell_orders_section(const world& w, const recipe_registry& reg, ui_sta
 
     const entity_id corp = w.player_entity;
     const entity_id body = (w.bodies.count(state.active_body) != 0) ? state.active_body
-                                                                    : w.home_body;
+                                                                     : w.home_body;
     if (body == null_entity)
     {
         ImGui::TextDisabled("No body in view to trade on.");
         return;
     }
 
-    // The resources traded on this body's market (base_price > 0), for the add-form.
     const market_component* market = nullptr;
     for (const auto& [mid, mc] : w.markets)
         if (mc.body == body) { market = &mc; break; }
 
     ImGui::TextDisabled("Body: %s", w.bodies.at(body).name.c_str());
 
-    // --- existing orders for the player on this body ---
     bool any = false;
     for (std::size_t i = 0; i < state.sell_orders.size(); ++i)
     {
@@ -233,14 +268,13 @@ void draw_sell_orders_section(const world& w, const recipe_registry& reg, ui_sta
         {
             state.sell_orders.erase(state.sell_orders.begin() + static_cast<long>(i));
             ImGui::PopID();
-            break; // indices shifted; redraw next frame
+            break;
         }
         ImGui::PopID();
     }
     if (!any)
         ImGui::TextDisabled("No sell orders on this body.");
 
-    // --- add-order form ---
     if (market == nullptr)
     {
         ImGui::TextDisabled("This body has no market.");
@@ -248,11 +282,10 @@ void draw_sell_orders_section(const world& w, const recipe_registry& reg, ui_sta
     }
 
     ImGui::Separator();
-    static int   add_resource = -1;     // index into resource_type, -1 = unset
+    static int   add_resource = -1;
     static float add_quantity = 10.0f;
-    static float add_floor     = 0.0f;
+    static float add_floor    = 0.0f;
 
-    // Default the resource to the first traded one.
     if (add_resource < 0 || market->base_price[static_cast<std::size_t>(add_resource)] <= 0.0f)
     {
         for (std::size_t r = 0; r < resource_count; ++r)
@@ -274,9 +307,9 @@ void draw_sell_orders_section(const world& w, const recipe_registry& reg, ui_sta
         ImGui::EndCombo();
     }
     ImGui::InputFloat("Quantity / tick", &add_quantity, 1.0f, 10.0f, "%.0f");
-    ImGui::InputFloat("Floor price", &add_floor, 0.1f, 1.0f, "%.1f");
+    ImGui::InputFloat("Floor price",     &add_floor,    0.1f, 1.0f,  "%.1f");
     if (add_quantity < 0.0f) add_quantity = 0.0f;
-    if (add_floor < 0.0f)    add_floor    = 0.0f;
+    if (add_floor    < 0.0f) add_floor    = 0.0f;
 
     ImGui::BeginDisabled(add_resource < 0 || add_quantity <= 0.0f);
     if (ImGui::Button("Add sell order"))
@@ -302,12 +335,12 @@ void draw_construction_panel(world& w,
     if (p_open && !*p_open)
         return;
 
-    // Shared ledger-window chrome (docs/ui/LAYOUT.md § Uniform ledger-window chrome).
     ImGui::SetNextWindowPos(ledger_window_spawn, ImGuiCond_Once);
     ImGui::SetNextWindowSize(ledger_window_size, ImGuiCond_Once);
-    // Passing p_open gives the window a close button that clears the flag.
     ImGui::Begin("Construction", p_open);
 
+    draw_queue_section(w);
+    ImGui::Spacing();
     draw_build_section(state);
     ImGui::Spacing();
     draw_selected_section(w, reg, state);
