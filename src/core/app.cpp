@@ -11,7 +11,10 @@
 #include "ui/canvas_command.hpp"
 #include "ui/circumplanetary_canvas.hpp"
 #include "ui/construction_panel.hpp"
+#include "ui/balance_ledger.hpp"
+#include "ui/corporation_panel.hpp"
 #include "ui/economy_panel.hpp"
+#include "ui/market_ledger.hpp"
 #include "ui/explorer_panel.hpp"
 #include "ui/fonts.hpp"
 #include "ui/format.hpp"
@@ -795,6 +798,9 @@ void app::render()
     ui::draw_tile_inspector(m_world, m_ui, &m_ui.show_tile_ledger);
     ui::draw_economy_panel(m_world, m_registry, m_last_econ_report, &m_ui.show_economy_panel);
     ui::draw_construction_panel(m_world, m_registry, m_ui, &m_ui.show_construction_panel);
+    ui::draw_market_ledger(m_world, m_ui, m_ui.show_market_ledger);
+    ui::draw_balance_ledger(m_world, m_ui, m_ui.show_balance_ledger);
+    ui::draw_corporation_panel(m_world, m_ui, m_ui.show_corporation_panel);
 
     // Overlay-lens controls — a bottom-left strip from the nav-pane edge inward,
     // clear of the centred scale/zoom control. Replaces the old minimap mode bar.

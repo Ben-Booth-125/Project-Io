@@ -37,6 +37,9 @@ void draw_nav_pane(ui_state& state, float top_offset)
     constexpr int tile_ledger_slot   = 8; // 1-based position of the Tile Ledger
     constexpr int economy_panel_slot = 7; // 1-based position of the Economy panel
     constexpr int construction_slot  = 6; // 1-based position of the Construction / building-management panel
+    constexpr int market_ledger_slot = 5; // Market Ledger
+    constexpr int balance_ledger_slot = 4; // Balance Ledger
+    constexpr int corp_panel_slot    = 3; // Corporation Overview Dashboard
 
     // Square slots; Selectable treats a nonzero size as literal, so derive the
     // rail width explicitly rather than passing -1.
@@ -48,6 +51,9 @@ void draw_nav_pane(ui_state& state, float top_offset)
         const bool   is_ledger       = (slot == tile_ledger_slot);
         const bool   is_economy      = (slot == economy_panel_slot);
         const bool   is_construction = (slot == construction_slot);
+        const bool   is_market       = (slot == market_ledger_slot);
+        const bool   is_balance      = (slot == balance_ledger_slot);
+        const bool   is_corp         = (slot == corp_panel_slot);
         const ImVec2 p0              = ImGui::GetCursorScreenPos();
 
         char id[16];
@@ -73,6 +79,24 @@ void draw_nav_pane(ui_state& state, float top_offset)
             if (ImGui::Selectable(id, state.show_construction_panel, 0, {slot_size, slot_size}))
                 state.show_construction_panel = !state.show_construction_panel;
             ImGui::SetItemTooltip("Construction");
+        }
+        else if (is_market)
+        {
+            if (ImGui::Selectable(id, state.show_market_ledger, 0, {slot_size, slot_size}))
+                state.show_market_ledger = !state.show_market_ledger;
+            ImGui::SetItemTooltip("Market Ledger");
+        }
+        else if (is_balance)
+        {
+            if (ImGui::Selectable(id, state.show_balance_ledger, 0, {slot_size, slot_size}))
+                state.show_balance_ledger = !state.show_balance_ledger;
+            ImGui::SetItemTooltip("Balance Ledger");
+        }
+        else if (is_corp)
+        {
+            if (ImGui::Selectable(id, state.show_corporation_panel, 0, {slot_size, slot_size}))
+                state.show_corporation_panel = !state.show_corporation_panel;
+            ImGui::SetItemTooltip("Corporations");
         }
         else
         {

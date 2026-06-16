@@ -87,6 +87,9 @@ struct ui_state
     bool show_tile_ledger = false; ///< Whether the Tile Ledger window is open. Toggled by the nav pane tab and the window's close button.
     bool show_economy_panel = false; ///< Whether the Layer 3 economy panel is open. Toggled by the nav pane tab and the window's close button.
     bool show_construction_panel = false; ///< Whether the Layer 4 construction / building-management panel is open. Toggled by the nav pane tab and the window's close button.
+    bool show_market_ledger = false; ///< Whether the Market Ledger is open.
+    bool show_balance_ledger = false; ///< Whether the Balance Ledger is open.
+    bool show_corporation_panel = false; ///< Whether the Corporation Overview Dashboard is open.
 
     /// Building-placement interaction state (Layer 4 UI groundwork scaffold). See construction_state.
     construction_state construction;
