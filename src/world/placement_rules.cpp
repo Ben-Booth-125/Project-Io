@@ -41,6 +41,15 @@ resource_type richest_extractable(const tile_component& tc, bool& any)
     return best;
 }
 
+bool can_place_population_centre(const tile_component& tc)
+{
+    // Ocean tiles never host population centres.
+    if (is_ocean_tile(tc.composition))
+        return false;
+    // Uninhabitable tiles (hazard-dominated, airless, etc.) are also excluded.
+    return tc.habitability > 0.0f;
+}
+
 bool can_place(const tile_component& tc, building_type type, resource_type target)
 {
     // No building ever sits on water.

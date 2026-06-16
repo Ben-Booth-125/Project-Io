@@ -288,5 +288,31 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
         }
     }
 
+    // Population demand pass: each population centre adds a stub demand of
+    // 1 unit of agricultural_produce per scale level into the body's market.
+    // stub: replace with food_rations demand when the processing pipeline
+    // connects food production end-to-end (food_rations requires agricultural
+    // produce → processing_facility recipe, deferred).
+    for (const auto& [centre_id, pcc] : w.population_centres)
+    {
+        const auto tile_it = w.population_centre_tile.find(centre_id);
+        if (tile_it == w.population_centre_tile.end())
+            continue;
+        const auto tc_it = w.tiles.find(tile_it->second);
+        if (tc_it == w.tiles.end())
+            continue;
+        const entity_id body = tc_it->second.body;
+
+        // Find the market for this body and add demand.
+        for (auto& [mid, mc] : w.markets)
+        {
+            if (mc.body != body)
+                continue;
+            const std::size_t ri = static_cast<std::size_t>(resource_type::agricultural_produce);
+            mc.demand[ri] += static_cast<float>(pcc.scale);
+            break; // one market per body in the prototype
+        }
+    }
+
     return report;
 }

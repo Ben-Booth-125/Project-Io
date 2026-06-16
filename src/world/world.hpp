@@ -59,7 +59,16 @@ struct world
     std::unordered_map<entity_id, building_component>  buildings;
     std::unordered_map<entity_id, stockpile_component> stockpiles;
     std::unordered_map<entity_id, market_component>    markets;
-    std::unordered_map<entity_id, unit_component>      units;
+    std::unordered_map<entity_id, unit_component>             units;
+
+    /// Population centre entities keyed by their entity ID. Populated by
+    /// generate_population_centres() after tile generation; empty until that
+    /// call is made for a body. No AI behaviour in the prototype.
+    std::unordered_map<entity_id, population_centre_component> population_centres;
+
+    /// Maps a population centre entity ID to the tile entity it occupies.
+    /// Written alongside population_centres by generate_population_centres().
+    std::unordered_map<entity_id, entity_id>                   population_centre_tile;
 
     /// Nation entities keyed by their entity ID. Populated by generate_nations()
     /// after tile generation; empty until that call is made for a body.
