@@ -262,17 +262,6 @@ currently hold Briefs appear as sections below.
 
 ## Canvas
 
-- **[B3 ✓] Implement the Resource lens render pass.** The lens *design* is now settled
-  (`docs/ui/LENSES.md` § Resource lens, 2026-06-15) and the glyph exists
-  (`ui::icons::resource`). What remains is the **functional lens**: add
-  `overlay_mode::resource` to `src/ui/ui_state.hpp`; a strip button (calling
-  `icons::resource`) + `overlay_mode_name` entry in `src/ui/overlay.cpp`; and the guarded
-  Planetary render pass in `src/ui/body_surface_canvas.cpp` — **highest-value mode** (tint each
-  tile by its richest deposit's identity colour, opacity by magnitude, via
-  `presentation_of(res).colour`) and a **single-resource mode** (player-picked resource → density
-  heatmap) with a lens-local resource selector and the on-canvas gradient colour key the design
-  specifies. Data is already present (tile `resource_deposit`). Authority `docs/ui/LENSES.md`.
-
 - **[C1 ✓] Corporation lens player-tile border is redundant.** Found during the 2026-06-14
   visual verification: under the corporation lens the player's tile is filled
   `faction_colour(0)` *and* outlined `faction_colour(0)`, so the border is invisible
@@ -408,9 +397,9 @@ currently hold Briefs appear as sections below.
   `circumplanetary_anchor`).
 
 **The Layer-4 read-surface family (decomposed 2026-06-15).** The single "Market lens & ledger
-family" Brief is now **decomposed into the five discrete Briefs below** — four ledgers plus the
-Market lens render pass. They share design conventions, stated once here so each Brief need not
-repeat them:
+family" Brief is now **decomposed into the discrete Briefs below** — four ledgers (the Market
+lens render pass landed 2026-06-16, see § Completed). They share design conventions, stated once
+here so each Brief need not repeat them:
 
 - **Player-focused, with a corp selector.** Every ledger **defaults to the player corporation**
   (`w.player_entity`) and offers a selector to view another corporation's figures.
@@ -459,16 +448,6 @@ repeat them:
   table ambition. Files: `src/ui/construction_panel.{hpp,cpp}` (refit/rename), nav-rail slot 6 (per
   the curated order, § Menu). Reads the player assets, `building_report`,
   `src/world/placement_rules.hpp`. *(Settled into `docs/ui/MENU.md`.)*
-
-- **[B3 ✓] Market lens render pass.** Build the **Market lens** (`overlay_mode::market`) to the
-  spec already settled in `docs/ui/LENSES.md` § Market lens: **Planetary** per-tile diverging
-  warm↔cool price tint for the player-selected good (warm = dear vs. body mean, cool = cheap),
-  with the on-canvas gradient key and good-selector (shared in form with the Resource lens's
-  picker); plus the **Circumplanetary** per-body price summary strip. Mirrors the Resource-lens
-  build (add `overlay_mode::market`, strip button + `overlay_mode_name`, guarded render passes).
-  **No data dependency remains** — price resolution landed in v0.0.4. Files:
-  `src/ui/ui_state.hpp`, `src/ui/overlay.cpp`, `src/ui/body_surface_canvas.cpp`,
-  `src/ui/solar_system_canvas.cpp` (Circumplanetary summary). Authority `docs/ui/LENSES.md`.
 
 ### Selection info element
 
@@ -572,6 +551,24 @@ The market layer. Per the 2026-06-14 Q&A, **market resolution collapses into Lay
 price resolution has now landed; **inter-body trade stays open**. Markets are a per-body
 exchange, **distinct from corp stockpile pools**. Design authority `docs/SYSTEMS.md` § Trade,
 `docs/economy/RESOURCES.md`.
+
+- **[B3 ~] Multiple markets per body (tile-centred).** *(Written 2026-06-16, batch-close Q&A.)*
+  Today a body has **one** `market_component` (one price per good per body). The settled direction
+  is **multiple markets per body, each centred on a tile** — usually the **capital** — so price
+  varies *within* a body by locality, not just between bodies. This is the model that gives the
+  **Market lens** (`docs/ui/LENSES.md` § Market lens) a genuinely *spatial* Planetary surface: the
+  current build is a body-wide wash precisely because there is only one market per body; with
+  tile-centred markets the lens tints each market's catchment instead. **Minimal stub for now:**
+  the single per-body market stands as the degenerate case (one market, centred on the body's
+  principal tile); this Brief is the generalisation. **Design owed:** how many markets a body has
+  and what seeds them (capital + population centres?), each market's **catchment** (which tiles
+  clear against which market), how convoys/logistics move goods *between* intra-body markets
+  (couples to Supply / Layer 5 and the [A4] inter-body model), and the price-resolution change from
+  one clear-per-body to one-per-market. Couples to NATION/POPULATION generation (capital/centre
+  placement) and `src/world/market_clearing.{hpp,cpp}`. Check whether `docs/SYSTEMS.md` § Trade
+  already hints at sub-body markets and reconcile. Authority `docs/SYSTEMS.md` § Trade,
+  `docs/ui/LENSES.md` § Market lens. *(Newest Brief on markets — treat as canon where it overlaps
+  the "per-body exchange" wording above.)*
 
 - **[B4 ✓] Preferential purchasing (choosing counterparties).** Split from the sell-orders Brief
   (the **sell-orders** half landed 2026-06-15). What remains is letting the buyer **choose

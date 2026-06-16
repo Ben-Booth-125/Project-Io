@@ -6,6 +6,62 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## 2026-06-16 — v0.1.0 Session 2: the lens batch (Resource + Market) (branch v0.0.5)
+
+The Session-2 goal: publish the two unblocked overlay modes, golden-verified against the F3
+harness. A **Batch Publish** of two Briefs (OPENS § Canvas), **strictly serial** — both write
+the same hotspot files (`ui_state.hpp`, `overlay.cpp`, `body_surface_canvas.cpp`; Market also
+`circumplanetary_canvas.cpp`), so no fan-out was possible. **Status: Complete — 12/12 requirements
+met** (resource 6/6, market 6/6); two commits, one per Brief.
+
+### Briefs published
+
+- **[B3] Resource lens render pass** *(first — built the shared selector + key infrastructure)*.
+  `overlay_mode::resource`: **highest-value mode** tints each tile by its richest deposit's identity
+  hue at a **per-body magnitude-normalised** opacity (composited over terrain via a new `lerp_colour`,
+  so density reads); **single-resource mode** is a heatmap of one selected good. A lens-local **"Single"
+  checkbox + a shared resource combo** (bound to a new `ui_state.lens_resource`) drive it. First lens
+  with an **on-canvas key** (gradient bar + swatch/name). `verify.set_lens_resource` /
+  `set_resource_mode` hooks; 4 blessed goldens PASS ≤0.0089%.
+- **[B3] Market lens render pass**. `overlay_mode::market`: a body-wide **diverging warm↔cool wash**
+  keyed to `price/base_price` (`diverging_colour`), plus a **Circumplanetary per-body price strip**
+  (7 goods, selected highlighted). Reuses the Resource lens's selector + key. A new
+  `verify.show_panel` hook clears the economy panel that `econ_step(12)` opens before capture; 3
+  blessed goldens PASS ≤0.0082%.
+
+### Execution / design calls
+
+- **Markets are per-body, not per-tile.** `market_component` is one exchange per body, so the spec's
+  "per-tile price tint" became an honest **body-wide wash**. Confirmed in the closing Q&A; raised a new
+  timestamped Brief **[B3 ~] Multiple markets per body (tile-centred)** (OPENS § Trade) for the future
+  spatial model.
+- **Diverging keyed to `price/base_price`, not a basket "body mean"** — a mean across goods with very
+  different base prices (steel 8 vs stone ~0.5) isn't meaningful. Confirmed; LENSES.md refined.
+- **Resource "value" ranks by richness alone** — `resource_presentation` has no weight field; the
+  spec's richness × weight is deferred. Confirmed.
+- **Circumplanetary strip in `circumplanetary_canvas.cpp`**, not `solar_system_canvas.cpp` as the
+  handoff's file list said (Solar has no market surface — LENSES.md rung table).
+- **On-canvas keys/strip inset past the nav rail** (`nav_pane_width`): the full-window canvases render
+  *behind* the 56px nav rail (known DEVLOG note), which clipped the first key placement; re-blessed the
+  resource goldens for the cleaner position.
+
+### Design-direction Q&A (closing)
+
+All three calls above **confirmed** by the user. Q2 surfaced the markets-per-body direction (markets
+will be **multiple per body, tile-centred on the capital**) — recorded as the new [B3 ~] Trade Brief
+and a "toward per-tile variation" note in LENSES.md § Market lens. User also set a **workflow rule**:
+*timestamp Briefs when written; treat the newest Brief as canon on overlap; resolve Briefs at
+batch-publish* (saved to memory). The formal Q&A served as the review, so the two LENSES.md
+implementation notes were written directly without lingering `⟳` markers.
+
+### Open / next
+
+Session-2 lens batch complete. Remaining v0.1.0 arc per ROADMAP: the v0.0.6 ledger family /
+population, the selection trio, and Supply / Layer 5 (gated) — plus the design-owed substrate Brief
+and the new tile-centred-markets Brief.
+
+---
+
 ## 2026-06-16 — v0.1.0 Session 2 open: S1 doc-review + substrate design Q&A (branch v0.0.5)
 
 Opening of **Session 2 (the lens batch)**. Started with the carried-over housekeeping: the three

@@ -197,16 +197,21 @@ is active.
 is built: the Circumplanetary strip and the Planetary wash share the resolved
 `market_component.price`.
 
-> ⟳ Implemented 2026-06-16 (Market lens render Brief). Planetary wash in
-> `body_surface_canvas.cpp` (`diverging_colour`, composited over terrain at ~0.55 alpha);
-> the per-body strip in **`circumplanetary_canvas.cpp`** — the Circumplanetary rung, *not*
-> `solar_system_canvas.cpp` as the Session-2 handoff's file list said (Solar has no market
-> surface). The good-selector is the shared combo from the Resource lens (`overlay.cpp`,
-> bound to `ui_state.lens_resource`). On-canvas keys/strip are inset past the nav rail
-> (`nav_pane_width`) and vertically centred. Verified by `scripts/verify/market_lens.lua`,
-> which runs `verify.econ_step(12)` to diverge prices from base before capture (and a new
-> `verify.show_panel("economy", false)` hook to clear the panel `econ_step` opens), against
-> blessed goldens. Pending user review.
+**Implemented 2026-06-16** (Market lens render Brief; design confirmed in the batch-close Q&A).
+Planetary wash in `body_surface_canvas.cpp` (`diverging_colour`, composited over terrain at ~0.55
+alpha); the per-body strip in **`circumplanetary_canvas.cpp`** — the Circumplanetary rung, *not*
+`solar_system_canvas.cpp` as the Session-2 handoff's file list said (Solar has no market surface).
+The good-selector is the shared combo from the Resource lens (`overlay.cpp`, bound to
+`ui_state.lens_resource`). On-canvas keys/strip are inset past the nav rail (`nav_pane_width`) and
+vertically centred. Verified by `scripts/verify/market_lens.lua`, which runs `verify.econ_step(12)`
+to diverge prices from base before capture (and a new `verify.show_panel("economy", false)` hook to
+clear the panel `econ_step` opens), against blessed goldens.
+
+**Toward per-tile variation (future).** The wash is body-wide because today there is **one market
+per body**. The settled direction (batch-close Q&A 2026-06-16) is **multiple markets per body,
+each centred on a tile** (usually the capital) — when that lands, this lens regains a genuinely
+*spatial* per-market surface (tint each market's catchment, not the whole body). Tracked by
+OPENS § Trade **[B3 ~] Multiple markets per body (tile-centred)**.
 
 ## Per-lens selection validity & routing (settled 2026-06-15, [F4])
 
@@ -288,12 +293,11 @@ lens-local control (proposed: a dropdown in the control strip when the Resource
 lens is active, shared in form with the Market good-selector). Default mode
 requires no selection. No new data, no tick dependency — buildable immediately.
 
-> ⟳ Implemented 2026-06-16 (Resource lens render Brief). `overlay_mode::resource`
-> Planetary pass in `body_surface_canvas.cpp`: opacity = magnitude **normalised per
-> body** (against the body's richest deposit, so each body's heatmap auto-scales); the
-> hue is composited over terrain (`lerp_colour`), not a flat replacement, so density
-> reads. The lens-local control is a **"Single" mode checkbox + a shared resource combo**
-> bound to `ui_state.lens_resource` in `overlay.cpp` (the same combo the Market good-selector
-> uses). The on-canvas key sits at the **left edge, vertically centred** (clear of the
-> Selection panel, header/Explorer, and lens strip). Verified by `scripts/verify/resource_lens.lua`
-> against blessed goldens. Pending user review.
+**Implemented 2026-06-16** (Resource lens render Brief; design confirmed in the batch-close
+Q&A). `overlay_mode::resource` Planetary pass in `body_surface_canvas.cpp`: opacity = magnitude
+**normalised per body** (against the body's richest deposit, so each body's heatmap auto-scales);
+the hue is composited over terrain (`lerp_colour`), not a flat replacement, so density reads. The
+lens-local control is a **"Single" mode checkbox + a shared resource combo** bound to
+`ui_state.lens_resource` in `overlay.cpp` (the same combo the Market good-selector uses). The
+on-canvas key sits at the **left edge, vertically centred, inset past the nav rail**. Verified by
+`scripts/verify/resource_lens.lua` against blessed goldens.
