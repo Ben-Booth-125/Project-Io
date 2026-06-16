@@ -246,9 +246,10 @@ struct land_use_component
 /// See docs/economy/POPULATION.md.
 struct population_centre_component
 {
-    int   scale         = 1;    ///< 1–5 (village → metropolis).
-    int   population    = 0;    ///< Absolute headcount in thousands.
-    float habitability  = 1.0f; ///< 0–1 scalar inherited from the tile.
+    int   scale              = 1;    ///< 1–5 (village → metropolis).
+    int   population         = 0;    ///< Absolute headcount in thousands.
+    float habitability       = 1.0f; ///< 0–1 scalar inherited from the tile.
+    int   growth_accumulator = 0;    ///< Ticks of qualifying growth; resets on level-up.
 };
 
 /// Deployable unit stub. Combat rules, faction AI, and transport are deferred;

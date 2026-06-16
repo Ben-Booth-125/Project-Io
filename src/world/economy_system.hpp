@@ -52,6 +52,10 @@ struct economy_report
     /// proportionally (docs/economy/POPULATION.md § Workforce model, step 1). Read by
     /// the budget step (wages on effective workforce) and the economy panel.
     std::map<std::pair<entity_id, entity_id>, float> workforce_contention;
+
+    /// Per-body mean habitability aggregate (BL-048): weighted average of all
+    /// population-centre tiles on the body. 0.0 = uninhabitable, 1.0 = full.
+    std::map<entity_id, float> body_habitability;
 };
 
 /// Run one economy step over every corporation's buildings: extraction credits

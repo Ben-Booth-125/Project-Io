@@ -369,5 +369,87 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
         }
     }
 
+    // BL-048A: Body habitability aggregate — weighted mean of population-centre
+    // tile habitability, where weight = population centre scale.
+    {
+        std::map<entity_id, std::pair<float, float>> hab_sum; // body → (weighted_sum, weight)
+        for (const auto& [cid, pcc] : w.population_centres)
+        {
+            const auto tile_it = w.population_centre_tile.find(cid);
+            if (tile_it == w.population_centre_tile.end())
+                continue;
+            const auto tc_it = w.tiles.find(tile_it->second);
+            if (tc_it == w.tiles.end())
+                continue;
+            const float w_scale = static_cast<float>(std::max(1, pcc.scale));
+            hab_sum[tc_it->second.body].first  += pcc.habitability * w_scale;
+            hab_sum[tc_it->second.body].second += w_scale;
+        }
+        for (const auto& [body, acc] : hab_sum)
+            report.body_habitability[body] = (acc.second > 0.0f) ? acc.first / acc.second : 1.0f;
+
+        // Apply habitability efficiency multiplier to effective_workforce via the
+        // economy-report contention entries.  Habitability > 0.6 → 1.0×; below 0.6 →
+        // linear from 1.0 down to 0.5× at habitability 0.
+        for (auto& [key, contention] : report.workforce_contention)
+        {
+            const entity_id body = key.second;
+            const auto hit = report.body_habitability.find(body);
+            const float hab = (hit != report.body_habitability.end()) ? hit->second : 1.0f;
+            const float hab_scalar = (hab >= 0.6f) ? 1.0f : (0.5f + (hab / 0.6f) * 0.5f);
+            contention *= hab_scalar;
+        }
+    }
+
+    // BL-048B: Population growth step — accumulate growth per centre each tick;
+    // level up when the accumulator crosses the tier threshold.
+    // Growth ticks only when body habitability >= 0.5 AND food demand is >= 50% met.
+    // Tier thresholds (ticks to grow): scale 1→2: 200, 2→3: 500, 3→4: 1500, 4→5: 5000.
+    static constexpr int growth_threshold[6] = { 0, 200, 500, 1500, 5000, 0 };
+    for (auto& [cid, pcc] : w.population_centres)
+    {
+        if (pcc.scale >= 5)
+            continue; // already at max
+
+        const auto tile_it = w.population_centre_tile.find(cid);
+        if (tile_it == w.population_centre_tile.end())
+            continue;
+        const auto tc_it = w.tiles.find(tile_it->second);
+        if (tc_it == w.tiles.end())
+            continue;
+        const entity_id body = tc_it->second.body;
+
+        const auto hit = report.body_habitability.find(body);
+        const float hab = (hit != report.body_habitability.end()) ? hit->second : 1.0f;
+        if (hab < 0.5f)
+            continue;
+
+        // Check food supply ratio (agricultural_produce demand vs. supply in body's market).
+        float food_ratio = 1.0f;
+        for (const auto& [mid, mc] : w.markets)
+        {
+            if (mc.body != body)
+                continue;
+            const std::size_t ri = static_cast<std::size_t>(resource_type::agricultural_produce);
+            const float demand = mc.demand[ri];
+            const float supply = mc.supply[ri];
+            if (demand > 0.0f)
+                food_ratio = std::min(1.0f, supply / demand);
+            break;
+        }
+        if (food_ratio < 0.5f)
+            continue;
+
+        ++pcc.growth_accumulator;
+        const int threshold = growth_threshold[std::clamp(pcc.scale, 1, 5)];
+        if (threshold > 0 && pcc.growth_accumulator >= threshold)
+        {
+            ++pcc.scale;
+            pcc.growth_accumulator = 0;
+            // Population headcount: scale × base (10k per scale level as a rough proxy).
+            pcc.population = pcc.scale * 10;
+        }
+    }
+
     return report;
 }
