@@ -3,10 +3,12 @@
 
 #include "canvas_scale.hpp"
 #include "highlight.hpp"
+#include "nav_pane.hpp"
 #include "presentation.hpp"
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <limits>
 #include <vector>
 
@@ -32,6 +34,61 @@ body_style style_for(body_type t)
         case body_type::station:  return { 4.0f, IM_COL32( 80, 180, 160, 255) };
         case body_type::star:     return { 18.0f, IM_COL32(255, 220,  80, 255) };
         default:                  return { 4.0f, IM_COL32(200, 200, 200, 255) };
+    }
+}
+
+/// Market lens, Circumplanetary rung (LENSES.md § Market lens): a compact good→price
+/// strip for the anchor body's per-body market, the lens-selected good highlighted.
+/// Lists every traded good (non-zero base price) with its resolved price; top-left,
+/// pure ImDrawList. No-op when the anchor has no market or no traded goods.
+void draw_market_price_strip(ImDrawList* dl, const world& w, entity_id anchor,
+                             const ui_state& state, ImVec2 origin, ImVec2 size)
+{
+    const market_component* mk = nullptr;
+    for (const auto& [mid, m] : w.markets)
+        if (m.body == anchor) { mk = &m; break; }
+    if (!mk)
+        return;
+
+    std::vector<std::pair<resource_type, float>> rows;
+    for (std::size_t i = 0; i < resource_count; ++i)
+        if (mk->base_price[i] > 0.0f)
+            rows.push_back({ static_cast<resource_type>(i), mk->price[i] });
+    if (rows.empty())
+        return;
+
+    const float pad    = 8.0f;
+    const float line_h = ImGui::GetTextLineHeight();
+    const float box_w  = 152.0f;
+    const float body_h = pad + line_h + 3.0f +
+                         static_cast<float>(rows.size()) * (line_h + 2.0f) + pad;
+    // Left edge inset past the nav rail, vertically centred — clear of the Selection
+    // panel (top-left), the header (top-centre), and the Explorer/minimap (right).
+    const ImVec2 p0 = { origin.x + nav_pane_width + pad,
+                        origin.y + std::max(pad, (size.y - body_h) * 0.5f) };
+    const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
+    dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
+    dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
+
+    const float x = p0.x + pad;
+    float       y = p0.y + pad * 0.5f;
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Market prices");
+    y += line_h + 3.0f;
+
+    for (const auto& [r, price] : rows)
+    {
+        const bool sel = (r == state.lens_resource);
+        if (sel)
+            dl->AddRectFilled({p0.x + 2.0f, y}, {p1.x - 2.0f, y + line_h}, IM_COL32(60, 70, 90, 255));
+        dl->AddRectFilled({x, y + 3.0f}, {x + 8.0f, y + 11.0f}, presentation_of(r).colour);
+        dl->AddText({x + 12.0f, y}, sel ? IM_COL32(255, 255, 255, 255) : IM_COL32(210, 210, 215, 255),
+                    presentation_of(r).abbrev);
+        char pbuf[32];
+        std::snprintf(pbuf, sizeof(pbuf), "%.1f", static_cast<double>(price));
+        const ImVec2 pts = ImGui::CalcTextSize(pbuf);
+        dl->AddText({p1.x - pad - pts.x, y},
+                    sel ? IM_COL32(255, 255, 255, 255) : IM_COL32(180, 185, 195, 255), pbuf);
+        y += line_h + 2.0f;
     }
 }
 
@@ -198,6 +255,11 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
                         IM_COL32(255, 255, 255, 255), body.name.c_str());
         }
     }
+
+    // Market lens: the per-body price strip for the anchor's market (top-left).
+    // Primary view only — the minimap is too small for a legible strip.
+    if (apply_view && state.overlay == overlay_mode::market)
+        draw_market_price_strip(dl, w, anchor, state, origin, size);
 
     // Scale bar + zoom slider — primary view only, pinned to the bottom centre.
     // Shared with the Solar canvas via draw_scale_zoom_overlay. Drawn before the

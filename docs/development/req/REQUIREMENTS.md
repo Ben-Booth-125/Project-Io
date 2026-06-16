@@ -127,12 +127,12 @@ floor), not a basket "body mean" — recorded as a LENSES.md refinement.
 
 | ID | Requirement | Verification | Status | Notes |
 |----|-------------|--------------|--------|-------|
-| R1 | **Brief-spanning:** under the Market lens the Planetary surface washes the body by the selected good's relative price (warm = dear, cool = cheap), shows an on-canvas diverging key + good-selector, and the Circumplanetary rung shows a per-body price strip — golden-verified. | `visual` (`scripts/verify/market_lens.lua` golden) | pending | end-to-end gate |
-| R2 | Planetary: a diverging warm↔cool tint keyed to `price[g]/base_price[g]` (neutral at the floor ratio 1.0), uniform across the active body (per-body market). | `code` + `visual` | pending | body wash, not per-tile (per-body market) |
-| R3 | An on-canvas diverging key (cheap ↔ dear) renders with the selected good's name. | `visual` | pending | |
-| R4 | The good-selector (shared in form with the Resource selector, bound to `lens_resource`) picks the displayed good. | `code` + `visual` | pending | |
-| R5 | Circumplanetary: when the Market lens is active, a per-body price strip lists the anchor body's market prices with the selected good highlighted. | `visual` | pending | `circumplanetary_canvas.cpp` (not solar — Solar has no market surface) |
-| R6 | The golden runs `verify.econ_step` first so prices diverge from base, then captures; the market pass reads the resolved `market_component.price`. | `visual` + `doc` | pending | deterministic given fixed seed + tick count |
+| R1 | **Brief-spanning:** under the Market lens the Planetary surface washes the body by the selected good's relative price (warm = dear, cool = cheap), shows an on-canvas diverging key + good-selector, and the Circumplanetary rung shows a per-body price strip — golden-verified. | `visual` (`scripts/verify/market_lens.lua` golden) | complete | 3/3 goldens PASS ≤0.0082%, exit 0 |
+| R2 | Planetary: a diverging warm↔cool tint keyed to `price[g]/base_price[g]` (neutral at the floor ratio 1.0), uniform across the active body (per-body market). | `code` + `visual` | complete | `diverging_colour`; iron ×0.57 cool wash captured |
+| R3 | An on-canvas diverging key (cheap ↔ dear) renders with the selected good's name. | `visual` | complete | `draw_market_key`; name + ratio |
+| R4 | The good-selector (shared in form with the Resource selector, bound to `lens_resource`) picks the displayed good. | `code` + `visual` | complete | iron→steel re-keys the wash |
+| R5 | Circumplanetary: when the Market lens is active, a per-body price strip lists the anchor body's market prices with the selected good highlighted. | `visual` | complete | 7 goods listed, Fe row highlighted; `circumplanetary_canvas.cpp` |
+| R6 | The golden runs `verify.econ_step` first so prices diverge from base, then captures; the market pass reads the resolved `market_component.price`. | `visual` + `doc` | complete | `econ_step(12)` + new `show_panel` hook to clear the panel |
 
 *Sections appear here when a Brief is promoted, and move to the archive below on completion
 or cancellation.*

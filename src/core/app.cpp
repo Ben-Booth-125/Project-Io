@@ -339,6 +339,15 @@ int app::run_verify(const std::string& script_path, bool bless)
         m_ui.show_economy_panel = true;
     });
 
+    // Open/close a ledger panel by name — lets a lens check run econ ticks (which
+    // open the economy panel) and then clear it so the panel does not obscure the
+    // canvas capture. Unknown names are ignored.
+    v.set_function("show_panel", [this](const std::string& name, bool open) {
+        if (name == "economy")           m_ui.show_economy_panel = open;
+        else if (name == "construction") m_ui.show_construction_panel = open;
+        else if (name == "tile")         m_ui.show_tile_ledger = open;
+    });
+
     // Open the Layer 4 construction / building-management panel so a capture shows
     // the building surface. The scaffold panel takes no economy state to populate.
     v.set_function("show_construction", [this]() {

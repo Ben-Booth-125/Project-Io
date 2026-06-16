@@ -33,7 +33,7 @@ but its build is gated on a dependency (named in the lens section).
 | Lens | Solar | Circumplanetary | Planetary |
 |---|---|---|---|
 | Supply | (later) inter-body route lines | (later) per-body throughput badge | (later) per-tile route + stockpile |
-| Market | — | (later) per-body price summary | (later) per-tile price/scarcity tint |
+| Market | — | ✓ per-body price strip | ✓ per-body price wash |
 | Faction | — | — | ✓ tile tint + owner borders |
 | **Corporation** | — | — | **✓ tile tint + player border** |
 | **Resource** | — | — | **✓ deposit-density tint + gradient key** |
@@ -162,7 +162,7 @@ Planetary-first default). **Gated on Layer 5**: no convoy/route geometry is
 generated yet, so nothing renders today. No interim Planetary-only stub is built —
 the lens waits for its data.
 
-## Market lens *(target spec — gated on the economy tick + price resolution)*
+## Market lens *(built 2026-06-16 — price resolution landed in v0.0.4)*
 
 **Intent.** Read the map as a *price surface*: where a good is dear or cheap, and
 how scarcity varies across markets. The complement to Supply — Supply shows flow,
@@ -170,15 +170,20 @@ Market shows the prices that drive it.
 
 **Rung applicability.**
 - **Solar** — none; prices are per-body-market and have no inter-body surface.
-- **Circumplanetary** — a **per-body price summary** for the focused body's
-  market (a compact good→price strip).
-- **Planetary** — **per-tile** price/scarcity tint for the player-selected good
-  (high price = warm, low = cool), so local production/consumption reads spatially.
+- **Circumplanetary** — a **per-body price strip** for the anchor body's market (a
+  compact good→price list, the selected good highlighted).
+- **Planetary** — a **body-wide price wash** for the player-selected good (dear =
+  warm, cheap = cool). Markets are per-**body** (`market_component`), not per-tile, so
+  the tint is uniform across the body — a property of the body's market, not of each
+  tile.
 
-**Colour.** A diverging warm↔cool gradient keyed to price relative to the body
-mean; neutral mid-tone at the mean. As with Resource, the player picks which good
-the surface shows (a good selector shared with the Resource lens's resource
-picker).
+**Colour.** A diverging warm↔cool gradient keyed to **price relative to the good's
+own base (floor) price** (`price / base_price`); neutral mid-tone at the floor ratio
+1.0, trending cool below and warm above, across the market's `[0.25×, 4×]` clamp band.
+*(Refinement from the original "relative to the body mean": a basket mean across
+resources of very different base prices is not meaningful — the per-good floor ratio is
+the scarcity signal.)* As with Resource, the player picks which good the surface shows
+(a good selector shared with the Resource lens's resource picker — one `lens_resource`).
 
 **Glyph.** Three ascending bars — a price-chart silhouette (`icons::market`).
 Distinct from the supply horizontal pair and the resource horizontal strata
@@ -188,9 +193,20 @@ Distinct from the supply horizontal pair and the resource horizontal strata
 gradient key (cheap↔dear) and the selected good's name when the per-tile surface
 is active.
 
-**Interaction notes.** Single-select. **Gated on the economy tick + per-market
-price resolution**, neither implemented yet — no interim stub. When prices exist,
-build Circumplanetary summary and Planetary tint together.
+**Interaction notes.** Single-select. Price resolution landed in v0.0.4, so the lens
+is built: the Circumplanetary strip and the Planetary wash share the resolved
+`market_component.price`.
+
+> ⟳ Implemented 2026-06-16 (Market lens render Brief). Planetary wash in
+> `body_surface_canvas.cpp` (`diverging_colour`, composited over terrain at ~0.55 alpha);
+> the per-body strip in **`circumplanetary_canvas.cpp`** — the Circumplanetary rung, *not*
+> `solar_system_canvas.cpp` as the Session-2 handoff's file list said (Solar has no market
+> surface). The good-selector is the shared combo from the Resource lens (`overlay.cpp`,
+> bound to `ui_state.lens_resource`). On-canvas keys/strip are inset past the nav rail
+> (`nav_pane_width`) and vertically centred. Verified by `scripts/verify/market_lens.lua`,
+> which runs `verify.econ_step(12)` to diverge prices from base before capture (and a new
+> `verify.show_panel("economy", false)` hook to clear the panel `econ_step` opens), against
+> blessed goldens. Pending user review.
 
 ## Per-lens selection validity & routing (settled 2026-06-15, [F4])
 

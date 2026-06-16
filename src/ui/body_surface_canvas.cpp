@@ -3,6 +3,7 @@
 
 #include "highlight.hpp"
 #include "icons.hpp"
+#include "nav_pane.hpp"
 #include "presentation.hpp"
 #include "world/placement_rules.hpp"
 
@@ -107,9 +108,10 @@ void draw_resource_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size,
 
     const float body_h = pad + line_h + 4.0f + bar_h + 2.0f + line_h + 4.0f +
                          static_cast<float>(std::max(0, rows)) * (line_h + 2.0f) + pad;
-    // Left edge, vertically centred: clear of the Selection panel (top-left), the
-    // header/Explorer (top-right) and the lens control strip (bottom-left).
-    const ImVec2 p0 = { area_origin.x + pad,
+    // Left edge (inset past the nav rail, which occludes x < nav_pane_width),
+    // vertically centred: clear of the Selection panel (top-left), the header/Explorer
+    // (top-right) and the lens control strip (bottom-left).
+    const ImVec2 p0 = { area_origin.x + nav_pane_width + pad,
                         area_origin.y + std::max(pad, (area_size.y - body_h) * 0.5f) };
     const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
     dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
@@ -156,6 +158,71 @@ void draw_resource_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size,
             y += line_h + 2.0f;
         }
     }
+}
+
+/// Diverging warm↔cool colour for a price relative to its base (floor) price.
+/// `ratio = price / base_price`: 1.0 is the neutral mid-tone, < 1 (cheap) trends
+/// cool, > 1 (dear) trends warm. Centred on the log of the ratio so the symmetric
+/// price band `[0.25×, 4×]` (the market clamp) maps to the full [cool, warm] span.
+ImU32 diverging_colour(float ratio)
+{
+    ratio = std::clamp(ratio, 0.25f, 4.0f);
+    const float d = std::log(ratio) / std::log(4.0f); // [-1, 1]
+    constexpr ImU32 neutral = IM_COL32(205, 205, 210, 255);
+    constexpr ImU32 cool    = IM_COL32( 70, 140, 225, 255);
+    constexpr ImU32 warm    = IM_COL32(232, 120,  60, 255);
+    return d < 0.0f ? lerp_colour(neutral, cool, -d) : lerp_colour(neutral, warm, d);
+}
+
+/// On-canvas legend for the Market lens: a diverging cheap↔dear gradient bar plus
+/// the selected good's name and its current price ratio (or an "untraded" note when
+/// the body's market has no entry for it). Same left-edge placement as the Resource key.
+void draw_market_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size,
+                     const ui_state& state, bool active, float ratio)
+{
+    const float pad    = 8.0f;
+    const float box_w  = 172.0f;
+    const float line_h = ImGui::GetTextLineHeight();
+    const float bar_h  = 10.0f;
+
+    const float body_h = pad + line_h + 4.0f + bar_h + 2.0f + line_h + 4.0f + line_h + pad;
+    const ImVec2 p0 = { area_origin.x + nav_pane_width + pad,
+                        area_origin.y + std::max(pad, (area_size.y - body_h) * 0.5f) };
+    const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
+    dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
+    dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
+
+    const float x     = p0.x + pad;
+    const float bar_w = box_w - 2.0f * pad;
+    float       y     = p0.y + pad * 0.5f;
+
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Market price");
+    y += line_h + 4.0f;
+
+    // Diverging bar: cheap (cool) at the left, dear (warm) at the right, sampling
+    // the same band the wash uses (ratio 0.25 → 4).
+    constexpr int segs = 24;
+    for (int i = 0; i < segs; ++i)
+    {
+        const float t = static_cast<float>(i) / (segs - 1);  // 0..1
+        const ImU32 c = diverging_colour(std::pow(4.0f, t * 2.0f - 1.0f));
+        dl->AddRectFilled({ x + bar_w * static_cast<float>(i) / segs, y },
+                          { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
+    }
+    y += bar_h + 2.0f;
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "cheap");
+    const ImVec2 dts = ImGui::CalcTextSize("dear");
+    dl->AddText({x + bar_w - dts.x, y}, IM_COL32(170, 175, 185, 255), "dear");
+    y += line_h + 4.0f;
+
+    char buf[96];
+    if (active)
+        std::snprintf(buf, sizeof(buf), "%s  x%.2f",
+                      presentation_of(state.lens_resource).name, static_cast<double>(ratio));
+    else
+        std::snprintf(buf, sizeof(buf), "%s  (untraded)",
+                      presentation_of(state.lens_resource).name);
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), buf);
 }
 
 } // namespace
@@ -342,6 +409,30 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
                 res_present.push_back(static_cast<resource_type>(r));
     }
 
+    // Market lens pre-pass: the active body's market is a single per-body exchange,
+    // so the Planetary tint is a body-wide wash (not per-tile). Resolve the selected
+    // good's price relative to its base (floor) price once; an untraded good (no base
+    // price) leaves the wash off. See LENSES.md § Market lens.
+    bool  market_active = false;
+    float market_ratio  = 1.0f;
+    ImU32 market_wash   = 0;
+    if (state.overlay == overlay_mode::market)
+    {
+        const std::size_t g = static_cast<std::size_t>(state.lens_resource);
+        for (const auto& [mid, mk] : w.markets)
+        {
+            if (mk.body != state.active_body)
+                continue;
+            if (mk.base_price[g] > 0.0f)
+            {
+                market_ratio  = mk.price[g] / mk.base_price[g];
+                market_wash   = diverging_colour(market_ratio);
+                market_active = true;
+            }
+            break;
+        }
+    }
+
     const ImVec2 mouse = ImGui::GetIO().MousePos;
 
     // Hover resolves to a single tile copy. Adjacent hexes' circular hit-tests
@@ -429,6 +520,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
                 const float t = 0.2f + 0.7f * std::clamp(mag / norm, 0.0f, 1.0f);
                 fill = lerp_colour(fill, presentation_of(static_cast<resource_type>(res_idx)).colour, t);
             }
+        }
+        // Market lens: a body-wide diverging wash for the selected good's price
+        // relative to its floor (warm = dear, cool = cheap). Uniform across the body
+        // because the market is per-body; composited over terrain so the surface still
+        // reads. Off when the good is untraded here (no base price).
+        else if (state.overlay == overlay_mode::market)
+        {
+            if (market_active)
+                fill = lerp_colour(fill, market_wash, 0.55f);
         }
         const auto   built_it  = built_tiles.find(id);
         const bool   built     = built_it != built_tiles.end();
@@ -608,6 +708,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
     // lens to carry a colour key; Market's diverging key is added alongside.
     if (state.overlay == overlay_mode::resource)
         draw_resource_key(dl, grid_area_origin, grid_area_size, state, res_present);
+    else if (state.overlay == overlay_mode::market)
+        draw_market_key(dl, grid_area_origin, grid_area_size, state, market_active, market_ratio);
 
     if (!input_enabled)
         return;
