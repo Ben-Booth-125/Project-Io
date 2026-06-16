@@ -59,6 +59,44 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## 2026-06-16 — Interim: lens-ideas Q&A + multiple market centres (branch v0.0.5)
+
+An interim design + publish session between the lens batch and Session 3.
+
+**Lens-ideas Q&A.** Brainstormed *what else is informative as a map lens*; six new Briefs
+landed in OPENS § Canvas (commit `5204fac`): Production/Output (intensity = sell value of all
+outputs), Habitability/Population, Placement-suitability (a surface on *tile selection*, not a
+strip lens), Ambient/Scarcity (single-resource body-wide heatmap, access left open),
+Reach/Logistics (`F4`, needs scoping), and a meta sweep on per-lens Solar/Circumplanetary
+representation. All `~`.
+
+**Multiple market centres (published — guess design, revise after population).** Promoted the
+`[B3 ~]` multiple-markets-per-body Brief at the user's request, guessing the implementation:
+- `market_component` gains `centre_tile`; a body may carry **several** markets.
+- **Catchment = nearest centre** — `market_for_tile` (`market_clearing.{hpp,cpp}`) routes a tile
+  to the market whose centre is nearest by grid distance; a body with one market routes there
+  unconditionally. Clearing routes each corp's body-aggregate supply/demand to the market nearest
+  its representative holding (`market_for_corp_on_body`).
+- **Behaviour-preserving:** the live world still seeds **one** market per body (`centre_tile`
+  null), so all existing assertions hold; the multi-market path is exercised + verified by four
+  new `econ_harness` cases (MM.1–MM.4, all pass; full harness green).
+- Propagated to `docs/SYSTEMS.md` § Trade and `docs/ui/LENSES.md` § Market lens; the big Brief is
+  replaced by a residual `[B3 ~]` "seed multiple market centres from capitals/population" (deferred
+  to the population layer) plus noted follow-ups (finer per-building split; inter-market convoys).
+
+### In-session decisions
+
+**Routing keyed by corp representative tile, not per building.** Supply/demand are `(corp,body)`
+aggregates, not per-tile, so a corp's whole body output routes to the single market nearest its
+lowest-id building. Finer per-building splitting across catchments is a noted follow-up — adequate
+for the degenerate one-market-per-body world and revisable once population seeds real centres.
+
+### Open items
+
+- `tools/verify/econ_stability.cpp` is **pre-existingly broken** — it calls `apply_budget` with the
+  old 3-arg signature (the workforce-contention param was added later). Not touched this session;
+  worth a fix so the 100-tick stability check runs again.
+
 ## 2026-06-16 — v0.1.0 Session 2: the lens batch (Resource + Market) (branch v0.0.5)
 
 The Session-2 goal: publish the two unblocked overlay modes, golden-verified against the F3

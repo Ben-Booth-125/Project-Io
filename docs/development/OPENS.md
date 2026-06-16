@@ -675,23 +675,21 @@ price resolution has now landed; **inter-body trade stays open**. Markets are a 
 exchange, **distinct from corp stockpile pools**. Design authority `docs/SYSTEMS.md` § Trade,
 `docs/economy/RESOURCES.md`.
 
-- **[B3 ~] Multiple markets per body (tile-centred).** *(Written 2026-06-16, batch-close Q&A.)*
-  Today a body has **one** `market_component` (one price per good per body). The settled direction
-  is **multiple markets per body, each centred on a tile** — usually the **capital** — so price
-  varies *within* a body by locality, not just between bodies. This is the model that gives the
-  **Market lens** (`docs/ui/LENSES.md` § Market lens) a genuinely *spatial* Planetary surface: the
-  current build is a body-wide wash precisely because there is only one market per body; with
-  tile-centred markets the lens tints each market's catchment instead. **Minimal stub for now:**
-  the single per-body market stands as the degenerate case (one market, centred on the body's
-  principal tile); this Brief is the generalisation. **Design owed:** how many markets a body has
-  and what seeds them (capital + population centres?), each market's **catchment** (which tiles
-  clear against which market), how convoys/logistics move goods *between* intra-body markets
-  (couples to Supply / Layer 5 and the [A4] inter-body model), and the price-resolution change from
-  one clear-per-body to one-per-market. Couples to NATION/POPULATION generation (capital/centre
-  placement) and `src/world/market_clearing.{hpp,cpp}`. Check whether `docs/SYSTEMS.md` § Trade
-  already hints at sub-body markets and reconcile. Authority `docs/SYSTEMS.md` § Trade,
-  `docs/ui/LENSES.md` § Market lens. *(Newest Brief on markets — treat as canon where it overlaps
-  the "per-body exchange" wording above.)*
+- **[B3 ~] Seed multiple market centres from capitals / population.** *(Written 2026-06-16,
+  market-centres publish.)* The **mechanism** for multiple tile-centred markets per body landed
+  2026-06-16 (market `centre_tile`, nearest-centre catchment routing `market_for_tile`, clearing
+  routed per corp holding — see DEVLOG and `docs/SYSTEMS.md` § Trade). What remains is **generation
+  seeding more than one centre per body**: the present world still authors **one** market per body
+  (the behaviour-preserving degenerate case), so no body yet exercises the multi-market path in the
+  live economy. **Design owed (deferred to the population layer):** how many markets a body has and
+  what seeds them (capital + population centres?), and — once seeded — the **Market lens** tinting
+  each market's catchment rather than the whole body (`docs/ui/LENSES.md` § Market lens). Couples to
+  NATION/POPULATION generation (capital/centre placement); touches `src/world/hard_coded_world.cpp`
+  (market authoring) and later the generation pass. **Open follow-ups noted at landing:** finer
+  per-building supply/demand splitting (today a corp's whole body-aggregate routes to one nearest
+  market, not split across catchments), and how convoys move goods *between* intra-body markets
+  (couples to Supply / Layer 5 and the [A4] inter-body model). Authority `docs/SYSTEMS.md` § Trade,
+  `docs/ui/LENSES.md` § Market lens.
 
 - **[B4 ✓] Preferential purchasing (choosing counterparties).** Split from the sell-orders Brief
   (the **sell-orders** half landed 2026-06-15). What remains is letting the buyer **choose

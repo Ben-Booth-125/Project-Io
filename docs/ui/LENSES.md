@@ -207,11 +207,13 @@ vertically centred. Verified by `scripts/verify/market_lens.lua`, which runs `ve
 to diverge prices from base before capture (and a new `verify.show_panel("economy", false)` hook to
 clear the panel `econ_step` opens), against blessed goldens.
 
-**Toward per-tile variation (future).** The wash is body-wide because today there is **one market
-per body**. The settled direction (batch-close Q&A 2026-06-16) is **multiple markets per body,
-each centred on a tile** (usually the capital) — when that lands, this lens regains a genuinely
-*spatial* per-market surface (tint each market's catchment, not the whole body). Tracked by
-OPENS § Trade **[B3 ~] Multiple markets per body (tile-centred)**.
+**Toward per-tile variation.** The wash is body-wide because the present world seeds **one market
+per body**. The data model now supports **multiple tile-centred markets per body** — each market
+carries a `centre_tile`, and a tile clears against the nearest centre's market (its *catchment*,
+`market_for_tile` in `src/world/market_clearing.cpp`); landed 2026-06-16. When generation seeds
+genuinely multiple centres (from capitals / population centres — owed, follows the population
+layer, OPENS § Trade), this lens should tint **each market's catchment** rather than the whole
+body, regaining a spatial per-market surface.
 
 ## Per-lens selection validity & routing (settled 2026-06-15, [F4])
 

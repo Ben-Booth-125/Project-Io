@@ -314,6 +314,54 @@ int main()
               "SO.3 pool debited by the order", ws.pool_for(corp, b).quantities[ri(resource_type::steel)], 0.0f);
     }
 
+    // --- Multiple markets per body: nearest-centre catchment routing ---
+    // A body carries two markets centred on tiles 100 columns apart. A tile near
+    // each centre resolves (market_for_tile) to that centre's market, and a corp
+    // whose building sits in one catchment lists its surplus in that market only.
+    {
+        world wm;
+        const entity_id b = wm.create_entity(); wm.bodies[b] = body_component{};
+
+        const entity_id centre_a = wm.create_entity();
+        { tile_component tc{}; tc.body = b; tc.grid_x = 0;   tc.grid_y = 0; wm.tiles[centre_a] = tc; }
+        const entity_id centre_b = wm.create_entity();
+        { tile_component tc{}; tc.body = b; tc.grid_x = 100; tc.grid_y = 0; wm.tiles[centre_b] = tc; }
+
+        const entity_id mkt_a = wm.create_entity();
+        { market_component mc{}; mc.body = b; mc.centre_tile = centre_a;
+          mc.base_price[ri(resource_type::steel)] = 8.0f; mc.price = mc.base_price; wm.markets[mkt_a] = mc; }
+        const entity_id mkt_b = wm.create_entity();
+        { market_component mc{}; mc.body = b; mc.centre_tile = centre_b;
+          mc.base_price[ri(resource_type::steel)] = 8.0f; mc.price = mc.base_price; wm.markets[mkt_b] = mc; }
+
+        const entity_id tile_a = wm.create_entity();
+        { tile_component tc{}; tc.body = b; tc.grid_x = 10; tc.grid_y = 0; wm.tiles[tile_a] = tc; }
+        const entity_id tile_b = wm.create_entity();
+        { tile_component tc{}; tc.body = b; tc.grid_x = 90; tc.grid_y = 0; wm.tiles[tile_b] = tc; }
+        check(market_for_tile(wm, tile_a) == mkt_a, "MM.1 tile near centre A routes to market A");
+        check(market_for_tile(wm, tile_b) == mkt_b, "MM.2 tile near centre B routes to market B");
+
+        const entity_id corp_a = wm.create_entity();
+        { corporation_component cc; const entity_id bid = wm.create_entity();
+          building_component bld{}; bld.tile = tile_a; wm.buildings[bid] = bld;
+          cc.assets.push_back(bid); wm.corporations[corp_a] = cc; }
+        const entity_id corp_b = wm.create_entity();
+        { corporation_component cc; const entity_id bid = wm.create_entity();
+          building_component bld{}; bld.tile = tile_b; wm.buildings[bid] = bld;
+          cc.assets.push_back(bid); wm.corporations[corp_b] = cc; }
+        wm.pool_for(corp_a, b).quantities[ri(resource_type::steel)] = 10.0f;
+        wm.pool_for(corp_b, b).quantities[ri(resource_type::steel)] = 10.0f;
+
+        economy_report empty;
+        clear_markets(wm, reg, empty);
+        check(near(wm.markets[mkt_a].supply[ri(resource_type::steel)], 10.0f),
+              "MM.3 corp A surplus lists in catchment market A",
+              wm.markets[mkt_a].supply[ri(resource_type::steel)], 10.0f);
+        check(near(wm.markets[mkt_b].supply[ri(resource_type::steel)], 10.0f),
+              "MM.4 corp B surplus lists in catchment market B",
+              wm.markets[mkt_b].supply[ri(resource_type::steel)], 10.0f);
+    }
+
     std::printf("\n%s  (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES", g_failures, g_failures == 1 ? "" : "s");
     return g_failures == 0 ? 0 : 1;
 }

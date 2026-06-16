@@ -186,6 +186,12 @@ struct stockpile_component
 struct market_component
 {
     entity_id body;
+    /// Tile this market is centred on (usually a body's principal/capital tile).
+    /// A body may carry **several** markets, each with a distinct centre; a tile
+    /// clears against the market whose centre is nearest (see `market_for_tile`).
+    /// `null_entity` = unanchored: a body with a single market routes to it
+    /// regardless of centre (the degenerate, behaviour-preserving case).
+    entity_id centre_tile = null_entity;
     std::array<float, resource_count> supply;
     std::array<float, resource_count> demand;
     std::array<float, resource_count> price;      ///< Current resolved price; set to base_price until first tick.

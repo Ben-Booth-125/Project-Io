@@ -41,27 +41,62 @@ float resolve_price(float prior, float base, float supply, float demand)
     return std::clamp(next, lo, hi);
 }
 
-/// One cleared movement of a resource on a body, valued after prices resolve.
-/// `floor` is the seller's minimum unit price (player sell orders); 0 for the
-/// automatic surplus path and for purchases.
+/// One cleared movement of a resource, valued after prices resolve. `market` is
+/// the market the movement clears against (its catchment — § Trade, multiple
+/// markets per body); `floor` is the seller's minimum unit price (player sell
+/// orders), 0 for the automatic surplus path and for purchases.
 struct cleared_flow
 {
     entity_id   corp;
-    entity_id   body;
+    entity_id   market;
     std::size_t r;
     float       qty;
     float       floor;
 };
 
-/// Map each body that has a market to its market entity id. Layer 3 authors only
-/// Kepler's market; bodies without one are skipped by clearing.
-std::unordered_map<entity_id, entity_id> body_to_market(const world& w)
+/// Markets present on each body, in ascending market-id order (deterministic).
+std::unordered_map<entity_id, std::vector<entity_id>> markets_by_body(const world& w)
 {
-    std::unordered_map<entity_id, entity_id> map;
+    std::unordered_map<entity_id, std::vector<entity_id>> map;
     map.reserve(w.markets.size());
     for (const auto& [mid, mc] : w.markets)
-        map[mc.body] = mid;
+        map[mc.body].push_back(mid);
+    for (auto& [body, ids] : map)
+        std::sort(ids.begin(), ids.end());
     return map;
+}
+
+/// Pick, from a body's markets, the one whose centre tile is nearest `tile`.
+/// One market → that market (anchored or not). Several → the nearest anchored
+/// centre by squared grid distance (ties → lowest id); an unanchored market is a
+/// candidate only if every market on the body is unanchored, in which case the
+/// lowest id wins.
+entity_id nearest_market(const world& w, const std::vector<entity_id>& body_markets,
+                         const tile_component& tile)
+{
+    if (body_markets.empty())
+        return null_entity;
+    if (body_markets.size() == 1)
+        return body_markets.front();
+
+    entity_id best      = null_entity;
+    long long best_dist = 0;
+    for (const entity_id mid : body_markets)
+    {
+        const entity_id centre = w.markets.at(mid).centre_tile;
+        const auto cit = w.tiles.find(centre);
+        if (cit == w.tiles.end())
+            continue; // unanchored — skip while an anchored market exists
+        const long long dx = cit->second.grid_x - tile.grid_x;
+        const long long dy = cit->second.grid_y - tile.grid_y;
+        const long long d  = dx * dx + dy * dy;
+        if (best == null_entity || d < best_dist)
+        {
+            best      = mid;
+            best_dist = d;
+        }
+    }
+    return best != null_entity ? best : body_markets.front(); // all unanchored
 }
 
 /// Input reservation a corporation needs to keep on a body to feed a full run of
@@ -98,7 +133,68 @@ std::array<float, resource_count> processor_reservation(
     return reserve;
 }
 
+/// A corporation's representative tile on a body: the tile of its lowest-id
+/// building there. Used to route the corp's body-aggregate supply/demand to a
+/// market when the body carries several. `null_entity` if the corp holds nothing
+/// on the body.
+entity_id representative_tile(const world& w, entity_id corp, entity_id body)
+{
+    const auto cit = w.corporations.find(corp);
+    if (cit == w.corporations.end())
+        return null_entity;
+
+    entity_id best_building = null_entity;
+    entity_id best_tile     = null_entity;
+    for (const entity_id bid : cit->second.assets)
+    {
+        const auto bit = w.buildings.find(bid);
+        if (bit == w.buildings.end())
+            continue;
+        const auto tit = w.tiles.find(bit->second.tile);
+        if (tit == w.tiles.end() || tit->second.body != body)
+            continue;
+        if (best_building == null_entity || bid < best_building)
+        {
+            best_building = bid;
+            best_tile     = bit->second.tile;
+        }
+    }
+    return best_tile;
+}
+
+/// Route a corp's body-aggregate clearing to one market: the market nearest the
+/// corp's representative tile on the body (one market → that market; no holdings
+/// there → the body's lowest-id market). `null_entity` if the body has no market.
+entity_id market_for_corp_on_body(
+    const world& w, const std::unordered_map<entity_id, std::vector<entity_id>>& by_body,
+    entity_id corp, entity_id body)
+{
+    const auto it = by_body.find(body);
+    if (it == by_body.end() || it->second.empty())
+        return null_entity;
+    if (it->second.size() == 1)
+        return it->second.front();
+
+    const entity_id rep = representative_tile(w, corp, body);
+    const auto tit = w.tiles.find(rep);
+    if (tit == w.tiles.end())
+        return it->second.front();
+    return nearest_market(w, it->second, tit->second);
+}
+
 } // namespace
+
+entity_id market_for_tile(const world& w, entity_id tile)
+{
+    const auto tit = w.tiles.find(tile);
+    if (tit == w.tiles.end())
+        return null_entity;
+    const auto by_body = markets_by_body(w);
+    const auto it = by_body.find(tit->second.body);
+    if (it == by_body.end())
+        return null_entity;
+    return nearest_market(w, it->second, tit->second);
+}
 
 std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     world& w,
@@ -107,7 +203,7 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     const std::vector<sell_order>& player_orders)
 {
     std::unordered_map<entity_id, corp_cash_flow> flows;
-    const auto markets = body_to_market(w);
+    const auto by_body = markets_by_body(w);
 
     // Recompute market supply/demand from scratch this tick. Quantities move now;
     // price resolves once supply and demand are known, and the cash value of every
@@ -140,13 +236,13 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         const entity_id corp = key.first;
         const entity_id body = key.second;
 
-        const auto mit = markets.find(body);
-        if (mit == markets.end())
+        const entity_id mid = market_for_corp_on_body(w, by_body, corp, body);
+        if (mid == null_entity)
             continue; // body has no market — nothing clears here
         if (w.corporations.find(corp) == w.corporations.end())
             continue;
 
-        market_component& mc = w.markets.at(mit->second);
+        market_component& mc = w.markets.at(mid);
         const auto reserve = processor_reservation(w, reg, corp, body);
 
         for (std::size_t r = 0; r < resource_count; ++r)
@@ -162,7 +258,7 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
 
             pool.quantities[r] -= surplus;
             mc.supply[r]       += surplus;
-            sales.push_back({corp, body, r, surplus, 0.0f});
+            sales.push_back({corp, mid, r, surplus, 0.0f});
         }
     }
 
@@ -172,10 +268,12 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // max(resolved price, floor) in the final pass.
     for (const sell_order& order : player_orders)
     {
-        const auto mit = markets.find(order.body);
-        if (mit == markets.end() || order.quantity <= 0.0f)
+        if (order.quantity <= 0.0f)
             continue;
-        market_component& mc = w.markets.at(mit->second);
+        const entity_id mid = market_for_corp_on_body(w, by_body, order.corp, order.body);
+        if (mid == null_entity)
+            continue;
+        market_component& mc = w.markets.at(mid);
         const std::size_t r = static_cast<std::size_t>(order.resource);
         auto pkit = w.corp_body_pools.find(std::make_pair(order.corp, order.body));
         if (pkit == w.corp_body_pools.end())
@@ -185,7 +283,7 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
             continue;
         pkit->second.quantities[r] -= sold;
         mc.supply[r]               += sold;
-        sales.push_back({order.corp, order.body, r, sold, order.floor_price});
+        sales.push_back({order.corp, mid, r, sold, order.floor_price});
     }
 
     // --- Demand: processor input shortfalls auto-bought this tick ---
@@ -194,11 +292,11 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         const entity_id corp = key.first;
         const entity_id body = key.second;
 
-        const auto mit = markets.find(body);
-        if (mit == markets.end())
+        const entity_id mid = market_for_corp_on_body(w, by_body, corp, body);
+        if (mid == null_entity)
             continue;
 
-        market_component& mc = w.markets.at(mit->second);
+        market_component& mc = w.markets.at(mid);
 
         for (std::size_t r = 0; r < resource_count; ++r)
         {
@@ -206,7 +304,7 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
             if (qty <= 0.0f)
                 continue;
             mc.demand[r] += qty;
-            buys.push_back({corp, body, r, qty, 0.0f});
+            buys.push_back({corp, mid, r, qty, 0.0f});
         }
     }
 
@@ -218,12 +316,12 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // --- Value every movement at the resolved price (player orders honour their floor) ---
     for (const cleared_flow& s : sales)
     {
-        const float price = w.markets.at(markets.at(s.body)).price[s.r];
+        const float price = w.markets.at(s.market).price[s.r];
         flows[s.corp].income += s.qty * std::max(price, s.floor);
     }
     for (const cleared_flow& b : buys)
     {
-        const float price = w.markets.at(markets.at(b.body)).price[b.r];
+        const float price = w.markets.at(b.market).price[b.r];
         flows[b.corp].expenditure += b.qty * price;
     }
 

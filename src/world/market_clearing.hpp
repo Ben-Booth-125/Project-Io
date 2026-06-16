@@ -41,3 +41,11 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     const recipe_registry& reg,
     const economy_report& report,
     const std::vector<sell_order>& player_orders = {});
+
+/// Resolve which market a tile clears against (its market catchment). Among the
+/// markets on the tile's body: a body with a single market routes there
+/// unconditionally; with several, the tile clears against the market whose
+/// `centre_tile` is nearest by grid distance (ties → lowest market id; markets
+/// with no centre are ignored when an anchored one exists). Returns `null_entity`
+/// if the tile's body has no market.
+entity_id market_for_tile(const world& w, entity_id tile);
