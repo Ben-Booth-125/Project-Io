@@ -15,7 +15,29 @@ void diamond(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
 {
     const ImVec2 v[4] = { {c.x, c.y - r}, {c.x + r, c.y}, {c.x, c.y + r}, {c.x - r, c.y} };
     dl->AddConvexPolyFilled(v, 4, fill);
-    dl->AddPolyline(v, 4, outline, ImDrawFlags_Closed, 1.0f);
+}
+
+// Faceted ore/mineral silhouette for extraction-site — an angular eight-sided
+// crystal chunk, wider than tall, with cuts at all four corners. Distinct from
+// the gem-diamond pip (a regular 4-point diamond) and the port triangle.
+void ore_chunk(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    const float rx = r;           // horizontal half-extent
+    const float ry = r * 0.72f;  // vertical half-extent (flatter than a diamond)
+    const float cx = rx * 0.45f; // corner cut size (horizontal)
+    const float cy = ry * 0.45f; // corner cut size (vertical)
+    const ImVec2 v[8] = {
+        { c.x - rx + cx, c.y - ry },   // top-left
+        { c.x + rx - cx, c.y - ry },   // top-right
+        { c.x + rx,      c.y - ry + cy }, // right-top facet
+        { c.x + rx,      c.y + ry - cy }, // right-bottom facet
+        { c.x + rx - cx, c.y + ry },   // bottom-right
+        { c.x - rx + cx, c.y + ry },   // bottom-left
+        { c.x - rx,      c.y + ry - cy }, // left-bottom facet
+        { c.x - rx,      c.y - ry + cy }, // left-top facet
+    };
+    dl->AddConvexPolyFilled(v, 8, fill);
+    dl->AddPolyline(v, 8, outline, ImDrawFlags_Closed, 1.0f);
 }
 
 void square(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
@@ -37,10 +59,13 @@ void building(ImDrawList* dl, ImVec2 centre, float r, building_type type, ImU32 
 {
     switch (type)
     {
-        case building_type::extraction_site:     diamond(dl, centre, r, fill); break;
-        case building_type::processing_facility: square(dl, centre, r, fill);  break;
-        case building_type::port:                triangle(dl, centre, r, fill); break;
-        default:                                 dl->AddCircleFilled(centre, r, fill); break;
+        case building_type::extraction_site:     ore_chunk(dl, centre, r, fill); break;
+        case building_type::processing_facility: square(dl, centre, r, fill);    break;
+        case building_type::port:                triangle(dl, centre, r, fill);  break;
+        default:
+            dl->AddCircleFilled(centre, r, fill);
+            dl->AddCircle(centre, r, outline, 0, 1.0f);
+            break;
     }
 }
 
@@ -51,8 +76,15 @@ void resource(ImDrawList* dl, ImVec2 centre, float r, resource_type res)
 
 void unit(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
 {
-    const ImVec2 v[3] = { {centre.x, centre.y - r}, {centre.x + r, centre.y + r}, {centre.x - r, centre.y + r} };
-    dl->AddConvexPolyFilled(v, 3, colour);
+    // Open upward chevron (V): two lines meeting at a bottom point, open at top.
+    // Stroke-only so it is unambiguously distinct from the filled port triangle.
+    const ImVec2 v[3] = {
+        { centre.x - r, centre.y - r * 0.5f },  // top-left arm
+        { centre.x,     centre.y + r },          // bottom point
+        { centre.x + r, centre.y - r * 0.5f },  // top-right arm
+    };
+    dl->AddPolyline(v, 3, outline, ImDrawFlags_None, 2.0f);
+    dl->AddPolyline(v, 3, colour,  ImDrawFlags_None, 1.5f);
 }
 
 void ledger(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
