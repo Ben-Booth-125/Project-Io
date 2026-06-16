@@ -5,6 +5,7 @@
       "Bash(git add*)",
       "Bash(git diff*)",
       "Bash(git commit*)",
+      "Bash(git push*)",
       "Bash(git log*)",
       "Bash(git show*)",
       "Bash(git mv*)",
@@ -23,7 +24,7 @@
     ],
     "deny": [
       "Bash(rm -rf *)",
-      "Bash(git push*)",
+      "Bash(git push --force*)",
       "Bash(git reset --hard*)",
       "Bash(git clean*)"
     ]
