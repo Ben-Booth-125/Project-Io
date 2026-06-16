@@ -7,23 +7,18 @@ struct ui_state; // forward-declared; the full definition lives in ui_state.hpp.
 
 namespace ui {
 
-/// Draw the Layer 4 construction / building-management panel — the building
-/// surface added as v0.0.5 "Layer 4 UI groundwork" (see ROADMAP.md). It carries
-/// two sections:
-///   - a **Build** section whose buttons arm placement mode by writing the shared
-///     construction_state (type / target / active) on @p state; and
-///   - a **Selected building** section that resolves the building sitting on the
-///     selected tile and shows its configuration read-only.
+/// Draw the Construction Ledger — a ledger-family window (BL-029) with two
+/// sections:
+///   - a **Queue overview** table listing all active construction items across
+///     every body (body / building type / progress / est. ticks remaining /
+///     cost remaining); shows "No active construction" when the queue is empty.
+///   - a **Selected building** section that resolves the building sitting on
+///     the selected tile and shows its configuration and management controls.
 ///
-/// This is a *non-mutating scaffold*: the Build buttons only set placement-mode UI
-/// state, and the per-building controls (recipe combo, workforce slider, sell-order
-/// button) are DISABLED display-only stubs. The functional loop — build-cost spend,
-/// world mutation, recipe/workforce authoring — lands in v0.0.6 (TODO § Infrastructure).
+/// Ledger conventions: opens at `ledger_window_spawn` / `ledger_window_size`
+/// (ImGuiCond_Once), starts closed, title "Construction".
 ///
-/// The window carries a close button; clicking it clears *p_open so the window
-/// closes rather than collapses. When *p_open is false the function draws nothing.
-///
-/// @param w      Read-only world (buildings, tiles, the selected entity's building).
+/// @param w      Read-only world (buildings, tiles, queues).
 /// @param reg    Loaded registry (recipe names and per-type economics).
 /// @param state  Shared UI state — read (selected_entity) and written (construction).
 /// @param p_open Open/closed flag; cleared by the close button.
