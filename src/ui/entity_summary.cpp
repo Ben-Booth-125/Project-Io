@@ -7,6 +7,7 @@
 #include <imgui.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <utility>
 #include <vector>
@@ -317,6 +318,51 @@ void draw_nation_summary(const world& w, entity_id id)
     }
 }
 
+void draw_body_summary(const world& w, const ui_state& s, entity_id id)
+{
+    auto it = w.bodies.find(id);
+    if (it == w.bodies.end())
+    {
+        ImGui::TextDisabled("\xe2\x80\x94");
+        return;
+    }
+
+    const body_component& b = it->second;
+
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", b.name.c_str());
+    ImGui::TextDisabled("%s", body_type_name(b.type));
+
+    // Rung-relative distance: on Solar the reference is the star (body_type::star);
+    // on Circumplanetary the reference is the active parent body (s.active_body).
+    if (s.primary_level == canvas_level::circumplanetary && s.active_body != null_entity)
+    {
+        auto ref_it = w.bodies.find(s.active_body);
+        if (ref_it != w.bodies.end() && ref_it->first != id)
+        {
+            const float dist = std::abs(b.orbital_radius_au - ref_it->second.orbital_radius_au);
+            ImGui::Text("Dist from %s: %.2f AU", ref_it->second.name.c_str(), dist);
+        }
+        else
+        {
+            ImGui::Text("Orbit: %.2f AU", b.orbital_radius_au);
+        }
+    }
+    else
+    {
+        // Solar rung or unset: show orbital radius from the star.
+        ImGui::Text("Orbit: %.2f AU", b.orbital_radius_au);
+    }
+
+    if (b.parent != null_entity)
+    {
+        auto parent_it = w.bodies.find(b.parent);
+        if (parent_it != w.bodies.end())
+            ImGui::Text("Orbits: %s", parent_it->second.name.c_str());
+    }
+
+    ImGui::Text("Grid: %dx%d tiles", b.grid_width, b.grid_height);
+}
+
 void draw_corporation_summary(const world& w, entity_id id)
 {
     auto it = w.corporations.find(id);
@@ -345,6 +391,59 @@ void draw_corporation_summary(const world& w, entity_id id)
     ImGui::Text("Focus: %s", industrial_focus_name(c.focus));
     ImGui::Text("Capital: %s", ui::fmt::credits(c.starting_capital).c_str());
     ImGui::Text("Assets: %zu", c.assets.size());
+}
+
+void draw_hover_card(ImDrawList* dl, const world& w, const ui_state& s, entity_id eid)
+{
+    if (eid == null_entity)
+        return;
+
+    // Dispatch by entity kind: probe the world maps in priority order.
+    // Each branch opens the tooltip, calls the appropriate builder, and closes it.
+    if (w.tiles.count(eid))
+    {
+        ImGui::BeginTooltip();
+        draw_tile_summary(w, eid);
+        ImGui::EndTooltip();
+    }
+    else if (w.bodies.count(eid))
+    {
+        ImGui::BeginTooltip();
+        draw_body_summary(w, s, eid);
+        ImGui::EndTooltip();
+    }
+    else if (w.buildings.count(eid))
+    {
+        ImGui::BeginTooltip();
+        draw_building_summary(w, eid);
+        ImGui::EndTooltip();
+    }
+    else if (w.markets.count(eid))
+    {
+        ImGui::BeginTooltip();
+        draw_market_summary(w, eid);
+        ImGui::EndTooltip();
+    }
+    else if (w.units.count(eid))
+    {
+        ImGui::BeginTooltip();
+        draw_unit_summary(w, eid);
+        ImGui::EndTooltip();
+    }
+    else if (w.nations.count(eid))
+    {
+        ImGui::BeginTooltip();
+        draw_nation_summary(w, eid);
+        ImGui::EndTooltip();
+    }
+    else if (w.corporations.count(eid))
+    {
+        ImGui::BeginTooltip();
+        draw_corporation_summary(w, eid);
+        ImGui::EndTooltip();
+    }
+    // Unknown kind: no-op (no tooltip opened).
+    (void)dl; // dl is available for future canvas-overlay content inside the card.
 }
 
 } // namespace ui

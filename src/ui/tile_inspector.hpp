@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ui_state.hpp"
 #include "world/world.hpp"
 
 namespace ui {
@@ -16,7 +17,8 @@ namespace ui {
 /// function draws nothing. Reopen it from the navigation pane.
 ///
 /// @param w       Read-only reference to the current world state.
+/// @param s       Current canvas/nav state; used to seed the body selector default.
 /// @param p_open  Open/closed flag. Cleared by the window's close button.
-void draw_tile_inspector(const world& w, bool* p_open);
+void draw_tile_inspector(const world& w, const ui_state& s, bool* p_open);
 
 } // namespace ui

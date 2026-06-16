@@ -2,6 +2,7 @@
 
 #include "ledger_chrome.hpp" // shared ledger-window size + spawn anchor
 #include "presentation.hpp"
+#include "world/components.hpp"
 
 #include <imgui.h>
 
@@ -10,7 +11,7 @@
 
 namespace ui {
 
-void draw_tile_inspector(const world& w, bool* p_open)
+void draw_tile_inspector(const world& w, const ui_state& s, bool* p_open)
 {
     // Honour the open flag; when closed the window draws nothing at all.
     if (p_open && !*p_open)
@@ -38,9 +39,23 @@ void draw_tile_inspector(const world& w, bool* p_open)
     }
 
     // --- Body selector ---
-    static entity_id selected_body = 0;
-    if (selected_body == 0)
-        selected_body = body_ids.front();
+    // Default: prefer the canvas's active surface body, then fall back to lowest id.
+    static entity_id selected_body = null_entity;
+    if (selected_body == null_entity || w.bodies.find(selected_body) == w.bodies.end())
+    {
+        // 1. Use ui_state.active_body when it refers to a surface body.
+        if (s.active_body != null_entity)
+        {
+            auto ab_it = w.bodies.find(s.active_body);
+            if (ab_it != w.bodies.end() && ab_it->second.type != body_type::star)
+            {
+                selected_body = s.active_body;
+            }
+        }
+        // 2. Fall back to the lowest-id surface body (existing default).
+        if (selected_body == null_entity || w.bodies.find(selected_body) == w.bodies.end())
+            selected_body = body_ids.front();
+    }
 
     const body_component& sel_body = w.bodies.at(selected_body);
     if (ImGui::BeginCombo("Body", sel_body.name.c_str()))

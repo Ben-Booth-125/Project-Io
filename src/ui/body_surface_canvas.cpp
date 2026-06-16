@@ -1,6 +1,7 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "body_surface_canvas.hpp"
 
+#include "entity_summary.hpp"
 #include "highlight.hpp"
 #include "icons.hpp"
 #include "nav_pane.hpp"
@@ -744,7 +745,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
             {
                 const auto corp_it = tile_to_corp.find(id);
                 if (corp_it != tile_to_corp.end() && corp_it->second == w.player_entity)
-                    dl->AddPolyline(verts, 6, palette::faction_colour(0),
+                    dl->AddPolyline(verts, 6, palette::selection,
                                     ImDrawFlags_Closed, 2.0f);
             }
 
@@ -844,27 +845,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
 
     // Hover tooltip.
     if (hovered_tile != null_entity)
-    {
-        const tile_component& tile = w.tiles.at(hovered_tile);
-        ImGui::BeginTooltip();
-        ImGui::Text("[%d, %d]", tile.grid_x, tile.grid_y);
-        ImGui::Text("%s \xc2\xb7 %s", composition_name(tile.composition),
-                                       landform_name(tile.landform));
-        ImGui::Text("Hazard: %.2f", tile.hazard_level);
-        ImGui::Text("Habitability: %.2f", tile.habitability);
-        bool any_deposit = false;
-        for (std::size_t r = 0; r < resource_count; ++r)
-        {
-            if (tile.resource_deposit[r] > 0.0f)
-            {
-                ImGui::Text("%s: %.1f", resource_name(static_cast<resource_type>(r)), tile.resource_deposit[r]);
-                any_deposit = true;
-            }
-        }
-        if (!any_deposit)
-            ImGui::TextDisabled("No deposits");
-        ImGui::EndTooltip();
-    }
+        draw_hover_card(dl, w, state, hovered_tile);
 
     // Click handling. The surface is the bottom rung, so there is nothing to
     // descend into: a single left-click simply selects the hovered tile (null
