@@ -76,8 +76,9 @@ nothing on the other two canvases.
 - **Owned tiles** are tinted their owning corporation's identity colour (a direct
   replacement of the terrain hue, matching the Faction lens's tint convention).
 - The **player corporation** (`w.player_entity`) uses
-  `presentation::faction_colour(0)` and additionally gets a thin border in that
-  same colour so the player's holdings read at a glance against rivals.
+  `presentation::faction_colour(0)` for its tile fill and additionally gets a thin
+  border in `palette::selection` (white) so the player's holdings contrast against
+  any rival fill colour at a glance.
 - **Rival corporations** use the per-corp hashed faction slot already used for the
   building markers (a multiplicative hash kept off slot 0 so a rival never
   collides with the player's colour).

@@ -26,7 +26,7 @@ focused, and selected at once.
 | State | Meaning | Lifetime | Drives | Backing |
 |---|---|---|---|---|
 | **Active** | The navigation **anchor** — which body/tile the canvas rungs are framed around. | Persists until you navigate. | Which Circumplanetary/Planetary rung renders, and around what. | `ui_state.active_body`, `ui_state.active_tile` (existing). |
-| **Focus** | The entity **under the pointer** right now. | Transient, per-frame. | The hover tooltip / hover card. | Per-frame `hovered_*` locals today (not stored); a future `focus` field when the hover card lands. |
+| **Focus** | The entity **under the pointer** right now. | Transient, per-frame. | The hover tooltip / hover card (see [`TOOLTIP.md`](TOOLTIP.md)). | Per-frame `hovered_*` locals today (not stored); a future `focus` field when the hover card lands. |
 | **Selection** | The entity the player **single-clicked** to inspect. | Persists until you select something else (or clear). | The Selection info element's contents and its 'go to' target. | **New:** `ui_state.selected_entity`. |
 
 Key consequence: **Selection is distinct from Active.** Selecting a body in the

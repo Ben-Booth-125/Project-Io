@@ -1,6 +1,9 @@
 #pragma once
 
+#include "ui_state.hpp"
 #include "world/world.hpp"
+
+#include <imgui.h>
 
 /// @file
 /// Shared per-entity-kind "stat block" content builders described in
@@ -28,6 +31,15 @@ namespace ui {
 /// @param w  Read-only world state.
 /// @param id Entity id expected in @p w.bodies.
 void draw_body_summary(const world& w, entity_id id);
+
+/// Canvas-aware body stat block. Identical to @ref draw_body_summary but adds
+/// a rung-relative distance field: on Solar the reference is the star; on
+/// Circumplanetary the reference is the active parent body (@p s.active_body).
+///
+/// @param w  Read-only world state.
+/// @param s  Current canvas/nav state (determines which rung is active).
+/// @param id Entity id expected in @p w.bodies.
+void draw_body_summary(const world& w, const ui_state& s, entity_id id);
 
 /// Stat block for a tile: coordinates, composition × landform, hazard,
 /// habitability, and its non-zero resource deposits with identity swatches.
@@ -69,5 +81,15 @@ void draw_nation_summary(const world& w, entity_id id);
 /// @param w  Read-only world state.
 /// @param id Entity id expected in @p w.corporations.
 void draw_corporation_summary(const world& w, entity_id id);
+
+/// Wraps the per-entity summary builders in a tooltip card (BeginTooltip/EndTooltip).
+/// Dispatches to the appropriate builder based on @p eid's entity kind. No-op when
+/// @p eid is null_entity or does not resolve to a known kind.
+///
+/// @param dl  Active background draw list (forwarded to canvas-aware builders).
+/// @param w   Read-only world state.
+/// @param s   Current canvas/nav state (forwarded to canvas-aware builders).
+/// @param eid Entity to describe inside the tooltip.
+void draw_hover_card(ImDrawList* dl, const world& w, const ui_state& s, entity_id eid);
 
 } // namespace ui

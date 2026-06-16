@@ -788,7 +788,7 @@ void app::render()
 
     // Left navigation pane and the menus it opens. Starts below the profile.
     ui::draw_nav_pane(m_ui, ui::profile_panel_height);
-    ui::draw_tile_inspector(m_world, &m_ui.show_tile_ledger);
+    ui::draw_tile_inspector(m_world, m_ui, &m_ui.show_tile_ledger);
     ui::draw_economy_panel(m_world, m_registry, m_last_econ_report, &m_ui.show_economy_panel);
     ui::draw_construction_panel(m_world, m_registry, m_ui, &m_ui.show_construction_panel);
 
