@@ -184,6 +184,10 @@ Consequences:
 - **Agents build and commit on their own worktree branch**; the **main session merges** them in
   dependency order, runs the integrating build, and verifies. Assume nothing about an agent's
   self-reported success — verify retroactively after merge.
+- **Sub-agents must use the Bash tool with a heredoc for all git commits.** The project's
+  `settings.json` allow rule is `Bash(git commit*)` — the PowerShell tool is not covered and
+  will stall on a permission prompt. Every sub-agent prompt should include: *"Use the Bash tool
+  with a heredoc for git commits; PowerShell is blocked by the allow rule."*
 - **Hotspot/integration wiring stays in the main session.** The seam every slice eventually
   touches is integrated centrally, after the agent slices land.
 - **Fan-out is a discretionary call made *after* the tasks and collision map.** Fan out when
