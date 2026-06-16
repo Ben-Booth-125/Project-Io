@@ -99,6 +99,29 @@ target_link_libraries(ProjectIo PRIVATE
     imgui
 )
 
+# ---------------------------------------------------------------------------
+# Precompiled header
+# Covers headers present in 5+ TUs. Excluded: sol2 (3 TUs, very slow to
+# compile even once) and project-internal headers (invalidate PCH on edit).
+# ---------------------------------------------------------------------------
+target_precompile_headers(ProjectIo PRIVATE
+    # Standard library
+    <algorithm>
+    <array>
+    <cmath>
+    <cstddef>
+    <cstdint>
+    <cstdio>
+    <limits>
+    <random>
+    <string>
+    <unordered_map>
+    <utility>
+    <vector>
+    # Dear ImGui (included in 14 of 45 TUs — largest single parsing cost)
+    <imgui.h>
+)
+
 # Copy scripts directory next to the executable after each build
 add_custom_command(TARGET ProjectIo POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
