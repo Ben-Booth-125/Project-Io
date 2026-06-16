@@ -835,6 +835,34 @@
       ]
     },
     {
+      "brief": "nav-slot-sync",
+      "title": "Nav slot open/close colour sync (BL-055)",
+      "difficulty": 2, "importance": "B", "evaluated_difficulty": null,
+      "status": "complete", "resolved": "2026-06-16", "resolution": "Complete. close_all_panels() helper added to nav_pane.cpp; each live slot saves was_open, calls close_all_panels, then toggles to !was_open. Build clean.",
+      "promoted_from": "BL-055", "batch": "v0.0.7",
+      "rows": [
+        { "id": "R1", "requirement": "Brief-spanning: toggling a nav slot while another panel is open closes the other panel first; the nav-slot highlight is always in sync with the open panel state so at most one panel is active at a time.", "verification": ["build", "manual: open Economy panel, click another nav slot — first panel closes and new one opens; click open slot again — it closes"], "status": "complete", "result_metric": "build clean; close_all_panels pattern in nav_pane.cpp slots 1,2,5,6,9", "notes": "" }
+      ]
+    },
+    {
+      "brief": "supply-layer",
+      "title": "Supply routing — convoys + inter-body market coupling (BL-039, BL-038, BL-045)",
+      "difficulty": 5, "importance": "S", "evaluated_difficulty": null,
+      "status": "active", "resolved": null, "resolution": null,
+      "promoted_from": "BL-039 (folds BL-038, BL-045)", "batch": "v0.0.7",
+      "rows": [
+        { "id": "R1", "requirement": "Brief-spanning: a convoy dispatched from a source pool reaches a destination market after N ticks and credits cargo to the destination pool — headless-verified.", "verification": ["headless: tools/verify/supply_advance.cpp"], "status": "complete", "result_metric": "supply_advance.exe ALL PASS (21/21); advance + credit + dispatch all covered", "notes": "" },
+        { "id": "R2", "requirement": "convoy_component has fields: source_market, dest_market, mode {land|sea|air|space}, cargo_resource, cargo_qty, progress [0,1], speed.", "verification": ["code: components.hpp"], "status": "complete", "result_metric": "components.hpp:275 convoy_component has all named fields", "notes": "" },
+        { "id": "R3", "requirement": "scripts/economy.lua carries a logistics.base_cost_per_unit_distance table keyed by mode, ordered land < sea < air < space.", "verification": ["code: economy.lua"], "status": "complete", "result_metric": "economy.lua logistics table: land=0.02, sea=0.05, air=0.15, space=1.00", "notes": "BL-045 cost constants" },
+        { "id": "R4", "requirement": "At convoy dispatch, the dispatching corp's balance is debited by base_logistics_cost[mode] × distance × cargo_qty.", "verification": ["headless: supply_advance.cpp — check balance delta after dispatch"], "status": "complete", "result_metric": "supply_advance R5: balance 500 -> 450 (cost = 1.0×1.0×50 = 50)", "notes": "" },
+        { "id": "R5", "requirement": "Auto-dispatch: a (corp, body, resource) shortfall triggers a convoy from the cheapest reachable surplus source (all prototype bodies treated as reachable).", "verification": ["headless: supply_advance.cpp — seed surplus on one body, shortfall on another; confirm convoy created"], "status": "complete", "result_metric": "supply_advance R5: convoy created, cargo=50, mode=space", "notes": "" },
+        { "id": "R6", "requirement": "Space-mode convoys require a launchpad at the source body; land-mode convoys are ungated.", "verification": ["headless: supply_advance.cpp — gate check: no launchpad -> no space convoy dispatched"], "status": "complete", "result_metric": "supply_advance R6: gate check PASS (no launchpad -> convoys.empty())", "notes": "" },
+        { "id": "R7", "requirement": "On arrival, the destination (corp, body) pool is credited with cargo_qty and market_component.supply[resource] increases accordingly.", "verification": ["headless: supply_advance.cpp — check pool and market supply after arrival"], "status": "complete", "result_metric": "supply_advance R7: pool 5+30=35, market supply 10+30=40", "notes": "BL-038 market coupling" },
+        { "id": "R8", "requirement": "Two bodies' market prices diverge without convoys and converge after repeated convoy deliveries — price coupling is purely through delivered cargo.", "verification": ["headless: supply_advance.cpp multi-tick two-body scenario"], "status": "active", "result_metric": "", "notes": "BL-038 inter-body market effect — mechanism verified (R7 delivery injects into market supply); multi-tick price convergence scenario deferred to integration testing" },
+        { "id": "R9", "requirement": "Brief-spanning visual: the Supply lens shows inter-body route lines (Solar), per-body throughput badges (Circumplanetary), and tile segment glyphs (Planetary) — golden-verified.", "verification": ["visual: scripts/verify/supply_lens.lua golden"], "status": "active", "result_metric": "", "notes": "Canvas supply-lens pass implemented (Task F); golden blessing deferred — needs a world with active convoys to capture" }
+      ]
+    },
+    {
       "brief": "population-dynamic",
       "title": "Population centres — dynamic half (Briefs 6–7)",
       "difficulty": 4, "importance": "A", "evaluated_difficulty": null,

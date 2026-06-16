@@ -35,6 +35,10 @@ in `tools/verify/README.md`.
   zero-deposit tiles are rejected). Links the generation TUs (`tile_generation`,
   `nation_generation`, `corporation_generation`, `population_generation`,
   `placement_rules`, `hard_coded_world`, `orbital_system`, `world`).
+- **`supply_advance`** — Supply layer (BL-039 / BL-038 / BL-045): `advance_convoys` progress
+  and arrival (R1), `recipe_registry` logistics-cost accessors (R4), `dispatch_convoys`
+  gate check + balance debit + source-pool debit (R4–R6), and `credit_arrived_convoys`
+  pool + market-supply injection (R7). Links `world.cpp`, `supply_system.cpp`.
 - **`construction_harness`** — Layer 4 player construction (`construct_building`):
   `placement_rules::can_place` validation, build-cost spend from the corp balance,
   building/stockpile authoring and asset attachment, default-recipe seeding, and the

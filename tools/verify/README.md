@@ -43,6 +43,14 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\construction_harness.cpp ^
 .\construction_harness.exe
 ```
 
+:: Supply layer — advance_convoys (R1), logistics constants (R4), dispatch_convoys
+:: gate check + balance debit + pool debit (R5, R6), credit_arrived_convoys pool +
+:: market supply injection (R7, R8). BL-039 / BL-038 / BL-045.
+cl /nologo /std:c++20 /EHsc /I src tools\verify\supply_advance.cpp ^
+   src\world\world.cpp src\world\supply_system.cpp /Fe:supply_advance.exe
+.\supply_advance.exe
+```
+
 Each exits non-zero on a failed assertion. The economy *panel* (the visual class)
 is verified separately via `ProjectIo --verify scripts/verify/economy_panel.lua`
 (the `verifier-visual` skill).

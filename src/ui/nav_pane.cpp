@@ -8,6 +8,18 @@
 
 namespace ui {
 
+/// Close every nav-pane panel so at most one is open at a time. Call before
+/// toggling a slot ON; skip when toggling OFF (the toggle handles that itself).
+static void close_all_panels(ui_state& state)
+{
+    state.show_corporation_panel = false;
+    state.show_balance_ledger    = false;
+    state.show_market_ledger     = false;
+    state.show_construction_panel = false;
+    state.show_tile_ledger       = false;
+    state.show_economy_panel     = false;
+}
+
 void draw_nav_pane(ui_state& state, float top_offset)
 {
     const ImVec2 disp = ImGui::GetIO().DisplaySize;
@@ -49,13 +61,19 @@ void draw_nav_pane(ui_state& state, float top_offset)
         switch (slot)
         {
         case 1: // Corporation overview (BL-022)
-            if (ImGui::Selectable(id, state.show_corporation_panel, 0, {slot_size, slot_size}))
-                state.show_corporation_panel = !state.show_corporation_panel;
+            if (ImGui::Selectable(id, state.show_corporation_panel, 0, {slot_size, slot_size})) {
+                const bool was_open = state.show_corporation_panel;
+                close_all_panels(state);
+                state.show_corporation_panel = !was_open;
+            }
             ImGui::SetItemTooltip("Corporations");
             break;
         case 2: // Budget (BL-028)
-            if (ImGui::Selectable(id, state.show_balance_ledger, 0, {slot_size, slot_size}))
-                state.show_balance_ledger = !state.show_balance_ledger;
+            if (ImGui::Selectable(id, state.show_balance_ledger, 0, {slot_size, slot_size})) {
+                const bool was_open = state.show_balance_ledger;
+                close_all_panels(state);
+                state.show_balance_ledger = !was_open;
+            }
             ImGui::SetItemTooltip("Budget");
             break;
         case 3: // Workforce / Population — placeholder (BL-042 step 2 feeds this)
@@ -71,13 +89,19 @@ void draw_nav_pane(ui_state& state, float top_offset)
             ImGui::SetItemTooltip("Research (coming)");
             break;
         case 5: // Market Ledger (BL-027)
-            if (ImGui::Selectable(id, state.show_market_ledger, 0, {slot_size, slot_size}))
-                state.show_market_ledger = !state.show_market_ledger;
+            if (ImGui::Selectable(id, state.show_market_ledger, 0, {slot_size, slot_size})) {
+                const bool was_open = state.show_market_ledger;
+                close_all_panels(state);
+                state.show_market_ledger = !was_open;
+            }
             ImGui::SetItemTooltip("Market Ledger");
             break;
         case 6: // Construction / Buildings (BL-029)
-            if (ImGui::Selectable(id, state.show_construction_panel, 0, {slot_size, slot_size}))
-                state.show_construction_panel = !state.show_construction_panel;
+            if (ImGui::Selectable(id, state.show_construction_panel, 0, {slot_size, slot_size})) {
+                const bool was_open = state.show_construction_panel;
+                close_all_panels(state);
+                state.show_construction_panel = !was_open;
+            }
             ImGui::SetItemTooltip("Construction");
             break;
         case 7: // Corp. Strategy — placeholder
@@ -93,8 +117,11 @@ void draw_nav_pane(ui_state& state, float top_offset)
             ImGui::SetItemTooltip("Diplomacy (coming)");
             break;
         case 9: // History (Tile Ledger lives here per MENU.md renaming)
-            if (ImGui::Selectable(id, state.show_tile_ledger, 0, {slot_size, slot_size}))
-                state.show_tile_ledger = !state.show_tile_ledger;
+            if (ImGui::Selectable(id, state.show_tile_ledger, 0, {slot_size, slot_size})) {
+                const bool was_open = state.show_tile_ledger;
+                close_all_panels(state);
+                state.show_tile_ledger = !was_open;
+            }
             ImGui::SetItemTooltip("History");
             break;
         default: // Slot 10 — spare placeholder

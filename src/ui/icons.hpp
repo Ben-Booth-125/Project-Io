@@ -64,6 +64,15 @@ void placeholder(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Stroke colour.
 void supply(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Supply / convoy glyph — a rightward chevron (→) symbolising goods in transit.
+/// Used as an on-canvas convoy marker in the Supply lens.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Stroke colour.
+void convoy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 /// Draw the Market-lens glyph — a three-bar ascending chart outline — in
 /// @p colour. For the overlay-lens control strip.
 ///

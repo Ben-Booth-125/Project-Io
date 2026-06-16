@@ -95,6 +95,7 @@ enum class building_type : uint8_t
     extraction_site     = 1,
     processing_facility = 2,
     port                = 3,
+    launchpad           = 4, ///< Space-launch facility; gates space-mode convoy dispatch.
 };
 
 /// Sentinel `building_component.recipe` value meaning "no processing recipe is
@@ -259,6 +260,29 @@ struct unit_component
     entity_id body;  ///< Body where the unit is currently located.
     entity_id owner; ///< Corporation or faction entity that controls this unit.
     int       count; ///< Number of units in the group.
+};
+
+// ---------------------------------------------------------------------------
+// Convoy component
+// ---------------------------------------------------------------------------
+
+/// A goods convoy in transit between two markets. Created at dispatch, retired on
+/// arrival. Progress advances per Tick via advance_convoys (supply_system.hpp).
+/// Cargo is committed from the source pool at dispatch; destination is credited on
+/// arrival. See docs/development/BACKLOG.md § BL-039 and supply_system.hpp.
+enum class convoy_mode : uint8_t { land = 0, sea = 1, air = 2, space = 3 };
+
+struct convoy_component
+{
+    entity_id   source_market  = null_entity; ///< Market the cargo was dispatched from.
+    entity_id   dest_market    = null_entity; ///< Market the cargo is bound for.
+    convoy_mode mode           = convoy_mode::land;
+    resource_type cargo_resource = resource_type::iron_ore;
+    float       cargo_qty      = 0.0f;
+    float       progress       = 0.0f; ///< 0.0 (just dispatched) → 1.0 (arrived).
+    float       speed          = 0.0f; ///< Progress increment per Tick (1/distance in ticks).
+    entity_id   corp           = null_entity; ///< Dispatching corporation.
+    bool        arrived        = false; ///< Set true when progress >= 1.0; retirement pending.
 };
 
 // ---------------------------------------------------------------------------

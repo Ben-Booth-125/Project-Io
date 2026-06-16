@@ -532,6 +532,30 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
                 scar_max_sel = std::max(scar_max_sel, tile.resource_deposit[sel]);
     }
 
+    // Supply lens pre-pass: check whether the active body has any player convoys
+    // (source or destination). Used inside the tile loop to gate the per-tile glyph.
+    // w.convoys is empty until the dispatch system lands; supply_active stays false.
+    bool supply_active = false;
+    if (state.overlay == overlay_mode::supply)
+    {
+        for (const auto& cv : w.convoys)
+        {
+            if (cv.corp != w.player_entity)
+                continue;
+            entity_id src_body = null_entity;
+            entity_id dst_body = null_entity;
+            const auto smk = w.markets.find(cv.source_market);
+            const auto dmk = w.markets.find(cv.dest_market);
+            if (smk != w.markets.end()) src_body = smk->second.body;
+            if (dmk != w.markets.end()) dst_body = dmk->second.body;
+            if (src_body == state.active_body || dst_body == state.active_body)
+            {
+                supply_active = true;
+                break;
+            }
+        }
+    }
+
     const ImVec2 mouse = ImGui::GetIO().MousePos;
 
     // Hover resolves to a single tile copy. Adjacent hexes' circular hit-tests
@@ -762,6 +786,16 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
                     marker_col = corp_colour(corp_it->second);
 
                 icons::building(dl, {cx, cy}, mr, built_type, marker_col);
+            }
+
+            // Supply lens: draw a convoy glyph on every tile when the active body
+            // has a player convoy passing through it. supply_active is false when
+            // w.convoys is empty, so this is a no-op until dispatch is wired.
+            if (supply_active)
+            {
+                constexpr ImU32 supply_col = IM_COL32(80, 200, 255, 200);
+                const float gr = std::max(2.0f, draw_r * 0.28f);
+                icons::convoy(dl, {cx, cy}, gr, supply_col);
             }
 
             // Selection outline is drawn on every visible copy of the selected

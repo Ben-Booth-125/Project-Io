@@ -261,6 +261,44 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
     if (apply_view && state.overlay == overlay_mode::market)
         draw_market_price_strip(dl, w, anchor, state, origin, size);
 
+    // Supply lens: draw a convoy count badge next to each body's label.
+    // w.convoys is empty until the dispatch system lands; the loop is a no-op
+    // in the meantime. Primary view only — the minimap is too small.
+    if (apply_view && state.overlay == overlay_mode::supply)
+    {
+        constexpr ImU32 badge_col  = IM_COL32(80, 200, 255, 200);
+        constexpr ImU32 badge_bg   = IM_COL32(18, 18, 24, 200);
+        for (const auto& [id, is_anchor_body] : draw_list)
+        {
+            // Count convoys whose source or destination body matches this body.
+            int count = 0;
+            for (const auto& cv : w.convoys)
+            {
+                entity_id src_body = null_entity;
+                entity_id dst_body = null_entity;
+                const auto smk = w.markets.find(cv.source_market);
+                const auto dmk = w.markets.find(cv.dest_market);
+                if (smk != w.markets.end()) src_body = smk->second.body;
+                if (dmk != w.markets.end()) dst_body = dmk->second.body;
+                if (src_body == id || dst_body == id)
+                    ++count;
+            }
+            if (count == 0)
+                continue;
+
+            const float  radius = body_radius(id, is_anchor_body);
+            const ImVec2 pos    = to_screen(local_pos(id, is_anchor_body));
+            char buf[32];
+            std::snprintf(buf, sizeof(buf), "%d", count);
+            const ImVec2 ts  = ImGui::CalcTextSize(buf);
+            const ImVec2 bp  = { pos.x + radius + 4.0f, pos.y - ts.y * 0.5f };
+            dl->AddRectFilled({ bp.x - 2.0f, bp.y - 1.0f },
+                              { bp.x + ts.x + 2.0f, bp.y + ts.y + 1.0f },
+                              badge_bg, 2.0f);
+            dl->AddText(bp, badge_col, buf);
+        }
+    }
+
     // Scale bar + zoom slider — primary view only, pinned to the bottom centre.
     // Shared with the Solar canvas via draw_scale_zoom_overlay. Drawn before the
     // input_enabled early-out so it stays put while an ImGui panel captures the
