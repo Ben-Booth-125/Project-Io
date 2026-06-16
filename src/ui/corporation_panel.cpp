@@ -36,6 +36,9 @@ std::string nation_label(const world& w, entity_id nation_id)
 
 void draw_corporation_panel(const world& w, ui_state& s, bool& open)
 {
+    if (!open)
+        return;
+
     ImGui::SetNextWindowSize(ledger_window_size, ImGuiCond_Once);
     ImGui::SetNextWindowPos(ledger_window_spawn, ImGuiCond_Once);
 

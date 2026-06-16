@@ -33,8 +33,8 @@ in `tools/verify/README.md`.
   (forest + wetland fraction), extraction-asset placement, deposit-reserve seeding,
   and the reusable `placement_rules::can_place` seam (placed assets pass it; ocean /
   zero-deposit tiles are rejected). Links the generation TUs (`tile_generation`,
-  `nation_generation`, `corporation_generation`, `placement_rules`, `hard_coded_world`,
-  `orbital_system`, `world`).
+  `nation_generation`, `corporation_generation`, `population_generation`,
+  `placement_rules`, `hard_coded_world`, `orbital_system`, `world`).
 - **`construction_harness`** — Layer 4 player construction (`construct_building`):
   `placement_rules::can_place` validation, build-cost spend from the corp balance,
   building/stockpile authoring and asset attachment, default-recipe seeding, and the

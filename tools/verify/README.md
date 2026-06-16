@@ -17,29 +17,30 @@ Compile and run from the repo root, after sourcing the VS BuildTools `vcvars64`:
 cl /nologo /std:c++20 /EHsc /I src tools\verify\econ_harness.cpp ^
    src\world\world.cpp src\world\economy_system.cpp ^
    src\world\market_clearing.cpp src\world\budget_system.cpp /Fe:econ_harness.exe
-econ_harness.exe
+.\econ_harness.exe
 
 :: Multi-tick economy stability — runs the loop 100 ticks on a small fixed world
 :: and asserts price-band, finiteness, monotonic reserve, and bounded balances.
 cl /nologo /std:c++20 /EHsc /I src tools\verify\econ_stability.cpp ^
    src\world\world.cpp src\world\economy_system.cpp ^
    src\world\market_clearing.cpp src\world\budget_system.cpp /Fe:econ_stability.exe
-econ_stability.exe
+.\econ_stability.exe
 
 :: World audit — Kepler biome balance (S2) + extraction placement (S1) +
 :: deposit-reserve seeding (resource_remaining = richness x reserve factor).
 cl /nologo /std:c++20 /EHsc /I src tools\verify\world_audit.cpp ^
    src\world\world.cpp src\world\tile_generation.cpp src\world\nation_generation.cpp ^
    src\world\corporation_generation.cpp src\world\placement_rules.cpp ^
-   src\world\hard_coded_world.cpp src\world\orbital_system.cpp /Fe:world_audit.exe
-world_audit.exe
+   src\world\population_generation.cpp src\world\hard_coded_world.cpp ^
+   src\world\orbital_system.cpp /Fe:world_audit.exe
+.\world_audit.exe
 
 :: Layer 4 player construction — construct_building validation, build-cost spend,
 :: component authoring, and the insufficient-funds / unknown-corp/tile guards.
 cl /nologo /std:c++20 /EHsc /I src tools\verify\construction_harness.cpp ^
    src\world\world.cpp src\world\construction.cpp src\world\placement_rules.cpp ^
    /Fe:construction_harness.exe
-construction_harness.exe
+.\construction_harness.exe
 ```
 
 Each exits non-zero on a failed assertion. The economy *panel* (the visual class)

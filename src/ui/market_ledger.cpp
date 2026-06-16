@@ -92,6 +92,8 @@ void draw_market_ledger(const world& w, const ui_state& /*s*/, bool& open)
     constexpr ImGuiTableFlags table_flags =
         ImGuiTableFlags_Borders | ImGuiTableFlags_SizingStretchProp;
 
+    float total_cleared = 0.0f;
+
     if (ImGui::BeginTable("##market_ledger", 5, table_flags))
     {
         ImGui::TableSetupColumn("Resource");
@@ -100,8 +102,6 @@ void draw_market_ledger(const world& w, const ui_state& /*s*/, bool& open)
         ImGui::TableSetupColumn("Price");
         ImGui::TableSetupColumn("Net");
         ImGui::TableHeadersRow();
-
-        float total_cleared = 0.0f;
 
         for (std::size_t r = 0; r < resource_count; ++r)
         {

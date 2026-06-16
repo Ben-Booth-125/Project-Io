@@ -143,7 +143,7 @@ int main()
     {
         economy_report rep = run_economy_step(w, reg);
         auto flows = clear_markets(w, reg, rep);
-        apply_budget(w, reg, flows);
+        apply_budget(w, reg, flows, rep.workforce_contention);
 
         const market_component& m = w.markets[market];
         const float pi = m.price[ri(resource_type::iron_ore)];
