@@ -1,12 +1,33 @@
 #include "budget_system.hpp"
 
 #include <algorithm>
+#include <map>
 
 void apply_budget(world& w,
                   const recipe_registry& reg,
                   const std::unordered_map<entity_id, corp_cash_flow>& flows,
                   const std::map<std::pair<entity_id, entity_id>, float>& contention)
 {
+    // BL-042B: mean habitability per body (from population centres) for wage scaling.
+    std::map<entity_id, float> mean_habitability_by_body;
+    {
+        std::map<entity_id, std::pair<float, int>> hab_accum; // body → (sum, count)
+        for (const auto& [cid, pcc] : w.population_centres)
+        {
+            const auto tile_it = w.population_centre_tile.find(cid);
+            if (tile_it == w.population_centre_tile.end())
+                continue;
+            const auto tc_it = w.tiles.find(tile_it->second);
+            if (tc_it == w.tiles.end())
+                continue;
+            auto& acc = hab_accum[tc_it->second.body];
+            acc.first  += pcc.habitability;
+            acc.second += 1;
+        }
+        for (const auto& [body, acc] : hab_accum)
+            mean_habitability_by_body[body] = (acc.second > 0) ? acc.first / acc.second : 1.0f;
+    }
+
     for (auto& [corp, cc] : w.corporations)
     {
         float delta = 0.0f;
@@ -47,7 +68,11 @@ void apply_budget(world& w,
             // Guard against negative labour_cost when wt_scalar < 0.3 (the material
             // floor already covers more than the scaled total in that edge case).
             delta -= material_cost + std::max(0.0f, labour_cost);
-            delta -= b.decommissioned ? 0.0f : b.workforce_assigned * scalar * e.base_wage * wt_scalar;
+            const float hab  = [&]() -> float {
+                const auto it = mean_habitability_by_body.find(body);
+                return (it != mean_habitability_by_body.end()) ? std::clamp(it->second, 0.1f, 2.0f) : 1.0f;
+            }();
+            delta -= b.decommissioned ? 0.0f : b.workforce_assigned * scalar * e.base_wage * wt_scalar * hab;
         }
 
         cc.balance += delta; // may go negative — allowed in the prototype

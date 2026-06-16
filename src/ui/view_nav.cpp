@@ -92,7 +92,16 @@ void focus_on_entity(const world& w, ui_state& ui, entity_id entity)
         return;
     }
     if (w.bodies.count(entity))
+    {
         focus_on_surface(w, ui, entity);
+        return;
+    }
+    if (w.corporations.count(entity))
+    {
+        ui.show_corporation_panel = true;
+        return;
+    }
+    // Nations: no ledger yet — no-op (nation ledger is deferred).
 }
 
 } // namespace ui

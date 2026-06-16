@@ -221,6 +221,39 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
     for (const auto& [mid, mc] : w.markets)
         bodies_with_market.insert(mc.body);
 
+    // BL-042: Derive per-body workforce supply from population centres.
+    // Scale → labour-force table (units available to industry on this body).
+    static constexpr float labour_by_scale[6] = { 0.0f, 1.0f, 3.0f, 10.0f, 30.0f, 100.0f };
+    std::map<entity_id, float> pop_supply_by_body;
+    for (const auto& [cid, pcc] : w.population_centres)
+    {
+        const auto tile_it = w.population_centre_tile.find(cid);
+        if (tile_it == w.population_centre_tile.end())
+            continue;
+        const auto tc_it = w.tiles.find(tile_it->second);
+        if (tc_it == w.tiles.end())
+            continue;
+        const int sc = std::clamp(pcc.scale, 1, 5);
+        pop_supply_by_body[tc_it->second.body] += labour_by_scale[sc];
+    }
+    // Building counts per (corp, body) for apportionment.
+    std::map<std::pair<entity_id, entity_id>, int> bldg_count_by_corp_body;
+    std::map<entity_id, int>                        bldg_count_by_body;
+    for (const auto& [corp, cc] : w.corporations)
+    {
+        for (const entity_id bid : cc.assets)
+        {
+            const auto bit = w.buildings.find(bid);
+            if (bit == w.buildings.end())
+                continue;
+            const entity_id body = building_body(w, bit->second);
+            if (body == null_entity)
+                continue;
+            ++bldg_count_by_corp_body[{corp, body}];
+            ++bldg_count_by_body[body];
+        }
+    }
+
     // Visit corporations in ascending id order for deterministic output.
     std::vector<entity_id> corp_ids;
     corp_ids.reserve(w.corporations.size());
@@ -254,7 +287,20 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
         std::map<entity_id, float> contention_by_body;
         for (const auto& [body, demand] : demand_by_body)
         {
-            const float supply = w.workforce_supply(corp, body);
+            const float pop_total = [&]() -> float {
+                const auto it = pop_supply_by_body.find(body);
+                return (it != pop_supply_by_body.end()) ? it->second : 0.0f;
+            }();
+            const int corp_bldgs  = [&]() -> int {
+                const auto it = bldg_count_by_corp_body.find({corp, body});
+                return (it != bldg_count_by_corp_body.end()) ? it->second : 0;
+            }();
+            const int total_bldgs = [&]() -> int {
+                const auto it = bldg_count_by_body.find(body);
+                return (it != bldg_count_by_body.end()) ? it->second : 0;
+            }();
+            const float share  = (total_bldgs > 0) ? static_cast<float>(corp_bldgs) / static_cast<float>(total_bldgs) : 1.0f;
+            const float supply = (pop_total > 0.0f) ? pop_total * share : w.workforce_supply(corp, body);
             const float scalar = (demand > supply && demand > 0.0f) ? supply / demand : 1.0f;
             contention_by_body[body] = scalar;
             report.workforce_contention[std::make_pair(corp, body)] = scalar;
