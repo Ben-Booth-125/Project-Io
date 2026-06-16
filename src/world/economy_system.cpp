@@ -56,8 +56,11 @@ building_report run_extraction(world& w, const recipe_registry& reg,
     const float richness = tc.resource_deposit[ri];
     const float base_rate = reg.economics(building_type::extraction_site).base_rate;
 
+    // Apply the player's workforce target (0–200 % of nominal capacity).
+    const float wt_scalar = std::clamp(b.workforce_target / 100.0f, 0.0f, 2.0f);
+
     // Rate the deposit would yield at full reserve (richness sets the rate).
-    const float nominal = base_rate * richness * effective_workforce * (1.0f - tc.hazard_level);
+    const float nominal = base_rate * richness * effective_workforce * wt_scalar * (1.0f - tc.hazard_level);
     if (nominal <= 0.0f)
     {
         rep.idle = true; // unstaffed, no deposit of the target, or fully hazardous
@@ -117,8 +120,10 @@ building_report run_processing(world& w, const recipe_registry& reg,
     rep.body = body;
 
     const recipe* rcp = reg.get_recipe(b.recipe);
+    // Apply the player's workforce target (0–200 % of nominal capacity).
+    const float wt_scalar    = std::clamp(b.workforce_target / 100.0f, 0.0f, 2.0f);
     const float batches_full =
-        reg.economics(building_type::processing_facility).base_rate * effective_workforce;
+        reg.economics(building_type::processing_facility).base_rate * effective_workforce * wt_scalar;
 
     if (body == null_entity || rcp == nullptr || batches_full <= 0.0f)
     {
@@ -267,6 +272,10 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
                 continue;
             const building_component& b = bit->second;
             const entity_id body = building_body(w, b);
+
+            // Decommissioned buildings produce nothing — skip production entirely.
+            if (b.decommissioned)
+                continue;
 
             switch (b.type)
             {

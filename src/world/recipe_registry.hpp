@@ -75,6 +75,15 @@ public:
 
     std::size_t recipe_count() const { return m_recipes.size(); }
 
+    /// Returns the number of available recipes for the given building type.
+    /// Only processing_facility has recipes; all other types return 0.
+    int recipe_count(building_type bt) const;
+
+    /// Returns the recipe at index @p i for building type @p bt.
+    /// The index is clamped to [0, recipe_count(bt) - 1]; returns a dummy empty
+    /// recipe if the type has no recipes.
+    const recipe& recipe_at(building_type bt, int i) const;
+
     // --- direct construction for tests (headless harness builds these by hand) ---
     void set_thresholds(float t_full, float t_idle) { m_t_full = t_full; m_t_idle = t_idle; }
     void set_economics(building_type type, const building_economics& e)

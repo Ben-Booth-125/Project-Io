@@ -58,6 +58,36 @@ void read_resource_map(const sol::table& src, std::array<float, resource_count>&
 
 } // namespace
 
+// --- recipe_count / recipe_at ------------------------------------------------
+
+int recipe_registry::recipe_count(building_type bt) const
+{
+    // Only processing facilities use recipes. Extraction sites and ports do not.
+    if (bt != building_type::processing_facility)
+        return 0;
+    return static_cast<int>(m_recipes.size());
+}
+
+namespace {
+// Dummy recipe returned when the building type carries no recipes.
+const recipe& empty_recipe()
+{
+    static const recipe r{};
+    return r;
+}
+} // namespace
+
+const recipe& recipe_registry::recipe_at(building_type bt, int i) const
+{
+    const int n = recipe_count(bt);
+    if (n == 0)
+        return empty_recipe();
+    const int clamped = (i < 0) ? 0 : (i >= n ? n - 1 : i);
+    return m_recipes[static_cast<std::size_t>(clamped)];
+}
+
+// --- load_from_lua -----------------------------------------------------------
+
 void recipe_registry::load_from_lua(lua_state& lua)
 {
     sol::state& s = lua.state();
