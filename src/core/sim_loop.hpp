@@ -29,6 +29,10 @@ public:
     static constexpr double seconds_per_day_1x = 6.0; ///< Real seconds per day at 1x (=> ~2s/day at 3x).
     static constexpr int    max_speed          = 5;
 
+    /// Non-linear time multiplier for speed level s (1–5).
+    /// Returns the real multiplier applied to the 1× pace reference.
+    static double speed_multiplier(int s);
+
     sim_loop();
 
     /// Advance by wall-clock delta. Call exactly once per rendered frame.

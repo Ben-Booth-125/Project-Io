@@ -707,7 +707,7 @@ void app::render()
             ImGui::TableSetColumnIndex(0);
             ImGui::Text("%d Q%d", date.year, date.quarter);
             ImGui::Text("%s %02d", ui::fmt::month_abbrev(date.month), date.day);
-            ImGui::ProgressBar(ui::fmt::quarter_progress(day), {-1.0f, 0.0f});
+            ImGui::ProgressBar(ui::fmt::quarter_progress(day), {-1.0f, 0.0f}, "");
 
             // --- Right: the compressed speed controls.
             ImGui::TableSetColumnIndex(1);
@@ -716,11 +716,15 @@ void app::render()
             if (m_sim_loop.paused())
                 ImGui::TextDisabled("(paused)");
             else
-                ImGui::TextDisabled("(%dx)", m_sim_loop.speed());
+            {
+                static constexpr const char* mult_labels[] = {"", "1/4x", "1/2x", "1x", "4x", "16x"};
+                const int s = m_sim_loop.speed();
+                ImGui::TextDisabled("(%s)", (s >= 1 && s <= sim_loop::max_speed) ? mult_labels[s] : "?");
+            }
 
-            // Pause plus 1x..5x. The active speed is highlighted. The pause label
-            // flips to a play symbol when paused so it reflects the toggle state.
-            const char* labels[] = {m_sim_loop.paused() ? ">" : "II", "1", "2", "3", "4", "5"};
+            // Pause plus speed buttons. The active speed is highlighted. The pause
+            // label flips to a play symbol when paused so it reflects the toggle state.
+            const char* labels[] = {m_sim_loop.paused() ? ">" : "II", "1/4x", "1/2x", "1x", "4x", "16x"};
             const int   speeds[] = { 0,    1,   2,   3,   4,   5 };
             const int   n        = 6;
             const float spacing  = ImGui::GetStyle().ItemSpacing.x;
