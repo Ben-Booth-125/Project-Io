@@ -1,0 +1,86 @@
+# Project Io — Supply (Layer 5)
+
+Layer 5 of the economy is the **logistics / convoy layer** — the mechanism that physically moves goods between markets and bodies, coupling otherwise-isolated price pools through cargo movement. A convoy is the unit of flow; there is no abstract price-coupling term between bodies: the convoy *is* the coupling. Full design authority for this layer is BL-039 (`[S5]`) in `docs/development/BACKLOG.md` § Supply; the build is v0.0.7's whole theme.
+
+---
+
+## Convoy entity
+
+A convoy is a world ECS component. Each active convoy carries:
+
+| Field | Type / values | Notes |
+|---|---|---|
+| `source_market` | market entity | The market the cargo was dispatched from |
+| `destination_market` | market entity | The market the cargo is being delivered to |
+| `mode` | `{land, sea, air, space}` | Determines infrastructure gate and cost multiplier |
+| `cargo_resource` | resource enum | The good being transported |
+| `cargo_qty` | quantity | Units in transit |
+| `progress` | `0.0–1.0` | Fraction of route completed |
+| `speed` | progress/Tick | Fixed linear advance per economy Tick |
+
+The coupling is **market-to-market**, not body-to-body. A convoy is created when goods are dispatched toward a destination shortfall. It advances `progress` by `speed` each Tick (linear; no orbital mechanics in the prototype). On arrival (`progress >= 1.0`) it credits the destination `(corp, body)` pool and market supply, then is retired.
+
+Cargo leaves the source pool at **dispatch**, not arrival. Goods in transit are committed — the source pool shrinks immediately when a convoy departs.
+
+---
+
+## Logistical cost
+
+Each convoy incurs a budget outflow:
+
+```
+logistical_cost = base_logistics_cost × distance × cargo_qty
+```
+
+`base_logistics_cost` is a per-mode multiplier from the Lua economy-constants registry (`scripts/economy.lua`), ordered:
+
+```
+land < sea < air < space
+```
+
+For **space convoys**, `distance` is the Euclidean distance between the parent bodies' centres (no path routing — straight-line in the prototype). For **intra-body convoys** (land / sea / air), distance is the route length across the tile grid.
+
+The cost is charged at dispatch (or amortised per Tick — the exact timing is a build decision). It is the term that makes distant arbitrage marginal: a profitable inter-body trade requires `source_price + logistical_cost_per_unit < destination_price`.
+
+---
+
+## Dispatch trigger
+
+**Auto-dispatch is the default.** On each economy Tick the system scans for destination shortfalls (demand exceeds local supply) and dispatches convoys from the cheapest reachable source to fill them. The loop runs without player intervention.
+
+**Player-direction is the exception.** A player can direct a specific convoy — for example, fulfilling a standing sell order whose counterparty is on another body. This covers targeted arbitrage and order-book matching across bodies.
+
+**Space launches are always player-directed.** Leaving the gravity well is an explicit decision, never auto-dispatched — in Era 0 and Era 1 alike. Terrestrial (land / sea / air) convoys auto-dispatch.
+
+**Reachability.** In the prototype all bodies are treated as reachable (Exploration is a data-model stub). Infrastructure gates (below) are the operative constraint on reachability, not exploration state.
+
+---
+
+## Infrastructure gates
+
+Each convoy mode is gated on endpoint infrastructure. Mode is selected by the source/destination pair: inter-body → **space**; intra-body → **land** by default, **sea** when the route must cross water.
+
+| Mode | Gate | Status |
+|---|---|---|
+| **Land** | Ungated — available across contiguous land with no built prerequisite | Prototype default for intra-body |
+| **Sea** | **Port** building at both endpoints | Port is in the Era 0 building set |
+| **Air** | **Airfield** building at both endpoints | Designed; building not in the prototype set — deferred |
+| **Space** | **Launchpad** at the origin + **Orbital Port** at the destination; **Era 1 required** | Era gate already enforced by `docs/economy/ERAS.md` |
+
+Roads are an optional land cost-reducer — a `road_level` tile attribute that multiplies the per-unit-distance land cost downward when a route crosses it. Roads are a deferred tuning follow-on; the prototype land mode works without them.
+
+Per-node throughput capacity (a larger Port or Orbital Port carrying more cargo per Tick) is the natural infrastructure tuning lever but is out of prototype scope.
+
+---
+
+## Build status
+
+This layer is **designed but not yet built**. BL-039 (`[S5]`) is v0.0.7's whole theme — the largest remaining v0.1.0 build. The decomposition at promotion (foundation-first) is:
+
+1. Convoy component + per-Tick advance
+2. Logistical-cost budget term + economy-constants entries
+3. Dispatch triggers (auto, then player-directed)
+4. Destination crediting + inter-body market effect
+5. Supply lens render passes (disjoint from 1–4)
+
+Files touched at build time: `src/world/supply_system.{hpp,cpp}` (new), `src/world/components.hpp` (convoy component), `src/world/budget_system.cpp` (cost), `scripts/economy.lua` (per-mode constants), `src/world/market_clearing.{hpp,cpp}` (delivery).
