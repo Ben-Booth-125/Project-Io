@@ -8,6 +8,14 @@ sim_loop::sim_loop()
     : m_last_ms(SDL_GetTicks())
 {}
 
+double sim_loop::speed_multiplier(int s)
+{
+    // Non-linear curve: 0.25× / 0.5× / 1× / 4× / 16×
+    static constexpr double table[max_speed + 1] = { 0.0, 0.25, 0.5, 1.0, 4.0, 16.0 };
+    if (s <= 0 || s > max_speed) return 0.0;
+    return table[s];
+}
+
 void sim_loop::set_speed(int speed)
 {
     m_speed = (speed <= 0) ? 0 : std::min(speed, max_speed);
@@ -28,14 +36,15 @@ void sim_loop::tick()
     }
 
     // Real milliseconds per sim step at the current speed. Derived so that one
-    // day (sim_ticks_per_day steps) takes seconds_per_day_1x / speed seconds.
+    // day (sim_ticks_per_day steps) takes seconds_per_day_1x / multiplier seconds.
+    const double mult    = speed_multiplier(m_speed);
     const double step_ms = (seconds_per_day_1x * 1000.0)
-                         / (sim_ticks_per_day * m_speed);
+                         / (sim_ticks_per_day * mult);
 
     // Continuous day counter for smooth visual motion. One day passes every
-    // seconds_per_day_1x / speed real seconds, so days advance by delta scaled
+    // seconds_per_day_1x / multiplier real seconds, so days advance by delta scaled
     // accordingly. Decoupled from the discrete sim-step accumulator below.
-    m_elapsed_days += (delta * m_speed) / (seconds_per_day_1x * 1000.0);
+    m_elapsed_days += (delta * mult) / (seconds_per_day_1x * 1000.0);
 
     m_accum_ms += delta;
 
