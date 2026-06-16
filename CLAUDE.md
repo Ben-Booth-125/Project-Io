@@ -140,6 +140,23 @@ behaviour) — Briefs that fail are doc-changing and get a **per-Brief doc colli
 calls, **closes with a proportional design-direction Q&A** (recorded in DEVLOG; see
 `docs/development/DEVELOPMENT_PRACTICES.md` § Design-direction Q&A).
 
+### Progress reporting & Brief timestamping (policy 2026-06-16)
+
+Two standing conventions, settled at the v0.0.5 lens-batch close. Full detail in
+`docs/development/OPENS.md` (§ Publish → Progress reporting; § Design state → Brief timestamping
+& precedence).
+
+- **Progress markers.** A Publish expected to span many steps (any Batch Publish) emits a
+  **coarse `%` progress line** in the response text between tool calls — estimated once up front
+  after the collision map, in multiples of 5 (`0 … 100`), weighting verification/golden steps
+  heavily. It is a *naive pacing guess* riding existing output (no extra tool call), never walked
+  backwards; skip it for a trivial single-Brief Publish.
+- **Brief timestamping & precedence.** Timestamp every **new** Brief (`*(Written YYYY-MM-DD,
+  trigger)*`). On conflict, **the newest-dated statement is canon and a present timestamp is
+  never ignored** (a dated Brief outranks undated prose). **No retroactive refactor** — undated
+  Briefs stand; they just lose to a dated Brief that contradicts them. Reconcile conflicts at
+  batch-publish, not continuously.
+
 ### Proportionality and session boundaries
 
 Two standing guidelines temper the lifecycle above. They are reasserted operationally in

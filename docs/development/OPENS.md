@@ -51,6 +51,33 @@ to keep honest: an authority doc therefore *lags* OPENS for any subject with an 
 Brief, so that doc should **point forward** to the open Brief rather than imply its
 pre-design state is current.
 
+### Brief timestamping & precedence (policy 2026-06-16)
+
+OPENS accretes across many sessions, so two Briefs — or a Brief and older prose — can
+describe the **same subject** differently. The precedence rule:
+
+- **Timestamp a Brief when you write it.** Add a `*(Written YYYY-MM-DD, <trigger>)*`
+  note (the trigger is usually a Q&A or a batch-close decision). Going forward this is
+  the default for every new Brief.
+- **Newest wins on conflict — and a present timestamp is never ignored.** When two
+  statements about one subject disagree, the **more recently dated one is canon**. A
+  Brief that carries a date **outranks undated prose** on the same subject; between two
+  dated statements the later date wins. Do **not** discount a timestamp because the
+  conflicting text is longer, older-looking, or in an authority doc.
+- **No retroactive refactor.** We do **not** backfill timestamps onto the existing
+  undated Briefs. An undated Brief is still valid; it simply loses to a *dated* Brief
+  that contradicts it. The policy is forward-only — it costs nothing to adopt and
+  needs no sweep.
+- **Resolve at batch-publish.** A Batch Publish is when Briefs are resolved
+  (promoted/closed); reconcile any newest-wins conflicts among the set being published
+  at that point, not continuously.
+
+Example: the v0.0.5 close raised **[B3 ~] Multiple markets per body (tile-centred)**
+*(Written 2026-06-16)* in § Trade, which supersedes the older undated "markets are a
+per-body exchange" wording at the head of that section — the dated Brief is canon where
+they overlap, and the old wording was left in place (no refactor) with the Brief noting
+it is the newer authority.
+
 ## OPENS vs. TASKS
 
 This file (OPENS.md) holds **described intent**. [`TASKS.md`](TASKS.md) holds the
@@ -131,6 +158,30 @@ The depth verb is how you override that.
    cancellation reason alongside the task entry.
 5. **Commit** — once all tasks are complete or cancelled, create a single commit
    for the Brief using the format below.
+
+#### Progress reporting (naive `%` markers — policy 2026-06-16)
+
+A Publish — especially a Batch Publish — can run long (the v0.0.5 lens batch took over an
+hour). Emit a **coarse progress percentage** so the user can see the pace and pick a moment to
+interrupt, at near-zero cost: it **rides the text output between tool calls** (which the user
+sees), not a tool call of its own.
+
+- **Estimate once, up front.** After the collision map (step 3) the shape is known: count the
+  meaningful checkpoints — roughly one per task/wave, plus the verification/golden step (weight
+  it **heavily** — that is where the time goes) and the commit. Map them onto a **0–100% scale
+  in multiples of 5** (`0, 5, … 95, 100`). Light tasks (an enum edit) get a small jump; heavy
+  ones (a render pass, a golden bless, a build-and-verify loop) get a big one.
+- **Emit a one-line marker at each checkpoint**, in the response text, e.g.
+  `▕▓▓▓▓░░░░░░░░░░▏ 30% — Group R-C: Planetary render pass`. **0%** at batch start (after the
+  collision map); **100%** at the final commit.
+- **It is a guess, not a measurement.** "Roughly how long the batch might take," allocated
+  across the waves — it may jump unevenly. If the estimate proves off, **re-baseline silently
+  toward 100%** (never walk the number backwards). Keep it to one short line; never spend a tool
+  call or a build on it.
+
+This is a *pacing signal* for the user, independent of the requirement verification that proves
+correctness. Skip it for a trivial single-Brief Publish (proportionality) — it earns its place on
+a multi-Brief batch or any Publish expected to span many steps.
 
 #### Publishing multiple Briefs together (Batch Publish — barrier semantics)
 

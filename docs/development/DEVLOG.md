@@ -6,6 +6,59 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+> ## Handoff — Session 3: the UI-polish batch
+>
+> **Goal.** Clear the cheap, unblocked UI polish — per ROADMAP § Near-term publish plan
+> → **Session 3 (UI polish, serial, main session)**. A Batch Publish, **strictly serial**:
+> every Brief collides on `icons.{hpp,cpp}` and/or the shared UI files, so there is **no
+> fan-out**. Mostly already-designed (`✓`) Briefs in OPENS § Canvas.
+>
+> **Briefs, in order (OPENS § Canvas / § Selection unless noted):**
+> 1. **[C2 ✓] Icon silhouette collisions & contract mismatch** + **[C2 ✓] Icon outline &
+>    colour conventions** — *land together*, same files (`icons.{hpp,cpp}`, `docs/ui/ICONS.md`):
+>    redraw extraction-site (faceted ore, off the gem-diamond pip) and unit/convoy (open chevron);
+>    bring `icons.cpp` into line with the shared outline/colour-source conventions.
+> 2. **[C2 ✓] Verify icon usage is consistent** — audit every `ui::icons::*` call site against
+>    ICONS.md; fix cheap drifts, promote larger ones. Runs *after* (1) so it audits the redrawn set.
+> 3. **[C2 ✓] Reference distances are rung-relative** — `entity_summary.cpp`: read the distance
+>    reference from the current rung (star at Solar, parent at Circumplanetary) rather than hard-coding the star.
+> 4. **Time-speed curve / clarify time-control** (ROADMAP names these — confirm their exact Brief
+>    text/location in OPENS before promoting; may be a § Time / § Canvas pair).
+> 5. **[C2 ✓] Tile-ledger body-selector default** — `tile_inspector.cpp`: default the selector to
+>    the in-view body (`ui_state.active_body` / `circumplanetary_anchor`), not the lowest id.
+> 6. **[C1 ✓] Corporation-lens player border recolour** — `body_surface_canvas.cpp` (hotspot): the
+>    player border is `faction_colour(0)` over a `faction_colour(0)` fill (invisible); recolour for
+>    contrast (e.g. `palette::selection`). Update LENSES.md § Corporation lens. **Re-bless the
+>    `corporation_lens` golden** after.
+>
+> **Hotspot / why serial.** `icons.{hpp,cpp}` (every icon Brief) and `body_surface_canvas.cpp`
+> (border recolour) are single-writer in the main session. No disjoint scopes → no sub-agents.
+>
+> **Verification.** Each `src/`-changing Brief: brief-spanning **visual** requirement first, then
+> author/extend a `scripts/verify/*.lua` and bless a golden (F3 diffing is live). The corp /
+> resource / market goldens are existing references; (6) changes the corp golden, so re-bless it.
+>
+> **New process this session (just adopted — apply them):**
+> - **Progress markers.** Emit a coarse `%` line (`0 … 100`, steps of 5) in your text output at
+>   each checkpoint — estimate once after the collision map, weight verification heavily. See
+>   CLAUDE.md § Publication pipeline → Progress reporting; OPENS § Publish.
+> - **Brief timestamping.** Timestamp every *new* Brief; newest-dated statement is canon on
+>   conflict; no retroactive refactor. See OPENS § Design state → Brief timestamping & precedence.
+>
+> **Before promoting:** ROADMAP flags two entries (C1 nav-rail ordering, A3 design-pass
+> propagation) as possibly **stale** (already settled into their authority docs) — check and
+> *remove* rather than work them if so.
+>
+> **Not in scope (gated):** v0.0.6 ledger family / population / building management; the selection
+> trio; Supply / Layer 5; the design-owed `~` Briefs — **[B4 ~] substrate generation** and the new
+> **[B3 ~] Multiple markets per body (tile-centred)** (§ Trade) — which need a *design* pass, not a
+> publish. After Session 3, ROADMAP § Session 4 is the A3 economy-panel refit (alone).
+>
+> **State at handoff:** branch `v0.0.5`; tree clean; TASKS empty; no pending `⟳` notes. Last
+> commits: lens batch (`030934c`, `24d8013`) + close-out + this process pass.
+
+---
+
 ## 2026-06-16 — v0.1.0 Session 2: the lens batch (Resource + Market) (branch v0.0.5)
 
 The Session-2 goal: publish the two unblocked overlay modes, golden-verified against the F3

@@ -5,6 +5,7 @@ out/
 
 # Backups
 backups/
+generic files/
 
 # CMake generated
 CMakeCache.txt
@@ -25,6 +26,10 @@ Makefile
 
 # Dear ImGui auto-saved window state (per-machine runtime layout)
 imgui.ini
+
+# Verify-harness capture output (run-from-repo-root lands here; goldens under
+# scripts/verify/golden/ are the committed references)
+screenshots/
 
 # Compiled artifacts
 *.exe
