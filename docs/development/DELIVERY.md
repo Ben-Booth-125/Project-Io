@@ -69,7 +69,7 @@ glyph in `BACKLOG.md` mirrors it 1:1 for human skimming:
 
 - **`designed` (glyph `✓`)** — design settled; **promote-ready**. What remains is execution. (May
   still be *blocked* on a dependency existing — a sequencing fact, not a design gap; see
-  `blocked_on`.)
+  `requires` and `blocked_on`.)
 - **`design-owed` (glyph `~`)** — design still owed. The item names the problem and open
   questions but **must be designed before it is promoted**. Doing the design *is* the next action.
 

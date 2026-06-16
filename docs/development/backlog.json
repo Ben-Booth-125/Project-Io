@@ -1,5 +1,5 @@
 {
-  "_schema": "backlog/io-v1",
+  "_schema": "backlog/io-v2",
   "_note": [
     "Canonical backlog for Project Io — the authoritative METADATA index of every backlog item",
     "(formerly an OPENS 'Brief'). The rich per-item DESIGN PROSE lives in BACKLOG.md, keyed by id;",
@@ -16,8 +16,10 @@
     "  `parked:true` is the explicit flag for F-priority items.",
     "DIFFICULTY (1-5, non-linear ~3-4x per step): 1=~5min, 2=~20min, 3=~1h, 4=~3h, 5=~12h+ (break a 5 down).",
     "",
-    "SEQUENCING: `waits_on` lists other item short_names that must land first; `blocked_on` names a",
-    "external prerequisite (a layer/system not yet built). An item can be `designed` and still blocked.",
+    "SEQUENCING: `requires` lists BL-XXX ids of backlog items that must land first (supercedes the",
+    "old `waits_on` short_name list — v2 schema 2026-06-17). `blocked_on` names a truly-external",
+    "prerequisite with no backlog item (third-party dep, real-world gate). An item can be `designed`",
+    "and still have unmet `requires`. Both fields are nullable; [] means no dependencies.",
     "",
     "WORKFLOW: a `designed` item is PROMOTED into REFINED.md (the active worklist) and DELIVERED",
     "(the five-step lifecycle — see DELIVERY.md). A `design-owed` item is DESIGNED first (prose settled",
@@ -35,7 +37,9 @@
     "",
     "Migration note (2026-06-16): this index was extracted from the legacy OPENS.md. The design bodies",
     "currently still carry their old `[priority+difficulty glyph]` markers in BACKLOG.md; those markers",
-    "are now NON-AUTHORITATIVE display history — this file is the source of truth for metadata."
+    "are now NON-AUTHORITATIVE display history — this file is the source of truth for metadata.",
+    "Migration note (2026-06-17): `waits_on` (short_name list) replaced by `requires` (BL-XXX id list).",
+    "All external `blocked_on` string refs resolved to BL-XXX ids or new stub items."
   ],
   "items": [
     {
@@ -48,7 +52,7 @@
       "priority": "F",
       "difficulty": 3,
       "parked": true,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": null,
       "files": [
@@ -69,7 +73,7 @@
       "priority": "B",
       "difficulty": 3,
       "parked": false,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -91,7 +95,7 @@
       "priority": "B",
       "difficulty": 3,
       "parked": false,
-      "waits_on": [],
+      "requires": ["BL-043"],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -112,10 +116,8 @@
       "priority": "F",
       "difficulty": 4,
       "parked": true,
-      "waits_on": [],
-      "blocked_on": [
-        "SUPPLY_LAYER"
-      ],
+      "requires": ["BL-039"],
+      "blocked_on": [],
       "written": "2026-06-16",
       "files": [
         "src/ui/body_surface_canvas.cpp"
@@ -134,12 +136,12 @@
       "priority": "C",
       "difficulty": 3,
       "parked": false,
-      "waits_on": [],
+      "requires": ["BL-013"],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [],
       "authority_doc": "docs/ui/LENSES.md",
-      "summary": "Design sweep: for each lens decide what (if anything) it shows on the Solar/Circumplanetary rungs. Output is an updated rung-applicability table + per-lens notes. Not a build.",
+      "summary": "Design sweep: for each lens decide what (if anything) it shows on the Solar/Circumplanetary rungs. Output is an updated rung-applicability table + per-lens notes. Not a build. Requires lens strip settled first.",
       "design": "@BACKLOG.md"
     },
     {
@@ -152,7 +154,7 @@
       "priority": "B",
       "difficulty": 2,
       "parked": false,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -173,13 +175,8 @@
       "priority": "F",
       "difficulty": 3,
       "parked": true,
-      "waits_on": [
-        "SUPPLY_CONVOYS"
-      ],
-      "blocked_on": [
-        "SUPPLY_LAYER",
-        "ORDER_BOOK"
-      ],
+      "requires": ["BL-039", "BL-037"],
+      "blocked_on": [],
       "written": "2026-06-16",
       "files": [
         "src/ui/body_surface_canvas.cpp"
@@ -198,9 +195,7 @@
       "priority": "C",
       "difficulty": 3,
       "parked": false,
-      "waits_on": [
-        "SEED_MARKET_CENTRES"
-      ],
+      "requires": ["BL-036"],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -221,14 +216,14 @@
       "priority": "F",
       "difficulty": 3,
       "parked": true,
-      "waits_on": [],
+      "requires": ["BL-013"],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
         "src/ui/presentation.hpp"
       ],
       "authority_doc": "docs/ui/LENSES.md",
-      "summary": "Board-wide lens colour reconsideration; on-canvas text labels for some lenses; a Corporation-lens legend. Deferred to a dedicated colour session. Design owed: the whole pass.",
+      "summary": "Board-wide lens colour reconsideration; on-canvas text labels for some lenses; a Corporation-lens legend. Deferred to a dedicated colour session. Design owed: the whole pass. Strip must be settled first.",
       "design": "@BACKLOG.md"
     },
     {
@@ -241,7 +236,7 @@
       "priority": "B",
       "difficulty": 3,
       "parked": false,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -262,7 +257,7 @@
       "priority": "C",
       "difficulty": 3,
       "parked": false,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -282,7 +277,7 @@
       "priority": "C",
       "difficulty": 3,
       "parked": false,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -302,9 +297,7 @@
       "priority": "C",
       "difficulty": 4,
       "parked": false,
-      "waits_on": [
-        "HOVER_CARD_PRIMITIVE"
-      ],
+      "requires": ["BL-057"],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [],
@@ -322,9 +315,7 @@
       "priority": "B",
       "difficulty": 3,
       "parked": false,
-      "waits_on": [
-        "SEED_MARKET_CENTRES"
-      ],
+      "requires": ["BL-036"],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -344,10 +335,8 @@
       "priority": "C",
       "difficulty": 2,
       "parked": false,
-      "waits_on": [],
-      "blocked_on": [
-        "SELECTABLE_MARKERS"
-      ],
+      "requires": ["BL-056"],
+      "blocked_on": [],
       "written": null,
       "files": [
         "src/ui/body_surface_canvas.cpp",
@@ -367,10 +356,8 @@
       "priority": "B",
       "difficulty": 4,
       "parked": false,
-      "waits_on": [],
-      "blocked_on": [
-        "CANVAS_HIT_TESTING"
-      ],
+      "requires": ["BL-031"],
+      "blocked_on": [],
       "written": null,
       "files": [
         "src/ui/selection_panel.cpp"
@@ -389,9 +376,7 @@
       "priority": "B",
       "difficulty": 3,
       "parked": false,
-      "waits_on": [
-        "PREFERENTIAL_PURCHASING"
-      ],
+      "requires": ["BL-037"],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -412,10 +397,8 @@
       "priority": "B",
       "difficulty": 3,
       "parked": false,
-      "waits_on": [],
-      "blocked_on": [
-        "POPULATION_LAYER"
-      ],
+      "requires": ["BL-046"],
+      "blocked_on": [],
       "written": "2026-06-16",
       "files": [
         "src/world/hard_coded_world.cpp"
@@ -434,10 +417,8 @@
       "priority": "B",
       "difficulty": 4,
       "parked": false,
-      "waits_on": [],
-      "blocked_on": [
-        "SUPPLY_LAYER"
-      ],
+      "requires": ["BL-039"],
+      "blocked_on": [],
       "written": null,
       "files": [
         "src/world/market_clearing.hpp",
@@ -457,12 +438,8 @@
       "priority": "A",
       "difficulty": 4,
       "parked": false,
-      "waits_on": [
-        "SUPPLY_CONVOYS"
-      ],
-      "blocked_on": [
-        "SUPPLY_LAYER"
-      ],
+      "requires": ["BL-039"],
+      "blocked_on": [],
       "written": null,
       "files": [
         "src/world/market_clearing.hpp",
@@ -482,7 +459,7 @@
       "priority": "S",
       "difficulty": 5,
       "parked": false,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": null,
       "files": [
@@ -508,7 +485,7 @@
       "priority": "B",
       "difficulty": 3,
       "parked": false,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": null,
       "files": [
@@ -528,7 +505,7 @@
       "priority": "B",
       "difficulty": 3,
       "parked": false,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -548,7 +525,7 @@
       "priority": "B",
       "difficulty": 4,
       "parked": false,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -568,7 +545,7 @@
       "priority": "B",
       "difficulty": 3,
       "parked": false,
-      "waits_on": [],
+      "requires": ["BL-043"],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -588,10 +565,8 @@
       "priority": "B",
       "difficulty": 4,
       "parked": false,
-      "waits_on": [],
-      "blocked_on": [
-        "SUPPLY_CONVOYS"
-      ],
+      "requires": ["BL-039"],
+      "blocked_on": [],
       "written": null,
       "files": [
         "scripts/economy.lua",
@@ -612,7 +587,7 @@
       "priority": "S",
       "difficulty": 5,
       "parked": false,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": null,
       "files": [],
@@ -630,7 +605,7 @@
       "priority": "B",
       "difficulty": 4,
       "parked": false,
-      "waits_on": [],
+      "requires": ["BL-053"],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -651,7 +626,7 @@
       "priority": "F",
       "difficulty": 4,
       "parked": true,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": null,
       "files": [
@@ -671,7 +646,7 @@
       "priority": "C",
       "difficulty": 2,
       "parked": false,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -691,7 +666,7 @@
       "priority": "B",
       "difficulty": 4,
       "parked": false,
-      "waits_on": [],
+      "requires": ["BL-052"],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -711,7 +686,7 @@
       "priority": "F",
       "difficulty": 5,
       "parked": true,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": null,
       "files": [
@@ -731,7 +706,7 @@
       "priority": "B",
       "difficulty": 2,
       "parked": false,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -741,6 +716,48 @@
       "authority_doc": "docs/ui/MENU.md",
       "summary": "Nav rail slots show an active (highlighted) state driven by show_* booleans in ui_state. When a ledger panel is closed via its X button, ImGui sets the bool false one frame later so the slot de-highlights correctly. However, if a second panel opens while a first is already open, neither closes the other — both slots show active simultaneously. Fix: when a nav slot is toggled ON, clear all other show_* panel booleans so at most one panel is active at a time (exclusive-open model), OR document that simultaneous panels are intended and the highlight is per-panel not per-slot.",
       "design": "Two sub-options:\n\nA) **Exclusive model (recommended for now):** In , when a slot is toggled ON, set all other  panel flags to false before setting the new one to true. This matches the expected accordion-style behaviour the user observed.\n\nB) **Permissive model:** Document that multiple panels can be open simultaneously and the nav slot simply reflects each panel's own open state. Requires no code change but may feel wrong to players.\n\nPrefer A. The ledger windows are floating and re-openable; the nav slot is the toggle, not a tab bar. Implementation: in the switch statement that handles each slot, before , add a  helper that clears all show_* flags, then set the target one based on the prior state (if it was open, close it; if closed, open it — genuine toggle)."
+    },
+    {
+      "id": "BL-056",
+      "short_name": "SELECTABLE_MARKERS",
+      "category": "Canvas",
+      "title": "Selectable entity markers — buildings, units, market centres",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "B",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-06-17",
+      "files": [
+        "src/ui/body_surface_canvas.cpp",
+        "src/ui/icons.hpp"
+      ],
+      "authority_doc": "docs/ui/CANVASES.md",
+      "summary": "On-canvas marker entities (buildings, units, market centres) drawn as distinct, clickable/selectable ImDrawList glyphs at world positions. Prerequisite for canvas hit-testing to extend beyond tile/body kind. Design owed: marker shapes, z-order, hover-zone size, registration contract.",
+      "design": "Stub. Draw each entity class as a glyph (via ui::icons or a new marker primitive) at its world position; register each drawn marker in a per-frame hit-test zone list alongside the tile cells. The hit-test list is consumed by CANVAS_HIT_TESTING (BL-031). Design owed: which glyphs, hover-zone radius, draw order relative to tile overlays, how the zone list is cleared each frame."
+    },
+    {
+      "id": "BL-057",
+      "short_name": "HOVER_CARD_PRIMITIVE",
+      "category": "Canvas",
+      "title": "Hover-card UI primitive — transient floating detail card",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "B",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-06-17",
+      "files": [
+        "src/ui/hover_card.hpp",
+        "src/ui/hover_card.cpp"
+      ],
+      "authority_doc": "docs/ui/TOOLTIP.md",
+      "summary": "A transient floating card that appears on tile/entity hover — distinct from the pinned Selection panel. Lighter than a tooltip (richer content, brief delay) but dismisses on mouse-off. Prerequisite for the tooltip-simplification sweep (BL-020). Design owed: content contract, animation, relationship to Selection panel.",
+      "design": "Stub. An ImGui child window (no title bar, rounded, semi-opaque) that tracks the cursor position and renders a caller-supplied content callback. Should not fight with the Selection panel (different trigger: hover not click). Design owed: appear delay, max width, fade-out vs instant dismiss, whether the card can be pinned by the user, and the content-builder API that BL-020 will use."
     }
   ]
 }

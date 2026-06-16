@@ -6,6 +6,25 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — Backlog dependency schema v2 (2026-06-17)
+
+**Goal.** Introduce a first-class, ID-based dependency field to `backlog.json`.
+
+**Changes:**
+- `waits_on` (short_name list, v1) → `requires` (BL-XXX id list, v2). All 33 existing items converted.
+- `blocked_on` retained as a field for truly-external prerequisites; all existing string refs resolved to BL-XXX ids and moved to `requires`, leaving `blocked_on: []` on all current items.
+- **New stub items** created for concepts that were referenced as blockers but had no backlog entry: BL-056 `SELECTABLE_MARKERS` (gates BL-031 canvas hit-testing) and BL-057 `HOVER_CARD_PRIMITIVE` (gates BL-020 tooltip simplification). Other `blocked_on` strings resolved to existing items: `SUPPLY_LAYER` → BL-039, `ORDER_BOOK` → BL-037, `POPULATION_LAYER` → BL-046, `CANVAS_HIT_TESTING` → BL-031.
+- **Implied dependencies added:** BL-010 → BL-043, BL-012 → BL-013, BL-016 → BL-013, BL-044 → BL-043, BL-050 → BL-053, BL-053 → BL-052.
+- Schema version bumped to `backlog/io-v2`. `DELIVERY.md` updated to reference both `requires` and `blocked_on`.
+
+**In-session decisions:**
+- `SUPPLY_LAYER` (used as blocker in 4 items) resolved to BL-039 SUPPLY_CONVOYS — the supply convoys build is the gating deliverable for Layer 5, not a separate stub.
+- `ORDER_BOOK` (BL-014) resolved to BL-037 PREFERENTIAL_PURCHASING, which encompasses the order book mechanism.
+- `POPULATION_LAYER` (BL-036) resolved to BL-046 LAYER4_INDEX — the population umbrella.
+- `CANVAS_HIT_TESTING` in BL-032's blocked_on resolved to BL-031 (already in backlog, was an inconsistency).
+
+---
+
 ## Session — v0.0.6 Batch Delivery (2026-06-16)
 
 **Goal.** Batch-deliver all designed (✓), unblocked backlog items for v0.0.6 using parallel sub-agents in worktrees. 20 items promoted and delivered across 6 waves; build green at every integration point.
