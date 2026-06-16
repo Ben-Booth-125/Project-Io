@@ -177,6 +177,26 @@ different offsets). The **Market / Balance / Construction ledger family** (defer
 Layer 4 — OPENS § Ledger) inherits the same two constants when it is built. The header is
 exempt — it is persistent chrome, not a ledger.
 
+### Ledger family conventions
+
+All ledger windows share four standing conventions, stated once here so each new ledger
+need not rediscover them:
+
+- **Uniform chrome.** Every ledger drives `SetNextWindowSize` / `SetNextWindowPos` from
+  `ledger_window_size` and `ledger_window_spawn` in `src/ui/ledger_chrome.hpp`, with
+  `ImGuiCond_Once` so the player may freely move or resize after first open.
+- **Player corporation defaulted.** Every ledger that shows per-corporation data defaults
+  to `w.player_entity` in its corp selector and offers a selector to view any other
+  corporation's figures. Cross-corporation side-by-side comparison is not in scope for
+  the prototype.
+- **Shared content builders.** Per-entity stat blocks are rendered through the shared
+  `entity_summary` helpers (`src/ui/entity_summary.{hpp,cpp}`), which are also used by
+  the Selection info element and the hover card. Do not duplicate this logic inside a
+  ledger — call the shared builders.
+- **Start closed.** All ledger windows open with their initial `open` flag set to `false`
+  (policy established in `src/ui/ledger_chrome.hpp` / `src/ui/nav_pane.cpp`). None are
+  shown until the player explicitly opens them from the nav pane.
+
 ---
 
 ## UI popup elements
