@@ -60,12 +60,12 @@ Glyphs fall into three families by role.
 
 | Glyph | Function | Shape | Colour | Drawn for / where |
 |---|---|---|---|---|
-| **Extraction site** | `building(…, extraction_site, fill)` | Faceted ore/mineral silhouette + outline (distinct from the gem-diamond pip) | Caller `fill` | Building marker, Planetary canvas |
+| **Extraction site** | `building(…, extraction_site, fill)` | Faceted ore/mineral silhouette + outline — an angular eight-sided crystal chunk (wider than tall, corner-cut facets), distinct from the regular gem-diamond pip and the port/unit glyphs | Caller `fill` | Building marker, Planetary canvas |
 | **Processing facility** | `building(…, processing_facility, fill)` | Filled square + outline | Caller `fill` | Building marker, Planetary canvas |
 | **Port** | `building(…, port, fill)` | Filled upward triangle + outline | Caller `fill` | Building marker, Planetary canvas |
 | **Building (none/other)** | `building(…, none, fill)` | Filled circle (dot) | Caller `fill` | Fallback building marker |
 | **Resource pip** | `resource(…, res)` | Filled diamond (no outline) | **Derived** — `presentation_of(res).colour` | Resource strips, deposit markers |
-| **Unit / convoy** | `unit(…, colour)` | Open upward chevron (V) + outline — true chevron, distinct from the filled `port` triangle | Caller `colour` (e.g. a faction colour) | Unit stacks, Layer 5 convoy heads |
+| **Unit / convoy** | `unit(…, colour)` | Open upward chevron (V) — two stroke lines meeting at a bottom point, open at the top; drawn with a dark 2 px shadow pass then a 1.5 px colour pass; stroke-only so it never reads as the filled port triangle | Caller `colour` (e.g. a faction colour) | Unit stacks, Layer 5 convoy heads |
 
 On the Planetary canvas the **building** glyph's `fill` now encodes the *owning
 corporation* (player corp = faction slot 0; rivals a hashed slot), so the

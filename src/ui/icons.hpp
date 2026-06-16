@@ -8,9 +8,9 @@ namespace ui::icons {
 
 /// Draw a building-type marker as a vector glyph centred at @p centre with
 /// half-extent @p r. Each type has a distinct silhouette so a glance reads the
-/// installation kind: extraction = diamond, processing = square, port =
-/// triangle, none = dot. Filled in @p fill with a thin dark outline for
-/// contrast on any terrain.
+/// installation kind: extraction = faceted ore/mineral chunk (eight-sided,
+/// wider than tall), processing = square, port = triangle, none = dot. Filled
+/// in @p fill with a thin dark outline for contrast on any terrain.
 ///
 /// @param dl     Draw list to render into.
 /// @param centre Glyph centre, screen pixels.
