@@ -42,8 +42,9 @@ the Layer 4 foundations are complete:
   depletion**; a warm-start so the world opens live; the player's balance in the header.
 - **Layer 4 foundations (v0.0.5)** — the reusable placement-rules seam, the multi-tick
   economy-stability harness, the workforce-pool/model groundwork, uniform ledger-window chrome,
-  and the Layer 4 UI scaffold; plus the visual-verification **golden-image** harness, the
-  Resource / Market / Population / Scarcity **map lenses**, tile-centred markets, and
+  and the Layer 4 UI scaffold; plus the visual-verification **golden-image** harness (with
+  pass/fail diffing live), the Resource / Market / Population / Scarcity **map lenses**, the
+  multiple-market-centres seam (one market per body today, tile-centred catchment ready), and
   the world-gen fixes (orphan-island claim, lean focus-shaped corp holdings).
 
 The economy *runs* but is not yet *played*: the player observes authored assets rather than
@@ -191,10 +192,11 @@ included** — not just "write a lot of code." Its load-bearing parts:
 
 ### Cross-cutting rules (read once, apply every session)
 
-- **Golden-image diffing lands first.** Until the F3 golden-image Brief lands, every `visual`
-  check is **eyeball-only** — a Brief can pass with a hidden bug. Publishing F3 first upgrades
-  every later visual check to automated pass/fail, so it pays back across the whole plan. This is
-  the real lever against silent bugs — **not** more frequent builds.
+- **Golden-image diffing is live (landed Session 1).** The F3 golden-image Brief shipped first,
+  as planned, so every `visual` check is now automated pass/fail against a blessed golden rather
+  than eyeball-only — the real lever against silent bugs. Author a `scripts/verify/*.lua` and
+  bless a golden for each new visual requirement (via the `verifier-visual` skill); re-bless when
+  a Brief deliberately changes a captured surface.
 - **Build per commit, not per wave.** One commit per Brief already means a green tree at each
   commit. The only *extra* build worth inserting is right after editing a shared/integration file
   (`app.cpp`, `ui_state.hpp`, `overlay.cpp`). A green build proves it *links*, not that it is
@@ -209,37 +211,12 @@ included** — not just "write a lot of code." Its load-bearing parts:
 
 ### The sessions
 
-Ordered; each is a clean checkpoint. A session may itself pause mid-slice if context drifts.
-
-**Session 1 — verification + world-gen foundation.** *Lay the safety net; take the one clean
-fan-out.*
-- F3 golden-image harness (`png_writer`, `app.cpp`, the `verifier-visual` skill) — **first,
-  alone.**
-- Then fan out the two disjoint world-gen fixes: C2 orphan-island (`nation_generation.cpp`) ∥ B4
-  corp starting-holdings (`corporation_generation.cpp`) — disjoint files, both with headless
-  audits. The one place sub-agents earn their cost.
-
-**Session 2 — the lens batch.** *The two unblocked overlay modes, now golden-verifiable.*
-- B3 Resource lens → B3 Market lens. **Serial** — both write `ui_state.hpp`, `overlay.cpp`,
-  `body_surface_canvas.cpp`. Verify against Session-1 goldens. (Fold B3 hover-card in here if
-  taken early — same hotspot file.)
-
-**Session 3 — UI polish (serial, main session).** *Clear the cheap unblocked polish.*
-- Icons together (C2 collisions + C2 conventions — same files) → C2 icon audit → C2 reference
-  distances → C2 time-speed curve → F3 clarify time-control → C2 tile-ledger default → C1 border
-  recolour. All serial on shared files; build at each commit.
-
-**Session 4 — ledger foundation.** *De-risk the v0.0.7 ledger family without entering it.*
-- A3 economy-panel refit (`economy_panel.{hpp,cpp}`) — **alone.** It is the convention reference
-  the v0.0.7 ledger family lifts from; the refit is now a v0.0.6 legibility strand, but the rest
-  of that family stays in v0.0.7.
-
-### Roadmap note — this pulls v0.0.8 polish forward
-
-Sessions 2–3 publish work the map above files under **v0.0.8** (lens completion, hover-card,
-menu/icon polish). That is a deliberate, eyes-open reorder: the work is unblocked and low-risk, so
-clearing it early frees the deck for the v0.0.6 building/population build. It does **not** move the
-v0.0.6/0.7 *themes* — those Briefs stay gated (below).
+*Interrupted 2026-06-16.* The earlier ordered session slices (verification + world-gen foundation
+→ the lens batch → UI polish → ledger foundation) were **largely worked through** by the v0.0.5
+close — the golden-image harness, the lens batch, tile-centred markets, and the world-gen fixes all
+landed. The plan was then **paused for a v0.0.6 brief-intake session** (the 14 Briefs filed across
+[`OPENS.md`](OPENS.md) on 2026-06-16). The next session slices will be **rebuilt from the refreshed
+OPENS backlog** rather than the stale per-session list that stood here.
 
 ### Out of scope for this plan (gated — do not pull in)
 
@@ -250,8 +227,14 @@ v0.0.6/0.7 *themes* — those Briefs stay gated (below).
 - **v0.0.7 (Layer 5 half)**: supply convoys (S5), logistics/infrastructure, and the cross-body
   half of preferential purchasing — all blocked on Layer 5. *(The convoy-free inter-body
   feasibility probe and the intra-body order book move up to v0.0.6 — improved core-loop.)*
-- **Design-owed (`~`)**: tile-gen refinements, nation behaviour — these need a *design* pass, not
-  a publish.
+- **Design-owed (`~`)**: the v0.0.6 brief-intake (2026-06-16) parked a large design-owed backlog
+  that each needs a *design* pass before any publish — a **lens-redesign cluster** (strip
+  single-select/rename, the colour-scheme pass, per-rung representation, and the Production /
+  Placement-suitability / Reach / market-boundary / resource-density reworks plus tooltip
+  simplification); **core-loop design** (the nation-owned substrate, market-centre seeding,
+  construction-cost-in-resources, stricter placement rules, habitability→workforce); and
+  **world / country** work (Faction→Country rename, more countries generated "in history", nation
+  behaviour, and the tile-gen deep models). None are promotable until settled.
 - **v0.2**: resource-generation scarcity, full deposit authoring.
 
 *(Two entries — C1 nav-rail ordering, A3 design-pass propagation — read as largely doc-only and

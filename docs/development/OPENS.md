@@ -448,6 +448,82 @@ population layer). The remaining Briefs below are `~` (design owed) — each nee
   the sweep itself. Authority `docs/ui/LENSES.md` § Rung applicability,
   `docs/ui/{SOLAR,CIRCUMPLANETARY}.md`.
 
+### v0.0.6 brief intake — lens & legibility (2026-06-16)
+
+A list-pass over noticed lens/UI issues (v0.0.6 brief-intake session, 2026-06-16). Expanded from
+the user's notes; design is deliberately **owed** (`~`) — settle each before promoting. They extend
+the lens family (`overlay_mode` in `src/ui/ui_state.hpp`; passes in `src/ui/body_surface_canvas.cpp`;
+strip in `src/ui/overlay.cpp`); glyph/colour work propagates to `docs/ui/ICONS.md`,
+`src/ui/presentation.hpp`. *(Companion non-lens items from the same intake are filed under their own
+categories: § Ledger (multiple-markets visibility), § Trade (warm-start pass), § Workforce
+(habitability→workforce rule), § Infrastructure (building rules, construction pricing), § Environment
+(country rename + generation).)*
+
+- **[B2 ~] Lens strip: single-select, nullable, ordered & renamed.** *(Written 2026-06-16, v0.0.6
+  brief intake.)* The lens control strip must be **single-select with a null/none state** (no lens =
+  plain terrain) and **default to "Corporation ownership"** at campaign start. Also fixes the strip's
+  **lens ordering and display names**. The strip is a **curated subset of useful lenses, not the
+  exhaustive set** — some lenses are reached from a menu / the selection element instead (couples to
+  the Market-boundary Brief below). **Design owed:** the order, the final labels, the strip-vs-menu
+  split. Authority `docs/ui/LENSES.md`.
+
+- **[F3 ~] Supply-routes lens — market-connection graph.** *(Written 2026-06-16, v0.0.6 brief
+  intake.)* A lens drawing the **graph of trade connections between markets**: one edge per active
+  route, **thickness/colour from the net worth of all trades on it** (thick green = net positive
+  value flow, red = negative). User's render note: it *reads* like an infinite loop but **the graph
+  is rendered once per frame** — structure the build so edge aggregation is computed once, not
+  recomputed per-edge. **Build-blocked on Layer 5 / the order book** (no inter-market trades to graph
+  yet); decide whether this is the [S5] Supply lens itself or a distinct "trade-value" mode.
+  **Design owed:** edge/value aggregation, the once-per-frame structure, rung applicability.
+  Authority `docs/ui/LENSES.md` § Supply.
+
+- **[C3 ~] Market lens → market-boundary UI; relocate the price readout.** *(Written 2026-06-16,
+  v0.0.6 brief intake.)* Replace the current **market-price** map UI with a **market-boundary** lens
+  (tinting each market's catchment — couples to multiple tile-centred markets, § Trade). **Keep the
+  price-UI code** — it becomes a lens **accessed via a menu / the selection element**, off the strip.
+  **Design owed:** boundary rendering (catchment fill/outline), where the price lens is reached from,
+  relationship to the Market Ledger (§ Ledger [A4]). Authority `docs/ui/LENSES.md` § Market lens.
+
+- **[F3 ~] Lens colour-scheme pass (deferred to a colour session).** *(Written 2026-06-16, v0.0.6
+  brief intake.)* A board-wide reconsideration of lens colours — some too harsh, some too soft.
+  **Deferred to a dedicated colour-scheme design session.** Also in scope: **on-canvas text labels**
+  naming items for some lenses (country/market), and a **legend for the Corporation lens**.
+  **Design owed:** the whole pass. Authority `docs/ui/LENSES.md`; identity colours in
+  `src/ui/presentation.hpp`.
+
+- **[B3 ~] Replace Habitability main-lens with Population / "Opportunity".** *(Written 2026-06-16,
+  v0.0.6 brief intake.)* Habitability is a good *field* but not a top-level lens. Replace it on the
+  strip with **Population** (more useful), or a hybrid **"Opportunity"** lens — a tile's **max yield**
+  evaluated *without* regard to the specific resource or logistics. (The per-tile habitability tint
+  already built stays available, just not as a primary strip lens.) Couples to the
+  habitability→workforce rule (§ Workforce) and the population layer. **Design owed:** Population vs.
+  Opportunity vs. both; what "max yield" means; legend. Authority `docs/ui/LENSES.md` § Population lens.
+
+- **[C3 ~] Scarcity lens — blur to a market-level heatmap.** *(Written 2026-06-16, v0.0.6 brief
+  intake.)* The Scarcity lens (built, per-tile translucent heatmap) should read as a **market-level
+  field** more than a per-tile one — a **blurred/fuzzy heatmap** that still overlaps tiles enough to
+  give tile info. Feasibility question: can the lens be driven by a **fuzzy colour not tied to tile
+  boundaries** — e.g. render **spheres / pixelated boundaries** rather than crisp per-tile cells?
+  **Design owed (keep open if not feasible):** whether a non-tile-bound fuzzy field is renderable in
+  the immediate-mode canvas, the smoothing approach, market-vs-tile weighting. Authority
+  `docs/ui/LENSES.md` § Scarcity lens.
+
+- **[C3 ~] Resource-density lens — uniform colour, deposit-shape.** *(Written 2026-06-16, v0.0.6
+  brief intake.)* The Resource lens should be **always single-select**, use a **uniform colour** (not
+  a per-level gradient), and **render the shape of the deposit** — the **whole contiguous deposit**
+  when resource levels are present. Test two treatments: **resource-level as a colour bloom** within
+  the contiguous deposit, **and** a flat version that does not track per-tile levels at all.
+  **Design owed:** contiguous-deposit detection, bloom vs. flat, the single-colour choice.
+  Authority `docs/ui/LENSES.md` (Resource lens stub), `docs/economy/TILES.md`.
+
+- **[C4 ~] Tooltip simplification — lens-specific, "why" not "what".** *(Written 2026-06-16, v0.0.6
+  brief intake.)* Tooltips give too much data. Reframe them: **less information, lens-specific**, and
+  aimed at **explaining *why* a system behaves as it does** — not at gathering data for quick
+  decisions (that is the ledgers' job). **Defer nested tooltips.** Flagged by the user as a **large,
+  multi-round, detailed Brief touching every visible entity** — a sweep, not a single edit. Couples to
+  the hover-card primitive ([B3 ✓] above) and `docs/ui/TOOLTIP.md`. **Design owed:** the per-entity,
+  per-lens content sweep. Authority `docs/ui/TOOLTIP.md`.
+
 ## Menu
 
 - **[B3 ✓] Define the menu items from the systems.** **Design settled (2026-06-15).** The
@@ -504,6 +580,15 @@ population layer). The remaining Briefs below are `~` (design owed) — each nee
   ordering is otherwise fine. Touches the body-selector default in
   `src/ui/tile_inspector.cpp` (read `ui_state.active_body` /
   `circumplanetary_anchor`).
+
+- **[B3 ~] Surface multiple markets in the economy / market ledgers.** *(Written 2026-06-16, v0.0.6
+  brief intake.)* The economy ledger shows **one market table per body** — Kepler reads as a single
+  market — so the multiple-tile-centred-markets mechanism (§ Trade [B3]) is **invisible**. Make the
+  market read surfaces show **each market on a body distinctly** (a per-market breakdown / selector,
+  not one aggregate table); the single-market case should read as "1 of N". *(Partly gated on
+  generation seeding >1 centre per body — § Trade [B3] — but the ledger should be ready to show them
+  now.)* User flagged this as **vital**. **Design owed:** the per-market table/selector layout.
+  Authority the Market Ledger ([A4] below), `docs/SYSTEMS.md` § Trade.
 
 **The Layer-4 read-surface family (decomposed 2026-06-15).** The single "Market lens & ledger
 family" Brief is now **decomposed into the discrete Briefs below** — four ledgers (the Market
@@ -612,6 +697,11 @@ shared per-entity content builders in `entity_summary.{hpp,cpp}`):
   now. Files at promotion: the selection-resolution seam (`draw_selection_panel` / hover dispatch),
   reads `overlay_mode`. *(Design settled inline; propagation to `docs/ui/{SELECTION,LENSES}.md`
   tracked under § Documentation.)*
+  — **Clarification (2026-06-16, v0.0.6 brief intake): each lens must yield a *distinct* selection.**
+    The resolution table above already encodes this (a lens picks which entity wins); this note pins
+    it as an explicit requirement and adds a second strand — **consider which smaller ledgers** each
+    lens's selection can open to give *interesting* per-lens info, not just route to the one big
+    ledger. Folds into this Brief; the smaller-ledger catalogue is **design owed**.
 
 ## Documentation
 
@@ -667,6 +757,15 @@ The market layer. Per the 2026-06-14 Q&A, **market resolution collapses into Lay
 price resolution has now landed; **inter-body trade stays open**. Markets are a per-body
 exchange, **distinct from corp stockpile pools**. Design authority `docs/SYSTEMS.md` § Trade,
 `docs/economy/RESOURCES.md`.
+
+- **[B3 ~] Economy warm-start pre-generation pass — surface auto-buy / auto-sell.** *(Written
+  2026-06-16, v0.0.6 brief intake.)* When the simulation starts, **every economy function that
+  currently yields a profit must already be reflected** in the opening state — a pre-generation /
+  warm-start settle so the economy opens at (or near) steady state, not mid-transient. It must be
+  **legible what is in excess and auto-sold, and what is being auto-bought** at the start. Builds on
+  the v0.0.4 warm-start; couples to the order book (below). Fits the v0.0.6 legibility strand.
+  **Design owed:** how many settle-ticks, and what the surfaced "auto-sold / auto-bought" readout
+  looks like (likely a Balance/Market ledger block). Authority `docs/SYSTEMS.md` § Trade.
 
 - **[B3 ~] Seed multiple market centres from capitals / population.** *(Written 2026-06-16,
   market-centres publish.)* The **mechanism** for multiple tile-centred markets per body landed
@@ -813,6 +912,17 @@ authority: `docs/economy/RESOURCES.md`, `docs/economy/PRODUCTION.md`.
 
 The labour scalar (`docs/SYSTEMS.md` § Workforce, `docs/economy/POPULATION.md`).
 
+- **[B3 ~] Habitability gates max workforce, not production directly.** *(Written 2026-06-16, v0.0.6
+  brief intake.)* A population/workforce rule the user likes: **habitability should not scale a
+  building's production output directly** — instead it caps the **building's max workforce fraction**.
+  Above ~**0.6** habitability → **100% base workforce**; below, a reduced fraction. **Open reference
+  note:** *tech will later raise the fraction above 100%* — e.g. habitability 0.99 could eventually
+  support **~250%** of base workforce. Couples to the contention scalar ([A4] step 2 below) and the
+  building workforce-target control ([S4] § Infrastructure building management); pairs with the
+  Habitability→Population/Opportunity lens (§ Canvas). **Design owed:** the habitability→fraction
+  curve, the tech-driven over-100% multiplier model. Authority `docs/economy/POPULATION.md`,
+  `docs/SYSTEMS.md` § Workforce.
+
 - **[S4 ✓] Workforce pool & population coupling — step 2 (population-derived supply).**
   *(Re-rated A→S 2026-06-16 — grounds labour supply from population; v0.0.6 spine, take with/after
   the population static MVP.)*
@@ -830,6 +940,28 @@ The labour scalar (`docs/SYSTEMS.md` § Workforce, `docs/economy/POPULATION.md`)
   `src/world/budget_system.cpp` (wage level). Best taken *with* or *after* S4.
 
 ## Infrastructure
+
+- **[B4 ~] Building rules — stricter placement & a per-building justification process.** *(Written
+  2026-06-16, v0.0.6 brief intake.)* Placement is too loose — buildings appear **infinite** and a
+  **Port can be placed anywhere**. This Brief defines (a) **stricter per-building placement / limit
+  rules** (counts, terrain, adjacency, finite slots — couples to the substrate slot model,
+  § Environment), and (b) a **documented process for justifying each building's rules** — a
+  per-building table where the user **approves** terrain, limits, and rationale (**user response
+  required** as part of resolving this Brief). Also the **building-ledger UI direction**: the
+  Construction/building ledger becomes a **secondary window** opening a **larger horizontal,
+  cross-canvas panel**; **primary selection on a tile always gives a tile overview** with navigation
+  to a **finite set of further ledger options** (perhaps only "building" — left open). Couples to
+  `src/world/placement_rules.hpp`, the Construction Ledger ([A4] § Ledger), and the tile Selection
+  element. **Design owed:** the per-building rule table + approval pass, the placement limits, the
+  ledger-as-secondary-window layout. Authority `docs/economy/PRODUCTION.md`, `docs/ui/SELECTION.md`.
+
+- **[B3 ~] Construction pricing — buildings cost resources (per-building, approved).** *(Written
+  2026-06-16, v0.0.6 brief intake.)* Buildings must **cost resources** to construct, set
+  **per-building and approved** the same way as the building rules above — a documented, user-approved
+  cost table. Couples to the build-cost model already noted in [S4] building management (the
+  labour/material split in `scripts/economy.lua`) and the construction spend ([A3] § Selection build
+  front door). **Design owed:** the per-building resource/cost table and its approval pass. Authority
+  `docs/economy/PRODUCTION.md`, `scripts/economy.lua`.
 
 - **[B4 ✓] Logistics network & infrastructure model.** Surfaced by the 2026-06-15
   Q&A: the convoy-mode model ([S5] Supply, [A4] inter-body markets) makes each convoy mode —
@@ -1073,6 +1205,24 @@ The world-generation layer — terrain, nations, corporations. Design authority:
 ### Nation generation
 
 Design authority: `docs/generation/NATION_GENERATION.md`.
+
+- **[C2 ~] Rename "Faction" → "Country" (doc- and code-wide).** *(Written 2026-06-16, v0.0.6 brief
+  intake.)* Rename the **Faction presence** lens to **Countries**, and propagate a **doc-wide and
+  code-wide rename** of *faction* → *country* where it refers to nations (the lens label, GLOSSARY
+  term, LENSES/SELECTION wording). **Caveat to resolve:** `faction_colour()` is currently the
+  **corporation** identity colour (player vs. rival), *not* the nation lens — so the rename must
+  disentangle "faction-as-nation" from "faction-as-corp-colour" rather than blanket-replace. **Design
+  owed:** the exact term boundary (nation / country vs. corp colour) and the rename sweep list.
+  Authority `docs/GLOSSARY.md`, `docs/ui/LENSES.md`, `src/ui/presentation.hpp`.
+
+- **[B4 ~] Country generation — more countries, generated "in history".** *(Written 2026-06-16,
+  v0.0.6 brief intake.)* The world needs **more countries** than today's nation generation produces,
+  generated with a sense of **history** rather than a flat Voronoi partition. For v0.1.0 the target
+  is **clustering seeds — some larger, some smaller countries** (a varied size distribution, not
+  uniform territories). Couples to NATION_GENERATION (Voronoi BFS today) and the saturated-substrate
+  Brief (§ Environment cross-cutting). **Design owed:** the clustered-seed sizing model, what
+  "generated in history" means at prototype depth, the count target. Authority
+  `docs/generation/NATION_GENERATION.md`.
 
 - **[F5 ~] Deferred — nation behaviour & production passes.** Per NATION_GENERATION.md
   § Open items: the nation *system* (tax, licences, war, infrastructure), the
