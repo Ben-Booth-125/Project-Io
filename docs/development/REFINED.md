@@ -541,34 +541,27 @@ Remaining harness follow-up (golden-image diffing) lives in [BACKLOG.md](BACKLOG
 
 ---
 
-## NAV_SLOT_PANEL_SYNC (promoted from BACKLOG § BL-055)
+## NAV_SLOT_PANEL_SYNC (promoted from BACKLOG § BL-055) — **COMPLETE**
 
 Requirements: `req/requirements.json § nav-slot-sync`
 
-- **[2] A — Exclusive-open nav-slot toggle.** In `nav_pane.cpp`, add a `close_all_panels(ui_state&)` helper that sets every `show_*` panel boolean to `false`. At the top of each slot's toggle handler, call it before setting the target flag — but only when toggling ON (check the prior value; if it was already `true`, the slot is toggling off, so skip the close-all and just clear the target). This gives a genuine exclusive toggle: clicking an open slot closes it; clicking a closed slot closes any other open panel first. Files: `src/ui/nav_pane.cpp`. Deps: foundation. Satisfies: R1.
+- **[2] A — Exclusive-open nav-slot toggle.** ✓ Files: `src/ui/nav_pane.cpp`. Satisfies: R1.
 
-Parallelisation note: single task, independent root.
+R1 complete. Build clean.
 
 ---
 
-## Supply Layer — convoys, logistics costs, inter-body market coupling (promoted from BACKLOG § BL-039, BL-038, BL-045)
+## Supply Layer — convoys, logistics costs, inter-body market coupling (promoted from BACKLOG § BL-039, BL-038, BL-045) — **PAUSED**
 
 Requirements: `req/requirements.json § supply-layer`
 
-Items folded in: **BL-045** (LOGISTICS_NETWORK — cost constants land as task B, before the convoy model consumes them); **BL-038** (INTER_BODY_MARKETS — destination crediting and inter-body coupling land as task E, the final supply-seam task). Both are inseparable at this depth; they do not get their own commit.
+Items folded in: **BL-045** (cost constants); **BL-038** (inter-body market coupling).
 
-Tasks A and B are parallel-safe (disjoint files). A, B → C → D → E serially (shared economy/supply/budget seam). F is disjoint from C–D and can run concurrently with either.
+- **[3] A — Convoy component + per-Tick advance.** ✓ Files: `src/world/components.hpp`, `src/world/supply_system.{hpp,cpp}`. Satisfies: R1, R2.
+- **[2] B — Per-mode logistics-cost constants (BL-045).** ✓ Files: `scripts/economy.lua`. Satisfies: R3.
+- **[2] C — Logistical-cost budget deduction.** ✓ Folded into dispatch_convoys (cost debited at dispatch time). Satisfies: R4.
+- **[3] D — Auto-dispatch trigger.** ✓ Files: `src/world/supply_system.cpp`. Satisfies: R5, R6.
+- **[3] E — Arrival crediting + inter-body market coupling.** ✓ Folded into credit_arrived_convoys (credits pool + injects into market.supply). Files: `src/world/supply_system.cpp`. Satisfies: R7. R8 mechanism in place; multi-tick price-convergence scenario deferred.
+- **[3] F — Supply lens render passes.** ✓ Files: `src/ui/icons.{hpp,cpp}`, `src/ui/solar_system_canvas.cpp`, `src/ui/circumplanetary_canvas.cpp`, `src/ui/body_surface_canvas.cpp`. Satisfies: R9 (visual pass wired; golden deferred — no active convoys in the cold world at verify time).
 
-- **[3] A — Convoy component + per-Tick advance.** Define `convoy_component` in `components.hpp`: `entity_id source_market`, `entity_id dest_market`, `enum class convoy_mode { land, sea, air, space } mode`, `resource_type cargo_resource`, `float cargo_qty`, `float progress` (0→1), `float speed`. Create `src/world/supply_system.{hpp,cpp}` with `advance_convoys(world&)` that iterates `world.convoys` (a `std::vector<convoy_component>` hanging off `world`) and increments each convoy's `progress` by `speed` per Tick. Mark arrived convoys (`progress >= 1.0`) with a flag but do not credit yet — that is task E. Files: `src/world/components.hpp`, `src/world/supply_system.hpp`, `src/world/supply_system.cpp`. Deps: foundation. Parallel-safe with B. Satisfies: R1, R2.
-
-- **[2] B — Per-mode logistics-cost constants (BL-045).** Add a `logistics` table to `scripts/economy.lua`: `base_cost_per_unit_distance` keyed by mode string (`"land"`, `"sea"`, `"air"`, `"space"`), ordered land < sea < air < space (reasonable round numbers; tune later). This closes BL-045's cost-constants contribution; endpoint-gate checks fold into task D. Files: `scripts/economy.lua`. Deps: foundation. Parallel-safe with A. Satisfies: R3.
-
-- **[2] C — Logistical-cost budget deduction.** In `budget_system.cpp`, extend `apply_budget` (or a new `apply_logistics_costs(world&, const recipe_registry&)` pass) to debit the dispatching corp's balance at convoy creation time: `base_logistics_cost[mode] × distance × cargo_qty`. For intra-body convoys, `distance` = tile-distance between source and dest tiles; for inter-body convoys, `distance` = Euclidean distance between the two bodies' `solar_body_component::position` fields. Load the mode-cost table from the recipe_registry or a new Lua accessor. Files: `src/world/budget_system.cpp`. Deps: A, B. Satisfies: R4.
-
-- **[3] D — Auto-dispatch trigger.** In `supply_system.cpp`, add `dispatch_convoys(world&, const recipe_registry&)` called each economy Tick. For each `(corp, body, resource)` where market demand exceeds local pool supply, search other `(corp, body)` pools for a surplus of that resource and a reachable source (prototype: all bodies treated as reachable; space mode requires a `building_type::launchpad` in the source corp's assets on that body — check `world.assets`). Dispatch a new `convoy_component` if an affordable source exists (cost ≤ arbitrage margin), committing cargo from the source pool at dispatch. Player-directed dispatch (sell-order matched to an off-body counterparty) is deferred. Files: `src/world/supply_system.cpp`. Deps: C. Satisfies: R5, R6.
-
-- **[3] E — Arrival crediting + inter-body market coupling (BL-038).** In `supply_system.cpp`, after `advance_convoys` marks a convoy arrived: credit the destination `(corp, body)` pool with `cargo_qty` of `cargo_resource`; insert the delivery quantity into the destination body's `market_component.supply[cargo_resource]` so the next clearing pass reprices it; retire the convoy. Cargo was already committed from the source pool at dispatch (task D). This closes the BL-038 (INTER_BODY_MARKETS) coupling: two bodies' markets link **only** through what convoys actually deliver, with no abstract price-coupling term. Files: `src/world/supply_system.cpp`, `src/world/market_clearing.hpp`, `src/world/market_clearing.cpp`. Deps: D. Satisfies: R7, R8.
-
-- **[3] F — Supply lens render passes.** Under `overlay_mode::supply`: on the Planetary canvas, draw a route-segment glyph on source and destination tiles of active convoys; on the Circumplanetary canvas, draw a throughput badge per body (convoy count or cargo total); on the Solar canvas, draw a line per active inter-body convoy between the two body positions. Add a `supply` entry to the lens strip in `overlay.cpp` and author `icons::supply` (a convoy/arrow glyph) in `icons.{hpp,cpp}`. Files: `src/ui/body_surface_canvas.cpp`, `src/ui/circumplanetary_canvas.cpp`, `src/ui/solar_system_canvas.cpp`, `src/ui/overlay.cpp`, `src/ui/icons.hpp`, `src/ui/icons.cpp`. Deps: A (convoy component exists to read). Parallel-safe with C, D (disjoint files). Satisfies: R9.
-
-Parallelisation note: A ∥ B (disjoint files); {A, B} → C → D → E (serial — shared supply/budget/clearing seam); A → F ∥ {C, D} (F reads convoys for display; disjoint from budget/clearing). Integration wiring (`advance_convoys` + `dispatch_convoys` into `app.cpp`'s economy step; `world.convoys` initialisation in `hard_coded_world.cpp`) stays in the main session after E lands.
+R1–R7 complete (supply_advance.exe ALL PASS, 21/21). R8 (multi-tick price convergence) and R9 (golden) remain active — pending a world with active convoys and a supply_lens.lua script.

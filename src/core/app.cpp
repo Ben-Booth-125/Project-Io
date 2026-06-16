@@ -32,6 +32,7 @@
 #include "world/hard_coded_world.hpp"
 #include "world/market_clearing.hpp"
 #include "world/orbital_system.hpp"
+#include "world/supply_system.hpp"
 
 #include <algorithm>
 #include <cctype>
@@ -217,9 +218,14 @@ void app::load_economy()
 
 void app::step_economy()
 {
+    dispatch_convoys(m_world, m_registry,
+                     m_registry.logistics_cost(convoy_mode::land),
+                     m_registry.logistics_cost(convoy_mode::space));
+    advance_convoys(m_world);
     m_last_econ_report = run_economy_step(m_world, m_registry);
     auto flows = clear_markets(m_world, m_registry, m_last_econ_report, m_ui.sell_orders);
     apply_budget(m_world, m_registry, flows, m_last_econ_report.workforce_contention);
+    credit_arrived_convoys(m_world);
 
     // Record the player's post-tick balance for the header net figure + sparkline.
     // Capped so the buffer stays small; the sparkline shows the most recent window.

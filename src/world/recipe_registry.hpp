@@ -73,6 +73,12 @@ public:
     float t_full() const { return m_t_full; }
     float t_idle() const { return m_t_idle; }
 
+    /// Base logistics cost per unit distance per unit cargo for the given convoy mode.
+    float logistics_cost(convoy_mode m) const
+    {
+        return m_logistics_costs[static_cast<std::size_t>(m)];
+    }
+
     std::size_t recipe_count() const { return m_recipes.size(); }
 
     /// Returns the number of available recipes for the given building type.
@@ -90,6 +96,10 @@ public:
     {
         m_building_econ[static_cast<std::size_t>(type)] = e;
     }
+    void set_logistics_cost(convoy_mode m, float v)
+    {
+        m_logistics_costs[static_cast<std::size_t>(m)] = v;
+    }
     uint16_t add_recipe(const recipe& r)
     {
         m_recipes.push_back(r);
@@ -99,9 +109,13 @@ public:
 private:
     std::vector<recipe> m_recipes;
 
-    /// Indexed by building_type (none / extraction_site / processing_facility / port).
-    std::array<building_economics, 4> m_building_econ = {};
+    /// Indexed by building_type (none / extraction_site / processing_facility / port / launchpad).
+    std::array<building_economics, 5> m_building_econ = {};
 
     float m_t_full = 1.0f;
     float m_t_idle = 0.2f;
+
+    /// Logistics base cost per unit distance per unit cargo, indexed by convoy_mode
+    /// (land=0, sea=1, air=2, space=3). Defaults match economy.lua values.
+    std::array<float, 4> m_logistics_costs = { 0.02f, 0.05f, 0.15f, 1.00f };
 };

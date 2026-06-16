@@ -226,6 +226,33 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
         }
     }
 
+    // Supply lens: draw a line between the two bodies for each inter-body convoy.
+    // w.convoys is empty until the dispatch system lands, so this branch is a
+    // no-op in the meantime. Primary view only — the minimap is too small.
+    if (apply_view && state.overlay == overlay_mode::supply)
+    {
+        constexpr ImU32 supply_col = IM_COL32(80, 200, 255, 160);
+        for (const auto& cv : w.convoys)
+        {
+            // Resolve the source and destination bodies via their markets.
+            entity_id src_body = null_entity;
+            entity_id dst_body = null_entity;
+            const auto src_mk = w.markets.find(cv.source_market);
+            const auto dst_mk = w.markets.find(cv.dest_market);
+            if (src_mk != w.markets.end()) src_body = src_mk->second.body;
+            if (dst_mk != w.markets.end()) dst_body = dst_mk->second.body;
+            if (src_body == null_entity || dst_body == null_entity || src_body == dst_body)
+                continue;
+            const auto sb = w.bodies.find(src_body);
+            const auto db = w.bodies.find(dst_body);
+            if (sb == w.bodies.end() || db == w.bodies.end())
+                continue;
+            const ImVec2 pos_a = to_screen(body_world(src_body, body_world));
+            const ImVec2 pos_b = to_screen(body_world(dst_body, body_world));
+            dl->AddLine(pos_a, pos_b, supply_col, 2.0f);
+        }
+    }
+
     // Scale bar + zoom slider — primary view only, pinned to the bottom centre.
     // Shared with the Circumplanetary canvas via draw_scale_zoom_overlay. Drawn
     // before the input_enabled early-out so it stays put while an ImGui panel

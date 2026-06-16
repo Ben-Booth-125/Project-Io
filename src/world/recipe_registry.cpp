@@ -138,6 +138,7 @@ void recipe_registry::load_from_lua(lua_state& lua)
             { "extraction_site",     building_type::extraction_site },
             { "processing_facility", building_type::processing_facility },
             { "port",                building_type::port },
+            { "launchpad",           building_type::launchpad },
         };
         for (const named_type& nt : types)
         {
@@ -150,6 +151,29 @@ void recipe_registry::load_from_lua(lua_state& lua)
             e.base_wage   = b->get_or("base_wage",   0.0f);
             e.build_cost  = b->get_or("build_cost",  0.0f);
             m_building_econ[static_cast<std::size_t>(nt.type)] = e;
+        }
+    }
+
+    // --- logistics costs (scripts/economy.lua global 'logistics') ---
+    sol::optional<sol::table> logistics = s["logistics"];
+    if (logistics)
+    {
+        sol::optional<sol::table> costs = (*logistics)["base_cost_per_unit_distance"];
+        if (costs)
+        {
+            struct named_mode { const char* key; convoy_mode mode; };
+            const named_mode modes[] = {
+                { "land",  convoy_mode::land  },
+                { "sea",   convoy_mode::sea   },
+                { "air",   convoy_mode::air   },
+                { "space", convoy_mode::space },
+            };
+            for (const named_mode& nm : modes)
+            {
+                sol::optional<float> v = (*costs)[nm.key];
+                if (v)
+                    m_logistics_costs[static_cast<std::size_t>(nm.mode)] = *v;
+            }
         }
     }
 }

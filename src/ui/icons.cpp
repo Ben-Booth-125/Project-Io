@@ -110,6 +110,14 @@ void supply(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     dl->AddLine({ centre.x - r, centre.y + off }, { centre.x + r, centre.y + off }, colour, 1.5f);
 }
 
+void convoy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    const float hw = r * 0.55f;
+    const float hh = r * 0.70f;
+    dl->AddLine({centre.x - hw, centre.y - hh}, {centre.x + hw, centre.y}, colour, 2.0f);
+    dl->AddLine({centre.x + hw, centre.y},       {centre.x - hw, centre.y + hh}, colour, 2.0f);
+}
+
 void market(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
 {
     // Three ascending bars, outlined, sharing a common baseline — a price chart.

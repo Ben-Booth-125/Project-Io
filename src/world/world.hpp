@@ -93,6 +93,13 @@ struct world
     /// stay on disjoint files. The per-building `stockpile_component` is unused in L3.
     std::map<std::pair<entity_id, entity_id>, stockpile_component> corp_body_pools;
 
+    /// Active convoys — goods in transit. Appended by dispatch_convoys, advanced by
+    /// advance_convoys, and retired (erased) by credit_arrived_convoys in
+    /// supply_system.hpp. A std::vector (not a map) because convoys have no persistent
+    /// entity ID — they are identified by index while in flight. Order is
+    /// dispatch-time insertion; stable between ticks.
+    std::vector<convoy_component> convoys;
+
     /// Stockpile pool for a (corporation, body) pair, inserting an empty pool on
     /// first access. The single point through which the economy systems read and
     /// write the shared pool.
