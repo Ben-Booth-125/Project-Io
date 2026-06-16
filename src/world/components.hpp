@@ -214,6 +214,27 @@ struct sell_order
     float         floor_price = 0.0f; ///< Minimum acceptable unit price; 0 = sell at the market price.
 };
 
+/// Land-use classification of a tile or zone. Drives the trade-off between
+/// residential, industrial, agricultural, and undeveloped land.
+/// See docs/economy/POPULATION.md § Land-use trade-offs.
+struct land_use_component
+{
+    enum class type { residential, industrial, agricultural, wilderness };
+    type use = type::wilderness;
+};
+
+/// A population centre occupying a tile. Scale governs agglomeration bonuses
+/// and workforce supply; population is the absolute headcount in thousands;
+/// habitability is a 0–1 scalar read from the tile at generation and cached here.
+/// No AI behaviour in the prototype — data-model only.
+/// See docs/economy/POPULATION.md.
+struct population_centre_component
+{
+    int   scale         = 1;    ///< 1–5 (village → metropolis).
+    int   population    = 0;    ///< Absolute headcount in thousands.
+    float habitability  = 1.0f; ///< 0–1 scalar inherited from the tile.
+};
+
 /// Deployable unit stub. Combat rules, faction AI, and transport are deferred;
 /// this struct exists so the field-level data model is in place.
 struct unit_component

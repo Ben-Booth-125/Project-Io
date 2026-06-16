@@ -36,6 +36,16 @@ float extractable_deposit(const tile_component& tc);
 /// the tile carries none (callers fall back to a default target).
 resource_type richest_extractable(const tile_component& tc, bool& any);
 
+/// Returns true if a population centre may be placed on this tile.
+///
+/// A population centre requires a non-ocean, non-deep-ocean land tile with
+/// positive habitability. Ocean tiles (composition == ocean) and tiles whose
+/// habitability is zero (harsh, uninhabitable terrain) are rejected.
+///
+/// @param tc  The candidate tile.
+/// @return    True if a population centre may be placed here.
+bool can_place_population_centre(const tile_component& tc);
+
 /// The load-bearing validity check: may a building of `type` targeting
 /// `target` be placed on tile `tc`?
 ///
