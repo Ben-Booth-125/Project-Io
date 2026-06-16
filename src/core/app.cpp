@@ -55,6 +55,8 @@ overlay_mode overlay_from_name(const std::string& s)
     if (s == "faction")     return overlay_mode::faction;
     if (s == "corporation") return overlay_mode::corporation;
     if (s == "resource")    return overlay_mode::resource;
+    if (s == "population")  return overlay_mode::population;
+    if (s == "scarcity")    return overlay_mode::scarcity;
     return overlay_mode::none;
 }
 

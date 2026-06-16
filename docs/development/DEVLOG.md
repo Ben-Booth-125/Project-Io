@@ -84,6 +84,20 @@ representation. All `~`.
   replaced by a residual `[B3 ~]` "seed multiple market centres from capitals/population" (deferred
   to the population layer) plus noted follow-ups (finer per-building split; inter-market convoys).
 
+**Population + Scarcity lens batch (published).** Batch-published two of the new lens Briefs as
+Planetary render passes — strictly serial (both collide on `ui_state.hpp` enum, `overlay.cpp`,
+`body_surface_canvas.cpp`, `icons.{hpp,cpp}`, so no fan-out):
+- **Population lens** (`overlay_mode::population`) — per-tile **habitability** tint (dark→liveable
+  green, `0.15 + 0.7·h`); figure glyph; low→high key. Reads `tile.habitability` directly (population
+  *density* deferred with the population layer).
+- **Scarcity lens** (`overlay_mode::scarcity`) — single-resource **translucent** heatmap, scarcity
+  `= 1 − deposit/body-max` composited hot at `0.5·scarcity`; hollow-triangle glyph; abundant→scarce
+  key + resource swatch; shares the `lens_resource` selector.
+- Verified: 5 blessed goldens PASS ≤0.0073%, exit 0 (`population_lens.lua`, `scarcity_lens.lua`).
+  Propagated to `docs/ui/LENSES.md` (two new sections + rung table) and `docs/ui/ICONS.md`
+  (two glyphs). Both Briefs removed from OPENS § Canvas; REQUIREMENTS archived.
+- **Status: Complete — 9/9 requirements met** (population R1–R4, scarcity R1–R5).
+
 ### In-session decisions
 
 **Routing keyed by corp representative tile, not per building.** Supply/demand are `(corp,body)`

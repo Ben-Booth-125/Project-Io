@@ -28,6 +28,8 @@ enum class overlay_mode
     faction,     ///< Faction presence.
     corporation, ///< Corporate-owned tiles (per-corp tint; player-corp border). See LENSES.md.
     resource,    ///< Deposit-density tint (richest-deposit hue, magnitude opacity). See LENSES.md § Resource lens.
+    population,  ///< Per-tile habitability tint (dark → liveable green). See LENSES.md § Population lens.
+    scarcity,    ///< Per-tile single-resource scarcity heatmap (hot where absent). See LENSES.md § Scarcity lens.
 };
 
 /// Construction (building-placement) interaction state. When `active`, the

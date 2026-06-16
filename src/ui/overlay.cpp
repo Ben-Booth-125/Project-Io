@@ -24,6 +24,8 @@ void draw_lens_icon(ImDrawList* dl, overlay_mode m, ImVec2 rect_min, ImVec2 rect
         case overlay_mode::faction:     icons::faction    (dl, centre, r, colour); break;
         case overlay_mode::corporation: icons::corporation(dl, centre, r, colour); break;
         case overlay_mode::resource:    icons::resource   (dl, centre, r, colour); break;
+        case overlay_mode::population:  icons::population (dl, centre, r, colour); break;
+        case overlay_mode::scarcity:    icons::scarcity   (dl, centre, r, colour); break;
         default: break;
     }
 }
@@ -35,7 +37,8 @@ void draw_lens_icon(ImDrawList* dl, overlay_mode m, ImVec2 rect_min, ImVec2 rect
 /// in the control strip only while one of those two lenses is active.
 void draw_lens_selector(ui_state& ui)
 {
-    if (ui.overlay != overlay_mode::resource && ui.overlay != overlay_mode::market)
+    if (ui.overlay != overlay_mode::resource && ui.overlay != overlay_mode::market &&
+        ui.overlay != overlay_mode::scarcity)
         return;
 
     // Resource lens: a mode toggle. Highest-value needs no selection; single-resource
@@ -48,6 +51,7 @@ void draw_lens_selector(ui_state& ui)
 
     const bool show_picker =
         (ui.overlay == overlay_mode::market) ||
+        (ui.overlay == overlay_mode::scarcity) ||
         (ui.overlay == overlay_mode::resource && ui.resource_lens_single);
     if (!show_picker)
         return;
@@ -81,6 +85,8 @@ const char* overlay_mode_name(overlay_mode m)
         case overlay_mode::faction:     return "Faction presence";
         case overlay_mode::corporation: return "Corporation ownership";
         case overlay_mode::resource:    return "Resource density";
+        case overlay_mode::population:  return "Habitability";
+        case overlay_mode::scarcity:    return "Resource scarcity";
         default:                        return "None";
     }
 }
@@ -94,6 +100,8 @@ const char* overlay_mode_short_name(overlay_mode m)
         case overlay_mode::faction:     return "Faction";
         case overlay_mode::corporation: return "Corp";
         case overlay_mode::resource:    return "Resource";
+        case overlay_mode::population:  return "Habitability";
+        case overlay_mode::scarcity:    return "Scarcity";
         default:                        return "None";
     }
 }
@@ -107,9 +115,10 @@ void draw_overlay_controls(ui_state& ui, float left_x, float bottom_y)
 {
     // The selectable lenses, in mode-bar order. overlay_mode::none is not a
     // button — clicking the active lens clears back to it (toggle_overlay).
-    constexpr overlay_mode modes[5] = {
+    constexpr overlay_mode modes[7] = {
         overlay_mode::supply, overlay_mode::market, overlay_mode::faction,
-        overlay_mode::corporation, overlay_mode::resource };
+        overlay_mode::corporation, overlay_mode::resource,
+        overlay_mode::population, overlay_mode::scarcity };
 
     ImGui::SetNextWindowPos({left_x, bottom_y}, ImGuiCond_Always, {0.0f, 1.0f});
     ImGui::SetNextWindowBgAlpha(0.65f);

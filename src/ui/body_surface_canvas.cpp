@@ -225,6 +225,91 @@ void draw_market_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size,
     dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), buf);
 }
 
+/// On-canvas legend for the Population lens: a low→high habitability gradient bar
+/// (dark substrate → liveable green). Same left-edge placement as the other keys.
+void draw_population_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size)
+{
+    const float pad    = 8.0f;
+    const float box_w  = 156.0f;
+    const float line_h = ImGui::GetTextLineHeight();
+    const float bar_h  = 10.0f;
+
+    const float body_h = pad + line_h + 4.0f + bar_h + 2.0f + line_h + pad;
+    const ImVec2 p0 = { area_origin.x + nav_pane_width + pad,
+                        area_origin.y + std::max(pad, (area_size.y - body_h) * 0.5f) };
+    const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
+    dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
+    dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
+
+    const float x     = p0.x + pad;
+    const float bar_w = box_w - 2.0f * pad;
+    float       y     = p0.y + pad * 0.5f;
+
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Habitability");
+    y += line_h + 4.0f;
+
+    constexpr ImU32 live = IM_COL32(80, 200, 110, 255);
+    constexpr int segs = 24;
+    for (int i = 0; i < segs; ++i)
+    {
+        const float t0 = static_cast<float>(i) / segs;
+        const ImU32 c  = lerp_colour(IM_COL32(40, 40, 48, 255), live, 0.15f + 0.7f * t0);
+        dl->AddRectFilled({ x + bar_w * t0, y },
+                          { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
+    }
+    y += bar_h + 2.0f;
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "low");
+    const ImVec2 hts = ImGui::CalcTextSize("high");
+    dl->AddText({x + bar_w - hts.x, y}, IM_COL32(170, 175, 185, 255), "high");
+}
+
+/// On-canvas legend for the Scarcity lens: an abundant→scarce gradient bar (no tint
+/// → hot) plus the selected resource's name and swatch. Same placement as the others.
+void draw_scarcity_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size,
+                       const ui_state& state)
+{
+    const float pad    = 8.0f;
+    const float box_w  = 156.0f;
+    const float line_h = ImGui::GetTextLineHeight();
+    const float bar_h  = 10.0f;
+
+    const float body_h = pad + line_h + 4.0f + bar_h + 2.0f + line_h + 4.0f + line_h + pad;
+    const ImVec2 p0 = { area_origin.x + nav_pane_width + pad,
+                        area_origin.y + std::max(pad, (area_size.y - body_h) * 0.5f) };
+    const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
+    dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
+    dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
+
+    const float x     = p0.x + pad;
+    const float bar_w = box_w - 2.0f * pad;
+    float       y     = p0.y + pad * 0.5f;
+
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Resource scarcity");
+    y += line_h + 4.0f;
+
+    // Abundant (substrate, no tint) → scarce (hot). Mirrors the per-tile composite.
+    constexpr ImU32 substrate = IM_COL32(40, 40, 48, 255);
+    constexpr ImU32 hot       = IM_COL32(220, 70, 55, 255);
+    constexpr int segs = 24;
+    for (int i = 0; i < segs; ++i)
+    {
+        const float t0 = static_cast<float>(i) / segs;
+        const ImU32 c  = lerp_colour(substrate, hot, t0);
+        dl->AddRectFilled({ x + bar_w * t0, y },
+                          { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
+    }
+    y += bar_h + 2.0f;
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "abundant");
+    const ImVec2 sts = ImGui::CalcTextSize("scarce");
+    dl->AddText({x + bar_w - sts.x, y}, IM_COL32(170, 175, 185, 255), "scarce");
+    y += line_h + 4.0f;
+
+    dl->AddRectFilled({x, y + 2.0f}, {x + 10.0f, y + 12.0f},
+                      presentation_of(state.lens_resource).colour);
+    dl->AddText({x + 14.0f, y}, IM_COL32(235, 235, 235, 255),
+                presentation_of(state.lens_resource).name);
+}
+
 } // namespace
 
 void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, ImVec2 size, bool input_enabled)
@@ -433,6 +518,19 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
         }
     }
 
+    // Scarcity lens pre-pass: the body's richest deposit of the selected resource —
+    // the normaliser for the per-tile scarcity heatmap (scarcity = 1 − mag/max).
+    // When the body holds none of the good, the max stays 0 and every tile reads
+    // maximally scarce (the resource is absent body-wide). See LENSES.md § Scarcity.
+    float scar_max_sel = 0.0f;
+    if (state.overlay == overlay_mode::scarcity)
+    {
+        const std::size_t sel = static_cast<std::size_t>(state.lens_resource);
+        for (const auto& [id, tile] : w.tiles)
+            if (tile.body == state.active_body)
+                scar_max_sel = std::max(scar_max_sel, tile.resource_deposit[sel]);
+    }
+
     const ImVec2 mouse = ImGui::GetIO().MousePos;
 
     // Hover resolves to a single tile copy. Adjacent hexes' circular hit-tests
@@ -529,6 +627,32 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
         {
             if (market_active)
                 fill = lerp_colour(fill, market_wash, 0.55f);
+        }
+        // Population lens: tint a tile by its habitability (0–1, already normalised) —
+        // a sequential dark→liveable-green gradient composited over terrain, so
+        // hospitable land reads bright and barren land barely tints.
+        else if (state.overlay == overlay_mode::population)
+        {
+            const float h = std::clamp(tile.habitability, 0.0f, 1.0f);
+            if (h > 0.0f)
+            {
+                constexpr ImU32 live = IM_COL32(80, 200, 110, 255);
+                fill = lerp_colour(fill, live, 0.15f + 0.7f * h);
+            }
+        }
+        // Scarcity lens: a translucent single-resource heatmap of where the selected
+        // resource is *absent* or sparse. scarcity = 1 − mag/max across the body; hot
+        // where scarce, fading to no tint where abundant. Composited at a low alpha so
+        // terrain still reads (a translucent heatmap, not a replacement).
+        else if (state.overlay == overlay_mode::scarcity)
+        {
+            const std::size_t sel = static_cast<std::size_t>(state.lens_resource);
+            const float mag  = tile.resource_deposit[sel];
+            const float frac = scar_max_sel > 0.0f
+                             ? std::clamp(mag / scar_max_sel, 0.0f, 1.0f) : 0.0f;
+            const float scar = 1.0f - frac;
+            constexpr ImU32 hot = IM_COL32(220, 70, 55, 255);
+            fill = lerp_colour(fill, hot, 0.5f * scar);
         }
         const auto   built_it  = built_tiles.find(id);
         const bool   built     = built_it != built_tiles.end();
@@ -710,6 +834,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, ImVec2 origin, Im
         draw_resource_key(dl, grid_area_origin, grid_area_size, state, res_present);
     else if (state.overlay == overlay_mode::market)
         draw_market_key(dl, grid_area_origin, grid_area_size, state, market_active, market_ratio);
+    else if (state.overlay == overlay_mode::population)
+        draw_population_key(dl, grid_area_origin, grid_area_size);
+    else if (state.overlay == overlay_mode::scarcity)
+        draw_scarcity_key(dl, grid_area_origin, grid_area_size, state);
 
     if (!input_enabled)
         return;

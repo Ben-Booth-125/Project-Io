@@ -395,9 +395,14 @@ currently hold Briefs appear as sections below.
 A brainstorm pass over *what else is informative as a map lens* (Q&A 2026-06-16). Five lens
 ideas were accepted, plus one meta item. They extend the lens family in `docs/ui/LENSES.md`
 (`overlay_mode` in `src/ui/ui_state.hpp`; render passes in `src/ui/body_surface_canvas.cpp`;
-strip controls in `src/ui/overlay.cpp`). All are `~` (design owed) — each needs a settle pass
-(rung applicability, legend/key, glyph, interaction) before promotion. Glyph additions
-propagate to `docs/ui/ICONS.md` § Map-lens glyphs.
+strip controls in `src/ui/overlay.cpp`). Glyph additions propagate to `docs/ui/ICONS.md`
+§ Map-lens glyphs.
+
+**Built 2026-06-16:** the **Population** (per-tile habitability tint) and **Scarcity**
+(single-resource translucent heatmap) lenses landed as Planetary render passes (see DEVLOG and
+`docs/ui/LENSES.md` § Population/Scarcity lens; the population *density* half is deferred with the
+population layer). The remaining Briefs below are `~` (design owed) — each needs a settle pass
+(rung applicability, legend/key, glyph, interaction) before promotion.
 
 - **[B3 ~] Production / Output lens.** *(Written 2026-06-16, lens-ideas Q&A.)* Read the map as a
   *production-intensity surface*: where value is actually being made. **Intensity metric settled:
@@ -410,16 +415,6 @@ propagate to `docs/ui/ICONS.md` § Map-lens glyphs.
   the value→opacity normalisation (per-body, like Resource?), whether idle vs active gets a
   distinct treatment, glyph, legend. Authority `docs/ui/LENSES.md`.
 
-- **[B4 ~] Habitability / Population lens.** *(Written 2026-06-16, lens-ideas Q&A.)* Read the map
-  as a *liveability / population-density surface*: where habitability is high and where workforce
-  and demand concentrate (`docs/economy/POPULATION.md`). A strip lens, Planetary tint. **Partly
-  target-spec** — population centres are deferred from the prototype, so the data this tints is
-  not all generated yet; the habitability half may be expressible sooner than the
-  population-density half. Couples to the Workforce/Population Layer-4 work (§ Workforce,
-  § Infrastructure). **Design owed:** which signal (habitability, population, or a combined read),
-  what data exists now vs is gated, rung, legend, glyph. Authority `docs/ui/LENSES.md`,
-  `docs/economy/POPULATION.md`.
-
 - **[B3 ~] Placement-suitability surface (a lens on *tile selection*, not a strip lens).**
   *(Written 2026-06-16, lens-ideas Q&A.)* **Explicitly *not* an `overlay_mode` strip lens** — it is
   a surface tied to **tile selection / armed construction placement**: for a selected (or armed-to-
@@ -430,16 +425,6 @@ propagate to `docs/ui/ICONS.md` § Map-lens glyphs.
   **Design owed:** the exact trigger (tile selection vs armed-build mode vs both), the
   valid/affine/invalid colour treatment, where it lives in the canvas-state model given it is *not*
   an `overlay_mode`. Authority `docs/ui/LENSES.md` (note the distinction), `docs/economy/PRODUCTION.md`.
-
-- **[C3 ~] Ambient / Scarcity lens (single-resource, body-wide).** *(Written 2026-06-16,
-  lens-ideas Q&A.)* The inverse of the Resource lens: highlight where a chosen good is **absent or
-  below the ambient floor** across a body — scarcity rather than density. **Settled shape: a global
-  *body-wide* heatmap, valid only for a single selected resource** (no "highest-value" default
-  mode — scarcity of *what?* must be answered). Reads the same `resource_deposit` data the Resource
-  lens does, framed negatively. **Access mechanism left open** — whether it is its own
-  `overlay_mode`, a toggle within the Resource lens (density↔scarcity), or a mode of the resource
-  selector. **Design owed:** that access decision, the colour ramp (scarce = hot? cool?), legend.
-  Authority `docs/ui/LENSES.md` § Resource lens (sibling).
 
 - **[F4 ~] Reach / Logistics-range lens.** *(Written 2026-06-16, lens-ideas Q&A.)* A static
   *reach* surface — how far deployment or supply can extend from ports/launchpads — complementing
@@ -628,6 +613,13 @@ shared per-entity content builders in `entity_summary.{hpp,cpp}`):
   tracked under § Documentation.)*
 
 ## Documentation
+
+- **[S1] Review the Population + Scarcity lens doc propagation (2026-06-16).** The lens batch added
+  `docs/ui/LENSES.md` § Population lens and § Scarcity lens (+ the rung-applicability table rows) and
+  two glyph rows in `docs/ui/ICONS.md` § Map-lens glyphs, and the multiple-markets publish touched
+  `docs/SYSTEMS.md` § Trade and `docs/ui/LENSES.md` § Market lens. All were verified live (goldens /
+  the headless harness), so no transient `⟳` notes were left; this reminder is the standing
+  invitation to confirm the wording. Clear it once reviewed.
 
 Propagation-tracking for the 2026-06-15 v0.1.0 design pass — which settled designs have reached
 their authority docs. *(The standing `S`-tier review reminders raised by the retroactive

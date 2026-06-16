@@ -37,6 +37,8 @@ but its build is gated on a dependency (named in the lens section).
 | Faction | — | — | ✓ tile tint + owner borders |
 | **Corporation** | — | — | **✓ tile tint + player border** |
 | **Resource** | — | — | **✓ deposit-density tint + gradient key** |
+| **Population** | — | — | **✓ habitability tint + gradient key** |
+| **Scarcity** | — | — | **✓ single-resource scarcity heatmap + key** |
 
 **Resource** is **built** (2026-06-16): unlike Supply and Market it had **no data
 dependency** (tile `resource_deposit` is already generated), so it landed directly as a
@@ -303,3 +305,62 @@ lens-local control is a **"Single" mode checkbox + a shared resource combo** bou
 `ui_state.lens_resource` in `overlay.cpp` (the same combo the Market good-selector uses). The
 on-canvas key sits at the **left edge, vertically centred, inset past the nav rail**. Verified by
 `scripts/verify/resource_lens.lua` against blessed goldens.
+
+## Population lens *(built 2026-06-16 — no data dependency)*
+
+**Intent.** Read the map as a *liveability surface*: where land is hospitable, so the player can
+weigh siting and (later) population pressure. The complement to Resource's material read.
+
+**Data definition (settled).** Every tile carries a `habitability` value in `[0, 1]` from
+generation (`tile_component.habitability`). The lens reads it directly at draw time; **no new data
+is generated**. Population *density* (people per tile) is **deferred** — population centres are not
+yet generated — so this lens reads **habitability only** for now; the density half folds in when the
+population layer lands (§ Workforce / § Infrastructure Briefs).
+
+**Rung.** Planetary only — habitability is per-tile and has no inter-body surface. Guarded behind
+`overlay_mode::population` in [`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp).
+
+**Colour.** A sequential dark→liveable-green gradient: a tile's terrain hue is composited toward a
+"liveable" green (`IM_COL32(80, 200, 110)`) at opacity `0.15 + 0.7·habitability` (`lerp_colour`), so
+hospitable land reads bright and barren land barely tints. Sequential (not diverging) — habitability
+has a single good direction. No per-faction colours.
+
+**Glyph.** A small figure — round head over a tapered torso (`icons::population`); reads as
+"people / habitability", distinct from the other lens glyphs.
+
+**Legend.** A low→high habitability gradient bar, left edge, vertically centred, inset past the nav
+rail (the Resource/Market key placement). Tooltip "Habitability".
+
+**Interaction notes.** Planetary-only, single-select, no selector (the whole-body habitability
+surface needs no resource pick). Verified by `scripts/verify/population_lens.lua` against blessed
+goldens. **Toward population density (future):** when population centres generate, this lens should
+gain a density read (a second mode or a blended signal) — owed with the population layer.
+
+## Scarcity lens *(built 2026-06-16 — no data dependency)*
+
+**Intent.** The inverse of the Resource lens: read the map as an *absence surface* — where a chosen
+good is **scarce or absent**, so the player sees gaps rather than concentrations. Answers "where is
+there *no* iron?" directly, which the density lens only shows by omission.
+
+**Data definition (settled).** Reads the same `tile.resource_deposit` the Resource lens does; no new
+data. **Single-resource only** — scarcity is meaningful only relative to a specific good (scarcity
+*of what?*), so there is no "highest-value" default mode. The selected good is the shared
+`ui_state.lens_resource` (the same combo Resource single-mode and Market use).
+
+**Rung.** Planetary only. Guarded behind `overlay_mode::scarcity` in `body_surface_canvas.cpp`.
+
+**Colour.** A **translucent** per-tile heatmap: scarcity `= 1 − deposit[sel] / body-max` (normalised
+against the body's richest deposit of the selected good in a pre-pass); the tile is composited toward
+a hot hue (`IM_COL32(220, 70, 55)`) at opacity `0.5 · scarcity`, so an abundant tile keeps its
+terrain and a poor/absent tile reads hot — translucent so terrain still reads beneath. When the body
+holds **none** of the good, every tile reads maximally scarce (absent body-wide).
+
+**Glyph.** A hollow downward-pointing triangle (`icons::scarcity`) — an "empty / depleted" motif,
+the inverse of the filled resource pip.
+
+**Legend.** An abundant→scarce gradient bar plus the selected resource's name and identity swatch,
+same placement as the others. Tooltip "Resource scarcity". The resource selector appears in the
+control strip when the lens is active (shared form with Resource/Market).
+
+**Interaction notes.** Planetary-only, single-select. Verified by `scripts/verify/scarcity_lens.lua`
+against blessed goldens (iron and coal variants prove the selector re-skins the surface).

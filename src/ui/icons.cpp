@@ -138,4 +138,32 @@ void resource(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     }
 }
 
+void population(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // A small figure: round head over a tapered torso (shoulders wider than the
+    // head, narrowing toward a flat base) — a "people / habitability" motif.
+    const float head_r = r * 0.42f;
+    const ImVec2 head_c = { centre.x, centre.y - r * 0.45f };
+    dl->AddCircleFilled(head_c, head_r, colour);
+    const ImVec2 torso[4] = {
+        { centre.x - r * 0.30f, centre.y - r * 0.05f }, // left shoulder
+        { centre.x + r * 0.30f, centre.y - r * 0.05f }, // right shoulder
+        { centre.x + r * 0.55f, centre.y + r },         // right base
+        { centre.x - r * 0.55f, centre.y + r },         // left base
+    };
+    dl->AddConvexPolyFilled(torso, 4, colour);
+}
+
+void scarcity(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // A hollow downward-pointing triangle — an "empty / depleted" motif, the
+    // inverse of the filled resource pip. Stroke only so it reads as absence.
+    const ImVec2 v[3] = {
+        { centre.x - r, centre.y - r },   // top-left
+        { centre.x + r, centre.y - r },   // top-right
+        { centre.x,     centre.y + r },   // bottom point
+    };
+    dl->AddPolyline(v, 3, colour, ImDrawFlags_Closed, 1.5f);
+}
+
 } // namespace ui::icons

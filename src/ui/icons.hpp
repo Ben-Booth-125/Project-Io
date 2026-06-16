@@ -105,4 +105,25 @@ void corporation(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Fill colour of the strata (drawn at descending opacity).
 void resource(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw the Population-lens glyph — a small figure (round head over a tapered
+/// torso) — in @p colour. Reads as "people / habitability", distinct from the
+/// other lens glyphs. For the overlay-lens control strip. See LENSES.md
+/// § Population lens.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Fill colour of the figure.
+void population(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
+/// Draw the Scarcity-lens glyph — a hollow downward-pointing triangle (an
+/// "empty / depleted" motif, the inverse of the filled resource pip) — in
+/// @p colour. For the overlay-lens control strip. See LENSES.md § Scarcity lens.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Stroke colour of the outline.
+void scarcity(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 } // namespace ui::icons

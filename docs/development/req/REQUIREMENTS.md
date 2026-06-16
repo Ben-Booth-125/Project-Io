@@ -111,6 +111,37 @@ Permanent record of resolved requirement groups, newest first. Each carries a
 `Resolved:` line and is retained verbatim; re-promote by copying a section back up to
 **Active requirements**.
 
+### scarcity-lens-render
+
+Resolved: 2026-06-16 — complete, all rows met. Promoted from OPENS § Canvas —
+**[C3] Ambient / Scarcity lens**. `overlay_mode::scarcity`: a single-resource (shared
+`lens_resource`) per-tile **translucent** heatmap of where the selected resource is absent or
+sparse — the inverse of the Resource lens, reading the same `resource_deposit`. 3 blessed goldens
+PASS at ≤0.0000% (iron + coal variants prove the selector re-skins).
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | **Brief-spanning:** under the Scarcity lens the Planetary surface translucently tints each tile by the selected resource's scarcity (hot where absent, fading where abundant), with a resource selector, an on-canvas key, and a distinct strip glyph — golden-verified. | `visual` (`scripts/verify/scarcity_lens.lua` golden) | complete | 3/3 goldens PASS ≤0.0000%, exit 0 |
+| R2 | A per-tile translucent tint keyed to scarcity = 1 − `deposit[sel]`/body-max, composited at low alpha (0.5·scarcity) so terrain reads. | `code` + `visual` | complete | `body_surface_canvas.cpp` scarcity branch + pre-pass |
+| R3 | The shared resource selector (`lens_resource`) re-skins the scarcity surface to a different resource. | `code` + `visual` | complete | iron→coal re-keys |
+| R4 | An on-canvas abundant→scarce key renders with the selected resource's name + swatch. | `visual` | complete | `draw_scarcity_key` |
+| R5 | A distinct strip glyph (`icons::scarcity`, a hollow inverted triangle) appears and tooltips "Resource scarcity". | `code` + `visual` | complete | `icons.cpp`, `overlay.cpp` |
+
+### population-lens-render
+
+Resolved: 2026-06-16 — complete, all rows met. Promoted from OPENS § Canvas —
+**[B4] Population / Habitability lens**. `overlay_mode::population`: a per-tile habitability tint on
+the Planetary canvas. Per-tile habitability is the only signal generated today (population centres
+are deferred — the density half folds in with the population layer), so this lens reads habitability
+directly. 2 blessed goldens PASS at ≤0.0073%.
+
+| ID | Requirement | Verification | Status | Notes |
+|----|-------------|--------------|--------|-------|
+| R1 | **Brief-spanning:** under the Population lens the Planetary surface tints each tile by its habitability (dark → liveable green), shows an on-canvas habitability key, and the lens strip carries a distinct figure glyph — golden-verified. | `visual` (`scripts/verify/population_lens.lua` golden) | complete | 2/2 goldens PASS ≤0.0073%, exit 0 |
+| R2 | A per-tile dark→green tint keyed to `tile.habitability` (0–1), composited over terrain (`lerp_colour`, t = 0.15 + 0.7·h); barren tiles barely tint. | `code` + `visual` | complete | `body_surface_canvas.cpp` population branch |
+| R3 | An on-canvas low→high habitability gradient key renders, inset past the nav rail. | `visual` | complete | `draw_population_key` |
+| R4 | A distinct strip glyph (`icons::population`, a figure) appears in the lens control strip and tooltips "Habitability". | `code` + `visual` | complete | `icons.cpp`, `overlay.cpp` |
+
 ### market-lens-render
 
 Resolved: 2026-06-16 — complete, all rows met. Promoted from OPENS § Canvas —
