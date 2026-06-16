@@ -510,59 +510,18 @@ owned `world_audit.cpp`, the docs, the build, and verification.
 
 ---
 
-*No active groups. The worklist is empty between work blocks.*
+---
 
-Completed 2026-06-16 / 2026-06-15 / 2026-06-14 (see DEVLOG, newest first):
+*v0.0.6 Batch Delivery — **Completed** 2026-06-16. 20 items delivered across 6 waves:
+Wave A (BL-033 inline + BL-034 doc propagation); Wave B parallel (BL-002+003 icon
+silhouettes/outlines, BL-001/006/005/024 corp lens/hover-card/rung-distances/tile-ledger,
+BL-007 speed curve, BL-004 icon audit — clean); Wave C parallel (BL-026 null delta —
+already conformant, BL-047 population static MVP, BL-049 building management); Wave D
+parallel (BL-027 Market Ledger, BL-028 Balance Ledger, BL-029 Construction Ledger, BL-022
+Corp Dashboard); Wave E main session (BL-042 workforce pool step 2, BL-021 menu curated
+order, BL-030 non-spatial goto); Wave F main session (BL-048 population dynamic half).
+Build green at every wave integration. See DEVLOG for session record.*
 
-- *Session 2 — the lens batch (2 Briefs, strictly serial, branch v0.0.5). **Completed:** the
-  Resource lens (`overlay_mode::resource` — highest-value + single-resource deposit-density tint,
-  per-body magnitude normalisation, shared lens-local selector, on-canvas gradient key) and the
-  Market lens (`overlay_mode::market` — per-body diverging price wash keyed to `price/base_price`,
-  Circumplanetary per-body price strip). Both reuse one shared good-selector + on-canvas key,
-  inset past the nav rail. 12/12 requirements met; verified by `scripts/verify/resource_lens.lua`
-  (4 goldens) and `market_lens.lua` (3 goldens), all PASS ≤0.0089%. One commit per Brief. No
-  fan-out (both wrote the same hotspot files). See REQUIREMENTS.md archive.*
-
-- *v0.0.5 Layer 4 UI groundwork — single Brief, scaffold scope (branch v0.0.5). **Completed:**
-  the held fifth v0.0.5 enabler — construction interaction state on `ui_state`
-  (`construction_state` + `show_construction_panel`); a hover-driven ghost placement marker
-  and non-mutating click seam on the Planetary canvas (`body_surface_canvas.cpp`); the
-  construction / building-management panel shell with armed-placement Build section and
-  disabled management stubs (`src/ui/construction_panel.{hpp,cpp}`); nav-rail slot 6 + shell
-  wiring + `verify` hooks (`nav_pane.cpp`, `app.cpp`). **No economic mutation** — the functional
-  loop stays in v0.0.6. 8/8 requirements met; verified via the ProjectIo Debug build, code
-  grep, and `scripts/verify/construction_panel.lua`. B ∥ C fanned out to two concurrent
-  sub-agents. See REQUIREMENTS.md archive.*
-
-- *v0.0.5 Layer 4 foundations — publish set (4 Briefs, barrier semantics, branch v0.0.5).
-  **Completed:** reusable placement-rules seam (`src/world/placement_rules.{hpp,cpp}`, Pass 3
-  re-pointed, no behaviour change); multi-tick economy-stability harness
-  (`tools/verify/econ_stability.cpp`, 100 ticks); workforce-model design
-  (`POPULATION.md` § Workforce model); uniform ledger-window chrome
-  (`src/ui/ledger_chrome.hpp`, both ledgers re-pointed). 16/16 requirements met; verified via
-  the ProjectIo build, `tools/verify/econ_stability`, and `tools/verify/world_audit`. One commit
-  per Brief plus a tracking close-out. The roadmap's fifth v0.0.5 enabler (A4 Layer 4 UI
-  groundwork) was deliberately held for a later pass. See REQUIREMENTS.md archive.*
-
-- *Layer 3 finalisation — publish set (5 Briefs, barrier semantics). **Completed:**
-  price resolution from local supply/demand (A); deposit depletion model (B); pre-game
-  economy ticks / warm start (C); player balance header + design pass (D); uniform
-  ledger-window chrome principle (E, family deferred). 13/13 requirements met; verified
-  via `tools/verify/econ_harness`, `tools/verify/world_audit`, and
-  `scripts/verify/header.lua`. Four functional commits (C+D merged — shared `app.cpp`)
-  plus a tracking close-out. See REQUIREMENTS.md archive.*
-
-- *Layer 3 economy — publish set (8 Briefs, barrier semantics). **Completed:** data-model
-  foundation; recipe/economy registry (Lua); production simulation; per-body market clearing;
-  corporate money loop; economy observability panel; building-placement audit (S1); Kepler
-  biome balance (S2). 27/27 requirements met; verified via `tools/verify/econ_harness`,
-  `tools/verify/world_audit`, and `scripts/verify/economy_panel.lua`. One commit per Brief
-  after a doc-refactor commit. See REQUIREMENTS.md archive.*
-
-- *Publish block — Selection info element + Known Bug (six groups, barrier set).
-  **Completed:** Go-to planetary landing + Kepler-only reliability (R1–R5;
-  `focus_on_entity` body → `focus_on_surface`, tile → no-op; `verify.go_to` +
-  `selection_go_to.lua`); Generation Ledger design (R1–R4; `GENERATION_LEDGER.md`).
   **Cancelled back to TODO:** Non-spatial 'go to' routing (blocked — no nation/corp
   ledgers); Canvas hit-testing (blocked — entities not drawn as selectable markers);
   Frame stutter measurement (R1/R2 failed — verification needs live instrumentation);

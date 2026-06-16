@@ -6,6 +6,36 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — v0.0.6 Batch Delivery (2026-06-16)
+
+**Goal.** Batch-deliver all designed (✓), unblocked backlog items for v0.0.6 using parallel sub-agents in worktrees. 20 items promoted and delivered across 6 waves; build green at every integration point.
+
+**Waves and outcomes:**
+
+- **Wave A (main session, doc-only).** BL-033 inline light-mode review — confirmed clean, removed. BL-034 propagated the v0.1.0 design-pass into authority docs: `LAYOUT.md` ledger-family conventions block, `SYSTEMS.md` Supply section settled, new `docs/economy/SUPPLY.md` Layer-5 authority doc created.
+
+- **Wave B (4 parallel agents, 1 serial follow-on).** B1: redrawn extraction-site (faceted ore-chunk polygon) and unit/convoy (open V chevron), outline convention applied to all filled markers (BL-002+003). B2: corp lens player-tile border → `palette::selection`, hover-card `draw_hover_card` dispatcher, rung-relative distance reference fixed to canvas rung, tile ledger defaults to `active_body` (BL-001/006/005/024). B3: non-linear speed curve (¼×/½×/1×/4×/16×), progress bar text suppressed (BL-007). B4 (after B1 merge): icon usage audit — all 13 call sites fully conformant, null commit (BL-004). All merged clean.
+
+- **Wave C (3 parallel agents).** C1: economy panel audit — already conformant, null delta (BL-026). C2: population static MVP — `land_use_component` + `population_centre_component`, `population_generation.{hpp,cpp}` with seeded clustering, `agricultural_produce` demand stub in `economy_system.cpp` (BL-047). C3: building management — `workforce_target` + `decommissioned` + `active_recipe_index` on `building_component`, workforce scalar and labour/material cost split wired in economy + budget system, recipe control API, live management controls in construction panel (BL-049). C2+C3 shared-file conflict (`components.hpp`, `economy_system.cpp`) resolved by merge order. BL-047 wired into `hard_coded_world.cpp` (main session).
+
+- **Wave D (4 parallel agents).** D1: Market Ledger — supply/demand/price/net table per resource, body selector (BL-027). D2: Balance Ledger — treasury, starting capital, net, assets (BL-028). D3: Construction Ledger refit — queue overview table prepended, management controls from C3 retained (BL-029). D4: Corp Overview Dashboard — per-corp table, player row tinted, row-click sets selection (BL-022). D3 had a merge conflict with C3 on `construction_panel.cpp` — resolved by keeping C3's live management controls, D3's queue section already present in file. All four new panels wired into `ui_state.hpp` + `nav_pane.cpp` + `app.cpp` (main session).
+
+- **Wave E (main session).** BL-042: workforce supply now derived from population centres (scale → labour-force table, apportioned by building-count ratio); wage scaling by body mean habitability added to `budget_system.cpp`. BL-021: nav-pane rewired to the curated 9-slot order from `MENU.md` (Corp/Budget/Workforce/Research/Market/Construction/Strategy/Diplomacy/History); four live slots, five placeholder slots with tooltips. BL-030: `focus_on_entity` extended — corporation entity → open corp panel; nation → no-op stub.
+
+- **Wave F (main session).** BL-048: body habitability aggregate computed from population-centre tile weights and stored in `economy_report.body_habitability`; habitability efficiency multiplier applied to `workforce_contention` (>0.6 → 1×, linear to 0.5× at 0). Population growth step: per-tick accumulator incremented when habitability ≥ 0.5 and food supply ≥ 50% met; levels up at tier thresholds (200/500/1500/5000 ticks). `growth_accumulator` field added to `population_centre_component`.
+
+**In-session decisions:**
+- BL-026 (economy panel refit): already conformant — null delta, no code change required.
+- BL-023 (nav-rail ordering rule): confirmed stale (design already in MENU.md), removed from backlog.
+- BL-033 (lens doc review): cleared inline (light mode) — LENSES.md, ICONS.md, SYSTEMS.md all consistent.
+- Construction panel merge conflict: kept C3 (BL-049) live management controls; D3's queue section was already present in the merged file.
+- Workforce supply derivation (BL-042): implemented in-engine with a hardcoded scale→labour table rather than reading from Lua, matching the headless-safe constraint (economy_system.cpp is harness-buildable).
+- Population growth ticks added to BL-048 despite the `growth_accumulator` field not being in the original component design — added inline rather than creating a separate component.
+
+**Open after this session:** remaining backlog items (32 items); BL-048 growth needs a proper Lua-driven rate table (currently hardcoded thresholds); the four placeholder nav slots (Workforce/Research/Corp Strategy/Diplomacy/History) need their ledger implementations.
+
+---
+
 > ## Handoff — Session 3: the UI-polish batch
 >
 > **Goal.** Clear the cheap, unblocked UI polish — per ROADMAP § Near-term publish plan
