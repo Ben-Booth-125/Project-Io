@@ -15,12 +15,13 @@ The project is in **prototype phase**, solo-developed in C++ with Lua scripting.
 technical documentation lives under [`docs/`](docs/) — start with
 [`docs/CONCEPT.md`](docs/CONCEPT.md) and [`docs/SYSTEMS.md`](docs/SYSTEMS.md).
 
-## Latest release — v0.0.4
+## Latest release — v0.0.5
 
-Layer 3 economy: per-body market clearing, supply/demand price resolution, deposit depletion,
-corporate balance and operating costs, plus an economy ledger panel and balance header. Also
-adds the visual- and headless-verification harnesses. Full history in
-[`CHANGELOG.md`](CHANGELOG.md).
+Layer 4 foundations: the reusable placement-rules seam, a multi-tick economy-stability harness,
+the workforce pool (step 1), and the Layer 4 UI scaffold. Adds the Resource / Market / Population /
+Scarcity **map lenses**, tile-centred markets, player sell-orders, golden-image visual
+verification, and world-generation fixes (full land claim, lean corporation holdings). Full
+history in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Versioning & releases
 

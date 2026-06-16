@@ -1,0 +1,619 @@
+{
+  "version": 1,
+  "note": "Machine-readable requirements ledger. One object per promoted Brief; rows are individual requirements. The prose policy/workflow guide still lives in REQUIREMENTS.md. status: active | complete | cancelled. verification is always an array; a 'class: detail' element (e.g. 'code: diff_rgba') keeps its qualifier inline. difficulty/importance/evaluated_difficulty are nullable and not yet backfilled from the source markdown.",
+  "groups": [
+    {
+      "brief": "scarcity-lens-render",
+      "title": "Ambient / Scarcity lens",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-16",
+      "resolution": "Complete, all rows met. overlay_mode::scarcity: a single-resource (shared lens_resource) per-tile translucent heatmap of where the selected resource is absent or sparse — the inverse of the Resource lens, reading the same resource_deposit. 3 blessed goldens PASS at <=0.0000% (iron + coal variants prove the selector re-skins).",
+      "promoted_from": "OPENS § Canvas — [C3] Ambient / Scarcity lens",
+      "batch": null,
+      "rows": [
+        { "id": "R1", "requirement": "Brief-spanning: under the Scarcity lens the Planetary surface translucently tints each tile by the selected resource's scarcity (hot where absent, fading where abundant), with a resource selector, an on-canvas key, and a distinct strip glyph — golden-verified.", "verification": ["visual: scripts/verify/scarcity_lens.lua golden"], "status": "complete", "result_metric": "3/3 goldens PASS <=0.0000%, exit 0", "notes": "" },
+        { "id": "R2", "requirement": "A per-tile translucent tint keyed to scarcity = 1 - deposit[sel]/body-max, composited at low alpha (0.5*scarcity) so terrain reads.", "verification": ["code", "visual"], "status": "complete", "result_metric": "", "notes": "body_surface_canvas.cpp scarcity branch + pre-pass" },
+        { "id": "R3", "requirement": "The shared resource selector (lens_resource) re-skins the scarcity surface to a different resource.", "verification": ["code", "visual"], "status": "complete", "result_metric": "", "notes": "iron->coal re-keys" },
+        { "id": "R4", "requirement": "An on-canvas abundant->scarce key renders with the selected resource's name + swatch.", "verification": ["visual"], "status": "complete", "result_metric": "", "notes": "draw_scarcity_key" },
+        { "id": "R5", "requirement": "A distinct strip glyph (icons::scarcity, a hollow inverted triangle) appears and tooltips 'Resource scarcity'.", "verification": ["code", "visual"], "status": "complete", "result_metric": "", "notes": "icons.cpp, overlay.cpp" }
+      ]
+    },
+    {
+      "brief": "population-lens-render",
+      "title": "Population / Habitability lens",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-16",
+      "resolution": "Complete, all rows met. overlay_mode::population: a per-tile habitability tint on the Planetary canvas. Per-tile habitability is the only signal generated today (population centres are deferred — the density half folds in with the population layer), so this lens reads habitability directly. 2 blessed goldens PASS at <=0.0073%.",
+      "promoted_from": "OPENS § Canvas — [B4] Population / Habitability lens",
+      "batch": null,
+      "rows": [
+        { "id": "R1", "requirement": "Brief-spanning: under the Population lens the Planetary surface tints each tile by its habitability (dark -> liveable green), shows an on-canvas habitability key, and the lens strip carries a distinct figure glyph — golden-verified.", "verification": ["visual: scripts/verify/population_lens.lua golden"], "status": "complete", "result_metric": "2/2 goldens PASS <=0.0073%, exit 0", "notes": "" },
+        { "id": "R2", "requirement": "A per-tile dark->green tint keyed to tile.habitability (0-1), composited over terrain (lerp_colour, t = 0.15 + 0.7*h); barren tiles barely tint.", "verification": ["code", "visual"], "status": "complete", "result_metric": "", "notes": "body_surface_canvas.cpp population branch" },
+        { "id": "R3", "requirement": "An on-canvas low->high habitability gradient key renders, inset past the nav rail.", "verification": ["visual"], "status": "complete", "result_metric": "", "notes": "draw_population_key" },
+        { "id": "R4", "requirement": "A distinct strip glyph (icons::population, a figure) appears in the lens control strip and tooltips 'Habitability'.", "verification": ["code", "visual"], "status": "complete", "result_metric": "", "notes": "icons.cpp, overlay.cpp" }
+      ]
+    },
+    {
+      "brief": "market-lens-render",
+      "title": "Market lens render pass",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-16",
+      "resolution": "Complete, all rows met. overlay_mode::market: a body-wide diverging warm/cool Planetary wash keyed to price/base_price (uniform per body), plus a Circumplanetary per-body price strip. Reuses the Resource lens good-selector and on-canvas key. 3 blessed goldens PASS at <=0.0082%.",
+      "promoted_from": "OPENS § Canvas — [B3] Market lens render pass",
+      "batch": null,
+      "rows": [
+        { "id": "R1", "requirement": "Brief-spanning: under the Market lens the Planetary surface washes the body by the selected good's relative price (warm=dear, cool=cheap), shows an on-canvas diverging key + good-selector, and the Circumplanetary rung shows a per-body price strip — golden-verified.", "verification": ["visual: scripts/verify/market_lens.lua golden"], "status": "complete", "result_metric": "3/3 goldens PASS <=0.0082%, exit 0", "notes": "" },
+        { "id": "R2", "requirement": "Planetary: a diverging warm/cool tint keyed to price[g]/base_price[g] (neutral at the floor ratio 1.0), uniform across the active body (per-body market).", "verification": ["code", "visual"], "status": "complete", "result_metric": "iron x0.57 cool wash captured", "notes": "diverging_colour" },
+        { "id": "R3", "requirement": "An on-canvas diverging key (cheap to dear) renders with the selected good's name.", "verification": ["visual"], "status": "complete", "result_metric": "", "notes": "draw_market_key; name + ratio" },
+        { "id": "R4", "requirement": "The good-selector (shared in form with the Resource selector, bound to lens_resource) picks the displayed good.", "verification": ["code", "visual"], "status": "complete", "result_metric": "", "notes": "iron->steel re-keys the wash" },
+        { "id": "R5", "requirement": "Circumplanetary: when the Market lens is active, a per-body price strip lists the anchor body's market prices with the selected good highlighted.", "verification": ["visual"], "status": "complete", "result_metric": "7 goods listed, Fe row highlighted", "notes": "circumplanetary_canvas.cpp" },
+        { "id": "R6", "requirement": "The golden runs verify.econ_step first so prices diverge from base, then captures; the market pass reads the resolved market_component.price.", "verification": ["visual", "doc"], "status": "complete", "result_metric": "", "notes": "econ_step(12) + new show_panel hook to clear the panel" }
+      ]
+    },
+    {
+      "brief": "resource-lens-render",
+      "title": "Resource lens render pass",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-16",
+      "resolution": "Complete, all rows met. overlay_mode::resource: highest-value mode tints each tile by its richest deposit's identity hue at a per-body magnitude-normalised opacity; single-resource mode is a heatmap of one selected good. Lens-local 'Single' toggle + shared resource combo (bound to ui_state.lens_resource, reused by Market). 4 blessed goldens PASS at <=0.0089%.",
+      "promoted_from": "OPENS § Canvas — [B3] Resource lens render pass",
+      "batch": null,
+      "rows": [
+        { "id": "R1", "requirement": "Brief-spanning: under the Resource lens the Planetary surface tints tiles by deposit density (highest-value default + single-resource heatmap), shows an on-canvas gradient key, and the resource strip button is present — golden-verified against a blessed reference.", "verification": ["visual: scripts/verify/resource_lens.lua golden"], "status": "complete", "result_metric": "4/4 goldens PASS <=0.0089%, exit 0", "notes": "" },
+        { "id": "R2", "requirement": "overlay_mode::resource exists and is wired: a strip button (the icons::resource glyph), overlay_mode_name ('Resource density'), short name, overlay_from_name, and the strip modes[] list.", "verification": ["code", "build"], "status": "complete", "result_metric": "", "notes": "enum + overlay.cpp + app.cpp; build clean" },
+        { "id": "R3", "requirement": "Highest-value mode: each tile tints to its richest deposit's presentation_of(res).colour at an opacity scaled by that deposit's magnitude (normalised per body); zero-deposit tiles keep terrain.", "verification": ["code", "visual"], "status": "complete", "result_metric": "", "notes": "per-body normalised; lerp_colour composite; ranks by richness (weight deferred — LENSES.md note)" },
+        { "id": "R4", "requirement": "Single-resource mode: a lens-local selector picks a resource; every tile tints that resource's colour at its per-tile magnitude (zero -> terrain).", "verification": ["code", "visual"], "status": "complete", "result_metric": "", "notes": "iron/coal heatmaps captured; shared combo with Market" },
+        { "id": "R5", "requirement": "An on-canvas key renders: a sparse->dense gradient bar, plus the selected resource's name+swatch (single mode) or a swatch list of the body's present resources (highest-value mode).", "verification": ["visual"], "status": "complete", "result_metric": "", "notes": "left-edge key inset past nav rail, clear of chrome" },
+        { "id": "R6", "requirement": "A verify hook drives the lens mode + selected resource headlessly so the golden is reproducible; the lua check is named in the verifier-visual skill or run via it.", "verification": ["code", "doc"], "status": "complete", "result_metric": "", "notes": "verify.set_lens_resource / set_resource_mode; run via verifier-visual" }
+      ]
+    },
+    {
+      "brief": "orphan-island-assignment",
+      "title": "Orphan-island assignment",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-15",
+      "resolution": "Complete, all rows met. A deterministic post-pass (assign_orphan_islands in nation_generation.cpp) groups unclaimed non-ocean land into cardinal-adjacency components and assigns each whole component to the nearest claimed tile's nation across water. world_audit reports 6048/6048 Kepler land tiles owned, 0 unclaimed (was ~12% unclaimed).",
+      "promoted_from": "OPENS § Nation generation — [C2] Orphan-island assignment",
+      "batch": null,
+      "rows": [
+        { "id": "R1", "requirement": "After generate_nations, every non-ocean land tile on Kepler is assigned to a nation (zero unclaimed land).", "verification": ["headless: world_audit orphan-land count == 0"], "status": "complete", "result_metric": "0 unclaimed of 6048", "notes": "" },
+        { "id": "R2", "requirement": "Each orphan land component is assigned, whole, to the nearest nation measured across water (deterministic, seed-stable).", "verification": ["headless", "code"], "status": "complete", "result_metric": "", "notes": "no RNG; raster-order, distance/index tie-break" }
+      ]
+    },
+    {
+      "brief": "corp-starting-holdings",
+      "title": "Revise the corporation starting-holdings shape",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-15",
+      "resolution": "Complete, all rows met. The flat k_min_holdings/k_max_holdings range was retired for a focus-shaped holdings_range (extraction 3-4, processing 2-3, trade 1-2); anchor + nearest-tile clustering retained. world_audit confirms all 8 corps sit within their focus ceilings (counts now 1-3, was 3-6) and the S1 can_place check stays PASS.",
+      "promoted_from": "OPENS § Corporation generation — [B4] Revise the corporation starting-holdings shape",
+      "batch": null,
+      "rows": [
+        { "id": "R1", "requirement": "Corporations open with a lean, focus-shaped holding set — per-focus counts smaller than the retired flat 3-6 spread.", "verification": ["headless: world_audit per-corp counts within focus bounds"], "status": "complete", "result_metric": "8/8 corps within ceiling", "notes": "" },
+        { "id": "R2", "requirement": "The flat k_min_holdings/k_max_holdings range is retired in favour of a focus-shaped count.", "verification": ["code: range constants gone"], "status": "complete", "result_metric": "", "notes": "replaced by holdings_range" },
+        { "id": "R3", "requirement": "Every placed asset still passes placement_rules::can_place — no placement regression.", "verification": ["headless: world_audit S1 stays PASS"], "status": "complete", "result_metric": "", "notes": "S1 R2 + seam checks PASS" },
+        { "id": "R4", "requirement": "Holdings remain clustered within the home nation's territory.", "verification": ["code", "headless"], "status": "complete", "result_metric": "", "notes": "anchor/neighbourhood logic unchanged" }
+      ]
+    },
+    {
+      "brief": "golden-image-diff",
+      "title": "Visual-verification harness — golden-image diffing",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-15",
+      "resolution": "Complete, all rows met. PNG reader + diff added to png_writer; run_verify gained a compare/bless step and a golden dir derived from the script path; --bless added to main.cpp. End-to-end gate verified: clean re-run PASSed at 0.0056% differing, a deliberately wrong golden FAILed at 56.44% with a diff image and a non-zero exit. verifier-visual SKILL.md documents the bless flow + tolerance knobs.",
+      "promoted_from": "OPENS § Canvas — [F3] Visual-verification harness — golden-image diffing",
+      "batch": null,
+      "rows": [
+        { "id": "R1", "requirement": "png_writer exposes read_png_rgba that reads a PNG produced by write_png_rgba back to byte-identical RGBA pixels (stored-block zlib only — the writer's own output).", "verification": ["headless: round-trip via golden compare"], "status": "complete", "result_metric": "0.0056% on PASS run", "notes": "round-trip exercised by the PASS run" },
+        { "id": "R2", "requirement": "png_writer exposes a diff that counts a pixel as differing when its max channel delta > T, fails when the differing fraction > F, and can emit a highlighted diff image; both knobs are caller-overridable.", "verification": ["headless", "code: diff_rgba"], "status": "complete", "result_metric": "", "notes": "diff_rgba takes T; F owned at the call site" },
+        { "id": "R3", "requirement": "run_verify compares each capture against scripts/verify/golden/<name>.png when present, logs PASS/FAIL, and writes a diff image to screenshots/diff/<name>.png; absent golden = capture-only.", "verification": ["code", "visual"], "status": "complete", "result_metric": "", "notes": "diff written to screenshots/diff/" },
+        { "id": "R4", "requirement": "A --bless mode writes captures into the golden directory instead of comparing, so an intentional change regenerates goldens.", "verification": ["code", "visual"], "status": "complete", "result_metric": "", "notes": "header_populated golden blessed" },
+        { "id": "R5", "requirement": "End-to-end: a golden check PASSes against a blessed golden and FAILs against a deliberately altered capture (the tolerance knobs discriminate).", "verification": ["headless", "visual"], "status": "complete", "result_metric": "PASS 0.0056% / FAIL 56.44%, exit 0 / 1", "notes": "" }
+      ]
+    },
+    {
+      "brief": "corporation-generation-revision",
+      "title": "Revise the corporation generation strategy + Model pre-game profit",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-15",
+      "resolution": "Complete, all rows met. Coordinated B4 + C3 (same passes). The agent's pre-game warm-start hand-built a duplicate economy registry inside generation — excised in favour of the existing app-startup warm-start. Verified via world_audit and a clean ProjectIo Debug build.",
+      "promoted_from": "TODO § Corporation generation — [B4] Revise the corporation generation strategy + [C3] Model pre-game profit",
+      "batch": null,
+      "rows": [
+        { "id": "R1", "requirement": "Each corporation opens with a clustered set of multiple assets (target 3-6), not a single building.", "verification": ["headless"], "status": "complete", "result_metric": "15 extraction assets across 8 corps, all valid", "notes": "world_audit" },
+        { "id": "R2", "requirement": "The asset mix reflects the corp's industrial_focus (extraction/processing/trade anchored).", "verification": ["manual"], "status": "complete", "result_metric": "", "notes": "focus_asset_pattern; reviewed" },
+        { "id": "R3", "requirement": "Holdings cluster spatially around a focus-weighted anchor (nearest-first placement).", "verification": ["manual"], "status": "complete", "result_metric": "", "notes": "distance-sorted neighbourhood; reviewed" },
+        { "id": "R4", "requirement": "Every placed asset passes placement_rules::can_place (never ocean / never a deposit-less extraction site).", "verification": ["headless"], "status": "complete", "result_metric": "0 invalid placements", "notes": "world_audit" },
+        { "id": "R5", "requirement": "Opening balances and (corp, body) pools reflect a multi-tick operating history, seeded without duplicating the economy constants.", "verification": ["build"], "status": "complete", "result_metric": "", "notes": "app warm-start 2->12 ticks, reuses the loaded registry" }
+      ]
+    },
+    {
+      "brief": "player-sell-orders",
+      "title": "Player-driven sell orders & preferential purchasing",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-15",
+      "resolution": "Complete, all rows met. The sell-orders half is done; preferential purchasing is split out as its own deferred Brief (it needs a matched order-book the anonymous pooled clearing lacks). Verified via econ_harness (SO.1-3) and a clean ProjectIo Debug build.",
+      "promoted_from": "TODO § Trade — [A3] Player-driven sell orders & preferential purchasing",
+      "batch": null,
+      "rows": [
+        { "id": "R1", "requirement": "sell_order is storable as player game-state (ui_state.sell_orders) and passed to clear_markets each tick.", "verification": ["build"], "status": "complete", "result_metric": "", "notes": "moved to components.hpp; wired in app::step_economy" },
+        { "id": "R2", "requirement": "A standing player sell order sells up to its quantity from the (corp, body) pool, valued at max(resolved_price, floor_price).", "verification": ["headless"], "status": "complete", "result_metric": "", "notes": "SO.2" },
+        { "id": "R3", "requirement": "The auto-surplus path yields a resource the player has a standing order for (manual control overrides the greedy auto-sell).", "verification": ["headless"], "status": "complete", "result_metric": "", "notes": "SO.2/SO.3 (order sells, pool debited)" },
+        { "id": "R4", "requirement": "The building-management UI authors orders (resource / quantity / floor) on the in-view body and lists/removes them.", "verification": ["build"], "status": "complete", "result_metric": "", "notes": "draw_sell_orders_section" }
+      ]
+    },
+    {
+      "brief": "build-front-door",
+      "title": "Tile Selection element as the build front door",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-15",
+      "resolution": "Complete, all rows met. Makes the v0.0.5 construction scaffold functional: a single construct_building world function (validation + cost spend + component authoring), reached from the tile Selection element and the placement-mode canvas click. Verified via construction_harness (11/11 PASS) and a clean ProjectIo Debug build.",
+      "promoted_from": "TODO § Selection info element — [A3] Tile Selection element as the build front door",
+      "batch": null,
+      "rows": [
+        { "id": "R1", "requirement": "construct_building validates the tile via placement_rules::can_place (rejects ocean / wrong-deposit) with no mutation on failure.", "verification": ["headless"], "status": "complete", "result_metric": "", "notes": "C.R1" },
+        { "id": "R2", "requirement": "On success it creates the building (+ stockpile), authors it (target / staffing), appends it to the corp's assets, and debits the registry build cost.", "verification": ["headless"], "status": "complete", "result_metric": "", "notes": "C.R2" },
+        { "id": "R3", "requirement": "A constructed processing facility is seeded with the default recipe so it is productive.", "verification": ["headless"], "status": "complete", "result_metric": "", "notes": "C.R3" },
+        { "id": "R4", "requirement": "Construction is refused for insufficient funds (no build, no spend).", "verification": ["headless"], "status": "complete", "result_metric": "", "notes": "C.R4" },
+        { "id": "R5", "requirement": "Unknown corp / tile are rejected.", "verification": ["headless"], "status": "complete", "result_metric": "", "notes": "C.R5" },
+        { "id": "R6", "requirement": "The tile Selection element hosts a 'Build here' affordance (buildable types + cost) that enqueues a request the app executes; the placement-mode canvas click enqueues the same.", "verification": ["build"], "status": "complete", "result_metric": "", "notes": "UI builds clean; logic shared with R1-R5" }
+      ]
+    },
+    {
+      "brief": "lens-system-design",
+      "title": "Design the lens system (complete the stubs)",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-15",
+      "resolution": "Complete, all rows met. Design-doc Brief plus one new glyph. The Resource-lens render pass is a follow-on implementation Brief left in TODO. Verified by doc inspection + a clean build of the new glyph.",
+      "promoted_from": "TODO § Canvas — [B3] Design the lens system (complete the stubs)",
+      "batch": null,
+      "rows": [
+        { "id": "R1", "requirement": "LENSES.md settles Supply / Market / Faction / Resource to the Corporation section's depth (per-lens spec, rung table, legend, interaction notes).", "verification": ["doc: docs/ui/LENSES.md"], "status": "complete", "result_metric": "", "notes": "" },
+        { "id": "R2", "requirement": "The Resource lens is specified (deposit density: highest-value + single-resource modes, gradient legend).", "verification": ["doc: docs/ui/LENSES.md"], "status": "complete", "result_metric": "", "notes": "" },
+        { "id": "R3", "requirement": "A distinct ui::icons::resource lens glyph is declared and implemented, and catalogued in ICONS.md.", "verification": ["build"], "status": "complete", "result_metric": "", "notes": "overload of the resource pip" }
+      ]
+    },
+    {
+      "brief": "workforce-pool",
+      "title": "Workforce pool & population coupling (step 1)",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-15",
+      "resolution": "Complete, all rows met. Step 1 (pool without population; POPULATION.md § Workforce model). Step 2 (population-derived supply) remains in TODO under the same Brief, coupled to the S4 population-centre work. Verified via econ_harness (WF.R2-R5 + unchanged Layer 3 assertions) and a clean ProjectIo Debug build.",
+      "promoted_from": "TODO § Workforce — [A4] Workforce pool & population coupling",
+      "batch": null,
+      "rows": [
+        { "id": "R1", "requirement": "world holds an authored per-(corp, body) workforce supply with a default fallback and an accessor (workforce_supply).", "verification": ["code: workforce_supply"], "status": "complete", "result_metric": "", "notes": "" },
+        { "id": "R2", "requirement": "run_economy_step computes a per-(corp, body) contention scalar min(1, supply/demand) and reports it on economy_report.workforce_contention.", "verification": ["headless"], "status": "complete", "result_metric": "", "notes": "WF.R2" },
+        { "id": "R3", "requirement": "Effective workforce (workforce_assigned x contention) scales extraction and processing output, reported per building (building_report.effective_workforce).", "verification": ["headless"], "status": "complete", "result_metric": "", "notes": "WF.R3" },
+        { "id": "R4", "requirement": "Wages in apply_budget are paid on effective (allocated) workforce, not the requested target.", "verification": ["headless"], "status": "complete", "result_metric": "", "notes": "WF.R4" },
+        { "id": "R5", "requirement": "Default supply leaves single-building corps uncontended; an over-built (corp, body) is throttled.", "verification": ["headless"], "status": "complete", "result_metric": "", "notes": "WF.R5 + unchanged L3 rows" },
+        { "id": "R6", "requirement": "The economy panel surfaces per-(corp, body) contention when below 1.0.", "verification": ["code: contention"], "status": "complete", "result_metric": "", "notes": "draw_workforce" }
+      ]
+    },
+    {
+      "brief": "layer4-ui-groundwork",
+      "title": "Layer 4 building-management interaction scaffold",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-15",
+      "resolution": "Complete; all 8 rows met. The fifth v0.0.5 enabler (held from the original Layer 4 foundations set), published scaffold-only on branch v0.0.5. No economic mutation (the functional loop is v0.0.6). Verified via the ProjectIo Debug build, code grep, and scripts/verify/construction_panel.lua.",
+      "promoted_from": "TODO § Canvas — [A4] Layer 4 building-management interaction scaffold",
+      "batch": null,
+      "rows": [
+        { "id": "R1", "requirement": "ui_state carries a construction_state placement sub-state: an active flag, a building_type, and a resource_type target.", "verification": ["code: struct construction_state", "build"], "status": "complete", "result_metric": "", "notes": "ui_state.hpp:35" },
+        { "id": "R2", "requirement": "ui_state carries show_construction_panel, defaulting false (ledgers start closed, per MENU.md).", "verification": ["code: show_construction_panel = false"], "status": "complete", "result_metric": "", "notes": "ui_state.hpp:62" },
+        { "id": "R3", "requirement": "When placement mode is active, the Planetary canvas draws a ghost building marker at the hovered tile, coloured by validity (positive=valid / negative=invalid via placement_rules::can_place).", "verification": ["visual", "code: can_place"], "status": "complete", "result_metric": "", "notes": "Code-verified (body_surface_canvas.cpp:433-451). Ghost is hover-driven; headless harness has no synthetic mouse, so on-canvas capture not feasible." },
+        { "id": "R4", "requirement": "A left-click in placement mode mutates neither the world nor the selection (scaffold seam); tile selection occurs only when placement mode is inactive.", "verification": ["code: !state.construction.active", "build"], "status": "complete", "result_metric": "", "notes": "body_surface_canvas.cpp:492-495" },
+        { "id": "R5", "requirement": "The construction panel renders with the shared ledger chrome (ledger_window_size/ledger_window_spawn, ImGuiCond_Once) and defaults closed.", "verification": ["code: ledger_window_size", "visual"], "status": "complete", "result_metric": "", "notes": "construction_panel.cpp:169-170; screenshots/construction_panel_build.png" },
+        { "id": "R6", "requirement": "The panel's Build section sets the placement-mode state (building type + extraction target) and offers a Cancel that clears it.", "verification": ["code", "visual"], "status": "complete", "result_metric": "", "notes": "Capture shows 'Placing: Extraction Site -> Iron Ore' + target list + Cancel" },
+        { "id": "R7", "requirement": "The panel shows read-only detail for the building on the selected tile (type / target / recipe / workforce / cost) with disabled stub recipe / workforce / sell-order controls.", "verification": ["visual", "code: BeginDisabled"], "status": "complete", "result_metric": "", "notes": "Disabled stubs construction_panel.cpp:142-155; no tile-selection verify hook to drive a populated capture headlessly" },
+        { "id": "R8", "requirement": "The panel is reachable from a nav-rail slot and wired into app::render, with verify API hooks driving it headlessly.", "verification": ["code", "build", "visual"], "status": "complete", "result_metric": "", "notes": "nav slot 6 (nav_pane.cpp), app.cpp render call + show_construction/place_mode hooks" }
+      ]
+    },
+    {
+      "brief": "placement-rules-seam",
+      "title": "Placement-rules seam",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-15",
+      "resolution": "Complete. Part of the v0.0.5 Layer 4 foundations publish set. Verified via the ProjectIo Debug build, econ_stability (100-tick stability), and world_audit (placement seam + negative controls).",
+      "promoted_from": null,
+      "batch": "v0.0.5 Layer 4 foundations publish set",
+      "rows": [
+        { "id": "R1", "requirement": "A screen-independent src/world/placement_rules.{hpp,cpp} declares the prototype-extractable resource set and an is_ocean_tile / richest_extractable helper family.", "verification": ["code: placement_rules", "build"], "status": "complete", "result_metric": "", "notes": "ProjectIo Debug build clean" },
+        { "id": "R2", "requirement": "can_place(const tile_component&, building_type, resource_type target) -> bool enforces: extraction only on a non-zero deposit of the target / valid terrain, never ocean; processing/port on any non-ocean land.", "verification": ["code: can_place", "build"], "status": "complete", "result_metric": "", "notes": "world_audit negative controls (ocean / zero-deposit rejected, processing accepted)" },
+        { "id": "R3", "requirement": "corporation_generation.cpp Pass 3 (place_starting_asset) calls the seam with no behaviour change to generation (same placements).", "verification": ["headless: world_audit placement counts unchanged"], "status": "complete", "result_metric": "3 extraction assets, 0 invalid", "notes": "unchanged from S1" },
+        { "id": "R4", "requirement": "world_audit asserts every placed extraction asset passes can_place, and ocean / zero-deposit tiles fail it.", "verification": ["headless"], "status": "complete", "result_metric": "PASS", "notes": "can_place agrees with placement + negative controls" }
+      ]
+    },
+    {
+      "brief": "econ-stability-harness",
+      "title": "Economy stability harness",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-15",
+      "resolution": "Complete. Part of the v0.0.5 Layer 4 foundations publish set.",
+      "promoted_from": null,
+      "batch": "v0.0.5 Layer 4 foundations publish set",
+      "rows": [
+        { "id": "R1", "requirement": "tools/verify/econ_stability.cpp runs run_economy_step -> clear_markets -> apply_budget over 100 ticks on a small fixed world.", "verification": ["headless"], "status": "complete", "result_metric": "ran 100 ticks without tripping a stability assertion", "notes": "" },
+        { "id": "R2", "requirement": "Over the run, every market price stays within [0.25x, 4x] base_price and does not diverge/oscillate unboundedly.", "verification": ["headless"], "status": "complete", "result_metric": "R2 PASS", "notes": "" },
+        { "id": "R3", "requirement": "No NaN/Inf appears in any price, pool quantity, or balance across the run.", "verification": ["headless"], "status": "complete", "result_metric": "R3 PASS", "notes": "" },
+        { "id": "R4", "requirement": "Deposit reserves decrease monotonically toward exhaustion; balances do not diverge unboundedly.", "verification": ["headless"], "status": "complete", "result_metric": "reserve 1200 -> 7.42 monotonic; balances bounded", "notes": "" },
+        { "id": "R5", "requirement": "econ_stability is named in the verifier-headless skill and its exe has a settings.json allow rule.", "verification": ["doc: .claude/skills/verifier-headless/SKILL.md"], "status": "complete", "result_metric": "", "notes": "Skill + README updated; Bash(& \".\\econ_stability*) added to settings.json (user-approved) and the CLAUDE.md mapping" }
+      ]
+    },
+    {
+      "brief": "workforce-model-design",
+      "title": "Workforce model design",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-15",
+      "resolution": "Complete. Part of the v0.0.5 Layer 4 foundations publish set. Design-only deliverable in POPULATION.md.",
+      "promoted_from": null,
+      "batch": "v0.0.5 Layer 4 foundations publish set",
+      "rows": [
+        { "id": "R1", "requirement": "docs/economy/POPULATION.md specifies the corporation-wide (or per-body) labour pool model.", "verification": ["doc: docs/economy/POPULATION.md"], "status": "complete", "result_metric": "", "notes": "§ Workforce model -> The labour pool (settled per-(corp, body))" },
+        { "id": "R2", "requirement": "It specifies proportional contention when total building workforce demand exceeds pool supply.", "verification": ["doc"], "status": "complete", "result_metric": "", "notes": "§ Contention (uniform supply/demand scalar)" },
+        { "id": "R3", "requirement": "It specifies how workforce supply and wages derive from population centres, and the split between what the player sets vs. what the system allocates.", "verification": ["doc"], "status": "complete", "result_metric": "", "notes": "§ Player-set vs. system-allocated + § Wages" },
+        { "id": "R4", "requirement": "It records the upgrade path from the L3 authored workforce_assigned constant to the pool model.", "verification": ["doc"], "status": "complete", "result_metric": "", "notes": "§ Upgrade path from the authored constant (3-step additive migration)" }
+      ]
+    },
+    {
+      "brief": "uniform-ledger-chrome",
+      "title": "Uniform ledger-window chrome",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-15",
+      "resolution": "Complete. Part of the v0.0.5 Layer 4 foundations publish set.",
+      "promoted_from": null,
+      "batch": "v0.0.5 Layer 4 foundations publish set",
+      "rows": [
+        { "id": "R1", "requirement": "src/ui/ledger_chrome.hpp declares one shared ledger-window size constant and one shared spawn-anchor constant, anchored clear of the profile/header chrome.", "verification": ["code: ledger_chrome", "build"], "status": "complete", "result_metric": "", "notes": "ledger_window_size / ledger_window_spawn; build clean" },
+        { "id": "R2", "requirement": "Both the Tile Ledger (tile_inspector.cpp) and the Economy panel (economy_panel.cpp) use the shared constants with ImGuiCond_Once (no per-window literal size/offset).", "verification": ["code: no 820/560/760/620 literals remain", "build"], "status": "complete", "result_metric": "", "notes": "Both re-pointed; literals removed; build clean" },
+        { "id": "R3", "requirement": "docs/ui/LAYOUT.md § Uniform ledger-window chrome references the shared constants.", "verification": ["doc: docs/ui/LAYOUT.md"], "status": "complete", "result_metric": "", "notes": "Section records the implemented constants" }
+      ]
+    },
+    {
+      "brief": "price-resolution",
+      "title": "Price resolution",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-15",
+      "resolution": "Complete; all 4 rows met. Verified via econ_harness (resolved iron/steel prices and corp balances at the eased sqrt(D/S) target) and the ProjectIo build.",
+      "promoted_from": null,
+      "batch": null,
+      "rows": [
+        { "id": "R1", "requirement": "clear_markets resolves each traded market_component.price[r] toward base_price[r] x sqrt(demand[r]/supply[r]) each tick.", "verification": ["headless"], "status": "complete", "result_metric": "iron S20/D4 -> 1.809", "notes": "" },
+        { "id": "R2", "requirement": "The resolved price is clamped to [0.25x, 4x] base_price[r] and eased from the prior price by an EMA (smoothing 0.5); zero-supply pushes to the ceiling, zero-demand to the floor.", "verification": ["headless"], "status": "complete", "result_metric": "steel D0 floored then eased base 8 -> 5.0", "notes": "" },
+        { "id": "R3", "requirement": "Sales income and purchase expenditure in the returned corp_cash_flow are valued at the resolved price, not base_price.", "verification": ["headless"], "status": "complete", "result_metric": "corp balances 1027.18 / 996.76 at resolved price", "notes": "" },
+        { "id": "R4", "requirement": "The change builds clean and the budget loop (reading the flows) reflects resolved-price cash.", "verification": ["build"], "status": "complete", "result_metric": "", "notes": "ProjectIo Debug build clean" }
+      ]
+    },
+    {
+      "brief": "deposit-depletion",
+      "title": "Deposit depletion",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-15",
+      "resolution": "Complete; all 5 rows met. Verified via world_audit (reserve seeding over the generated world) and econ_harness (draw-down, taper, exhaustion) plus the ProjectIo build.",
+      "promoted_from": null,
+      "batch": null,
+      "rows": [
+        { "id": "R1", "requirement": "resource_remaining[r] is seeded at generation to resource_deposit[r] x deposit_reserve_factor for every non-zero deposit; richness is unchanged.", "verification": ["headless"], "status": "complete", "result_metric": "65382 deposits, 0 mis-seeded (factor 400)", "notes": "world_audit" },
+        { "id": "R2", "requirement": "Extraction draws its credited output from resource_remaining, decrementing it each tick.", "verification": ["headless"], "status": "complete", "result_metric": "reserve 1e6 -> 1e6-20; full-rate draw at ample reserve", "notes": "econ_harness" },
+        { "id": "R3", "requirement": "Output tapers down over the last deposit_taper_ticks of nominal yield as the reserve nears zero.", "verification": ["headless"], "status": "complete", "result_metric": "reserve 80 -> output 10 (half nominal)", "notes": "econ_harness" },
+        { "id": "R4", "requirement": "A building whose reserve falls below deposit_min_taper of nominal reports exhausted ('out of resources') and produces nothing; the state is distinct from idle and shown in the economy panel.", "verification": ["headless"], "status": "complete", "result_metric": "reserve 5 -> exhausted, output 0", "notes": "econ_harness; panel State column" },
+        { "id": "R5", "requirement": "Deposits never refill (finite); the change builds clean.", "verification": ["build"], "status": "complete", "result_metric": "", "notes": "No refill path; ProjectIo Debug build clean" }
+      ]
+    },
+    {
+      "brief": "balance-header",
+      "title": "Balance header",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-15",
+      "resolution": "Complete; all 4 rows met. Verified via scripts/verify/header.lua (capture showed BALANCE Cr 126.3k green, STOCKPILE Cr 0, NET +810/qtr green, rising sparkline) and the ProjectIo build.",
+      "promoted_from": null,
+      "batch": null,
+      "rows": [
+        { "id": "R1", "requirement": "The header renders the player corporation's running balance, with negatives flagged red (palette::negative).", "verification": ["visual"], "status": "complete", "result_metric": "", "notes": "header_populated.png: balance green (positive)" },
+        { "id": "R2", "requirement": "The header renders an estimated stockpile valuation (player (corp,body) pools summed at market price).", "verification": ["visual"], "status": "complete", "result_metric": "", "notes": "header_populated.png: STOCKPILE Cr 0 (extractor sells surplus each tick; renders)" },
+        { "id": "R3", "requirement": "The header renders the last-tick net change as a coloured signed per-quarter figure plus a sparkline of recent balances.", "verification": ["visual"], "status": "complete", "result_metric": "", "notes": "header_populated.png: NET +810/qtr green + rising sparkline" },
+        { "id": "R4", "requirement": "app maintains a capped balance-history buffer pushed each step_economy(); the build is clean.", "verification": ["build"], "status": "complete", "result_metric": "", "notes": "m_balance_history (cap 64); ProjectIo Debug build clean" }
+      ]
+    },
+    {
+      "brief": "economy-data-model",
+      "title": "Economy data model",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-15",
+      "resolution": "Complete. Part of the Layer 3 economy publish set. Verified via econ_harness, world_audit, and scripts/verify/economy_panel.lua.",
+      "promoted_from": null,
+      "batch": "Layer 3 economy publish set",
+      "rows": [
+        { "id": "R1", "requirement": "building_component declares resource_type target_resource and uint16_t recipe, with a no_recipe sentinel constant.", "verification": ["code: target_resource", "code: no_recipe"], "status": "complete", "result_metric": "", "notes": "in components.hpp" },
+        { "id": "R2", "requirement": "tile_component declares a reserved resource_remaining array (resource-indexed), unused in L3.", "verification": ["code: resource_remaining"], "status": "complete", "result_metric": "", "notes": "" },
+        { "id": "R3", "requirement": "corporation_component declares a float balance.", "verification": ["code: balance"], "status": "complete", "result_metric": "", "notes": "" },
+        { "id": "R4", "requirement": "world holds a (corporation, body) -> stockpile_component pool with a pool_for(corp, body) accessor.", "verification": ["code: pool_for", "build"], "status": "complete", "result_metric": "", "notes": "Deterministic std::map keyed by pair" }
+      ]
+    },
+    {
+      "brief": "recipe-registry",
+      "title": "Recipe registry",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-15",
+      "resolution": "Complete. Part of the Layer 3 economy publish set.",
+      "promoted_from": null,
+      "batch": "Layer 3 economy publish set",
+      "rows": [
+        { "id": "R1", "requirement": "scripts/recipes.lua authors the prototype processing recipes (steel, refined fuel, food rations) as {inputs, outputs} with reagent support.", "verification": ["doc: scripts/recipes.lua"], "status": "complete", "result_metric": "", "notes": "" },
+        { "id": "R2", "requirement": "recipe_registry loads recipes via sol2 (protected calls only) into C++ tables addressable by the building_component.recipe id.", "verification": ["code: recipe_registry", "code: protected_function/safe_script"], "status": "complete", "result_metric": "", "notes": "" },
+        { "id": "R3", "requirement": "A recipe is a struct of input/output quantities indexed by resource_type; Lua resource names map to the enum.", "verification": ["code: struct recipe"], "status": "complete", "result_metric": "", "notes": "" },
+        { "id": "R4", "requirement": "Per-building_type economy constants (base_rate, maintenance, base_wage, build_cost) and global t_full/t_idle are queryable from the registry.", "verification": ["code", "build"], "status": "complete", "result_metric": "", "notes": "accessor" },
+        { "id": "R5", "requirement": "scripts/economy.lua authors those constants with legible round defaults.", "verification": ["doc: scripts/economy.lua"], "status": "complete", "result_metric": "", "notes": "" }
+      ]
+    },
+    {
+      "brief": "production-simulation",
+      "title": "Production simulation",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-15",
+      "resolution": "Complete. Part of the Layer 3 economy publish set.",
+      "promoted_from": null,
+      "batch": "Layer 3 economy publish set",
+      "rows": [
+        { "id": "R1", "requirement": "run_economy_step credits each extraction building's (corp, body) pool with its target_resource at base_rate x richness x workforce x (1 - hazard).", "verification": ["headless: pool rises after a step"], "status": "complete", "result_metric": "", "notes": "Method: verify.econ_step hook + headless harness" },
+        { "id": "R2", "requirement": "Processing consumes inputs pool-first and accrues outputs, using the two-threshold (t_full/t_idle) partial-run model.", "verification": ["headless"], "status": "complete", "result_metric": "", "notes": "" },
+        { "id": "R3", "requirement": "A building below t_idle on its limiting input idles (no output, recorded idle).", "verification": ["headless"], "status": "complete", "result_metric": "", "notes": "" },
+        { "id": "R4", "requirement": "Workforce applies as a single linear scalar at both stages.", "verification": ["code", "headless"], "status": "complete", "result_metric": "", "notes": "" },
+        { "id": "R5", "requirement": "Deposits do not deplete — resource_remaining is untouched by the step.", "verification": ["code: no write to resource_remaining"], "status": "complete", "result_metric": "", "notes": "" }
+      ]
+    },
+    {
+      "brief": "market-clearing",
+      "title": "Market clearing",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-15",
+      "resolution": "Complete. Part of the Layer 3 economy publish set.",
+      "promoted_from": null,
+      "batch": "Layer 3 economy publish set",
+      "rows": [
+        { "id": "R1", "requirement": "Per body market, supply = each corp's surplus listed for sale (pool above processor needs this tick).", "verification": ["headless: market.supply populated"], "status": "complete", "result_metric": "", "notes": "" },
+        { "id": "R2", "requirement": "Demand = processor input shortfalls auto-bought from the market.", "verification": ["headless"], "status": "complete", "result_metric": "", "notes": "" },
+        { "id": "R3", "requirement": "Transactions clear at base_price; market.price stays at base_price.", "verification": ["code", "headless"], "status": "complete", "result_metric": "", "notes": "" },
+        { "id": "R4", "requirement": "A framework hook for player-driven sell orders exists (no-op in L3).", "verification": ["code: hook present"], "status": "complete", "result_metric": "", "notes": "" }
+      ]
+    },
+    {
+      "brief": "budget-system",
+      "title": "Budget system",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-15",
+      "resolution": "Complete. Part of the Layer 3 economy publish set.",
+      "promoted_from": null,
+      "batch": "Layer 3 economy publish set",
+      "rows": [
+        { "id": "R1", "requirement": "Income = goods sold x base_price credited to corporation.balance.", "verification": ["headless: balance moves"], "status": "complete", "result_metric": "", "notes": "" },
+        { "id": "R2", "requirement": "Expenditure = input purchases x base_price + per-building maintenance + wages (workforce x base_wage).", "verification": ["headless"], "status": "complete", "result_metric": "", "notes": "" },
+        { "id": "R3", "requirement": "Balance opens at starting_capital and may go negative (no insolvency consequence).", "verification": ["code", "headless"], "status": "complete", "result_metric": "", "notes": "" }
+      ]
+    },
+    {
+      "brief": "economy-panel",
+      "title": "Economy panel",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-15",
+      "resolution": "Complete. Part of the Layer 3 economy publish set.",
+      "promoted_from": null,
+      "batch": "Layer 3 economy publish set",
+      "rows": [
+        { "id": "R1", "requirement": "The panel shows each (corp, body) pool's per-resource quantities.", "verification": ["visual"], "status": "complete", "result_metric": "", "notes": "Method: scripts/verify/economy_panel.lua after verify.econ_step" },
+        { "id": "R2", "requirement": "It shows each building's current output rate and idle/active state (+ limiting input for processors).", "verification": ["visual"], "status": "complete", "result_metric": "", "notes": "" },
+        { "id": "R3", "requirement": "It shows body market supply/demand figures.", "verification": ["visual"], "status": "complete", "result_metric": "", "notes": "" },
+        { "id": "R4", "requirement": "It shows the per-corporation balance, with negative values flagged red.", "verification": ["visual"], "status": "complete", "result_metric": "", "notes": "" }
+      ]
+    },
+    {
+      "brief": "placement-rules-audit",
+      "title": "Placement rules audit",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-15",
+      "resolution": "Complete. Part of the Layer 3 economy publish set.",
+      "promoted_from": null,
+      "batch": "Layer 3 economy publish set",
+      "rows": [
+        { "id": "R1", "requirement": "A findings list records whether Pass 3 placement matches PRODUCTION.md rules (no extraction on zero-deposit/invalid terrain; never ocean).", "verification": ["manual: findings recorded in DEVLOG"], "status": "complete", "result_metric": "", "notes": "" },
+        { "id": "R2", "requirement": "Cheap gaps are fixed so every placed extraction asset sits on a tile with a non-zero deposit of a valid target; larger gaps promoted.", "verification": ["headless: audit assertion over a generated world"], "status": "complete", "result_metric": "", "notes": "Method: headless harness checks placed assets" }
+      ]
+    },
+    {
+      "brief": "selection-go-to-planetary",
+      "title": "Selection 'go to' descends to Planetary surface",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-14",
+      "resolution": "Complete, all rows met. 'Go to' on a body now descends to its Planetary tile surface (focus_on_entity -> focus_on_surface); the tile branch is a no-op. Verified with verify.go_to + scripts/verify/selection_go_to.lua: Kepler, Cinder, and Selene all land on their tile grids.",
+      "promoted_from": "TODO § Selection info element",
+      "batch": null,
+      "rows": [
+        { "id": "R1", "requirement": "focus_on_entity routes a body selection through focus_on_surface (Planetary rung), not focus_on_body.", "verification": ["code: focus_on_surface in the body branch of focus_on_entity"], "status": "complete", "result_metric": "", "notes": "view_nav.cpp body branch now calls focus_on_surface" },
+        { "id": "R2", "requirement": "focus_on_entity does nothing for a tile selection (surface already shown; pan-to-tile out of scope).", "verification": ["code: tile branch is a no-op / early return"], "status": "complete", "result_metric": "", "notes": "Tile branch is an early return" },
+        { "id": "R3", "requirement": "'Go to' lands on the Planetary surface for any body, not only Kepler.", "verification": ["visual: a non-Kepler body lands on its tile grid"], "status": "complete", "result_metric": "", "notes": "go_to_00_kepler_home / _01_cinder_planet / _02_selene_moon all show tile grids; minimap re-anchors" },
+        { "id": "R4", "requirement": "docs/ui/SELECTION.md 'go to' table + click model read 'body -> Planetary surface; tile -> no-op'.", "verification": ["doc: docs/ui/SELECTION.md"], "status": "complete", "result_metric": "", "notes": "Per-kind 'go to' table updated" },
+        { "id": "R5", "requirement": "A durable verify.go_to(name) hook drives focus_on_entity, and scripts/verify/selection_go_to.lua captures the landing.", "verification": ["code: go_to", "doc: scripts/verify/selection_go_to.lua"], "status": "complete", "result_metric": "", "notes": "Reusable method for R3" }
+      ]
+    },
+    {
+      "brief": "generation-ledger-design",
+      "title": "Generation ledger design",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-14",
+      "resolution": "Complete, all rows met. Design-only deliverable: docs/generation/GENERATION_LEDGER.md authored and indexed from CLAUDE.md. Settles the per-tile derivation breadcrumb, per-body histograms, regenerate-on-demand data lifetime, and surfacing (Ledger window + Planetary field lens).",
+      "promoted_from": null,
+      "batch": null,
+      "rows": [
+        { "id": "R1", "requirement": "docs/generation/GENERATION_LEDGER.md exists and specifies the per-tile derivation breadcrumb.", "verification": ["doc: docs/generation/GENERATION_LEDGER.md"], "status": "complete", "result_metric": "", "notes": "§ What the ledger presents -> Per-tile derivation breadcrumb" },
+        { "id": "R2", "requirement": "It specifies per-body summaries (composition / landform histograms, ocean threshold).", "verification": ["doc"], "status": "complete", "result_metric": "", "notes": "§ Per-body summaries" },
+        { "id": "R3", "requirement": "It settles persist-vs-regenerate (deterministic -> regenerate on demand).", "verification": ["doc"], "status": "complete", "result_metric": "", "notes": "§ Data lifetime — regenerate on demand" },
+        { "id": "R4", "requirement": "It settles surfacing (Ledger window vs. Planetary overlay lens) and notes the hover-card / Selection overlap.", "verification": ["doc"], "status": "complete", "result_metric": "", "notes": "§ Surfacing" }
+      ]
+    },
+    {
+      "brief": "frame-stutter-measure",
+      "title": "Frame-stutter measurement",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "cancelled",
+      "resolved": "2026-06-14",
+      "resolution": "Cancelled. Verification needs live frame-time instrumentation that does not yet exist; the measurement method is itself the deferred design work. Intent refined and returned to TODO § Known Bug. Baseline by code read: vsync on (SDL_SetRenderVSync(m_renderer, 1), app.cpp:77), no frame cap, no per-frame timing readout.",
+      "promoted_from": "TODO § Known Bug",
+      "batch": null,
+      "rows": [
+        { "id": "R1", "requirement": "A repeatable frame-time measurement method exists that classifies the stutter.", "verification": ["manual: live window"], "status": "failed", "result_metric": "", "notes": "No headless tool observes a live present loop; building the live instrument is deferred design" },
+        { "id": "R2", "requirement": "The hardware-limit config (vsync / frame cap / present mode) is settled against the measurement.", "verification": ["manual"], "status": "failed", "result_metric": "", "notes": "Blocked on R1; provisional pre-economy regardless" }
+      ]
+    },
+    {
+      "brief": "body-label-stepping",
+      "title": "Body-label stepping",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "cancelled",
+      "resolved": "2026-06-14",
+      "resolution": "Cancelled. Root cause confirmed (R1 complete); the fix and its temporal verification are deferred. Stepping is AddText glyph-grid quantisation (label position from the live float pos; dot is sub-pixel AA, text is not), solar_system_canvas.cpp:218-224. Intent refined and returned to TODO § Known Bug.",
+      "promoted_from": "TODO § Known Bug",
+      "batch": null,
+      "rows": [
+        { "id": "R1", "requirement": "The stepping is confirmed to be AddText glyph-grid quantisation (label position from the live float pos; dot is sub-pixel AA, text is not).", "verification": ["code: label_pos from float pos, no rounding"], "status": "complete", "result_metric": "", "notes": "solar_system_canvas.cpp:218-224" },
+        { "id": "R2", "requirement": "The fix renders labels smoothly (sub-pixel text or accepted-and-documented).", "verification": ["visual: over time"], "status": "failed", "result_metric": "", "notes": "Temporal/live; no headless tool to observe motion. Deferred to TODO" }
+      ]
+    },
+    {
+      "brief": "visual-verification-harness-phase-2",
+      "title": "Visual-verification harness — Phase 2",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-14",
+      "resolution": "Complete, all rows (V7-V12) met. A shared canvas command vocabulary backing both player keyboard navigation and the verify API, a reusable Lua helper library, and promotion of a proven check to a permanent verifier-visual skill.",
+      "promoted_from": null,
+      "batch": null,
+      "rows": [
+        { "id": "V7", "requirement": "A canvas_command enum and canvas_command_from_name mapping exist in src/ui/canvas_command.hpp, covering descend, ascend, body next/prev, pan up/down/left/right, zoom in/out, and lens next/prev/clear.", "verification": ["code: enum class canvas_command", "code: canvas_command_from_name"], "status": "complete", "result_metric": "", "notes": "Strand A foundation" },
+        { "id": "V8", "requirement": "apply_canvas_command mutates ui_state for every command, and app::process_events maps the keybinding table to it, guarded by ImGui keyboard capture. The verify API routes verify.command(name) through the same dispatch.", "verification": ["code: apply_canvas_command", "visual"], "status": "complete", "result_metric": "", "notes": "handle_key_down (app.cpp) + verify.command both call apply_canvas_command. Keyboard injection not headlessly exercisable; the shared dispatch it calls is" },
+        { "id": "V9", "requirement": "verify.center_tile(col, row[, zoom]) centres the named tile on the Planetary canvas using the canvas's own transform — no pan arithmetic in Lua.", "verification": ["visual", "code: center_tile"], "status": "complete", "result_metric": "", "notes": "player (22,82) and rival (42,63) tiles centre exactly. Pending-centre request consumed inside body_surface_canvas" },
+        { "id": "V10", "requirement": "scripts/verify/lib.lua provides sweep_overlays(prefix), tour_buildings(zoom), and frame_tile(col, row, zoom) layered over the low-level verify API.", "verification": ["visual", "code: function"], "status": "complete", "result_metric": "", "notes": "Auto-loaded by the harness from the script's directory (no require)" },
+        { "id": "V11", "requirement": "scripts/verify/corporation_lens.lua is refactored onto lib.lua/center_tile with no hand-computed set_pan literals, and reproduces the Phase 1 captures.", "verification": ["visual"], "status": "complete", "result_metric": "", "notes": "Re-run reproduces R2-R6 captures via sweep_overlays/frame_tile" },
+        { "id": "V12", "requirement": "A verifier-visual skill exists under .claude/skills/verifier-visual/ that runs ProjectIo --verify <script> for a given script and reports the captures.", "verification": ["doc: .claude/skills/verifier-visual/SKILL.md"], "status": "complete", "result_metric": "", "notes": "Single general skill (owner's call), not per-feature" }
+      ]
+    },
+    {
+      "brief": "visual-verification-harness-phase-1",
+      "title": "Visual-verification harness — Phase 1",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-14",
+      "resolution": "Complete, all rows (V1-V6) met. Headless --verify capture mode, dependency-free PNG writer, and the verify Lua API that makes the visual requirement class runnable without a human at the screen. Full row table predates the permanent-history policy; see DEVLOG § 'Visual-verification harness (Phase 1)' (2026-06-14).",
+      "promoted_from": null,
+      "batch": null,
+      "rows": []
+    },
+    {
+      "brief": "corporation-lens",
+      "title": "Corporation lens",
+      "difficulty": null,
+      "importance": null,
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-14",
+      "resolution": "Complete, all 9 rows (R1-R9) met. First cancelled (4/9 met when the visual rows had no runnable verification tool), then re-verified and closed once the visual-verification harness landed: R2-R6 confirmed via PNG inspection. Full row table predates the permanent-history policy; see DEVLOG § 'Corporation lens' and § 'Visual-verification harness (Phase 1) + Corporation lens closed' (2026-06-14).",
+      "promoted_from": null,
+      "batch": null,
+      "rows": []
+    }
+  ]
+}

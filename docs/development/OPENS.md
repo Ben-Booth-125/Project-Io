@@ -116,7 +116,7 @@ phrasing ("look at", "do", "sort out") when the depth matters:
   (that propagation happens later, when the work lands). Use when a Brief is not yet
   promotable and the design is the next action.
 - **Promote** — **planning depth only.** Break a `✓` Brief into TASKS.md tasks and write
-  its REQUIREMENTS.md table, then **stop**. No code is written. Use when the plan
+  its `requirements.json` group, then **stop**. No code is written. Use when the plan
   should be reviewed before execution.
 - **Implement (don't commit)** — **code depth.** Promote, then write and build the
   code, but hold the commit. The result is a *code-complete* group (built, not yet
@@ -136,8 +136,9 @@ The depth verb is how you override that.
 
 0. **Brief-spanning requirement (gate — if the Brief changes `src/`).** *Before* a Brief
    that will modify `src/` is decomposed into tasks, write a **brief-spanning requirement**
-   in [`req/REQUIREMENTS.md`](req/REQUIREMENTS.md) — one requirement covering the Brief *as a
-   whole* rather than a single task. This is **usually a visual-verification requirement** (the
+   as a row in the Brief's group in [`req/requirements.json`](req/requirements.json) (schema
+   and policy in [`req/REQUIREMENTS.md`](req/REQUIREMENTS.md)) — one requirement covering the
+   Brief *as a whole* rather than a single task. This is **usually a visual-verification requirement** (the
    `visual` class — a `scripts/verify/<feature>.lua` check); for a Brief with no visible
    surface it is the equivalent end-to-end `headless` check. It is the acceptance gate the
    finished Brief is verified against, and it is written first so decomposition (step 1) is
@@ -145,9 +146,9 @@ The depth verb is how you override that.
    requirements still follow in step 2.
 1. **Create tasks** — promote the Brief into TASKS.md: decompose into ordered,
    file-scoped, dependency-marked tasks (see TASKS.md § Task format).
-2. **Create requirements** — write or link requirements in
-   [`req/REQUIREMENTS.md`](req/REQUIREMENTS.md) for each task group, following the
-   requirements policy there.
+2. **Create requirements** — append each task group's requirement records to
+   [`req/requirements.json`](req/requirements.json) (the data + permanent history),
+   following the policy in [`req/REQUIREMENTS.md`](req/REQUIREMENTS.md).
 3. **Check parallel-safety** — build the collision map and resolve any scope collision
    before execution. Tasks with **disjoint file scopes are parallel-safe — fan them out
    to concurrent sub-agents**; only same-file (colliding) tasks stay sequential. This
@@ -812,7 +813,9 @@ authority: `docs/economy/RESOURCES.md`, `docs/economy/PRODUCTION.md`.
 
 The labour scalar (`docs/SYSTEMS.md` § Workforce, `docs/economy/POPULATION.md`).
 
-- **[A4 ✓] Workforce pool & population coupling — step 2 (population-derived supply).**
+- **[S4 ✓] Workforce pool & population coupling — step 2 (population-derived supply).**
+  *(Re-rated A→S 2026-06-16 — grounds labour supply from population; v0.0.6 spine, take with/after
+  the population static MVP.)*
   **Step 1 landed 2026-06-15** (per-`(corp, body)` labour pool with authored supply,
   proportional contention scalar `min(1, supply/demand)` feeding both production and wages;
   `world::workforce_supply` / `workforce_supply_overrides`,
@@ -921,7 +924,9 @@ The labour scalar (`docs/SYSTEMS.md` § Workforce, `docs/economy/POPULATION.md`)
   design, the economy-test harness — all landed). See `docs/economy/{PRODUCTION,POPULATION}.md` and
   the milestone map in `docs/development/ROADMAP.md` (v0.0.6 — building management + population).
 
-- **[S4 ✓] Population centres — static MVP (Briefs 1–5).** **Decomposed (2026-06-15);** the
+- **[SSS4 ✓] Population centres — static MVP (Briefs 1–5).** *(Re-rated S→SSS 2026-06-16 — the
+  unblocked foundation root of the v0.0.6 Layer-4 goal; everything else in the layer couples to it.)*
+  **Decomposed (2026-06-15);** the
   foundation-first sequence is in `docs/economy/POPULATION.md` § Implementation decomposition.
   The **static-MVP scope** is: **(1) land-use foundation** (`land_use` enum/field on
   `tile_component` + transition rules via `placement_rules`), **(2) population-centre model +
@@ -941,7 +946,9 @@ The labour scalar (`docs/SYSTEMS.md` § Workforce, `docs/economy/POPULATION.md`)
   pool are live. Authority `docs/economy/POPULATION.md` § Implementation decomposition,
   § Habitability and workforce efficiency.
 
-- **[A4 ✓] Building management — functional recipe & workforce control.** The **interaction** half
+- **[S4 ✓] Building management — functional recipe & workforce control.** *(Re-rated A→S
+  2026-06-16 — the interaction core of "construct and manage" in the v0.1.0 done-definition; v0.0.6
+  spine.)* The **interaction** half
   of "manage buildings" named in the v0.1.0 done-definition (`docs/development/ROADMAP.md`),
   distinct from the read-only Construction/Buildings-overview Ledger (§ Ledger) which *displays*
   these fields. **Newly authored 2026-06-15** — the done-definition's "recipe and workforce control"

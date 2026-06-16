@@ -100,15 +100,17 @@ condensed reference.
 ### The five steps
 
 0. **Brief-spanning requirement (gate — if the Brief changes `src/`).** Before decomposing a
-   `src/`-changing Brief into tasks, write a **brief-spanning requirement** in
-   `req/REQUIREMENTS.md` — one requirement covering the whole Brief, **usually a
+   `src/`-changing Brief into tasks, write a **brief-spanning requirement** as a row in the
+   Brief's `req/requirements.json` group (schema/policy in `req/REQUIREMENTS.md`) — one
+   requirement covering the whole Brief, **usually a
    visual-verification (`visual`) requirement**. It is the end-to-end acceptance gate and is
    written first so the decomposition is shaped by it. Doc-only Briefs are exempt.
 1. **Create tasks** — promote the Brief into TASKS.md: decompose into the smallest
    independently-buildable steps (foundation first), scope each step to its exact files,
    and mark dependencies and parallelisation.
-2. **Create requirements** — write or link requirements in `req/REQUIREMENTS.md` per the
-   requirements policy there.
+2. **Create requirements** — append the Brief's requirement group to the data file
+   `req/requirements.json` (the source of truth + permanent history) per the policy in
+   `req/REQUIREMENTS.md`.
 3. **Check parallel-safety** — build the collision map (which files each task touches) and
    resolve any scope collisions before execution. Tasks with **disjoint file scopes are
    parallel-safe**: fan them out to concurrent sub-agents. Only same-file (colliding) tasks

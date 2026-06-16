@@ -28,10 +28,10 @@ where one is likely.
 
 ---
 
-## Where we are — v0.0.4
+## Where we are — v0.0.5
 
-The engine, data model, primary canvases, world generation, and the single-body economy loop
-are complete:
+The engine, data model, primary canvases, world generation, the single-body economy loop, and
+the Layer 4 foundations are complete:
 
 - **Layer 0–2** — SDL3 + fixed-timestep simulation + economy tick + sol2; the core data
   model; the Solar / Body-Surface canvases with the minimap zoom ladder.
@@ -40,6 +40,11 @@ are complete:
 - **Layer 3 economy (v0.0.4)** — extraction → processing → per-`(corp, body)` stockpile →
   per-body market with supply/demand **price resolution** → budget; finite **deposit
   depletion**; a warm-start so the world opens live; the player's balance in the header.
+- **Layer 4 foundations (v0.0.5)** — the reusable placement-rules seam, the multi-tick
+  economy-stability harness, the workforce-pool/model groundwork, uniform ledger-window chrome,
+  and the Layer 4 UI scaffold; plus the visual-verification **golden-image** harness, the
+  Resource / Market / Population / Scarcity **map lenses**, tile-centred markets, and
+  the world-gen fixes (orphan-island claim, lean focus-shaped corp holdings).
 
 The economy *runs* but is not yet *played*: the player observes authored assets rather than
 building and managing them. Closing that gap is the spine of the road to v0.1.0.
@@ -48,32 +53,47 @@ building and managing them. Closing that gap is the spine of the road to v0.1.0.
 
 ## The road to v0.1.0
 
-Five minor versions, then the cut. Each is a single theme; v0.0.6 is the likely split point.
+Four minor versions, then the cut. Each is a single theme; v0.0.7 (the merged interactive build)
+is the certain split point.
 
-### v0.0.5 — Layer 4 foundations
+### v0.0.6 — Improved core-loop
 
-*Theme: make the economy buildable-on.* The enablers that must precede any building-management
-UI — the reusable placement-rules seam (so player construction and generation share one
-validity check), a multi-tick economy-stability harness (insurance before UI piles on the
-loop), the workforce-model design (settled before it is exposed), uniform ledger-window
-chrome, and the Layer 4 UI groundwork scaffold. Low-risk, largely disjoint, fan-out-friendly.
+*Theme: deepen and make the economy that already runs legible — no new player verbs yet.* The
+loop (extraction → processing → market → budget) runs but is shallow and merely observed; this
+minor sharpens it *before* v0.0.7 makes it interactive. Three strands:
 
-### v0.0.6 — Building management + population
+- **Market depth.** Replace the flat anonymous auto-clear with the matched price-time **order
+  book** (intra-body; the cross-body reachability bias waits on supply), and run the **inter-body
+  market feasibility probe** — the convoy-free minimal coupling that tests whether the model
+  carries its weight without triggering per-body data-creep.
+- **A saturated world.** Generate the **nation-owned background substrate** so the map reads as a
+  saturated earth-like economy to trade against, with real market liquidity, rather than the
+  sparse world the lean corporation holdings leave today.
+- **Legibility.** Refit the economy panel onto the shared ledger conventions (the convention
+  reference the v0.0.7 ledger family lifts from), and the time-control clarity pass — non-linear
+  speed curve and the days-until-next-quarter countdown.
 
-*Theme: the economy becomes interactive and gains depth.* The heart of "Layer 4 working":
-player **construction** (placement + build-cost spend + terrain/deposit validation),
-**recipe / workforce / sell-order** control, and the **Market / Balance / Construction**
-ledger family — coupled with **population centres** (scale, agglomeration, land-use
-trade-offs, habitability feedback) and the **workforce pool** that grounds labour supply.
-The largest minor; **likely to split** at promotion (building management ahead of population,
-or construction ahead of the ledger family). Planned as one theme; expected to land in two.
+Lower-risk consolidation that pays back when v0.0.7 piles player interaction onto the loop.
 
-### v0.0.7 — Supply routing (Layer 5)
+### v0.0.7 — Building management, population & supply (Layers 4–5)
 
-*Theme: the economy gains space.* Supply convoys with source/destination/cargo and fractional
-progress; distance-based logistical cost; delivered cargo adjusting the destination market.
-Inter-body market linkage unlocks here — **price can now diverge between bodies**, the first
-real spatial-strategic dimension.
+*Theme: the economy becomes interactive and gains space.* The two large interactive builds,
+**merged into one theme** — they are adjacent and share the construction / market / ledger
+surfaces:
+
+- **Building management + population (Layer 4).** Player **construction** (placement + build-cost
+  spend + terrain/deposit validation), **recipe / workforce / sell-order** control, and the
+  **Market / Balance / Construction** ledger family + corporation dashboard — coupled with
+  **population centres** (scale, agglomeration, land-use trade-offs, habitability feedback) and
+  the **workforce pool** that grounds labour supply.
+- **Supply routing (Layer 5).** Supply convoys with source/destination/cargo and fractional
+  progress; distance-based logistical cost; delivered cargo adjusting the destination market.
+  Inter-body market linkage completes here — **price diverges spatially**, the first real
+  spatial-strategic dimension, and the cross-body half of the order book unlocks.
+
+**By far the largest minor; certain to split** at promotion — building management ahead of
+population, construction ahead of the ledger family, and supply as its own slice. Planned as one
+theme; expected to land across several releases.
 
 ### v0.0.8 — Budget + hardening (Layer 6 + polish)
 
@@ -209,10 +229,10 @@ fan-out.*
   distances → C2 time-speed curve → F3 clarify time-control → C2 tile-ledger default → C1 border
   recolour. All serial on shared files; build at each commit.
 
-**Session 4 — L4 ledger foundation.** *De-risk v0.0.6 without entering it.*
+**Session 4 — ledger foundation.** *De-risk the v0.0.7 ledger family without entering it.*
 - A3 economy-panel refit (`economy_panel.{hpp,cpp}`) — **alone.** It is the convention reference
-  the v0.0.6 ledger family lifts from; landing it now is foundation, but the rest of that family
-  stays in v0.0.6.
+  the v0.0.7 ledger family lifts from; the refit is now a v0.0.6 legibility strand, but the rest
+  of that family stays in v0.0.7.
 
 ### Roadmap note — this pulls v0.0.8 polish forward
 
@@ -223,12 +243,13 @@ v0.0.6/0.7 *themes* — those Briefs stay gated (below).
 
 ### Out of scope for this plan (gated — do not pull in)
 
-- **v0.0.6**: corporation dashboard, Market/Balance/Construction ledgers, population (S4 +
-  dynamic), building management, workforce step 2.
+- **v0.0.7 (Layer 4 half)**: corporation dashboard, Market/Balance/Construction ledgers,
+  population (S4 + dynamic), building management, workforce step 2.
 - **Selection trio**: non-spatial routing, canvas hit-testing, lens-driven resolution — blocked
   on markers / ledgers existing.
-- **v0.0.7+**: supply convoys (S5), inter-body markets, preferential purchasing,
-  logistics/infrastructure — all blocked on Layer 5.
+- **v0.0.7 (Layer 5 half)**: supply convoys (S5), logistics/infrastructure, and the cross-body
+  half of preferential purchasing — all blocked on Layer 5. *(The convoy-free inter-body
+  feasibility probe and the intra-body order book move up to v0.0.6 — improved core-loop.)*
 - **Design-owed (`~`)**: tile-gen refinements, nation behaviour — these need a *design* pass, not
   a publish.
 - **v0.2**: resource-generation scarcity, full deposit authoring.

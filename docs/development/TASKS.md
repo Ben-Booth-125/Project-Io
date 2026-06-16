@@ -40,7 +40,7 @@ integrating session run the build — sub-agents should not build or commit.
 ```
 ## <Group name> (promoted from OPENS § <Brief>)
 
-Requirements: [REQUIREMENTS.md § <slug>](req/REQUIREMENTS.md#<slug>)
+Requirements: requirements.json § <slug>
 
 - **[<difficulty>] A — <action>.** Files: `<paths>`. Deps: foundation. Satisfies: R1, R2.
 - **[<difficulty>] B — <action>.** Files: `<paths>`. Deps: A. Parallel-safe with C. Satisfies: R3.
@@ -50,7 +50,9 @@ Parallelisation note: A → {B, C}; B ∥ C (disjoint files). Promote D once B a
 land; D depends on both.
 ```
 
-Requirements policy and table format are in [`req/REQUIREMENTS.md`](req/REQUIREMENTS.md).
+Requirement records (the data + permanent history) live in
+[`req/requirements.json`](req/requirements.json); the schema and workflow policy are in
+[`req/REQUIREMENTS.md`](req/REQUIREMENTS.md).
 
 ## Definition of "complete"
 
@@ -81,11 +83,11 @@ TASKS.md is a **working state**: a group is meant to be driven to *complete* (se
 above) in **one working block**. A group that cannot be — blocked, out of time, or
 superseded — is **cancelled** rather than left half-tracked. Cancelling a group:
 
-1. **Marks its requirements `failed`** in [`req/REQUIREMENTS.md`](req/REQUIREMENTS.md)
-   (with the reason in Notes), so the failed attempt is on record. Rows genuinely met
-   before the block stalled keep their real status. The section is then **moved to that
-   file's Completed / cancelled archive** with a `Resolved:` line recording the
-   cancellation — it is never deleted. Re-promoting copies it back to Active.
+1. **Marks its requirements `failed`** in [`req/requirements.json`](req/requirements.json)
+   (with the reason in `notes`), so the failed attempt is on record. Rows genuinely met
+   before the block stalled keep their real status. The group `status` is then flipped to
+   `"cancelled"` with a `resolution` recording the cancellation — the record is never
+   deleted. Re-promoting flips it back to `"active"`.
 2. **Rewrites the group's task intent back into [`OPENS.md`](OPENS.md)** as described
    intent, **merging into a related existing Brief** where one exists rather than
    duplicating.
