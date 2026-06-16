@@ -3,6 +3,7 @@
 #include "corporation_generation.hpp"
 #include "nation_generation.hpp"
 #include "orbital_system.hpp"
+#include "population_generation.hpp"
 #include "tile_generation.hpp"
 
 #include <array>
@@ -119,6 +120,8 @@ world make_hard_coded_world()
     generate_nations(w, kepler, kepler_tiles, 180, 84,
         nation_params{ .nation_count = 10, .min_seed_separation = 6 },
         /*seed=*/0x4A71012u);
+
+    generate_population_centres(w, kepler, /*seed=*/0x70701001u);
 
     // Attach installations to the first two land tiles found in raster order.
     {
