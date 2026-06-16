@@ -47,4 +47,18 @@ economy = {
     },
 }
 
+-- Logistics cost constants (BL-045 / BL-039 supply layer).
+-- base_cost_per_unit_distance is multiplied by convoy distance × cargo_qty to
+-- give the per-dispatch budget debit. Ordered land < sea < air < space so that
+-- space transport is the most expensive, reflecting the energy and infrastructure
+-- cost of leaving a gravity well.
+logistics = {
+    base_cost_per_unit_distance = {
+        land  = 0.02,
+        sea   = 0.05,
+        air   = 0.15,
+        space = 1.00,
+    },
+}
+
 print("[Lua] economy.lua loaded")
