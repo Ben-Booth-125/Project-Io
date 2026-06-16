@@ -1,5 +1,7 @@
 #include "budget_system.hpp"
 
+#include <algorithm>
+
 void apply_budget(world& w,
                   const recipe_registry& reg,
                   const std::unordered_map<entity_id, corp_cash_flow>& flows,
@@ -35,8 +37,17 @@ void apply_budget(world& w,
             if (cit != contention.end())
                 scalar = cit->second;
 
-            delta -= e.maintenance;
-            delta -= b.workforce_assigned * scalar * e.base_wage;
+            // Labour/material cost split (BL-049).
+            // Material cost: fixed 30 % overhead, charged even when decommissioned.
+            // Labour cost: scales with workforce_target; zero when decommissioned.
+            const float wt_scalar     = std::clamp(b.workforce_target / 100.0f, 0.0f, 2.0f);
+            const float material_cost = e.maintenance * 0.3f;
+            const float labour_cost   = b.decommissioned ? 0.0f
+                                        : e.maintenance * wt_scalar - material_cost;
+            // Guard against negative labour_cost when wt_scalar < 0.3 (the material
+            // floor already covers more than the scaled total in that edge case).
+            delta -= material_cost + std::max(0.0f, labour_cost);
+            delta -= b.decommissioned ? 0.0f : b.workforce_assigned * scalar * e.base_wage * wt_scalar;
         }
 
         cc.balance += delta; // may go negative — allowed in the prototype

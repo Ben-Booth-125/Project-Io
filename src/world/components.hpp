@@ -168,6 +168,22 @@ struct building_component
     /// Authored at placement and fixed at construction; meaningful only for
     /// processing_facility. `no_recipe` means none assigned.
     uint16_t      recipe = no_recipe;
+
+    /// Player-authored workforce target as a percentage of nominal capacity.
+    /// Range [0, 200]; 100 = full nominal staffing. Scales actual output and
+    /// the labour portion of maintenance. Applied in economy_system and budget_system.
+    int  workforce_target = 100;
+
+    /// When true the building produces nothing and is charged only material
+    /// (fixed overhead) maintenance — no labour cost. Pending removal by the
+    /// player. Set by the building-management UI (construction_panel).
+    bool decommissioned = false;
+
+    /// Index of the active recipe in the building type's recipe list. 0 = default.
+    /// Used by the management UI; the economy system continues to use the `recipe`
+    /// field (the registry-wide index), which is updated when the player selects a
+    /// different recipe via `active_recipe_index`.
+    int  active_recipe_index = 0;
 };
 
 /// Pooled resource quantities held by an entity.

@@ -1,5 +1,7 @@
 #include "construction_panel.hpp"
 
+#include <algorithm>
+
 #include "ledger_chrome.hpp" // shared ledger-window size + spawn anchor
 #include "presentation.hpp"
 #include "ui_state.hpp"
@@ -84,18 +86,17 @@ void draw_build_section(ui_state& state)
 }
 
 // --- Selected-building section -----------------------------------------------
-// Resolves the building whose tile is the current selection and shows its config
-// read-only, followed by DISABLED stub controls. The stubs are wired to v0.0.6
-// management logic later; here they only display the current values.
-void draw_selected_section(const world& w, const recipe_registry& reg, const ui_state& state)
+// Resolves the building whose tile is the current selection and shows its config,
+// plus live management controls: workforce slider, recipe selector, decommission.
+void draw_selected_section(world& w, const recipe_registry& reg, const ui_state& state)
 {
     if (!ImGui::CollapsingHeader("Selected building", ImGuiTreeNodeFlags_DefaultOpen))
         return;
 
     // Find the building sitting on the selected tile (buildings key on their own
     // entity id, not their tile, so we scan for tile == selected_entity).
-    const building_component* found = nullptr;
-    for (const auto& [id, bld] : w.buildings)
+    building_component* found = nullptr;
+    for (auto& [id, bld] : w.buildings)
     {
         if (bld.tile == state.selected_entity)
         {
@@ -110,7 +111,7 @@ void draw_selected_section(const world& w, const recipe_registry& reg, const ui_
         return;
     }
 
-    const building_component&  b   = *found;
+    building_component&        b   = *found;
     const building_economics&  eco = reg.economics(b.type);
     const recipe*              rcp = reg.get_recipe(b.recipe);
 
@@ -129,28 +130,63 @@ void draw_selected_section(const world& w, const recipe_registry& reg, const ui_
     else
         ImGui::TextDisabled("Recipe: -");
 
-    ImGui::Text("Workforce: %.0f%%", b.workforce_assigned * 100.0f);
     ImGui::Text("Build cost: %.1f", eco.build_cost);
     ImGui::Text("Maintenance: %.1f / tick", eco.maintenance);
 
     ImGui::Spacing();
-    ImGui::SeparatorText("Management (v0.0.6)");
+    ImGui::SeparatorText("Management");
 
-    // v0.0.5 DISABLED scaffolds: these controls display the current state but take
-    // no input. They are wired to the v0.0.6 management logic (recipe authoring,
-    // workforce allocation, sell orders) later — kept here so the surface exists.
-    ImGui::BeginDisabled();
+    // --- Workforce slider ---------------------------------------------------
+    // Shows and edits the player's workforce target (0–200 % of nominal).
+    ImGui::Text("Workforce: %d%%", b.workforce_target);
+    ImGui::SameLine();
+    ImGui::SetNextItemWidth(160.0f);
+    ImGui::SliderInt("Workforce##bld", &b.workforce_target, 0, 200);
+    b.workforce_target = std::clamp(b.workforce_target, 0, 200);
 
-    // Recipe combo — shows the current recipe name; selection is inert for now.
-    const char* preview = (rcp != nullptr && !rcp->name.empty()) ? rcp->name.c_str() : "-";
-    if (ImGui::BeginCombo("Recipe##stub", preview))
-        ImGui::EndCombo();
+    // --- Recipe selector ----------------------------------------------------
+    // Shown only for buildings that have more than one recipe available.
+    const int n_recipes = reg.recipe_count(b.type);
+    if (n_recipes > 1)
+    {
+        // Build the combo item list from the registry.
+        // active_recipe_index drives the combo; update b.recipe to keep them in sync.
+        b.active_recipe_index = std::clamp(b.active_recipe_index, 0, n_recipes - 1);
+        const recipe& cur_rcp = reg.recipe_at(b.type, b.active_recipe_index);
+        const char* combo_preview = cur_rcp.name.empty() ? "-" : cur_rcp.name.c_str();
+        if (ImGui::BeginCombo("Recipe##bld", combo_preview))
+        {
+            for (int i = 0; i < n_recipes; ++i)
+            {
+                const recipe& r = reg.recipe_at(b.type, i);
+                const bool sel  = (i == b.active_recipe_index);
+                if (ImGui::Selectable(r.name.empty() ? "-" : r.name.c_str(), sel))
+                {
+                    b.active_recipe_index = i;
+                    // Sync the registry-wide recipe id used by the economy system.
+                    b.recipe = reg.recipe_id(r.name);
+                }
+                if (sel)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+    }
 
-    // Workforce slider — shows the assigned fraction; drag is inert for now.
-    float workforce = b.workforce_assigned;
-    ImGui::SliderFloat("Workforce##stub", &workforce, 0.0f, 1.0f, "%.2f");
-
-    ImGui::EndDisabled();
+    // --- Decommission button ------------------------------------------------
+    ImGui::Spacing();
+    if (b.decommissioned)
+    {
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative),
+                           "DECOMMISSIONED");
+    }
+    else
+    {
+        if (ImGui::Button("Decommission"))
+            b.decommissioned = true;
+        ImGui::SameLine();
+        ImGui::TextDisabled("(stops production; material cost only)");
+    }
 }
 
 // --- Sell orders (player) ----------------------------------------------------
@@ -258,7 +294,7 @@ void draw_sell_orders_section(const world& w, const recipe_registry& reg, ui_sta
 
 } // namespace
 
-void draw_construction_panel(const world& w,
+void draw_construction_panel(world& w,
                              const recipe_registry& reg,
                              ui_state& state,
                              bool* p_open)
