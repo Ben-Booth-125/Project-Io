@@ -614,6 +614,237 @@
       "promoted_from": null,
       "batch": null,
       "rows": []
+    },
+    {
+      "brief": "design-pass-propagation",
+      "title": "Propagate 2026-06-15 v0.1.0 design pass into authority docs",
+      "difficulty": 3, "importance": "A", "evaluated_difficulty": null,
+      "status": "active", "resolved": null, "resolution": null,
+      "promoted_from": "BL-034", "batch": "v0.0.6",
+      "rows": [
+        { "id": "R1", "requirement": "docs/ui/LAYOUT.md contains a 'Ledger family' subsection recording: uniform ledger_chrome, player-default corp selector, shared entity_summary builders, ledgers-start-closed.", "verification": ["doc: docs/ui/LAYOUT.md"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R2", "requirement": "docs/SYSTEMS.md § Supply records the convoy model (entity fields, logistical cost, dispatch trigger, modes/gates); docs/economy/SUPPLY.md exists as the Layer-5 authority doc.", "verification": ["doc: docs/SYSTEMS.md", "doc: docs/economy/SUPPLY.md"], "status": "pending", "result_metric": "", "notes": "" }
+      ]
+    },
+    {
+      "brief": "corp-lens-border",
+      "title": "Corporation lens player-tile border is redundant",
+      "difficulty": 1, "importance": "C", "evaluated_difficulty": null,
+      "status": "active", "resolved": null, "resolution": null,
+      "promoted_from": "BL-001", "batch": "v0.0.6",
+      "rows": [
+        { "id": "R1", "requirement": "Brief-spanning: under the Corporation lens the player's tiles have a visible white (palette::selection) border distinct from the faction fill — golden-verified.", "verification": ["visual: scripts/verify/corp_lens_border.lua golden"], "status": "pending", "result_metric": "", "notes": "" }
+      ]
+    },
+    {
+      "brief": "icon-silhouettes-outlines",
+      "title": "Resolve icon silhouette collisions + settle outline conventions",
+      "difficulty": 2, "importance": "C", "evaluated_difficulty": null,
+      "status": "active", "resolved": null, "resolution": null,
+      "promoted_from": "BL-002+003", "batch": "v0.0.6",
+      "rows": [
+        { "id": "R1", "requirement": "Brief-spanning: extraction-site renders as a faceted ore silhouette, unit/convoy renders as an open chevron (V), and all filled canvas markers carry a dark outline — golden-verified.", "verification": ["visual: scripts/verify/icon_silhouettes.lua golden"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R2", "requirement": "draw_extraction_site produces a faceted mineral silhouette distinct from the gem pip and from the port triangle.", "verification": ["code", "visual"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R3", "requirement": "draw_unit / draw_convoy produce an open V chevron visually distinct from the filled port triangle.", "verification": ["code", "visual"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R4", "requirement": "Every filled canvas marker (building, faction, corp, unit) carries a dark outline stroke; resource pip remains outline-free.", "verification": ["code: icons.cpp", "visual"], "status": "pending", "result_metric": "", "notes": "" }
+      ]
+    },
+    {
+      "brief": "hover-card-primitive",
+      "title": "Implement the hover-card primitive",
+      "difficulty": 3, "importance": "B", "evaluated_difficulty": null,
+      "status": "active", "resolved": null, "resolution": null,
+      "promoted_from": "BL-006", "batch": "v0.0.6",
+      "rows": [
+        { "id": "R1", "requirement": "Brief-spanning: hovering over a tile, body, or building on the Planetary canvas shows a hover card via the shared draw_hover_card dispatcher — golden-verified.", "verification": ["visual: scripts/verify/hover_card.lua golden"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R2", "requirement": "draw_hover_card(world&, ui_state&, entity_id) exists in entity_summary.{hpp,cpp} and wraps per-entity builders in BeginTooltip/EndTooltip.", "verification": ["code: entity_summary.hpp"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R3", "requirement": "All three ad-hoc tooltip call sites in body_surface_canvas.cpp are replaced by draw_hover_card; no inline ImGui::BeginTooltip remains for entity hover.", "verification": ["code: grep BeginTooltip body_surface_canvas.cpp"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R4", "requirement": "docs/ui/LAYOUT.md § UI popup elements cross-references docs/ui/TOOLTIP.md; docs/ui/SELECTION.md Focus state section references it.", "verification": ["doc"], "status": "pending", "result_metric": "", "notes": "" }
+      ]
+    },
+    {
+      "brief": "rung-relative-distances",
+      "title": "Reference distances for bodies are rung-relative",
+      "difficulty": 2, "importance": "C", "evaluated_difficulty": null,
+      "status": "active", "resolved": null, "resolution": null,
+      "promoted_from": "BL-005", "batch": "v0.0.6",
+      "rows": [
+        { "id": "R1", "requirement": "Brief-spanning: on the Solar canvas the body-summary distance reads from the star; on the Circumplanetary canvas it reads from the parent body — golden-verified.", "verification": ["visual: scripts/verify/rung_distances.lua golden"], "status": "pending", "result_metric": "", "notes": "" }
+      ]
+    },
+    {
+      "brief": "tile-ledger-default-body",
+      "title": "Tile Ledger default body",
+      "difficulty": 2, "importance": "C", "evaluated_difficulty": null,
+      "status": "active", "resolved": null, "resolution": null,
+      "promoted_from": "BL-024", "batch": "v0.0.6",
+      "rows": [
+        { "id": "R1", "requirement": "Opening the Tile Ledger while viewing a planetary body defaults the body selector to that body, not the lowest-id body.", "verification": ["code: tile_inspector.cpp default logic", "build"], "status": "pending", "result_metric": "", "notes": "" }
+      ]
+    },
+    {
+      "brief": "time-speed-curve",
+      "title": "Time-speed curve + econ-tick progress bar",
+      "difficulty": 2, "importance": "C", "evaluated_difficulty": null,
+      "status": "active", "resolved": null, "resolution": null,
+      "promoted_from": "BL-007", "batch": "v0.0.6",
+      "rows": [
+        { "id": "R1", "requirement": "Brief-spanning: the five speed buttons map to 0.25×/0.5×/1×/4×/16× and the quarter-progress bar shows no % overlay — golden-verified.", "verification": ["visual: scripts/verify/time_controls.lua golden"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R2", "requirement": "Speed buttons 1–5 in sim_loop map to multipliers 0.25, 0.5, 1.0, 4.0, 16.0.", "verification": ["code: sim_loop.cpp"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R3", "requirement": "The ImGui::ProgressBar for the econ-tick quarter progress passes an empty overlay string (no xx% text).", "verification": ["code: app.cpp ProgressBar call"], "status": "pending", "result_metric": "", "notes": "" }
+      ]
+    },
+    {
+      "brief": "icon-usage-audit",
+      "title": "Verify icon usage is consistent across the app",
+      "difficulty": 2, "importance": "C", "evaluated_difficulty": null,
+      "status": "active", "resolved": null, "resolution": null,
+      "promoted_from": "BL-004", "batch": "v0.0.6",
+      "rows": [
+        { "id": "R1", "requirement": "Every ui::icons::* call site uses the correct glyph per docs/ui/ICONS.md (no extraction-site used where a building marker is intended, etc.).", "verification": ["code: audit call sites"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R2", "requirement": "Cheap discrepancies (wrong colour source, inconsistent r) are fixed; larger findings are promoted as new backlog items.", "verification": ["code", "build"], "status": "pending", "result_metric": "", "notes": "" }
+      ]
+    },
+    {
+      "brief": "economy-panel-refit",
+      "title": "Economy panel — second pass (foundation refit)",
+      "difficulty": 3, "importance": "A", "evaluated_difficulty": null,
+      "status": "active", "resolved": null, "resolution": null,
+      "promoted_from": "BL-026", "batch": "v0.0.6",
+      "rows": [
+        { "id": "R1", "requirement": "Brief-spanning: the economy panel opens with the player corp selected, uses ledger_chrome, and shows the stockpile/market/balance sections via shared builders — golden-verified.", "verification": ["visual: scripts/verify/economy_panel_refit.lua golden"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R2", "requirement": "A corp selector at the top of economy_panel defaults to w.player_entity and switching corps updates all sections.", "verification": ["code", "visual"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R3", "requirement": "economy_panel uses ledger_chrome (not ad-hoc size/anchor constants) for its window.", "verification": ["code: grep ledger_chrome economy_panel.cpp"], "status": "pending", "result_metric": "", "notes": "" }
+      ]
+    },
+    {
+      "brief": "population-static-mvp",
+      "title": "Population centres — static MVP (Briefs 1–3, 5)",
+      "difficulty": 4, "importance": "SSS", "evaluated_difficulty": null,
+      "status": "active", "resolved": null, "resolution": null,
+      "promoted_from": "BL-047", "batch": "v0.0.6",
+      "rows": [
+        { "id": "R1", "requirement": "Brief-spanning: the generated world contains population centres on habitable nation tiles; each body's market demand reflects population consumption; agglomeration bonus applies to production — headless-verified.", "verification": ["headless: tools/verify/population_mvp.cpp"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R2", "requirement": "tile_component has a land_use_state field (enum class land_use); placement helpers set extraction/urban correctly.", "verification": ["code: components.hpp", "build"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R3", "requirement": "population_centre_component exists; generate_population_centres(world&) seeds at least one centre per nation on Kepler; each occupied tile has land_use_state == urban.", "verification": ["headless: population_mvp.cpp"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R4", "requirement": "market_component.demand is non-zero on Kepler after generate_population_centres + run_economy_step; reflects food/water/consumer/habitability goods basket.", "verification": ["headless: population_mvp.cpp"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R5", "requirement": "A body with a Town+ centre shows a measurable agglomeration production bonus vs the same body with an Outpost only.", "verification": ["headless: population_mvp.cpp"], "status": "pending", "result_metric": "", "notes": "" }
+      ]
+    },
+    {
+      "brief": "building-management",
+      "title": "Building management — functional recipe & workforce control",
+      "difficulty": 4, "importance": "S", "evaluated_difficulty": null,
+      "status": "active", "resolved": null, "resolution": null,
+      "promoted_from": "BL-049", "batch": "v0.0.6",
+      "rows": [
+        { "id": "R1", "requirement": "Brief-spanning: the player can select a building and change its recipe and workforce target; the economy system honours both at the next tick — golden-verified.", "verification": ["visual: scripts/verify/building_management.lua golden"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R2", "requirement": "building_component has a workforce_target field (float 0..1, default 1.0).", "verification": ["code: components.hpp"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R3", "requirement": "A processing facility with no_recipe produces zero output after run_economy_step.", "verification": ["headless: tools/verify/econ_stability.cpp or new harness"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R4", "requirement": "Setting workforce_target=0.5 on a building halves its wage draw (verified via budget_system output).", "verification": ["headless"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R5", "requirement": "scripts/economy.lua build_cost entries are tables with labour and material fields; C++ reads both.", "verification": ["code: economy.lua + recipe_registry.cpp"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R6", "requirement": "decommission_building removes the building from corp assets, sets the tile to undeveloped, and issues the correct refund/charge to the budget.", "verification": ["headless"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R7", "requirement": "The construction panel building-detail section shows a recipe selector and workforce slider; selecting a recipe or moving the slider persists to building_component.", "verification": ["visual: building_management.lua"], "status": "pending", "result_metric": "", "notes": "" }
+      ]
+    },
+    {
+      "brief": "market-ledger",
+      "title": "Market Ledger",
+      "difficulty": 4, "importance": "A", "evaluated_difficulty": null,
+      "status": "active", "resolved": null, "resolution": null,
+      "promoted_from": "BL-027", "batch": "v0.0.6",
+      "rows": [
+        { "id": "R1", "requirement": "Brief-spanning: the Market Ledger opens from the nav rail, shows the current body's per-resource market table with supply/demand/price columns and the player's sell orders — golden-verified.", "verification": ["visual: scripts/verify/market_ledger.lua golden"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R2", "requirement": "The ledger has a corp selector defaulting to the player and a body selector defaulting to the current view's main body.", "verification": ["code", "visual"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R3", "requirement": "Per-resource rows show: name, supply, demand, resolved price, price/base_price ratio, player buys, player sells, standing sell-order qty+floor.", "verification": ["visual"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R4", "requirement": "The window uses ledger_chrome (shared size/anchor).", "verification": ["code: grep ledger_chrome market_ledger.cpp"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R5", "requirement": "market_ledger.{hpp,cpp} are new files; nav_pane wiring is in slot 5 and toggled by show_market_ledger.", "verification": ["build", "code"], "status": "pending", "result_metric": "", "notes": "" }
+      ]
+    },
+    {
+      "brief": "balance-ledger",
+      "title": "Balance Ledger",
+      "difficulty": 4, "importance": "A", "evaluated_difficulty": null,
+      "status": "active", "resolved": null, "resolution": null,
+      "promoted_from": "BL-028", "batch": "v0.0.6",
+      "rows": [
+        { "id": "R1", "requirement": "Brief-spanning: the Balance Ledger opens from the nav rail and shows the player's income breakdown, expenditure breakdown, and a running balance sparkline — golden-verified.", "verification": ["visual: scripts/verify/balance_ledger.lua golden"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R2", "requirement": "Income section: per-resource rows of goods sold (qty × price = total).", "verification": ["visual", "code"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R3", "requirement": "Expenditure section: input purchases, maintenance, wages — each line + total.", "verification": ["visual", "code"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R4", "requirement": "Running balance sparkline matches the one in the header (same balance_history source).", "verification": ["visual", "code"], "status": "pending", "result_metric": "", "notes": "" }
+      ]
+    },
+    {
+      "brief": "construction-ledger",
+      "title": "Construction Ledger (construction-in-progress only)",
+      "difficulty": 4, "importance": "A", "evaluated_difficulty": null,
+      "status": "active", "resolved": null, "resolution": null,
+      "promoted_from": "BL-029", "batch": "v0.0.6",
+      "rows": [
+        { "id": "R1", "requirement": "Brief-spanning: the Construction Ledger shows a queue of in-progress buildings with type, location, labour cost, material cost, and progress — golden-verified.", "verification": ["visual: scripts/verify/construction_ledger.lua golden"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R2", "requirement": "When no construction is in progress, the panel shows a 'No active construction' placeholder.", "verification": ["visual"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R3", "requirement": "The panel uses ledger_chrome and preserves the armed-placement Build section from the v0.0.5 scaffold.", "verification": ["code", "build"], "status": "pending", "result_metric": "", "notes": "" }
+      ]
+    },
+    {
+      "brief": "corp-overview-dashboard",
+      "title": "Corporation overview dashboard",
+      "difficulty": 3, "importance": "B", "evaluated_difficulty": null,
+      "status": "active", "resolved": null, "resolution": null,
+      "promoted_from": "BL-022", "batch": "v0.0.6",
+      "rows": [
+        { "id": "R1", "requirement": "Brief-spanning: the Corp Overview dashboard opens from nav slot 1 and shows Money/Holdings/Production/Alerts blocks — golden-verified.", "verification": ["visual: scripts/verify/corp_dashboard.lua golden"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R2", "requirement": "Money block: balance (negatives red), last-tick net ±, recent sparkline. Clicking opens show_balance_ledger.", "verification": ["visual", "code"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R3", "requirement": "Holdings block: building count by type/state, stockpile valuation. Clicking opens show_construction_panel.", "verification": ["visual", "code"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R4", "requirement": "Alerts block: shows at least idle-building and negative-balance alerts when conditions hold.", "verification": ["visual", "code"], "status": "pending", "result_metric": "", "notes": "" }
+      ]
+    },
+    {
+      "brief": "workforce-pool-step2",
+      "title": "Workforce pool & population coupling — step 2",
+      "difficulty": 4, "importance": "S", "evaluated_difficulty": null,
+      "status": "active", "resolved": null, "resolution": null,
+      "promoted_from": "BL-042", "batch": "v0.0.6",
+      "rows": [
+        { "id": "R1", "requirement": "Brief-spanning: workforce pool supply derives from population centres; bodies with larger/higher populations supply more labour — headless-verified.", "verification": ["headless: tools/verify/population_mvp.cpp (extend) or new harness"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R2", "requirement": "world::default_workforce_supply / workforce_supply_overrides are removed or bypassed; supply is computed from population_centre_component each tick.", "verification": ["code: economy_system.cpp"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R3", "requirement": "Wage level scales with body habitability (higher habitability → higher base_wage multiplier).", "verification": ["headless", "code: budget_system.cpp"], "status": "pending", "result_metric": "", "notes": "" }
+      ]
+    },
+    {
+      "brief": "menu-items-from-systems",
+      "title": "Define the menu items from the systems",
+      "difficulty": 3, "importance": "B", "evaluated_difficulty": null,
+      "status": "active", "resolved": null, "resolution": null,
+      "promoted_from": "BL-021", "batch": "v0.0.6",
+      "rows": [
+        { "id": "R1", "requirement": "Brief-spanning: the nav rail shows 9 slots in the curated order with the correct tooltips; live slots 1/2/5/6 open their ledgers — golden-verified.", "verification": ["visual: scripts/verify/nav_rail.lua golden"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R2", "requirement": "Slots are ordered: Corp Overview · Budget · Workforce placeholder · Research placeholder · Market Ledger · Construction · Corp. Strategy placeholder · Diplomacy placeholder · History placeholder.", "verification": ["code: nav_pane.cpp slot order"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R3", "requirement": "The Exploration slot is removed; placeholder slots show the neutral hollow-square glyph.", "verification": ["code", "visual"], "status": "pending", "result_metric": "", "notes": "" }
+      ]
+    },
+    {
+      "brief": "non-spatial-goto",
+      "title": "Non-spatial 'go to' routing",
+      "difficulty": 2, "importance": "C", "evaluated_difficulty": null,
+      "status": "active", "resolved": null, "resolution": null,
+      "promoted_from": "BL-030", "batch": "v0.0.6",
+      "rows": [
+        { "id": "R1", "requirement": "Selecting a corporation entity and pressing 'go to' opens the Corp Overview dashboard (show_corporation_panel = true).", "verification": ["code: selection_panel.cpp focus_on_entity", "build"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R2", "requirement": "Selecting a nation entity and pressing 'go to' is a no-op (nation ledger deferred); no crash or unhandled case.", "verification": ["code", "build"], "status": "pending", "result_metric": "", "notes": "" }
+      ]
+    },
+    {
+      "brief": "population-dynamic",
+      "title": "Population centres — dynamic half (Briefs 6–7)",
+      "difficulty": 4, "importance": "A", "evaluated_difficulty": null,
+      "status": "active", "resolved": null, "resolution": null,
+      "promoted_from": "BL-048", "batch": "v0.0.6",
+      "rows": [
+        { "id": "R1", "requirement": "Brief-spanning: low-habitability bodies show reduced effective_workforce; over many ticks a well-supplied body's population centre levels up — headless-verified.", "verification": ["headless: tools/verify/population_dynamic.cpp"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R2", "requirement": "A body with mean urban habitability < 0.6 has effective_workforce < 1.0 (the feedback multiplier is < 1).", "verification": ["headless"], "status": "pending", "result_metric": "", "notes": "" },
+        { "id": "R3", "requirement": "Running 500+ ticks with demand ≥ 50% met and habitability ≥ 0.5 causes at least one centre to level up from Outpost.", "verification": ["headless"], "status": "pending", "result_metric": "", "notes": "" }
+      ]
     }
   ]
 }
