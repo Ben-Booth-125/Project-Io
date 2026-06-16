@@ -390,6 +390,78 @@ currently hold Briefs appear as sections below.
   TIME_CONTROLS.md § Open questions). `src/`-changing → brief-spanning requirement at promotion.
   See `docs/ui/TIME_CONTROLS.md` / `docs/ui/LAYOUT.md`.
 
+### Further map lenses (lens-ideas Q&A, 2026-06-16)
+
+A brainstorm pass over *what else is informative as a map lens* (Q&A 2026-06-16). Five lens
+ideas were accepted, plus one meta item. They extend the lens family in `docs/ui/LENSES.md`
+(`overlay_mode` in `src/ui/ui_state.hpp`; render passes in `src/ui/body_surface_canvas.cpp`;
+strip controls in `src/ui/overlay.cpp`). All are `~` (design owed) — each needs a settle pass
+(rung applicability, legend/key, glyph, interaction) before promotion. Glyph additions
+propagate to `docs/ui/ICONS.md` § Map-lens glyphs.
+
+- **[B3 ~] Production / Output lens.** *(Written 2026-06-16, lens-ideas Q&A.)* Read the map as a
+  *production-intensity surface*: where value is actually being made. **Intensity metric settled:
+  the sell value of all of a tile's building outputs** (output qty × resolved market price,
+  summed across the recipe's products) — not raw output count, so a high-value low-volume site
+  reads hot and a bulk low-value one cooler. A strip lens (`overlay_mode`), Planetary tint over
+  producing tiles, plain terrain where nothing produces; idle/exhausted buildings read cold. No
+  data dependency — reads the economy/`building_report` and `market_component` prices already
+  present. Supports the Layer-4 goal (siting and reading the production loop). **Design owed:**
+  the value→opacity normalisation (per-body, like Resource?), whether idle vs active gets a
+  distinct treatment, glyph, legend. Authority `docs/ui/LENSES.md`.
+
+- **[B4 ~] Habitability / Population lens.** *(Written 2026-06-16, lens-ideas Q&A.)* Read the map
+  as a *liveability / population-density surface*: where habitability is high and where workforce
+  and demand concentrate (`docs/economy/POPULATION.md`). A strip lens, Planetary tint. **Partly
+  target-spec** — population centres are deferred from the prototype, so the data this tints is
+  not all generated yet; the habitability half may be expressible sooner than the
+  population-density half. Couples to the Workforce/Population Layer-4 work (§ Workforce,
+  § Infrastructure). **Design owed:** which signal (habitability, population, or a combined read),
+  what data exists now vs is gated, rung, legend, glyph. Authority `docs/ui/LENSES.md`,
+  `docs/economy/POPULATION.md`.
+
+- **[B3 ~] Placement-suitability surface (a lens on *tile selection*, not a strip lens).**
+  *(Written 2026-06-16, lens-ideas Q&A.)* **Explicitly *not* an `overlay_mode` strip lens** — it is
+  a surface tied to **tile selection / armed construction placement**: for a selected (or armed-to-
+  build) building type, tint every tile by validity/affinity — valid terrain highlighted, invalid
+  greyed, "thrives here" stronger than "merely allowed". A siting aid answering *where can this go,
+  and where is it best*. Reads the terrain enums and `src/world/placement_rules.hpp` already in
+  place; couples to the Construction Ledger / armed-placement flow (§ Ledger [A4] Construction).
+  **Design owed:** the exact trigger (tile selection vs armed-build mode vs both), the
+  valid/affine/invalid colour treatment, where it lives in the canvas-state model given it is *not*
+  an `overlay_mode`. Authority `docs/ui/LENSES.md` (note the distinction), `docs/economy/PRODUCTION.md`.
+
+- **[C3 ~] Ambient / Scarcity lens (single-resource, body-wide).** *(Written 2026-06-16,
+  lens-ideas Q&A.)* The inverse of the Resource lens: highlight where a chosen good is **absent or
+  below the ambient floor** across a body — scarcity rather than density. **Settled shape: a global
+  *body-wide* heatmap, valid only for a single selected resource** (no "highest-value" default
+  mode — scarcity of *what?* must be answered). Reads the same `resource_deposit` data the Resource
+  lens does, framed negatively. **Access mechanism left open** — whether it is its own
+  `overlay_mode`, a toggle within the Resource lens (density↔scarcity), or a mode of the resource
+  selector. **Design owed:** that access decision, the colour ramp (scarce = hot? cool?), legend.
+  Authority `docs/ui/LENSES.md` § Resource lens (sibling).
+
+- **[F4 ~] Reach / Logistics-range lens.** *(Written 2026-06-16, lens-ideas Q&A.)* A static
+  *reach* surface — how far deployment or supply can extend from ports/launchpads — complementing
+  the Supply lens (which shows flow) with a distance/falloff field. **Flagged as needing more
+  scoping** (deferred, `F`): the notion of "reach" is underdefined until the Supply/Layer-5 route
+  model exists, and partly overlaps it. **Design owed:** what reach means (logistical cost radius?
+  deployment range? both), its relationship to the [S5] Supply layer, rung (likely multi-rung like
+  Supply), whether it is a distinct lens at all or a Supply sub-mode. Couples to § Supply [S5].
+  Authority `docs/ui/LENSES.md` § Supply.
+
+- **[C3 ~] Meta: per-lens Solar / Circumplanetary representation.** *(Written 2026-06-16,
+  lens-ideas Q&A.)* The lens system is **Planetary-first** today; the rung-applicability table in
+  `docs/ui/LENSES.md` only sketches coarser representations (Supply route lines, Market price
+  strip). This meta-Brief is to **consider each lens's implication on the Solar and
+  Circumplanetary canvases deliberately** — each one is *very different* and has distinct needs (a
+  Resource density has no inter-body surface; Production might roll up per-body; Supply is
+  inherently all-rung; Market has a per-body strip). Not a build — a **design sweep** producing,
+  per lens, a settled "what (if anything) does this show on the upper two rungs and why". Output is
+  an updated rung-applicability table + per-lens rung notes in `docs/ui/LENSES.md`. **Design owed:**
+  the sweep itself. Authority `docs/ui/LENSES.md` § Rung applicability,
+  `docs/ui/{SOLAR,CIRCUMPLANETARY}.md`.
+
 ## Menu
 
 - **[B3 ✓] Define the menu items from the systems.** **Design settled (2026-06-15).** The
