@@ -1,26 +1,26 @@
-# Project Io — TASKS
+# Project Io — REFINED (active worklist)
 
-The **active, prioritised, actionable worklist**. Unlike [`OPENS.md`](OPENS.md)
-(described intent), every entry here is a concrete, file-scoped,
-individually-buildable step ready to execute. Tasks are **promoted** from a
-designed (`✓`) Brief (see OPENS.md § OPENS vs. TASKS) and cleared as they complete — this
-file is transient and is expected to be empty between work blocks.
+The **active, prioritised, actionable worklist** (formerly TASKS.md). Unlike the backlog
+([`backlog.json`](backlog.json) metadata + [`BACKLOG.md`](BACKLOG.md) design bodies), every
+entry here is a concrete, file-scoped, individually-buildable step ready to execute. Tasks are
+**promoted** from a `designed` (`✓`) backlog item (see [`DELIVERY.md`](DELIVERY.md)) and cleared
+as they complete — this file is transient and is expected to be empty between work blocks.
 
-> **Proportionality (see CLAUDE.md § Proportionality and session boundaries).** Promoting a
-> Brief into this file is for *substantial* work. A quick low-risk high-value change — a
+> **Proportionality (see DELIVERY.md § Proportionality, and Rule 0).** Promoting an item into
+> this file is for *substantial* (Full-mode) work. A quick low-risk high-value change — a
 > one-file fix, an obvious cleanup, a cheap optimisation — does **not** need a task group or a
 > REQUIREMENTS table: make and verify it directly, then commit. Reach for the full lifecycle
 > only where its coordination cost pays back; applying it to trivial work is over-engineering.
 
 ## Task format
 
-List tasks in **execution order**, grouped by the Brief they were promoted
+List tasks in **execution order**, grouped by the item they were promoted
 from. Each task carries:
 
 - **A group-scoped ID letter** (A, B, C, …), so dependencies and parallel pairs
   can be named.
-- **A difficulty** in brackets (the OPENS.md 1–5 time scale; tasks carry difficulty
-  only — priority is an OPENS-level triage concept, not a per-task field).
+- **A difficulty** in brackets (the backlog 1–5 time scale; tasks carry difficulty
+  only — priority is a backlog-level triage concept, not a per-task field).
 - **A one-line action** — imperative; what to change.
 - **File scope** — the files the task is expected to touch. This is what makes
   collisions between tasks visible.
@@ -30,15 +30,16 @@ from. Each task carries:
   whether as a sub-agent. Only true when the file scopes are **disjoint**.
 
 End each group with a **parallelisation note**: the dependency shape and which
-roots are safe to fan out. Run concurrent tasks only when their file scopes do
-not overlap; keep same-file tasks sequential. Spawn a sub-agent for a parallel
-branch only when it is genuinely disjoint and self-contained, and have the
-integrating session run the build — sub-agents should not build or commit.
+roots are safe to fan out. Concurrent sub-agents run in **separate git worktrees**
+(the isolation mechanism); the collision map is a *splitting heuristic* for carving
+focused agents, not a hard disjointness gate. Agents build and commit on their own
+worktree branch; the integrating session merges, builds, and verifies. See
+[`DELIVERY.md`](DELIVERY.md) § Sub-agents & worktrees for the authoritative model.
 
 ### Template
 
 ```
-## <Group name> (promoted from OPENS § <Brief>)
+## <Group name> (promoted from BACKLOG § <item>)
 
 Requirements: requirements.json § <slug>
 
@@ -73,13 +74,13 @@ against "the code is written":
 
 A task that is implemented and builds but whose requirements have not all been
 reviewed and tested is *code-complete*, not complete. Only mark a group cleared
-(and its Brief removed) when its requirements are complete by this definition,
+(and its item removed) when its requirements are complete by this definition,
 or its remaining rows are explicitly accepted as out of scope. See also
 [`../GLOSSARY.md`](../GLOSSARY.md) **Complete (task state)**.
 
 ## Cancelling a task group
 
-TASKS.md is a **working state**: a group is meant to be driven to *complete* (see
+REFINED.md is a **working state**: a group is meant to be driven to *complete* (see
 above) in **one working block**. A group that cannot be — blocked, out of time, or
 superseded — is **cancelled** rather than left half-tracked. Cancelling a group:
 
@@ -88,15 +89,15 @@ superseded — is **cancelled** rather than left half-tracked. Cancelling a grou
    before the block stalled keep their real status. The group `status` is then flipped to
    `"cancelled"` with a `resolution` recording the cancellation — the record is never
    deleted. Re-promoting flips it back to `"active"`.
-2. **Rewrites the group's task intent back into [`OPENS.md`](OPENS.md)** as described
-   intent, **merging into a related existing Brief** where one exists rather than
-   duplicating.
+2. **Rewrites the group's task intent back into the backlog** (a new or existing item in
+   [`backlog.json`](backlog.json) / [`BACKLOG.md`](BACKLOG.md)) as described intent, **merging
+   into a related existing item** where one exists rather than duplicating.
 3. **Removes the task stubs** (the A–F entries) from this file.
 
 Cancelling reverts *tracking*, not committed code — code already landed stays in the
 tree; its intent simply returns to the backlog to be re-promoted later. A group is
 thus always in one of two terminal states: **completed**, or **cancelled** back to
-OPENS. See also [`../GLOSSARY.md`](../GLOSSARY.md) **Cancelled (task state)**.
+the backlog. See also [`../GLOSSARY.md`](../GLOSSARY.md) **Cancelled (task state)**.
 
 ## Pausing a task group (deliberate handoff)
 
@@ -104,12 +105,12 @@ Driving a group to *complete* in one block is the default, **not** a mandate (se
 § Proportionality and session boundaries). When ending a session early serves the work — the
 batch is large, context is drifting, or a natural checkpoint is reached — **pause** the group
 rather than force completion or cancel it. A paused group is a deliberate scoping choice,
-distinct from a *cancelled* one (which reverts intent to OPENS): the tasks stay in this file,
+distinct from a *cancelled* one (which reverts intent to the backlog): the tasks stay in this file,
 ready for the next session to resume.
 
 Pausing is only legitimate if the stop is **clean and resumable**:
 
-1. **TASKS.md is true to state** — completed tasks marked done, the in-flight task marked as
+1. **REFINED.md is true to state** — completed tasks marked done, the in-flight task marked as
    the resume point, untouched tasks left as-is. No silent half-edits.
 2. **The build is green, or the breakage is noted** — if the tree does not build, say exactly
    why and what the next session must finish to green it.
@@ -117,16 +118,23 @@ Pausing is only legitimate if the stop is **clean and resumable**:
    `app.cpp`; B/C landed and verified").
 
 A paused group is therefore *not* a terminal state — it is an explicit, recorded intermission.
-The barrier semantics for a multi-Brief set still hold *within* a session; pausing is how a
+The barrier semantics for a multi-item set still hold *within* a session; pausing is how a
 session boundary is drawn *between* them.
 
 ---
 
 ## Dividing work across agents & authoring tasks
 
-This is the method used to promote a Brief and (optionally) fan it out to
+This is the method used to promote an item and (optionally) fan it out to
 parallel sub-agents. It is descriptive of how the v0.0.3 Environment groups were
 run; follow it when promoting future work.
+
+> **Note (2026-06-16):** the **authoritative** sub-agent model is now
+> [`DELIVERY.md`](DELIVERY.md) § Sub-agents & worktrees — **worktrees are the primary isolation
+> mechanism** and agents build/commit on their own branch. The decomposition and
+> file-mapping guidance below still holds (it is how you carve focused agents); where this
+> section's older "disjoint write-sets / sub-agents don't commit" phrasing conflicts with the
+> worktree model, DELIVERY.md wins.
 
 ### 1. Decompose, then map every task to its files
 
@@ -570,4 +578,4 @@ Completed 2026-06-16 / 2026-06-15 / 2026-06-14 (see DEVLOG, newest first):
 - *Corporation lens: re-verified with the new harness — R2–R6 confirmed
   `complete`; the cancelled group is now closed.*
 
-Remaining harness follow-up (golden-image diffing) lives in [OPENS.md](OPENS.md) § Canvas.
+Remaining harness follow-up (golden-image diffing) lives in [BACKLOG.md](BACKLOG.md) § Canvas.

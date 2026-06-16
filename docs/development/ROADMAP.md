@@ -3,9 +3,9 @@
 The milestone map from the current state to **v0.1.0**, the finished prototype. This
 document is **forward-facing and lean**: it names the version sequence, the *theme* of each
 minor, and the done-definition for v0.1.0. It deliberately does **not** enumerate individual
-Briefs — that lives in [`OPENS.md`](OPENS.md) (described intent) and [`TASKS.md`](TASKS.md)
-(the active worklist). The roadmap sits *above* both: it says which theme each minor carries;
-OPENS/TASKS say what work realises it.
+items — that lives in the backlog ([`backlog.json`](backlog.json) metadata + [`BACKLOG.md`](BACKLOG.md)
+design prose) and the active worklist [`REFINED.md`](REFINED.md). The roadmap sits *above* both: it
+says which theme each minor carries; the backlog and worklist say what work realises it.
 
 The prototype validates the **economy loop only**. The full scope and its exclusions
 (Conflict, Research, Policy, Diplomacy beyond a data-model stub) are owned by
@@ -22,7 +22,7 @@ enablers, taken end-to-end and cut as a release (see `DEVELOPMENT_PRACTICES.md` 
 release). This is the grain established by v0.0.3 (the whole world-generation spine in one
 bump). A minor is not a fixed quantum of work; it is a theme that reads as one thing.
 
-A minor may prove too large and **split in practice** at TASKS promotion — that is expected,
+A minor may prove too large and **split in practice** at promotion into the worklist — that is expected,
 not a roadmap failure. The plan below is the *intended* shape; the split point is called out
 where one is likely.
 
@@ -110,7 +110,7 @@ harden** what Layers 4–6 built, so v0.1.0 is cut on evidence rather than hope.
 assess, each with a rough target a non-specialist can read straight off an instrument:
 
 - **Frame budget (lag).** 60 FPS gives a **~16.7 ms** per-frame budget. The frame-time HUD (the
-  [B4] known-bug instrument in OPENS) reads last / avg / max ms plus the **1% lows** — the worst
+  [B4] known-bug instrument in the backlog) reads last / avg / max ms plus the **1% lows** — the worst
   1% of frames, which is what a player actually feels as a stutter. Rough targets: **avg < 8 ms,
   max < 16.7 ms** while panning the dense Kepler grid (180×84 = 15,120 tiles). If max spikes, the
   HUD's job is to say *why* — GPU present (vsync/compositor), draw-call volume (the immediate-mode
@@ -131,7 +131,7 @@ Plus the cheap hygiene that needs no instrument: the build stays **warning-clean
 static-analysis run** (cppcheck, or MSVC `/analyze`) read for genuine findings, and the headless
 harnesses kept green. None of this requires benchmarking expertise — it is reading three numbers
 off an instrument and checking they sit under a threshold. The detailed Briefs (what each
-instrument prints, the exact harness extensions) are settled in OPENS when this minor is designed.
+instrument prints, the exact harness extensions) are settled in the backlog when this minor is designed.
 
 ### v0.1.0 — Cut the prototype
 
@@ -167,27 +167,27 @@ milestone that says so.
 
 ## Near-term publish plan — sequencing the unblocked backlog
 
-The milestone map above is **theme-level** and deliberately Brief-free. This section is the
-**operational layer beneath it**: how the *currently-unblocked* Briefs in [`OPENS.md`](OPENS.md)
-are sliced into work sessions and published. It names Briefs (which the map above does not) but
-**does not duplicate their design** — each Brief's detail stays in OPENS; this is only the
+The milestone map above is **theme-level** and deliberately item-free. This section is the
+**operational layer beneath it**: how the *currently-unblocked* items in [`BACKLOG.md`](BACKLOG.md)
+are sliced into work sessions and delivered. It names items (which the map above does not) but
+**does not duplicate their design** — each item's detail stays in the backlog; this is only the
 *sequencing*. Treat it as the standing reference a session opens with, and update the slice list
 as sessions complete. *(If it churns enough to feel out of place inside the lean roadmap, graduate
 it to its own `PUBLISH_PLAN.md` and cross-link — for now it lives here so there is one place to
 look.)*
 
-### Batch Publish is a strategy, not a code-sprint
+### Batch Delivery is a strategy, not a code-sprint
 
-A **Batch Publish** ([`../GLOSSARY.md`](../GLOSSARY.md)) is the whole *process* of moving many
-Briefs from intent to committed code — **collision mapping, checkpoints, and session boundaries
+A **Batch Delivery** ([`../GLOSSARY.md`](../GLOSSARY.md)) is the whole *process* of moving many
+items from intent to committed code — **collision mapping, checkpoints, and session boundaries
 included** — not just "write a lot of code." Its load-bearing parts:
 
-- **Barrier semantics** — the set advances breadth-first; every Brief clears a Publish step
-  before any starts the next (OPENS § Publishing multiple Briefs together).
+- **Barrier semantics** — the set advances breadth-first; every item clears a Delivery step
+  before any starts the next (DELIVERY.md § Batch Delivery).
 - **Collision mapping** — the file write-sets that decide what can fan out and what stays serial
   (built *per session*, not frozen here — see below).
 - **Session boundaries as checkpoints** — a large set is **paused** at a clean, resumable
-  boundary rather than forced to complete (TASKS.md § Pausing a task group). The slices below
+  boundary rather than forced to complete (REFINED.md § Pausing a task group). The slices below
   *are* those boundaries.
 
 ### Cross-cutting rules (read once, apply every session)
@@ -214,9 +214,9 @@ included** — not just "write a lot of code." Its load-bearing parts:
 *Interrupted 2026-06-16.* The earlier ordered session slices (verification + world-gen foundation
 → the lens batch → UI polish → ledger foundation) were **largely worked through** by the v0.0.5
 close — the golden-image harness, the lens batch, tile-centred markets, and the world-gen fixes all
-landed. The plan was then **paused for a v0.0.6 brief-intake session** (the 14 Briefs filed across
-[`OPENS.md`](OPENS.md) on 2026-06-16). The next session slices will be **rebuilt from the refreshed
-OPENS backlog** rather than the stale per-session list that stood here.
+landed. The plan was then **paused for a v0.0.6 backlog-intake session** (the 14 items filed across
+[`BACKLOG.md`](BACKLOG.md) on 2026-06-16). The next session slices will be **rebuilt from the refreshed
+backlog** rather than the stale per-session list that stood here.
 
 ### Out of scope for this plan (gated — do not pull in)
 
@@ -245,7 +245,7 @@ to **remove** rather than work to publish, before slotting either into a session
 
 A deliberate choice. This plan records the **durable** facts — the slices, their order, and the
 **hotspot files** — but **not** the fine-grained per-task collision table. That table is a derived
-artifact that goes stale the moment a file is restructured or a Brief re-scoped, so it is **built
-fresh at promotion** in TASKS.md (§ Dividing work across agents, step 1), where it is actually
+artifact that goes stale the moment a file is restructured or an item re-scoped, so it is **built
+fresh at promotion** in REFINED.md (§ Dividing work across agents, step 1), where it is actually
 consumed. A session reads the hotspot list here, then maps its own slice. Documenting the full map
 here would only rot; documenting the hotspots is what carries between sessions.

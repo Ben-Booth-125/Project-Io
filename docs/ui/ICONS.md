@@ -18,7 +18,7 @@ are not defined here — they live in [`presentation.hpp`](../../src/ui/presenta
 (`presentation_of`, the `palette` namespace). See also
 [CANVASES.md](CANVASES.md) (where markers are drawn), [SELECTION.md](SELECTION.md)
 (the summaries that reuse swatches), and the **lens-design** item in
-`docs/development/OPENS.md` (the lens glyphs below feed it).
+`docs/development/BACKLOG.md` (the lens glyphs below feed it).
 
 ---
 

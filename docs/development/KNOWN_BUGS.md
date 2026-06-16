@@ -1,13 +1,14 @@
 # Project Io — Known Bugs
 
-Known defects and rough edges in the prototype. **This is not an OPENS file** — a known bug is a
+Known defects and rough edges in the prototype. **This is not a backlog file** — a known bug is a
 *reported defect with a settled (or owed) fix*, not a unit of design intent, so it lives here
-rather than in the OPENS Brief backlog. Each entry records the symptom, the confirmed root cause
+rather than in the backlog. Each entry records the symptom, the confirmed root cause
 (where known), and the settled fix or the work still owed. When a fix lands, the entry moves to
 the DEVLOG and is removed here.
 
-> Relocated from `OPENS.md § Known Bug` (2026-06-15) — known bugs are defect tracking, not design
-> Briefs. The two entries below carry the fix designs settled in the 2026-06-15 design pass.
+> Relocated from `BACKLOG.md` § Known Bug (2026-06-15; the file was then named `OPENS.md`) — known
+> bugs are defect tracking, not design items. The two entries below carry the fix designs settled in
+> the 2026-06-15 design pass.
 
 ---
 
@@ -62,4 +63,4 @@ visual check — the temporal artefact is invisible to the headless capture harn
 ## Related
 
 - `docs/development/DEVLOG.md` — where a fixed bug's record lands.
-- `docs/development/OPENS.md` — design intent (Briefs), distinct from defect tracking here.
+- `docs/development/BACKLOG.md` — design intent (items; metadata in `backlog.json`), distinct from defect tracking here.

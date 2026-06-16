@@ -25,23 +25,23 @@ the file is the project's complete requirement history.
 
 | Field | Meaning |
 |-------|---------|
-| `brief` | the Brief slug (the stable key) |
-| `title` | the Brief's human title |
-| `difficulty` | declared difficulty (OPENS 1–5 scale), or `null` |
+| `brief` | the backlog item slug (the stable key) — **the JSON key stays `brief`; it means a backlog item** (see `../BACKLOG.md` / `backlog.json`) |
+| `title` | the item's human title |
+| `difficulty` | declared difficulty (backlog 1–5 scale), or `null` |
 | `importance` | declared importance, or `null` |
 | `evaluated_difficulty` | retrospective second-guess at the real difficulty once the work landed, or `null` |
 | `status` | `active` \| `complete` \| `cancelled` |
 | `resolved` | resolution date (`YYYY-MM-DD`), or `null` while active |
 | `resolution` | one-paragraph outcome (the old `Resolved:` line) |
-| `promoted_from` | OPENS/TODO origin pointer, or `null` |
-| `batch` | the publish-set umbrella this Brief belonged to, or `null` |
+| `promoted_from` | backlog/TODO origin pointer, or `null` |
+| `batch` | the delivery-set umbrella this item belonged to, or `null` |
 | `rows` | the requirement records |
 
 ### Row object
 
 | Field | Meaning |
 |-------|---------|
-| `id` | sequential within the Brief (`R1`, `R2`, …) — referenced by TASKS.md `Satisfies:` fields and DEVLOG status lines |
+| `id` | sequential within the Brief (`R1`, `R2`, …) — referenced by REFINED.md `Satisfies:` fields and DEVLOG status lines |
 | `requirement` | a single testable outcome, present tense |
 | `verification` | **always an array** of classes (below); a qualifier is kept inline as one element, e.g. `"code: diff_rgba"`, `"doc: docs/ui/LENSES.md"` |
 | `status` | `pending` \| `complete` \| `failed` |
@@ -66,21 +66,21 @@ count, e.g. `Status: Complete — 5/6 requirements met (R4 failed; see requireme
 
 1. **At promotion** — append a group object to `requirements.json` with `status: "active"`,
    `resolved: null`, and a `rows[]` derived from the Brief's success criteria (one row per
-   testable outcome). Link it from the TASKS.md group header as
+   testable outcome). Link it from the REFINED.md group header as
    `Requirements: requirements.json § <slug>`.
 2. **As tasks land** — update row `status`. A `failed` row does not block the Brief: add a
    note, leave it `pending` or `failed`, refine the responsible task, and retry.
 3. **On completion** — when all rows are `complete` (or `failed` rows are accepted as
    explicitly out of scope), flip the group `status` to `"complete"`, set `resolved` +
-   `resolution`, and remove the group from TASKS.md and the Brief from OPENS.md. The record
+   `resolution`, and remove the group from REFINED.md and the item from the backlog. The record
    **stays in the JSON** as permanent history.
-4. **On cancellation** — a cancelled group (see TASKS.md § Cancelling a task group) flips to
+4. **On cancellation** — a cancelled group (see REFINED.md § Cancelling a task group) flips to
    `status: "cancelled"` with a `resolution` recording the reason. Its rows keep the real
    status they reached. Re-promoting flips it back to `"active"` and continues from there.
 
 ### Verifying when no skill or tool exists
 
-A task is only **complete** (see TASKS.md § Definition of "complete") when each of its
+A task is only **complete** (see REFINED.md § Definition of "complete") when each of its
 requirements has actually had its **Verification** *run*. When that verification can be
 performed with an available skill or tool — a `build`, a `code` grep, the headless harness,
 an existing visual-check skill — run it and record the result.
@@ -106,21 +106,21 @@ downgrade it to an assumption. Instead:
    method (or a pointer to it) in the row's `notes`.
 3. **Defer only when it needs design.** If establishing the method is impossible without
    non-trivial design — new infrastructure, an architectural decision, or its own scoping —
-   do **not** block the task. Record the testing-method work as an [`../OPENS.md`](../OPENS.md)
-   Brief (with file pointers and enough context to pick up), leave the requirement `pending`
+   do **not** block the task. Record the testing-method work as a backlog item in
+   [`../BACKLOG.md`](../BACKLOG.md) (with file pointers and enough context to pick up), leave the requirement `pending`
    with the deferral reason in `notes`, and proceed. A requirement whose method is deferred is
    **not** complete, and the task carrying it is at best *code-complete* until the method lands
    and the verification is run.
 
 ### Agent workflow
 
-A planning agent writes both the TASKS.md group and the matching `requirements.json` group
-together. An implementation agent reads only its task group (from TASKS.md) and the matching
-JSON record — it does not need the full OPENS backlog or DEVLOG history in context.
+A planning agent writes both the REFINED.md group and the matching `requirements.json` group
+together. An implementation agent reads only its task group (from REFINED.md) and the matching
+JSON record — it does not need the full backlog or DEVLOG history in context.
 
 ### Querying
 
 Because the record is structured data, it can be queried directly for insight rather than
 read end to end — e.g. all `failed` rows, the count by verification class, every `visual`
 requirement and its golden, or all Briefs resolved on a given date. A standalone query tool
-is a candidate follow-on (an OPENS Brief), not part of this file.
+is a candidate follow-on (a backlog item), not part of this file.

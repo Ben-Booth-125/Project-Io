@@ -386,5 +386,5 @@ read only the profile, never the body's identity.
 captures the per-pass intermediates (heightmap, moisture, latitude bands, ocean
 threshold). The common path passes `nullptr` and pays nothing. Generation is
 deterministic, so this is the seam a future **Generation Ledger** (see
-`docs/development/OPENS.md`) will read to explain *why* a tile turned out as it did —
+`docs/development/BACKLOG.md`) will read to explain *why* a tile turned out as it did —
 the Ledger decides what to persist versus regenerate on demand.

@@ -7,9 +7,12 @@
       "Bash(git commit*)",
       "Bash(git log*)",
       "Bash(git show*)",
+      "Bash(git mv*)",
       "Bash(git checkout*)",
       "Bash(git restore*)",
+      "Bash(git worktree*)",
       "Bash(cmake *)",
+      "Bash(ctest*)",
       "Bash(& \"build*)",
       "Bash(.\\build*)",
       "Bash(cl *)",
@@ -17,6 +20,12 @@
       "Bash(& \".\\econ_stability*)",
       "Bash(& \".\\world_audit*)",
       "Bash(& \".\\construction_harness*)"
+    ],
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(git push*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean*)"
     ]
   }
 }

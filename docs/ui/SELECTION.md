@@ -12,7 +12,7 @@ rail — the only way to open it is to select something.
 
 See also: [LAYOUT.md](LAYOUT.md) (where it sits in the shell), [CANVASES.md](CANVASES.md)
 (the click model it revises), the deferred hover-card item in
-`docs/development/OPENS.md`, and `src/ui/view_nav.hpp` (`focus_on_entity`, the
+`docs/development/BACKLOG.md`, and `src/ui/view_nav.hpp` (`focus_on_entity`, the
 'go to' target).
 
 ---
@@ -92,7 +92,7 @@ affordability-gated against the player corporation's balance; choosing one enque
 construction request that the mutable-world pass executes (`construct_building`). This is the
 deliberate design choice that **building on one tile is a targeted action reached through the
 tile Selection element**, not a reserved menu — the nav-rail construction surface stays a
-broad overview (see `docs/ui/MENU.md`, OPENS § Ledger). The equivalent placement-mode canvas
+broad overview (see `docs/ui/MENU.md`, BACKLOG § Ledger). The equivalent placement-mode canvas
 click enqueues the same request.
 
 ---
@@ -175,7 +175,7 @@ ledger are the *same* decision — the lens that validates the entity also route
 | **Supply** *(Layer 5)* | the **route / stockpile** under the pointer | (Supply surface, when it exists) |
 
 This couples the Selection element's Focus state to the lens system (LENSES.md) and the ledger
-family (OPENS § Ledger): the 'go to' dispatch seam (`focus_on_entity`) is unchanged — the lens
+family (BACKLOG § Ledger): the 'go to' dispatch seam (`focus_on_entity`) is unchanged — the lens
 only changes *which entity id and which target* are handed to it. The same dispatch carries the
 non-spatial 'go to' routing (nation/corporation → ledger) already specified above.
 

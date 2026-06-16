@@ -21,7 +21,7 @@ Canonical definitions for all project terms. Use these terms consistently. If a 
 All settled technical decisions: language, framework, architecture, tick model, data model, UI approach, and serialisation. Read this before writing any code or making any architectural suggestion. It also defines the prototype scope and what is explicitly excluded.
 
 **`docs/development/ROADMAP.md`**
-The milestone map from the current state to v0.1.0 (the finished prototype): the version sequence, the theme of each minor, and the v0.1.0 done-definition. Forward-facing and lean — it sits above OPENS/TASKS, naming which theme each minor carries, not the individual Briefs. Read this for questions about sequence, what comes when, or whether a feature belongs in the prototype's remaining arc.
+The milestone map from the current state to v0.1.0 (the finished prototype): the version sequence, the theme of each minor, and the v0.1.0 done-definition. Forward-facing and lean — it sits above the backlog and worklist, naming which theme each minor carries, not the individual items. Read this for questions about sequence, what comes when, or whether a feature belongs in the prototype's remaining arc.
 
 **`docs/development/DEVELOPMENT_PRACTICES.md`**
 Testing framework (Catch2), naming conventions, documentation standards, the per-milestone ImGui panel rule, the standing development constraints, the tone/approach guidance, and how to cut a release. Read this alongside TECH_FOUNDATIONS when working on implementation.
@@ -31,18 +31,17 @@ Running session log — chronological record of what was built each session and
 in-session decisions. Consult when asked about prior work, open items, or why
 a specific implementation choice was made.
 
-**`docs/development/OPENS.md`** and **`docs/development/TASKS.md`**
-The two-file backlog. OPENS.md (the **open items**) holds *described intent* — parked
-additions and deferred ideas with file pointers — and is **design-focused**: each Brief
-carries a **design-state glyph** (`✓` designed/promote-ready, `~` design still owed).
-OPENS is also the **design authority for an open Brief**: while the work is unrealised,
-the settled design lives in the Brief (OPENS is the most up-to-date source), and only
-propagates into the subject's authority doc when the work lands and the Brief is removed
-(authority time-slices — see OPENS.md § Design state). TASKS.md
-holds the *active, prioritised, actionable worklist*: a `✓` Brief is **promoted** into
-file-scoped, dependency- and parallelisation-marked tasks (the A–F style) when we decide to
-act on it. Read OPENS.md § OPENS vs. TASKS for the workflow before promoting or executing
-backlog work.
+**`docs/development/backlog.json`**, **`docs/development/BACKLOG.md`**, **`docs/development/REFINED.md`**, and **`docs/development/DELIVERY.md`**
+The backlog and delivery system. **`backlog.json`** is the canonical **metadata index** of every
+backlog **item** (formerly a "Brief") — status (`designed` ✓ / `design-owed` ~), priority,
+difficulty, sequencing, file scope — queryable and authoritative for metadata. **`BACKLOG.md`**
+holds the rich **design prose** for each item, keyed by id, and is the **design authority for an
+open item** while the work is unrealised (the design propagates into the subject's authority doc
+only when the work lands and the item is removed — authority time-slices). **`REFINED.md`** is the
+*active, prioritised, actionable worklist*: a `designed` item is **promoted** into file-scoped,
+dependency-marked tasks (the A–F style) when we act on it. **`DELIVERY.md`** is the method
+authority — the Delivery lifecycle, design-state model, depth verbs, and worktree sub-agent model.
+Read DELIVERY.md before promoting or executing backlog work.
 
 **`docs/ui/CANVASES.md`**
 Overview of the three primary canvases — Solar, Circumplanetary, and Planetary — arranged as a **zoom ladder** (descend by clicking a body in the primary, ascend by clicking the minimap). Covers the shared layout, selection/view state, and implementation approach. Per-canvas detail lives in `SOLAR.md`, `CIRCUMPLANETARY.md`, and `PLANETARY.md`; the minimap chrome and ladder navigation are in `MINIMAP.md`. Authoritative reference for Layer 2 and for later work that adds overlays to these canvases.
@@ -57,7 +56,7 @@ Surface-level description of the application shell — how the screen regions (n
 The icon vocabulary — every hand-drawn vector glyph in the `ui::icons` namespace (`src/ui/icons.{hpp,cpp}`, the source of truth): building markers, resource pips, unit markers, nav-rail affordances, and the map-lens glyphs. Catalogues each glyph's shape, meaning, usage, and colour source, the shared `(dl, centre, r, colour)` contract, and the recipe for adding one. Read before adding or changing any on-canvas/strip glyph; identity *colours* live in `presentation.hpp`, not here.
 
 **`docs/ui/LENSES.md`**
-The map-lens system — the overlay modes (`overlay_mode` in `src/ui/ui_state.hpp`) selectable from the canvas control strip. The **Corporation** lens is fully settled (tile ownership tint, player vs. rival colours, Planetary-only); the **Supply / Market / Faction** sections currently record existing behaviour and the proposed **Resource** lens is a stub — completing them is a Brief under OPENS § Canvas. Read before any work on overlay modes, lens rendering, or the lens icon vocabulary (which propagates to ICONS.md).
+The map-lens system — the overlay modes (`overlay_mode` in `src/ui/ui_state.hpp`) selectable from the canvas control strip. The **Corporation** lens is fully settled (tile ownership tint, player vs. rival colours, Planetary-only); the **Supply / Market / Faction** sections currently record existing behaviour and the proposed **Resource** lens is a stub — completing them is a backlog item under BACKLOG § Canvas. Read before any work on overlay modes, lens rendering, or the lens icon vocabulary (which propagates to ICONS.md).
 
 **`docs/economy/RESOURCES.md`**
 The canonical resource list: all 23 resources organised into three tiers (raw → refined → product), their terrain affinity and body availability, the Era 0 / Era 1 split, and the seven-resource prototype subset. Read before any work involving resource types, tile deposits, or market goods.
@@ -91,127 +90,86 @@ The Generation Ledger (design only) — a tuning/analysis surface that explains 
 
 ---
 
-## Publication pipeline
+## Delivery pipeline
 
-The five-step **Publish** lifecycle for acting on a Brief. Full detail lives in
-`docs/development/OPENS.md` § Publish and `docs/development/TASKS.md`. This is the
-condensed reference.
+The lifecycle for acting on a backlog **item**. **Full authority lives in
+`docs/development/DELIVERY.md`**; this is the condensed reference.
 
-### The five steps
+### Rule 0 — size the effort to the job
 
-0. **Brief-spanning requirement (gate — if the Brief changes `src/`).** Before decomposing a
-   `src/`-changing Brief into tasks, write a **brief-spanning requirement** as a row in the
-   Brief's `req/requirements.json` group (schema/policy in `req/REQUIREMENTS.md`) — one
-   requirement covering the whole Brief, **usually a
-   visual-verification (`visual`) requirement**. It is the end-to-end acceptance gate and is
-   written first so the decomposition is shaped by it. Doc-only Briefs are exempt.
-1. **Create tasks** — promote the Brief into TASKS.md: decompose into the smallest
-   independently-buildable steps (foundation first), scope each step to its exact files,
-   and mark dependencies and parallelisation.
-2. **Create requirements** — append the Brief's requirement group to the data file
-   `req/requirements.json` (the source of truth + permanent history) per the policy in
-   `req/REQUIREMENTS.md`.
-3. **Check parallel-safety** — build the collision map (which files each task touches) and
-   resolve any scope collisions before execution. Tasks with **disjoint file scopes are
-   parallel-safe**: fan them out to concurrent sub-agents. Only same-file (colliding) tasks
-   stay sequential.
-4. **Complete tasks** — implement, review, and verify each task against its requirements.
-   Tasks that prove blocked or out of scope are *cancelled* (intent returned to OPENS, stubs
-   removed from TASKS.md) — not left in flight.
-5. **Commit** — one commit per Brief, format:
+Every non-trivial task states its **mode**:
+
+- **Light (default).** A one-line fix, an obvious cleanup, a doc tweak — make it, check it, say
+  what you did. No tasks, no requirements, no ceremony.
+- **Full (earned).** Work whose coordination cost it repays — touches the economy / save-format /
+  integration seam, spans more than ~2 files of real logic, or carries determinism risk. Run the
+  Delivery lifecycle below.
+
+**Rule 0a — ad-hoc ideas.** When the user raises an unscoped idea with no explicit "do it now",
+offer two options **before acting**, without first asking clarifying questions: **A) save to the
+backlog**, or **B) implement now** (smoke-test, then ask before committing).
+
+### Source of truth — where each thing lives
+
+| Concern | Authority | Notes |
+|---|---|---|
+| Backlog **metadata** (status, priority, sequencing, files) | `docs/development/backlog.json` | Queryable; the JSON wins over any prose/glyph. |
+| Backlog **design prose** for an open item | `docs/development/BACKLOG.md` | Design authority *while the item is open*; propagates to the subject doc on landing. |
+| **Active worklist** (promoted tasks) | `docs/development/REFINED.md` | Transient; empty between work blocks. |
+| **Method** (lifecycle, depth verbs, batch, worktrees) | `docs/development/DELIVERY.md` | The long-form of this section. |
+| **Requirements** (data + history) | `req/requirements.json` (policy `req/REQUIREMENTS.md`) | |
+| **Standing invariants** | `.claude/rules/io-standing-rules.md` | Always-on; the "do not" rules. |
+| What was built / why | `docs/development/DEVLOG.md` | |
+
+### The Delivery lifecycle (Full mode)
+
+0. **Item-spanning requirement (gate — if the item changes `src/`).** Write one requirement
+   covering the whole item in its `req/requirements.json` group (usually a `visual` check), first,
+   so decomposition is shaped by it. Doc-only items exempt.
+1. **Create tasks** — promote the item into `REFINED.md`: smallest independently-buildable steps
+   (foundation first), each scoped to its files, dependencies marked.
+2. **Create requirements** — append the item's requirement group to `req/requirements.json`.
+3. **Plan parallelisation** — build the file **collision map**; it *informs how to split focused
+   sub-agents* (see below), no longer gates them.
+4. **Complete tasks** — implement, review, verify against requirements. Blocked/out-of-scope tasks
+   are **cancelled** (intent returned to the backlog), not left in flight.
+5. **Commit** — once all tasks are terminal, one commit per item:
    ```
-   <Brief title>
+   <item title>
 
    Tasks: <N completed>, <N cancelled>
    Requirements: <N completed>, <N pending>, <N failed>
    ```
 
-**When publishing multiple Briefs together** (a **Batch Publish**; see GLOSSARY), run the five
-steps as **barriers across the whole set** (breadth-first, not depth-first): every Brief clears
-step *N* before any starts *N+1*. No Brief is committed while another still has a task in flight.
-Step 4 closes on *terminal* states (complete **or** cancelled) — a blocked task is cancelled
-rather than held open.
+**Batch Delivery** runs the steps as **barriers across the whole set** (breadth-first); step 4 is
+the load-bearing barrier (all tasks terminal before any commit). It also runs the
+**documentation-coverage discipline** (per-item doc collision map, transient `> ⟳` change notes, a
+standing `S`-tier review item per changed doc, a closing design-direction Q&A when non-trivial
+calls were made) and emits a **coarse `%` progress marker** between tool calls. **Timestamp every
+new item**; newest-dated wins on conflict (a dated item outranks undated prose; no retroactive
+refactor). Full detail in `DELIVERY.md`.
 
-A Batch Publish also runs a **documentation-coverage discipline** around the five steps (full
-detail in `docs/development/OPENS.md` § Publish): up front, **determine per Brief whether the
-docs already record the implementation** (or it is a direct consequence of documented
-behaviour) — Briefs that fail are doc-changing and get a **per-Brief doc collision map** with
-**sub-agent fan-out** across disjoint docs; every changed doc carries a **minor transient
-"what was changed" note** (a visible `> ⟳` blockquote, removed once reviewed); and the batch
-**always adds an `S`-tier review Brief per changed doc** and, when it made non-trivial design
-calls, **closes with a proportional design-direction Q&A** (recorded in DEVLOG; see
-`docs/development/DEVELOPMENT_PRACTICES.md` § Design-direction Q&A).
+**Proportionality & pausing.** The lifecycle is proportional to the work (Rule 0); a Light change
+skips steps 1–2. Pausing a group is a legitimate outcome — leave it clean and resumable rather
+than forcing completion or cancelling.
 
-### Progress reporting & Brief timestamping (policy 2026-06-16)
+### Sub-agents & worktrees (the parallelism model)
 
-Two standing conventions, settled at the v0.0.5 lens-batch close. Full detail in
-`docs/development/OPENS.md` (§ Publish → Progress reporting; § Design state → Brief timestamping
-& precedence).
+**Worktrees are the primary isolation mechanism.** Concurrent sub-agents each run in their own git
+worktree (`isolation: "worktree"`), so two agents touching the same file no longer corrupt each
+other. This **replaces** the old hard rule that sub-agents must have disjoint file write-sets.
 
-- **Progress markers.** A Publish expected to span many steps (any Batch Publish) emits a
-  **coarse `%` progress line** in the response text between tool calls — estimated once up front
-  after the collision map, in multiples of 5 (`0 … 100`), weighting verification/golden steps
-  heavily. It is a *naive pacing guess* riding existing output (no extra tool call), never walked
-  backwards; skip it for a trivial single-Brief Publish.
-- **Brief timestamping & precedence.** Timestamp every **new** Brief (`*(Written YYYY-MM-DD,
-  trigger)*`). On conflict, **the newest-dated statement is canon and a present timestamp is
-  never ignored** (a dated Brief outranks undated prose). **No retroactive refactor** — undated
-  Briefs stand; they just lose to a dated Brief that contradicts them. Reconcile conflicts at
-  batch-publish, not continuously.
-
-### Proportionality and session boundaries
-
-Two standing guidelines temper the lifecycle above. They are reasserted operationally in
-`docs/development/TASKS.md`.
-
-- **Proportionality — the procedure is a guideline, not a fixed ceremony.** Treat the
-  documented procedure as proportional to the work. Before promoting, ask: substantial Brief,
-  or quick low-risk high-value change? For the latter — a one-file fix, an obvious cleanup, a
-  cheap optimisation — skip the TASKS/REQUIREMENTS ceremony, make and verify the change
-  directly, commit. The five-step lifecycle exists for work whose coordination cost it pays
-  back; applying it to trivial changes is the over-engineering this guards against.
-
-- **Session boundaries — pausing is a legitimate outcome.** Driving a group to *complete* in
-  one block is the default, not a mandate. When ending a session early serves the work — the
-  batch is large, context is drifting, or a natural checkpoint is reached — **pause** the group
-  rather than force completion or cancel it: leave it clean and resumable (TASKS.md true to
-  state, build green or breakage noted, a short "resume here" handoff line). A paused group is a
-  deliberate scoping choice, distinct from a *cancelled* one, which reverts intent to OPENS.
-
-### Parallelisation (the load-bearing rule)
-
-**Two tasks may run as concurrent sub-agents only if their file write-sets are disjoint.**
-Two agents writing the same file corrupt each other's edits.
-
-Practical consequences:
-
-- **Build the collision map first** — list every file each task will write. Hotspot files
-  (shared headers, `hard_coded_world.cpp`, the integration seam) are where parallelism dies;
-  see them before planning waves.
-- **Passes inside one generator stay sequential** — all passes of a generator share one
-  `.cpp`; give the whole group to one agent. Concurrency lives *across* groups, not within a
-  generator.
-- **Design for disjointness where it is also good design** — e.g. storing tile→nation
-  ownership in a `world` map rather than a `tile_component` field kept the nation and
-  tile-tuning groups off each other's files so they could run concurrently in v0.0.3.
-- **Keep hotspot files and integration in the main session** — the file every group
-  eventually touches is never given to a sub-agent. The main session wires hooks, runs the
-  build, and verifies after each wave. Sub-agents write code on a disjoint scope and report
-  their public signature; they do not build or commit.
-- **Group concurrent tasks into waves** — run a wave of disjoint-scope agents in parallel;
-  verify before starting the next wave. Assume nothing about an agent's self-reported
-  success — verify retroactively.
-
-**Fan-out is a discretionary call, made *after* writing the tasks and the collision map —
-not a default, and not something to ask permission for each time.** By then the shape is
-clear, so decide on the evidence: **fan out** when there is a substantial wave of
-disjoint-scope work a cold agent can execute from its task text alone (e.g. several
-independent generators or audits); **stay in the main session** when the parallel win is
-marginal — a short serial dependency chain, interfaces still co-evolving, or work that keeps
-returning to shared/integration files — because each spawn starts cold and re-derives
-context, which can cost more than it saves. This paragraph is standing authorisation to use
-sub-agents at that discretion: state the call and its reason ("fanning out A/B/C — disjoint;
-keeping the D→E→F chain serial — co-evolving interfaces") rather than asking first.
+- **The collision map is now a *splitting heuristic*, not a gate** — use it to carve **focused,
+  meaningful agents** (each a coherent vertical slice), not to prove disjointness.
+- **Keep each agent on a tight block of code, reading minimal documentation** — give it the task
+  text, its files, and the one or two docs it actually needs, not the whole design corpus. A
+  narrow, well-scoped agent is the unit that pays back.
+- **Agents build and commit on their own worktree branch; the main session merges** them in
+  dependency order, runs the integrating build, and verifies. Verify retroactively — assume
+  nothing about an agent's self-reported success.
+- **Hotspot/integration wiring stays in the main session.**
+- **Fan-out is a discretionary call made *after* the tasks and collision map** — state the call
+  and its reason rather than asking permission each time.
 
 ### Skills
 
@@ -245,67 +203,17 @@ workflow is:
    ad hoc rather than saved.
 
 For a larger or speculative skill that needs design rather than a quick wrap, **propose it as
-a Brief** (category: Documentation or the relevant system category) instead of improvising.
+a backlog item** (category: Documentation or the relevant system category) instead of improvising.
 
-#### Promoting a skill's permissions into settings.json
+#### settings.json permissions (slimmed model — confirmed 2026-06-16)
 
-When a skill is created or modified, its Bash commands may require entries in
-`.claude/settings.json` (`permissions.allow`) to avoid per-invocation prompts.
-**Adding a rule to settings.json is a permanent, project-wide change** — it silently
-allows any matching command in all future sessions, not just the one being tested.
-The bar for adding a rule is therefore higher than for adding the skill itself.
+`.claude/settings.json` now uses **broad prefix allows + a `deny` safety net** rather than a
+per-command mapping table. The allow-list covers routine read/build/git/worktree commands; the
+`deny` list blocks the genuinely dangerous (`rm -rf`, `git push`, `git reset --hard`,
+`git clean`) outright. This is the lighter model adopted from Project-Fulcrum's process, and the
+allow/deny split is **confirmed**.
 
-**Required before any rule is added:**
-
-1. **Read the SKILL.md in full.** Do not infer what commands a skill runs from its
-   description alone — open `.claude/skills/<name>/SKILL.md` and read the entire
-   Procedure section. Identify every `Bash` call the skill makes.
-2. **List the exact commands and the rule that would cover them.** Write out
-   each proposed rule alongside the command it permits, so the reviewer can
-   match them one-to-one.
-3. **Request user approval.** Present the list and ask explicitly: *"May I add
-   these rules to `.claude/settings.json`?"* Do not add rules speculatively or
-   bundle them silently into a broader change.
-4. **Use the narrowest rule that works.** Prefer a prefix pattern
-   (`Bash(git *)`) over a bare tool allow (`Bash`). Prefer matching a
-   specific executable path over a wildcard if the skill always calls one binary.
-5. **Document the mapping in a comment block above the settings file** — since
-   JSON forbids inline comments, record the skill-to-rule mapping in this CLAUDE.md
-   section (below) so the rationale survives.
-
-**Do not approve a rule you have not manually traced to a specific command in
-a specific SKILL.md.** If a proposed rule covers more than the skill warrants,
-reject it and ask for a tighter alternative.
-
-#### Current settings.json rules — approved mapping
-
-`.claude/settings.json` → `permissions.allow`:
-
-| Rule | Skill(s) | Commands covered |
-|------|----------|-----------------|
-| `Bash(git status*)` | `commit`, `scoped-commit` | `git status --porcelain`, `git status --short` |
-| `Bash(git add*)` | `commit`, `scoped-commit` | `git add <paths>` |
-| `Bash(git diff*)` | `commit`, `scoped-commit` | `git diff --stat`, `git diff --cached --name-status` |
-| `Bash(git commit*)` | `commit`, `scoped-commit` | `git commit -m ...`, `git commit -F -` |
-| `Bash(git log*)` | `commit`, `scoped-commit` | `git log -1 --pretty=format:...` |
-| `Bash(git show*)` | `commit`, `scoped-commit` | `git show --stat HEAD` |
-| `Bash(git checkout*)` | `scoped-commit` | `git checkout -b <branch>` |
-| `Bash(git restore*)` | `scoped-commit` | `git restore --staged <paths>` |
-| `Bash(cmake *)` | `verifier-visual` | `cmake --build build --config Debug --target ProjectIo` |
-| `Bash(& "build*)` | `verifier-visual` | `& "build/Debug/ProjectIo.exe" --verify <script>` |
-| `Bash(.\build*)` | `verifier-visual` | `.\build\Debug\ProjectIo.exe --verify <script>` |
-| `Bash(cl *)` | `verifier-headless` | `cl /nologo /std:c++20 ...` MSVC compile (requires vcvars64 already active) |
-| `Bash(& ".\econ_harness*)` | `verifier-headless` | `& ".\econ_harness.exe"` |
-| `Bash(& ".\econ_stability*)` | `verifier-headless` | `& ".\econ_stability.exe"` |
-| `Bash(& ".\world_audit*)` | `verifier-headless` | `& ".\world_audit.exe"` |
-| `Bash(& ".\construction_harness*)` | `verifier-headless` | `& ".\construction_harness.exe"` |
-
-**Intentionally omitted — will still prompt:**
-
-- `Bash(git push*)`, `Bash(git reset*)`, `Bash(git clean*)`, `Bash(git branch*)` —
-  destructive or outbound; no current skill requires them without user oversight.
-- `Bash(cmd *)` — removed as a shell escape hatch; the `verifier-headless` vcvars64
-  compound invocation (`cmd /c "vcvars64.bat && cl ..."`) will prompt until that
-  step is wrapped in a dedicated script with a narrower allow rule.
-- New harness executables — when a new harness is added to `verifier-headless`, its
-  exe name must be explicitly added here before it runs without a prompt.
+When in doubt, tighten an allow rule rather than broaden it. The per-harness exe allows (`econ_harness`, `world_audit`,
+etc.) stay narrow because they are specific binaries; add a new harness's exe before it runs
+prompt-free. `deny` takes precedence over `allow`, so a denied command is blocked even if an
+allow rule would match.

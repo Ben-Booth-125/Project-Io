@@ -9,7 +9,7 @@ Runs the headless visual-verification harness (Phase 1 + Phase 2) for a named
 check and reports the captured frames. This wraps `ProjectIo --verify <script>`
 so re-running a proven visual check is a single invocation rather than bespoke
 authoring. Design context: `docs/development/DEVELOPMENT_PRACTICES.md`
-§ Visual verification; `docs/development/OPENS.md` § Canvas.
+§ Visual verification; `docs/development/BACKLOG.md` § Canvas.
 
 ## Argument
 
@@ -43,7 +43,7 @@ feature name (e.g. `corporation_lens`). If omitted, list the available scripts i
 ## Golden-image diffing (automatic PASS/FAIL)
 
 A capture can be checked automatically against a committed **golden** reference
-image instead of eyeballed (OPENS § Canvas [F3]). Goldens live in a `golden/`
+image instead of eyeballed (BACKLOG § Canvas [F3]). Goldens live in a `golden/`
 directory **beside the verify scripts** — `scripts/verify/golden/<capture>.png`,
 one per named `capture()`.
 

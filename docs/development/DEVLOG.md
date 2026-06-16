@@ -59,6 +59,23 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## 2026-06-16 — Process refit: JSON backlog + vocabulary alignment (branch v0.0.6)
+
+- **Mode:** Full (doc/process only — no `src/`, CMake, or Lua touched; build unaffected).
+- **What changed:**
+  - **Backlog → JSON.** `OPENS.md` split into `backlog.json` (canonical metadata index — 54 items, with `status`/`priority`/`difficulty`/`waits_on`/`files`/`design`) plus `BACKLOG.md` (design prose, keyed by item). `TASKS.md` → `REFINED.md`. New `DELIVERY.md` (method authority) and `.claude/rules/io-standing-rules.md` (always-on invariants). New `REVIEW_LOG.md` (code-review gate).
+  - **Vocabulary aligned** (full; glyphs kept): Brief → item, Publish → Deliver, Batch Publish → Batch Delivery, OPENS → backlog, TASKS → REFINED. Glyphs `✓`/`~` retained but bound 1:1 to the JSON `status` (`designed`/`design-owed`), JSON authoritative. All live cross-references swept; DEVLOG history and the archived REFINED publish-sets left period-accurate.
+  - **Sub-agent model:** worktrees are now the primary isolation mechanism; the collision map is a *splitting heuristic*, not a gate (`DELIVERY.md` § Sub-agents & worktrees).
+  - **settings.json** slimmed to broad prefix allows + a `deny` net (the split is confirmed).
+- **Decisions:**
+  - **markdown/JSON policy:** new items are JSON-native (prose in the `design` field); legacy items keep `BACKLOG.md` bodies (sentinel `@BACKLOG.md`), deleted on promotion — so `BACKLOG.md` only drains and is eventually removed.
+  - **No review-mode approval Q&A.** Considered (Fulcrum has one) and rejected: Fulcrum needs higher-up sign-off, whereas Io is solo and authoritative — the **backlog is the review surface**, sourced from the roadmap, and we don't leave ambiguities. Rule 0a remains the only sanctioned Q&A (for *unscoped ideas*, not for reviewing settled work).
+  - `requirements.json` `brief` field key intentionally **not** renamed (data migration deferred); bridged in prose.
+- **Note:** the Session-3 handoff block at the top of this log predates the rename — read its "Brief / OPENS / Publish" as "item / backlog / Deliver".
+- **Why:** adopt the queryable-JSON backlog and lighter vocabulary observed in Project-Fulcrum's process, kept tighter for Io's solo model.
+
+---
+
 ## 2026-06-16 — Interim: lens-ideas Q&A + multiple market centres (branch v0.0.5)
 
 An interim design + publish session between the lens batch and Session 3.

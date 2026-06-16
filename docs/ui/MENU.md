@@ -34,7 +34,7 @@ targeted action?* Broad → a ledger with a slot. Targeted → the Selection ele
 no slot. This keeps the ten slots scaling with the *systems* the game has, not with the number
 of things a player can do to a single entity — e.g. the per-tile "build here" flow lives in the
 tile Selection element, while the broad **buildings overview** is what earns the construction
-slot (see `docs/development/OPENS.md` § Ledger / § Selection info element).
+slot (see `docs/development/BACKLOG.md` § Ledger / § Selection info element).
 
 ## Layer 2 state
 
@@ -88,7 +88,7 @@ Notes on the mapping:
   me") in the **Corporation overview dashboard** (slot 1, the holdings roll-up); **competitors'
   buildings** ("competition") in the **Market Ledger**. This collapses the old slot-3
   "Construction / Buildings overview" — the slot table above predates this call and is reconciled
-  in the pending **nav-rail ordering** pass (OPENS § Menu); construction *in progress* still needs
+  in the pending **nav-rail ordering** pass (BACKLOG § Menu); construction *in progress* still needs
   a home, folded into the dashboard/market surfaces rather than its own ledger.
 - **Layer-4 ledgers** are the near-term build (the [A4] ledger family — Budget, Workforce,
   Market, and the Corporation dashboard); the strategy slots (Corp. Strategy, Diplomacy) are

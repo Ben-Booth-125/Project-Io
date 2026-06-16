@@ -176,7 +176,7 @@ Workforce is a corporation-wide pool divided across all active buildings. The `w
 
 The full policy allocation system — where the player sets targets and shortages cascade automatically — is a post-prototype feature, and the corporation-wide labour pool itself is deferred to the population layer. In the prototype, `workforce_assigned` is an authored constant per building, making it a fixed modifier on output rate rather than a dynamically contested resource.
 
-Staffed workforce carries an operating cost: each building incurs a per-tick **wage** of `workforce_assigned × base_wage` (a tunable constant), charged against the corporation's balance (see § Stockpile and output flow and the Budget brief in `docs/development/OPENS.md`). A sensible `base_wage` is set now and refined once population centres model labour supply.
+Staffed workforce carries an operating cost: each building incurs a per-tick **wage** of `workforce_assigned × base_wage` (a tunable constant), charged against the corporation's balance (see § Stockpile and output flow and the Budget item in `docs/development/BACKLOG.md`). A sensible `base_wage` is set now and refined once population centres model labour supply.
 
 ---
 
@@ -186,7 +186,7 @@ Extraction and processing outputs accrue into a shared stockpile pool held per `
 
 1. **Supply** is the goods each corporation lists for sale — its surplus above what its own processors will consume that tick.
 2. **Demand** is the total input shortfall auto-bought by processing buildings (inputs not covered by the corporation's own pool), plus any standing convoy cargo orders (from Layer 5 onward).
-3. **Transactions clear at base price.** Sales credit, and purchases debit, the corporation's balance at `market_component.base_price`. Price resolution from the supply/demand ratio is deferred to a discrete open Brief (OPENS.md § Trade); until then `market_component.price` stays at `base_price`.
+3. **Transactions clear at base price.** Sales credit, and purchases debit, the corporation's balance at `market_component.base_price`. Price resolution from the supply/demand ratio is deferred to a discrete open item (BACKLOG.md § Trade); until then `market_component.price` stays at `base_price`.
 
 ---
 
