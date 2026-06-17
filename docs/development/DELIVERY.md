@@ -132,12 +132,21 @@ large); for a `design-owed` item, **Design** is the implied first step.
    marked.
 2. **Create requirements** — append the item's requirement group to `req/requirements.json`
    (the data + permanent history) per `req/REQUIREMENTS.md`.
-3. **Plan parallelisation** — build the **file collision map** (which files each task writes).
-   This now *informs how to split work into focused sub-agents* (see below) rather than gating
-   it.
+3. **Plan parallelisation** — build the **collision map**. This is two layers: the **file**
+   layer (which files each task writes), which *informs how to split work into focused
+   sub-agents* (see below) rather than gating it; and the **symbol** layer — each task's
+   `provides:` and `consumes:` lines (see § The symbol-level dependency contract). The symbol
+   layer is the checklist the review barrier verifies.
 4. **Complete tasks** — implement, review, and verify each against its requirements. Tasks that
    prove blocked or out of scope are **cancelled** (intent returned to the backlog), not left in
    flight.
+4a. **Review barrier (before any fresh full compile).** Once slices have merged into the
+   integrating tree, run the **`verifier-review`** skill over the integrated diff *before* spending
+   the integrating build. It is a static, no-compile pass (the cheapest verification tier) whose
+   one job is to catch the cross-item integration class — a consumer built against a symbol no
+   producer landed — early, when the fix is cheap. Its verdict gates the compile: resolve any
+   Critical before building. This is a filter, not a substitute: always still compile. In a
+   single-item Light change with no cross-item surface, skip it.
 5. **Commit** — once all tasks are terminal (complete or cancelled), one commit per item:
    ```
    <item title>
@@ -146,13 +155,34 @@ large); for a `design-owed` item, **Design** is the implied first step.
    Requirements: <N completed>, <N pending>, <N failed>
    ```
 
+### The symbol-level dependency contract (`provides` / `consumes`)
+
+`waits_on` / `blocked_on` in `backlog.json` capture *item-level* ordering — coarse, and enough to
+sequence items across sessions. They do **not** capture the *symbol-level* contract between
+concurrent tasks inside one batch. Close it at the task layer, where the failure lives:
+
+- When promoting items into `REFINED.md`, annotate each task with **`provides:`** (the public
+  symbols it adds or changes — struct fields, enum values, function signatures, recipe/Lua keys)
+  and **`consumes:`** (the symbols it depends on another task to provide).
+- Every `consumes` entry **must** name a `provides` entry on another task in the batch (or an
+  already-landed symbol). An unmatched `consumes` is a sequencing bug caught *before* code is
+  written, not after a failed compile.
+- This is the checklist the **review barrier (step 4a)** verifies against the integrated diff. Keep
+  it lightweight — symbol names and owning task, not signatures-in-full; the point is to make the
+  cross-slice contract explicit enough to check.
+
+It stays transient in `REFINED.md` (it concerns *this* batch's parallel tasks). Promote a genuinely
+item-level prerequisite to `waits_on` as usual; `provides`/`consumes` is the finer, within-batch layer.
+
 ### Batch Delivery (barrier semantics)
 
 Delivering more than one item in a work block runs the steps as **barriers across the whole set**
 (breadth-first): every item clears step *N* before any starts *N+1*. Step 4 is the load-bearing
 barrier — **all** tasks across **all** items reach a terminal state before any item is committed;
-a blocked task is *cancelled*, not held. Commits are still one-per-item, made back-to-back once
-the step-4 barrier closes.
+a blocked task is *cancelled*, not held. **Step 4a (the review barrier) then runs once over the
+whole integrated set** — a single `verifier-review` pass across all merged slices, not one per
+item, because the failure it hunts is *cross*-slice. Commits are still one-per-item, made
+back-to-back once the review barrier closes clean.
 
 A Batch Delivery also runs a **documentation-coverage discipline**: up front, determine per item
 whether the docs already record what it will produce; doc-changing items get a per-item **doc**
