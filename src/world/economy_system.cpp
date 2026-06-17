@@ -451,8 +451,6 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
         }
     }
 
-    inject_substrate_demand(w);
-
     return report;
 }
 

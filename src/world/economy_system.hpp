@@ -59,7 +59,8 @@ struct economy_report
 };
 
 /// Inject nation-substrate background supply and demand into body markets.
-/// Call once per economy tick, before clear_markets.
+/// Called from clear_markets after the per-tick supply/demand reset, before
+/// the order-book pass, so substrate is additive to the market quantities.
 ///
 /// @param w World; market supply/demand arrays are mutated in place.
 void inject_substrate_demand(world& w);

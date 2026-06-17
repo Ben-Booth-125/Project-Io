@@ -117,11 +117,13 @@ world make_hard_coded_world()
     // Kepler is the only body with a political layer in the prototype: 8–12
     // nations placed over its land tiles. Selene/Cinder/Pallas stay unclaimed.
     // See docs/generation/NATION_GENERATION.md.
+    // Population centres must be placed before generate_nations so that Pass 6
+    // (substrate density) can reference them during nation territory assignment.
+    generate_population_centres(w, kepler, /*seed=*/0x70701001u);
+
     generate_nations(w, kepler, kepler_tiles, 180, 84,
         nation_params{ .nation_count = 10, .min_seed_separation = 6 },
         /*seed=*/0x4A71012u);
-
-    generate_population_centres(w, kepler, /*seed=*/0x70701001u);
 
     // Attach installations to the first two land tiles found in raster order.
     {
@@ -144,40 +146,48 @@ world make_hard_coded_world()
         w.stockpiles[kepler_processor] = stockpile_component{};
     }
 
-    // Kepler market. Authored for the prototype's tradeable subset; resources
-    // outside it stay at zero supply/demand until a later pass authors them.
-    const entity_id kepler_market = w.create_entity();
-    w.markets[kepler_market] = market_component{
-        .body       = kepler,
-        .supply     = resource_array({ {resource_type::iron_ore,             500.0f},
-                                       {resource_type::petroleum,            220.0f},
-                                       {resource_type::water,                350.0f},
-                                       {resource_type::agricultural_produce, 300.0f},
-                                       {resource_type::steel,                120.0f},
-                                       {resource_type::refined_fuel,          80.0f},
-                                       {resource_type::food_rations,         140.0f} }),
-        .demand     = resource_array({ {resource_type::iron_ore,             400.0f},
-                                       {resource_type::petroleum,            260.0f},
-                                       {resource_type::water,                300.0f},
-                                       {resource_type::agricultural_produce, 360.0f},
-                                       {resource_type::steel,                200.0f},
-                                       {resource_type::refined_fuel,         150.0f},
-                                       {resource_type::food_rations,         180.0f} }),
-        .price      = resource_array({ {resource_type::iron_ore,               2.5f},
-                                       {resource_type::petroleum,              3.5f},
-                                       {resource_type::water,                  1.5f},
-                                       {resource_type::agricultural_produce,   3.0f},
-                                       {resource_type::steel,                  8.0f},
-                                       {resource_type::refined_fuel,          10.0f},
-                                       {resource_type::food_rations,           6.0f} }),
-        .base_price = resource_array({ {resource_type::iron_ore,               2.5f},
-                                       {resource_type::petroleum,              3.5f},
-                                       {resource_type::water,                  1.5f},
-                                       {resource_type::agricultural_produce,   3.0f},
-                                       {resource_type::steel,                  8.0f},
-                                       {resource_type::refined_fuel,          10.0f},
-                                       {resource_type::food_rations,           6.0f} }),
-    };
+    // Kepler markets — one per major population centre (scale >= 3), anchored to
+    // that centre's tile so catchment routing (market_for_tile) partitions the map.
+    // Resources outside the tradeable prototype subset stay at base 0 and are
+    // never traded. Supply/demand are seeded by the substrate injection each tick;
+    // no warm-start values are set here (BL-035 handles that separately).
+    {
+        const market_component kepler_market_template{
+            .body       = kepler,
+            .base_price = resource_array({ {resource_type::iron_ore,               2.5f},
+                                           {resource_type::petroleum,              3.5f},
+                                           {resource_type::water,                  1.5f},
+                                           {resource_type::agricultural_produce,   3.0f},
+                                           {resource_type::steel,                  8.0f},
+                                           {resource_type::refined_fuel,          10.0f},
+                                           {resource_type::food_rations,           6.0f} }),
+        };
+        int markets_seeded = 0;
+        for (const auto& [cid, pcc] : w.population_centres)
+        {
+            if (pcc.scale < 3)
+                continue;
+            const auto tile_it = w.population_centre_tile.find(cid);
+            if (tile_it == w.population_centre_tile.end())
+                continue;
+            const auto tc_it = w.tiles.find(tile_it->second);
+            if (tc_it == w.tiles.end() || tc_it->second.body != kepler)
+                continue;
+
+            market_component mc = kepler_market_template;
+            mc.centre_tile = tile_it->second;
+            mc.price       = mc.base_price; // start at canonical base
+            w.markets[w.create_entity()] = mc;
+            ++markets_seeded;
+        }
+        // Fallback: if no large centres were generated, seed one unanchored market.
+        if (markets_seeded == 0)
+        {
+            market_component mc = kepler_market_template;
+            mc.price = mc.base_price;
+            w.markets[w.create_entity()] = mc;
+        }
+    }
 
     // Corporations: 6–10 actors registered in the generated nations, including
     // the player's (which sets w.player_entity). Runs after the nations exist and
