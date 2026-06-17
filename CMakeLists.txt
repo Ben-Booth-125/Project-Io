@@ -99,6 +99,11 @@ target_link_libraries(ProjectIo PRIVATE
     imgui
 )
 
+# IMGUI_DEFINE_MATH_OPERATORS must be visible before imgui.h in every TU.
+# Since the PCH includes imgui.h, per-file #defines are too late — pass it
+# on the compiler command line so it precedes any header parsing.
+target_compile_definitions(ProjectIo PRIVATE IMGUI_DEFINE_MATH_OPERATORS)
+
 # ---------------------------------------------------------------------------
 # Precompiled header
 # Covers headers present in 5+ TUs. Excluded: sol2 (3 TUs, very slow to
