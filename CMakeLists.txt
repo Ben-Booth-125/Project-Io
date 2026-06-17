@@ -155,3 +155,22 @@ if(WIN32)
         COMMENT "Copying runtime DLLs"
     )
 endif()
+
+# ---------------------------------------------------------------------------
+# Headless economy bankruptcy calibration harness (no SDL / Lua / ImGui)
+# ---------------------------------------------------------------------------
+# Links only the SDL/Lua-free world translation units, mirroring the manual
+# build documented in tools/verify/README.md and run_harness.bat.
+add_executable(econ_bankruptcy
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/econ_bankruptcy.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/economy_system.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/market_clearing.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/budget_system.cpp"
+)
+
+target_include_directories(econ_bankruptcy PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)
+
+target_compile_features(econ_bankruptcy PRIVATE cxx_std_20)
