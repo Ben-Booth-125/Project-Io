@@ -691,8 +691,8 @@
       "short_name": "SELECTABLE_MARKERS",
       "category": "Canvas",
       "title": "Selectable entity markers — buildings, units, market centres",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "designed",
+      "glyph": "✓",
       "priority": "B",
       "difficulty": 2,
       "parked": false,
@@ -705,15 +705,15 @@
       ],
       "authority_doc": "docs/ui/CANVASES.md",
       "summary": "On-canvas marker entities (buildings, units, market centres) drawn as distinct, clickable/selectable ImDrawList glyphs at world positions. Prerequisite for canvas hit-testing to extend beyond tile/body kind. Design owed: marker shapes, z-order, hover-zone size, registration contract.",
-      "design": "Stub. Draw each entity class as a glyph (via ui::icons or a new marker primitive) at its world position; register each drawn marker in a per-frame hit-test zone list alongside the tile cells. The hit-test list is consumed by CANVAS_HIT_TESTING (BL-031). Design owed: which glyphs, hover-zone radius, draw order relative to tile overlays, how the zone list is cleared each frame."
+      "design": "Draw each entity class as a glyph at its world position and register a per-frame hit-test zone whose radius tracks the glyph's DRAWN size (scales with zoom, not a fixed pixel radius), appended to the tile-cell hit list consumed by CANVAS_HIT_TESTING (BL-031). Marker classes carry a fixed selection precedence when zones overlap: building > unit > market-centre > tile, so the topmost meaningful entity wins (this precedence feeds BL-032's specificity stack). Glyphs reuse the ui::icons vocabulary (building markers, unit markers, the market-centre glyph). Z-order: markers paint ABOVE the lens overlays so they stay legible under a dense lens, but BELOW the pinned Selection panel chrome. The zone list is rebuilt and cleared each frame alongside the tile cells. Settled 2026-06-17."
     },
     {
       "id": "BL-060",
       "short_name": "HOVER_CARD_PRIMITIVE",
       "category": "Canvas",
       "title": "Hover-card UI primitive — transient floating detail card",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "designed",
+      "glyph": "✓",
       "priority": "B",
       "difficulty": 2,
       "parked": false,
@@ -726,7 +726,7 @@
       ],
       "authority_doc": "docs/ui/TOOLTIP.md",
       "summary": "A transient floating card that appears on tile/entity hover — distinct from the pinned Selection panel. Lighter than a tooltip (richer content, brief delay) but dismisses on mouse-off. Prerequisite for the tooltip-simplification sweep (BL-020). Design owed: content contract, animation, relationship to Selection panel.",
-      "design": "Stub. An ImGui child window (no title bar, rounded, semi-opaque) that tracks the cursor position and renders a caller-supplied content callback. Should not fight with the Selection panel (different trigger: hover not click). Design owed: appear delay, max width, fade-out vs instant dismiss, whether the card can be pinned by the user, and the content-builder API that BL-020 will use.",
+      "design": "An ImGui child window (no title bar, rounded, semi-opaque) that tracks the cursor and renders a caller-supplied content callback, triggered on HOVER (distinct from the click-pinned Selection panel). Content is LENS-CONTEXTUAL and rigorously condensed: the smallest meaningful read for the entity under the active lens (e.g. name + the one or two stats that lens is about), never a full mirror of the Selection panel. The card is PINNABLE: a click pins it in place, and a pinned card may EXPAND toward fuller detail (expansion is where additional content surfaces; the unpinned hover state stays minimal). Appears after a brief delay; while unpinned it dismisses on mouse-off. Max width kept tight to suit the condensed content. Exposes the content-builder API that TOOLTIP_SIMPLIFICATION (BL-020) consumes. Settled 2026-06-17.",
       "waits_on": [
         "SELECTABLE_MARKERS"
       ]
