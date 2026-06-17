@@ -1,0 +1,22 @@
+# Normalize line endings to LF in the repository; let git convert on checkout
+# per core.autocrlf on each platform. This prevents whole-file diff churn
+# when the Cowork Linux shell mounts the Windows working tree.
+* text=auto
+
+# Binary assets — never touch line endings
+*.ttf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.wav binary
+*.ogg binary
+*.mp3 binary
+*.zip binary
+*.exe binary
+*.dll binary
+*.lib binary
+*.a   binary
+*.so  binary
+*.pdb binary
