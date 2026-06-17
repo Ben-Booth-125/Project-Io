@@ -1,5 +1,5 @@
 {
-  "_schema": "backlog/io-v1",
+  "_schema": "backlog/io-v2",
   "_note": [
     "Canonical backlog for Project Io — the authoritative METADATA index of every backlog item.",
     "One item = one object in `items`.",
@@ -13,8 +13,10 @@
     "  `parked:true` is the explicit flag for F-priority items.",
     "DIFFICULTY (1-5): 1=~5min, 2=~20min, 3=~1h, 4=~3h, 5=~12h+ (break a 5 down).",
     "",
-    "SEQUENCING: `waits_on` lists short_names that must land first; `blocked_on` names an",
-    "external prerequisite. An item can be `designed` and still blocked.",
+    "SEQUENCING: `requires` lists BL-XXX ids of backlog items that must land first (supercedes the",
+    "old `waits_on` short_name list — v2 schema 2026-06-17). `blocked_on` names a truly-external",
+    "prerequisite with no backlog item (third-party dep, real-world gate). An item can be `designed`",
+    "and still have unmet `requires`. Both fields are nullable; [] means no dependencies.",
     "",
     "WORKFLOW: a `designed` item is PROMOTED into REFINED.md and DELIVERED (see DELIVERY.md).",
     "A `design-owed` item is DESIGNED first (prose settled in `design` field, status flipped).",
@@ -42,7 +44,7 @@
       "priority": "F",
       "difficulty": 3,
       "parked": true,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": null,
       "files": [
@@ -63,7 +65,7 @@
       "priority": "B",
       "difficulty": 3,
       "parked": false,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -85,7 +87,7 @@
       "priority": "B",
       "difficulty": 3,
       "parked": false,
-      "waits_on": [],
+      "requires": ["BL-043"],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -106,10 +108,8 @@
       "priority": "F",
       "difficulty": 4,
       "parked": true,
-      "waits_on": [],
-      "blocked_on": [
-        "SUPPLY_LAYER"
-      ],
+      "requires": ["BL-039"],
+      "blocked_on": [],
       "written": "2026-06-16",
       "files": [
         "src/ui/body_surface_canvas.cpp"
@@ -128,12 +128,12 @@
       "priority": "C",
       "difficulty": 3,
       "parked": false,
-      "waits_on": [],
+      "requires": ["BL-013"],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [],
       "authority_doc": "docs/ui/LENSES.md",
-      "summary": "Design sweep: for each lens decide what (if anything) it shows on the Solar/Circumplanetary rungs. Output is an updated rung-applicability table + per-lens notes. Not a build.",
+      "summary": "Design sweep: for each lens decide what (if anything) it shows on the Solar/Circumplanetary rungs. Output is an updated rung-applicability table + per-lens notes. Not a build. Requires lens strip settled first.",
       "design": "@BACKLOG.md"
     },
     {
@@ -146,7 +146,7 @@
       "priority": "B",
       "difficulty": 2,
       "parked": false,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -167,13 +167,8 @@
       "priority": "F",
       "difficulty": 3,
       "parked": true,
-      "waits_on": [
-        "SUPPLY_CONVOYS"
-      ],
-      "blocked_on": [
-        "SUPPLY_LAYER",
-        "ORDER_BOOK"
-      ],
+      "requires": ["BL-039", "BL-037"],
+      "blocked_on": [],
       "written": "2026-06-16",
       "files": [
         "src/ui/body_surface_canvas.cpp"
@@ -192,9 +187,7 @@
       "priority": "C",
       "difficulty": 3,
       "parked": false,
-      "waits_on": [
-        "SEED_MARKET_CENTRES"
-      ],
+      "requires": ["BL-036"],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -215,14 +208,14 @@
       "priority": "F",
       "difficulty": 3,
       "parked": true,
-      "waits_on": [],
+      "requires": ["BL-013"],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
         "src/ui/presentation.hpp"
       ],
       "authority_doc": "docs/ui/LENSES.md",
-      "summary": "Board-wide lens colour reconsideration; on-canvas text labels for some lenses; a Corporation-lens legend. Deferred to a dedicated colour session. Design owed: the whole pass.",
+      "summary": "Board-wide lens colour reconsideration; on-canvas text labels for some lenses; a Corporation-lens legend. Deferred to a dedicated colour session. Design owed: the whole pass. Strip must be settled first.",
       "design": "@BACKLOG.md"
     },
     {
@@ -235,7 +228,7 @@
       "priority": "B",
       "difficulty": 3,
       "parked": false,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -256,7 +249,7 @@
       "priority": "C",
       "difficulty": 3,
       "parked": false,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -276,7 +269,7 @@
       "priority": "C",
       "difficulty": 3,
       "parked": false,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -296,9 +289,7 @@
       "priority": "C",
       "difficulty": 4,
       "parked": false,
-      "waits_on": [
-        "HOVER_CARD_PRIMITIVE"
-      ],
+      "requires": ["BL-060"],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [],
@@ -316,9 +307,7 @@
       "priority": "B",
       "difficulty": 3,
       "parked": false,
-      "waits_on": [
-        "SEED_MARKET_CENTRES"
-      ],
+      "requires": ["BL-036"],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -338,10 +327,8 @@
       "priority": "C",
       "difficulty": 2,
       "parked": false,
-      "waits_on": [],
-      "blocked_on": [
-        "SELECTABLE_MARKERS"
-      ],
+      "requires": ["BL-059"],
+      "blocked_on": [],
       "written": null,
       "files": [
         "src/ui/body_surface_canvas.cpp",
@@ -361,10 +348,8 @@
       "priority": "B",
       "difficulty": 4,
       "parked": false,
-      "waits_on": [],
-      "blocked_on": [
-        "CANVAS_HIT_TESTING"
-      ],
+      "requires": ["BL-031"],
+      "blocked_on": [],
       "written": null,
       "files": [
         "src/ui/selection_panel.cpp"
@@ -383,9 +368,7 @@
       "priority": "B",
       "difficulty": 3,
       "parked": false,
-      "waits_on": [
-        "PREFERENTIAL_PURCHASING"
-      ],
+      "requires": ["BL-037"],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -406,10 +389,8 @@
       "priority": "B",
       "difficulty": 3,
       "parked": false,
-      "waits_on": [],
-      "blocked_on": [
-        "POPULATION_LAYER"
-      ],
+      "requires": ["BL-046"],
+      "blocked_on": [],
       "written": "2026-06-16",
       "files": [
         "src/world/hard_coded_world.cpp"
@@ -428,10 +409,8 @@
       "priority": "B",
       "difficulty": 4,
       "parked": false,
-      "waits_on": [],
-      "blocked_on": [
-        "SUPPLY_LAYER"
-      ],
+      "requires": ["BL-039"],
+      "blocked_on": [],
       "written": null,
       "files": [
         "src/world/market_clearing.hpp",
@@ -451,12 +430,8 @@
       "priority": "A",
       "difficulty": 4,
       "parked": false,
-      "waits_on": [
-        "SUPPLY_CONVOYS"
-      ],
-      "blocked_on": [
-        "SUPPLY_LAYER"
-      ],
+      "requires": ["BL-039"],
+      "blocked_on": [],
       "written": null,
       "files": [
         "src/world/market_clearing.hpp",
@@ -476,7 +451,7 @@
       "priority": "S",
       "difficulty": 5,
       "parked": false,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": null,
       "files": [
@@ -502,7 +477,7 @@
       "priority": "B",
       "difficulty": 3,
       "parked": false,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": null,
       "files": [
@@ -522,7 +497,7 @@
       "priority": "B",
       "difficulty": 3,
       "parked": false,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -542,7 +517,7 @@
       "priority": "B",
       "difficulty": 4,
       "parked": false,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -562,7 +537,7 @@
       "priority": "B",
       "difficulty": 3,
       "parked": false,
-      "waits_on": [],
+      "requires": ["BL-043"],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -582,10 +557,8 @@
       "priority": "B",
       "difficulty": 4,
       "parked": false,
-      "waits_on": [],
-      "blocked_on": [
-        "SUPPLY_CONVOYS"
-      ],
+      "requires": ["BL-039"],
+      "blocked_on": [],
       "written": null,
       "files": [
         "scripts/economy.lua",
@@ -606,7 +579,7 @@
       "priority": "S",
       "difficulty": 5,
       "parked": false,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": null,
       "files": [],
@@ -624,7 +597,7 @@
       "priority": "B",
       "difficulty": 4,
       "parked": false,
-      "waits_on": [],
+      "requires": ["BL-053"],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -645,7 +618,7 @@
       "priority": "F",
       "difficulty": 4,
       "parked": true,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": null,
       "files": [
@@ -665,7 +638,7 @@
       "priority": "C",
       "difficulty": 2,
       "parked": false,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -685,7 +658,7 @@
       "priority": "B",
       "difficulty": 4,
       "parked": false,
-      "waits_on": [],
+      "requires": ["BL-052"],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -705,7 +678,7 @@
       "priority": "F",
       "difficulty": 5,
       "parked": true,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": null,
       "files": [
@@ -725,7 +698,7 @@
       "priority": "B",
       "difficulty": 2,
       "parked": false,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -746,7 +719,7 @@
       "priority": "B",
       "difficulty": 3,
       "parked": false,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -767,7 +740,7 @@
       "priority": "SSS",
       "difficulty": 4,
       "parked": false,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": "2026-06-17",
       "files": [
@@ -792,7 +765,7 @@
       "priority": "A",
       "difficulty": 2,
       "parked": false,
-      "waits_on": [],
+      "requires": [],
       "blocked_on": [],
       "written": "2026-06-17",
       "files": [
@@ -803,6 +776,48 @@
       "authority_doc": ".claude/rules/io-standing-rules.md",
       "summary": "Two git footguns when running git inside the Cowork shell (VM bridge): CRLF blobs vs LF mount -> whole-file diff churn; .git blocks unlink/rename -> stale lock files + unsafe ref writes. Fix: add .gitattributes (* text=auto) + one-time renormalize for the CRLF half; standing rule that git WRITES run from native Claude Code / terminal, never the Cowork shell. Part 2 dissolves under native Linux dev (BL-057).",
       "design": "**Origin.** Surfaced 2026-06-17 trying to commit BL-057 from the Cowork shell; previously hit on Project-Fulcrum and wrongly assumed resolved. The cause is structural (the Cowork file bridge), not per-repo, so it recurs across projects.\n\n**Problem — two independent failure modes when git *writes* run inside the Cowork shell.** The shell is a sandboxed Linux VM with the Windows repo bridged in via a sync/mount layer; the file tools (Read/Write/Edit) hit the real folder, the shell sees a mirror.\n1. *Line endings.* Repo blobs are CRLF (native Windows checkout) but files surface in the mount as LF/mixed, so every `git add` becomes a whole-file line-ending diff — e.g. CMakeLists showed 289 changed lines for a ~9-line edit; REFINED 1161; requirements 2678. The real change is buried and the commit is junk.\n2. *`.git` permissions.* The mount blocks unlink/rename inside `.git`: git can write loose objects but cannot remove temp files or `*.lock` refs, so it leaves stale `HEAD.lock` / `refs/heads/main.lock` and cannot safely update a ref (`Operation not permitted`).\n\nNet: git writes (add/commit/merge/push) from the shell corrupt diffs and/or wedge the repo. Content edits via the file tools are safe; git is not.\n\n**Fix — two parts.**\n1. *Line-ending hardening (repo).* Add a `.gitattributes` — `* text=auto`, plus explicit binary rules (`*.ttf binary`, and any other binaries) — then run a one-time `git add --renormalize .` so blobs become canonical LF while Windows working trees stay CRLF via autocrlf. Removes the diff-churn half. The renormalize is a single deliberate repo-wide commit; do it on its own, native, not bundled with feature work.\n2. *Standing rule (process).* Record that **git writes must run from native Claude Code or a native terminal, never the Cowork shell** — the shell is for content edits (file tools) and read-only inspection only. Lands in `.claude/rules/io-standing-rules.md` § Working method when actioned; cross-ref from CLAUDE.md.\n\n**Note.** Part 2 is fully dissolved once development moves to native Linux Claude Code (no VM, no bridge) — see BL-057 — but the rule still matters for any Cowork-shell session. Part 1 (`.gitattributes`) is worth doing regardless as CRLF hygiene for the Linux/Windows split.\n\n**Out of scope.** The `.git` unlink/permission limitation is a property of the Cowork bridge, not fixable in-repo; the standing rule is the mitigation."
+    },
+    {
+      "id": "BL-059",
+      "short_name": "SELECTABLE_MARKERS",
+      "category": "Canvas",
+      "title": "Selectable entity markers — buildings, units, market centres",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "B",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-06-17",
+      "files": [
+        "src/ui/body_surface_canvas.cpp",
+        "src/ui/icons.hpp"
+      ],
+      "authority_doc": "docs/ui/CANVASES.md",
+      "summary": "On-canvas marker entities (buildings, units, market centres) drawn as distinct, clickable/selectable ImDrawList glyphs at world positions. Prerequisite for canvas hit-testing to extend beyond tile/body kind. Design owed: marker shapes, z-order, hover-zone size, registration contract.",
+      "design": "Stub. Draw each entity class as a glyph (via ui::icons or a new marker primitive) at its world position; register each drawn marker in a per-frame hit-test zone list alongside the tile cells. The hit-test list is consumed by CANVAS_HIT_TESTING (BL-031). Design owed: which glyphs, hover-zone radius, draw order relative to tile overlays, how the zone list is cleared each frame."
+    },
+    {
+      "id": "BL-060",
+      "short_name": "HOVER_CARD_PRIMITIVE",
+      "category": "Canvas",
+      "title": "Hover-card UI primitive — transient floating detail card",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "B",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-06-17",
+      "files": [
+        "src/ui/hover_card.hpp",
+        "src/ui/hover_card.cpp"
+      ],
+      "authority_doc": "docs/ui/TOOLTIP.md",
+      "summary": "A transient floating card that appears on tile/entity hover — distinct from the pinned Selection panel. Lighter than a tooltip (richer content, brief delay) but dismisses on mouse-off. Prerequisite for the tooltip-simplification sweep (BL-020). Design owed: content contract, animation, relationship to Selection panel.",
+      "design": "Stub. An ImGui child window (no title bar, rounded, semi-opaque) that tracks the cursor position and renders a caller-supplied content callback. Should not fight with the Selection panel (different trigger: hover not click). Design owed: appear delay, max width, fade-out vs instant dismiss, whether the card can be pinned by the user, and the content-builder API that BL-020 will use."
     }
   ]
 }
