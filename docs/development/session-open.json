@@ -1,0 +1,63 @@
+{
+  "_note": "Forward-facing session seed. Update when milestone or priority changes. Complement to session-close.json (which is backwards-facing).",
+  "generated": "2026-06-17",
+  "next_milestone": "v0.0.7",
+  "milestone_theme": "Building management, population & supply (Layers 4–5)",
+  "milestone_status": "in-progress — majority of scope already shipped",
+
+  "what_already_shipped": {
+    "note": "Confirmed via docs/development/item-commits.json — these all have commits.",
+    "layer4": ["BL-047 population MVP", "BL-048 population dynamic", "BL-049 building management",
+                "BL-042 workforce pool step 2", "BL-022 corp dashboard",
+                "BL-027 market ledger", "BL-028 balance ledger", "BL-029 construction ledger"],
+    "layer5": ["BL-039 supply convoys", "BL-045 logistics model", "BL-038 inter-body markets"]
+  },
+
+  "remaining_designed": {
+    "note": "Promotable now — design is settled.",
+    "items": [
+      {"id": "BL-031", "title": "Canvas hit-testing for buildings / units / markets",   "priority": "C", "needs": ["BL-059"]},
+      {"id": "BL-032", "title": "Lens-driven selection resolution",                      "priority": "B", "needs": ["BL-031"]},
+      {"id": "BL-041", "title": "Habitability gates max workforce, not production",      "priority": "B", "needs": []},
+      {"id": "BL-043", "title": "Stricter building placement & justification process",   "priority": "B", "needs": []},
+      {"id": "BL-044", "title": "Construction pricing — buildings cost resources",       "priority": "B", "needs": []}
+    ]
+  },
+
+  "remaining_design_owed_in_scope": [
+    {"id": "BL-059", "title": "Selectable entity markers", "priority": "B", "note": "Prereq for BL-031 hit-testing; design stub exists, needs settling"},
+    {"id": "BL-060", "title": "Hover-card UI primitive",   "priority": "B", "note": "ROADMAP places this in v0.0.8; confirm before promoting"}
+  ],
+
+  "housekeeping_on_open": [
+    "Mark BL-046 (Layer 4 umbrella index) shipped — all child items have landed",
+    "Normalise backlog status: 5 items use 'complete' instead of 'shipped' (BL-038/039/045/055/058)"
+  ],
+
+  "suggested_first_step": "Design BL-059 (selectable markers) — it gates BL-031 (hit-testing) which gates BL-032 (selection). Then batch BL-031+032+041+043+044 as the v0.0.7 completion batch.",
+
+  "out_of_scope_this_milestone": [
+    "BL-057 cross-platform build (user-deferred — Linux box not set up)",
+    "BL-060 hover-card (v0.0.8 per ROADMAP — confirm before pulling in)",
+    "BL-008 time control clarity (F priority, v0.0.8 polish)",
+    "BL-010/011/014/015/016/020 lens polish cluster (v0.0.8)",
+    "BL-051/053/054 world-gen deep models (v0.2 or beyond)",
+    "BL-040 full deposit authoring (v0.2 explicitly)",
+    "BL-061/062 input strand (tooling/polish, no milestone assigned)"
+  ],
+
+  "tools": {
+    "apply_session_close":  "node tools/session/apply_session_close.js",
+    "flush_requirements":   "node tools/session/flush_requirements.js group-id...",
+    "ship_items":           "node tools/session/ship_items.js BL-XXX...",
+    "regen_golden_log":     "node tools/session/gen_golden_log.js",
+    "regen_item_commits":   "node tools/session/gen_item_commits.js"
+  },
+
+  "docs_to_read_on_cold_start": [
+    "docs/development/ROADMAP.md — milestone sequence and themes",
+    "docs/development/DELIVERY.md — full lifecycle + sub-agent model",
+    "docs/development/item-commits.json — what has actually landed (oracle)",
+    "docs/development/session-close.json — what the last session delivered"
+  ]
+}
