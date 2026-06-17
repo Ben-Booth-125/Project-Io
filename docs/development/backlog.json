@@ -729,6 +729,49 @@
       "waits_on": [
         "SELECTABLE_MARKERS"
       ]
+    },
+    {
+      "id": "BL-061",
+      "short_name": "APP_DRIVEN_MOUSE",
+      "category": "Development",
+      "title": "Application-driven mouse — scriptable cursor override for deterministic capture",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "B",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-06-17",
+      "files": [
+        "src/core/app.cpp",
+        "src/ui/body_surface_canvas.cpp",
+        "src/ui/ui_state.hpp"
+      ],
+      "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+      "summary": "A verify/app-controlled synthetic cursor so the real OS mouse position cannot leak into --verify captures (hover highlight + hover-card perturb the frame -> flaky goldens). Also the foundation for scripted pointer input (move/click/drag) in the verify harness. Design owed: synthetic-vs-real source switch, global hover-suppress vs explicit positioning, click/drag API surface.",
+      "design": "**Problem.** Headless `--verify` captures read the live `ImGui::GetIO().MousePos`, so wherever the real OS cursor happens to sit leaks into the frame as a hovered-tile highlight (and the hover-card). A cursor that moves between or during captures changes the rendered frame -> golden flake. Observed in the Lens & Legibility batch (2026-06-17): the draw-order sort fixed the `unordered_map` half of the nondeterminism, but a moving mouse is the other half. See [[reference_worktree_gui_build]].\n\n**Proposal.** An **application-driven mouse**: a single source-of-truth cursor position the canvases consume instead of the raw IO mouse, with an override the verify harness (and later scripted input) sets. In `--verify`, hover is **off by default** (no synthetic position) and a script opts in with an explicit `verify.mouse(x,y)` / `verify.hover_tile(col,row)`; in the live app the source is the real mouse. This makes captures deterministic regardless of the OS cursor and is the groundwork for **scripted pointer input** (move/click/drag) the verify harness currently lacks.\n\n**Open questions (design owed):** where the synthetic-vs-real switch lives (ui_state flag? a thin input source abstraction?); whether to suppress hover globally in verify or require explicit positioning; whether to generalise to full scripted click/drag now or stub the API; interaction with the existing `verify.center_tile`/`canvas_command` vocabulary. Pairs with [[the hotkey/input system]] (BL: HOTKEY_SYSTEM) — both want a small input-dispatch layer. Relates to the determinism work landed in the lens batch."
+    },
+    {
+      "id": "BL-062",
+      "short_name": "HOTKEY_SYSTEM",
+      "category": "Menu",
+      "title": "Full hotkey system — unified, rebindable keymap + discoverability",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "C",
+      "difficulty": 4,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-06-17",
+      "files": [
+        "src/ui/canvas_command.cpp",
+        "src/core/app.cpp"
+      ],
+      "authority_doc": "docs/ui/MENU.md",
+      "summary": "Replace the ad-hoc, partly-hardcoded input (canvas_command vocabulary + Space=pause, 1-5 speed, lens cycle) with a unified hotkey system: a central action->binding keymap, rebindable, discoverable (help/cheat-sheet overlay), covering canvas nav, lens selection, time control, ledger toggles, and build. Design owed: binding storage, conflict/chord handling, the help surface, context scoping, how it subsumes canvas_command.",
+      "design": "**Problem.** Input bindings are scattered and partly hardcoded: the `canvas_command` vocabulary (pan/zoom/ascend/descend/body+lens cycle) plus hardcoded keys (Space = pause, 1-5 = speed, lens cycle), with no single place a player or developer can see or change them. There is no discoverability and no rebinding.\n\n**Proposal (to design).** A **unified hotkey system**: one central **action -> binding** keymap that every input flows through, covering canvas navigation, lens selection (the curated strip + cycle), time control, ledger/panel toggles, and build/placement. Rebindable, with a **discoverable cheat-sheet / help overlay**. The existing `canvas_command` enum is a natural action vocabulary to build on / subsume.\n\n**Open questions (design owed):** binding storage (a keymap file vs settings.json vs in-engine config); conflict detection and resolution; chord / modifier support; the help-overlay surface and how it lists bindings; **context scoping** (do bindings differ by canvas rung / modal state / placement mode?); whether `canvas_command` becomes the action layer or is replaced; player-facing rebinding UI vs developer-only config for the prototype. Bundled with [[the application-driven mouse]] (BL: APP_DRIVEN_MOUSE) as the project's input strand — both could share a small input-dispatch layer; sequence the keymap on top of, or alongside, that. Consider whether a dedicated `docs/ui/HOTKEYS.md` authority doc is warranted over MENU.md."
     }
   ]
 }
