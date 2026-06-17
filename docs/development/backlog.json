@@ -56,28 +56,6 @@
       "design": "@BACKLOG.md"
     },
     {
-      "id": "BL-009",
-      "short_name": "PRODUCTION_OUTPUT_LENS",
-      "category": "Canvas",
-      "title": "Production / Output lens",
-      "status": "designed",
-      "glyph": "✓",
-      "priority": "B",
-      "difficulty": 3,
-      "parked": false,
-      "requires": [],
-      "blocked_on": [],
-      "written": "2026-06-16",
-      "files": [
-        "src/ui/ui_state.hpp",
-        "src/ui/body_surface_canvas.cpp",
-        "src/ui/overlay.cpp"
-      ],
-      "authority_doc": "docs/ui/LENSES.md",
-      "summary": "Planetary lens tinting tiles by production intensity = sum of (output qty x resolved price) across the recipe's products. Design owed: value->opacity normalisation, idle treatment, glyph, legend.",
-      "design": "Read the map as a *production-intensity surface*: where value is actually being made. Intensity metric: the sell value of all of a tile's building outputs (output qty × resolved market price, summed across the recipe's products) — not raw output count, so a high-value low-volume site reads hot and a bulk low-value one cooler. A strip lens (`overlay_mode`), Planetary tint over producing tiles, plain terrain where nothing produces. No data dependency — reads the economy/`building_report` and `market_component` prices already present. Supports the Layer-4 goal (siting and reading the production loop).\n\n**Design settled (2026-06-16):** intensity is a **log scale relative to the market average** — tiles above average read hot, below average cool, zero is the market floor; this keeps contrast meaningful across bodies with very different absolute output levels. Idle / exhausted buildings read **cold (zero intensity)**, indistinguishable from unbuilt terrain on this lens. Glyph and legend owed at promotion. Authority `docs/ui/LENSES.md`."
-    },
-    {
       "id": "BL-010",
       "short_name": "PLACEMENT_SUITABILITY_SURFACE",
       "category": "Canvas",
@@ -123,47 +101,6 @@
       "authority_doc": "docs/ui/LENSES.md",
       "summary": "Static reach surface (deployment/supply falloff from ports/launchpads). Underdefined until the Supply route model exists; may be a Supply sub-mode. Design owed.",
       "design": "@BACKLOG.md"
-    },
-    {
-      "id": "BL-012",
-      "short_name": "META_PER_LENS_UPPER_RUNGS",
-      "category": "Canvas",
-      "title": "Meta: per-lens Solar / Circumplanetary representation",
-      "status": "design-owed",
-      "glyph": "~",
-      "priority": "C",
-      "difficulty": 3,
-      "parked": false,
-      "requires": [
-        "BL-013"
-      ],
-      "blocked_on": [],
-      "written": "2026-06-16",
-      "files": [],
-      "authority_doc": "docs/ui/LENSES.md",
-      "summary": "Design sweep: for each lens decide what (if anything) it shows on the Solar/Circumplanetary rungs. Output is an updated rung-applicability table + per-lens notes. Not a build. Requires lens strip settled first.",
-      "design": "@BACKLOG.md"
-    },
-    {
-      "id": "BL-013",
-      "short_name": "LENS_STRIP_SINGLE_SELECT",
-      "category": "Canvas",
-      "title": "Lens strip: single-select, nullable, ordered & renamed",
-      "status": "designed",
-      "glyph": "✓",
-      "priority": "B",
-      "difficulty": 2,
-      "parked": false,
-      "requires": [],
-      "blocked_on": [],
-      "written": "2026-06-16",
-      "files": [
-        "src/ui/ui_state.hpp",
-        "src/ui/overlay.cpp"
-      ],
-      "authority_doc": "docs/ui/LENSES.md",
-      "summary": "Lens strip single-select with a null/none state (default Corporation ownership); fix ordering and labels; the strip is a curated subset (others reached via menu/selection). Design owed: order, labels, strip-vs-menu split.",
-      "design": "The lens control strip must be **single-select with a null/none state** (no lens = plain terrain) and **default to \"Corporation ownership\"** at campaign start. Also fixes the strip's **lens ordering and display names**. The strip is a **curated subset of useful lenses, not the exhaustive set** — some lenses are reached from a menu / the selection element instead.\n\n**Design settled (2026-06-16):** Strip order (left → right): **Corp → Country → Resource → Market → Population → Opportunity → Production → Scarcity**. Opportunity pairs with Population (both from BL-017; exact slot adjacency to confirm at visual review). Price readout is **off the strip** — accessed via the Market Ledger only (open ledger, pick resource, see per-tile price overlay). Default at campaign start: **Corporation**. Authority `docs/ui/LENSES.md`."
     },
     {
       "id": "BL-014",
@@ -234,67 +171,6 @@
       "authority_doc": "docs/ui/LENSES.md",
       "summary": "Board-wide lens colour reconsideration; on-canvas text labels for some lenses; a Corporation-lens legend. Deferred to a dedicated colour session. Design owed: the whole pass. Strip must be settled first.",
       "design": "@BACKLOG.md"
-    },
-    {
-      "id": "BL-017",
-      "short_name": "POPULATION_OPPORTUNITY_LENS",
-      "category": "Canvas",
-      "title": "Replace Habitability main-lens with Population / Opportunity",
-      "status": "designed",
-      "glyph": "✓",
-      "priority": "B",
-      "difficulty": 3,
-      "parked": false,
-      "requires": [],
-      "blocked_on": [],
-      "written": "2026-06-16",
-      "files": [
-        "src/ui/body_surface_canvas.cpp",
-        "src/ui/overlay.cpp"
-      ],
-      "authority_doc": "docs/ui/LENSES.md",
-      "summary": "Replace Habitability on the strip with Population, or a hybrid Opportunity lens (tile max yield ignoring resource/logistics). Per-tile habitability tint stays available. Design owed: which, what max-yield means, legend.",
-      "design": "Habitability is a good *field* but not a top-level lens. Replace it on the strip with **Population** and a separate **\"Opportunity\"** lens. (The per-tile habitability tint already built stays available from tile detail, just not as a strip lens.) Couples to the habitability→workforce rule (BL-041) and the population layer.\n\n**Design settled (2026-06-16):** **Both Population and Opportunity** are separate strip lenses (not a single hybrid — they are distinct reads). **Population**: per-tile population density tint. **Opportunity**: per-tile **estimated net margin** — what the best valid building on that terrain would net (output value minus input/cost), evaluated without regard to what is currently built or logistics. Serves as a siting signal: *where could value be made?* Legend and exact margin formula owed at promotion. Authority `docs/ui/LENSES.md` § Population lens."
-    },
-    {
-      "id": "BL-018",
-      "short_name": "SCARCITY_MARKET_HEATMAP",
-      "category": "Canvas",
-      "title": "Scarcity lens — blur to a market-level heatmap",
-      "status": "designed",
-      "glyph": "✓",
-      "priority": "C",
-      "difficulty": 3,
-      "parked": false,
-      "requires": [],
-      "blocked_on": [],
-      "written": "2026-06-16",
-      "files": [
-        "src/ui/body_surface_canvas.cpp"
-      ],
-      "authority_doc": "docs/ui/LENSES.md",
-      "summary": "Make the built Scarcity lens read as a blurred market-level field rather than crisp per-tile cells; feasibility of a non-tile-bound fuzzy field in immediate mode. Design owed (keep open if infeasible).",
-      "design": "The Scarcity lens (built, per-tile translucent heatmap) should read as a **market-level field** more than a per-tile one.\n\n**Design settled (2026-06-16):** render as **chunky per-market blocks** — each market's catchment tiles are tinted as one solid region (not per-tile; not a smooth gradient). This is honest to the market structure (the catchment IS the unit) and avoids the renderer complexity of a continuous field. Scarcity signal is driven by **supply shortfall** — how much demand exceeded supply last tick, independent of price — so the heatmap reflects actual unmet need rather than price deviation. Authority `docs/ui/LENSES.md` § Scarcity lens."
-    },
-    {
-      "id": "BL-019",
-      "short_name": "RESOURCE_DENSITY_LENS",
-      "category": "Canvas",
-      "title": "Resource-density lens — uniform colour, deposit-shape",
-      "status": "designed",
-      "glyph": "✓",
-      "priority": "C",
-      "difficulty": 3,
-      "parked": false,
-      "requires": [],
-      "blocked_on": [],
-      "written": "2026-06-16",
-      "files": [
-        "src/ui/body_surface_canvas.cpp"
-      ],
-      "authority_doc": "docs/ui/LENSES.md",
-      "summary": "Resource lens always single-select, uniform colour (not a gradient), render the whole contiguous deposit shape; test level-as-bloom vs flat. Design owed: contiguous-deposit detection, bloom vs flat.",
-      "design": "The Resource lens should be **always single-select** and **render the shape of the deposit** — the **whole contiguous deposit** when resource levels are present.\n\n**Design settled (2026-06-16):** render as **flat fill** — a uniform colour over the entire contiguous deposit shape with no per-tile level gradient. Intensity information is available in tile detail, not the lens. Contiguous deposit is detected by **8-connected flood fill** (diagonals included) from any tile with > 0 of the selected resource. Authority `docs/ui/LENSES.md` (Resource lens stub), `docs/economy/TILES.md`."
     },
     {
       "id": "BL-020",
@@ -672,26 +548,6 @@
       "authority_doc": "docs/generation/TILE_GENERATION.md",
       "summary": "Generation-mechanics passes only (deposit data half moved to RESOURCE_GENERATION_FULL_SET): smooth band transitions + coastline refinement (buildable, cosmetic, deferred) and speculative orbital-derivation + tectonic landforms (design owed, beyond v0.1.0).",
       "design": "@BACKLOG.md"
-    },
-    {
-      "id": "BL-052",
-      "short_name": "FACTION_TO_COUNTRY_RENAME",
-      "category": "Environment",
-      "title": "Rename Faction → Country (doc- and code-wide)",
-      "status": "designed",
-      "glyph": "✓",
-      "priority": "C",
-      "difficulty": 2,
-      "parked": false,
-      "requires": [],
-      "blocked_on": [],
-      "written": "2026-06-16",
-      "files": [
-        "src/ui/presentation.hpp"
-      ],
-      "authority_doc": "docs/GLOSSARY.md",
-      "summary": "Rename the Faction-presence lens to Countries and propagate faction->country where it means nation. Caveat: faction_colour() is the CORPORATION colour, not the nation lens, so disentangle faction-as-nation from faction-as-corp-colour. Design owed: term boundary + sweep list.",
-      "design": "Rename the **Faction presence** lens to **Countries**, and propagate a **doc-wide and code-wide rename** of *faction* → *country* where it refers to nations (the lens label, GLOSSARY term, LENSES/SELECTION wording). Caveat: `faction_colour()` is currently the **corporation** identity colour (player vs. rival), *not* the nation lens — so the rename must disentangle \"faction-as-nation\" from \"faction-as-corp-colour\".\n\n**Design settled (2026-06-16):** full disentanglement — **Country** for all territorial/nation entities (lens label, GLOSSARY term, LENSES/SELECTION wording, doc prose); `faction_colour()` is renamed to **`corp_colour()`** (or `identity_colour()`) because it refers to corporation identity (player vs. rival), not nations. The rename sweep must target \"faction-as-nation\" usages only; \"faction-as-corp-colour\" becomes `corp_colour`. Rename list (owed at promotion): GLOSSARY `Faction` entry, LENSES § Faction, all lens-label strings, `faction_colour()` in `src/ui/presentation.hpp` and call sites. Authority `docs/GLOSSARY.md`, `docs/ui/LENSES.md`, `src/ui/presentation.hpp`."
     },
     {
       "id": "BL-053",

@@ -46,7 +46,7 @@ Two settled visual sub-conventions (the resolution of former Open clarifications
   family (`building`, `unit`). The resource **pip** is the single documented exception: as a
   strip/swatch/deposit glyph it stays **outline-less**.
 - **`colour` means fill or stroke per family, fixed:** the filled families
-  (`building`, `faction`, `corporation`, `unit`, resource `pip`) treat `colour` as the **fill**;
+  (`building`, `country`, `corporation`, `unit`, resource `pip`) treat `colour` as the **fill**;
   the stroke families (`supply`, `market`, `ledger`, `placeholder`, resource-**lens**) treat it as
   the **stroke** line colour and have no fill.
 
@@ -65,10 +65,10 @@ Glyphs fall into three families by role.
 | **Port** | `building(…, port, fill)` | Filled upward triangle + outline | Caller `fill` | Building marker, Planetary canvas |
 | **Building (none/other)** | `building(…, none, fill)` | Filled circle (dot) | Caller `fill` | Fallback building marker |
 | **Resource pip** | `resource(…, res)` | Filled diamond (no outline) | **Derived** — `presentation_of(res).colour` | Resource strips, deposit markers |
-| **Unit / convoy** | `unit(…, colour)` | Open upward chevron (V) — two stroke lines meeting at a bottom point, open at the top; drawn with a dark 2 px shadow pass then a 1.5 px colour pass; stroke-only so it never reads as the filled port triangle | Caller `colour` (e.g. a faction colour) | Unit stacks, Layer 5 convoy heads |
+| **Unit / convoy** | `unit(…, colour)` | Open upward chevron (V) — two stroke lines meeting at a bottom point, open at the top; drawn with a dark 2 px shadow pass then a 1.5 px colour pass; stroke-only so it never reads as the filled port triangle | Caller `colour` (e.g. a corp colour) | Unit stacks, Layer 5 convoy heads |
 
 On the Planetary canvas the **building** glyph's `fill` now encodes the *owning
-corporation* (player corp = faction slot 0; rivals a hashed slot), so the
+corporation* (player corp = corp slot 0; rivals a hashed slot), so the
 silhouette reads the building **type** and the fill reads **who owns it**.
 
 ### 2. UI-affordance glyphs — drawn in chrome
@@ -84,10 +84,12 @@ silhouette reads the building **type** and the fill reads **who owns it**.
 |---|---|---|---|---|
 | **Supply** | `supply(…, colour)` | Two parallel horizontal lines (route shorthand) | Caller stroke | `overlay_mode::supply` |
 | **Market** | `market(…, colour)` | Three ascending bars (price chart), outlined | Caller stroke | `overlay_mode::market` |
-| **Faction** | `faction(…, colour)` | Downward shield silhouette + outline | Caller fill | `overlay_mode::faction` |
+| **Country** | `country(…, colour)` | Downward-pointing shield silhouette + dark outline | Caller fill | `overlay_mode::country` |
 | **Corporation** | `corporation(…, colour)` | Filled square + dark inner dot ("seal") | Caller fill | `overlay_mode::corporation` |
 | **Resource** | `resource(…, colour)` | Three stacked horizontal strata, widening + deepening top-to-bottom (gradient / density motif) | Caller fill (per-stratum alpha) | `overlay_mode::resource` |
 | **Population** | `population(…, colour)` | Small figure: round head over a tapered torso (people / habitability motif) | Caller fill | `overlay_mode::population` |
+| **Opportunity** | `opportunity(…, colour)` | Open circle with an inner "+" (stroke only) — a "potential gain / margin" motif (where value could be made) | Caller stroke | `overlay_mode::opportunity` |
+| **Production** | `production(…, colour)` | Filled upward-pointing triangle over a short baseline (output / throughput rising motif); distinct from the market bars and the scarcity hollow down-triangle | Caller fill | `overlay_mode::production` |
 | **Scarcity** | `scarcity(…, colour)` | Hollow downward-pointing triangle (empty / depleted motif; inverse of the filled resource pip) | Caller stroke | `overlay_mode::scarcity` |
 
 In the strip ([`overlay.cpp`](../../src/ui/overlay.cpp), `draw_overlay_controls`)
@@ -133,18 +135,19 @@ firmed up (several feed the **lens-design** Brief):
    glyph, outline-less). See § Shared conventions.
 
 4. **Fill-vs-stroke — RESOLVED (2026-06-15): fixed per family.** Documented in § Shared
-   conventions: `building`/`faction`/`corporation`/`unit`/`pip` → `colour` is fill;
+   conventions: `building`/`country`/`corporation`/`unit`/`pip` → `colour` is fill;
    `supply`/`market`/`ledger`/`placeholder`/resource-lens → stroke.
 
-5. **The lens set is now complete.** Five lens glyphs exist
-   (supply/market/faction/corporation/**resource**); all five are ratified in
-   [LENSES.md](LENSES.md) and catalogued above. Note `resource` is **overloaded**:
+5. **The lens set is now complete.** The curated strip order is
+   corporation / country / resource / market / population / **opportunity** /
+   **production** / scarcity; all are ratified in [LENSES.md](LENSES.md) and
+   catalogued above (`supply` exists but is off the strip). Note `resource` is **overloaded**:
    `resource(…, resource_type)` is the identity-coloured *pip* (a diamond), while
    `resource(…, ImU32)` is the *lens* glyph (the strata motif) — same name,
    disambiguated by the final argument type and by context (strip vs. canvas pip).
 
 6. **No dedicated nation / corporation entity glyph.** The political layer conveys
    nations by tile *tint* (`palette::nation_colour`) and corporations by building
-   *fill* (`palette::faction_colour`), not by a glyph. If nations/corps become
+   *fill* (`palette::corp_colour`), not by a glyph. If nations/corps become
    directly canvas-selectable (the Ledger hit-testing follow-up), decide whether
    they need their own markers.

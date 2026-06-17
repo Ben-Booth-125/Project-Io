@@ -600,3 +600,115 @@ verification (R1–R4, R6) lands on the Linux box / in CI.
 
 Parallelisation note: A → {B, C, D}; B ∥ C (disjoint files: docs vs workflow). D shares
 `build.yml` with C, so sequence D after C. A is the foundation everything builds on.
+
+---
+
+## Lens & Legibility — Batch Delivery — **COMPLETE** (2026-06-17)
+
+All seven items delivered, verified (22/22 requirements, deterministic goldens), docs
+propagated, items removed from the backlog. See DEVLOG § Lens & Legibility Batch
+Delivery. Tasks A–H below retained for one cycle as the decomposition record.
+
+<details>
+<summary>Completed task breakdown (retained for reference)</summary>
+
+Requirements: `req/requirements.json §` lens-strip-single-select, faction-to-country-rename,
+resource-density-flat, population-opportunity-lens, production-output-lens,
+scarcity-market-heatmap, meta-per-lens-upper-rungs.
+
+The full lens strip (`Corp → Country → Resource → Market → Population → Opportunity →
+Production → Scarcity`) bar the Market slot (gated on multi-market seeding, BL-036). All
+work converges on `body_surface_canvas.cpp` + `ui_state.hpp` + `overlay.cpp` +
+`presentation.{hpp,cpp}` + `icons.{hpp,cpp}` — a single-file-concentrated render refactor,
+so **no code fan-out** (worktree-merge cost on the shared fill chain exceeds the win; see
+DELIVERY.md § Sub-agents — "passes inside one file are sequential, hotspots stay in the main
+session"). Sequential, foundation-first. Doc propagation fans out at the close; the
+`verifier-review` skill runs the review barrier.
+
+### Wave 0 — foundation (main session)
+
+- **[2] A — Enum + signature + default.** Add `overlay_mode::opportunity`, `overlay_mode::production`;
+  rename `overlay_mode::faction` → `country`. Default lens → `corporation` (`ui_state.hpp`
+  field **and** `app.cpp:283`). Extend `draw_body_surface_canvas` to take
+  `const recipe_registry&` + `const economy_report&`; update the call site (`app.cpp:689`,
+  pass `m_registry`, `m_last_econ_report`) and `body_surface_canvas.hpp`. Bump
+  `canvas_command.cpp overlay_mode_count` (5 → 10) and refresh its stale comment.
+  Files: `src/ui/ui_state.hpp`, `src/ui/body_surface_canvas.hpp`, `src/core/app.cpp`,
+  `src/ui/canvas_command.cpp`. Deps: foundation.
+  provides: `overlay_mode::{country,opportunity,production}`, new canvas signature.
+  Satisfies: lens-strip R2, faction-to-country R1.
+- **[2] B — corp_colour rename.** `palette::faction_colour` → `corp_colour`,
+  `faction_slot_count` → `corp_slot_count`, `faction_table` → `corp_table`; update call sites
+  (`presentation.cpp`, the `body_surface_canvas.cpp` local lambda, any others). `nation_colour`
+  untouched. Files: `src/ui/presentation.hpp`, `src/ui/presentation.cpp`,
+  `src/ui/body_surface_canvas.cpp`. Deps: foundation. provides: `palette::corp_colour`.
+  Satisfies: faction-to-country R2.
+- **[2] C — Country glyph + labels.** `icons::faction` → `icons::country`; strip label
+  "Faction presence" → "Countries", short "Faction" → "Country"; the `faction` case in
+  `overlay.cpp` switches and `app.cpp` name parse (`"country"`, keep `"faction"` alias).
+  Files: `src/ui/icons.hpp`, `src/ui/icons.cpp`, `src/ui/overlay.cpp`, `src/core/app.cpp`.
+  Deps: A. provides: `icons::country`. Satisfies: faction-to-country R1, R3.
+
+### Wave 1 — lens render passes (main session, sequential in `body_surface_canvas.cpp`)
+
+- **[3] D — Resource lens → flat contiguous fill.** Replace the magnitude-opacity tint with an
+  8-connected flood fill from any tile with >0 of `lens_resource`, uniform flat fill over the
+  whole deposit; always single-resource. Update `draw_resource_key`. Files:
+  `src/ui/body_surface_canvas.cpp`, `src/ui/overlay.cpp` (drop the Single checkbox / highest-value
+  path). Deps: A. Satisfies: resource-density R1, R2.
+- **[3] E — Scarcity lens → per-market shortfall blocks.** Replace the deposit-based per-tile
+  heatmap with `shortfall = max(0, demand−supply)` of `lens_resource`, per-market via
+  `market_for_tile`, normalised across the body's markets, uniform tint per catchment. Update
+  `draw_scarcity_key`. Files: `src/ui/body_surface_canvas.cpp`. Deps: A. Satisfies:
+  scarcity-market R1, R2.
+- **[3] F — Production lens.** `overlay_mode::production` pass: per built tile, intensity =
+  Σ(output qty × `market.price`) from the `economy_report` building rows (processor outputs split
+  by recipe proportions); log scale vs the body's producing-tile mean; idle/exhausted = cold.
+  New `draw_production_key`. Files: `src/ui/body_surface_canvas.cpp`. Deps: A. Satisfies:
+  production-output R1, R2.
+- **[3] G — Opportunity lens.** `overlay_mode::opportunity` pass: per tile, best valid building's
+  net margin (extraction: deposit×base_rate×price; processing: Σout×price − Σin×price; − maintenance)
+  over types valid on the terrain (`placement_rules`), diverging red→green normalised per body.
+  New `draw_opportunity_key`. Files: `src/ui/body_surface_canvas.cpp`. Deps: A. Satisfies:
+  population-opportunity R1.
+
+### Wave 2 — strip ordering (main session)
+
+- **[2] H — Strip order + selector.** Reorder `modes[]` to Corp, Country, Resource, Market,
+  Population, Opportunity, Production, Scarcity; add the `opportunity`/`production` glyph cases to
+  `draw_lens_icon`, `overlay_mode_name`, `overlay_mode_short_name`; keep the
+  resource/market/scarcity good-selector. Files: `src/ui/overlay.cpp`. Deps: C, D, F, G.
+  Satisfies: lens-strip R1, R3.
+
+### Wave 3 — review barrier, build, verify
+
+- Run **`verifier-review`** over the integrated diff (step 4a), resolve any Critical.
+- Build (`cmake`); fix to green.
+- **`verifier-visual`** for each `visual` row: author/extend `scripts/verify/{lens_strip,
+  country_lens,resource_lens,population_lens,opportunity_lens,production_lens,scarcity_lens}.lua`,
+  bless goldens.
+
+### Wave 4 — docs (fan-out: disjoint authority docs)
+
+- Propagate to `docs/ui/LENSES.md` (all six lenses + BL-012 rung table), `docs/ui/ICONS.md`
+  (country/opportunity/production glyphs), `docs/GLOSSARY.md` (Faction→Country). Each a disjoint
+  doc → parallel doc agents.
+
+### Collision map
+
+| File | Tasks |
+|------|-------|
+| `src/ui/ui_state.hpp` | A |
+| `src/ui/body_surface_canvas.hpp` | A |
+| `src/core/app.cpp` | A, C |
+| `src/ui/canvas_command.cpp` | A |
+| `src/ui/presentation.{hpp,cpp}` | B |
+| `src/ui/icons.{hpp,cpp}` | C |
+| `src/ui/body_surface_canvas.cpp` | B, D, E, F, G (hotspot — sequential, main session) |
+| `src/ui/overlay.cpp` | C, D, H (sequential) |
+
+`body_surface_canvas.cpp` and `overlay.cpp` are touched by most tasks → **no concurrent agents**;
+the win from worktree-splitting a single shared fill chain is negative. Foundation (A/B/C) first;
+render passes D/E/F/G are independent *regions* of the same file done back-to-back; H last.
+
+</details>

@@ -21,39 +21,28 @@ void draw_lens_icon(ImDrawList* dl, overlay_mode m, ImVec2 rect_min, ImVec2 rect
     {
         case overlay_mode::supply:      icons::supply     (dl, centre, r, colour); break;
         case overlay_mode::market:      icons::market     (dl, centre, r, colour); break;
-        case overlay_mode::faction:     icons::faction    (dl, centre, r, colour); break;
+        case overlay_mode::country:     icons::country    (dl, centre, r, colour); break;
         case overlay_mode::corporation: icons::corporation(dl, centre, r, colour); break;
         case overlay_mode::resource:    icons::resource   (dl, centre, r, colour); break;
         case overlay_mode::population:  icons::population (dl, centre, r, colour); break;
+        case overlay_mode::opportunity: icons::opportunity(dl, centre, r, colour); break;
+        case overlay_mode::production:  icons::production (dl, centre, r, colour); break;
         case overlay_mode::scarcity:    icons::scarcity   (dl, centre, r, colour); break;
         default: break;
     }
 }
 
-/// Draw the lens-local resource/good selector for the Resource and Market lenses.
-/// Both lenses pick "which resource" from the same `lens_resource` field (LENSES.md
-/// says the two selectors share a form), so one combo serves both; the Resource lens
-/// additionally exposes its highest-value / single-resource mode toggle. Drawn inline
-/// in the control strip only while one of those two lenses is active.
+/// Draw the lens-local resource/good selector for the Resource, Market, and
+/// Scarcity lenses. All three pick "which resource" from the same `lens_resource`
+/// field (LENSES.md says the selectors share a form), so one combo serves them.
+/// Drawn inline in the control strip only while one of those lenses is active.
 void draw_lens_selector(ui_state& ui)
 {
+    // The Resource, Market, and Scarcity lenses all pick one resource/good from the
+    // shared `lens_resource` field. The Resource lens is always single-resource
+    // (BL-019) — no highest-value toggle — so the picker simply shows for all three.
     if (ui.overlay != overlay_mode::resource && ui.overlay != overlay_mode::market &&
         ui.overlay != overlay_mode::scarcity)
-        return;
-
-    // Resource lens: a mode toggle. Highest-value needs no selection; single-resource
-    // reveals the picker. The Market lens always shows the picker (it has no "all goods").
-    if (ui.overlay == overlay_mode::resource)
-    {
-        ImGui::SameLine();
-        ImGui::Checkbox("Single", &ui.resource_lens_single);
-    }
-
-    const bool show_picker =
-        (ui.overlay == overlay_mode::market) ||
-        (ui.overlay == overlay_mode::scarcity) ||
-        (ui.overlay == overlay_mode::resource && ui.resource_lens_single);
-    if (!show_picker)
         return;
 
     ImGui::SameLine();
@@ -82,11 +71,13 @@ const char* overlay_mode_name(overlay_mode m)
     {
         case overlay_mode::supply:      return "Supply routes";
         case overlay_mode::market:      return "Market prices";
-        case overlay_mode::faction:     return "Faction presence";
+        case overlay_mode::country:     return "Countries";
         case overlay_mode::corporation: return "Corporation ownership";
-        case overlay_mode::resource:    return "Resource density";
+        case overlay_mode::resource:    return "Resource deposits";
         case overlay_mode::population:  return "Habitability";
-        case overlay_mode::scarcity:    return "Resource scarcity";
+        case overlay_mode::opportunity: return "Opportunity (net margin)";
+        case overlay_mode::production:  return "Production intensity";
+        case overlay_mode::scarcity:    return "Market scarcity";
         default:                        return "None";
     }
 }
@@ -97,10 +88,12 @@ const char* overlay_mode_short_name(overlay_mode m)
     {
         case overlay_mode::supply:      return "Supply";
         case overlay_mode::market:      return "Market";
-        case overlay_mode::faction:     return "Faction";
+        case overlay_mode::country:     return "Country";
         case overlay_mode::corporation: return "Corp";
         case overlay_mode::resource:    return "Resource";
-        case overlay_mode::population:  return "Habitability";
+        case overlay_mode::population:  return "Population";
+        case overlay_mode::opportunity: return "Opportunity";
+        case overlay_mode::production:  return "Production";
         case overlay_mode::scarcity:    return "Scarcity";
         default:                        return "None";
     }
@@ -113,12 +106,15 @@ void toggle_overlay(ui_state& ui, overlay_mode m)
 
 void draw_overlay_controls(ui_state& ui, float left_x, float bottom_y)
 {
-    // The selectable lenses, in mode-bar order. overlay_mode::none is not a
-    // button — clicking the active lens clears back to it (toggle_overlay).
-    constexpr overlay_mode modes[7] = {
-        overlay_mode::supply, overlay_mode::market, overlay_mode::faction,
-        overlay_mode::corporation, overlay_mode::resource,
-        overlay_mode::population, overlay_mode::scarcity };
+    // The curated lens strip, in settled order (BL-013): Corp → Country → Resource
+    // → Market → Population → Opportunity → Production → Scarcity. Single-select
+    // with a null state — clicking the active lens clears to overlay_mode::none
+    // (toggle_overlay). Supply is off the strip (Layer-5, reached by keyboard
+    // cycle); the strip is a curated subset, not the exhaustive enum.
+    constexpr overlay_mode modes[8] = {
+        overlay_mode::corporation, overlay_mode::country, overlay_mode::resource,
+        overlay_mode::market, overlay_mode::population, overlay_mode::opportunity,
+        overlay_mode::production, overlay_mode::scarcity };
 
     ImGui::SetNextWindowPos({left_x, bottom_y}, ImGuiCond_Always, {0.0f, 1.0f});
     ImGui::SetNextWindowBgAlpha(0.65f);

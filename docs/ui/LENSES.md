@@ -14,13 +14,15 @@ the [canvas zoom ladder](CANVASES.md) it applies to, and how its legend reads.
 Glyph shapes live in [ICONS.md](ICONS.md); identity colours live in
 [`presentation.hpp`](../../src/ui/presentation.hpp) (the `palette` namespace).
 
-> **Status.** This doc was created alongside the **Corporation lens**
-> implementation; the Corporation section was the first fully settled. The
-> remaining four sections (Supply, Market, Faction, Resource) are **settled by
-> the lens-design Brief** to the same depth — per-lens specification, rung
-> applicability, glyph, legend, and interaction notes. Where a lens depends on
-> data or geometry not yet generated (Supply routes, Market prices), the spec
-> is the *target*; the build is gated on that dependency and noted per lens.
+> **Status.** All strip lenses are built except where a section names a gating
+> dependency. The **Lens & Legibility** batch (BL-013/052/019/017/009/018) settled
+> the curated single-select strip, renamed Faction → **Country**, reworked the
+> **Resource** lens to a flat contiguous-deposit fill, reworked **Scarcity** to a
+> per-market shortfall field, and added the **Opportunity** (net-margin) and
+> **Production** (intensity) lenses. The **Market** lens's per-catchment surface
+> still waits on multi-market seeding (BL-036); **Supply** waits on Layer-5 route
+> geometry. Identity colours live in `presentation.hpp`; the corporation-identity
+> helper is `palette::corp_colour` (renamed from `faction_colour`, BL-052).
 
 ---
 
@@ -30,15 +32,37 @@ Which lenses are meaningful on each rung of the ladder. "—" = no representatio
 intended; "✓" = built and active; "(later)" = a representation is specified here
 but its build is gated on a dependency (named in the lens section).
 
+The strip presents a **curated subset** in this order (BL-013): **Corporation →
+Country → Resource → Market → Population → Opportunity → Production → Scarcity**.
+Supply is off the strip (Layer-5, reached by keyboard lens-cycle). The default
+active lens at campaign start is **Corporation**; the strip is single-select with a
+null state (re-selecting the active lens clears to plain terrain).
+
+The per-rung representation of every strip lens (the BL-012 sweep). "—" = no
+representation intended; "✓" = built and active; "(later)" = specified but gated on
+a dependency (named in the lens section).
+
 | Lens | Solar | Circumplanetary | Planetary |
 |---|---|---|---|
-| Supply | (later) inter-body route lines | (later) per-body throughput badge | (later) per-tile route + stockpile |
-| Market | — | ✓ per-body price strip | ✓ per-body price wash |
-| Faction | — | — | ✓ tile tint + owner borders |
+| Supply *(off strip)* | (later) inter-body route lines | (later) per-body throughput badge | (later) per-tile route + stockpile |
 | **Corporation** | — | — | **✓ tile tint + player border** |
-| **Resource** | — | — | **✓ deposit-density tint + gradient key** |
+| **Country** | — | — | **✓ tile tint + owner borders** |
+| **Resource** | — | — | **✓ contiguous-deposit flat fill + key** |
+| **Market** | — | ✓ per-body price strip | ✓ per-body price wash |
 | **Population** | — | — | **✓ habitability tint + gradient key** |
-| **Scarcity** | — | — | **✓ single-resource scarcity heatmap + key** |
+| **Opportunity** | — | — | **✓ best-building net-margin tint + key** |
+| **Production** | — | (later) per-body output-throughput badge | **✓ production-intensity tint + key** |
+| **Scarcity** | — | (later) per-body shortfall badge | **✓ per-market shortfall blocks + key** |
+
+**BL-012 per-lens rung notes.** Corporation, Country, Resource, Population, and
+Opportunity are **Planetary-only** — their unit of meaning (a tile, a building, a
+deposit, a margin) is sub-body and has no coherent inter-body surface, and nations
+are sub-body political units. Market and Supply are the genuinely multi-rung lenses
+(prices per body-market; logistics span the ladder). Production and Scarcity are
+Planetary today but each has a natural **Circumplanetary per-body badge** owed
+(total output / aggregate shortfall for the anchor body) — additive passes guarded
+behind the same `overlay_mode`, not changing the Planetary behaviour. None propagate
+to the Solar rung in the prototype.
 
 **Resource** is **built** (2026-06-16): unlike Supply and Market it had **no data
 dependency** (tile `resource_deposit` is already generated), so it landed directly as a
@@ -97,7 +121,11 @@ follow-up shared with the Faction lens.
 
 ---
 
-## Faction lens
+## Country lens
+
+*(Renamed from "Faction" — BL-052. The lens shows **national** territory, so its
+name is Country; `overlay_mode::country`, glyph `icons::country`. `"faction"`
+remains a legacy alias in the verify-script name parser.)*
 
 **Intent.** Read the map as a *political landscape*: which nation holds which
 tile, and where the borders between them fall. This is the national counterpart
@@ -110,7 +138,7 @@ Unclaimed tiles have no owner.
 
 **Rung.** Planetary only. No Solar or Circumplanetary representation is intended:
 nations are sub-body political units and have no coherent expression on the
-inter-body rungs. The render pass is guarded behind `overlay_mode::faction` in
+inter-body rungs. The render pass is guarded behind `overlay_mode::country` in
 [`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp).
 
 **Colour.**
@@ -123,11 +151,11 @@ inter-body rungs. The render pass is guarded behind `overlay_mode::faction` in
 - **Unclaimed tiles** keep their plain terrain hue with no tint.
 
 **Glyph.** A downward-pointing shield silhouette with a dark outline
-(`icons::faction`). Distinct from the corporation seal-square and the resource
+(`icons::country`). Distinct from the corporation seal-square and the resource
 strata.
 
 **Legend.** Named by the strip glyph highlight and its hover tooltip
-(`overlay_mode_name` → "Faction territory"); no on-canvas colour key yet. A
+(`overlay_mode_name` → "Countries"); no on-canvas colour key yet. A
 per-nation colour key is a follow-up shared with the Corporation lens (both want
 the same identity-swatch list).
 
@@ -230,9 +258,12 @@ valid:
 |---|---|---|
 | **none** | the lowest drawn entity (marker, else tile) | Tile Ledger |
 | **Corporation** | the **owning corporation** of the tile/building | Balance Ledger |
-| **Faction** | the **owning nation** of the tile | Nation ledger |
+| **Country** | the **owning nation** of the tile | Nation ledger |
 | **Resource** | the tile's **deposit** profile | Tile Ledger (deposit detail) |
 | **Market** | the body's **market** / the listing under the pointer | Market Ledger |
+| **Opportunity** | the tile (and its best-building margin breakdown) | Tile Ledger |
+| **Production** | the producing **building** under the pointer | Balance Ledger |
+| **Scarcity** | the tile's **market** (the catchment under the pointer) | Market Ledger |
 | **Supply** *(Layer 5)* | the **route segment / stockpile** under the pointer | (Supply surface) |
 
 A lens skips kinds it does not validate: under the Corporation lens a hovered *building* resolves
@@ -253,20 +284,16 @@ from generation (see [TILES.md](../economy/TILES.md) and
 [TILE_GENERATION.md](../generation/TILE_GENERATION.md)). The lens reads that
 profile directly at draw time; **no new data is generated**.
 
-**Two modes (settled).**
-- **Highest-value (default).** Each tile is tinted by the **identity colour of its
-  single highest-value deposit**, at an **opacity scaled by that deposit's
-  magnitude** — so a rich iron tile and a trace iron tile share the iron hue but
-  differ in intensity. Tiles with no deposit (below the ambient floor) render plain
-  terrain. *(Implementation note: "value" ranks by **deposit richness alone**. The
-  spec's richness × **presentation weight** product is deferred — `resource_presentation`
-  carries only name/abbrev/colour today, no weight field; adding a 19-entry weight
-  table is out of this render Brief's scope. Revisit when a weight lands.)*
-- **Single-resource (player-selected).** When the player picks a specific resource
-  from the lens's resource selector, every tile is tinted that resource's identity
-  colour at an opacity scaled by that resource's deposit magnitude **on that
-  tile** (zero where absent → plain terrain). This turns the surface into a
-  density heatmap for one good.
+**Single mode — flat contiguous fill (settled, BL-019).** The lens is **always
+single-resource** (no highest-value mode, no Single toggle): the player picks a
+good from the shared selector and the lens fills the **whole contiguous deposit**
+of that good as a **flat, uniform colour** — the *shape* of the deposit, not a
+magnitude gradient. Every tile carrying any of the resource (deposit > 0) takes the
+resource's identity colour at a fixed opacity (composited over terrain); a tile
+without it keeps its terrain hue. Intensity lives in tile detail, not the lens. A
+deposit is the 8-connected (diagonals included) blob of tiles with the good;
+because the fill is uniform, the per-tile threshold is visually identical to a
+flood-fill grouping, so no flood-fill pass is built.
 
 **Rung.** Planetary only — deposits are per-tile and have no inter-body surface.
 The render pass is guarded behind `overlay_mode::resource` in
@@ -286,26 +313,21 @@ full-width, equal), the market *vertical* bars, the faction shield, and the
 corporation seal-square; and distinct from the resource *pip* diamond (the
 `resource_type` overload) it shares a name with.
 
-**Legend.** Strip glyph highlight + tooltip ("Resource density"). Because this
-lens is a true gradient it warrants an on-canvas key the others lack: a **gradient
-bar** (sparse → dense) plus, in single-resource mode, the **selected resource's
-name and identity swatch**; in highest-value mode, a compact swatch list of the
-resources actually present on the body. This is the first lens to specify a
-colour key — the per-faction key for Corporation/Faction is still a follow-up.
+**Legend.** Strip glyph highlight + tooltip ("Resource deposits"), plus an
+on-canvas key: the selected resource's identity swatch + name and the note
+"filled = deposit present". Flat, not a gradient — the lens shows deposit *shape*.
 
-**Interaction notes.** Planetary-only, single-select. The resource selector is a
-lens-local control (proposed: a dropdown in the control strip when the Resource
-lens is active, shared in form with the Market good-selector). Default mode
-requires no selection. No new data, no tick dependency — buildable immediately.
+**Interaction notes.** Planetary-only, single-select. The resource selector is the
+shared combo in the control strip (form shared with the Market and Scarcity
+selectors, bound to `ui_state.lens_resource`). No new data, no tick dependency.
 
-**Implemented 2026-06-16** (Resource lens render Brief; design confirmed in the batch-close
-Q&A). `overlay_mode::resource` Planetary pass in `body_surface_canvas.cpp`: opacity = magnitude
-**normalised per body** (against the body's richest deposit, so each body's heatmap auto-scales);
-the hue is composited over terrain (`lerp_colour`), not a flat replacement, so density reads. The
-lens-local control is a **"Single" mode checkbox + a shared resource combo** bound to
-`ui_state.lens_resource` in `overlay.cpp` (the same combo the Market good-selector uses). The
-on-canvas key sits at the **left edge, vertically centred, inset past the nav rail**. Verified by
-`scripts/verify/resource_lens.lua` against blessed goldens.
+**Implemented 2026-06-17** (Lens & Legibility batch, BL-019). `overlay_mode::resource`
+Planetary pass in `body_surface_canvas.cpp`: a tile with `resource_deposit[sel] > 0` is
+composited toward `presentation_of(sel).colour` at a fixed 0.8 (uniform flat fill); other tiles
+keep terrain. The highest-value mode and the `resource_lens_single` toggle were removed (the
+lens is always single). The on-canvas key sits at the left edge, vertically centred, inset past
+the nav rail. Verified by `scripts/verify/resource_lens.lua` against blessed goldens
+(deterministic after the draw-order fix).
 
 ## Population lens *(built 2026-06-16 — no data dependency)*
 
@@ -337,24 +359,92 @@ surface needs no resource pick). Verified by `scripts/verify/population_lens.lua
 goldens. **Toward population density (future):** when population centres generate, this lens should
 gain a density read (a second mode or a blended signal) — owed with the population layer.
 
+## Opportunity lens *(built 2026-06-17 — BL-017)*
+
+**Intent.** Read the map as a *siting surface*: where could value be made? Each tile
+shows the estimated **net margin of the best valid building on its terrain** — the
+counterpart to Population's liveability read. Paired with Population on the strip
+(both replace the former Habitability main-lens).
+
+**Data definition (settled).** For each tile, over the building types valid on its
+terrain (`placement_rules::can_place`): **extraction** — the best single deposit's
+`base_rate × richness × price − maintenance − wage`; **processing** — the best
+recipe's `base_rate × (Σ outputs×price − Σ inputs×price) − maintenance − wage`. The
+margin is the max over candidates, evaluated **ignoring what is currently built and
+ignoring logistics** (it is potential, not actual). Prices come from the tile's
+market (`market_for_tile`); upkeep from the recipe registry. No new data.
+
+**Rung.** Planetary only. Guarded behind `overlay_mode::opportunity`.
+
+**Colour.** A **diverging** surface normalised against the body's largest absolute
+margin: profit composites toward green (`IM_COL32(110,200,120)`), loss toward red
+(`IM_COL32(216,100,96)`), at `0.75 · |margin|/max`. Tiles with no valid building keep
+terrain.
+
+**Glyph.** An open circle with an inner "+" (`icons::opportunity`) — a potential-gain
+motif.
+
+**Legend.** Strip glyph + tooltip ("Opportunity (net margin)") + an on-canvas
+loss→profit diverging key.
+
+**Interaction notes.** Planetary-only, single-select; the script ticks the economy
+first so prices have resolved. Verified by `scripts/verify/opportunity_lens.lua`.
+Owed follow-on: the margin formula is a first-cut estimate (single workforce, no
+contention); refine when the build-cost amortisation model lands.
+
+## Production lens *(built 2026-06-17 — BL-009)*
+
+**Intent.** Read the map as a *production-intensity surface*: where value is actually
+being made right now. Complements Opportunity (potential) with the realised output.
+
+**Data definition (settled).** Per producing tile, intensity = **Σ(output qty ×
+resolved price)** across the building's outputs this tick, read from the
+`economy_report` (`output_quantity`) and the tile's market prices; a processor's
+total output is split across its recipe's products by their batch proportions.
+Idle / exhausted / unbuilt tiles produce nothing → no entry → cold.
+
+**Rung.** Planetary today; a Circumplanetary per-body output badge is owed (rung
+table). Guarded behind `overlay_mode::production`.
+
+**Colour.** Each producing tile's value is taken **relative to the body's
+producing-tile geometric mean** and run through the diverging warm↔cool ramp
+(`diverging_colour`, the same band the Market wash uses): above the mean reads warm,
+below cool, composited at 0.6 over terrain. So contrast is meaningful across bodies
+of very different absolute output; a body of similar producers reads near-neutral
+(honest — there is little intensity spread to show).
+
+**Glyph.** A filled upward triangle over a baseline (`icons::production`) — output
+rising.
+
+**Legend.** Strip glyph + tooltip ("Production intensity") + an on-canvas low→high
+diverging key.
+
+**Interaction notes.** Planetary-only, single-select; the script ticks the economy
+so buildings produce and the report populates before capture. Verified by
+`scripts/verify/production_lens.lua`.
+
 ## Scarcity lens *(built 2026-06-16 — no data dependency)*
 
 **Intent.** The inverse of the Resource lens: read the map as an *absence surface* — where a chosen
 good is **scarce or absent**, so the player sees gaps rather than concentrations. Answers "where is
 there *no* iron?" directly, which the density lens only shows by omission.
 
-**Data definition (settled).** Reads the same `tile.resource_deposit` the Resource lens does; no new
-data. **Single-resource only** — scarcity is meaningful only relative to a specific good (scarcity
-*of what?*), so there is no "highest-value" default mode. The selected good is the shared
-`ui_state.lens_resource` (the same combo Resource single-mode and Market use).
+**Data definition (settled, BL-018).** Reads **market supply shortfall**, not tile deposits:
+`shortfall = max(0, market.demand[sel] − market.supply[sel])` — how much demand outran supply for
+the selected good last tick, independent of price. **Single-resource only** (scarcity *of what?*);
+the good is the shared `ui_state.lens_resource` (same combo as Resource and Market). Reads the
+existing `market_component` arrays — no new data; needs the economy to have ticked so supply/demand
+are populated.
 
 **Rung.** Planetary only. Guarded behind `overlay_mode::scarcity` in `body_surface_canvas.cpp`.
 
-**Colour.** A **translucent** per-tile heatmap: scarcity `= 1 − deposit[sel] / body-max` (normalised
-against the body's richest deposit of the selected good in a pre-pass); the tile is composited toward
-a hot hue (`IM_COL32(220, 70, 55)`) at opacity `0.5 · scarcity`, so an abundant tile keeps its
-terrain and a poor/absent tile reads hot — translucent so terrain still reads beneath. When the body
-holds **none** of the good, every tile reads maximally scarce (absent body-wide).
+**Colour — chunky per-market blocks.** The lens is a **market-level field**, not a per-tile one:
+every tile in a market's catchment (via `market_for_tile`) reads as **one solid block** tinted by
+that market's shortfall, normalised across the body's markets (the body-max shortfall in a pre-pass).
+A tile is composited toward a hot hue (`IM_COL32(220, 70, 55)`) at opacity `0.6 · scarcity`, so a
+met market keeps terrain and a short one reads hot. With one market per body (the present generation)
+the whole body reads as a single block — honest to the market structure (the catchment is the unit);
+it gains spatial variation once multiple centres are seeded (BL-036).
 
 **Glyph.** A hollow downward-pointing triangle (`icons::scarcity`) — an "empty / depleted" motif,
 the inverse of the filled resource pip.
@@ -363,5 +453,12 @@ the inverse of the filled resource pip.
 same placement as the others. Tooltip "Resource scarcity". The resource selector appears in the
 control strip when the lens is active (shared form with Resource/Market).
 
-**Interaction notes.** Planetary-only, single-select. Verified by `scripts/verify/scarcity_lens.lua`
-against blessed goldens (iron and coal variants prove the selector re-skins the surface).
+**Interaction notes.** Planetary-only, single-select. The script runs `verify.econ_step(12)` so
+market supply/demand populate before capture. Verified by `scripts/verify/scarcity_lens.lua`
+against blessed goldens (iron and steel variants prove the selector re-skins the surface).
+
+**Implemented 2026-06-17** (Lens & Legibility batch, BL-018). Reworked from the prior deposit-based
+per-tile heatmap to per-market shortfall blocks: a pre-pass collects each body market's
+`max(0, demand−supply)` of the selected good and the body-max; the fill pass maps each tile to its
+market (`market_for_tile`) and composites the hot hue by the normalised shortfall. The on-canvas key
+reads "Market scarcity" (met → scarce).

@@ -133,7 +133,7 @@ void market(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     }
 }
 
-void faction(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+void country(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
 {
     // Downward-pointing shield silhouette: flat top, square shoulders, point at
     // the bottom. Filled with a thin dark outline for contrast on any background.
@@ -204,6 +204,31 @@ void scarcity(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
         { centre.x,     centre.y + r },   // bottom point
     };
     dl->AddPolyline(v, 3, colour, ImDrawFlags_Closed, 1.5f);
+}
+
+void opportunity(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // An open circle with an inner "+" — a "potential gain / margin" motif: where
+    // value *could* be made. Stroke only, distinct from the filled corporation
+    // seal-square and the resource strata.
+    dl->AddCircle(centre, r, colour, 0, 1.5f);
+    const float a = r * 0.5f;
+    dl->AddLine({ centre.x - a, centre.y }, { centre.x + a, centre.y }, colour, 1.5f);
+    dl->AddLine({ centre.x, centre.y - a }, { centre.x, centre.y + a }, colour, 1.5f);
+}
+
+void production(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // A filled upward-pointing triangle over a short baseline — an "output /
+    // throughput rising" motif. Distinct from the market vertical bars and the
+    // scarcity hollow down-triangle (this one is filled and points up).
+    const ImVec2 v[3] = {
+        { centre.x,         centre.y - r },        // apex
+        { centre.x + r,     centre.y + r * 0.5f }, // bottom-right
+        { centre.x - r,     centre.y + r * 0.5f }, // bottom-left
+    };
+    dl->AddConvexPolyFilled(v, 3, colour);
+    dl->AddLine({ centre.x - r, centre.y + r }, { centre.x + r, centre.y + r }, colour, 1.5f);
 }
 
 } // namespace ui::icons

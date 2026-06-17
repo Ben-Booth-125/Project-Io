@@ -9,11 +9,14 @@ Any discrete celestial object in the simulation — planet, moon, asteroid, or s
 **Corporation**
 The player's controlling entity. Unlike nation-states, a corporation begins with no territorial claim or military force and must justify every asset through economic or strategic return. The corporation persists as long as it holds any asset.
 
+**Country**
+A generated nation; the territorial/political unit that holds tiles on a body. The Country map lens (`overlay_mode::country`, formerly "Faction") tints each nation's tiles by its identity colour (`nation_colour`) with dark borders between owners. See **Faction**.
+
 **Tick**
 The fixed period between economy updates. Supply, demand, and market prices resolve at the end of each Tick. Real-time play continues within a Tick; the boundary is a hard economic checkpoint, not a pause.
 
 **Faction**
-A named actor with a distinct starting position, ideology, and resource profile. Factions include the player's corporation and all AI-controlled entities. Each faction maintains sentiment values toward every other known faction.
+A named actor with a distinct starting position, ideology, and resource profile. Factions include the player's corporation and all AI-controlled entities. Each faction maintains sentiment values toward every other known faction. The map lens that shows national territory is now the **Country** lens (it shows nations, not the broad Faction actor set); "faction" as a colour concept — player-vs-rival corporation identity — is the **Corporation** identity colour (`corp_colour`).
 
 **Market**
 A pooled exchange with a physical boundary through which any faction can buy or sell goods with the delivery cost depending on logistical cost. Price is set by rarity on a body, then modulated by local supply and demand. All tiles belong to a market.
@@ -154,7 +157,7 @@ A per-entity store of resource quantities, held in a `stockpile_component`. Extr
 
 ### Conceptual overlaps worth a crisp boundary
 
-- **Faction** vs **Corporation** — Faction is defined to *include* the player's corporation, yet Corporation is its own headline entry as "the player's controlling entity." The relationship (every corporation is a faction; a faction may be a corporation or something else) is implied but never stated. One sentence in each entry cross-referencing the other would remove the ambiguity.
+- **Faction** vs **Corporation** — Faction is defined to *include* the player's corporation, yet Corporation is its own headline entry as "the player's controlling entity." The relationship (every corporation is a faction; a faction may be a corporation or something else) is implied but never stated. One sentence in each entry cross-referencing the other would remove the ambiguity. (Note: **Country** (= nation territory) is now a distinct third term, resolving the old conflation where the "Faction" lens actually showed nations.)
 - **Canvas** vs **Ledger** — both are "views/screens." The intended distinction (Canvas = navigable spatial screen; Ledger = sub-system report window) isn't recoverable from the definitions alone. Worth making explicit in both entries.
 
 ### Terms referenced in the docs but missing from the glossary

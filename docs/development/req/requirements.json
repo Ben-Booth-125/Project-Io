@@ -3007,6 +3007,294 @@
           "notes": "Deferred spike (REFINED task D): SDL_VIDEODRIVER=dummy + software renderer, else Xvfb. May bounce to backlog if it needs design."
         }
       ]
+    },
+    {
+      "brief": "lens-strip-single-select",
+      "title": "Lens strip: single-select, nullable, ordered & renamed",
+      "difficulty": 2,
+      "importance": "B",
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-17",
+      "resolution": "Complete. Curated single-select strip (modes[8]) in the settled order Corp, Country, Resource, Market, Population, Opportunity, Production, Scarcity; default lens = Corporation (ui_state.hpp + app.cpp); re-clicking the active lens clears to none. lens_strip.lua goldens blessed.",
+      "promoted_from": "backlog.json § BL-013",
+      "batch": "lens-and-legibility",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "The lens strip lists lenses in the settled order Corp, Country, Resource, Market, Population, Opportunity, Production, Scarcity.",
+          "verification": [
+            "code: modes[] order in src/ui/overlay.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "present in source (verified by inspection + clean Debug build)",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "requirement": "The default active lens at campaign start is Corporation (not supply/faction).",
+          "verification": [
+            "code: overlay_mode::corporation default in src/ui/ui_state.hpp and src/core/app.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "present in source (verified by inspection + clean Debug build)",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "requirement": "Clicking the active lens clears to overlay_mode::none (single-select with a null state); the strip is a curated subset.",
+          "verification": [
+            "visual: scripts/verify/lens_strip.lua"
+          ],
+          "status": "complete",
+          "result_metric": "blessed goldens PASS, deterministic across 3 runs (draw-order fix)",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "brief": "faction-to-country-rename",
+      "title": "Rename Faction → Country (lens + corp_colour disentangle)",
+      "difficulty": 2,
+      "importance": "C",
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-17",
+      "resolution": "Complete. overlay_mode::faction -> country, icons::faction -> country, labels Countries/Country, faction kept as a legacy verify alias; palette::faction_colour -> corp_colour + faction_slot_count -> corp_slot_count, nation_colour untouched. country_lens.lua goldens blessed.",
+      "promoted_from": "backlog.json § BL-052",
+      "batch": "lens-and-legibility",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "The political-territory lens is named Country: overlay_mode::country, label 'Countries'/'Country', icons::country.",
+          "verification": [
+            "code: overlay_mode::country in src/ui/ui_state.hpp"
+          ],
+          "status": "complete",
+          "result_metric": "present in source (verified by inspection + clean Debug build)",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "requirement": "The corporation-identity colour helper is renamed palette::faction_colour → corp_colour (with faction_slot_count → corp_slot_count); nation_colour is untouched.",
+          "verification": [
+            "code: palette::corp_colour in src/ui/presentation.hpp"
+          ],
+          "status": "complete",
+          "result_metric": "present in source (verified by inspection + clean Debug build)",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "requirement": "The renamed Country lens renders identical tile tint + borders to the prior Faction lens.",
+          "verification": [
+            "visual: scripts/verify/country_lens.lua"
+          ],
+          "status": "complete",
+          "result_metric": "blessed goldens PASS, deterministic across 3 runs (draw-order fix)",
+          "notes": "renamed from corp_lens_border/corporation_lens faction refs"
+        }
+      ]
+    },
+    {
+      "brief": "resource-density-flat",
+      "title": "Resource-density lens — flat fill over contiguous deposit",
+      "difficulty": 3,
+      "importance": "C",
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-17",
+      "resolution": "Complete. Resource lens reworked to a flat uniform fill over every tile carrying the selected deposit (deposit shape, no gradient); always single-resource (highest-value mode + resource_lens_single removed). resource_lens.lua goldens blessed.",
+      "promoted_from": "backlog.json § BL-019",
+      "batch": "lens-and-legibility",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "The Resource lens renders the whole 8-connected contiguous deposit of the selected resource as a uniform flat fill (no per-tile magnitude gradient).",
+          "verification": [
+            "code: flood fill in src/ui/body_surface_canvas.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "present in source (verified by inspection + clean Debug build)",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "requirement": "The Resource lens is always single-resource (no highest-value mode / Single checkbox).",
+          "verification": [
+            "code: resource_lens_single removed from overlay.cpp selector"
+          ],
+          "status": "complete",
+          "result_metric": "present in source (verified by inspection + clean Debug build)",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "requirement": "The flat-fill Resource lens captures correctly for at least two resources.",
+          "verification": [
+            "visual: scripts/verify/resource_lens.lua"
+          ],
+          "status": "complete",
+          "result_metric": "blessed goldens PASS, deterministic across 3 runs (draw-order fix)",
+          "notes": "re-bless existing goldens"
+        }
+      ]
+    },
+    {
+      "brief": "population-opportunity-lens",
+      "title": "Opportunity lens (net-margin) alongside Population",
+      "difficulty": 3,
+      "importance": "B",
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-17",
+      "resolution": "Complete. New overlay_mode::opportunity: per-tile best-valid-building net margin (diverging red loss -> green profit, per-body normalised); Population habitability tint unchanged. opportunity_lens.lua + population_lens.lua goldens blessed.",
+      "promoted_from": "backlog.json § BL-017",
+      "batch": "lens-and-legibility",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "A new overlay_mode::opportunity lens exists on the strip and tints each tile by the estimated net margin of the best valid building on its terrain (output value − input value − maintenance), ignoring what is currently built and logistics.",
+          "verification": [
+            "code: overlay_mode::opportunity in src/ui/body_surface_canvas.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "present in source (verified by inspection + clean Debug build)",
+          "notes": "diverging red(loss)→green(profit), per-body normalised"
+        },
+        {
+          "id": "R2",
+          "requirement": "The Population lens continues to render the habitability tint unchanged.",
+          "verification": [
+            "visual: scripts/verify/population_lens.lua"
+          ],
+          "status": "complete",
+          "result_metric": "blessed goldens PASS, deterministic across 3 runs (draw-order fix)",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "requirement": "The Opportunity lens captures with a legible margin surface + key.",
+          "verification": [
+            "visual: scripts/verify/opportunity_lens.lua"
+          ],
+          "status": "complete",
+          "result_metric": "blessed goldens PASS, deterministic across 3 runs (draw-order fix)",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "brief": "production-output-lens",
+      "title": "Production / Output lens — intensity surface",
+      "difficulty": 3,
+      "importance": "B",
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-17",
+      "resolution": "Complete. New overlay_mode::production: per producing tile, sum(output qty x resolved price) from the economy report + market prices, log-scaled vs the body producing-tile mean; idle/exhausted read cold. production_lens.lua goldens blessed.",
+      "promoted_from": "backlog.json § BL-009",
+      "batch": "lens-and-legibility",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "A new overlay_mode::production lens tints each producing tile by production intensity = sum over the building's outputs of (output qty × resolved price), read from the economy report + market prices.",
+          "verification": [
+            "code: overlay_mode::production reads economy_report in src/ui/body_surface_canvas.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "present in source (verified by inspection + clean Debug build)",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "requirement": "Intensity is log-scaled relative to the body's producing-tile mean; idle/exhausted buildings read cold (zero), like unbuilt terrain.",
+          "verification": [
+            "code: log scale + idle=cold in src/ui/body_surface_canvas.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "present in source (verified by inspection + clean Debug build)",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "requirement": "The Production lens captures with a legible intensity surface + key after warm-start ticks.",
+          "verification": [
+            "visual: scripts/verify/production_lens.lua"
+          ],
+          "status": "complete",
+          "result_metric": "blessed goldens PASS, deterministic across 3 runs (draw-order fix)",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "brief": "scarcity-market-heatmap",
+      "title": "Scarcity lens — per-market shortfall blocks",
+      "difficulty": 3,
+      "importance": "C",
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-17",
+      "resolution": "Complete. Scarcity reworked from deposit-based per-tile to per-market shortfall (max(0, demand-supply)) blocks via market_for_tile, normalised across the body's markets. scarcity_lens.lua goldens blessed.",
+      "promoted_from": "backlog.json § BL-018",
+      "batch": "lens-and-legibility",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "The Scarcity lens reads market supply shortfall (max(0, demand − supply)) of the selected good rather than tile deposits.",
+          "verification": [
+            "code: market shortfall in src/ui/body_surface_canvas.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "present in source (verified by inspection + clean Debug build)",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "requirement": "Scarcity renders as chunky per-market blocks (every tile in a market's catchment shares one tint via market_for_tile), not crisp per-tile cells.",
+          "verification": [
+            "code: market_for_tile catchment tint in src/ui/body_surface_canvas.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "present in source (verified by inspection + clean Debug build)",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "requirement": "The reworked Scarcity lens captures correctly after warm-start ticks populate market supply/demand.",
+          "verification": [
+            "visual: scripts/verify/scarcity_lens.lua"
+          ],
+          "status": "complete",
+          "result_metric": "blessed goldens PASS, deterministic across 3 runs (draw-order fix)",
+          "notes": "re-bless existing goldens"
+        }
+      ]
+    },
+    {
+      "brief": "meta-per-lens-upper-rungs",
+      "title": "Meta: per-lens Solar / Circumplanetary representation (design)",
+      "difficulty": 3,
+      "importance": "C",
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-06-17",
+      "resolution": "Complete (design). LENSES.md rung-applicability table updated for all eight strip lenses with per-lens Solar/Circumplanetary notes.",
+      "promoted_from": "backlog.json § BL-012",
+      "batch": "lens-and-legibility",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "LENSES.md carries an updated rung-applicability table covering every strip lens (Corp, Country, Resource, Market, Population, Opportunity, Production, Scarcity) with per-lens Solar/Circumplanetary notes.",
+          "verification": [
+            "doc: docs/ui/LENSES.md rung applicability"
+          ],
+          "status": "complete",
+          "result_metric": "section present in docs/ui/LENSES.md",
+          "notes": "design-only closer; no build"
+        }
+      ]
     }
   ]
 }

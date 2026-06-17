@@ -6,6 +6,75 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — Lens & Legibility Batch Delivery (2026-06-17)
+
+**Goal.** Deliver the full lens strip (bar the Market slot, gated on multi-market
+seeding) + the legibility lenses, as a Batch Delivery: BL-013, BL-052, BL-019,
+BL-017, BL-009, BL-018, plus BL-012 as a design-only closer.
+
+**Status: Complete — 22/22 requirements met across 7 groups** (lens-strip R1–R3,
+faction-to-country R1–R3, resource-density R1–R3, population-opportunity R1–R3,
+production-output R1–R3, scarcity-market R1–R3, meta-per-lens-upper-rungs R1). All
+`visual` rows verified against blessed goldens, deterministic across 3 runs.
+
+**Changes (all main-session, sequential — single-file-concentrated render refactor):**
+- **BL-013 strip:** curated single-select `modes[8]` in order Corp, Country,
+  Resource, Market, Population, Opportunity, Production, Scarcity (Supply off-strip);
+  default lens → Corporation (`ui_state.hpp` + `app.cpp`); re-click clears to none.
+- **BL-052 Faction→Country:** `overlay_mode::faction`→`country`, `icons::faction`→
+  `country`, labels "Countries"/"Country" ("faction" kept as a verify alias);
+  disentangled `palette::faction_colour`→`corp_colour` (+ `faction_slot_count`→
+  `corp_slot_count`); `nation_colour` untouched.
+- **BL-019 Resource:** reworked to a flat uniform fill over the contiguous deposit
+  of the selected good; always single-resource (removed highest-value mode +
+  `resource_lens_single`).
+- **BL-017 Opportunity:** new `overlay_mode::opportunity` — per-tile best-valid-
+  building net margin (diverging red→green, per-body normalised); Population
+  habitability tint unchanged.
+- **BL-009 Production:** new `overlay_mode::production` — per producing tile,
+  Σ(output qty × resolved price) from the `economy_report` + market prices, log-scaled
+  vs the body producing-tile mean; idle/exhausted read cold. Canvas signature gained
+  `const recipe_registry&` + `const economy_report&`.
+- **BL-018 Scarcity:** reworked from deposit-based per-tile to per-market shortfall
+  (`max(0, demand−supply)`) blocks via `market_for_tile`, normalised across the body's
+  markets.
+- **BL-012 (design closer):** LENSES.md rung-applicability table + per-lens
+  Solar/Circumplanetary notes for all eight strip lenses.
+- **Render determinism fix (enabling):** the Planetary draw loop now iterates tiles
+  in sorted-id order. `w.tiles` is a `std::unordered_map` whose per-process iteration
+  order made full-body golden captures flake ~1–2% on antialiased hex edges; sorting
+  makes captures reproducible (verified 0 fails across 3 independent suite runs).
+- **Docs:** LENSES.md (all six lenses + rung table + selection-routing table),
+  ICONS.md (country/opportunity/production glyphs, corp_colour), GLOSSARY.md (Country
+  term). ICONS/GLOSSARY propagated by parallel sub-agents.
+
+**In-session decisions (design-direction Q&A):**
+- **No code fan-out.** Every item converged on `body_surface_canvas.cpp` + the
+  shared strip/enum/colour files; per DELIVERY.md ("passes in one file are
+  sequential, hotspots stay in the main session") the worktree-merge cost exceeded
+  the win. Fan-out was used only for the disjoint doc-propagation wave.
+- **Resource flat fill:** the settled "8-connected flood fill" is visually identical
+  to a per-tile `deposit>0` threshold under a uniform fill, so no flood-fill pass was
+  built (recorded as a deliberate simplification).
+- **Opportunity margin** is a first-cut estimate (single workforce, no contention, no
+  build-cost amortisation) — refine when those models land.
+- **Production intensity** uses a geometric-mean-relative diverging scale; a body of
+  similar producers reads near-neutral (honest — little spread to show).
+- **Scarcity** with one market per body reads as a single body-wide block (honest to
+  the catchment-as-unit structure); spatial variation arrives with BL-036.
+- **GLOSSARY Faction vs Country:** the broad "Faction" actor/sentiment concept was
+  kept; only the *lens* (which showed nations) became Country. Flagged as the one
+  non-mechanical naming call.
+- **Golden ripple:** the default-lens change (Corporation) and the icon/strip change
+  restaled most canvas-bearing goldens; the whole suite was re-blessed against the
+  now-deterministic frames.
+
+**Left open:** Market-boundary lens (BL-015) + multi-market ledger (BL-025) still
+gated on BL-036 (market-centre seeding → population layer). Per-body Circumplanetary
+badges for Production/Scarcity noted in the LENSES.md rung table as owed.
+
+---
+
 ## Session — Supply layer R8+R9 closure (2026-06-17)
 
 **Goal.** Close the two remaining active requirements on the supply-layer group: R8 (headless multi-tick price convergence) and R9 (visual golden).

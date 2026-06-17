@@ -35,9 +35,9 @@ constexpr resource_presentation resource_table[resource_count] = {
     { "Food Rations",      "Food",IM_COL32(220, 180, 120, 255) }, // warm ration tan
 };
 
-// Reserved faction identity colours. Slot 0 is the player's corporation; the
-// rest are placeholders for the rival factions the data model already permits.
-constexpr ImU32 faction_table[palette::faction_slot_count] = {
+// Reserved corporation identity colours. Slot 0 is the player's corporation; the
+// rest are placeholders for the rival corporations the data model already permits.
+constexpr ImU32 corp_table[palette::corp_slot_count] = {
     IM_COL32( 80, 150, 230, 255), // player — corporate blue
     IM_COL32(220, 110,  90, 255), // red
     IM_COL32(110, 200, 130, 255), // green
@@ -119,16 +119,16 @@ const char* building_type_name(building_type t)
 
 namespace palette {
 
-ImU32 faction_colour(int slot)
+ImU32 corp_colour(int slot)
 {
-    const int s = ((slot % faction_slot_count) + faction_slot_count) % faction_slot_count;
-    return faction_table[s];
+    const int s = ((slot % corp_slot_count) + corp_slot_count) % corp_slot_count;
+    return corp_table[s];
 }
 
 ImU32 nation_colour(entity_id id)
 {
     // Twelve hues stepped ~30 deg around the wheel at moderate saturation/value,
-    // legible on the dark canvas and distinct from the faction palette.
+    // legible on the dark canvas and distinct from the corporation palette.
     static constexpr ImU32 nation_table[nation_slot_count] = {
         IM_COL32(204, 102, 102, 255), // red
         IM_COL32(204, 153, 102, 255), // orange

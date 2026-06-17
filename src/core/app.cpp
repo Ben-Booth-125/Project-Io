@@ -56,10 +56,13 @@ overlay_mode overlay_from_name(const std::string& s)
 {
     if (s == "supply")      return overlay_mode::supply;
     if (s == "market")      return overlay_mode::market;
-    if (s == "faction")     return overlay_mode::faction;
+    if (s == "country")     return overlay_mode::country;
+    if (s == "faction")     return overlay_mode::country; // legacy alias (renamed BL-052)
     if (s == "corporation") return overlay_mode::corporation;
     if (s == "resource")    return overlay_mode::resource;
     if (s == "population")  return overlay_mode::population;
+    if (s == "opportunity") return overlay_mode::opportunity;
+    if (s == "production")  return overlay_mode::production;
     if (s == "scarcity")    return overlay_mode::scarcity;
     return overlay_mode::none;
 }
@@ -277,10 +280,10 @@ void app::setup_world()
     // Routed through the shared focus helper rather than poking ui_state.
     ui::focus_on_surface(m_world, m_ui, start_body);
 
-    // Open with the Faction lens active so the generated political layer (nation
-    // territory tints + borders) is visible on the first frame rather than a bare
-    // terrain map. See TODO § Canvas (political layer render).
-    m_ui.overlay = overlay_mode::faction;
+    // Open with the Corporation lens active (BL-013): the player reads their own
+    // footprint first. Single-select with a null state — re-clicking the active
+    // lens clears to overlay_mode::none. See LENSES.md, docs/ui § lens strip.
+    m_ui.overlay = overlay_mode::corporation;
 }
 
 int app::run_verify(const std::string& script_path, bool bless)
@@ -321,14 +324,14 @@ int app::run_verify(const std::string& script_path, bool bless)
     v.set_function("set_overlay", [this](const std::string& name) {
         m_ui.overlay = overlay_from_name(name);
     });
-    // Drive the Resource/Market lens-local selector headlessly so a golden can pick
-    // the displayed good and (Resource) the highest-value / single-resource mode.
+    // Drive the Resource/Market/Scarcity lens-local selector headlessly so a golden
+    // can pick the displayed good.
     v.set_function("set_lens_resource", [this](const std::string& name) {
         m_ui.lens_resource = resource_from_name(name);
     });
-    v.set_function("set_resource_mode", [this](bool single) {
-        m_ui.resource_lens_single = single;
-    });
+    // Obsolete since BL-019 (the Resource lens is always single-resource); retained
+    // as a no-op so existing verify scripts that call it keep loading.
+    v.set_function("set_resource_mode", [](bool) {});
     v.set_function("set_zoom", [this](float z) { m_ui.planetary_zoom = z; });
     v.set_function("set_pan",  [this](float x, float y) {
         m_ui.planetary_pan_x = x;
@@ -686,7 +689,7 @@ void app::render()
                 break;
 
             case canvas_level::planetary:
-                ui::draw_body_surface_canvas(m_world, m_ui, {0.0f, 0.0f}, disp, primary_input);
+                ui::draw_body_surface_canvas(m_world, m_ui, m_registry, m_last_econ_report, {0.0f, 0.0f}, disp, primary_input);
                 ui::draw_circumplanetary_canvas(m_world, m_ui, inset_origin, inset_size, minimap_input, true);
                 {
                     const entity_id anchor = ui::circumplanetary_anchor(m_world, m_ui.active_body);

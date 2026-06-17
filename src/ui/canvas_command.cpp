@@ -17,8 +17,9 @@ constexpr float pan_step  = 80.0f;
 constexpr float zoom_step = 1.1f;
 
 // Number of overlay_mode values, for wrap-around lens cycling. Keep in sync with
-// the enum in ui_state.hpp (none, supply, market, faction, corporation).
-constexpr int overlay_mode_count = 5;
+// the enum in ui_state.hpp (none, supply, market, country, corporation, resource,
+// population, opportunity, production, scarcity).
+constexpr int overlay_mode_count = 10;
 
 /// Pointers to the pan/zoom fields of whichever rung is currently primary, so the
 /// pan/zoom commands act on the foregrounded canvas without per-rung branches.

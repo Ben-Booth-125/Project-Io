@@ -71,27 +71,29 @@ inline constexpr ImU32 selection = IM_COL32(255, 255, 255, 255); ///< The select
 inline constexpr ImU32 hover     = IM_COL32(120, 190, 255, 255); ///< The entity under the cursor.
 inline constexpr ImU32 pinned    = IM_COL32(255, 200,  90, 255); ///< An Explorer-pinned entity.
 
-/// Number of reserved faction colour slots. The data model already allows
-/// multiple factions (unit_component.owner); these are their on-canvas colours.
-inline constexpr int faction_slot_count = 6;
+/// Number of reserved corporation colour slots. These are the on-canvas identity
+/// colours for corporations (player vs. rivals); slot 0 is the player's corp.
+/// (Renamed from faction_slot_count, BL-052 — this palette is corporation
+/// identity, not nation territory, which keys off nation_colour.)
+inline constexpr int corp_slot_count = 6;
 
-/// On-canvas identity colour for faction slot @p slot, wrapping modulo
-/// faction_slot_count so any index is safe. Slot 0 is the player's corporation.
+/// On-canvas identity colour for corporation slot @p slot, wrapping modulo
+/// corp_slot_count so any index is safe. Slot 0 is the player's corporation.
 ///
-/// @param slot Faction index (player == 0).
-/// @return     The faction's reserved colour.
-ImU32 faction_colour(int slot);
+/// @param slot Corporation index (player == 0).
+/// @return     The corporation's reserved colour.
+ImU32 corp_colour(int slot);
 
-/// Number of distinct nation identity colours. Larger than faction_slot_count
-/// because a generated world holds many nations; the Faction-lens tile tint
+/// Number of distinct nation identity colours. Larger than corp_slot_count
+/// because a generated world holds many nations; the Country-lens tile tint
 /// keys off this palette via nation_colour.
 inline constexpr int nation_slot_count = 12;
 
 /// Stable on-canvas identity colour for a nation, keyed by its entity id. A
 /// multiplicative (Knuth) hash spreads sequential ids across the palette so
 /// neighbouring nations (often consecutive ids) rarely share or sit adjacent in
-/// hue. Distinct from the faction palette: nations tint territory, factions mark
-/// ownership.
+/// hue. Distinct from the corporation palette: nations tint territory,
+/// corporations mark ownership.
 ///
 /// @param id Nation entity id.
 /// @return   The nation's identity colour.

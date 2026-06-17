@@ -82,14 +82,33 @@ void convoy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Stroke colour.
 void market(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
-/// Draw the Faction-lens glyph — a downward-pointing shield silhouette — in
-/// @p colour. For the overlay-lens control strip.
+/// Draw the Country-lens glyph — a downward-pointing shield silhouette — in
+/// @p colour. For the overlay-lens control strip. (Renamed from `faction`,
+/// BL-052: the lens reads national territory.)
 ///
 /// @param dl     Draw list to render into.
 /// @param centre Glyph centre, screen pixels.
 /// @param r      Half-extent of the glyph, screen pixels.
 /// @param colour Fill colour.
-void faction(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+void country(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
+/// Draw the Opportunity-lens glyph — an open circle with an inner "+" (potential
+/// margin / where value could be made). For the overlay-lens control strip.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Stroke colour.
+void opportunity(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
+/// Draw the Production-lens glyph — a filled upward triangle over a baseline
+/// (output / throughput rising). For the overlay-lens control strip.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Fill colour.
+void production(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
 /// Draw the Corporation-lens glyph — a filled square with a centred inner dot, a
 /// "seal" silhouette — in @p colour. Distinct from the processing-facility plain
