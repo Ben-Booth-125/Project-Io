@@ -231,6 +231,20 @@ struct sell_order
     float         floor_price = 0.0f; ///< Minimum acceptable unit price; 0 = sell at the market price.
 };
 
+/// A buy order for one resource — the demand side of the order book. Each
+/// economy tick the clearing system matches buy orders against sell orders
+/// by price-time priority (cheapest seller first; highest bidder first).
+/// Defined alongside sell_order so both the UI and clearing system can name it.
+struct buy_order
+{
+    entity_id     corp             = null_entity;
+    entity_id     body             = null_entity;
+    resource_type resource         = resource_type::iron_ore;
+    float         quantity         = 0.0f;
+    float         max_price        = 0.0f; ///< Maximum acceptable unit price; 999 = pay anything.
+    entity_id     preferred_seller = null_entity; ///< Optional counterparty preference.
+};
+
 /// Land-use classification of a tile or zone. Drives the trade-off between
 /// residential, industrial, agricultural, and undeveloped land.
 /// See docs/economy/POPULATION.md § Land-use trade-offs.
