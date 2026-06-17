@@ -451,5 +451,26 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
         }
     }
 
+    inject_substrate_demand(w);
+
     return report;
+}
+
+void inject_substrate_demand(world& w)
+{
+    for (auto& [key, sub] : w.nation_substrates)
+    {
+        const entity_id body_id = key.second;
+        for (auto& [mid, mc] : w.markets)
+        {
+            if (mc.body != body_id)
+                continue;
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                mc.supply[r] += sub.background_supply[r];
+                mc.demand[r] += sub.background_demand[r];
+            }
+            break; // one market per body for now
+        }
+    }
 }

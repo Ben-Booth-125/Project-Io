@@ -653,5 +653,66 @@ std::vector<entity_id> generate_nations(
         w.tile_to_nation[tid] = nation_ids[static_cast<std::size_t>(ni)];
     }
 
+    // --- Pass 6: substrate density + nation_substrate accumulation ---
+    // For each nation-owned tile, find the nearest population centre on the same
+    // body and compute a density ripple. Tiles on bodies with no centres are left
+    // at substrate_density = 0.
+    constexpr float ripple_radius = 8.0f;
+
+    for (int idx = 0; idx < total; ++idx)
+    {
+        const int ni = owner_map[static_cast<std::size_t>(idx)];
+        if (ni < 0)
+            continue;
+
+        const entity_id tid = tile_ids[static_cast<std::size_t>(idx)];
+        if (tid == null_entity)
+            continue;
+
+        auto tile_it = w.tiles.find(tid);
+        if (tile_it == w.tiles.end())
+            continue;
+
+        tile_component& tc      = tile_it->second;
+        const entity_id body_id = tc.body;
+        const int       tx      = tc.grid_x;
+        const int       ty      = tc.grid_y;
+
+        // Find nearest population centre on the same body.
+        float     best_density  = 0.0f;
+        for (const auto& [cid, cc] : w.population_centres)
+        {
+            const auto ct_it = w.population_centre_tile.find(cid);
+            if (ct_it == w.population_centre_tile.end())
+                continue;
+
+            const auto ct2 = w.tiles.find(ct_it->second);
+            if (ct2 == w.tiles.end() || ct2->second.body != body_id)
+                continue;
+
+            const int dx   = std::abs(tx - ct2->second.grid_x);
+            const int dy   = std::abs(ty - ct2->second.grid_y);
+            const int dist = std::max(dx, dy); // Chebyshev
+            const float density = std::max(0.0f, 1.0f - static_cast<float>(dist) / ripple_radius)
+                                  * cc.scale;
+            if (density > best_density)
+                best_density = density;
+        }
+
+        tc.substrate_density = best_density;
+
+        if (best_density <= 0.0f)
+            continue;
+
+        const entity_id nation_id = nation_ids[static_cast<std::size_t>(ni)];
+        nation_substrate& sub = w.nation_substrates[std::make_pair(nation_id, body_id)];
+
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            sub.background_supply[r] += best_density * tc.resource_deposit[r] * 2.0f;
+            sub.background_demand[r] += best_density * 0.5f;
+        }
+    }
+
     return nation_ids;
 }
