@@ -1,0 +1,36 @@
+{
+  "date": "2026-06-17",
+  "milestone": "v0.0.6",
+  "batch_name": "Improved Core-Loop",
+  "delivered_items": [
+    {"id": "BL-050", "title": "Generate the saturated nation-owned background substrate",     "commit": "6691c7a"},
+    {"id": "BL-037", "title": "Preferential purchasing (choosing counterparties)",            "commit": "a980079"},
+    {"id": "BL-056", "title": "Economy bankruptcy test — calibrate costs to a 10–20 year runway", "commit": "b4e2b45"},
+    {"id": "BL-036", "title": "Seed multiple market centres from capitals / population",      "commit": "6691c7a"},
+    {"id": "BL-025", "title": "Surface multiple markets in the economy / market ledgers",    "commit": "8cf72a7"},
+    {"id": "BL-035", "title": "Economy warm-start pre-generation pass — surface auto-buy / auto-sell", "commit": "8cf72a7"}
+  ],
+  "requirements_closed": [
+    "saturated-substrate",
+    "order-book",
+    "econ-bankruptcy",
+    "market-centre-seeding",
+    "multi-market-dashboard",
+    "warm-start-surface"
+  ],
+  "goldens_blessed": [
+    {"file": "market_ledger.png",           "reason_tag": "new-capture",  "reason": "Initial capture — multi-market dashboard (BL-025) + warm-start surface (BL-035)"},
+    {"file": "market_lens_planetary_iron.png", "reason_tag": "new-capture", "reason": "Market lens with warm/cool price wash after warm-start ticks — iron ore (BL-035 proof)"},
+    {"file": "market_lens_planetary_steel.png","reason_tag": "new-capture", "reason": "Market lens re-keyed to steel — proves good-selector works independently"},
+    {"file": "market_lens_circum_strip.png", "reason_tag": "new-capture",  "reason": "Circumplanetary price strip: prices readable at orbit (market-lens-render R5)"},
+    {"file": "country_lens_full.png",        "reason_tag": "world-change", "reason": "Substrate injection + multi-market seeding altered the price distribution visible under the Country lens"},
+    {"file": "country_lens_zoom.png",        "reason_tag": "world-change", "reason": "Same as country_lens_full — world-change re-bless"},
+    {"file": "opportunity_lens_full.png",    "reason_tag": "world-change", "reason": "Opportunity heatmap affected by deposit/price distribution shift from substrate and multi-market"},
+    {"file": "opportunity_lens_zoom.png",    "reason_tag": "world-change", "reason": "Same as opportunity_lens_full — world-change re-bless"},
+    {"file": "scarcity_lens_full_iron.png",  "reason_tag": "world-change", "reason": "Multi-market catchments reshaped scarcity blocks (chunky regions now match new market layout)"},
+    {"file": "scarcity_lens_full_steel.png", "reason_tag": "world-change", "reason": "Same as scarcity_lens_full_iron — world-change re-bless for steel"},
+    {"file": "scarcity_lens_zoom_iron.png",  "reason_tag": "world-change", "reason": "Catchment boundary step change visible at zoom; re-blessed after multi-market layout change"}
+  ],
+  "pending_doc_propagation": [],
+  "housekeeping_complete": true
+}
