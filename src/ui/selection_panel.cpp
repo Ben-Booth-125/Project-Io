@@ -5,6 +5,7 @@
 #include "selection.hpp"
 #include "view_nav.hpp"
 
+#include "world/market_clearing.hpp"
 #include "world/placement_rules.hpp"
 
 #include <imgui.h>
@@ -204,6 +205,89 @@ void draw_selection_panel(const world& w, const recipe_registry& reg, ui_state& 
 
     // --- Body: polymorphic content for the selected kind ---
     draw_summary(w, kind, ui.selected_entity);
+
+    // Lens-contextual supplement (BL-032): when a tile is selected and a lens is
+    // active, show the most relevant stat for that lens below the base summary.
+    if (kind == selection_kind::tile)
+    {
+        const entity_id tile = ui.selected_entity;
+        const auto tit = w.tiles.find(tile);
+
+        if (tit != w.tiles.end())
+        {
+            if (ui.overlay == overlay_mode::corporation)
+            {
+                // Corporation lens: show which corp owns a building on this tile.
+                const corporation_component* owner_corp = nullptr;
+                for (const auto& [bld_id, bc] : w.buildings)
+                {
+                    if (bc.tile != tile)
+                        continue;
+                    for (const auto& [corp_id, cc] : w.corporations)
+                    {
+                        for (entity_id a : cc.assets)
+                        {
+                            if (a == bld_id)
+                            {
+                                owner_corp = &cc;
+                                break;
+                            }
+                        }
+                        if (owner_corp)
+                            break;
+                    }
+                    break;
+                }
+                if (owner_corp)
+                {
+                    ImGui::Separator();
+                    ImGui::TextColored({0.7f, 0.8f, 1.0f, 1.0f},
+                        "Owner: %s", owner_corp->name.c_str());
+                }
+            }
+            else if (ui.overlay == overlay_mode::market)
+            {
+                // Market lens: show which market's catchment covers this tile.
+                ImGui::Separator();
+                const entity_id mkt_id = market_for_tile(w, tile);
+                const auto mkt_it = w.markets.find(mkt_id);
+                if (mkt_it != w.markets.end())
+                {
+                    // Ordinal index for display (stable relative to iteration order).
+                    int idx = 1;
+                    for (const auto& [mid, mk] : w.markets)
+                    {
+                        if (mk.body != tit->second.body)
+                            continue;
+                        if (mid == mkt_id)
+                            break;
+                        ++idx;
+                    }
+                    ImGui::Text("Market %d catchment", idx);
+                    // Show selected-resource price.
+                    const std::size_t g = static_cast<std::size_t>(ui.lens_resource);
+                    ImGui::Text("%s price: %.2f",
+                                resource_name(ui.lens_resource),
+                                static_cast<double>(mkt_it->second.price[g]));
+                }
+            }
+            else if (ui.overlay == overlay_mode::production)
+            {
+                // Production lens: show base output of any building on this tile.
+                for (const auto& [bld_id, bc] : w.buildings)
+                {
+                    if (bc.tile != tile)
+                        continue;
+                    ImGui::Separator();
+                    const building_economics& eco = reg.economics(bc.type);
+                    ImGui::Text("Base rate: %.1f / tick", static_cast<double>(eco.base_rate));
+                    ImGui::Text("Workforce: %.0f%%",
+                                static_cast<double>(bc.workforce_assigned) * 100.0);
+                    break;
+                }
+            }
+        }
+    }
 
     // Build front door — only for a selected tile (the per-tile construction entry).
     if (kind == selection_kind::tile)

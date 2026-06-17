@@ -225,6 +225,10 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
     // Scale → labour-force table (units available to industry on this body).
     static constexpr float labour_by_scale[6] = { 0.0f, 1.0f, 3.0f, 10.0f, 30.0f, 100.0f };
     std::map<entity_id, float> pop_supply_by_body;
+    // BL-041: Habitability cap — weighted mean habitability of population centres per body.
+    // weight = centre scale; cap = min(1, mean_hab / 0.6); default 1.0 (uncapped) when no centres.
+    std::map<entity_id, float> hab_weighted_sum;
+    std::map<entity_id, float> hab_weight_total;
     for (const auto& [cid, pcc] : w.population_centres)
     {
         const auto tile_it = w.population_centre_tile.find(cid);
@@ -235,7 +239,19 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
             continue;
         const int sc = std::clamp(pcc.scale, 1, 5);
         pop_supply_by_body[tc_it->second.body] += labour_by_scale[sc];
+        const entity_id body = tc_it->second.body;
+        const float weight = static_cast<float>(sc);
+        hab_weighted_sum[body]  += pcc.habitability * weight;
+        hab_weight_total[body]  += weight;
     }
+    // Derive hab_cap_by_body: min(1, mean_hab / 0.6). Bodies with no centres get cap 1.0.
+    auto hab_cap_for = [&](entity_id body) -> float {
+        const auto wit = hab_weight_total.find(body);
+        if (wit == hab_weight_total.end() || wit->second <= 0.0f)
+            return 1.0f;
+        const float mean_hab = hab_weighted_sum.at(body) / wit->second;
+        return std::min(1.0f, mean_hab / 0.6f);
+    };
     // Building counts per (corp, body) for apportionment.
     std::map<std::pair<entity_id, entity_id>, int> bldg_count_by_corp_body;
     std::map<entity_id, int>                        bldg_count_by_body;
@@ -269,6 +285,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
         // (the requested workforce_assigned of every producing building there),
         // then derive a per-body contention scalar min(1, supply/demand). Below 1
         // it throttles every building on that (corp, body) uniformly.
+        // BL-041: demand is capped by the body's habitability scalar before summing.
         std::map<entity_id, float> demand_by_body;
         for (const entity_id building_id : cc.assets)
         {
@@ -281,7 +298,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
                 continue; // ports and none demand no labour in L3
             const entity_id body = building_body(w, b);
             if (body != null_entity)
-                demand_by_body[body] += b.workforce_assigned;
+                demand_by_body[body] += b.workforce_assigned * hab_cap_for(body);
         }
 
         std::map<entity_id, float> contention_by_body;

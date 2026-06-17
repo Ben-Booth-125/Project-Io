@@ -9,10 +9,12 @@
 enum class construction_result : uint8_t
 {
     placed = 0,          ///< Building created, added to the corp, and paid for.
-    invalid_tile,        ///< placement_rules::can_place rejected the tile (ocean / wrong deposit).
+    invalid_tile,        ///< placement_rules::can_place_in_world rejected the tile (ocean / wrong deposit / not coastal).
     insufficient_funds,  ///< The corporation cannot afford the build cost.
     no_corp,             ///< The corporation entity does not exist.
     no_tile,             ///< The tile entity does not exist.
+    slot_occupied,       ///< The body's per-type cap is full (Launchpad: max 1 per body).
+    insufficient_materials, ///< The building's resource_build_cost cannot be met from the corp's pool (BL-044).
 };
 
 /// Attempt to construct a building of `type` (targeting `target` for an extraction

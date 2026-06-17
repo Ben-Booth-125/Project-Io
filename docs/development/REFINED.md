@@ -886,3 +886,119 @@ the win from worktree-splitting a single shared fill chain is negative. Foundati
 render passes D/E/F/G are independent *regions* of the same file done back-to-back; H last.
 
 </details>
+
+---
+
+## v0.0.7 Batch Delivery — Building management, population & supply (promoted 2026-06-17)
+
+Nine items. Barrier semantics — all tasks reach terminal state before commits.
+Fan-out: Wave 1 items are file-disjoint; main session runs sequentially (parallel win marginal at this size).
+
+**Collision map:**
+
+| File | Items |
+|---|---|
+| `src/world/economy_system.cpp` | BL-041 |
+| `src/world/placement_rules.{hpp,cpp}` | BL-043 |
+| `src/world/construction.{hpp,cpp}` | BL-043, BL-044 |
+| `src/world/recipe_registry.{hpp,cpp}` | BL-044 |
+| `scripts/economy.lua` | BL-044 |
+| `src/ui/icons.{hpp,cpp}` | BL-059 |
+| `src/ui/ui_state.hpp` | BL-059, BL-060 |
+| `src/ui/body_surface_canvas.cpp` | BL-059, BL-015, BL-060, BL-031, BL-010 (hotspot — sequential) |
+| `src/ui/overlay.cpp` | BL-015 |
+| `src/ui/hover_card.{hpp,cpp}` | BL-060 (new files) |
+| `src/ui/selection_panel.cpp` | BL-031, BL-032 |
+
+### Wave 1 — Economy + Placement foundation (main session, sequential)
+
+#### BL-041 — Habitability gates max workforce
+
+Requirements: `req/requirements.json § habitability-workforce`
+
+- **[3] A — Apply habitability cap to workforce demand.** Before the contention loop in `run_economy_step`, derive `hab_cap_by_body` (mean population-centre habitability weighted by scale; default 1.0 for bodyless). Apply `min(1.0f, hab / 0.6f)` as a scalar on `b.workforce_assigned` when summing `demand_by_body`. Files: `src/world/economy_system.cpp`. Deps: foundation. Provides: `hab_cap_by_body` scalar. Satisfies: R1, R2, R3, R4.
+
+Parallelisation note: single task, economy_system.cpp only. Disjoint from BL-043.
+
+#### BL-043 — Stricter building placement rules
+
+Requirements: `req/requirements.json § building-placement-rules`
+
+- **[2] A — Add is_coastal + can_place_in_world helpers.** In `placement_rules.hpp/.cpp`: add `is_coastal(const world& w, entity_id tile_id) -> bool` (checks hex neighbours for ocean); add `can_place_in_world(const world& w, entity_id tile_id, building_type, resource_type) -> bool` that calls `can_place` then layers coastal (port) and body-count (launchpad ≤ 1) checks. New `world.hpp` include in placement_rules.cpp. Files: `src/world/placement_rules.{hpp,cpp}`. Deps: foundation. Provides: `is_coastal`, `can_place_in_world`. Satisfies: R2, R3, R4.
+- **[1] B — Update construction.cpp to use can_place_in_world; add slot_occupied.** In `construction.hpp`, add `slot_occupied` to `construction_result`. In `construction.cpp`, replace `can_place(tc, ...)` with `can_place_in_world(w, tile, type, target)` and return `slot_occupied` when the launchpad cap fires. Files: `src/world/construction.{hpp,cpp}`. Deps: A. Satisfies: R1, R5.
+- **[1] C — Show slot_occupied message in construction_panel.** In `construction_panel.cpp`, add "Already placed on this body." message for `slot_occupied`. Files: `src/ui/construction_panel.cpp`. Deps: B. Satisfies: R5.
+
+Parallelisation note: A → B → C (linear). Disjoint from BL-041.
+
+### Wave 2 — Canvas markers + Market boundary lens (main session, sequential — BSC hotspot)
+
+#### BL-059 — Selectable entity markers
+
+Requirements: `req/requirements.json § selectable-markers`
+
+- **[1] A — Add marker_hit_zone struct and hit-zone list to ui_state.** Define `marker_hit_zone { entity_id id; enum class kind { building, market_centre, unit }; ImVec2 centre; float radius; }` in `ui_state.hpp`; add `std::vector<marker_hit_zone> marker_hit_zones` to `ui_state`. Files: `src/ui/ui_state.hpp`. Deps: Wave 1 done. Provides: `marker_hit_zone`, `ui_state::marker_hit_zones`. Satisfies: R4.
+- **[1] B — Add icons::market_centre glyph.** A small circle with a cross (+) in `icons.hpp/.cpp` — distinct from building/unit glyphs. Files: `src/ui/icons.{hpp,cpp}`. Deps: foundation. Provides: `icons::market_centre`. Satisfies: R3.
+- **[2] C — Draw building + market-centre markers and register hit zones.** In `draw_body_surface_canvas`, after lens overlays and before Selection chrome: iterate buildings on the active body, compute screen position from tile grid coords, draw `icons::building` scaled with zoom, register a `marker_hit_zone`. Iterate markets on the active body, draw `icons::market_centre` at the centre_tile position, register zone. Clear `state.marker_hit_zones` at the top of the function and fill during this pass. Files: `src/ui/body_surface_canvas.cpp`. Deps: A, B. Satisfies: R1, R2, R3, R4, R5.
+
+Parallelisation note: A ∥ B (disjoint files); both → C (sequential in BSC).
+
+#### BL-015 — Market boundary lens
+
+Requirements: `req/requirements.json § market-boundary-lens`
+
+- **[3] A — Replace market price-wash with catchment-tint in BSC.** In `draw_body_surface_canvas` under `overlay_mode::market`: remove per-tile price diverging wash; add a pre-pass that assigns each market an index colour (cycling palette, same alpha as Corporation lens tint); tint each tile by `market_for_tile`'s result market's colour. Add `draw_market_boundary_key`. Files: `src/ui/body_surface_canvas.cpp`. Deps: BL-059-C done. Satisfies: R1, R2, R3, R4.
+- **[1] B — Update overlay.cpp market tooltip.** Change the strip tooltip for `overlay_mode::market` from price-wash description to "Market catchment boundaries". Files: `src/ui/overlay.cpp`. Deps: A. Satisfies: R3.
+
+Parallelisation note: A → B (BSC hotspot — sequential after BL-059-C).
+
+### Wave 3 — Hover card, hit-testing, construction pricing (main session)
+
+#### BL-060 — Hover-card primitive
+
+Requirements: `req/requirements.json § hover-card`
+
+- **[2] A — New hover_card.{hpp,cpp}.** `draw_hover_card(ImVec2 cursor, int hover_ticks, std::function<void()> content)` renders after `kHoverDelay = 20` frames of stable hover: an ImGui child window (no title bar, semi-opaque dark background, 4px rounding), max width 200px, positioned just above the cursor. Files: `src/ui/hover_card.{hpp,cpp}`. Deps: BL-059 done. Satisfies: R2.
+- **[2] B — Wire tile hover to hover_card in BSC.** Track a `hover_tile_ticks` counter in `draw_body_surface_canvas`; pass `content` = tile name + key stat (terrain type + habitability for plain canvas; selected resource deposit for Resource lens). Files: `src/ui/body_surface_canvas.cpp`, `src/ui/ui_state.hpp` (hover counter). Deps: A. Satisfies: R1, R3.
+
+Parallelisation note: A → B (B needs the hover_card API).
+
+#### BL-031 — Canvas hit-testing for entity markers
+
+Requirements: `req/requirements.json § canvas-hit-testing`
+
+- **[2] A — Hit-test marker_hit_zones before tile in BSC click handler.** In the single-click handler of `draw_body_surface_canvas`: before resolving the clicked tile, iterate `state.marker_hit_zones` and select the entity whose circle contains the cursor (prioritise building > market-centre, closest wins on tie). Set `state.selected_entity` to the winning entity. Files: `src/ui/body_surface_canvas.cpp`. Deps: BL-059 done. Satisfies: R1, R2.
+- **[1] B — selection_panel building branch.** When `selected_entity` maps to a building (found in `w.buildings`), render: building type + target/recipe, tile name, workforce slider (read-only for now). Files: `src/ui/selection_panel.cpp`. Deps: A. Satisfies: R3.
+
+Parallelisation note: A → B.
+
+#### BL-044 — Construction pricing — buildings cost resources
+
+Requirements: `req/requirements.json § construction-pricing`
+
+- **[2] A — Add resource_build_cost to building_economics + author in Lua.** Add `std::array<float, resource_count> resource_build_cost = {}` to `building_economics` in `recipe_registry.hpp`. In `economy.lua`, add `resource_costs` table per building type (extraction_site: 20 steel; processing_facility: 25 steel; port: 20 steel; launchpad: 50 steel + 20 refined_fuel). Update `recipe_registry.cpp` to load it. Files: `src/world/recipe_registry.{hpp,cpp}`, `scripts/economy.lua`. Deps: Wave 1 done. Provides: `building_economics::resource_build_cost`. Satisfies: R2.
+- **[2] B — Check + consume resource cost in construct_building.** Add `insufficient_materials` to `construction_result` (construction.hpp). In `construct_building`, after the funds check, verify `pool_for(corp, tile_body)` has enough of each `resource_build_cost[r]`; if short return `insufficient_materials`. On success, deduct from pool. Files: `src/world/construction.{hpp,cpp}`. Deps: A. Satisfies: R1, R3, R4.
+- **[1] C — Show resource cost in construction_panel.** Display the resource cost next to the budget cost for each building type in the Build section. Show "insufficient_materials" message. Files: `src/ui/construction_panel.cpp`. Deps: B. Satisfies: R4.
+
+Parallelisation note: A → B → C (linear).
+
+### Wave 4 — Placement suitability + Lens-driven selection (main session)
+
+#### BL-010 — Placement-suitability surface
+
+Requirements: `req/requirements.json § placement-suitability`
+
+- **[3] A — Tile-selection suitability pass in BSC.** When `state.selected_entity` is a tile: determine the tile's best valid building (richest extractable deposit → extraction_site, else any land → processing_facility). For each other tile: if `can_place` rejects → dark overlay (IM_COL32(0,0,0,90)); if terrain is affine (same composition class for the building type) → coloured tint (IM_COL32(100,200,100,60)); else no signal. Files: `src/ui/body_surface_canvas.cpp`. Deps: Wave 3 done. Satisfies: R1, R2, R3.
+
+Parallelisation note: single task, BSC hotspot.
+
+#### BL-032 — Lens-driven selection resolution
+
+Requirements: `req/requirements.json § lens-driven-selection`
+
+- **[4] A — Lens-contextual content in selection_panel.** Extend `draw_selection_panel` to branch on `w.overlay` (the active lens): tile + Corporation lens shows ownership + corp colour; tile + Production lens shows per-building output rates from the economy report; tile + Market lens shows market catchment + price row; building selected shows management controls (workforce target, decommission). Files: `src/ui/selection_panel.cpp`. Deps: BL-031 done (building selection exists). Satisfies: R1, R2.
+
+Parallelisation note: single task.
+
+---
+
+*Resume here: Wave 1 — BL-041-A (economy_system.cpp habitability cap).*

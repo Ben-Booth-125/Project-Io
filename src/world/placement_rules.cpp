@@ -1,5 +1,7 @@
 #include "world/placement_rules.hpp"
 
+#include "world/world.hpp"
+
 namespace placement_rules {
 
 bool is_ocean_tile(terrain_composition comp)
@@ -71,6 +73,83 @@ bool can_place(const tile_component& tc, building_type type, resource_type targe
             // Any non-ocean land tile is valid for non-extraction buildings.
             return true;
     }
+}
+
+bool is_coastal(const world& w, entity_id tile_id)
+{
+    const auto tc_it = w.tiles.find(tile_id);
+    if (tc_it == w.tiles.end())
+        return false;
+    const tile_component& tc = tc_it->second;
+    const entity_id body = tc.body;
+
+    const auto body_it = w.bodies.find(body);
+    if (body_it == w.bodies.end())
+        return false;
+    const int gw = body_it->second.grid_width;
+    const int gh = body_it->second.grid_height;
+
+    // Build a tile lookup: flat_index → entity_id for this body.
+    // (Only for the body's tiles — most calls are short-circuit on first ocean hit.)
+    // Odd-r offset neighbours (pointy-top hexes).
+    static const int even_off[6][2] = {{+1,0},{0,-1},{-1,-1},{-1,0},{-1,+1},{0,+1}};
+    static const int odd_off[6][2]  = {{+1,0},{+1,-1},{0,-1},{-1,0},{0,+1},{+1,+1}};
+    const int (*off)[2] = (tc.grid_y & 1) ? odd_off : even_off;
+
+    for (int n = 0; n < 6; ++n)
+    {
+        const int nrow = tc.grid_y + off[n][1];
+        if (nrow < 0 || nrow >= gh)
+            continue;
+        int ncol = tc.grid_x + off[n][0];
+        // Columns wrap (horizontal cylinder).
+        if (ncol < 0) ncol += gw;
+        else if (ncol >= gw) ncol -= gw;
+
+        // Find the neighbour tile by scanning tiles on this body.
+        // Linear scan is acceptable — this is a player-action path, not a hot loop.
+        for (const auto& [nid, ntc] : w.tiles)
+        {
+            if (ntc.body == body && ntc.grid_x == ncol && ntc.grid_y == nrow)
+            {
+                if (is_ocean_tile(ntc.composition))
+                    return true;
+                break;
+            }
+        }
+    }
+    return false;
+}
+
+bool can_place_in_world(const world& w, entity_id tile_id,
+                        building_type type, resource_type target)
+{
+    const auto tc_it = w.tiles.find(tile_id);
+    if (tc_it == w.tiles.end())
+        return false;
+    if (!can_place(tc_it->second, type, target))
+        return false;
+
+    if (type == building_type::port)
+    {
+        if (!is_coastal(w, tile_id))
+            return false;
+    }
+    else if (type == building_type::launchpad)
+    {
+        // Count launchpads already on this body.
+        const entity_id body = tc_it->second.body;
+        for (const auto& [bid, bc] : w.buildings)
+        {
+            if (bc.type != building_type::launchpad)
+                continue;
+            const auto btc_it = w.tiles.find(bc.tile);
+            if (btc_it != w.tiles.end() && btc_it->second.body == body)
+                return false; // Already one on this body.
+        }
+    }
+
+    return true;
 }
 
 } // namespace placement_rules

@@ -3,6 +3,7 @@
 
 #include "entity_summary.hpp"
 #include "highlight.hpp"
+#include "hover_card.hpp"
 #include "icons.hpp"
 #include "nav_pane.hpp"
 #include "presentation.hpp"
@@ -211,52 +212,49 @@ ImU32 diverging_colour(float ratio)
 /// On-canvas legend for the Market lens: a diverging cheap↔dear gradient bar plus
 /// the selected good's name and its current price ratio (or an "untraded" note when
 /// the body's market has no entry for it). Same left-edge placement as the Resource key.
+// BL-015: market lens is now a catchment-boundary tint (one colour per market).
+// The key shows a colour swatch per market with an ordinal label.
 void draw_market_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size,
-                     const ui_state& state, bool active, float ratio)
+                     const ui_state& /*state*/,
+                     const std::unordered_map<entity_id, ImU32>& catchment_colours)
 {
     const float pad    = 8.0f;
-    const float box_w  = 172.0f;
     const float line_h = ImGui::GetTextLineHeight();
-    const float bar_h  = 10.0f;
+    const float swatch = line_h;
+    const int   n      = static_cast<int>(catchment_colours.size());
+    const float box_w  = 140.0f;
+    const float body_h = pad + line_h + 4.0f
+                       + static_cast<float>(std::max(n, 1)) * (swatch + 2.0f)
+                       + pad;
 
-    const float body_h = pad + line_h + 4.0f + bar_h + 2.0f + line_h + 4.0f + line_h + pad;
     const ImVec2 p0 = { area_origin.x + nav_pane_width + pad,
                         area_origin.y + std::max(pad, (area_size.y - body_h) * 0.5f) };
     const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
     dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
     dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
 
-    const float x     = p0.x + pad;
-    const float bar_w = box_w - 2.0f * pad;
-    float       y     = p0.y + pad * 0.5f;
+    float x = p0.x + pad;
+    float y = p0.y + pad * 0.5f;
 
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Market price");
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Market catchments");
     y += line_h + 4.0f;
 
-    // Diverging bar: cheap (cool) at the left, dear (warm) at the right, sampling
-    // the same band the wash uses (ratio 0.25 → 4).
-    constexpr int segs = 24;
-    for (int i = 0; i < segs; ++i)
+    if (catchment_colours.empty())
     {
-        const float t = static_cast<float>(i) / (segs - 1);  // 0..1
-        const ImU32 c = diverging_colour(std::pow(4.0f, t * 2.0f - 1.0f));
-        dl->AddRectFilled({ x + bar_w * static_cast<float>(i) / segs, y },
-                          { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
+        dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "No markets");
+        return;
     }
-    y += bar_h + 2.0f;
-    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "cheap");
-    const ImVec2 dts = ImGui::CalcTextSize("dear");
-    dl->AddText({x + bar_w - dts.x, y}, IM_COL32(170, 175, 185, 255), "dear");
-    y += line_h + 4.0f;
 
-    char buf[96];
-    if (active)
-        std::snprintf(buf, sizeof(buf), "%s  x%.2f",
-                      presentation_of(state.lens_resource).name, static_cast<double>(ratio));
-    else
-        std::snprintf(buf, sizeof(buf), "%s  (untraded)",
-                      presentation_of(state.lens_resource).name);
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), buf);
+    int idx = 1;
+    for (const auto& [mid, col] : catchment_colours)
+    {
+        dl->AddRectFilled({x, y}, {x + swatch, y + swatch}, col);
+        char label[32];
+        std::snprintf(label, sizeof(label), " Market %d", idx);
+        dl->AddText({x + swatch + 4.0f, y}, IM_COL32(220, 220, 220, 255), label);
+        y += swatch + 2.0f;
+        ++idx;
+    }
 }
 
 /// On-canvas legend for the Population lens: a low→high habitability gradient bar
@@ -435,17 +433,26 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         };
     };
 
+    // Rebuild per-frame marker hit-zone list (BL-059). Cleared here so every draw
+    // call starts fresh; the tile loop and the market-centre pass below fill it.
+    state.marker_hit_zones.clear();
+
     // Clip to the grid area so hexes don't overdraw the title bar or the solar canvas.
     dl->PushClipRect(grid_area_origin, grid_area_origin + grid_area_size, true);
 
     // Tiles that carry a building, mapped to their type so the marker pass can
-    // draw the type-specific glyph.
+    // draw the type-specific glyph. Also track the building entity per tile for
+    // hit-zone registration (BL-059).
     std::unordered_map<entity_id, building_type> built_tiles;
-    for (const auto& [id, bld] : w.buildings)
+    std::unordered_map<entity_id, entity_id>     tile_to_bld; // tile_id → building entity
+    for (const auto& [bld_id, bld] : w.buildings)
     {
         auto tile_it = w.tiles.find(bld.tile);
         if (tile_it != w.tiles.end() && tile_it->second.body == state.active_body)
+        {
             built_tiles[bld.tile] = bld.type;
+            tile_to_bld[bld.tile] = bld_id;
+        }
     }
 
     // Spatial index: tile id keyed by its packed (col, row) on the active body,
@@ -504,27 +511,51 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // threshold is visually identical, so no flood-fill grouping is needed. No
     // normalisation maxima — the only state the pass needs is the selected index.
 
-    // Market lens pre-pass: the active body's market is a single per-body exchange,
-    // so the Planetary tint is a body-wide wash (not per-tile). Resolve the selected
-    // good's price relative to its base (floor) price once; an untraded good (no base
-    // price) leaves the wash off. See LENSES.md § Market lens.
-    bool  market_active = false;
-    float market_ratio  = 1.0f;
-    ImU32 market_wash   = 0;
+    // Market lens pre-pass (BL-015): assign each market on the active body a
+    // distinct catchment colour (using corp palette slots, cycling if there are
+    // more markets than slots). Tiles are tinted by their catchment market.
+    // The old price-wash readout is relocated to the Market Ledger.
+    std::unordered_map<entity_id, ImU32> market_catchment_colour;
     if (state.overlay == overlay_mode::market)
     {
-        const std::size_t g = static_cast<std::size_t>(state.lens_resource);
+        int slot = 0;
         for (const auto& [mid, mk] : w.markets)
         {
             if (mk.body != state.active_body)
                 continue;
-            if (mk.base_price[g] > 0.0f)
+            market_catchment_colour[mid] =
+                palette::corp_colour(slot % palette::corp_slot_count);
+            ++slot;
+        }
+    }
+
+    // Placement-suitability pre-pass (BL-010). Active when a tile is the selected
+    // entity. Derive the tile's best valid building (extraction > processing).
+    bool              suitability_active      = false;
+    building_type     suitability_btype       = building_type::none;
+    resource_type     suitability_target      = resource_type::iron_ore;
+    bool              suitability_affine      = false; // true when composition matters
+    terrain_composition suitability_composition = terrain_composition::ocean;
+    {
+        const auto sel_it = w.tiles.find(state.selected_entity);
+        if (sel_it != w.tiles.end() && sel_it->second.body == state.active_body)
+        {
+            const tile_component& stc = sel_it->second;
+            bool any_deposit = false;
+            const resource_type richest = placement_rules::richest_extractable(stc, any_deposit);
+            if (any_deposit && !placement_rules::is_ocean_tile(stc.composition))
             {
-                market_ratio  = mk.price[g] / mk.base_price[g];
-                market_wash   = diverging_colour(market_ratio);
-                market_active = true;
+                suitability_btype       = building_type::extraction_site;
+                suitability_target      = richest;
+                suitability_affine      = true;
+                suitability_composition = stc.composition;
             }
-            break;
+            else if (!placement_rules::is_ocean_tile(stc.composition))
+            {
+                suitability_btype  = building_type::processing_facility;
+                suitability_affine = false;
+            }
+            suitability_active = true;
         }
     }
 
@@ -769,14 +800,15 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (tile.resource_deposit[sel] > 0.0f)
                 fill = lerp_colour(fill, presentation_of(state.lens_resource).colour, 0.8f);
         }
-        // Market lens: a body-wide diverging wash for the selected good's price
-        // relative to its floor (warm = dear, cool = cheap). Uniform across the body
-        // because the market is per-body; composited over terrain so the surface still
-        // reads. Off when the good is untraded here (no base price).
+        // Market lens (BL-015): tint each tile with its catchment market's colour
+        // so the boundary between markets reads as a colour boundary. Same visual
+        // logic as the Corporation lens. Price readout is in the Market Ledger.
         else if (state.overlay == overlay_mode::market)
         {
-            if (market_active)
-                fill = lerp_colour(fill, market_wash, 0.55f);
+            const entity_id mid = market_for_tile(w, id);
+            const auto col_it   = market_catchment_colour.find(mid);
+            if (col_it != market_catchment_colour.end())
+                fill = lerp_colour(fill, col_it->second, 0.55f);
         }
         // Population lens: tint a tile by its habitability (0–1, already normalised) —
         // a sequential dark→liveable-green gradient composited over terrain, so
@@ -833,6 +865,19 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         const bool   built     = built_it != built_tiles.end();
         const building_type built_type = built ? built_it->second : building_type::none;
         const bool   selected  = (id == state.selected_entity);
+
+        // Placement-suitability overlay (BL-010): active when a tile is selected.
+        // Invalid tiles (can't build) darken; affine tiles (optimal terrain) tint green.
+        // Applies to *other* tiles — the selected tile itself is already outlined.
+        if (!selected && suitability_active && id != state.selected_entity)
+        {
+            const bool placeable = placement_rules::can_place(
+                tile, suitability_btype, suitability_target);
+            if (!placeable)
+                fill = lerp_colour(fill, IM_COL32(0, 0, 0, 255), 0.35f);
+            else if (suitability_affine && tile.composition == suitability_composition)
+                fill = lerp_colour(fill, IM_COL32(100, 200, 100, 255), 0.24f);
+        }
 
         // Range of wrap copies that land inside the canvas horizontally.
         const int k_min = (period_px > 0.0f)
@@ -936,6 +981,23 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     marker_col = corp_identity(corp_it->second);
 
                 icons::building(dl, {cx, cy}, mr, built_type, marker_col);
+
+                // Register hit zone (BL-059). Only the k==0 copy per tile so
+                // wrap copies don't produce duplicate zones; the single zone
+                // records the canonical screen position for this frame.
+                if (k == 0)
+                {
+                    const auto bld_it = tile_to_bld.find(id);
+                    if (bld_it != tile_to_bld.end())
+                    {
+                        marker_hit_zone hz;
+                        hz.id     = bld_it->second;
+                        hz.kind   = marker_hit_zone::kind::building;
+                        hz.centre = {cx, cy};
+                        hz.radius = mr * 2.0f;
+                        state.marker_hit_zones.push_back(hz);
+                    }
+                }
             }
 
             // Supply lens: draw a convoy glyph on every tile when the active body
@@ -982,6 +1044,48 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     if (have_hover && !hovered_selected)
         draw_hex_highlight(dl, hover_verts, highlight::hovered);
 
+    // Market-centre markers (BL-059). Draw a circle+cross glyph at each market's
+    // centre tile position and register a hit zone for click-selection (BL-031).
+    // Drawn after the tile loop so markers sit above all tile chrome. Only markets
+    // anchored to the active body (and with a valid centre_tile) are shown.
+    {
+        constexpr ImU32 mkt_col = IM_COL32(255, 220, 80, 220);
+        const float mkt_r = std::max(3.0f, draw_r * 0.28f);
+
+        for (const auto& [mid, mk] : w.markets)
+        {
+            if (mk.body != state.active_body)
+                continue;
+            if (mk.centre_tile == null_entity)
+                continue;
+            const auto ctc_it = w.tiles.find(mk.centre_tile);
+            if (ctc_it == w.tiles.end())
+                continue;
+            const tile_component& ctc = ctc_it->second;
+            const ImVec2 lc = hex_local_centre(ctc.grid_x, ctc.grid_y, hex_size);
+            const ImVec2 sc = to_screen(lc);
+
+            // Draw on every visible wrap copy.
+            const int k_min = (period_px > 0.0f)
+                ? static_cast<int>(std::ceil((visible_left  - sc.x) / period_px)) : 0;
+            const int k_max = (period_px > 0.0f)
+                ? static_cast<int>(std::floor((visible_right - sc.x) / period_px)) : 0;
+            for (int k = k_min; k <= k_max; ++k)
+            {
+                const ImVec2 mc = {sc.x + static_cast<float>(k) * period_px, sc.y};
+                icons::market_centre(dl, mc, mkt_r, mkt_col);
+            }
+
+            // Hit zone on the canonical copy (k==0).
+            marker_hit_zone hz;
+            hz.id     = mid;
+            hz.kind   = marker_hit_zone::kind::market_centre;
+            hz.centre = sc;
+            hz.radius = mkt_r * 2.0f;
+            state.marker_hit_zones.push_back(hz);
+        }
+    }
+
     // Building-placement ghost preview. When construction mode is active and a tile
     // is hovered, draw a translucent-intent marker of the chosen building type at the
     // hovered copy's centre, tinted green when the placement-rules seam accepts the
@@ -1018,7 +1122,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     if (state.overlay == overlay_mode::resource)
         draw_resource_key(dl, grid_area_origin, grid_area_size, state);
     else if (state.overlay == overlay_mode::market)
-        draw_market_key(dl, grid_area_origin, grid_area_size, state, market_active, market_ratio);
+        draw_market_key(dl, grid_area_origin, grid_area_size, state, market_catchment_colour);
     else if (state.overlay == overlay_mode::population)
         draw_population_key(dl, grid_area_origin, grid_area_size);
     else if (state.overlay == overlay_mode::opportunity)
@@ -1031,9 +1135,43 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     if (!input_enabled)
         return;
 
-    // Hover tooltip.
-    if (hovered_tile != null_entity)
-        draw_hover_card(dl, w, state, hovered_tile);
+    // Hover-card (BL-060). Track stable hover ticks against the resolved tile so
+    // the card appears after kHoverDelay frames of the cursor resting on the same
+    // entity. Content is lens-contextual: plain canvas shows terrain + habitability;
+    // Resource lens shows deposit depth of the selected resource.
+    {
+        const entity_id hover_eid = hovered_tile;
+        if (hover_eid != state.hovered_entity)
+        {
+            state.hovered_entity = hover_eid;
+            state.hover_ticks    = 0;
+        }
+        else if (hover_eid != null_entity)
+        {
+            ++state.hover_ticks;
+        }
+
+        if (hovered_tile != null_entity)
+        {
+            const tile_component& ht = w.tiles.at(hovered_tile);
+            draw_hover_card(mouse, state.hover_ticks, [&]() {
+                ImGui::TextUnformatted(composition_name(ht.composition));
+                if (state.overlay == overlay_mode::resource)
+                {
+                    const std::size_t sel = static_cast<std::size_t>(state.lens_resource);
+                    const float dep = ht.resource_deposit[sel];
+                    ImGui::Text("%s: %.2f",
+                                presentation_of(state.lens_resource).name,
+                                static_cast<double>(dep));
+                }
+                else
+                {
+                    ImGui::Text("Hab: %.0f%%",
+                                static_cast<double>(ht.habitability) * 100.0);
+                }
+            });
+        }
+    }
 
     // Click handling. The surface is the bottom rung, so there is nothing to
     // descend into: a single left-click simply selects the hovered tile (null
@@ -1042,11 +1180,44 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // Construction mode suppresses selection: in placement mode a left-click is a
     // construction gesture, not a selection one, so it must not retarget the
     // Selection info element.
+    // BL-031: marker hit zones take priority over tile selection (building >
+    // market_centre; closest-wins tie-break within a kind).
     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
     {
         if (!state.construction.active)
         {
-            state.selected_entity = hovered_tile;
+            // Resolve marker hit zones in priority order (BL-031).
+            entity_id marker_hit = null_entity;
+            float best_bld_d2  = std::numeric_limits<float>::max();
+            float best_mkt_d2  = std::numeric_limits<float>::max();
+            entity_id bld_hit  = null_entity;
+            entity_id mkt_hit  = null_entity;
+
+            for (const marker_hit_zone& hz : state.marker_hit_zones)
+            {
+                const float dx = mouse.x - hz.centre.x;
+                const float dy = mouse.y - hz.centre.y;
+                const float d2 = dx * dx + dy * dy;
+                if (d2 > hz.radius * hz.radius)
+                    continue;
+                if (hz.kind == marker_hit_zone::kind::building && d2 < best_bld_d2)
+                {
+                    best_bld_d2 = d2;
+                    bld_hit     = hz.id;
+                }
+                else if (hz.kind == marker_hit_zone::kind::market_centre && d2 < best_mkt_d2)
+                {
+                    best_mkt_d2 = d2;
+                    mkt_hit     = hz.id;
+                }
+            }
+            // Building outranks market-centre; both outrank tile.
+            if (bld_hit != null_entity)
+                marker_hit = bld_hit;
+            else if (mkt_hit != null_entity)
+                marker_hit = mkt_hit;
+
+            state.selected_entity = (marker_hit != null_entity) ? marker_hit : hovered_tile;
         }
         else if (hovered_tile != null_entity)
         {

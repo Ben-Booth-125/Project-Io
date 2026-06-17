@@ -183,15 +183,23 @@ void draw_building_summary(const world& w, entity_id id)
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
                        "%s", building_type_name(b.type));
 
-    // Host tile coordinates, resolved through the building's tile reference.
+    // Target resource (extraction) or active recipe (processing).
+    if (b.type == building_type::extraction_site)
+        ImGui::Text("Target: %s", resource_name(b.target_resource));
+    else if (b.type == building_type::processing_facility && b.recipe != null_entity)
+        ImGui::Text("Recipe: %u", static_cast<unsigned>(b.recipe));
+
+    // Host tile name, resolved through the building's tile reference.
     auto tile_it = w.tiles.find(b.tile);
     if (tile_it != w.tiles.end())
     {
         const tile_component& t = tile_it->second;
-        ImGui::Text("Tile: [%d, %d]", t.grid_x, t.grid_y);
+        ImGui::Text("Tile [%d, %d]  %s", t.grid_x, t.grid_y,
+                    composition_name(t.composition));
     }
 
-    ImGui::Text("Workforce: %.0f%%", b.workforce_assigned * 100.0f);
+    // Read-only workforce display (BL-031).
+    ImGui::Text("Workforce: %.0f%%", static_cast<double>(b.workforce_assigned) * 100.0);
 }
 
 void draw_market_summary(const world& w, entity_id id)

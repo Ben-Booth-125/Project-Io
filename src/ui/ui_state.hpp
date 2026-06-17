@@ -3,6 +3,7 @@
 #include "world/components.hpp" // building_type / resource_type / sell_order
 #include "world/entity.hpp"
 
+#include <imgui.h>
 #include <string>
 #include <vector>
 
@@ -32,6 +33,17 @@ enum class overlay_mode
     opportunity, ///< Per-tile best-building net-margin surface (red loss → green profit). See LENSES.md § Opportunity lens.
     production,  ///< Per-tile production-intensity surface (Σ output×price, log scale). See LENSES.md § Production lens.
     scarcity,    ///< Per-market supply-shortfall blocks (hot where demand outran supply). See LENSES.md § Scarcity lens.
+};
+
+/// A selectable on-canvas marker registered each frame by the Planetary canvas
+/// draw pass. Hit-test priority (highest first): building > market_centre > tile.
+/// Cleared and rebuilt every frame by body_surface_canvas. See BL-059, BL-031.
+struct marker_hit_zone
+{
+    entity_id id = null_entity; ///< The entity this marker represents (building or market).
+    enum class kind : uint8_t { building, market_centre, unit } kind = kind::building;
+    ImVec2    centre{};         ///< Marker centre in screen pixels (this frame).
+    float     radius = 0.0f;   ///< Hit-test radius in screen pixels.
 };
 
 /// Construction (building-placement) interaction state. When `active`, the
@@ -94,6 +106,11 @@ struct ui_state
     bool show_balance_ledger = false; ///< Whether the Balance Ledger is open.
     bool show_corporation_panel = false; ///< Whether the Corporation Overview Dashboard is open.
 
+    /// Per-frame list of on-canvas markers (buildings, market centres). Cleared at
+    /// the top of body_surface_canvas each frame and rebuilt during the draw pass
+    /// so click/hover handling can hit-test in priority order. See marker_hit_zone.
+    std::vector<marker_hit_zone> marker_hit_zones;
+
     /// Building-placement interaction state (Layer 4 UI groundwork scaffold). See construction_state.
     construction_state construction;
 
@@ -120,6 +137,10 @@ struct ui_state
     float planetary_zoom  = 4.0f / 3.0f; ///< Scroll-wheel zoom factor. 4/3 shows 3/4 of the grid height on load.
     float planetary_pan_x = 0.0f; ///< Pan offset of the grid centre from the canvas centre, screen px.
     float planetary_pan_y = 0.0f; ///< Pan offset of the grid centre from the canvas centre, screen px.
+
+    // --- hover-card state (BL-060) ---
+    entity_id hovered_entity = null_entity; ///< Entity the cursor rested on last frame; used to detect stable hover.
+    int       hover_ticks    = 0;           ///< Consecutive frames of stable hover over hovered_entity; resets on entity change.
 
     // --- pending centre request (verify harness) ---
     // verify.center_tile() sets these; the Planetary canvas consumes them on its
