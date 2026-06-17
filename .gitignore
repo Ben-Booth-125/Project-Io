@@ -31,6 +31,9 @@ imgui.ini
 # scripts/verify/golden/ are the committed references)
 screenshots/
 
+# Build and harness logs
+*.log
+
 # Compiled artifacts
 *.exe
 *.pdb
