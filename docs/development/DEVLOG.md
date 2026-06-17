@@ -6,6 +6,46 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — v0.0.6 Improved Core-Loop Batch Delivery (2026-06-17)
+
+**Goal.** Deliver all six v0.0.6 backlog items as a Batch Delivery: BL-050 (saturated
+substrate), BL-037 (order book), BL-056 (bankruptcy harness), BL-036 (multiple market
+centres), BL-025 (multi-market ledger dashboard), BL-035 (warm-start surface). BL-057
+(cross-platform build) deferred — Linux dev box not yet set up.
+
+**Status: Complete — 27/27 econ_harness tests PASS, 24/24 visual goldens PASS.**
+
+**Commits (3):**
+- `6691c7a` — BL-050 integration + BL-036: substrate injection wired into `clear_markets`;
+  population-centre ordering fixed (must precede `generate_nations` for Pass 6 to reference
+  centres); multiple markets seeded from scale≥3 population centres.
+- `a980079` — BL-037: `clear_markets` fully restructured — auto path (pool surplus /
+  auto-buys) bypasses the order book and clears at `resolve_price` directly; explicit sell /
+  buy orders are matched against each other; unmatched player sells clear at
+  `max(ref_price, floor_price)` (market as buyer of last resort).
+- `8cf72a7` — BL-025 + BL-035: `market_ledger.cpp` rewritten — body selector, dashboard
+  table (all markets: supply/demand/turnover), click-to-select → resource detail; 11 golden
+  images blessed.
+- `b4e2b45` — BL-056: `econ_bankruptcy.cpp` harness (Wave 1 sub-agent merge).
+
+**Key in-session decisions:**
+- **Auto-surplus VWAP bypass.** Auto-surplus entries (floor_price=0) entering the order book
+  caused VWAP to collapse to 0 when supply dwarfed demand, dragging EMA-smoothed prices to
+  zero each tick. Fix: separate the auto path entirely — auto entries clear at `ref_price =
+  resolve_price(...)` which already embeds the EMA. Using them as VWAP input would apply EMA
+  twice (double-smoothing). The order book now sees only explicit player orders.
+- **Substrate density static for prototype.** Growth model deferred; density is generated
+  once at world creation and does not change. Substrate background supply/demand arrays are
+  injected into markets each tick via `inject_substrate_demand(w)` called inside
+  `clear_markets` after the per-tick zero-reset, before the order-book pass.
+- **Market-centre anchor via `centre_tile`.** Each market carries a `centre_tile` field
+  pointing to the population-centre tile it was seeded from. `market_for_tile` / `nearest_market`
+  use this for catchment routing. The fallback (no scale≥3 centre) seeds one unanchored market.
+
+**Open items returned to backlog:** none — all tasks completed or were not promoted.
+
+---
+
 ## Session — Lens & Legibility Batch Delivery (2026-06-17)
 
 **Goal.** Deliver the full lens strip (bar the Market slot, gated on multi-market

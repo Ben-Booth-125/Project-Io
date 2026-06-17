@@ -603,7 +603,15 @@ Parallelisation note: A → {B, C, D}; B ∥ C (disjoint files: docs vs workflow
 
 ---
 
-## v0.0.6 Batch Delivery — Improved Core-Loop (promoted 2026-06-17)
+## v0.0.6 Batch Delivery — Improved Core-Loop (promoted 2026-06-17) ✓ COMPLETE
+
+All 6 items shipped 2026-06-17. 27/27 econ_harness tests PASS, 24/24 visual goldens PASS.
+3 commits: `6691c7a` (BL-050 + BL-036), `a980079` (BL-037), `8cf72a7` (BL-025 + BL-035).
+BL-056 bankruptcy harness committed in Wave 1 merge (`b4e2b45`).
+
+---
+
+## v0.0.6 Batch Delivery — Improved Core-Loop (archived)
 
 Six items: BL-050 (saturated substrate), BL-037 (order book), BL-056 (bankruptcy harness),
 BL-036 (market-centre seeding), BL-025 (multi-market ledger dashboard), BL-035 (warm-start
