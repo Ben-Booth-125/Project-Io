@@ -22,6 +22,28 @@ std::string body_label(const world& w, entity_id body)
     return "Body #" + std::to_string(body);
 }
 
+/// Market display label: "Region (col, row)" based on centre tile, or "Market N".
+std::string market_label(const world& w, entity_id mid, int index)
+{
+    const market_component& mc = w.markets.at(mid);
+    const auto tit = w.tiles.find(mc.centre_tile);
+    if (tit != w.tiles.end())
+        return "Region (" + std::to_string(tit->second.grid_x) + ","
+                          + std::to_string(tit->second.grid_y) + ")";
+    return "Market " + std::to_string(index + 1);
+}
+
+/// Markets on a given body, sorted by ascending entity id (deterministic).
+std::vector<entity_id> markets_on_body(const world& w, entity_id body)
+{
+    std::vector<entity_id> result;
+    for (const auto& [mid, mc] : w.markets)
+        if (mc.body == body)
+            result.push_back(mid);
+    std::sort(result.begin(), result.end());
+    return result;
+}
+
 } // namespace
 
 void draw_market_ledger(const world& w, const ui_state& /*s*/, bool& open)
@@ -45,40 +67,30 @@ void draw_market_ledger(const world& w, const ui_state& /*s*/, bool& open)
         return;
     }
 
-    // Build a sorted list of market entity IDs for deterministic iteration.
-    std::vector<entity_id> mids;
-    mids.reserve(w.markets.size());
-    for (const auto& [id, _] : w.markets)
-        mids.push_back(id);
-    std::sort(mids.begin(), mids.end());
-
-    // Body selector — default to the market whose body matches w.home_body.
-    static entity_id selected_market = null_entity;
-    if (selected_market == null_entity || w.markets.find(selected_market) == w.markets.end())
+    // --- Body selector ---
+    // Collect distinct bodies that have at least one market.
+    std::vector<entity_id> bodies;
+    for (const auto& [mid, mc] : w.markets)
     {
-        // Prefer the home-body market; fall back to the first sorted entry.
-        selected_market = mids.front();
-        for (entity_id mid : mids)
-        {
-            if (w.markets.at(mid).body == w.home_body)
-            {
-                selected_market = mid;
-                break;
-            }
-        }
+        if (std::find(bodies.begin(), bodies.end(), mc.body) == bodies.end())
+            bodies.push_back(mc.body);
     }
+    std::sort(bodies.begin(), bodies.end());
 
-    // Combo to pick which body's market to display.
-    const std::string preview = body_label(w, w.markets.at(selected_market).body);
-    if (ImGui::BeginCombo("Body", preview.c_str()))
+    static entity_id selected_body = null_entity;
+    if (selected_body == null_entity || w.bodies.find(selected_body) == w.bodies.end())
+        selected_body = (w.home_body != null_entity && w.bodies.count(w.home_body))
+                        ? w.home_body : bodies.front();
+
+    const std::string body_preview = body_label(w, selected_body);
+    if (ImGui::BeginCombo("Body", body_preview.c_str()))
     {
-        for (entity_id mid : mids)
+        for (entity_id bid : bodies)
         {
-            const bool is_selected = (mid == selected_market);
-            const std::string label = body_label(w, w.markets.at(mid).body);
-            if (ImGui::Selectable(label.c_str(), is_selected))
-                selected_market = mid;
-            if (is_selected)
+            const bool sel = (bid == selected_body);
+            if (ImGui::Selectable(body_label(w, bid).c_str(), sel))
+                selected_body = bid;
+            if (sel)
                 ImGui::SetItemDefaultFocus();
         }
         ImGui::EndCombo();
@@ -86,15 +98,90 @@ void draw_market_ledger(const world& w, const ui_state& /*s*/, bool& open)
 
     ImGui::Separator();
 
-    const market_component& mc = w.markets.at(selected_market);
+    const std::vector<entity_id> body_markets = markets_on_body(w, selected_body);
+    if (body_markets.empty())
+    {
+        ImGui::TextDisabled("No markets on this body.");
+        ImGui::End();
+        return;
+    }
 
-    // Resource table: Resource | Supply | Demand | Price | Net balance
-    constexpr ImGuiTableFlags table_flags =
+    // --- Dashboard: one summary row per market on the body ---
+    static entity_id selected_market = null_entity;
+    // Validate selection against the current body's markets.
+    if (selected_market == null_entity ||
+        std::find(body_markets.begin(), body_markets.end(), selected_market) == body_markets.end())
+        selected_market = body_markets.front();
+
+    ImGui::TextDisabled("Markets on %s (%zu)", body_label(w, selected_body).c_str(),
+                        body_markets.size());
+
+    constexpr ImGuiTableFlags dash_flags =
+        ImGuiTableFlags_Borders | ImGuiTableFlags_SizingStretchProp |
+        ImGuiTableFlags_RowBg;
+
+    if (ImGui::BeginTable("##market_dash", 4, dash_flags))
+    {
+        ImGui::TableSetupColumn("Market");
+        ImGui::TableSetupColumn("Supply");
+        ImGui::TableSetupColumn("Demand");
+        ImGui::TableSetupColumn("Turnover");
+        ImGui::TableHeadersRow();
+
+        for (int i = 0; i < static_cast<int>(body_markets.size()); ++i)
+        {
+            const entity_id mid = body_markets[static_cast<std::size_t>(i)];
+            const market_component& mc = w.markets.at(mid);
+            const bool is_sel = (mid == selected_market);
+
+            float total_supply = 0.0f, total_demand = 0.0f, total_cleared = 0.0f;
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                total_supply  += mc.supply[r];
+                total_demand  += mc.demand[r];
+                total_cleared += std::min(mc.supply[r], mc.demand[r]);
+            }
+
+            ImGui::TableNextRow();
+            ImGui::TableSetColumnIndex(0);
+            {
+                const std::string lbl = market_label(w, mid, i);
+                if (ImGui::Selectable(lbl.c_str(), is_sel,
+                                      ImGuiSelectableFlags_SpanAllColumns))
+                    selected_market = mid;
+            }
+            ImGui::TableSetColumnIndex(1);
+            ImGui::Text("%.0f", total_supply);
+            ImGui::TableSetColumnIndex(2);
+            ImGui::Text("%.0f", total_demand);
+            ImGui::TableSetColumnIndex(3);
+            ImGui::Text("%.0f", total_cleared);
+        }
+
+        ImGui::EndTable();
+    }
+
+    ImGui::Separator();
+
+    // --- Detail: selected market's per-resource table ---
+    if (w.markets.find(selected_market) == w.markets.end())
+    {
+        ImGui::End();
+        return;
+    }
+
+    const market_component& mc = w.markets.at(selected_market);
+    ImGui::TextDisabled("%s — resource detail",
+                        market_label(w, selected_market,
+                            static_cast<int>(std::find(body_markets.begin(),
+                                body_markets.end(), selected_market) - body_markets.begin())).c_str());
+
+    constexpr ImGuiTableFlags detail_flags =
         ImGuiTableFlags_Borders | ImGuiTableFlags_SizingStretchProp;
 
-    float total_cleared = 0.0f;
+    float detail_cleared = 0.0f;
 
-    if (ImGui::BeginTable("##market_ledger", 5, table_flags))
+    if (ImGui::BeginTable("##market_detail", 5, detail_flags))
     {
         ImGui::TableSetupColumn("Resource");
         ImGui::TableSetupColumn("Supply");
@@ -105,15 +192,13 @@ void draw_market_ledger(const world& w, const ui_state& /*s*/, bool& open)
 
         for (std::size_t r = 0; r < resource_count; ++r)
         {
+            if (mc.base_price[r] <= 0.0f)
+                continue; // resource not traded at this market
+
             const float supply = mc.supply[r];
             const float demand = mc.demand[r];
-
-            // Show only resources that have at least one offer or bid.
-            if (supply <= 0.0f && demand <= 0.0f)
-                continue;
-
-            const float net = supply - demand;
-            total_cleared += std::min(supply, demand);
+            const float net    = supply - demand;
+            detail_cleared += std::min(supply, demand);
 
             ImGui::TableNextRow();
 
@@ -121,15 +206,20 @@ void draw_market_ledger(const world& w, const ui_state& /*s*/, bool& open)
             {
                 const resource_presentation& rp =
                     presentation_of(static_cast<resource_type>(r));
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(rp.colour),
-                                   "%s", rp.name);
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(rp.colour), "%s", rp.name);
             }
 
             ImGui::TableSetColumnIndex(1);
-            ImGui::Text("%.1f", supply);
+            {
+                ImU32 col = (supply > 0.0f) ? palette::positive : palette::neutral;
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(col), "%.1f", supply);
+            }
 
             ImGui::TableSetColumnIndex(2);
-            ImGui::Text("%.1f", demand);
+            {
+                ImU32 col = (demand > supply) ? palette::negative : palette::neutral;
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(col), "%.1f", demand);
+            }
 
             ImGui::TableSetColumnIndex(3);
             ImGui::Text("%.2f", mc.price[r]);
@@ -140,8 +230,7 @@ void draw_market_ledger(const world& w, const ui_state& /*s*/, bool& open)
                 if (net > 0.0f)       col = palette::positive;
                 else if (net < 0.0f)  col = palette::negative;
                 else                  col = palette::neutral;
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(col),
-                                   "%+.1f", net);
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(col), "%+.1f", net);
             }
         }
 
@@ -149,7 +238,7 @@ void draw_market_ledger(const world& w, const ui_state& /*s*/, bool& open)
     }
 
     ImGui::Separator();
-    ImGui::Text("Turnover this tick: %.1f", total_cleared);
+    ImGui::Text("Turnover this tick: %.1f", detail_cleared);
 
     ImGui::End();
 }
