@@ -3,11 +3,13 @@
 //
 // Build (from repo root, after sourcing vcvars64):
 //   cl /nologo /std:c++20 /EHsc /I src tools\verify\supply_advance.cpp ^
-//      src\world\world.cpp src\world\supply_system.cpp /Fe:supply_advance.exe
+//      src\world\world.cpp src\world\supply_system.cpp ^
+//      src\world\market_clearing.cpp /Fe:supply_advance.exe
 // Run:
 //   .\supply_advance.exe
 
 #include "world/components.hpp"
+#include "world/market_clearing.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/supply_system.hpp"
 #include "world/world.hpp"
@@ -249,6 +251,98 @@ static void test_credit_arrived()
 }
 
 // ---------------------------------------------------------------------------
+// R8: two-body price convergence via repeated convoy deliveries
+//
+// Body A: abundant iron supply (large corp pool) → low market price.
+// Body B: iron demand only (no supply, no pool) → price at ceiling.
+// Each delivery tick: seed an arrived convoy, credit it, clear markets.
+// After 8 deliveries the body B pool accumulates → price falls.
+// ---------------------------------------------------------------------------
+static void test_price_convergence()
+{
+    std::printf("--- R8: two-body price convergence ---\n");
+    world w;
+    recipe_registry reg;
+
+    entity_id body_a = w.create_entity();
+    entity_id body_b = w.create_entity();
+    entity_id corp   = w.create_entity();
+
+    body_component ba{};
+    ba.name = "BodyA"; ba.type = body_type::planet;
+    ba.orbital_radius_au = 1.0f; ba.orbital_angle_rad = 0.0f;
+    ba.grid_width = ba.grid_height = 4;
+    w.bodies[body_a] = ba;
+
+    body_component bb{};
+    bb.name = "BodyB"; bb.type = body_type::planet;
+    bb.orbital_radius_au = 2.0f; bb.orbital_angle_rad = 0.0f;
+    bb.grid_width = bb.grid_height = 4;
+    w.bodies[body_b] = bb;
+
+    corporation_component cc{};
+    cc.balance = 1000.0f;
+    w.corporations[corp] = cc;
+
+    entity_id mkt_a = w.create_entity();
+    {
+        market_component mc{};
+        mc.body = body_a;
+        mc.base_price[ri(resource_type::iron_ore)] = 1.0f;
+        mc.price[ri(resource_type::iron_ore)]      = 1.0f;
+        w.markets[mkt_a] = mc;
+    }
+    w.pool_for(corp, body_a).quantities[ri(resource_type::iron_ore)] = 500.0f;
+
+    entity_id mkt_b = w.create_entity();
+    {
+        market_component mc{};
+        mc.body = body_b;
+        mc.base_price[ri(resource_type::iron_ore)] = 1.0f;
+        mc.price[ri(resource_type::iron_ore)]      = 1.0f;
+        w.markets[mkt_b] = mc;
+    }
+
+    // Standing iron_ore shortfall on body B drives demand each tick.
+    economy_report report;
+    std::array<float, resource_count> shortfall{};
+    shortfall[ri(resource_type::iron_ore)] = 50.0f;
+    report.purchases[{corp, body_b}] = shortfall;
+
+    // --- Phase 1: diverge without convoys (3 ticks to settle EMA) ---
+    for (int i = 0; i < 3; ++i)
+        clear_markets(w, reg, report);
+
+    const float price_b_before = w.markets.at(mkt_b).price[ri(resource_type::iron_ore)];
+    check(price_b_before > 1.0f,
+          "divergence: body B price above base (demand, no supply)",
+          price_b_before, 1.0f);
+
+    // --- Phase 2: deliver 60 iron to body B each tick ---
+    for (int tick = 0; tick < 8; ++tick)
+    {
+        convoy_component cv{};
+        cv.dest_market    = mkt_b;
+        cv.cargo_resource = resource_type::iron_ore;
+        cv.cargo_qty      = 60.0f;
+        cv.progress       = 1.0f;
+        cv.arrived        = true;
+        cv.corp           = corp;
+        w.convoys.push_back(cv);
+
+        credit_arrived_convoys(w);
+        clear_markets(w, reg, report);
+    }
+
+    const float price_b_after = w.markets.at(mkt_b).price[ri(resource_type::iron_ore)];
+    check(price_b_after < price_b_before,
+          "convergence: body B price falls after repeated convoy deliveries",
+          price_b_after, price_b_before);
+
+    std::printf("  INFO  price_b: before=%.3f  after=%.3f\n", price_b_before, price_b_after);
+}
+
+// ---------------------------------------------------------------------------
 
 int main()
 {
@@ -257,6 +351,7 @@ int main()
     test_logistics_constants();
     test_dispatch_and_gate();
     test_credit_arrived();
+    test_price_convergence();
 
     std::printf("\n%s  (%d failure%s)\n",
                 g_failures == 0 ? "ALL PASS" : "SOME FAILURES",

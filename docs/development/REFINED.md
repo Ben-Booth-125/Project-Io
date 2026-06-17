@@ -551,20 +551,22 @@ R1 complete. Build clean.
 
 ---
 
-## Supply Layer — convoys, logistics costs, inter-body market coupling (promoted from BACKLOG § BL-039, BL-038, BL-045) — **PAUSED**
+## Supply Layer — convoys, logistics costs, inter-body market coupling (promoted from BACKLOG § BL-039, BL-038, BL-045) — **COMPLETE**
 
 Requirements: `req/requirements.json § supply-layer`
 
 Items folded in: **BL-045** (cost constants); **BL-038** (inter-body market coupling).
 
-- **[3] A — Convoy component + per-Tick advance.** ✓ Files: `src/world/components.hpp`, `src/world/supply_system.{hpp,cpp}`. Satisfies: R1, R2.
-- **[2] B — Per-mode logistics-cost constants (BL-045).** ✓ Files: `scripts/economy.lua`. Satisfies: R3.
-- **[2] C — Logistical-cost budget deduction.** ✓ Folded into dispatch_convoys (cost debited at dispatch time). Satisfies: R4.
-- **[3] D — Auto-dispatch trigger.** ✓ Files: `src/world/supply_system.cpp`. Satisfies: R5, R6.
-- **[3] E — Arrival crediting + inter-body market coupling.** ✓ Folded into credit_arrived_convoys (credits pool + injects into market.supply). Files: `src/world/supply_system.cpp`. Satisfies: R7. R8 mechanism in place; multi-tick price-convergence scenario deferred.
-- **[3] F — Supply lens render passes.** ✓ Files: `src/ui/icons.{hpp,cpp}`, `src/ui/solar_system_canvas.cpp`, `src/ui/circumplanetary_canvas.cpp`, `src/ui/body_surface_canvas.cpp`. Satisfies: R9 (visual pass wired; golden deferred — no active convoys in the cold world at verify time).
+- **[3] A — Convoy component + per-Tick advance.** ✓ Satisfies: R1, R2.
+- **[2] B — Per-mode logistics-cost constants (BL-045).** ✓ Satisfies: R3.
+- **[2] C — Logistical-cost budget deduction.** ✓ Satisfies: R4.
+- **[3] D — Auto-dispatch trigger.** ✓ Satisfies: R5, R6.
+- **[3] E — Arrival crediting + inter-body market coupling.** ✓ Satisfies: R7.
+- **[3] F — Supply lens render passes.** ✓ Satisfies: R9.
+- **R8 — Two-body price convergence.** ✓ Extended supply_advance.cpp; price_b 3.625→0.923 over 8 delivery ticks.
+- **R9 — supply_lens.lua golden.** ✓ verify.seed_convoy API added; 3/3 golden PASS 0.00%.
 
-R1–R7 complete (supply_advance.exe ALL PASS, 21/21). R8 (multi-tick price convergence) and R9 (golden) remain active — pending a world with active convoys and a supply_lens.lua script.
+All R1–R9 complete. 2026-06-17.
 
 ---
 

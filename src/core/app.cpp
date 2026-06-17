@@ -495,6 +495,41 @@ int app::run_verify(const std::string& script_path, bool bless)
         }
     });
 
+    // Seed a test convoy in flight between two named bodies — lets visual-verify
+    // scripts capture the Supply lens without depending on auto-dispatch (which
+    // requires launchpads not present in the generated world). If the destination
+    // body has no market a minimal one is created so the Solar route line renders.
+    v.set_function("seed_convoy",
+        [this](const std::string& src_name, const std::string& dst_name,
+               const std::string& res_name, float qty, sol::optional<float> progress_opt)
+        {
+            const entity_id src_body = find_body(m_world, src_name);
+            const entity_id dst_body = find_body(m_world, dst_name);
+            if (src_body == null_entity || dst_body == null_entity)
+                return;
+            // Return the first market on a body, creating a minimal stub if absent.
+            auto ensure_market = [this](entity_id body) -> entity_id {
+                for (const auto& [mid, mc] : m_world.markets)
+                    if (mc.body == body) return mid;
+                const entity_id mid = m_world.create_entity();
+                market_component mc{};
+                mc.body = body;
+                m_world.markets[mid] = mc;
+                return mid;
+            };
+            convoy_component cv{};
+            cv.source_market  = ensure_market(src_body);
+            cv.dest_market    = ensure_market(dst_body);
+            cv.cargo_resource = resource_from_name(res_name);
+            cv.cargo_qty      = qty;
+            cv.mode           = convoy_mode::space;
+            cv.progress       = progress_opt.value_or(0.5f);
+            cv.arrived        = false;
+            cv.corp           = m_world.player_entity;
+            cv.speed          = 0.1f;
+            m_world.convoys.push_back(cv);
+        });
+
     try
     {
         // Auto-load the helper library (scripts/verify/lib.lua) from the script's
