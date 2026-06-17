@@ -17,14 +17,33 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     if (tile_it == w.tiles.end())
         return construction_result::no_tile;
 
-    // The load-bearing validity check — the same seam generation uses.
+    // Tile-level validity check (ocean / deposit / terrain).
     if (!placement_rules::can_place(tile_it->second, type, target))
         return construction_result::invalid_tile;
 
+    // World-level checks: coastal (Port), body-count cap (Launchpad).
+    // can_place passed, so failures here are world-state reasons, not terrain.
+    if (!placement_rules::can_place_in_world(w, tile, type, target))
+    {
+        if (type == building_type::launchpad)
+            return construction_result::slot_occupied;
+        return construction_result::invalid_tile; // Port not coastal
+    }
+
     corporation_component& cc = corp_it->second;
-    const float cost = reg.economics(type).build_cost;
-    if (cc.balance < cost)
+    const building_economics& econ = reg.economics(type);
+    if (cc.balance < econ.build_cost)
         return construction_result::insufficient_funds;
+
+    // Resource material cost (BL-044): check corp pool on the building's body.
+    const entity_id tile_body = tile_it->second.body;
+    stockpile_component& pool = w.pool_for(corp, tile_body);
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        if (econ.resource_build_cost[r] > 0.0f &&
+            pool.quantities[r] < econ.resource_build_cost[r])
+            return construction_result::insufficient_materials;
+    }
 
     // Create and author the building, mirroring corporation_generation.cpp Pass 3.
     const entity_id bld_id = w.create_entity();
@@ -50,7 +69,10 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     w.stockpiles[bld_id] = stockpile_component{};
 
     cc.assets.push_back(bld_id);
-    cc.balance -= cost;
+    cc.balance -= econ.build_cost;
+    // Deduct material costs from corp pool (BL-044).
+    for (std::size_t r = 0; r < resource_count; ++r)
+        pool.quantities[r] -= econ.resource_build_cost[r];
 
     out_building = bld_id;
     return construction_result::placed;

@@ -8,6 +8,7 @@
 
 #include "world/components.hpp"
 #include "world/placement_rules.hpp"
+#include "world/recipe_registry.hpp"
 
 #include <imgui.h>
 
@@ -77,7 +78,7 @@ void draw_queue_section(const world& /*w*/)
 }
 
 // --- Build section -----------------------------------------------------------
-void draw_build_section(ui_state& state)
+void draw_build_section(const recipe_registry& reg, ui_state& state)
 {
     if (!ImGui::CollapsingHeader("Build", ImGuiTreeNodeFlags_DefaultOpen))
         return;
@@ -120,6 +121,20 @@ void draw_build_section(ui_state& state)
         else
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::pinned),
                 "Placing: %s", building_type_name(state.construction.type));
+
+        // Show cost: cash + any resource materials (BL-044).
+        const building_economics& eco = reg.economics(state.construction.type);
+        ImGui::Text("Cost: %.0f cr", static_cast<double>(eco.build_cost));
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            if (eco.resource_build_cost[r] > 0.0f)
+                ImGui::Text("  + %.0f %s",
+                            static_cast<double>(eco.resource_build_cost[r]),
+                            resource_name(static_cast<resource_type>(r)));
+        }
+        if (!state.construction.last_message.empty())
+            ImGui::TextColored({1.0f, 0.4f, 0.4f, 1.0f}, "%s",
+                               state.construction.last_message.c_str());
 
         if (ImGui::Button("Cancel"))
             state.construction.active = false;
@@ -341,7 +356,7 @@ void draw_construction_panel(world& w,
 
     draw_queue_section(w);
     ImGui::Spacing();
-    draw_build_section(state);
+    draw_build_section(reg, state);
     ImGui::Spacing();
     draw_selected_section(w, reg, state);
     ImGui::Spacing();

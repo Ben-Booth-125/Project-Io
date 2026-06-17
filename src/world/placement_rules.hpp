@@ -1,6 +1,9 @@
 #pragma once
 
 #include "world/components.hpp"
+#include "world/entity.hpp"
+
+struct world; // forward declaration for can_place_in_world / is_coastal
 
 /// Reusable, screen-independent building-placement validity rules.
 ///
@@ -59,5 +62,29 @@ bool can_place_population_centre(const tile_component& tc);
 /// @param target  The extraction target resource (ignored for non-extraction types).
 /// @return        True if placement is valid.
 bool can_place(const tile_component& tc, building_type type, resource_type target);
+
+/// True if the tile at `tile_id` is coastal — has at least one ocean neighbour
+/// in the hex grid. Used to enforce Port placement rules (BL-043).
+///
+/// @param w       The world (reads tile components).
+/// @param tile_id The tile to test.
+/// @return        True if any of the 6 hex neighbours is an ocean tile.
+bool is_coastal(const world& w, entity_id tile_id);
+
+/// Full placement check including world-level constraints (BL-043):
+///  1. Tile-level can_place (ocean / deposit / terrain).
+///  2. Port: tile must be coastal (is_coastal).
+///  3. Launchpad: at most 1 per body; returns false when one already exists.
+///
+/// Use this at player construction time; generation uses can_place directly
+/// (world state is incomplete during generation passes).
+///
+/// @param w       The world (reads tiles, buildings for count checks).
+/// @param tile_id The candidate tile entity.
+/// @param type    Building type to place.
+/// @param target  Extraction target (ignored for non-extraction types).
+/// @return        True if placement is fully valid.
+bool can_place_in_world(const world& w, entity_id tile_id,
+                        building_type type, resource_type target);
 
 } // namespace placement_rules

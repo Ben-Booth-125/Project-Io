@@ -150,6 +150,11 @@ void recipe_registry::load_from_lua(lua_state& lua)
             e.maintenance = b->get_or("maintenance", 0.0f);
             e.base_wage   = b->get_or("base_wage",   0.0f);
             e.build_cost  = b->get_or("build_cost",  0.0f);
+            // Optional resource material cost (BL-044).
+            sol::optional<sol::table> rcosts = (*b)["resource_costs"];
+            if (rcosts)
+                read_resource_map(*rcosts, e.resource_build_cost,
+                                  std::string("buildings.") + nt.key + ".resource_costs");
             m_building_econ[static_cast<std::size_t>(nt.type)] = e;
         }
     }

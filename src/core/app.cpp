@@ -881,6 +881,10 @@ void app::render()
                 m_ui.construction.last_message = "Can't build there."; break;
             case construction_result::insufficient_funds:
                 m_ui.construction.last_message = "Can't afford it."; break;
+            case construction_result::slot_occupied:
+                m_ui.construction.last_message = "Already placed on this body."; break;
+            case construction_result::insufficient_materials:
+                m_ui.construction.last_message = "Not enough materials."; break;
             default:
                 m_ui.construction.last_message = "Construction failed."; break;
         }

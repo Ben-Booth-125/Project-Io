@@ -3579,6 +3579,396 @@
           "notes": null
         }
       ]
+    },
+    {
+      "brief": "habitability-workforce",
+      "title": "Habitability gates max workforce (BL-041)",
+      "difficulty": 3,
+      "importance": "B",
+      "evaluated_difficulty": null,
+      "status": "active",
+      "resolved": null,
+      "resolution": null,
+      "promoted_from": "BACKLOG § BL-041",
+      "batch": "v0.0.7",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: buildings on a body with mean habitability < 0.6 have their effective workforce capped by min(1, hab/0.6); the economy panel's output rate reflects the reduction.",
+          "verification": ["headless: econ_harness with hab < 0.6 body shows reduced output vs hab = 1.0 body"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R2",
+          "requirement": "The hab cap formula is min(1.0f, body_hab / 0.6f) applied to workforce demand before the contention scalar, so a body at hab 0.3 runs buildings at most 50% capacity.",
+          "verification": ["code: hab_cap formula in economy_system.cpp"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R3",
+          "requirement": "The cap is computed from the body's mean population-centre habitability (weighted by scale); bodies with no population centres default to hab 1.0 (uncapped).",
+          "verification": ["code: hab_cap_by_body derivation"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R4",
+          "requirement": "The economy report's workforce_contention map still reflects the combined effect (hab cap × contention scalar).",
+          "verification": ["code", "build"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        }
+      ]
+    },
+    {
+      "brief": "building-placement-rules",
+      "title": "Stricter building placement rules (BL-043)",
+      "difficulty": 4,
+      "importance": "B",
+      "evaluated_difficulty": null,
+      "status": "active",
+      "resolved": null,
+      "resolution": null,
+      "promoted_from": "BACKLOG § BL-043",
+      "batch": "v0.0.7",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: Port placement is rejected on non-coastal tiles; Launchpad is capped at 1 per body; both checks surface in the construction panel message.",
+          "verification": ["code: can_place_in_world", "build"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R2",
+          "requirement": "placement_rules gains can_place_in_world(world&, tile_id, type, target) -> bool that layers world-level checks (coastal for Port, body count for Launchpad) on top of the existing tile-level can_place.",
+          "verification": ["code: can_place_in_world signature"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R3",
+          "requirement": "Port requires at least one adjacent ocean tile (hex-grid neighbours); construction returns invalid_tile if no ocean neighbour.",
+          "verification": ["code: is_coastal helper", "build"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R4",
+          "requirement": "Launchpad is capped at 1 per body; a second construction attempt returns a new slot_occupied result.",
+          "verification": ["code: launchpad count check", "build"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R5",
+          "requirement": "construct_building uses can_place_in_world; the construction panel shows slot_occupied as a human message.",
+          "verification": ["code: construction.cpp call site"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        }
+      ]
+    },
+    {
+      "brief": "selectable-markers",
+      "title": "Selectable entity markers on canvas (BL-059)",
+      "difficulty": 2,
+      "importance": "B",
+      "evaluated_difficulty": null,
+      "status": "active",
+      "resolved": null,
+      "resolution": null,
+      "promoted_from": "BACKLOG § BL-059",
+      "batch": "v0.0.7",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: buildings and market centres are drawn as distinct selectable glyphs at their tile world positions on the Planetary canvas, golden-verified.",
+          "verification": ["visual: scripts/verify/selectable_markers.lua golden"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R2",
+          "requirement": "Buildings draw using ui::icons::building with a radius that scales with the zoom level; zone radius tracks the drawn size.",
+          "verification": ["code: building marker draw + zone registration", "visual"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R3",
+          "requirement": "Market centres draw as a distinct glyph (icons::market_centre, a small circle with cross) at the centre_tile world position.",
+          "verification": ["code: market centre marker + icons::market_centre", "visual"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R4",
+          "requirement": "A per-frame hit-zone list (marker_hit_zone entries with entity_id, kind, and screen-space centre+radius) is stored in ui_state, rebuilt each frame alongside tile cells, and cleared after click processing.",
+          "verification": ["code: ui_state::marker_hit_zones"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R5",
+          "requirement": "Markers paint above lens overlays but below the Selection panel chrome (z-order: tile → lens → markers → Selection).",
+          "verification": ["visual"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        }
+      ]
+    },
+    {
+      "brief": "market-boundary-lens",
+      "title": "Market boundary lens (BL-015)",
+      "difficulty": 3,
+      "importance": "C",
+      "evaluated_difficulty": null,
+      "status": "active",
+      "resolved": null,
+      "resolution": null,
+      "promoted_from": "BACKLOG § BL-015",
+      "batch": "v0.0.7",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: under the Market lens, each market's catchment tiles receive a distinct filled tint (one colour per market); the old price-wash is removed from the strip lens, golden-verified.",
+          "verification": ["visual: scripts/verify/market_boundary_lens.lua golden"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R2",
+          "requirement": "Each market is assigned a colour index (cycling through a palette); all tiles routed to that market by market_for_tile receive a flat translucent tint of that colour.",
+          "verification": ["code: market boundary pass in body_surface_canvas.cpp", "visual"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R3",
+          "requirement": "The market lens no longer shows the per-tile price wash on the strip; the Market Ledger retains the price table (price readout stays in the ledger).",
+          "verification": ["code: overlay_mode::market branch", "visual"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R4",
+          "requirement": "An on-canvas key lists each market with its colour swatch and market index.",
+          "verification": ["code: draw_market_boundary_key", "visual"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        }
+      ]
+    },
+    {
+      "brief": "hover-card",
+      "title": "Hover-card UI primitive (BL-060)",
+      "difficulty": 2,
+      "importance": "B",
+      "evaluated_difficulty": null,
+      "status": "active",
+      "resolved": null,
+      "resolution": null,
+      "promoted_from": "BACKLOG § BL-060",
+      "batch": "v0.0.7",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: hovering a tile shows a transient floating card with the tile's terrain name and key stat; the card dismisses on mouse-off.",
+          "verification": ["code: hover_card API wired to tile hover"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R2",
+          "requirement": "hover_card.{hpp,cpp} provides a draw_hover_card(content_fn, cursor_pos) API rendering an ImGui child window (no title bar, rounded, semi-opaque) that appears after a brief delay (kHoverDelay frames).",
+          "verification": ["code: hover_card.hpp API + kHoverDelay", "build"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R3",
+          "requirement": "Content is lens-contextual and minimal: the smallest read for the entity under the active lens (name + 1–2 stats).",
+          "verification": ["code: tile hover content callback"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        }
+      ]
+    },
+    {
+      "brief": "canvas-hit-testing",
+      "title": "Canvas hit-testing for entity markers (BL-031)",
+      "difficulty": 2,
+      "importance": "C",
+      "evaluated_difficulty": null,
+      "status": "active",
+      "resolved": null,
+      "resolution": null,
+      "promoted_from": "BACKLOG § BL-031",
+      "batch": "v0.0.7",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: clicking a building marker on the Planetary canvas selects that building entity (sets ui_state.selected_entity), taking precedence over the tile below it.",
+          "verification": ["code: hit-test priority in body_surface_canvas.cpp"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R2",
+          "requirement": "Click resolution priority: building > market-centre > tile (entity closest to cursor in the marker_hit_zones list wins).",
+          "verification": ["code: hit-zone priority loop"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R3",
+          "requirement": "The selection_panel renders a building summary when a building entity is selected (entity kind = building).",
+          "verification": ["code: selection_panel building branch"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        }
+      ]
+    },
+    {
+      "brief": "construction-pricing",
+      "title": "Construction pricing — buildings cost resources (BL-044)",
+      "difficulty": 3,
+      "importance": "B",
+      "evaluated_difficulty": null,
+      "status": "active",
+      "resolved": null,
+      "resolution": null,
+      "promoted_from": "BACKLOG § BL-044",
+      "batch": "v0.0.7",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: constructing a building costs resources from the (corp, body) pool; the construction panel shows insufficient_materials when the pool is short.",
+          "verification": ["code: construction.cpp resource cost check"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R2",
+          "requirement": "building_economics gains a resource_build_cost array indexed by resource_type; economy.lua authors steel (and refined_fuel for launchpad) resource costs per building type.",
+          "verification": ["code: building_economics::resource_build_cost", "build"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R3",
+          "requirement": "construct_building checks pool quantities for the resource cost and returns a new insufficient_materials result if any resource is short, without mutating the world.",
+          "verification": ["code: insufficient_materials guard in construction.cpp"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R4",
+          "requirement": "On success, the resource cost is consumed from the (corp, body) pool and the construction panel shows the required resources for each building type.",
+          "verification": ["code: pool deduction + UI display"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        }
+      ]
+    },
+    {
+      "brief": "placement-suitability",
+      "title": "Placement-suitability surface on tile selection (BL-010)",
+      "difficulty": 3,
+      "importance": "B",
+      "evaluated_difficulty": null,
+      "status": "active",
+      "resolved": null,
+      "resolution": null,
+      "promoted_from": "BACKLOG § BL-010",
+      "batch": "v0.0.7",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: when a tile is selected, all other tiles are tinted by placement suitability for the best valid building on the selected tile — affine tiles tinted, invalid tiles darkened, valid-but-not-affine tiles unchanged.",
+          "verification": ["visual: placement suitability surface visible on tile selection"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R2",
+          "requirement": "Affine tiles (terrain optimal for the best building on the selected tile) receive a coloured tint; invalid tiles receive a dark overlay; valid-but-not-affine are unchanged.",
+          "verification": ["code: placement suitability pass in body_surface_canvas.cpp"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R3",
+          "requirement": "The surface deactivates when no tile is selected (selected_entity == null_entity or a non-tile entity).",
+          "verification": ["code: guard on tile selection state"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        }
+      ]
+    },
+    {
+      "brief": "lens-driven-selection",
+      "title": "Lens-driven selection resolution (BL-032)",
+      "difficulty": 4,
+      "importance": "B",
+      "evaluated_difficulty": null,
+      "status": "active",
+      "resolved": null,
+      "resolution": null,
+      "promoted_from": "BACKLOG § BL-032",
+      "batch": "v0.0.7",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: the selection panel renders contextual content for the entity under the active lens — tile under Corporation lens shows corporation tint info; tile under Production lens shows per-tile output stats.",
+          "verification": ["code: lens-contextual selection_panel content"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R2",
+          "requirement": "The entity resolution priority (building > market-centre > tile) is applied in selection_panel based on the active overlay_mode.",
+          "verification": ["code: specificity stack in selection_panel"],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        }
+      ]
     }
   ]
 }

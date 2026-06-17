@@ -28,6 +28,10 @@ struct building_economics
     float maintenance = 0.0f; ///< Flat per-tick upkeep charged to the owning corp.
     float base_wage   = 0.0f; ///< Wage per unit workforce per tick.
     float build_cost  = 0.0f; ///< One-off construction cost (Layer 4 build UI).
+    /// Per-resource material cost of construction (BL-044). Indexed by
+    /// static_cast<std::size_t>(resource_type). Consumed from the corp's pool
+    /// on the body where the building is placed. Zero = no requirement for that good.
+    std::array<float, resource_count> resource_build_cost = {};
 };
 
 /// Startup-loaded registry of processing recipes and economy constants. Pure

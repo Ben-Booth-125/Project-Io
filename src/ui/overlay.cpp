@@ -70,7 +70,7 @@ const char* overlay_mode_name(overlay_mode m)
     switch (m)
     {
         case overlay_mode::supply:      return "Supply routes";
-        case overlay_mode::market:      return "Market prices";
+        case overlay_mode::market:      return "Market catchment boundaries";
         case overlay_mode::country:     return "Countries";
         case overlay_mode::corporation: return "Corporation ownership";
         case overlay_mode::resource:    return "Resource deposits";

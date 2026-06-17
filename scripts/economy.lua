@@ -31,18 +31,30 @@ economy = {
             maintenance = 5.0,
             base_wage   = 8.0,
             build_cost  = 100.0,
+            -- Resource material cost (BL-044). Keys are resource_type names;
+            -- the loader maps them to resource_build_cost[].
+            resource_costs = { steel = 20.0 },
         },
         processing_facility = {
             base_rate   = 8.0,
             maintenance = 10.0,
             base_wage   = 12.0,
             build_cost  = 200.0,
+            resource_costs = { steel = 25.0 },
         },
         port = {
             base_rate   = 0.0,
             maintenance = 8.0,
             base_wage   = 6.0,
             build_cost  = 150.0,
+            resource_costs = { steel = 20.0 },
+        },
+        launchpad = {
+            base_rate   = 0.0,
+            maintenance = 20.0,
+            base_wage   = 15.0,
+            build_cost  = 500.0,
+            resource_costs = { steel = 50.0, refined_fuel = 20.0 },
         },
     },
 }

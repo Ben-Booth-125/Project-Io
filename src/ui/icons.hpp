@@ -154,4 +154,15 @@ void population(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Stroke colour of the outline.
 void scarcity(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw a market-centre marker — a small circle with a centred cross (+) — in
+/// @p colour. Distinct from the building square/diamond/triangle glyphs and the
+/// unit chevron. Used as an on-canvas selectable marker for market entities
+/// (BL-059, BL-031). For hit-zone display on the Planetary canvas.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Marker centre, screen pixels.
+/// @param r      Half-extent (radius) of the glyph, screen pixels.
+/// @param colour Stroke colour.
+void market_centre(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 } // namespace ui::icons
