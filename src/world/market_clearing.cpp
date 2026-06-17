@@ -226,6 +226,11 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         mc.demand.fill(0.0f);
     }
 
+    // Inject nation-substrate background supply and demand into markets before the
+    // order-book runs. Must come after the zero-reset above so substrate is additive
+    // to the order-book quantities, not erased by it.
+    inject_substrate_demand(w);
+
     // A (corp, body, resource) the player has a standing sell order for is under
     // manual control: the auto-surplus path yields it so the player's floor-priced
     // order governs the sale, not the greedy auto path.
@@ -237,13 +242,23 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         return false;
     };
 
-    // --- Build per-(market, resource) order books ---
+    // --- Separate auto-clearing entries from the explicit-order books ---
+    //
+    // Auto-surplus and auto-demand (processor shortfalls) always clear at the
+    // reference price derived from supply/demand ratios — the market is a perfect
+    // counterparty for these. Explicit player orders go through the order book and
+    // also auto-clear at max(ref_price, floor) when no matching buyer exists, so
+    // supply is always guaranteed to clear (prototype invariant).
+    struct auto_sell_entry { entity_id corp; entity_id market; std::size_t r; float qty; };
+    struct auto_buy_entry  { entity_id corp; entity_id market; std::size_t r; float qty; };
+    std::vector<auto_sell_entry> auto_sells;
+    std::vector<auto_buy_entry>  auto_buys;
+
+    // Explicit priced player orders: supply/demand recorded into mc AND into order books.
     std::unordered_map<entity_id, std::unordered_map<std::size_t, std::vector<ob_sell_entry>>> sell_books;
     std::unordered_map<entity_id, std::unordered_map<std::size_t, std::vector<ob_buy_entry>>>  buy_books;
 
-    // Auto-surplus sell side: each corp's pool above its processor reservation.
-    // Pools are NOT debited here — debiting happens only for matched quantities after
-    // the order-book run, so unmatched surplus stays in the pool.
+    // Auto-surplus: each corp's pool above its processor reservation.
     for (auto& [key, pool] : w.corp_body_pools)
     {
         const entity_id corp = key.first;
@@ -269,12 +284,12 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
             if (surplus <= 0.0f)
                 continue;
 
-            sell_books[mid][r].push_back({corp, surplus, 0.0f});
+            w.markets.at(mid).supply[r] += surplus;
+            auto_sells.push_back({corp, mid, r, surplus});
         }
     }
 
-    // Player sell orders: pulled from the (corp, body) pool up to available stock.
-    // Like auto-surplus, the actual pool debit waits until after matching.
+    // Player sell orders: into mc.supply and the explicit sell book.
     for (const sell_order& order : player_orders)
     {
         if (order.quantity <= 0.0f)
@@ -289,10 +304,11 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         const float available = std::min(order.quantity, pkit->second.quantities[r]);
         if (available <= 0.0f)
             continue;
+        w.markets.at(mid).supply[r] += available;
         sell_books[mid][r].push_back({order.corp, available, order.floor_price});
     }
 
-    // Auto-demand buy side: processor input shortfalls from the economy report.
+    // Auto-demand: processor input shortfalls from the economy report.
     for (const auto& [key, bought] : report.purchases)
     {
         const entity_id corp = key.first;
@@ -307,12 +323,12 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
             const float qty = bought[r];
             if (qty <= 0.0f)
                 continue;
-            // 999 = pay any price; no counterparty preference on the auto path.
-            buy_books[mid][r].push_back({corp, qty, 999.0f, null_entity});
+            w.markets.at(mid).demand[r] += qty;
+            auto_buys.push_back({corp, mid, r, qty});
         }
     }
 
-    // Player buy orders.
+    // Player buy orders: into mc.demand and the explicit buy book.
     for (const buy_order& order : player_buy_orders)
     {
         if (order.quantity <= 0.0f)
@@ -321,15 +337,42 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         if (mid == null_entity)
             continue;
         const std::size_t r = static_cast<std::size_t>(order.resource);
+        w.markets.at(mid).demand[r] += order.quantity;
         buy_books[mid][r].push_back({order.corp, order.quantity, order.max_price,
                                      order.preferred_seller});
     }
 
-    // --- Match orders per (market, resource) ---
-    // Collect all trades; pool debits and mc.supply/demand updates happen in one pass below.
+    // --- Reference prices from accumulated supply/demand ---
+    // Computed once, before any clearing, so all income/expenditure uses the same price.
+    std::unordered_map<entity_id, std::array<float, resource_count>> ref_price;
+    for (const auto& [mid, mc] : w.markets)
+    {
+        ref_price[mid] = {};
+        for (std::size_t r = 0; r < resource_count; ++r)
+            ref_price[mid][r] = resolve_price(mc.price[r], mc.base_price[r],
+                                              mc.supply[r], mc.demand[r]);
+    }
+
+    // --- Auto-surplus clearing: income at ref_price, pool debited immediately ---
+    for (const auto_sell_entry& se : auto_sells)
+    {
+        const entity_id body = w.markets.at(se.market).body;
+        auto pkit = w.corp_body_pools.find(std::make_pair(se.corp, body));
+        if (pkit != w.corp_body_pools.end())
+            pkit->second.quantities[se.r] -= se.qty;
+        flows[se.corp].income += se.qty * ref_price[se.market][se.r];
+    }
+
+    // --- Auto-demand clearing: expenditure at ref_price ---
+    for (const auto_buy_entry& be : auto_buys)
+        flows[be.corp].expenditure += be.qty * ref_price[be.market][be.r];
+
+    // --- Explicit order-book matching (player sell vs player buy) ---
+    // Provides preferred-seller routing and a VWAP price signal when priced orders
+    // dominate. Unmatched player sell supply auto-clears below (market as buyer of
+    // last resort at max(ref_price, floor)), so supply always clears.
     std::vector<matched_trade> trades;
 
-    // Visit all markets that have at least one sell or buy entry this tick.
     for (auto& [mid, sell_by_r] : sell_books)
     {
         for (auto& [r, sellers] : sell_by_r)
@@ -337,13 +380,8 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
             auto& buyers_map = buy_books[mid];
             auto  bit        = buyers_map.find(r);
 
-            // Update mc.supply regardless of whether buyers exist.
-            market_component& mc = w.markets.at(mid);
-            for (const ob_sell_entry& se : sellers)
-                mc.supply[r] += se.qty;
-
             if (bit == buyers_map.end())
-                continue; // supply but no demand this tick — supply recorded, nothing matches
+                continue; // no explicit buyers — handled by auto-clear below
 
             std::vector<ob_buy_entry>& buyers = bit->second;
 
@@ -363,10 +401,6 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
                         : a.corp < b.corp;
                 });
 
-            // Update mc.demand.
-            for (const ob_buy_entry& be : buyers)
-                mc.demand[r] += be.qty;
-
             // Working copies of remaining quantities so we can drain both sides.
             std::vector<float> sell_rem(sellers.size());
             std::vector<float> buy_rem(buyers.size());
@@ -381,8 +415,6 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
 
                 const ob_buy_entry& buyer = buyers[bi];
 
-                // Find cheapest compatible seller for this buyer, accounting for the
-                // preferred_seller hint (wins ties; tolerated up to 10% premium).
                 float cheapest_price = -1.0f;
                 for (std::size_t si = 0; si < sellers.size(); ++si)
                 {
@@ -394,13 +426,8 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
                         cheapest_price = sellers[si].floor_price;
                 }
                 if (cheapest_price < 0.0f)
-                    continue; // no compatible seller this tick
+                    continue;
 
-                // Draw from sellers in priority order: preferred_seller wins when its
-                // price is within 10% of the cheapest non-preferred offer (or when it IS
-                // the cheapest). We do two passes over the seller list:
-                //   pass 0: try preferred_seller if present and price-eligible;
-                //   pass 1: everyone else in sorted order.
                 for (int pass = 0; pass <= 1 && buy_rem[bi] > 0.0f; ++pass)
                 {
                     for (std::size_t si = 0; si < sellers.size() && buy_rem[bi] > 0.0f; ++si)
@@ -415,13 +442,12 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
                         if (pass == 0 && !is_preferred)
                             continue;
                         if (pass == 1 && is_preferred)
-                            continue; // already handled in pass 0
+                            continue;
 
                         const float ask = sellers[si].floor_price;
                         if (ask > buyer.max_price)
                             continue;
 
-                        // Preferred seller allowed up to 10% premium over cheapest.
                         if (is_preferred && ask > cheapest_price * 1.10f)
                             continue;
 
@@ -436,68 +462,80 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         }
     }
 
-    // Collect buy-side entries that had no corresponding sell book (demand-only).
-    for (auto& [mid, buy_by_r] : buy_books)
-    {
-        market_component& mc = w.markets.at(mid);
-        for (auto& [r, buyers] : buy_by_r)
-        {
-            // Only update mc.demand if this resource wasn't already visited via sell_books.
-            if (sell_books[mid].find(r) == sell_books[mid].end())
-                for (const ob_buy_entry& be : buyers)
-                    mc.demand[r] += be.qty;
-        }
-    }
-
-    // --- Debit pools for matched sell quantities ---
-    // Aggregate matched sell qty per (corp, body, resource) to avoid multi-lookup.
-    // We need the body for the pool key; the market's body gives us that.
+    // --- Debit pools and accrue cash flows for matched explicit trades ---
     for (const matched_trade& t : trades)
     {
-        // Find the pool for the seller by iterating corp_body_pools keyed on the
-        // market's body. This is O(pools) but pool count is small in the prototype.
         const entity_id body = w.markets.at(t.market).body;
         auto pkit = w.corp_body_pools.find(std::make_pair(t.seller, body));
         if (pkit != w.corp_body_pools.end())
             pkit->second.quantities[t.r] -= t.qty;
+        flows[t.seller].income     += t.qty * t.price;
+        flows[t.buyer].expenditure += t.qty * t.price;
     }
 
-    // --- Price: volume-weighted average price of matched trades → EMA ---
-    // Accumulate vwap numerator (price × qty) and denominator (qty) per (market, r).
-    // Then apply the same EMA formula (supply/demand fallback when no trades occurred).
-    struct vwap_acc { float vol = 0.0f; float qty = 0.0f; };
-    std::unordered_map<entity_id, std::array<vwap_acc, resource_count>> vwap;
-    for (const matched_trade& t : trades)
+    // --- Auto-clear unmatched player sell supply ---
+    // The market is a buyer of last resort at max(ref_price, floor). Aggregate matched
+    // sell qty per (seller, market, r) from the explicit trades, then clear the rest.
     {
-        vwap[t.market][t.r].vol += t.price * t.qty;
-        vwap[t.market][t.r].qty += t.qty;
-    }
+        std::map<std::tuple<entity_id, entity_id, std::size_t>, float> matched_sell;
+        for (const matched_trade& t : trades)
+            matched_sell[{t.seller, t.market, t.r}] += t.qty;
 
-    for (auto& [mid, mc] : w.markets)
-    {
-        for (std::size_t r = 0; r < resource_count; ++r)
+        for (const auto& [mid, sell_by_r] : sell_books)
         {
-            const auto vit = vwap.find(mid);
-            if (vit != vwap.end() && vit->second[r].qty > 0.0f)
+            const entity_id body = w.markets.at(mid).body;
+            for (const auto& [r, sellers] : sell_by_r)
             {
-                // Trades happened: EMA toward the vwap.
-                const float tick_vwap = vit->second[r].vol / vit->second[r].qty;
-                mc.price[r] = mc.price[r] + price_smoothing * (tick_vwap - mc.price[r]);
-            }
-            else
-            {
-                // No trades this tick: fall back to supply/demand ratio signal.
-                mc.price[r] = resolve_price(mc.price[r], mc.base_price[r],
-                                            mc.supply[r], mc.demand[r]);
+                const float rp = ref_price[mid][r];
+                for (const ob_sell_entry& se : sellers)
+                {
+                    const float already_matched =
+                        [&]() -> float {
+                            auto it = matched_sell.find({se.corp, mid, r});
+                            return it != matched_sell.end() ? it->second : 0.0f;
+                        }();
+                    const float unmatched = se.qty - already_matched;
+                    if (unmatched <= 0.0f)
+                        continue;
+                    const float clearing = std::max(rp, se.floor_price);
+                    auto pkit = w.corp_body_pools.find(std::make_pair(se.corp, body));
+                    if (pkit != w.corp_body_pools.end())
+                        pkit->second.quantities[r] -= unmatched;
+                    flows[se.corp].income += unmatched * clearing;
+                }
             }
         }
     }
 
-    // --- Cash flow: accumulate from matched trades ---
-    for (const matched_trade& t : trades)
+    // --- Price update: ref_price (pre-computed from supply/demand) ---
+    // Explicit priced trades provide a VWAP signal; when they occurred, ease toward
+    // the VWAP. Otherwise use the supply/demand reference price directly (it already
+    // incorporates the EMA from resolve_price).
     {
-        flows[t.seller].income      += t.qty * t.price;
-        flows[t.buyer].expenditure  += t.qty * t.price;
+        struct vwap_acc { float vol = 0.0f; float qty = 0.0f; };
+        std::unordered_map<entity_id, std::array<vwap_acc, resource_count>> vwap;
+        for (const matched_trade& t : trades)
+        {
+            vwap[t.market][t.r].vol += t.price * t.qty;
+            vwap[t.market][t.r].qty += t.qty;
+        }
+
+        for (auto& [mid, mc] : w.markets)
+        {
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                const auto vit = vwap.find(mid);
+                if (vit != vwap.end() && vit->second[r].qty > 0.0f)
+                {
+                    const float tick_vwap = vit->second[r].vol / vit->second[r].qty;
+                    mc.price[r] = mc.price[r] + price_smoothing * (tick_vwap - mc.price[r]);
+                }
+                else
+                {
+                    mc.price[r] = ref_price[mid][r];
+                }
+            }
+        }
     }
 
     return flows;
