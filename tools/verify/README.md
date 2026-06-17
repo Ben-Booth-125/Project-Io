@@ -41,7 +41,6 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\construction_harness.cpp ^
    src\world\world.cpp src\world\construction.cpp src\world\placement_rules.cpp ^
    /Fe:construction_harness.exe
 .\construction_harness.exe
-```
 
 :: Supply layer — advance_convoys (R1), logistics constants (R4), dispatch_convoys
 :: gate check + balance debit + pool debit (R5, R6), credit_arrived_convoys pool +
@@ -49,6 +48,18 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\construction_harness.cpp ^
 cl /nologo /std:c++20 /EHsc /I src tools\verify\supply_advance.cpp ^
    src\world\world.cpp src\world\supply_system.cpp /Fe:supply_advance.exe
 .\supply_advance.exe
+
+:: Population MVP + workforce-pool step 2 — population centres on Kepler (R3),
+:: agricultural demand from pop (R4), agglomeration workforce contention (R5 / BL-042 R1).
+:: Also covers population-dynamic R2 (hab scalar) and R3 (growth level-up).
+:: Note: recipe_registry.cpp is excluded — its Lua dependency is not needed here.
+cl /nologo /std:c++20 /EHsc /I src tools\verify\population_mvp.cpp ^
+   src\world\world.cpp src\world\tile_generation.cpp src\world\nation_generation.cpp ^
+   src\world\corporation_generation.cpp src\world\placement_rules.cpp ^
+   src\world\population_generation.cpp src\world\hard_coded_world.cpp ^
+   src\world\orbital_system.cpp src\world\economy_system.cpp ^
+   src\world\market_clearing.cpp src\world\budget_system.cpp /Fe:population_mvp.exe
+.\population_mvp.exe
 ```
 
 Each exits non-zero on a failed assertion. The economy *panel* (the visual class)
