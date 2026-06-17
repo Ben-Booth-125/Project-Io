@@ -6,6 +6,22 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — Supply layer R8+R9 closure (2026-06-17)
+
+**Goal.** Close the two remaining active requirements on the supply-layer group: R8 (headless multi-tick price convergence) and R9 (visual golden).
+
+**Changes:**
+- **R8 (headless):** Extended `tools/verify/supply_advance.cpp` with a two-body price-convergence scenario. Body A holds a large iron surplus → price stays near floor. Body B has standing demand but no supply → opens at 3.625× base. Eight simulated convoy deliveries via `credit_arrived_convoys` + `clear_markets` bring it to 0.923×. Added `market_clearing.cpp` to the harness build. All 23 assertions PASS.
+- **R9 (visual):** Added `verify.seed_convoy(src, dst, resource, qty[, progress])` to the verify API in `app.cpp`; auto-creates a stub market on any body that lacks one. Authored `scripts/verify/supply_lens.lua` seeding a Kepler→Pallas in-flight convoy; blessed 3 goldens — `supply_lens_solar_route`, `supply_lens_circum_badges`, `supply_lens_planetary_glyphs` — all at 0.00% diff.
+
+**Outcome.** Supply-layer group (BL-039/038/045) fully complete, R1–R9. REFINED.md cleared.
+
+**In-session decisions:**
+- `seed_convoy` routes Kepler → Pallas rather than Kepler → Selene. Selene is Kepler's moon and its Solar-canvas position overlaps Kepler, making the route line invisible. Pallas is a distant asteroid with a clearly separated position.
+- Pallas has no authored market; `seed_convoy` creates a minimal stub in place rather than polluting world gen with a verify-only market.
+
+---
+
 ## Session — Backlog dependency schema v2 (2026-06-17)
 
 **Goal.** Introduce a first-class, ID-based dependency field to `backlog.json`.
@@ -22,6 +38,32 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 - `ORDER_BOOK` (BL-014) resolved to BL-037 PREFERENTIAL_PURCHASING, which encompasses the order book mechanism.
 - `POPULATION_LAYER` (BL-036) resolved to BL-046 LAYER4_INDEX — the population umbrella.
 - `CANVAS_HIT_TESTING` in BL-032's blocked_on resolved to BL-031 (already in backlog, was an inconsistency).
+
+---
+
+## Session — Supply Layer + BL-055 nav slot sync (2026-06-16)
+
+**Goal.** Deliver the supply routing layer (BL-039, folds BL-038 + BL-045) and the nav-slot open/close colour sync (BL-055).
+
+**Changes:**
+
+BL-055 (Light): `nav_pane.cpp` — `close_all_panels()` enforces exclusive-open slot behaviour; each live slot saves `was_open`, closes all, then toggles to `!was_open`. R1 complete.
+
+BL-039 / BL-038 / BL-045:
+- `convoy_component` + `convoy_mode` enum (`land/sea/air/space`) in `components.hpp`; `building_type::launchpad = 4` added.
+- `world.convoys` as `std::vector<convoy_component>`.
+- `supply_system.{hpp,cpp}`: `advance_convoys`, `credit_arrived_convoys`, `dispatch_convoys` (space-mode gated by launchpad on source body; logistics cost debited at dispatch; iterates markets for shortfalls).
+- `recipe_registry`: `logistics_cost(convoy_mode)` accessor + `set_logistics_cost()` setter; `m_building_econ` expanded to 5 slots for the launchpad; logistics table loaded from `economy.lua`.
+- `economy.lua`: `logistics.base_cost_per_unit_distance` table (land=0.02, sea=0.05, air=0.15, space=1.00).
+- `app.cpp`: per-tick pipeline wired — dispatch → advance → production → markets → budget → credit.
+- Supply lens canvas passes: Solar inter-body route lines, Circumplanetary throughput count badges, Planetary per-tile convoy glyphs; `icons::convoy` (open-chevron glyph).
+- `tools/verify/supply_advance.cpp`: 21/21 PASS covering R1–R7.
+
+**Outcome.** R1–R7 complete; R8 (multi-tick price convergence) and R9 (visual golden) deferred — both required an active-convoy world state that didn't exist until the following session.
+
+**In-session decisions:**
+- Auto-dispatch iterates markets for shortfalls rather than scanning corp pools directly — avoids double-pass.
+- Space-mode requires a launchpad on the source body; land-mode is ungated. No launchpads exist in world gen yet, so auto-dispatch does not fire in the cold world.
 
 ---
 

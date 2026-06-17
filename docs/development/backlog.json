@@ -87,7 +87,9 @@
       "priority": "B",
       "difficulty": 3,
       "parked": false,
-      "requires": ["BL-043"],
+      "requires": [
+        "BL-043"
+      ],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -108,7 +110,9 @@
       "priority": "F",
       "difficulty": 4,
       "parked": true,
-      "requires": ["BL-039"],
+      "requires": [
+        "BL-039"
+      ],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -128,7 +132,9 @@
       "priority": "C",
       "difficulty": 3,
       "parked": false,
-      "requires": ["BL-013"],
+      "requires": [
+        "BL-013"
+      ],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [],
@@ -167,7 +173,10 @@
       "priority": "F",
       "difficulty": 3,
       "parked": true,
-      "requires": ["BL-039", "BL-037"],
+      "requires": [
+        "BL-039",
+        "BL-037"
+      ],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -187,7 +196,9 @@
       "priority": "C",
       "difficulty": 3,
       "parked": false,
-      "requires": ["BL-036"],
+      "requires": [
+        "BL-036"
+      ],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -208,7 +219,9 @@
       "priority": "F",
       "difficulty": 3,
       "parked": true,
-      "requires": ["BL-013"],
+      "requires": [
+        "BL-013"
+      ],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -289,7 +302,9 @@
       "priority": "C",
       "difficulty": 4,
       "parked": false,
-      "requires": ["BL-060"],
+      "requires": [
+        "BL-060"
+      ],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [],
@@ -307,7 +322,9 @@
       "priority": "B",
       "difficulty": 3,
       "parked": false,
-      "requires": ["BL-036"],
+      "requires": [
+        "BL-036"
+      ],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -327,7 +344,9 @@
       "priority": "C",
       "difficulty": 2,
       "parked": false,
-      "requires": ["BL-059"],
+      "requires": [
+        "BL-059"
+      ],
       "blocked_on": [],
       "written": null,
       "files": [
@@ -348,7 +367,9 @@
       "priority": "B",
       "difficulty": 4,
       "parked": false,
-      "requires": ["BL-031"],
+      "requires": [
+        "BL-031"
+      ],
       "blocked_on": [],
       "written": null,
       "files": [
@@ -368,7 +389,9 @@
       "priority": "B",
       "difficulty": 3,
       "parked": false,
-      "requires": ["BL-037"],
+      "requires": [
+        "BL-037"
+      ],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -389,7 +412,9 @@
       "priority": "B",
       "difficulty": 3,
       "parked": false,
-      "requires": ["BL-046"],
+      "requires": [
+        "BL-046"
+      ],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -409,7 +434,9 @@
       "priority": "B",
       "difficulty": 4,
       "parked": false,
-      "requires": ["BL-039"],
+      "requires": [
+        "BL-039"
+      ],
       "blocked_on": [],
       "written": null,
       "files": [
@@ -425,12 +452,14 @@
       "short_name": "INTER_BODY_MARKETS",
       "category": "Trade",
       "title": "Inter-body / international markets",
-      "status": "designed",
+      "status": "complete",
       "glyph": "✓",
       "priority": "A",
       "difficulty": 4,
       "parked": false,
-      "requires": ["BL-039"],
+      "requires": [
+        "BL-039"
+      ],
       "blocked_on": [],
       "written": null,
       "files": [
@@ -439,14 +468,15 @@
       ],
       "authority_doc": "docs/SYSTEMS.md",
       "summary": "Each body keeps its own market/price; bodies couple ONLY through Supply convoys (market-to-market, mode-gated, Euclidean space distance). First build is a minimal feasibility probe of the coupling alone (no space gameplay). Blocked on Layer 5.",
-      "design": "@BACKLOG.md"
+      "design": "@BACKLOG.md",
+      "completion_note": "Folded into BL-039; inter-body market coupling lands with convoy delivery (credit_arrived_convoys injects into market.supply). Complete 2026-06-17."
     },
     {
       "id": "BL-039",
       "short_name": "SUPPLY_CONVOYS",
       "category": "Supply",
       "title": "Supply routing — convoys (Layer 5)",
-      "status": "designed",
+      "status": "complete",
       "glyph": "✓",
       "priority": "S",
       "difficulty": 5,
@@ -465,7 +495,8 @@
       ],
       "authority_doc": "docs/SYSTEMS.md",
       "summary": "Convoy entity (source/dest market, mode, cargo, progress, per-unit-distance logistical cost); auto-dispatch default, player-directed exception (space launches MUST be player-directed). Umbrella; decomposes 1->2->3->4 serial + 5 (lens) disjoint. The largest remaining v0.1.0 build (a 5); v0.0.7's whole theme.",
-      "design": "@BACKLOG.md"
+      "design": "@BACKLOG.md",
+      "completion_note": "Supply convoys, logistics, and inter-body market coupling (R1-R9) complete — supply_system.{hpp,cpp}, supply_lens.lua golden. 2026-06-17."
     },
     {
       "id": "BL-040",
@@ -537,7 +568,9 @@
       "priority": "B",
       "difficulty": 3,
       "parked": false,
-      "requires": ["BL-043"],
+      "requires": [
+        "BL-043"
+      ],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -552,12 +585,14 @@
       "short_name": "LOGISTICS_NETWORK",
       "category": "Infrastructure",
       "title": "Logistics network & infrastructure model",
-      "status": "designed",
+      "status": "complete",
       "glyph": "✓",
       "priority": "B",
       "difficulty": 4,
       "parked": false,
-      "requires": ["BL-039"],
+      "requires": [
+        "BL-039"
+      ],
       "blocked_on": [],
       "written": null,
       "files": [
@@ -567,7 +602,8 @@
       ],
       "authority_doc": "docs/SYSTEMS.md",
       "summary": "Infrastructure gates+costs each convoy mode (land<sea<air<space): land ungated (road=optional tile-attribute cost-reducer), sea gated on Port, air on Airfield (deferred building), space on Launchpad+Orbital Port. Capacity deferred. Emanation 'fuel' model noted as the growth direction (Shadow Empire feel).",
-      "design": "@BACKLOG.md"
+      "design": "@BACKLOG.md",
+      "completion_note": "Folded into BL-039; logistics cost constants in economy.lua, loaded via recipe_registry. Complete 2026-06-17."
     },
     {
       "id": "BL-046",
@@ -597,7 +633,9 @@
       "priority": "B",
       "difficulty": 4,
       "parked": false,
-      "requires": ["BL-053"],
+      "requires": [
+        "BL-053"
+      ],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -658,7 +696,9 @@
       "priority": "B",
       "difficulty": 4,
       "parked": false,
-      "requires": ["BL-052"],
+      "requires": [
+        "BL-052"
+      ],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -693,7 +733,7 @@
       "short_name": "NAV_SLOT_PANEL_SYNC",
       "category": "Menu",
       "title": "Nav slot open/close colour not in sync when panel closed via X button",
-      "status": "designed",
+      "status": "complete",
       "glyph": "✓",
       "priority": "B",
       "difficulty": 2,
@@ -707,7 +747,8 @@
       ],
       "authority_doc": "docs/ui/MENU.md",
       "summary": "Nav rail slots show an active (highlighted) state driven by show_* booleans in ui_state. When a ledger panel is closed via its X button, ImGui sets the bool false one frame later so the slot de-highlights correctly. However, if a second panel opens while a first is already open, neither closes the other — both slots show active simultaneously. Fix: when a nav slot is toggled ON, clear all other show_* panel booleans so at most one panel is active at a time (exclusive-open model), OR document that simultaneous panels are intended and the highlight is per-panel not per-slot.",
-      "design": "Two sub-options:\n\nA) **Exclusive model (recommended for now):** In , when a slot is toggled ON, set all other  panel flags to false before setting the new one to true. This matches the expected accordion-style behaviour the user observed.\n\nB) **Permissive model:** Document that multiple panels can be open simultaneously and the nav slot simply reflects each panel's own open state. Requires no code change but may feel wrong to players.\n\nPrefer A. The ledger windows are floating and re-openable; the nav slot is the toggle, not a tab bar. Implementation: in the switch statement that handles each slot, before , add a  helper that clears all show_* flags, then set the target one based on the prior state (if it was open, close it; if closed, open it — genuine toggle)."
+      "design": "Two sub-options:\n\nA) **Exclusive model (recommended for now):** In , when a slot is toggled ON, set all other  panel flags to false before setting the new one to true. This matches the expected accordion-style behaviour the user observed.\n\nB) **Permissive model:** Document that multiple panels can be open simultaneously and the nav slot simply reflects each panel's own open state. Requires no code change but may feel wrong to players.\n\nPrefer A. The ledger windows are floating and re-openable; the nav slot is the toggle, not a tab bar. Implementation: in the switch statement that handles each slot, before , add a  helper that clears all show_* flags, then set the target one based on the prior state (if it was open, close it; if closed, open it — genuine toggle).",
+      "completion_note": "Nav slot exclusive-open toggle in nav_pane.cpp. R1 complete 2026-06-16."
     },
     {
       "id": "BL-056",
