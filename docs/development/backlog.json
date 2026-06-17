@@ -113,7 +113,9 @@
       "requires": [
         "BL-039"
       ],
-      "blocked_on": [],
+      "blocked_on": [
+        "SUPPLY_CONVOYS"
+      ],
       "written": "2026-06-16",
       "files": [
         "src/ui/body_surface_canvas.cpp"
@@ -177,7 +179,9 @@
         "BL-039",
         "BL-037"
       ],
-      "blocked_on": [],
+      "blocked_on": [
+        "SUPPLY_CONVOYS"
+      ],
       "written": "2026-06-16",
       "files": [
         "src/ui/body_surface_canvas.cpp"
@@ -310,7 +314,10 @@
       "files": [],
       "authority_doc": "docs/ui/TOOLTIP.md",
       "summary": "Reframe tooltips: less data, lens-specific, explain WHY a system behaves (ledgers are for data). Defer nested tooltips. A large multi-round sweep over every visible entity. Design owed: the per-entity/per-lens content sweep.",
-      "design": "@BACKLOG.md"
+      "design": "@BACKLOG.md",
+      "waits_on": [
+        "HOVER_CARD_PRIMITIVE"
+      ]
     },
     {
       "id": "BL-025",
@@ -706,7 +713,10 @@
       ],
       "authority_doc": "docs/generation/NATION_GENERATION.md",
       "summary": "More countries than today's Voronoi partition, with a sense of history: v0.1.0 target is clustering seeds with a varied size distribution (some larger, some smaller). Couples to SATURATED_SUBSTRATE. Design owed: clustered-seed sizing, what 'in history' means, count target.",
-      "design": "@BACKLOG.md"
+      "design": "@BACKLOG.md",
+      "waits_on": [
+        "SATURATED_SUBSTRATE"
+      ]
     },
     {
       "id": "BL-054",
@@ -801,7 +811,7 @@
       "short_name": "GIT_BRIDGE_HYGIENE",
       "category": "Development",
       "title": "Git hygiene for the Cowork-shell bridge (line endings + native-commit rule)",
-      "status": "designed",
+      "status": "complete",
       "glyph": "✓",
       "priority": "A",
       "difficulty": 2,
@@ -816,7 +826,8 @@
       ],
       "authority_doc": ".claude/rules/io-standing-rules.md",
       "summary": "Two git footguns when running git inside the Cowork shell (VM bridge): CRLF blobs vs LF mount -> whole-file diff churn; .git blocks unlink/rename -> stale lock files + unsafe ref writes. Fix: add .gitattributes (* text=auto) + one-time renormalize for the CRLF half; standing rule that git WRITES run from native Claude Code / terminal, never the Cowork shell. Part 2 dissolves under native Linux dev (BL-057).",
-      "design": "**Origin.** Surfaced 2026-06-17 trying to commit BL-057 from the Cowork shell; previously hit on Project-Fulcrum and wrongly assumed resolved. The cause is structural (the Cowork file bridge), not per-repo, so it recurs across projects.\n\n**Problem — two independent failure modes when git *writes* run inside the Cowork shell.** The shell is a sandboxed Linux VM with the Windows repo bridged in via a sync/mount layer; the file tools (Read/Write/Edit) hit the real folder, the shell sees a mirror.\n1. *Line endings.* Repo blobs are CRLF (native Windows checkout) but files surface in the mount as LF/mixed, so every `git add` becomes a whole-file line-ending diff — e.g. CMakeLists showed 289 changed lines for a ~9-line edit; REFINED 1161; requirements 2678. The real change is buried and the commit is junk.\n2. *`.git` permissions.* The mount blocks unlink/rename inside `.git`: git can write loose objects but cannot remove temp files or `*.lock` refs, so it leaves stale `HEAD.lock` / `refs/heads/main.lock` and cannot safely update a ref (`Operation not permitted`).\n\nNet: git writes (add/commit/merge/push) from the shell corrupt diffs and/or wedge the repo. Content edits via the file tools are safe; git is not.\n\n**Fix — two parts.**\n1. *Line-ending hardening (repo).* Add a `.gitattributes` — `* text=auto`, plus explicit binary rules (`*.ttf binary`, and any other binaries) — then run a one-time `git add --renormalize .` so blobs become canonical LF while Windows working trees stay CRLF via autocrlf. Removes the diff-churn half. The renormalize is a single deliberate repo-wide commit; do it on its own, native, not bundled with feature work.\n2. *Standing rule (process).* Record that **git writes must run from native Claude Code or a native terminal, never the Cowork shell** — the shell is for content edits (file tools) and read-only inspection only. Lands in `.claude/rules/io-standing-rules.md` § Working method when actioned; cross-ref from CLAUDE.md.\n\n**Note.** Part 2 is fully dissolved once development moves to native Linux Claude Code (no VM, no bridge) — see BL-057 — but the rule still matters for any Cowork-shell session. Part 1 (`.gitattributes`) is worth doing regardless as CRLF hygiene for the Linux/Windows split.\n\n**Out of scope.** The `.git` unlink/permission limitation is a property of the Cowork bridge, not fixable in-repo; the standing rule is the mitigation."
+      "design": "**Origin.** Surfaced 2026-06-17 trying to commit BL-057 from the Cowork shell; previously hit on Project-Fulcrum and wrongly assumed resolved. The cause is structural (the Cowork file bridge), not per-repo, so it recurs across projects.\n\n**Problem — two independent failure modes when git *writes* run inside the Cowork shell.** The shell is a sandboxed Linux VM with the Windows repo bridged in via a sync/mount layer; the file tools (Read/Write/Edit) hit the real folder, the shell sees a mirror.\n1. *Line endings.* Repo blobs are CRLF (native Windows checkout) but files surface in the mount as LF/mixed, so every `git add` becomes a whole-file line-ending diff — e.g. CMakeLists showed 289 changed lines for a ~9-line edit; REFINED 1161; requirements 2678. The real change is buried and the commit is junk.\n2. *`.git` permissions.* The mount blocks unlink/rename inside `.git`: git can write loose objects but cannot remove temp files or `*.lock` refs, so it leaves stale `HEAD.lock` / `refs/heads/main.lock` and cannot safely update a ref (`Operation not permitted`).\n\nNet: git writes (add/commit/merge/push) from the shell corrupt diffs and/or wedge the repo. Content edits via the file tools are safe; git is not.\n\n**Fix — two parts.**\n1. *Line-ending hardening (repo).* Add a `.gitattributes` — `* text=auto`, plus explicit binary rules (`*.ttf binary`, and any other binaries) — then run a one-time `git add --renormalize .` so blobs become canonical LF while Windows working trees stay CRLF via autocrlf. Removes the diff-churn half. The renormalize is a single deliberate repo-wide commit; do it on its own, native, not bundled with feature work.\n2. *Standing rule (process).* Record that **git writes must run from native Claude Code or a native terminal, never the Cowork shell** — the shell is for content edits (file tools) and read-only inspection only. Lands in `.claude/rules/io-standing-rules.md` § Working method when actioned; cross-ref from CLAUDE.md.\n\n**Note.** Part 2 is fully dissolved once development moves to native Linux Claude Code (no VM, no bridge) — see BL-057 — but the rule still matters for any Cowork-shell session. Part 1 (`.gitattributes`) is worth doing regardless as CRLF hygiene for the Linux/Windows split.\n\n**Out of scope.** The `.git` unlink/permission limitation is a property of the Cowork bridge, not fixable in-repo; the standing rule is the mitigation.",
+      "completion_note": ".gitattributes (* text=auto + binary rules) committed in 32e16f5; standing rule added to io-standing-rules.md; renormalize clean. 2026-06-17."
     },
     {
       "id": "BL-059",
@@ -858,7 +869,10 @@
       ],
       "authority_doc": "docs/ui/TOOLTIP.md",
       "summary": "A transient floating card that appears on tile/entity hover — distinct from the pinned Selection panel. Lighter than a tooltip (richer content, brief delay) but dismisses on mouse-off. Prerequisite for the tooltip-simplification sweep (BL-020). Design owed: content contract, animation, relationship to Selection panel.",
-      "design": "Stub. An ImGui child window (no title bar, rounded, semi-opaque) that tracks the cursor position and renders a caller-supplied content callback. Should not fight with the Selection panel (different trigger: hover not click). Design owed: appear delay, max width, fade-out vs instant dismiss, whether the card can be pinned by the user, and the content-builder API that BL-020 will use."
+      "design": "Stub. An ImGui child window (no title bar, rounded, semi-opaque) that tracks the cursor position and renders a caller-supplied content callback. Should not fight with the Selection panel (different trigger: hover not click). Design owed: appear delay, max width, fade-out vs instant dismiss, whether the card can be pinned by the user, and the content-builder API that BL-020 will use.",
+      "waits_on": [
+        "SELECTABLE_MARKERS"
+      ]
     }
   ]
 }

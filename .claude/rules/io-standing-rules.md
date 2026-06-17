@@ -49,6 +49,11 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   § Sub-agents & worktrees).
 - **Save the tool.** When you build a check or helper, push it to a reusable skill or committed
   script (`CLAUDE.md` § Tool creation is skill creation), not a one-off.
+- **Git writes from native only.** `git add`, `commit`, `merge`, `push` must run from native
+  Claude Code or a native terminal — never the Cowork shell. The Cowork bridge mounts the Windows
+  repo into a Linux VM; git writes cause CRLF diff churn and `.git` lock-file failures. File
+  edits via the file tools (Read/Write/Edit) are safe from either context. (BL-058; dissolves
+  once development moves fully to native Linux — BL-057.)
 
 ## Tone
 
