@@ -565,3 +565,36 @@ Items folded in: **BL-045** (cost constants); **BL-038** (inter-body market coup
 - **[3] F — Supply lens render passes.** ✓ Files: `src/ui/icons.{hpp,cpp}`, `src/ui/solar_system_canvas.cpp`, `src/ui/circumplanetary_canvas.cpp`, `src/ui/body_surface_canvas.cpp`. Satisfies: R9 (visual pass wired; golden deferred — no active convoys in the cold world at verify time).
 
 R1–R7 complete (supply_advance.exe ALL PASS, 21/21). R8 (multi-tick price convergence) and R9 (golden) remain active — pending a world with active convoys and a supply_lens.lua script.
+
+---
+
+## Cross-platform build — Linux + Windows (promoted from BACKLOG § BL-057)
+
+Requirements: requirements.json § cross-platform-build
+
+Context: source is already Linux-clean; the only source gap was `src/ui/fonts.cpp`'s
+hardcoded Windows font paths. Dev moves to Linux, playtest stays on Windows; CI guards
+both. Tasks A, C, and (the draft of) the workflow were authored in the Cowork sandbox,
+which **cannot build** — so they are *code-complete, unverified*; the build/visual/headless
+verification (R1–R4, R6) lands on the Linux box / in CI.
+
+- **[2] A — Font portability fix.** Bundled-first candidate list loaded cwd-relative
+  (`assets/fonts/DejaVuSans.ttf` → Linux system fonts → Windows system fonts → ProggyClean);
+  bundle the font + license; copy `assets/` next to the exe at build time. Files:
+  `src/ui/fonts.cpp`, `src/ui/fonts.hpp`, `assets/fonts/DejaVuSans.ttf`,
+  `assets/fonts/DejaVuSans-LICENSE.txt`, `CMakeLists.txt`. Deps: foundation.
+  Satisfies: R4, R5. *(drafted — needs build+render verify.)*
+- **[3] B — Native Linux build recipe.** Confirm a `cmake` configure+build of the full app
+  on Linux and document the dep set + commands. Files: `docs/tech/TECH_FOUNDATIONS.md`.
+  Deps: A. Parallel-safe with C. Satisfies: R1, R2.
+- **[3] C — CI workflow.** GitHub Actions: `ubuntu-latest` builds app + builds/runs the
+  headless harnesses; `windows-latest` builds app; FetchContent dep caching. Files:
+  `.github/workflows/build.yml`. Deps: A. Parallel-safe with B. Satisfies: R3, R6.
+  *(drafted — first Actions run will likely need a dep-set tweak.)*
+- **[4] D — Visual-verify offscreen spike.** Make `ProjectIo --verify` render headlessly
+  (`SDL_VIDEODRIVER=dummy` + software renderer, else Xvfb); if green, add the visual tier to
+  CI. Files: `src/core/app.cpp`, `.github/workflows/build.yml`. Deps: A. Satisfies: R7.
+  *(spike — may bounce back to the backlog if it needs design.)*
+
+Parallelisation note: A → {B, C, D}; B ∥ C (disjoint files: docs vs workflow). D shares
+`build.yml` with C, so sequence D after C. A is the foundation everything builds on.

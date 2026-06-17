@@ -16,9 +16,22 @@ ImFont* load_ui_font(float size_px)
     cfg.OversampleV = 1;
     cfg.PixelSnapH  = false; // allow fractional horizontal placement so motion stays fluid
 
-    // System font candidates, most-preferred first. A bundled font under
-    // assets/fonts can be prepended here later for cross-platform builds.
-    static constexpr std::array<const char*, 4> candidates = {
+    // Font candidates, most-preferred first.
+    //
+    // The bundled DejaVuSans (copied next to the executable from assets/ by the
+    // CMake POST_BUILD step, loaded cwd-relative exactly like scripts/) is tried
+    // first so on-screen text — and any visual golden-diff capture — renders
+    // identically on every OS and machine, independent of which system fonts are
+    // installed. System fonts follow as fallbacks (Linux then Windows) for the
+    // rare build without the bundled asset; ProggyClean is the final backstop.
+    static constexpr std::array<const char*, 8> candidates = {
+        // Bundled — deterministic across platforms (see BACKLOG BL-057).
+        "assets/fonts/DejaVuSans.ttf",
+        // Linux system fonts.
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans.ttf",
+        // Windows system fonts.
         "C:/Windows/Fonts/segoeui.ttf",
         "C:/Windows/Fonts/tahoma.ttf",
         "C:/Windows/Fonts/arial.ttf",

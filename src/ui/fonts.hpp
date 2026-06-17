@@ -13,9 +13,10 @@ namespace ui {
 /// variants a bitmap font lacks). Falls back to the built-in ProggyClean font
 /// (also oversampled) when no candidate file is present.
 ///
-/// The candidate list is Windows system fonts for now (the prototype is
-/// Windows-only per TECH_FOUNDATIONS); a bundled assets/fonts/*.ttf can be
-/// prepended later for portability without changing call sites.
+/// The candidate list tries a bundled assets/fonts/*.ttf first (copied next to
+/// the executable at build time, loaded cwd-relative like scripts/) so text
+/// renders identically across OSes and machines, then Linux and Windows system
+/// fonts as fallbacks. Cross-platform per BACKLOG BL-057 / TECH_FOUNDATIONS.
 ///
 /// Call once after the ImGui context and renderer backend are initialised and
 /// before the first frame; the renderer backend uploads the atlas texture on

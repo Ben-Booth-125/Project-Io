@@ -756,6 +756,53 @@
       "authority_doc": "docs/economy/PRODUCTION.md",
       "summary": "Headless harness that runs economy ticks from world-gen to bankruptcy (cash <= 0), records tick count per run, and outputs a per-building / per-resource data table. Goal: tune costs so the average player goes bankrupt in 10–20 in-game years without intervention — use the data to derive sensible build costs and running expenses.",
       "design": "A `tools/verify/econ_bankruptcy.cpp` harness (same pattern as existing headless checks) that:\n\n1. Calls `make_hard_coded_world()` to get a reproducible starting state.\n2. Ticks `economy_system` until the player corporation cash <= 0 (or a ceiling tick, e.g. 500 years, to catch non-bankrupt runs).\n3. Records: total ticks to bankruptcy, in-game years elapsed, and for each building: cash burn per tick attributed to that building type, and for each resource: net flow (production minus consumption) per tick.\n4. Prints a structured report: summary row (years to bankruptcy), then per-building and per-resource rows.\n\nDesign owed: define bankruptcy precisely (cash <= 0? unable to pay maintenance for N consecutive ticks?); agree on the ceiling; decide whether to vary starting conditions (different body selections, building counts) or fix them. Once the harness runs, use the output table to set build costs and maintenance values such that an unmanaged player reaches bankruptcy in 10–20 years on average.\n\n**Design settled (2026-06-16):** Bankruptcy trigger: the corporation cannot cover its maintenance / running costs (interest) for a tick, AND balance is at or below **-5 × start_money** (deep-red threshold, not just any negative balance). Open design note: add a **debt-interest system** — when balance goes negative, charge interest each tick, making deep-red increasingly punishing; record as a follow-on item. Starting conditions: **fixed** (hard-coded world, same building set every run) for test reproducibility. Seeded variation (different building counts or random seeds) is recorded as a future extension but not part of the initial harness. Ceiling: a configurable tick ceiling (e.g. 500 in-game years) for non-bankrupt runs."
+    },
+    {
+      "id": "BL-057",
+      "short_name": "CROSS_PLATFORM_BUILD",
+      "category": "Development",
+      "title": "Cross-platform build (Linux + Windows)",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "SSS",
+      "difficulty": 4,
+      "parked": false,
+      "waits_on": [],
+      "blocked_on": [],
+      "written": "2026-06-17",
+      "files": [
+        "src/ui/fonts.cpp",
+        "src/ui/fonts.hpp",
+        "assets/fonts/",
+        "CMakeLists.txt",
+        ".github/workflows/build.yml",
+        "docs/tech/TECH_FOUNDATIONS.md"
+      ],
+      "authority_doc": "docs/tech/TECH_FOUNDATIONS.md",
+      "summary": "Linux+Windows build. Source already Linux-clean (FetchContent deps, LUA_USE_POSIX guarded) except src/ui/fonts.cpp's hardcoded Windows font paths; fix = bundle assets/fonts + SDL_GetBasePath prepend, Windows paths as fallback. Headless tier builds anywhere; GitHub Actions both-OS headless CI as the guard. Dev moves to Linux (dual-boot); visual-verify offscreen (dummy+software renderer / Xvfb) is a deferred spike.",
+      "design": "**Origin.** Linux + Windows cross-platform was original CONCEPT scope. Surfaced 2026-06-17 while wanting to run the build/verify loop from the Cowork Linux sandbox; Ben will move primary development to Linux (machine is dual-boot).\n\n**Finding — the source is already Linux-clean.** Audited all 93 `src/*` files: no `windows.h`, `WinMain`, `__declspec`, `_WIN32`/`_MSC_VER` guards, or `MAX_PATH`. Every dependency is cross-platform and acquired via CMake `FetchContent` (SDL3 release-3.2.0, Lua 5.4.7, sol2 v3.3.0, ImGui v1.91.6) — no vcpkg / system-package assumptions. `CMakeLists.txt` already guards Lua's `LUA_USE_POSIX` under `if(UNIX)`. So this is a build-environment job, not a source port — with one exception.\n\n**The one source gap — font loading.** `src/ui/fonts.cpp` hardcodes Windows system fonts (`C:/Windows/Fonts/segoeui.ttf`, tahoma, arial, verdana); `fonts.hpp` already flags this as Windows-only per TECH_FOUNDATIONS and names the intended fix. Fix: bundle a redistributable TTF under `assets/fonts/`, resolve it relative to the executable (`SDL_GetBasePath`) and prepend it to the candidate list; keep the Windows paths as a trailing fallback so Windows builds are unchanged. Built-in ProggyClean stays the final fallback. Small and self-contained — but it changes `src/` and renders in the GUI, so it must be visually verified on a real build (i.e. on Ben's Linux box), not blind-shipped from the sandbox.\n\n**Tiers — what runs where.**\n- *Headless tier* (`tools/verify/*.cpp` over `world/*`, deliberately SDL/Lua/ImGui-free): builds anywhere with g++/cmake. Already portable; nothing owed. The Cowork/CI-friendly target.\n- *Windowed app on Linux*: needs cmake + SDL3 build deps (X11/Wayland + GL dev headers) + the font fix. No code changes beyond fonts. Runnable natively once Ben is on Linux.\n- *Visual-verify tier* (`ProjectIo --verify` → PNG golden diff): `app.cpp` creates a real `SDL_Window` + `SDL_CreateRenderer`, so it runs natively on a Linux desktop. For *headless CI* it needs offscreen rendering (`SDL_VIDEODRIVER=dummy` + the SDL software renderer feeding `SDL_RenderReadPixels` → `png_writer`), else an Xvfb virtual display. **Open spike:** confirm dummy + software-renderer pixel readback under SDL3 3.2.0; fall back to Xvfb in CI if it won't read back. Contained — blocks neither the headless tier nor native Linux runs.\n\n**Settled decisions (2026-06-17).**\n- *Primary dev OS → Linux* (Ben's dual-boot machine). Makes native GUI + visual-verify available locally and flips Windows to the at-risk platform.\n- *CI → GitHub Actions, both OS, headless tier now.* Build `ubuntu-latest` + `windows-latest` and run the headless harnesses on push — the standing guard against Windows drift now that dev is Linux-side. Cache `FetchContent` deps to keep runs cheap. Visual-verify is added to CI **after** the offscreen spike, not on day one.\n\n**Recommended sequence.**\n1. Font portability fix (`assets/fonts/*.ttf` + candidate-list change) — unblocks any Linux GUI/visual build. *(touches src — verify the render on Linux.)*\n2. Confirm a native Linux configure+build of the full app; document the recipe (cmake + SDL3 deps) in TECH_FOUNDATIONS.\n3. CI workflow: ubuntu + windows build + headless harnesses, with dep caching.\n4. Offscreen-render spike; if green, add the visual-verify tier to CI.\n\n**Out of scope:** packaging/installers, macOS, broader runtime asset-path overhaul beyond fonts.\n\n**Cowork-session note (2026-06-17):** the design above is settled here, but the build/verify steps cannot be exercised in the Cowork sandbox (no cmake, no SDL3 deps, ephemeral dep re-pull). Execution — font edit, native build, CI YAML — lands on Ben's Linux box or in CI itself."
+    },
+    {
+      "id": "BL-058",
+      "short_name": "GIT_BRIDGE_HYGIENE",
+      "category": "Development",
+      "title": "Git hygiene for the Cowork-shell bridge (line endings + native-commit rule)",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 2,
+      "parked": false,
+      "waits_on": [],
+      "blocked_on": [],
+      "written": "2026-06-17",
+      "files": [
+        ".gitattributes",
+        ".claude/rules/io-standing-rules.md",
+        "CLAUDE.md"
+      ],
+      "authority_doc": ".claude/rules/io-standing-rules.md",
+      "summary": "Two git footguns when running git inside the Cowork shell (VM bridge): CRLF blobs vs LF mount -> whole-file diff churn; .git blocks unlink/rename -> stale lock files + unsafe ref writes. Fix: add .gitattributes (* text=auto) + one-time renormalize for the CRLF half; standing rule that git WRITES run from native Claude Code / terminal, never the Cowork shell. Part 2 dissolves under native Linux dev (BL-057).",
+      "design": "**Origin.** Surfaced 2026-06-17 trying to commit BL-057 from the Cowork shell; previously hit on Project-Fulcrum and wrongly assumed resolved. The cause is structural (the Cowork file bridge), not per-repo, so it recurs across projects.\n\n**Problem — two independent failure modes when git *writes* run inside the Cowork shell.** The shell is a sandboxed Linux VM with the Windows repo bridged in via a sync/mount layer; the file tools (Read/Write/Edit) hit the real folder, the shell sees a mirror.\n1. *Line endings.* Repo blobs are CRLF (native Windows checkout) but files surface in the mount as LF/mixed, so every `git add` becomes a whole-file line-ending diff — e.g. CMakeLists showed 289 changed lines for a ~9-line edit; REFINED 1161; requirements 2678. The real change is buried and the commit is junk.\n2. *`.git` permissions.* The mount blocks unlink/rename inside `.git`: git can write loose objects but cannot remove temp files or `*.lock` refs, so it leaves stale `HEAD.lock` / `refs/heads/main.lock` and cannot safely update a ref (`Operation not permitted`).\n\nNet: git writes (add/commit/merge/push) from the shell corrupt diffs and/or wedge the repo. Content edits via the file tools are safe; git is not.\n\n**Fix — two parts.**\n1. *Line-ending hardening (repo).* Add a `.gitattributes` — `* text=auto`, plus explicit binary rules (`*.ttf binary`, and any other binaries) — then run a one-time `git add --renormalize .` so blobs become canonical LF while Windows working trees stay CRLF via autocrlf. Removes the diff-churn half. The renormalize is a single deliberate repo-wide commit; do it on its own, native, not bundled with feature work.\n2. *Standing rule (process).* Record that **git writes must run from native Claude Code or a native terminal, never the Cowork shell** — the shell is for content edits (file tools) and read-only inspection only. Lands in `.claude/rules/io-standing-rules.md` § Working method when actioned; cross-ref from CLAUDE.md.\n\n**Note.** Part 2 is fully dissolved once development moves to native Linux Claude Code (no VM, no bridge) — see BL-057 — but the rule still matters for any Cowork-shell session. Part 1 (`.gitattributes`) is worth doing regardless as CRLF hygiene for the Linux/Windows split.\n\n**Out of scope.** The `.git` unlink/permission limitation is a property of the Cowork bridge, not fixable in-repo; the standing rule is the mitigation."
     }
   ]
 }

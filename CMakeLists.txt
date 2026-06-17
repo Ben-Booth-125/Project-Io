@@ -135,6 +135,16 @@ add_custom_command(TARGET ProjectIo POST_BUILD
     COMMENT "Copying scripts to output directory"
 )
 
+# Copy assets directory (bundled fonts, etc.) next to the executable after each
+# build, mirroring the scripts copy so cwd-relative asset loads — e.g. the
+# bundled assets/fonts/DejaVuSans.ttf in ui::load_ui_font — resolve on every OS.
+add_custom_command(TARGET ProjectIo POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+        "$<TARGET_FILE_DIR:ProjectIo>/assets"
+    COMMENT "Copying assets to output directory"
+)
+
 # Copy SDL3.dll on Windows (shared build)
 if(WIN32)
     add_custom_command(TARGET ProjectIo POST_BUILD
