@@ -448,68 +448,7 @@ The world-generation layer — terrain, nations, corporations. Design authority:
 
 ### Cross-cutting
 
-- **[B4 ~] Generate the saturated nation-owned background substrate.** **Raised 2026-06-15** by the
-  B4 design-direction Q&A: the user expected starting holdings to read as a *highly saturated* world,
-  but the settled premise (`GENERATION_STRATEGY.md` § The economic premise) makes corporations
-  **lean specialists** *on purpose* — the saturation is the **Nation AI's broad background
-  industry**, explicitly "not the player's playing field… not surfaced as manageable detail." That
-  substrate is currently **described but never generated**: nations get territory, resource
-  profiles, and political character, but no actual background industrial presence, so the world does
-  not yet *feel* saturated. This Brief is that missing mechanism — how the nation-owned substrate is
-  represented and generated so the map reads as a saturated earth-like economy without inflating
-  corporation holdings (which stay lean per the just-landed B4 revision).
-
-  **Design settled (best-guess primary direction, 2026-06-16 Q&A).** The user chose the direction
-  live and invited further ideas; the primary is committed, the speculative parts are open notes
-  below. *(Documentation only this session — no code; the substrate stays gated behind the lens
-  batch and v0.0.6 work.)*
-  — **Form — per-tile industry field + market aggregate.** A scalar **industry/productivity field
-    per tile** (nation-owned), aggregated into a **per-(nation, body) economic aggregate** that is
-    the market interface. No per-building entities for the background industry — this gives a
-    visibly saturated map *and* market depth while sidestepping the per-body entity multiplication
-    the inter-body-market probe ([A4], § Trade) is wary of.
-  — **Generation — slot/resource-consuming, not free paint.** The field is laid down by a
-    procedural pass that **consumes shared tile capacity**: a tile exposes a finite number of
-    **building-slots** (and draws on its resource/deposit profile), and substrate industry occupies
-    them like any holding. This makes saturation a *real, shared budget* rather than a cosmetic
-    tint — and unifies cleanly with the competitive choice below (player displacement = reclaiming
-    occupied slots).
-  — **Leading generation approach (open) — population-seeded ripple.** The user's instinct: fold
-    substrate into the **population stage** of generation — manufacturing dense at population centres,
-    **rippling outward (stronger → weaker)** with distance. Recorded as the leading approach; whether
-    it is a population sub-pass or a standalone substrate pass is left open (see open notes).
-  — **Market coupling — both supply and demand.** The aggregate injects **both** background
-    production and background consumption into the per-body markets, giving them liquidity (the
-    player has both substrate buyers to sell to and substrate sellers to buy from).
-  — **Dynamic, not static.** The substrate **evolves over Ticks**: background industry grows into
-    **unsaturated, resource-available** tiles and is **gated by resource discovery & research**
-    (it does not pile onto already-saturated tiles — "building where tiles are saturated is bad").
-    The exact growth cadence/rules are an open note.
-  — **Player interaction — competitive (displaceable).** The player can **out-compete / buy out**
-    substrate-occupied slots on a tile, converting background capacity into managed holdings. (Watch:
-    keep this *reclaiming slots*, not turning the substrate into individually-managed detail the
-    premise rules out.)
-  — **Visibility — map-lens overlay.** Surfaces as an **industry-density / productivity lens**
-    (off by default), not ambient base-map clutter. Best-guess; **the user will personally flag the
-    final visual treatment for v0.2.0.**
-
-  **Open notes (residual sub-design — settle before promoting to TASKS):**
-  — *Generation home:* **settled (2026-06-16)** — population sub-pass (co-generated with population
-    centres; centre-dense, rippling outward). Not a separate post-population pass.
-  — *Dynamic growth model:* the per-Tick growth cadence and how research / resource-discovery feed
-    expansion; interaction with the building-tier open item (`GENERATION_STRATEGY.md` § Open). Still open.
-  — *Slot/capacity model:* how per-tile building-slots and resource consumption are budgeted, and how
-    the **shared** budget is split between substrate and player/AI holdings. Still open.
-  — *Displacement seam:* **settled (2026-06-16)** — player displaces substrate by paying a **vastly
-    higher workforce cost** (the substrate "occupies" slots at a premium that the player must outbid).
-    **Open UI note:** it must be visually clear which tiles have substrate industry occupying slots —
-    a separate Brief or sub-item to cover before promotion.
-  — *Lens visual treatment:* final call deferred to v0.2.0 (user to flag).
-
-  Couples to NATION_GENERATION / POPULATION (the generation pass), the economy/market layer
-  ([A4] inter-body markets, § Trade), and the deferred building-tier item. Authority
-  `docs/generation/GENERATION_STRATEGY.md` § The economic premise + § Open / cross-cutting.
-  *(Primary direction settled; residual sub-design owed — settle the open notes before promoting.)*
+*(BL-050 prose promoted to backlog.json 2026-06-17.)*
 
 ### Tile generation (terrain)
 

@@ -603,6 +603,172 @@ Parallelisation note: A → {B, C, D}; B ∥ C (disjoint files: docs vs workflow
 
 ---
 
+## v0.0.6 Batch Delivery — Improved Core-Loop (promoted 2026-06-17)
+
+Six items: BL-050 (saturated substrate), BL-037 (order book), BL-056 (bankruptcy harness),
+BL-036 (market-centre seeding), BL-025 (multi-market ledger dashboard), BL-035 (warm-start
+surface). Barrier semantics; full requirements in `req/requirements.json §` saturated-substrate,
+order-book, econ-bankruptcy, market-centre-seeding, multi-market-dashboard, warm-start-surface.
+
+**Fan-out call:** Wave 1 fans out to three parallel sub-agents (BL-050 data model, BL-037
+order book, BL-056 harness) — file sets are disjoint and each agent is a coherent vertical
+slice. Waves 2–4 are sequential in the main session. Reason: Wave 1 items together span
+~d11 of work and share no files; worktree isolation absorbs any overlap at wiring.
+
+### Wave 1 (sub-agents — parallel)
+
+#### BL-050 — Saturated substrate data model
+
+Requirements: `req/requirements.json § saturated-substrate`
+
+- **[2] A — Add substrate_density to tile_component; add nation_substrate aggregate to world.**
+  Add `float substrate_density = 0.0f` to `tile_component` (components.hpp). Add
+  `nation_substrate` struct (background_supply[resource_count], background_demand[resource_count])
+  to `components.hpp`; add `std::map<std::pair<entity_id,entity_id>, nation_substrate> nation_substrates`
+  (keyed by (nation, body)) to `world.hpp`. Files: `src/world/components.hpp`, `src/world/world.hpp`.
+  Deps: foundation. provides: `tile_component::substrate_density`, `nation_substrate`, `world::nation_substrates`.
+  Satisfies: saturated-substrate R1, R2.
+- **[2] B — Substrate generation pass in nation_generation.cpp.** After territory assignment
+  (Pass 2), for each tile owned by a nation: find the nearest `population_centre_component`
+  centre on that body; set `substrate_density = max(0, 1 − dist / ripple_radius) × centre_strength`
+  where `ripple_radius` is a constant (e.g. 8 tiles) and `centre_strength` is `centre.scale /
+  max_scale`. Accumulate the per-(nation, body) `nation_substrate` aggregate in
+  `world.nation_substrates`. Files: `src/world/nation_generation.cpp`. Deps: A.
+  provides: populated `tile_component::substrate_density`, populated `world::nation_substrates`.
+  Satisfies: saturated-substrate R3.
+- **[2] C — Inject substrate supply/demand into market clearing.** In `economy_system.cpp`,
+  before market clearing, call `inject_substrate(world& w)`: for each `(nation, body)` key in
+  `nation_substrates`, add `background_supply[r]` and `background_demand[r]` to the appropriate
+  body's market `supply[r]` / `demand[r]`. Scale: `background_supply[r] = nation_substrates[(n,b)].background_supply[r]`
+  (already authored by B). Files: `src/world/economy_system.{hpp,cpp}`. Deps: A, B.
+  Satisfies: saturated-substrate R4.
+
+Parallelisation note: A → B → C (linear; A provides the types B uses, B populates data C reads).
+Sub-agent does NOT touch `hard_coded_world.cpp` — integration wiring stays main session.
+**Uses Bash tool with heredoc for git commits; PowerShell is blocked by the allow rule.**
+
+#### BL-037 — Order book (preferential purchasing)
+
+Requirements: `req/requirements.json § order-book`
+
+- **[2] A — Add buy_order struct and order-book clearing signature.** Add `buy_order`
+  (corp, body, resource, quantity, max_price, preferred_seller = null_entity) to
+  `components.hpp`. Change `clear_markets` signature to accept both sell and buy order
+  lists; keep the old default-empty overload as a shim. Files: `src/world/components.hpp`,
+  `src/world/market_clearing.hpp`. Deps: foundation.
+  provides: `buy_order`, updated `clear_markets` signature.
+  Satisfies: order-book R1, R2.
+- **[3] B — Implement matched order-book clearing.** Replace the pooled supply/demand
+  aggregate in `clear_markets` with per-resource order books: AI corps emit default sell
+  orders (all surplus at 0 floor) and default buy orders (all shortfall at 999 max) so
+  the book degrades to today's behaviour when no explicit orders exist. Match price-time
+  priority: cheapest-first among sellers, highest-bidder-first among buyers; trades clear
+  at the seller's ask. Apply preferred_seller bias: a preferred seller wins ties and is
+  tolerated up to +10% premium over the cheapest unpreferred option; avoided seller is last
+  resort. EMA price (`market_component.price[r]`) is updated from the volume-weighted
+  average of cleared trades this tick (same formula as before). Files:
+  `src/world/market_clearing.{hpp,cpp}`. Deps: A.
+  Satisfies: order-book R3, R4, R5.
+
+Parallelisation note: A → B. Disjoint from BL-050 (which injects into supply/demand arrays
+only — it does not touch market_clearing.cpp). Disjoint from BL-056.
+**Uses Bash tool with heredoc for git commits; PowerShell is blocked.**
+
+#### BL-056 — Economy bankruptcy harness
+
+Requirements: `req/requirements.json § econ-bankruptcy`
+
+- **[3] A — Author econ_bankruptcy.cpp harness.** `tools/verify/econ_bankruptcy.cpp`: call
+  `make_hard_coded_world()` + load recipes + load economy; tick `run_economy_step` +
+  `clear_markets` + `apply_budget` in a loop. Bankruptcy trigger: player corporation
+  cannot cover maintenance for a tick AND `balance <= -5 × start_money`. Ceiling: 500
+  in-game years. On exit, print: summary (years to bankruptcy or "solvent at ceiling"),
+  per-building cash burn per year, per-resource net flow per year. Files:
+  `tools/verify/econ_bankruptcy.cpp`. Deps: foundation. Satisfies: econ-bankruptcy R1, R2, R3.
+- **[1] B — Register econ_bankruptcy in CMakeLists.txt.** Add `econ_bankruptcy` target
+  following the existing `econ_harness` pattern. Files: `CMakeLists.txt`. Deps: A.
+  Satisfies: econ-bankruptcy R4.
+
+Parallelisation note: A → B. Fully disjoint from BL-050 and BL-037.
+**Uses Bash tool with heredoc for git commits; PowerShell is blocked.**
+
+### Integration 1 (main session — after Wave 1 merges)
+
+Wire BL-050 into `hard_coded_world.cpp`: ensure `make_hard_coded_world` calls nation
+generation after population centres exist (order check), so `substrate_density` is
+populated and `nation_substrates` is filled. Run build + headless verify.
+
+### Wave 2 (main session)
+
+#### BL-036 — Seed multiple market centres
+
+Requirements: `req/requirements.json § market-centre-seeding`
+
+- **[3] A — Seed multiple market centres per body from population centres.** In
+  `hard_coded_world.cpp`, update market authoring: for each body, find population centres
+  above a threshold `scale` (e.g. ≥ 0.3); create one `market_component` per qualifying
+  centre, with `centre_tile` set to the population centre's tile. Keep the single-market
+  fallback for bodies with no qualifying centre (null_entity). Files:
+  `src/world/hard_coded_world.cpp`. Deps: Integration 1. Satisfies: market-centre-seeding R1, R2, R3.
+
+Parallelisation note: single task. Depends on BL-050 integration (population centres
+must exist before seeding derives from them).
+
+### Wave 3 (main session)
+
+#### BL-025 — Multi-market ledger dashboard
+
+Requirements: `req/requirements.json § multi-market-dashboard`
+
+- **[3] A — Rework Market Ledger to show all markets on a body as a dashboard.**
+  Change `draw_market_ledger` to: show a combo to select the **body** (not the market);
+  below, render one section per market on that body (header = "Market N of M at tile
+  (x,y)", then the existing resource table for that market). When a body has one market
+  the layout is identical to today. Files: `src/ui/market_ledger.cpp`. Deps: Wave 2
+  complete (multiple markets exist). Satisfies: multi-market-dashboard R1, R2.
+
+Parallelisation note: single task; sequential after BL-036.
+
+### Wave 4 (main session)
+
+#### BL-035 — Economy warm-start surface
+
+Requirements: `req/requirements.json § warm-start-surface`
+
+- **[2] A — Surface opening supply/demand health in Market Ledger.** Add a header section
+  to `draw_market_ledger`: one row per resource showing opening state — if `supply > demand`,
+  show "(excess → auto-sold)"; if `demand > supply`, show "(short → auto-bought)"; if
+  balanced, omit. Settle-tick count is a `constexpr int settle_ticks = 2` in `app.cpp`
+  (the existing warm-start already runs 2 ticks; expose the constant). Files:
+  `src/ui/market_ledger.cpp`, `src/core/app.cpp`. Deps: Wave 3. Satisfies: warm-start-surface R1, R2.
+
+Parallelisation note: single task; sequential after BL-025.
+
+---
+
+**Collision map:**
+
+| File | Items |
+|---|---|
+| `src/world/components.hpp` | BL-050-A, BL-037-A |
+| `src/world/world.hpp` | BL-050-A |
+| `src/world/nation_generation.cpp` | BL-050-B |
+| `src/world/economy_system.{hpp,cpp}` | BL-050-C |
+| `src/world/market_clearing.{hpp,cpp}` | BL-037-A, BL-037-B |
+| `tools/verify/econ_bankruptcy.cpp` | BL-056-A |
+| `CMakeLists.txt` | BL-056-B |
+| `src/world/hard_coded_world.cpp` | BL-036-A + BL-050 integration (main session) |
+| `src/ui/market_ledger.cpp` | BL-025-A, BL-035-A |
+| `src/core/app.cpp` | BL-035-A |
+
+**BL-050-A and BL-037-A both touch components.hpp.** This is the one cross-agent shared
+file. BL-050 adds `substrate_density` + `nation_substrate`; BL-037 adds `buy_order`.
+These are independent struct additions — the agents operate on disjoint regions of the
+file. Worktree isolation absorbs the write; the main session resolves any trivial merge
+conflict at integration.
+
+---
+
 ## Lens & Legibility — Batch Delivery — **COMPLETE** (2026-06-17)
 
 All seven items delivered, verified (22/22 requirements, deterministic goldens), docs

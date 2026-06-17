@@ -511,23 +511,24 @@
       "short_name": "SATURATED_SUBSTRATE",
       "category": "Environment",
       "title": "Generate the saturated nation-owned background substrate",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "designed",
+      "glyph": "✓",
       "priority": "B",
       "difficulty": 4,
       "parked": false,
-      "requires": [
-        "BL-053"
-      ],
+      "requires": [],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
+        "src/world/components.hpp",
+        "src/world/world.hpp",
         "src/world/nation_generation.cpp",
-        "src/world/components.hpp"
+        "src/world/economy_system.cpp",
+        "src/world/hard_coded_world.cpp"
       ],
       "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
-      "summary": "Per-tile nation-owned industry field aggregated into a per-(nation,body) market interface (no per-building entities), laid down by a slot/resource-consuming pass (population-seeded ripple, leading approach), dynamic + displaceable, surfaced as an industry-density lens. Primary direction settled; residual sub-design owed (generation home, growth model, slot/capacity, lens visual).",
-      "design": "@BACKLOG.md"
+      "summary": "Per-tile substrate_density [0,1] on tile_component; nation_substrate aggregate (background supply+demand arrays) in world; population-ripple generation pass; economy tick injects substrate supply/demand into per-body markets. Static for v0.0.6. Continuous density model. Lens visual deferred to v0.2.",
+      "design": "Form: per-tile substrate_density float [0,1] on tile_component (nation-owned background productivity). Aggregated into a nation_substrate struct per (nation, body) in world — background_supply[resource_count] and background_demand[resource_count] arrays injected each economy tick into per-body market clearing. No per-building entities.\n\nGeneration — population sub-pass (settled 2026-06-16): co-generated with population centres (BL-036). Each tile substrate_density = max(0, 1 − distance_from_nearest_centre / ripple_radius) × centre_strength, where population centres are major clusters in the generation pass. Seeded inside nation_generation.cpp or a new substrate generation pass.\n\nDynamic growth model (settled 2026-06-17): STATIC for v0.0.6 — generated once at world-gen, no per-Tick evolution. Dynamic growth deferred to v0.2.\n\nSlot/capacity model (settled 2026-06-17): CONTINUOUS density — substrate_density [0,1] = fraction of tile capacity used by background industry. Player buildings claim from (1 − density) headroom. Maps to integer-slot model (BL-043) when that lands.\n\nMarket coupling: on each economy tick, nation_substrate aggregate for (nation, body) contributes background_supply[r] and background_demand[r] to the body market clearing, scaled by nation territory tile count × mean density × per-resource terrain affinity factor. Gives markets real liquidity.\n\nPlayer interaction — data model only for v0.0.6: player claims (1 − density) headroom when constructing. Displacement UI and workforce-cost premium are a follow-on Brief.\n\nVisibility: dedicated industry-density lens visual deferred to v0.2.0 (user to flag). Observable for v0.0.6 through market liquidity (deeper supply/demand in Market Ledger).\n\nBL-053 dependency removed: substrate mechanism works with existing Voronoi nations; more countries improve visual richness but are not a hard prerequisite.\n\nAuthority: docs/generation/GENERATION_STRATEGY.md § The economic premise. Written 2026-06-16; sub-design settled 2026-06-17."
     },
     {
       "id": "BL-051",

@@ -3295,6 +3295,290 @@
           "notes": "design-only closer; no build"
         }
       ]
+    },
+    {
+      "brief": "saturated-substrate",
+      "title": "Saturated nation-owned background substrate (BL-050)",
+      "difficulty": 4,
+      "importance": "B",
+      "evaluated_difficulty": null,
+      "status": "active",
+      "resolved": null,
+      "resolution": null,
+      "promoted_from": "backlog.json SS BL-050",
+      "batch": "v0.0.6-core-loop",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "tile_component carries a substrate_density float field [0,1] initialised to 0.",
+          "verification": [
+            "headless: compile check + grep tile_component"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R2",
+          "requirement": "world carries nation_substrates map keyed by (nation, body) with background_supply and background_demand arrays.",
+          "verification": [
+            "headless: compile check"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R3",
+          "requirement": "make_hard_coded_world populates substrate_density per tile via a population-ripple pass; tiles near population centres read higher density than distant tiles.",
+          "verification": [
+            "headless: world_audit reports min/mean/max substrate_density for Kepler; mean > 0"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R4",
+          "requirement": "Each economy tick injects substrate supply and demand into body markets before clearing; markets on a body with substrate show higher supply/demand than without.",
+          "verification": [
+            "headless: econ_harness or world_audit confirms market supply+demand > 0 after first tick on substrate-populated body"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        }
+      ]
+    },
+    {
+      "brief": "order-book",
+      "title": "Preferential purchasing matched order book (BL-037)",
+      "difficulty": 4,
+      "importance": "B",
+      "evaluated_difficulty": null,
+      "status": "active",
+      "resolved": null,
+      "resolution": null,
+      "promoted_from": "backlog.json SS BL-037",
+      "batch": "v0.0.6-core-loop",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "buy_order struct exists in components.hpp with fields corp, body, resource, quantity, max_price, preferred_seller.",
+          "verification": [
+            "headless: compile check"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R2",
+          "requirement": "clear_markets accepts optional buy and sell order lists; with empty lists produces the same clearing behaviour as before.",
+          "verification": [
+            "headless: econ_harness all existing assertions still pass"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R3",
+          "requirement": "With explicit sell orders at a floor price and buy orders at a ceiling, matched trades clear at the seller ask.",
+          "verification": [
+            "headless: unit scenario two corps one sell at floor 0.5 one buy at max 2.0; trade clears at 0.5"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R4",
+          "requirement": "EMA price updated from volume-weighted average of trades cleared this tick (formula equivalent to pre-order-book resolution).",
+          "verification": [
+            "headless: econ_harness price-convergence test still passes"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R5",
+          "requirement": "preferred_seller bias: a preferred seller wins price-time ties and is matched up to 10% premium over cheapest unpreferred seller.",
+          "verification": [
+            "headless: unit scenario preferred vs unpreferred seller; preferred chosen within 10% price gap"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        }
+      ]
+    },
+    {
+      "brief": "econ-bankruptcy",
+      "title": "Economy bankruptcy calibration harness (BL-056)",
+      "difficulty": 3,
+      "importance": "B",
+      "evaluated_difficulty": null,
+      "status": "active",
+      "resolved": null,
+      "resolution": null,
+      "promoted_from": "backlog.json SS BL-056",
+      "batch": "v0.0.6-core-loop",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "tools/verify/econ_bankruptcy.cpp exists and compiles as CMake target econ_bankruptcy.",
+          "verification": [
+            "headless: cmake build includes econ_bankruptcy"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R2",
+          "requirement": "Harness ticks economy until player balance <= -5 x start_money when unable to pay maintenance, or 500-year ceiling; exits 0.",
+          "verification": [
+            "headless: econ_bankruptcy runs to completion"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R3",
+          "requirement": "Output includes: years to bankruptcy or solvent-at-ceiling, per-building-type cash burn per year, per-resource net flow per year.",
+          "verification": [
+            "headless: econ_bankruptcy output contains all three data sections"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R4",
+          "requirement": "econ_bankruptcy passes verifier-headless (exits 0, output well-formed).",
+          "verification": [
+            "headless: verifier-headless econ_bankruptcy"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        }
+      ]
+    },
+    {
+      "brief": "market-centre-seeding",
+      "title": "Seed multiple market centres from population centres (BL-036)",
+      "difficulty": 3,
+      "importance": "B",
+      "evaluated_difficulty": null,
+      "status": "active",
+      "resolved": null,
+      "resolution": null,
+      "promoted_from": "backlog.json SS BL-036",
+      "batch": "v0.0.6-core-loop",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Bodies with multiple population centres above the scale threshold generate more than one market entity each with a distinct centre_tile.",
+          "verification": [
+            "headless: world_audit market count per body; a body with multiple centres has > 1 market"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R2",
+          "requirement": "market_for_tile routes each tile to its nearest market centre; tiles near centre A go to market A tiles near centre B go to market B.",
+          "verification": [
+            "headless: spot-check two tiles on a multi-market body route to different markets"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R3",
+          "requirement": "Bodies with no qualifying population centre retain a single fallback market with null centre; single-market body behaviour unchanged.",
+          "verification": [
+            "headless: world_audit single-market bodies still show exactly 1 market"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        }
+      ]
+    },
+    {
+      "brief": "multi-market-dashboard",
+      "title": "Market Ledger multi-market dashboard (BL-025)",
+      "difficulty": 3,
+      "importance": "B",
+      "evaluated_difficulty": null,
+      "status": "active",
+      "resolved": null,
+      "resolution": null,
+      "promoted_from": "backlog.json SS BL-025",
+      "batch": "v0.0.6-core-loop",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Market Ledger body selector groups by body; selecting a body shows all its markets as separate sections in a single view.",
+          "verification": [
+            "visual: scripts/verify/market_ledger_dashboard.lua; Kepler section count matches market count"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R2",
+          "requirement": "Each market section has a header identifying it and a resource supply/demand/price/net table.",
+          "verification": [
+            "visual: market_ledger_dashboard.lua; each section shows header and table"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        }
+      ]
+    },
+    {
+      "brief": "warm-start-surface",
+      "title": "Economy warm-start supply/demand health surface (BL-035)",
+      "difficulty": 3,
+      "importance": "B",
+      "evaluated_difficulty": null,
+      "status": "active",
+      "resolved": null,
+      "resolution": null,
+      "promoted_from": "backlog.json SS BL-035",
+      "batch": "v0.0.6-core-loop",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Market Ledger shows an opening supply/demand health summary: per-resource rows labelled excess or short based on post-settle-tick state.",
+          "verification": [
+            "visual: scripts/verify/market_ledger_warmstart.lua; health rows appear for resources with imbalance"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R2",
+          "requirement": "The settle-tick count is a named constant in app.cpp not a magic number.",
+          "verification": [
+            "headless: grep for named settle constant in app.cpp"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        }
+      ]
     }
   ]
 }
