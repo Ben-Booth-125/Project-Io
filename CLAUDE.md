@@ -183,6 +183,11 @@ These skills exist and should be used proactively rather than reinventing their 
   SDL/Lua-free `world/*` logic and reports its PASS/FAIL assertions. Use for any `headless`-class
   requirement (economy arithmetic, tile generation, placement audits). Authorising a new check
   means adding a `tools/verify/*.cpp` harness and naming it in the skill.
+- **`verifier-review`** — static, no-compile review over an integrated diff; reports a verdict on
+  cross-item symbol consistency, compile-by-inspection, standing invariants, the serialisation
+  seam, and requirement coverage. The cheap pre-compile gate: run it in a Batch Delivery after
+  slice merges and **before** the integrating build (DELIVERY.md step 4a). A filter, not a
+  substitute — always still compile.
 - **`scoped-commit`** — stages exactly the files belonging to the current task and commits
   with the correct format, without bundling unrelated working-tree changes. Use whenever
   committing, especially on the default branch or when the tree has pre-existing edits.
