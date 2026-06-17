@@ -20,7 +20,8 @@
       "Bash(& \".\\econ_harness*)",
       "Bash(& \".\\econ_stability*)",
       "Bash(& \".\\world_audit*)",
-      "Bash(& \".\\construction_harness*)"
+      "Bash(& \".\\construction_harness*)",
+      "Bash(node*)"
     ],
     "deny": [
       "Bash(rm -rf *)",

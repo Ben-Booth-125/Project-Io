@@ -32,14 +32,14 @@ in-session decisions. Consult when asked about prior work, open items, or why
 a specific implementation choice was made.
 
 **`docs/development/backlog.json`**, **`docs/development/BACKLOG.md`**, **`docs/development/REFINED.md`**, and **`docs/development/DELIVERY.md`**
-The backlog and delivery system. **`backlog.json`** is the canonical **metadata index** of every
-backlog **item** (formerly a "Brief") — status (`designed` ✓ / `design-owed` ~), priority,
-difficulty, sequencing, file scope — queryable and authoritative for metadata. **`BACKLOG.md`**
-holds the rich **design prose** for each item, keyed by id, and is the **design authority for an
-open item** while the work is unrealised (the design propagates into the subject's authority doc
-only when the work lands and the item is removed — authority time-slices). **`REFINED.md`** is the
-*active, prioritised, actionable worklist*: a `designed` item is **promoted** into file-scoped,
-dependency-marked tasks (the A–F style) when we act on it. **`DELIVERY.md`** is the method
+The backlog and delivery system. **`backlog.json`** is the canonical **metadata index and design
+prose store** — status (`designed` ✓ / `design-owed` ~), priority, difficulty, sequencing, file
+scope, and the **`design` field** holding each item's prose. **`BACKLOG.md`** is a **legacy drain**:
+it holds markdown bodies only for older items not yet migrated; when an item is edited or promoted,
+its body moves to `backlog.json`'s `design` field and is replaced by a tombstone. New items get
+**no** `BACKLOG.md` body. Authority time-slices: `backlog.json` while the item is open; the
+subject's authority doc once the work lands. **`REFINED.md`** is the *active worklist*: a `designed`
+item is **promoted** into file-scoped tasks when we act on it. **`DELIVERY.md`** is the method
 authority — the Delivery lifecycle, design-state model, depth verbs, and worktree sub-agent model.
 Read DELIVERY.md before promoting or executing backlog work.
 
@@ -114,7 +114,7 @@ backlog**, or **B) implement now** (smoke-test, then ask before committing).
 | Concern | Authority | Notes |
 |---|---|---|
 | Backlog **metadata** (status, priority, sequencing, files) | `docs/development/backlog.json` | Queryable; the JSON wins over any prose/glyph. |
-| Backlog **design prose** for an open item | `docs/development/BACKLOG.md` | Design authority *while the item is open*; propagates to the subject doc on landing. |
+| Backlog **design prose** for an open item | `docs/development/backlog.json` (`design` field) | Design authority *while the item is open*; `BACKLOG.md` holds legacy bodies not yet migrated. |
 | **Active worklist** (promoted tasks) | `docs/development/REFINED.md` | Transient; empty between work blocks. |
 | **Method** (lifecycle, depth verbs, batch, worktrees) | `docs/development/DELIVERY.md` | The long-form of this section. |
 | **Requirements** (data + history) | `req/requirements.json` (policy `req/REQUIREMENTS.md`) | |

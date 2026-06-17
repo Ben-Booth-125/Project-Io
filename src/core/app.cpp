@@ -357,6 +357,9 @@ int app::run_verify(const std::string& script_path, bool bless)
         if (name == "economy")           m_ui.show_economy_panel = open;
         else if (name == "construction") m_ui.show_construction_panel = open;
         else if (name == "tile")         m_ui.show_tile_ledger = open;
+        else if (name == "market")       m_ui.show_market_ledger = open;
+        else if (name == "balance")      m_ui.show_balance_ledger = open;
+        else if (name == "corporation")  m_ui.show_corporation_panel = open;
     });
 
     // Open the Layer 4 construction / building-management panel so a capture shows

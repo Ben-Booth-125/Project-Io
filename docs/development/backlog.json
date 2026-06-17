@@ -1,41 +1,35 @@
 {
   "_schema": "backlog/io-v1",
   "_note": [
-    "Canonical backlog for Project Io — the authoritative METADATA index of every backlog item",
-    "(formerly an OPENS 'Brief'). The rich per-item DESIGN PROSE lives in BACKLOG.md, keyed by id;",
-    "this file owns status, priority, difficulty, sequencing and file scope so they are queryable",
-    "and cannot drift. One item = one object in `items`.",
+    "Canonical backlog for Project Io — the authoritative METADATA index of every backlog item.",
+    "One item = one object in `items`.",
     "",
-    "STATUS (authoritative; the glyph in BACKLOG.md mirrors it 1:1, JSON wins on any disagreement):",
-    "  designed    (glyph ✓) — design settled, promote-ready. Execution is all that remains.",
-    "  design-owed (glyph ~) — design still owed; must be settled (into the item) before promotion.",
-    "Status is about readiness-to-promote and is orthogonal to priority and difficulty.",
+    "STATUS (authoritative; JSON wins over any prose/glyph disagreement):",
+    "  designed    (glyph ✓) — design settled, promote-ready.",
+    "  design-owed (glyph ~) — design still owed; must be settled before promotion.",
     "",
-    "PRIORITY (importance, ascending): F C B A S SSS.",
-    "  F=deferred/parked (revisit later), C=low, B=medium, A=important, S=high, SSS=do-immediately.",
+    "PRIORITY (ascending): F C B A S SSS.",
+    "  F=deferred/parked, C=low, B=medium, A=important, S=high, SSS=do-immediately.",
     "  `parked:true` is the explicit flag for F-priority items.",
-    "DIFFICULTY (1-5, non-linear ~3-4x per step): 1=~5min, 2=~20min, 3=~1h, 4=~3h, 5=~12h+ (break a 5 down).",
+    "DIFFICULTY (1-5): 1=~5min, 2=~20min, 3=~1h, 4=~3h, 5=~12h+ (break a 5 down).",
     "",
-    "SEQUENCING: `waits_on` lists other item short_names that must land first; `blocked_on` names a",
-    "external prerequisite (a layer/system not yet built). An item can be `designed` and still blocked.",
+    "SEQUENCING: `waits_on` lists short_names that must land first; `blocked_on` names an",
+    "external prerequisite. An item can be `designed` and still blocked.",
     "",
-    "WORKFLOW: a `designed` item is PROMOTED into REFINED.md (the active worklist) and DELIVERED",
-    "(the five-step lifecycle — see DELIVERY.md). A `design-owed` item is DESIGNED first (prose settled",
-    "in BACKLOG.md, status flipped to designed) before it can be promoted. When work lands, its item is",
-    "removed here and the design propagates into the subject's authority doc.",
+    "WORKFLOW: a `designed` item is PROMOTED into REFINED.md and DELIVERED (see DELIVERY.md).",
+    "A `design-owed` item is DESIGNED first (prose settled in `design` field, status flipped).",
+    "When work lands, the item is removed here and design propagates into the authority doc.",
     "",
-    "DESIGN PROSE — the `design` field & the markdown/JSON policy (2026-06-16):",
-    "  - NEW items are authored entirely here: put the design / detail / rationale prose in the",
-    "    `design` field (a markdown-formatted string). A new item gets NO BACKLOG.md body.",
-    "  - LEGACY items (migrated from OPENS) keep their prose in BACKLOG.md, keyed by title; their",
-    "    `design` field is the sentinel \"@BACKLOG.md\" = 'prose lives in the markdown body'.",
-    "  - ON PROMOTION into REFINED.md, an item's BACKLOG.md body is DELETED — a refined item must not",
-    "    have a markdown body. BACKLOG.md therefore only drains, never grows, and is deleted once empty.",
-    "  - For a design needing rich tables, set `design` to a pointer to the authority doc instead.",
-    "",
-    "Migration note (2026-06-16): this index was extracted from the legacy OPENS.md. The design bodies",
-    "currently still carry their old `[priority+difficulty glyph]` markers in BACKLOG.md; those markers",
-    "are now NON-AUTHORITATIVE display history — this file is the source of truth for metadata."
+    "DESIGN PROSE — the `design` field (policy updated 2026-06-17):",
+    "  - ALL items: prose lives in the `design` field here, not in BACKLOG.md.",
+    "  - NEW items: author prose here directly. No BACKLOG.md body.",
+    "  - LEGACY items (pre-2026-06-17): `design: \"@BACKLOG.md\"` means prose is still in markdown.",
+    "    Migrate to this field on first edit (design settle or promotion) — do not wait for promotion.",
+    "    On migration: write prose here, replace the BACKLOG.md body with a tombstone line.",
+    "  - ON PROMOTION into REFINED.md: delete any remaining BACKLOG.md body (if not yet migrated).",
+    "  - BACKLOG.md therefore only drains, never grows, and is deleted once empty.",
+    "  - For designs with rich tables use markdown in the `design` string (tables render fine).",
+    "  - `design: \"@<doc>\"` is also valid as a pointer to an authority doc when prose lives there."
   ],
   "items": [
     {
@@ -64,8 +58,8 @@
       "short_name": "PRODUCTION_OUTPUT_LENS",
       "category": "Canvas",
       "title": "Production / Output lens",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "designed",
+      "glyph": "✓",
       "priority": "B",
       "difficulty": 3,
       "parked": false,
@@ -79,15 +73,15 @@
       ],
       "authority_doc": "docs/ui/LENSES.md",
       "summary": "Planetary lens tinting tiles by production intensity = sum of (output qty x resolved price) across the recipe's products. Design owed: value->opacity normalisation, idle treatment, glyph, legend.",
-      "design": "@BACKLOG.md"
+      "design": "Read the map as a *production-intensity surface*: where value is actually being made. Intensity metric: the sell value of all of a tile's building outputs (output qty × resolved market price, summed across the recipe's products) — not raw output count, so a high-value low-volume site reads hot and a bulk low-value one cooler. A strip lens (`overlay_mode`), Planetary tint over producing tiles, plain terrain where nothing produces. No data dependency — reads the economy/`building_report` and `market_component` prices already present. Supports the Layer-4 goal (siting and reading the production loop).\n\n**Design settled (2026-06-16):** intensity is a **log scale relative to the market average** — tiles above average read hot, below average cool, zero is the market floor; this keeps contrast meaningful across bodies with very different absolute output levels. Idle / exhausted buildings read **cold (zero intensity)**, indistinguishable from unbuilt terrain on this lens. Glyph and legend owed at promotion. Authority `docs/ui/LENSES.md`."
     },
     {
       "id": "BL-010",
       "short_name": "PLACEMENT_SUITABILITY_SURFACE",
       "category": "Canvas",
       "title": "Placement-suitability surface (a lens on tile selection, not a strip lens)",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "designed",
+      "glyph": "✓",
       "priority": "B",
       "difficulty": 3,
       "parked": false,
@@ -100,7 +94,7 @@
       ],
       "authority_doc": "docs/ui/LENSES.md",
       "summary": "For a selected/armed building type, tint tiles by validity/affinity (valid highlighted, invalid greyed, thrives-here stronger). NOT an overlay_mode. Design owed: trigger, colour treatment, state model.",
-      "design": "@BACKLOG.md"
+      "design": "**Explicitly *not* an `overlay_mode` strip lens** — a surface tied to **tile selection**: when the player selects a tile, every other tile is tinted by how well the selected tile's best valid building type would do there — a siting aid answering *where else could this kind of building go, and where is it best*. Reads the terrain enums and `src/world/placement_rules.hpp` already in place.\n\n**Design settled (2026-06-16):** trigger is **tile selection only** (not armed-build mode). Colour treatment: **affine tiles** (terrain optimal for the building) receive a coloured tint; **invalid tiles** (building cannot be placed) receive a **dark overlay**; valid-but-not-affine tiles are **uncoloured** (no signal). Canvas-state model: the surface is tied to `selected_tile` state, not `overlay_mode` — it activates alongside the selection element and deactivates when nothing is selected. Authority `docs/ui/LENSES.md` (note the strip-lens distinction), `docs/economy/PRODUCTION.md`."
     },
     {
       "id": "BL-011",
@@ -147,8 +141,8 @@
       "short_name": "LENS_STRIP_SINGLE_SELECT",
       "category": "Canvas",
       "title": "Lens strip: single-select, nullable, ordered & renamed",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "designed",
+      "glyph": "✓",
       "priority": "B",
       "difficulty": 2,
       "parked": false,
@@ -161,7 +155,7 @@
       ],
       "authority_doc": "docs/ui/LENSES.md",
       "summary": "Lens strip single-select with a null/none state (default Corporation ownership); fix ordering and labels; the strip is a curated subset (others reached via menu/selection). Design owed: order, labels, strip-vs-menu split.",
-      "design": "@BACKLOG.md"
+      "design": "The lens control strip must be **single-select with a null/none state** (no lens = plain terrain) and **default to \"Corporation ownership\"** at campaign start. Also fixes the strip's **lens ordering and display names**. The strip is a **curated subset of useful lenses, not the exhaustive set** — some lenses are reached from a menu / the selection element instead.\n\n**Design settled (2026-06-16):** Strip order (left → right): **Corp → Country → Resource → Market → Population → Opportunity → Production → Scarcity**. Opportunity pairs with Population (both from BL-017; exact slot adjacency to confirm at visual review). Price readout is **off the strip** — accessed via the Market Ledger only (open ledger, pick resource, see per-tile price overlay). Default at campaign start: **Corporation**. Authority `docs/ui/LENSES.md`."
     },
     {
       "id": "BL-014",
@@ -193,8 +187,8 @@
       "short_name": "MARKET_BOUNDARY_LENS",
       "category": "Canvas",
       "title": "Market lens → market-boundary UI; relocate the price readout",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "designed",
+      "glyph": "✓",
       "priority": "C",
       "difficulty": 3,
       "parked": false,
@@ -209,7 +203,7 @@
       ],
       "authority_doc": "docs/ui/LENSES.md",
       "summary": "Replace market-price map UI with a market-boundary (catchment tint) lens; keep the price-UI code but move it to a menu/selection-accessed lens. Design owed: boundary rendering, price-lens entry point.",
-      "design": "@BACKLOG.md"
+      "design": "Replace the current **market-price** map UI with a **market-boundary** lens (tinting each market's catchment — couples to multiple tile-centred markets). **Keep the price-UI code** — it becomes a lens **accessed via the Market Ledger**, off the strip.\n\n**Design settled (2026-06-16):** boundary rendering is a **filled tint per catchment** — each market's tiles receive a distinct colour fill (same visual logic as the Corporation lens, one colour per market). Price readout is reached via the **Market Ledger only**: open the ledger, pick a resource, see the per-tile price overlay — not a separate strip lens or menu control. Authority `docs/ui/LENSES.md` § Market lens."
     },
     {
       "id": "BL-016",
@@ -236,8 +230,8 @@
       "short_name": "POPULATION_OPPORTUNITY_LENS",
       "category": "Canvas",
       "title": "Replace Habitability main-lens with Population / Opportunity",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "designed",
+      "glyph": "✓",
       "priority": "B",
       "difficulty": 3,
       "parked": false,
@@ -250,15 +244,15 @@
       ],
       "authority_doc": "docs/ui/LENSES.md",
       "summary": "Replace Habitability on the strip with Population, or a hybrid Opportunity lens (tile max yield ignoring resource/logistics). Per-tile habitability tint stays available. Design owed: which, what max-yield means, legend.",
-      "design": "@BACKLOG.md"
+      "design": "Habitability is a good *field* but not a top-level lens. Replace it on the strip with **Population** and a separate **\"Opportunity\"** lens. (The per-tile habitability tint already built stays available from tile detail, just not as a strip lens.) Couples to the habitability→workforce rule (BL-041) and the population layer.\n\n**Design settled (2026-06-16):** **Both Population and Opportunity** are separate strip lenses (not a single hybrid — they are distinct reads). **Population**: per-tile population density tint. **Opportunity**: per-tile **estimated net margin** — what the best valid building on that terrain would net (output value minus input/cost), evaluated without regard to what is currently built or logistics. Serves as a siting signal: *where could value be made?* Legend and exact margin formula owed at promotion. Authority `docs/ui/LENSES.md` § Population lens."
     },
     {
       "id": "BL-018",
       "short_name": "SCARCITY_MARKET_HEATMAP",
       "category": "Canvas",
       "title": "Scarcity lens — blur to a market-level heatmap",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "designed",
+      "glyph": "✓",
       "priority": "C",
       "difficulty": 3,
       "parked": false,
@@ -270,15 +264,15 @@
       ],
       "authority_doc": "docs/ui/LENSES.md",
       "summary": "Make the built Scarcity lens read as a blurred market-level field rather than crisp per-tile cells; feasibility of a non-tile-bound fuzzy field in immediate mode. Design owed (keep open if infeasible).",
-      "design": "@BACKLOG.md"
+      "design": "The Scarcity lens (built, per-tile translucent heatmap) should read as a **market-level field** more than a per-tile one.\n\n**Design settled (2026-06-16):** render as **chunky per-market blocks** — each market's catchment tiles are tinted as one solid region (not per-tile; not a smooth gradient). This is honest to the market structure (the catchment IS the unit) and avoids the renderer complexity of a continuous field. Scarcity signal is driven by **supply shortfall** — how much demand exceeded supply last tick, independent of price — so the heatmap reflects actual unmet need rather than price deviation. Authority `docs/ui/LENSES.md` § Scarcity lens."
     },
     {
       "id": "BL-019",
       "short_name": "RESOURCE_DENSITY_LENS",
       "category": "Canvas",
       "title": "Resource-density lens — uniform colour, deposit-shape",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "designed",
+      "glyph": "✓",
       "priority": "C",
       "difficulty": 3,
       "parked": false,
@@ -290,7 +284,7 @@
       ],
       "authority_doc": "docs/ui/LENSES.md",
       "summary": "Resource lens always single-select, uniform colour (not a gradient), render the whole contiguous deposit shape; test level-as-bloom vs flat. Design owed: contiguous-deposit detection, bloom vs flat.",
-      "design": "@BACKLOG.md"
+      "design": "The Resource lens should be **always single-select** and **render the shape of the deposit** — the **whole contiguous deposit** when resource levels are present.\n\n**Design settled (2026-06-16):** render as **flat fill** — a uniform colour over the entire contiguous deposit shape with no per-tile level gradient. Intensity information is available in tile detail, not the lens. Contiguous deposit is detected by **8-connected flood fill** (diagonals included) from any tile with > 0 of the selected resource. Authority `docs/ui/LENSES.md` (Resource lens stub), `docs/economy/TILES.md`."
     },
     {
       "id": "BL-020",
@@ -317,8 +311,8 @@
       "short_name": "MULTI_MARKET_LEDGER_VISIBILITY",
       "category": "Ledger",
       "title": "Surface multiple markets in the economy / market ledgers",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "designed",
+      "glyph": "✓",
       "priority": "B",
       "difficulty": 3,
       "parked": false,
@@ -332,7 +326,7 @@
       ],
       "authority_doc": "docs/ui/MENU.md",
       "summary": "Market read surfaces show each market on a body distinctly (per-market breakdown/selector, '1 of N'), so the tile-centred-markets mechanism is visible. User flagged vital. Design owed: per-market table/selector layout.",
-      "design": "@BACKLOG.md"
+      "design": "The economy ledger shows **one market table per body** — Kepler reads as a single market — so the multiple-tile-centred-markets mechanism is **invisible**. Make the market read surfaces show **each market on a body distinctly**. User flagged this as **vital** — must ship with multi-market seeding (BL-036).\n\n**Design settled (2026-06-16):** ledger default is a **dashboard view** — all markets on the body at a glance (not a per-market tab or dropdown). Selecting a market drives detail — the dashboard is the entry; the selected market's full table opens below or in a detail pane. Authority: Market Ledger, `docs/SYSTEMS.md` § Trade."
     },
     {
       "id": "BL-031",
@@ -384,8 +378,8 @@
       "short_name": "ECONOMY_WARM_START",
       "category": "Trade",
       "title": "Economy warm-start pre-generation pass — surface auto-buy / auto-sell",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "designed",
+      "glyph": "✓",
       "priority": "B",
       "difficulty": 3,
       "parked": false,
@@ -400,15 +394,15 @@
       ],
       "authority_doc": "docs/SYSTEMS.md",
       "summary": "Pre-generation settle so the economy opens at/near steady state, with a legible readout of what is auto-sold (excess) and auto-bought at start. Builds on the v0.0.4 warm-start. Design owed: settle-ticks, the readout.",
-      "design": "@BACKLOG.md"
+      "design": "When the simulation starts, **every economy function that currently yields a profit must already be reflected** in the opening state — a pre-generation / warm-start settle so the economy opens at (or near) steady state, not mid-transient. Builds on the v0.0.4 warm-start; couples to the order book. Fits the v0.0.6 legibility strand.\n\n**Design settled (2026-06-16):** the opening supply/demand state is surfaced in the **Market Ledger default view** — the dashboard (BL-025) includes a supply/demand health row per resource at campaign open, showing what is in excess (auto-sold) and what is short (auto-bought). The number of settle-ticks is a tuning parameter; owed at promotion. Authority `docs/SYSTEMS.md` § Trade."
     },
     {
       "id": "BL-036",
       "short_name": "SEED_MARKET_CENTRES",
       "category": "Trade",
       "title": "Seed multiple market centres from capitals / population",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "designed",
+      "glyph": "✓",
       "priority": "B",
       "difficulty": 3,
       "parked": false,
@@ -422,7 +416,7 @@
       ],
       "authority_doc": "docs/SYSTEMS.md",
       "summary": "Mechanism landed 2026-06-16; remaining is generation seeding >1 market centre per body (today one degenerate market). Design owed (deferred to population layer): centre count/seeds + Market lens per-catchment tint.",
-      "design": "@BACKLOG.md"
+      "design": "The **mechanism** for multiple tile-centred markets per body landed 2026-06-16 (market `centre_tile`, nearest-centre catchment routing `market_for_tile`). What remains is **generation seeding more than one centre per body**: the present world still authors **one** market per body (the behaviour-preserving degenerate case).\n\n**Design settled (2026-06-16):** market centres are seeded from **population centres** — one market per major population cluster above a threshold density. The threshold and the population-centre concept are owed alongside the population generation pass (BL-050). The Market lens (BL-015) tints each market's catchment once multiple centres are seeded. Couples to NATION/POPULATION generation; touches `src/world/hard_coded_world.cpp` (market authoring) and later the generation pass. **Open follow-ups:** finer per-building supply/demand splitting; convoys between intra-body markets (Layer 5 / inter-body model). Authority `docs/SYSTEMS.md` § Trade, `docs/ui/LENSES.md` § Market lens."
     },
     {
       "id": "BL-037",
@@ -523,8 +517,8 @@
       "short_name": "HABITABILITY_GATES_WORKFORCE",
       "category": "Workforce",
       "title": "Habitability gates max workforce, not production directly",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "designed",
+      "glyph": "✓",
       "priority": "B",
       "difficulty": 3,
       "parked": false,
@@ -536,15 +530,15 @@
       ],
       "authority_doc": "docs/economy/POPULATION.md",
       "summary": "Habitability caps a building's max workforce fraction (not output directly): >~0.6 -> 100% base; below, reduced. Tech later raises above 100% (0.99 -> ~250%). Design owed: the curve, the over-100% tech model.",
-      "design": "@BACKLOG.md"
+      "design": "**Habitability should not scale a building's production output directly** — instead it caps the **building's max workforce fraction**. Couples to the contention scalar and the building workforce-target control; pairs with the Population/Opportunity lens (BL-017).\n\n**Design settled (2026-06-16):** curve is **linear, stepped at 0.6** — habitability 0.0→0.6 maps linearly to 0%→100% max workforce fraction; at or above 0.6, max fraction is **100% base workforce**. Below 0.6 the fraction scales proportionally (e.g. hab 0.3 → 50% max). The tech-driven over-100% multiplier is **deferred** — settle the interface point when the research system lands. Authority `docs/economy/POPULATION.md`, `docs/SYSTEMS.md` § Workforce."
     },
     {
       "id": "BL-043",
       "short_name": "BUILDING_RULES_PLACEMENT",
       "category": "Infrastructure",
       "title": "Building rules — stricter placement & a per-building justification process",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "designed",
+      "glyph": "✓",
       "priority": "B",
       "difficulty": 4,
       "parked": false,
@@ -556,15 +550,15 @@
       ],
       "authority_doc": "docs/economy/PRODUCTION.md",
       "summary": "Placement too loose (buildings infinite, Port anywhere). Define stricter per-building rules (counts/terrain/adjacency/finite slots) + a user-approved per-building justification table; building-ledger-as-secondary-window direction. USER RESPONSE REQUIRED. Design owed.",
-      "design": "@BACKLOG.md"
+      "design": "Placement is too loose — buildings appear **infinite** and a **Port can be placed anywhere**. This Brief defines stricter per-building placement / limit rules (counts, terrain, adjacency, finite slots — couples to the substrate slot model, BL-050). Also the **building-ledger UI direction**: the Construction ledger becomes a **secondary window** opening a **larger horizontal, cross-canvas panel**; **primary selection on a tile always gives a tile overview**.\n\n**Design settled (2026-06-16) — four constraint types, all active:**\n(1) terrain type restriction, (2) per-body count cap, (3) per-tile slot cap (shared with substrate industry), (4) adjacency rule.\n\n**Approved per-building placement table (Era 0):**\n\n| Building | Body cap | Terrain | Adjacency | Note |\n|---|---|---|---|---|\n| Mine | Uncapped | Barren, rocky, volcanic, tundra | — | |\n| Oil Platform | Uncapped | Barren (deposit) | — | |\n| Quarry | Uncapped | All non-water | — | |\n| Lumber Camp | Uncapped | Forest, wetland | — | |\n| Farm | Uncapped | Grassland, wetland, forest-adj | — | |\n| Smelter | Uncapped | Any | — | |\n| Refinery | Uncapped | Any | — | |\n| Food Processor | Uncapped | Any | — | |\n| Chemical Plant | Uncapped | Any | — | |\n| Port | Uncapped | Coast / water-adjacent | Coast required (fixes current bug) | |\n| Launchpad | **1 per body** | Flat / non-mountainous | — | Era gate |\n| Warehouse | Uncapped | Any | — | |\n\nAll buildings uncapped at body level except Launchpad (max 1). Per-tile slot cap and adjacency rules apply per the substrate slot model (BL-050). Open note: refine rules after playtesting. Authority `docs/economy/PRODUCTION.md`, `docs/ui/SELECTION.md`."
     },
     {
       "id": "BL-044",
       "short_name": "CONSTRUCTION_PRICING",
       "category": "Infrastructure",
       "title": "Construction pricing — buildings cost resources (per-building, approved)",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "designed",
+      "glyph": "✓",
       "priority": "B",
       "difficulty": 3,
       "parked": false,
@@ -576,7 +570,7 @@
       ],
       "authority_doc": "docs/economy/PRODUCTION.md",
       "summary": "Buildings cost resources to construct, set per-building and user-approved (a documented cost table). Couples to the labour/material split and the construction spend. Design owed: the per-building cost table + approval pass.",
-      "design": "@BACKLOG.md"
+      "design": "Buildings must **cost resources** to construct. Couples to the build-cost model in [S4] building management (`scripts/economy.lua`) and the construction spend.\n\n**Design settled (2026-06-16) — cost form and approved table:**\nCost is **two-part: resource + budget** (materials and capital). General calibration: all costs are set **high** — the prototype should be hard rather than easy; all values carry an **open note to revise via playtesting**.\n\n| Building | Resource cost | Budget cost |\n|---|---|---|\n| Mine | 20 Steel | 2 500 |\n| Oil Platform | 20 Steel | 2 000 |\n| Quarry | ~20 Steel | ~2 000 (high tier, exact TBD) |\n| Lumber Camp | ~15 Timber | ~2 000 (high tier, exact TBD) |\n| Farm | ~15 Timber | ~2 000 (high tier, exact TBD) |\n| Smelter | 25 Steel | 2 000 |\n| Refinery | 25 Steel | 2 000 |\n| Food Processor | 20 Steel | 1 500 |\n| Chemical Plant | 30 Steel | 2 500 |\n| Port | 20 Steel | 1 500 |\n| Launchpad | 50 Steel + 20 Refined Fuel | 10 000 |\n| Warehouse | 8 Steel | 600 |\n\nAuthority `docs/economy/PRODUCTION.md`, `scripts/economy.lua`."
     },
     {
       "id": "BL-045",
@@ -666,8 +660,8 @@
       "short_name": "FACTION_TO_COUNTRY_RENAME",
       "category": "Environment",
       "title": "Rename Faction → Country (doc- and code-wide)",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "designed",
+      "glyph": "✓",
       "priority": "C",
       "difficulty": 2,
       "parked": false,
@@ -679,7 +673,7 @@
       ],
       "authority_doc": "docs/GLOSSARY.md",
       "summary": "Rename the Faction-presence lens to Countries and propagate faction->country where it means nation. Caveat: faction_colour() is the CORPORATION colour, not the nation lens, so disentangle faction-as-nation from faction-as-corp-colour. Design owed: term boundary + sweep list.",
-      "design": "@BACKLOG.md"
+      "design": "Rename the **Faction presence** lens to **Countries**, and propagate a **doc-wide and code-wide rename** of *faction* → *country* where it refers to nations (the lens label, GLOSSARY term, LENSES/SELECTION wording). Caveat: `faction_colour()` is currently the **corporation** identity colour (player vs. rival), *not* the nation lens — so the rename must disentangle \"faction-as-nation\" from \"faction-as-corp-colour\".\n\n**Design settled (2026-06-16):** full disentanglement — **Country** for all territorial/nation entities (lens label, GLOSSARY term, LENSES/SELECTION wording, doc prose); `faction_colour()` is renamed to **`corp_colour()`** (or `identity_colour()`) because it refers to corporation identity (player vs. rival), not nations. The rename sweep must target \"faction-as-nation\" usages only; \"faction-as-corp-colour\" becomes `corp_colour`. Rename list (owed at promotion): GLOSSARY `Faction` entry, LENSES § Faction, all lens-label strings, `faction_colour()` in `src/ui/presentation.hpp` and call sites. Authority `docs/GLOSSARY.md`, `docs/ui/LENSES.md`, `src/ui/presentation.hpp`."
     },
     {
       "id": "BL-053",
@@ -741,6 +735,27 @@
       "authority_doc": "docs/ui/MENU.md",
       "summary": "Nav rail slots show an active (highlighted) state driven by show_* booleans in ui_state. When a ledger panel is closed via its X button, ImGui sets the bool false one frame later so the slot de-highlights correctly. However, if a second panel opens while a first is already open, neither closes the other — both slots show active simultaneously. Fix: when a nav slot is toggled ON, clear all other show_* panel booleans so at most one panel is active at a time (exclusive-open model), OR document that simultaneous panels are intended and the highlight is per-panel not per-slot.",
       "design": "Two sub-options:\n\nA) **Exclusive model (recommended for now):** In , when a slot is toggled ON, set all other  panel flags to false before setting the new one to true. This matches the expected accordion-style behaviour the user observed.\n\nB) **Permissive model:** Document that multiple panels can be open simultaneously and the nav slot simply reflects each panel's own open state. Requires no code change but may feel wrong to players.\n\nPrefer A. The ledger windows are floating and re-openable; the nav slot is the toggle, not a tab bar. Implementation: in the switch statement that handles each slot, before , add a  helper that clears all show_* flags, then set the target one based on the prior state (if it was open, close it; if closed, open it — genuine toggle)."
+    },
+    {
+      "id": "BL-056",
+      "short_name": "ECONOMY_BANKRUPTCY_TEST",
+      "category": "Trade",
+      "title": "Economy bankruptcy test — calibrate costs to a 10–20 year runway",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 3,
+      "parked": false,
+      "waits_on": [],
+      "blocked_on": [],
+      "written": "2026-06-16",
+      "files": [
+        "tools/verify/econ_bankruptcy.cpp",
+        "scripts/economy.lua"
+      ],
+      "authority_doc": "docs/economy/PRODUCTION.md",
+      "summary": "Headless harness that runs economy ticks from world-gen to bankruptcy (cash <= 0), records tick count per run, and outputs a per-building / per-resource data table. Goal: tune costs so the average player goes bankrupt in 10–20 in-game years without intervention — use the data to derive sensible build costs and running expenses.",
+      "design": "A `tools/verify/econ_bankruptcy.cpp` harness (same pattern as existing headless checks) that:\n\n1. Calls `make_hard_coded_world()` to get a reproducible starting state.\n2. Ticks `economy_system` until the player corporation cash <= 0 (or a ceiling tick, e.g. 500 years, to catch non-bankrupt runs).\n3. Records: total ticks to bankruptcy, in-game years elapsed, and for each building: cash burn per tick attributed to that building type, and for each resource: net flow (production minus consumption) per tick.\n4. Prints a structured report: summary row (years to bankruptcy), then per-building and per-resource rows.\n\nDesign owed: define bankruptcy precisely (cash <= 0? unable to pay maintenance for N consecutive ticks?); agree on the ceiling; decide whether to vary starting conditions (different body selections, building counts) or fix them. Once the harness runs, use the output table to set build costs and maintenance values such that an unmanaged player reaches bankruptcy in 10–20 years on average.\n\n**Design settled (2026-06-16):** Bankruptcy trigger: the corporation cannot cover its maintenance / running costs (interest) for a tick, AND balance is at or below **-5 × start_money** (deep-red threshold, not just any negative balance). Open design note: add a **debt-interest system** — when balance goes negative, charge interest each tick, making deep-red increasingly punishing; record as a follow-on item. Starting conditions: **fixed** (hard-coded world, same building set every run) for test reproducibility. Seeded variation (different building counts or random seeds) is recorded as a future extension but not part of the initial harness. Ceiling: a configurable tick ceiling (e.g. 500 in-game years) for non-bankrupt runs."
     }
   ]
 }

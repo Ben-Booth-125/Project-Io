@@ -9,29 +9,31 @@ The three artefacts:
 | Artefact | Role |
 |---|---|
 | [`backlog.json`](backlog.json) | **Canonical backlog — metadata index.** Every item's status, priority, difficulty, sequencing, file scope. Queryable; the source of truth for metadata. |
-| [`BACKLOG.md`](BACKLOG.md) | **Design bodies + legend.** The rich per-item design prose, keyed by id, plus the status/priority legend. Metadata mirrors `backlog.json` (JSON wins on conflict). |
+| [`BACKLOG.md`](BACKLOG.md) | **Legacy drain only.** Holds markdown bodies for items not yet migrated to `backlog.json`. Tombstoned on edit; deleted once empty. |
 | [`REFINED.md`](REFINED.md) | **Active worklist (transient).** A `designed` item is *promoted* here into file-scoped, dependency-marked tasks when we act on it. Cleared as tasks complete. |
 
 *(History: `backlog.json` + `BACKLOG.md` replace the former `OPENS.md`; `REFINED.md` replaces
 `TASKS.md`. The lifecycle verb "Publish" was renamed "Deliver" — "Cut" stays reserved for cutting a
 release, see `DEVELOPMENT_PRACTICES.md` § Cutting a release.)*
 
-### Where design prose lives — the markdown/JSON policy (2026-06-16)
+### Where design prose lives — the markdown/JSON policy (updated 2026-06-17)
 
-Item **metadata** always lives in `backlog.json`. Item **design prose** follows one rule:
+Item **metadata** always lives in `backlog.json`. Item **design prose** lives in `backlog.json`
+too — in the `design` field. `BACKLOG.md` is a drain-only legacy file.
 
-- **New items are JSON-native.** Author the design / detail / rationale in the item's `design`
-  field (a markdown-formatted string). A new item gets **no `BACKLOG.md` body**.
-- **Legacy items keep their markdown body.** The 54 items migrated from OPENS keep their prose in
-  `BACKLOG.md`, keyed by title; their `design` field is the sentinel `"@BACKLOG.md"`.
-- **On promotion, the markdown body is deleted.** When an item is promoted into `REFINED.md`, its
-  `BACKLOG.md` body is removed — a refined item must not have a markdown body. So `BACKLOG.md`
-  only ever **drains** (on promotion/landing), never grows, and is **deleted once empty**.
-- **Rich tables** (the rare item whose design needs them) set `design` to a pointer to the
-  authority doc rather than fight JSON-string formatting.
+- **New items:** author prose in the `design` field here. No `BACKLOG.md` body, ever.
+- **Legacy items** (`design: "@BACKLOG.md"`): prose is still in `BACKLOG.md`. **Migrate on first
+  edit** — when you settle the design or promote the item, move the prose to `design` here and
+  replace the `BACKLOG.md` body with a tombstone line (`*(BL-XXX prose promoted to backlog.json
+  YYYY-MM-DD.)*`). Do not wait for promotion; settle → migrate in the same session.
+- **On promotion into `REFINED.md`:** delete any remaining `BACKLOG.md` body if it was not yet
+  migrated. A refined item must have its prose in JSON and no markdown body.
+- `BACKLOG.md` only ever **drains** (migrate-on-edit or on promotion/landing), never grows, and
+  is **deleted once empty**.
+- **Rich tables** in the `design` string are fine — markdown renders in the field. Set `design`
+  to `"@<authority-doc>"` only when the prose genuinely lives in a separate doc.
 
-The effect is a self-converging single-source model: metadata in JSON, prose either in the JSON
-`design` field (new) or a draining set of `BACKLOG.md` bodies (legacy).
+The effect: a single-source model — all prose in JSON, `BACKLOG.md` converging to empty.
 
 ## The one idea
 
@@ -77,8 +79,9 @@ Status is orthogonal to **priority** (importance) and **difficulty** (size).
 
 **Design happens in the item, not mid-flight.** Pausing to settle a `design-owed` item beats
 redesigning during a Delivery (redesign in place is costly). **The backlog is the design authority
-while a design is open** — the settled design lives in the item's `BACKLOG.md` body, which is by
-definition more current than any authority doc on that subject. Authority **time-slices**: the
+while a design is open** — the settled design lives in the item's `design` field in
+`backlog.json` (or its `BACKLOG.md` body if not yet migrated), which is by definition more
+current than any authority doc on that subject. Authority **time-slices**: the
 backlog while the item is open; the subject's authority doc once the work lands and the item is
 removed. Propagating the design into its authority doc is **part of landing the work**.
 

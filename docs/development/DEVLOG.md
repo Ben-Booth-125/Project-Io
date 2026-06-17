@@ -6,6 +6,48 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — Design Q&A: owed items sweep (2026-06-16)
+
+**Goal.** Work through all design-owed (~) backlog items that could be settled via Q&A, without writing code. 15 items settled and flipped to `designed` (✓); 1 item (BL-053) updated with partial direction but kept owed; BL-050 open notes partly settled.
+
+**Items settled this session (flipped to `designed`):**
+
+- **BL-009 Production/Output lens** — intensity: log scale relative to market average (tiles above average read hot, below cool); idle/exhausted buildings: cold (zero, same as unbuilt terrain).
+- **BL-010 Placement-suitability surface** — trigger: tile selection only (not armed-build); colour: affine tiles coloured, invalid tiles dark overlay, valid-but-not-affine uncoloured; canvas state tied to `selected_tile`, not `overlay_mode`.
+- **BL-013 Lens strip ordering & rename** — strip order: Corp → Country → Resource → Market → Population → Opportunity → Production → Scarcity; single-select with null state; defaults to Corp at campaign start; price readout is menu-only (Market Ledger).
+- **BL-015 Market lens → boundary UI** — render: filled tint per catchment (distinct colour per market, like Corporation lens); price readout: Market Ledger only (open ledger, pick resource, see per-tile price overlay).
+- **BL-017 Replace Habitability with Population / Opportunity** — both as separate strip lenses; Opportunity metric: estimated net margin (best valid building's net output minus input costs, without regard to current build state or logistics).
+- **BL-018 Scarcity lens blur** — render: chunky per-market blocks (solid tint per catchment, not per-tile gradient); signal: supply shortfall (demand minus supply last tick), not price.
+- **BL-019 Resource-density lens** — render: flat fill over 8-connected contiguous deposit shape; no per-tile level gradient.
+- **BL-025 Multiple markets in ledger** — default: dashboard view (all markets on the body); selection-driven detail per market. Flagged as vital — must ship with multi-market seeding.
+- **BL-035 Economy warm-start readout** — surfaces in the Market Ledger dashboard as opening supply/demand health per resource; settle-tick count owed at promotion.
+- **BL-036 Seed multiple market centres** — seeded from population centres above a threshold density; implementation gated on population generation pass.
+- **BL-041 Habitability → workforce curve** — linear 0→0.6 = proportionally reduced fraction; at/above 0.6 = 100% max workforce; over-100% (tech-driven) deferred.
+- **BL-043 Building rules** — four constraint types active (terrain, body cap, per-tile slot cap, adjacency); full Era 0 placement table approved; all buildings uncapped except Launchpad (1 per body); Port coast-adjacency restriction settled; open note to revise after playtesting.
+- **BL-044 Construction pricing** — two-part cost (resource + budget); full Era 0 cost table approved (high tier across the board); open note to revise all costs via playtesting.
+- **BL-052 Rename Faction → Country** — full disentanglement: Country for all nation/territory usages; `faction_colour()` → `corp_colour()` (not a blanket replace).
+- **BL-056 Economy bankruptcy test** — bankruptcy = unable to cover maintenance (interest) at balance ≤ -5 × start_money; fixed starting conditions; ceiling tick configurable; open note for a debt-interest system when balance goes negative.
+
+**Items partially settled / updated but kept design-owed:**
+
+- **BL-050 Saturated substrate** — generation home settled (population sub-pass); displacement seam settled (vastly higher workforce cost to outbid substrate); dynamic growth model and slot/capacity model still open; UI clarity note opened (must visually distinguish substrate-occupied tiles).
+- **BL-053 Country generation** — direction: ~45 countries (Earth-like density); size distribution open (tune visually after generation); "generated in history" model still owed.
+
+**Items not covered (still design-owed):**
+
+- BL-012 (meta per-lens Solar/Circumplanetary sweep), BL-020 (tooltip simplification sweep) — no Q&A this session.
+- BL-011, BL-014, BL-016, BL-051, BL-054 — F priority, deferred.
+
+**In-session decisions:**
+- All buildings uncapped at body level except Launchpad (max 1) — cost is the primary constraint; arbitrary count limits rejected.
+- All building costs calibrated to "high" tier deliberately; playtest note to revise. This makes the prototype harder than easy by design.
+- BL-017: both Population and Opportunity are separate lenses (not a single hybrid slot).
+- BL-025: dashboard-first with selection-driven detail (not tabs or dropdown selector).
+- BL-018: per-market solid block render preferred over smooth gradients — honest to market structure.
+- Scarcity signal is supply shortfall (volume), not price ratio — price-independent scarcity read.
+
+---
+
 ## Session — v0.0.6 Batch Delivery (2026-06-16)
 
 **Goal.** Batch-deliver all designed (✓), unblocked backlog items for v0.0.6 using parallel sub-agents in worktrees. 20 items promoted and delivered across 6 waves; build green at every integration point.
