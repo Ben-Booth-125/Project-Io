@@ -58,6 +58,12 @@ struct economy_report
     std::map<entity_id, float> body_habitability;
 };
 
+/// Inject nation-substrate background supply and demand into body markets.
+/// Call once per economy tick, before clear_markets.
+///
+/// @param w World; market supply/demand arrays are mutated in place.
+void inject_substrate_demand(world& w);
+
 /// Run one economy step over every corporation's buildings: extraction credits
 /// the (corp, body) pool with its target resource and draws the same amount from
 /// the tile's finite `resource_remaining` reserve (tapering as it nears empty,

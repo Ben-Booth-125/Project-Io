@@ -127,8 +127,17 @@ struct tile_component
     /// lands without a data-model retrofit. Indexed by resource_type, as above.
     std::array<float, resource_count> resource_remaining = {};
 
-    float      hazard_level;  ///< 0.0 (safe) – 1.0 (extreme hazard).
-    float      habitability;  ///< 0.0 (uninhabitable) – 1.0 (hospitable).
+    float      hazard_level;     ///< 0.0 (safe) – 1.0 (extreme hazard).
+    float      habitability;     ///< 0.0 (uninhabitable) – 1.0 (hospitable).
+    float      substrate_density = 0.0f; ///< Background nation industrial occupation [0, 1].
+};
+
+/// Background nation-owned industrial aggregate for one (nation, body) pair.
+/// Injected into the body's markets each economy tick to give them liquidity.
+struct nation_substrate
+{
+    std::array<float, resource_count> background_supply = {};
+    std::array<float, resource_count> background_demand = {};
 };
 
 /// A celestial body — the primary unit of territorial control and the location
