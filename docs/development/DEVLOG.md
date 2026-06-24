@@ -6,6 +6,44 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — Accessibility UX review + backlog capture (2026-06-24)
+
+**Goal.** Evaluate the UI for disability accessibility using the blessed golden captures as the
+corpus, and capture the findings into the backlog. Design depth only (no `src/` changes, no build).
+
+**What was done.**
+- Reviewed a representative spread of the 56 `scripts/verify/golden/*.png` captures — chrome (nav
+  rail, header, time controls, lens strip), dense ledgers (balance, corp dashboard, building
+  management), and the colour-coded lenses (country, resource, corporation, supply).
+- **New item BL-063 — Accessibility & legibility baseline** (`design-owed`, B/3): the gap nothing
+  covered — a global UI-scale control (`FontGlobalScale` / font re-load in `src/ui/fonts.cpp`) and
+  a secondary-text contrast pass to clear WCAG AA on dim header/label/ledger text. Files:
+  `src/ui/fonts.cpp`, `src/core/app.cpp`, `src/ui/presentation.hpp`. Proposed authority doc
+  `docs/ui/ACCESSIBILITY.md`.
+- **Reframed three existing items as one "accessibility strand":** BL-016 = colour-vision half
+  (colourblind-safe palette **+ redundant non-colour channel**, since lenses encode meaning in hue
+  alone — Resource lens red-on-green deposit pips, Country lens green/yellow/red fills); BL-020 =
+  cognitive half ("why not what" tooltips reduce colour-lens interpretive load); BL-062 = motor half
+  (keyboard-complete, rebindable operation is the top motor-access win).
+- Migrated BL-016 and BL-020 legacy prose from `BACKLOG.md` into `backlog.json`'s `design` field
+  (tombstoned the markdown bodies) per the migrate-on-edit policy.
+
+**Key decisions.**
+- **Scoped the new item to the *non-colour* half deliberately** — UI scale + contrast only. Colour
+  belongs to BL-016, motor to BL-062. Avoids one sprawling "accessibility" mega-item; the three
+  existing items already carve the space.
+- **Left priorities as-is, flagged the tension.** The accessibility framing raises the value of
+  BL-016 (currently parked F) and BL-062 (C); re-prioritising the board is the developer's call, so
+  the items note it rather than silently re-rating.
+
+**Open items.**
+- BL-063, BL-016, BL-020, BL-062 all remain `design-owed` — their open questions stand. Honest: this
+  session reframed and captured, it did not settle any design.
+- Whether a dedicated `docs/ui/ACCESSIBILITY.md` is warranted (vs folding into LAYOUT.md) is itself
+  an open question on BL-063.
+- A measured contrast audit of `presentation.hpp` + the dark theme is owed before BL-063 can flip to
+  `designed`.
+
 ## Session — v0.0.6 Improved Core-Loop Batch Delivery (2026-06-17)
 
 **Goal.** Deliver all six v0.0.6 backlog items as a Batch Delivery: BL-050 (saturated

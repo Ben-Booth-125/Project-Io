@@ -98,12 +98,7 @@ categories: § Ledger (multiple-markets visibility), § Trade (warm-start pass),
 
 *(BL-015 prose promoted to backlog.json 2026-06-17.)*
 
-- **[F3 ~] Lens colour-scheme pass (deferred to a colour session).** *(Written 2026-06-16, v0.0.6
-  brief intake.)* A board-wide reconsideration of lens colours — some too harsh, some too soft.
-  **Deferred to a dedicated colour-scheme design session.** Also in scope: **on-canvas text labels**
-  naming items for some lenses (country/market), and a **legend for the Corporation lens**.
-  **Design owed:** the whole pass. Authority `docs/ui/LENSES.md`; identity colours in
-  `src/ui/presentation.hpp`.
+*(BL-016 prose promoted to backlog.json 2026-06-24.)*
 
 *(BL-017 prose promoted to backlog.json 2026-06-17.)*
 
@@ -111,13 +106,7 @@ categories: § Ledger (multiple-markets visibility), § Trade (warm-start pass),
 
 *(BL-019 prose promoted to backlog.json 2026-06-17.)*
 
-- **[C4 ~] Tooltip simplification — lens-specific, "why" not "what".** *(Written 2026-06-16, v0.0.6
-  brief intake.)* Tooltips give too much data. Reframe them: **less information, lens-specific**, and
-  aimed at **explaining *why* a system behaves as it does** — not at gathering data for quick
-  decisions (that is the ledgers' job). **Defer nested tooltips.** Flagged by the user as a **large,
-  multi-round, detailed Brief touching every visible entity** — a sweep, not a single edit. Couples to
-  the hover-card primitive ([B3 ✓] above) and `docs/ui/TOOLTIP.md`. **Design owed:** the per-entity,
-  per-lens content sweep. Authority `docs/ui/TOOLTIP.md`.
+*(BL-020 prose promoted to backlog.json 2026-06-24.)*
 
 ## Menu
 
