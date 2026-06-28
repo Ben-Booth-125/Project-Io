@@ -332,23 +332,7 @@ inter-body-market note. Design authority `docs/SYSTEMS.md` § Supply, `docs/ui/L
 The resource economy's data and quality work — the substrate Layer 4 sits on. Design
 authority: `docs/economy/RESOURCES.md`, `docs/economy/PRODUCTION.md`.
 
-- **[B3 ✓] Resource generation — full-set deposit authoring + scarcity (direction settled; v0.2).**
-  Generation today authors deposits for the seven-resource prototype subset; extend it to the full
-  raw-material set with a plausible distribution and scarcity profile. **Design direction settled
-  (2026-06-15), scheduled to the v0.2 solar-generation roadmap** (with the tile-generation
-  refinement passes, § Environment): a **seeded per-resource rarity scalar** — a decimal in
-  `[0, 1]` (0 = trace/absent, 1 = near-universal ambient), **raw-tier resources only** (refined and
-  product goods are made, not mined, so carry no deposits). The scalar **modulates deposit
-  frequency and magnitude** on top of the existing terrain affinity, so a low scalar keeps a good
-  sparse even on affine terrain and a high one approaches the every-tile ambient floor; it is
-  **seeded** so a campaign's exact distribution varies while the rarity *ordering* (consistent with
-  each good's `RESOURCES.md` base-price rarity) stays stable. This is the *resource-economy* target;
-  the generation *mechanics* that consume the scalar are the tile-generation Brief (§ Environment),
-  the same v0.2 pass. Settled into `docs/economy/RESOURCES.md` § Deposit rarity & scarcity and
-  `docs/generation/TILE_GENERATION.md` § Deferred. Touches the deposit pass in
-  `src/world/tile_generation.cpp` (data-only — the deposit arrays already carry full enum width).
-  `src/`-changing → brief-spanning requirement (a `headless` deposit-distribution audit) at
-  promotion.
+*(BL-040 completed 2026-06-28 — full raw-set deposit authoring landed in `tile_generation.cpp`; design propagated to `docs/economy/RESOURCES.md` § Deposit rarity & scarcity and `docs/generation/TILE_GENERATION.md`. See backlog.json BL-040.)*
 
 ## Workforce
 

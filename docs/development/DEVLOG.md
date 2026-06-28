@@ -6,6 +6,60 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — BL-057 + BL-040 Batch Delivery (2026-06-28)
+
+**Goal.** Deliver the top two implementation-ready backlog items: BL-057 (cross-platform
+build) and BL-040 (full-set resource generation). Run from a native Linux remote
+environment with cmake 3.28 + g++ 13 — the first time the project has been compiled on
+Linux, which the work depended on.
+
+**Status: code complete, headless suite green (7/7). BL-040 complete; BL-057 partial
+(GUI/CI sign-off owed off-sandbox).**
+
+**BL-040 — full raw-set deposit authoring (complete).**
+- `build_rarity_profile(seed)` in `tile_generation.cpp` builds a per-body, seeded
+  per-resource rarity scalar [0,1], raw-tier only. The v0.0.4 seven-resource subset is
+  pinned at 1.0 so its hand-calibrated authoring is left untouched; the six additions
+  (silica, coal, iron-nickel ore, copper ore, rare-earth ore, PGM) carry fixed
+  base rarities ordered by base price + small seeded jitter.
+- A `put_rare` block authors the additions per terrain affinity (RESOURCES.md Tier 1),
+  the scalar gating presence (frequency) and scaling magnitude.
+- **Determinism decision.** The additions draw from an *independent* per-tile rng stream
+  (`rare_rng`), never the shared `tile_rng`. Adding draws to `tile_rng` would shift every
+  downstream draw and `derive_environment`, silently changing the calibrated economy. With
+  the separate stream, `econ_harness`/`econ_stability` are bit-identical.
+- `world_audit` gained the BL-040 distribution audit (R1: all six additions authored
+  somewhere; R2: PGM strictly rarer than copper). Observed: silica 7431, copper 5979, coal
+  3776, rare-earth 3767, iron-nickel 116, PGM 57 tiles — metallic pair scarce because
+  metallic terrain only exists on the Pallas asteroid (correct for Era 0).
+- Design propagated to RESOURCES.md and TILE_GENERATION.md; legacy BACKLOG.md body
+  tombstoned. Brought forward from its v0.2 schedule at user request.
+
+**BL-057 — cross-platform build (partial; the real blocker fixed).**
+- **The genuinely new finding:** the prior design's claim that "the source is already
+  Linux-clean" was wrong. Three `nation_component` fields were named identically to their
+  enum types (`ideology ideology`, `expansionism expansionism`, `economic_focus
+  economic_focus`) — ill-formed per `[basic.scope.class]`, rejected by GCC
+  (`-Wchanges-meaning`) though MSVC accepts it. Never caught because the code had never
+  built on Linux. Renamed to `politics`/`posture`/`focus` (matching the tile_component
+  convention) across the 8 reference sites; serialization layout unaffected (no reorder/retype).
+- Fixed a stale headless harness: `construction_harness` R4 asserted `insufficient_funds`
+  but BL-043's Port-coastal rule makes a non-coastal Port return `invalid_tile` first. R4
+  now uses a fresh valid tile + processing_facility so it tests the funds path it intends.
+- **Result:** all seven `tools/verify/*.cpp` harnesses build and pass under g++ — the CI
+  guard's headless tier is verified locally for the first time.
+- Refreshed `build.yml`'s stale "unverified" note; documented the Linux/headless build
+  recipe + the enum-naming gotcha in TECH_FOUNDATIONS.md (font fix was already present).
+- **Owed (cannot be done from this sandbox — GitHub clones for FetchContent are
+  403-blocked by egress policy):** the full GUI/CMake app build on Linux, visual-verify of
+  the bundled font on a real window, and the first GitHub Actions run of `build.yml`. These
+  land on the Linux dev box / in CI. BL-057 left `designed`, progress recorded in its item.
+
+**Env note.** This is a native Linux git clone, not the Cowork Windows-bridge shell, so the
+BL-058 git-write restriction does not apply; `.gitattributes` keeps line endings clean.
+
+---
+
 ## Session — v0.0.6 Improved Core-Loop Batch Delivery (2026-06-17)
 
 **Goal.** Deliver all six v0.0.6 backlog items as a Batch Delivery: BL-050 (saturated

@@ -280,10 +280,10 @@ extractable resource.
 | Clay | Wetland, any valley landform | 8–20 |
 | Peat | Tundra (plains/valley landform) | 5–15 |
 
-**Prototype deposit table** — only the seven-resource prototype subset is authored
-with non-zero primary deposits. All other resource enum slots are defined but
-receive zero. No generation code changes are needed when remaining resources are
-authored; the deposit arrays already carry the full enum width.
+**Calibrated subset deposit table** — the original seven-resource subset, authored
+on the per-tile `tile_rng` stream. These values are hand-calibrated and the economy
+is tuned on them; the full-set pass (BL-040, below) leaves them bit-for-bit
+unchanged.
 
 | Composition | Resource | Base range | Mountain mod | Rift mod | Valley mod |
 |---|---|---|---|---|---|
@@ -300,6 +300,25 @@ authored; the deposit arrays already carry the full enum width.
 | Regolith | (ambient only) | — | — | — | — |
 
 Modifiers apply multiplicatively to the upper bound of the base range.
+
+**Full raw-set additions (BL-040)** — the remaining Tier 1 raw resources, authored
+on an **independent per-tile rng stream** (`rare_rng`) so they cannot perturb the
+calibrated subset above or the derived environment. Each is gated by its seeded
+rarity scalar (§ deposit rarity in [RESOURCES.md](../economy/RESOURCES.md)): the
+scalar both gates presence (frequency) and scales the rolled magnitude, so rare
+goods are sparse *and* small. Base ranges below are pre-scalar.
+
+| Composition | Resource | Base range (pre-scalar) |
+|---|---|---|
+| Barren | Coal | 30–140 |
+| Barren | Silica | 20–90 |
+| Rocky | Silica | 20–100 |
+| Rocky | Copper ore | 30–160 |
+| Rocky | Rare earth ore | 10–70 |
+| Volcanic | Copper ore | 30–180 |
+| Volcanic | Rare earth ore | 20–100 |
+| Metallic | Iron-nickel ore | 60–260 |
+| Metallic | Platinum group metals | 20–120 |
 
 ---
 
@@ -325,9 +344,10 @@ weighted random sampling. A tectonic simulation pass would derive plate boundari
 as the structural input, concentrating volcanic activity and mountain chains along
 boundary zones and producing more geographically coherent features.
 
-**Full deposit authoring.** Copper ore, rare earth ore, silica, coal, and the
-remaining Tier 1 resources receive zero deposits in the prototype. Authoring their
-deposit ranges is a data pass that requires no generation architecture changes.
+**Full deposit authoring.** *Done (BL-040).* Copper ore, rare earth ore, silica,
+coal, iron-nickel ore, and platinum-group metals are now authored via the seeded
+rarity-scalar pass — see the full raw-set additions table above and
+[RESOURCES.md](../economy/RESOURCES.md) § Deposit rarity & scarcity.
 
 **Coastline refinement.** The noise-thresholded ocean produces plausible
 coastlines, but lacks features like enclosed seas, archipelagos, or large lakes.

@@ -532,8 +532,52 @@ float roll_mod(std::mt19937& rng, float lo, float hi, float upper_mod)
     return roll(rng, lo, hi * upper_mod);
 }
 
+// BL-040 — per-resource rarity scalar [0, 1], raw-tier resources only (refined and
+// product goods are made, not mined). Seeded so a campaign's exact distribution
+// varies, but each resource's BASE rarity is fixed and ordered to match its
+// RESOURCES.md base-price rarity, so rare goods stay rare across seeds.
+//
+// The v0.0.4 seven-resource subset is pinned at 1.0 — the "near-universal ambient
+// floor" end of the scale the design describes — so its hand-calibrated authoring
+// (and the economy tuned on it) is left bit-for-bit unchanged. The scalar's
+// behavioural modulation (frequency gate + magnitude scale) is realised on the
+// resources this pass adds to complete the full raw set.
+// See docs/economy/RESOURCES.md § Deposit rarity & scarcity.
+std::array<float, resource_count> build_rarity_profile(uint32_t seed)
+{
+    using r = resource_type;
+    std::array<float, resource_count> rarity{}; // 0 for non-raw / unauthored slots
+    auto set = [&](resource_type res, float v) { rarity[static_cast<std::size_t>(res)] = v; };
+
+    // Subset commons — pinned at the floor; authoring below is unchanged (×1.0).
+    set(r::iron_ore, 1.0f); set(r::petroleum, 1.0f); set(r::water, 1.0f);
+    set(r::agricultural_produce, 1.0f); set(r::regolith, 1.0f);
+    set(r::stone, 1.0f); set(r::timber, 1.0f); set(r::sand, 1.0f);
+    set(r::clay, 1.0f); set(r::peat, 1.0f);
+
+    // Full-set additions — fixed base rarity, ordered by base-price rarity, plus a
+    // small seeded jitter that varies the campaign without disturbing the ordering.
+    struct base_rarity { resource_type res; float val; };
+    static constexpr base_rarity bases[] = {
+        { r::silica,                0.65f },
+        { r::coal,                  0.60f },
+        { r::iron_nickel_ore,       0.55f },
+        { r::copper_ore,            0.50f },
+        { r::rare_earth_ore,        0.30f },
+        { r::platinum_group_metals, 0.15f }, // ultra-rare belt good
+    };
+    std::mt19937 rng(seed);
+    std::uniform_real_distribution<float> jitter(-0.06f, 0.06f);
+    for (const base_rarity& b : bases)
+        set(b.res, std::clamp(b.val + jitter(rng), 0.05f, 1.0f));
+
+    return rarity;
+}
+
 void generate_deposits(terrain_composition comp, terrain_landform lf,
-                       std::array<float, resource_count>& dep, std::mt19937& rng)
+                       std::array<float, resource_count>& dep, std::mt19937& rng,
+                       std::mt19937& rare_rng,
+                       const std::array<float, resource_count>& rarity)
 {
     using tc = terrain_composition;
     using r  = resource_type;
@@ -595,6 +639,44 @@ void generate_deposits(terrain_composition comp, terrain_landform lf,
             put(r::regolith, roll(rng, 20.0f, 50.0f));
             break;
         case tc::ocean:
+            break;
+    }
+
+    // --- full raw-set deposits (BL-040) ---
+    // The raw resources beyond the v0.0.4 subset, authored here so the map carries
+    // the complete Tier-1 set. Drawn from an INDEPENDENT rng stream (rare_rng) so
+    // the calibrated block above — and derive_environment's draws, which share the
+    // tile rng — stay bit-for-bit unchanged. Each resource's seeded rarity scalar
+    // gates presence (frequency) and scales magnitude on top of terrain affinity;
+    // affinities follow docs/economy/RESOURCES.md Tier 1.
+    std::uniform_real_distribution<float> gate(0.0f, 1.0f);
+    auto put_rare = [&](resource_type res, float lo, float hi)
+    {
+        const float s = rarity[static_cast<std::size_t>(res)];
+        if (gate(rare_rng) >= s) return;            // frequency: sparse when rare
+        put(res, roll(rare_rng, lo, hi) * s);       // magnitude: small when rare
+    };
+
+    switch (comp)
+    {
+        case tc::barren:
+            put_rare(r::coal,   30.0f, 140.0f);     // sedimentary carbon
+            put_rare(r::silica, 20.0f,  90.0f);
+            break;
+        case tc::rocky:
+            put_rare(r::silica,         20.0f, 100.0f);
+            put_rare(r::copper_ore,     30.0f, 160.0f);
+            put_rare(r::rare_earth_ore, 10.0f,  70.0f);
+            break;
+        case tc::volcanic:
+            put_rare(r::copper_ore,     30.0f, 180.0f);
+            put_rare(r::rare_earth_ore, 20.0f, 100.0f);
+            break;
+        case tc::metallic:
+            put_rare(r::iron_nickel_ore,       60.0f, 260.0f);
+            put_rare(r::platinum_group_metals, 20.0f, 120.0f);
+            break;
+        default:
             break;
     }
 }
@@ -813,6 +895,10 @@ std::vector<entity_id> generate_body_tiles(
         }
 
     // --- Pass 6: deposits, derived environment, entity creation ---
+    // Per-body rarity field (BL-040): one seeded draw, stable across the body's
+    // tiles, so each campaign varies while the rare-stays-rare ordering holds.
+    const std::array<float, resource_count> rarity = build_rarity_profile(seed ^ 0x68E31DA4u);
+
     std::vector<entity_id> tile_ids(total, null_entity);
     for (int row = 0; row < gh; ++row)
     {
@@ -823,10 +909,13 @@ std::vector<entity_id> generate_body_tiles(
             // Per-tile RNG keyed on body seed + tile index: deposits are stable
             // across runs and independent of neighbouring tiles.
             std::mt19937 tile_rng(seed_deposit ^ (static_cast<uint32_t>(idx) * 2654435761u));
+            // Independent stream for the full raw-set additions, so they cannot
+            // perturb the calibrated subset draws or derive_environment (BL-040).
+            std::mt19937 rare_rng(seed_deposit ^ (static_cast<uint32_t>(idx) * 40503u) ^ 0x5BD1E995u);
 
             std::array<float, resource_count> deposits{};
             if (!is_ocean[idx])
-                generate_deposits(comp[idx], land[idx], deposits, tile_rng);
+                generate_deposits(comp[idx], land[idx], deposits, tile_rng, rare_rng, rarity);
 
             // Seed the finite extraction reserve from richness. Richness stays the
             // rate multiplier; the reserve is what depletion (economy_system.cpp)
