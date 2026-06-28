@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(ProjectIo LANGUAGES CXX)
+project(ProjectIo LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,10 +11,11 @@ include(FetchContent)
 # ---------------------------------------------------------------------------
 FetchContent_Declare(
     SDL3
-    GIT_REPOSITORY https://github.com/libsdl-org/SDL.git
-    GIT_TAG        release-3.2.0
-    GIT_SHALLOW    TRUE
+    URL https://codeload.github.com/libsdl-org/SDL/tar.gz/refs/tags/release-3.2.0
 )
+set(SDL_TEST OFF CACHE BOOL "" FORCE)
+set(SDL_TESTS OFF CACHE BOOL "" FORCE)
+set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(SDL3)
 
 # ---------------------------------------------------------------------------
@@ -22,9 +23,7 @@ FetchContent_MakeAvailable(SDL3)
 # ---------------------------------------------------------------------------
 FetchContent_Declare(
     lua_src
-    GIT_REPOSITORY https://github.com/lua/lua.git
-    GIT_TAG        v5.4.7
-    GIT_SHALLOW    TRUE
+    URL https://codeload.github.com/lua/lua/tar.gz/refs/tags/v5.4.7
 )
 FetchContent_GetProperties(lua_src)
 if(NOT lua_src_POPULATED)
@@ -45,9 +44,7 @@ endif()
 # ---------------------------------------------------------------------------
 FetchContent_Declare(
     sol2_src
-    GIT_REPOSITORY https://github.com/ThePhD/sol2.git
-    GIT_TAG        v3.3.0
-    GIT_SHALLOW    TRUE
+    URL https://codeload.github.com/ThePhD/sol2/tar.gz/refs/tags/v3.3.0
 )
 FetchContent_GetProperties(sol2_src)
 if(NOT sol2_src_POPULATED)
@@ -59,9 +56,7 @@ endif()
 # ---------------------------------------------------------------------------
 FetchContent_Declare(
     imgui_src
-    GIT_REPOSITORY https://github.com/ocornut/imgui.git
-    GIT_TAG        v1.91.6
-    GIT_SHALLOW    TRUE
+    URL https://codeload.github.com/ocornut/imgui/tar.gz/refs/tags/v1.91.6
 )
 FetchContent_GetProperties(imgui_src)
 if(NOT imgui_src_POPULATED)
