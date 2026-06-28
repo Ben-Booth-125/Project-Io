@@ -85,10 +85,17 @@ int main()
     check(near(w.corporations[corp].balance, 0.0f),
           "C.R3 processing cost debited (150-150)", w.corporations[corp].balance, 0.0f);
 
-    // R4: now broke — a further build is refused for insufficient funds, no mutation.
+    // R4: now broke — a further build on a VALID tile is refused for insufficient
+    // funds, with no mutation. Uses a fresh valid tile + processing_facility (Any
+    // terrain) so the refusal is genuinely the funds check, not terrain: a Port
+    // requires a coastal tile (BL-043), and this synthetic world has no adjacency,
+    // so a Port would short-circuit to invalid_tile and mask the funds path.
+    const entity_id land2 = w.create_entity();
+    { tile_component tc{}; tc.body = body; tc.composition = terrain_composition::rocky;
+      tc.resource_deposit[ri(resource_type::iron_ore)] = 2.0f; w.tiles[land2] = tc; }
     const std::size_t n_before = w.corporations[corp].assets.size();
     entity_id none_built = null_entity;
-    auto r_broke = construct_building(w, reg, corp, land, building_type::port,
+    auto r_broke = construct_building(w, reg, corp, land2, building_type::processing_facility,
                                       resource_type::iron_ore, none_built);
     check(r_broke == construction_result::insufficient_funds &&
           none_built == null_entity &&

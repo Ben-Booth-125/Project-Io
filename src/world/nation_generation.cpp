@@ -430,15 +430,15 @@ void assign_political_character(nation_component& nc, std::mt19937& rng)
 {
     {
         std::uniform_int_distribution<int> d(0, 3);
-        nc.ideology = static_cast<::ideology>(d(rng));
+        nc.politics = static_cast<::ideology>(d(rng));
     }
     {
         std::uniform_int_distribution<int> d(0, 2);
-        nc.expansionism = static_cast<::expansionism>(d(rng));
+        nc.posture = static_cast<::expansionism>(d(rng));
     }
     {
         std::uniform_int_distribution<int> d(0, 2);
-        nc.economic_focus = static_cast<::economic_focus>(d(rng));
+        nc.focus = static_cast<::economic_focus>(d(rng));
     }
 }
 

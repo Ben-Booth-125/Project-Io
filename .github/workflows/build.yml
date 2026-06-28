@@ -8,9 +8,12 @@
 # deferred spike in BL-057. Dependencies are fetched by CMake FetchContent and
 # cached on the CMakeLists hash to keep runs cheap.
 #
-# NOTE: authored in the Cowork sandbox, which cannot run a build, so this YAML is
-# unverified — expect the first run to need a tweak (most likely the apt dep set
-# for SDL3 or the headless source list). Iterate from the first Actions log.
+# NOTE: the headless-harness job (the Linux build's second step) has been verified
+# locally on a native Linux toolchain (g++ 13, the exact recipe below) — all seven
+# tools/verify/*.cpp harnesses build and pass. The full-app build steps (CMake
+# FetchContent → SDL3/Lua/sol2/ImGui) still run for the first time in CI, since the
+# dev sandbox's egress policy blocks the GitHub clones FetchContent needs; expect
+# the first Actions run to possibly need an apt-dep tweak for the SDL3 build.
 
 name: build
 

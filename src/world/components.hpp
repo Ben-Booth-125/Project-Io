@@ -415,11 +415,15 @@ struct nation_component
     std::array<float, resource_count> resource_abundance{};
 
     /// Political orientation; drawn from seeded RNG in Pass 4.
-    ideology       ideology       = ::ideology::mercantile;
+    /// Named `politics` (not `ideology`) so the field does not shadow its enum
+    /// type — a field whose name matches its type is ill-formed under GCC
+    /// (-Wchanges-meaning) and breaks the Linux build. Mirrors the
+    /// tile_component convention (terrain_composition composition).
+    ideology       politics = ::ideology::mercantile;
 
     /// Military / territorial posture; drawn from seeded RNG in Pass 4.
-    expansionism   expansionism   = ::expansionism::passive;
+    expansionism   posture  = ::expansionism::passive;
 
     /// Dominant economic activity; drawn from seeded RNG in Pass 4.
-    economic_focus economic_focus = ::economic_focus::extraction;
+    economic_focus focus    = ::economic_focus::extraction;
 };
