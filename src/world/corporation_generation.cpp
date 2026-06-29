@@ -41,7 +41,7 @@ float nation_weight(const nation_component& nc,
     // extraction are slightly preferred because they attract the most distinct
     // corporate archetypes.
     float base = 1.0f;
-    switch (nc.economic_focus)
+    switch (nc.focus)
     {
         case economic_focus::extraction:  base = 1.3f; break;
         case economic_focus::processing:  base = 1.0f; break;
@@ -683,7 +683,7 @@ std::vector<entity_id> generate_corporations(
 
         const auto it = w.nations.find(home_nid);
         const economic_focus nation_ef = (it != w.nations.end())
-            ? it->second.economic_focus
+            ? it->second.focus
             : economic_focus::extraction;
 
         const industrial_focus focus = pick_focus(nation_ef, focus_counts, focus_rng);

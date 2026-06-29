@@ -220,6 +220,60 @@ int main()
     std::printf("  B4 R1 every corp holding count within its focus ceiling (>=1): %s\n",
                 holdings_bad == 0 ? "PASS" : "FAIL");
 
+    // --- BL-040: full raw-set deposit-distribution audit ---
+    // Every raw resource the full-set pass adds must now be authored somewhere in
+    // the world, and the seeded rarity ordering must hold: the ultra-rare
+    // platinum-group metals must sit on strictly fewer tiles than common copper.
+    struct raw_res { resource_type res; const char* name; };
+    const raw_res added[] = {
+        { resource_type::coal,                  "coal" },
+        { resource_type::silica,                "silica" },
+        { resource_type::copper_ore,            "copper_ore" },
+        { resource_type::rare_earth_ore,        "rare_earth_ore" },
+        { resource_type::iron_nickel_ore,       "iron_nickel_ore" },
+        { resource_type::platinum_group_metals, "platinum_group_metals" },
+    };
+    std::map<int, int> tile_count; // resource index -> tiles bearing it
+    for (const auto& [tid, tc] : w.tiles)
+        for (const raw_res& a : added)
+            if (tc.resource_deposit[ri(a.res)] > 0.0f)
+                ++tile_count[static_cast<int>(a.res)];
+
+    int absent = 0;
+    for (const raw_res& a : added)
+    {
+        const int n = tile_count[static_cast<int>(a.res)];
+        std::printf("  %-22s deposits on %d tiles\n", a.name, n);
+        if (n == 0) { ++absent; std::printf("  BAD: %s authored on no tile\n", a.name); }
+    }
+    const int pgm    = tile_count[static_cast<int>(resource_type::platinum_group_metals)];
+    const int copper = tile_count[static_cast<int>(resource_type::copper_ore)];
+    const bool ordering_ok = pgm < copper;
+    std::printf("  BL-040 R1 full raw set authored (all 6 additions present): %s\n",
+                absent == 0 ? "PASS" : "FAIL");
+    std::printf("  BL-040 R2 rarity ordering (PGM %d < copper %d): %s\n",
+                pgm, copper, ordering_ok ? "PASS" : "FAIL");
+
+    // --- BL-053: country count + size-variance audit ---
+    // Only Kepler generates nations, so w.nations is the Kepler political layer.
+    const int nation_n = static_cast<int>(w.nations.size());
+    int min_tiles = -1, max_tiles = 0;
+    for (const auto& [nid, nat] : w.nations)
+    {
+        const int t = static_cast<int>(nat.tiles.size());
+        if (min_tiles < 0 || t < min_tiles) min_tiles = t;
+        if (t > max_tiles) max_tiles = t;
+    }
+    if (min_tiles < 0) min_tiles = 0;
+    const bool count_ok    = nation_n >= 12 && nation_n <= 16;
+    const bool variance_ok = min_tiles > 0 && max_tiles >= 3 * min_tiles;
+    std::printf("Nations: %d (min tiles %d, max tiles %d)\n", nation_n, min_tiles, max_tiles);
+    std::printf("  BL-053 R1 nation count in [12,16]: %s\n", count_ok ? "PASS" : "FAIL");
+    std::printf("  BL-053 R2 strong size variance (max >= 3x min): %s\n",
+                variance_ok ? "PASS" : "FAIL");
+
     return (fw_frac >= 3.0f && bad == 0 && seed_bad == 0 && seam_bad == 0
-            && unclaimed_land == 0 && holdings_bad == 0) ? 0 : 1;
+            && unclaimed_land == 0 && holdings_bad == 0
+            && absent == 0 && ordering_ok
+            && count_ok && variance_ok) ? 0 : 1;
 }

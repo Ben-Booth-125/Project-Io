@@ -74,6 +74,42 @@ Tile data is **not Lua-scriptable at the per-tile level**. The scripting boundar
 
 SQLite is the natural next step if the world grows to the point where bodies cannot all be held in memory, or where querying across tile properties becomes necessary. That decision is deferred deliberately — the data structures must not preclude it, but nothing is built for it now.
 
+### Building (Linux + Windows)
+
+The project is **cross-platform** (BL-057): Linux is the primary development OS and
+Windows is the playtest OS. All dependencies (SDL3, Lua 5.4, sol2, Dear ImGui) are
+acquired by CMake `FetchContent` — there are no system-package or vcpkg
+assumptions — so a configure + build is self-contained on either OS.
+
+**Full app (either OS):**
+
+```
+cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+```
+
+On Linux this needs the SDL3 system build deps (X11/Wayland + GL/EGL + audio dev
+headers); the exact apt set is the `linux` job in `.github/workflows/build.yml`.
+
+**Headless verification tier** (the `tools/verify/*.cpp` harnesses over `world/*`,
+deliberately SDL/Lua/ImGui-free) builds with nothing but a C++20 compiler — no
+external deps, no display — which is why it runs in any sandbox and is the standing
+CI guard. Link each harness against every `src/world/*.cpp` except
+`recipe_registry.cpp` (the one TU that pulls sol2/Lua):
+
+```
+WORLD=$(ls src/world/*.cpp | grep -v recipe_registry.cpp)
+g++ -std=c++20 -O2 -I src tools/verify/<name>.cpp $WORLD -o <name> && ./<name>
+```
+
+**Source portability note.** GCC rejects a struct field whose name matches its own
+type (`-Wchanges-meaning`, ill-formed per `[basic.scope.class]`) where MSVC accepts
+it. Keep enum-typed fields named for their *role*, not their type
+(`terrain_composition composition`, not `ideology ideology`) — see
+`src/world/components.hpp`. The portable font path is bundled under `assets/fonts/`
+and resolved cwd-relative first (`src/ui/fonts.cpp`), so on-screen text and visual
+goldens render identically across machines.
+
 ---
 
 ## UI
@@ -118,3 +154,4 @@ This means ImGui panel code should be written clearly, not cleverly. It is refer
 | UI (prototype) | Dear ImGui |
 | UI (production) | Lua-driven retained layer — deferred to UI document |
 | Serialisation | Flat binary; SQLite deferred until world scale requires it |
+| Build | CMake + FetchContent (self-contained), Linux + Windows; headless tier needs only a C++20 compiler |

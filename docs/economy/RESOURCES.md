@@ -28,11 +28,10 @@ Price volatility and trade margins increase with tier. Raw materials are abundan
 
 Ambient and habitability resources exist at the edges of the market. They are worth producing and trading, but rarely the primary profit driver. Their value is to ensure every tile is economically meaningful in some way and that population welfare has a supply chain behind it.
 
-### Deposit rarity & scarcity (design direction — v0.2 solar generation)
+### Deposit rarity & scarcity (implemented — BL-040)
 
-Extending deposit authoring from the seven-resource prototype subset to the full 23-resource set
-is driven by a **per-resource rarity scalar** — a **seeded decimal in `[0, 1]`** (0 = effectively
-absent / trace, 1 = near-universal ambient). Settled rules:
+Deposit authoring covers the full raw-material set, driven by a **per-resource rarity scalar** — a
+**seeded decimal in `[0, 1]`** (0 = effectively absent / trace, 1 = near-universal ambient). Rules:
 
 - **Raw-tier (Tier 1) resources only carry a rarity scalar.** Refined and product resources are
   *made, not mined* — they receive no tile deposits, so scarcity does not apply to them.
@@ -43,9 +42,17 @@ absent / trace, 1 = near-universal ambient). Settled rules:
   (rare goods rare, ambient goods abundant) is stable, matching each resource's base-price
   rarity already noted in the Tier 1 tables.
 
-This is the *resource-economy target*; the *generation mechanics* that consume the scalar live in
-[TILE_GENERATION.md](../generation/TILE_GENERATION.md) § Deferred (Full deposit authoring), the
-same v0.2 pass.
+**Implementation (`src/world/tile_generation.cpp`).** `build_rarity_profile()` builds the per-body
+scalar field: the v0.0.4 seven-resource subset is pinned at `1.0` (the ambient-floor end — its
+hand-calibrated authoring and the economy tuned on it are left bit-for-bit unchanged), and the
+full-set additions (silica, coal, iron-nickel ore, copper ore, rare-earth ore, platinum-group
+metals) carry fixed base rarities ordered by base price plus a small seeded jitter that varies the
+campaign without disturbing the ordering. The additions are drawn on an **independent rng stream**
+so they cannot perturb the calibrated subset or the derived environment — preserving determinism.
+The distribution is guarded by the `world_audit` headless harness (BL-040 R1: all additions
+authored; R2: PGM strictly rarer than copper). Metallic-only goods (iron-nickel, PGM) appear only
+where metallic terrain exists — in Era 0 that is the asteroid belt, so they read as scarce until
+space access opens.
 
 ---
 

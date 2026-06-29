@@ -6,6 +6,118 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — Deliver BL-053 country generation (2026-06-29)
+
+**Goal.** Promote + deliver one of the five just-designed items. Of the five, four are GUI-side
+(app.cpp / ui_state.hpp / canvas+ledger surfaces) and cannot be compiled in this sandbox — the
+SDL3/ImGui/sol2 FetchContent clones are GitHub-egress-blocked here (same wall as BL-057's GUI
+half). **BL-053 is the exception** — it lives entirely in the SDL/Lua-free `src/world/` headless
+tier, so it can be built *and* verified here. Delivered it; the GUI four stay promotable for the
+Linux box / CI.
+
+**What landed (`nation_generation.cpp` + header + hard_coded_world + world_audit):**
+- **Pass 1b — growth weights.** Each seed gets a skewed weight (cube of a uniform draw → most
+  small, few large); the BFS step cost is divided by the owner's weight, so high-weight seeds
+  claim more. Turns near-uniform Voronoi cells into strongly varied sizes.
+- **Pass 2c — light "in history" merges.** Over-seed, then absorb the smallest nations into their
+  largest cardinally-adjacent neighbour until `merge_to` remain; compact indices. Deterministic
+  (no RNG), giving irregular grown borders. New `merge_to` field on `nation_params`.
+- **Kepler config:** 18 seeds, min_sep 5, merge_to 14.
+- **Acceptance:** world_audit BL-053 R1 (count in [12,16]) + R2 (max ≥ 3× min). Observed: **14
+  nations, sizes 24..2150 tiles** (~90× spread — a few great powers, many small states).
+
+**Isolation / determinism.** The econ harnesses build their own small worlds, and substrate is
+injected as a per-body sum over nations (invariant under re-partition), so only world_audit is
+affected. Full headless suite 7/7 green — no regression. Design propagated to NATION_GENERATION.md;
+BL-053 marked complete; REFINED group cleared.
+
+---
+
+## Session — Design pass: five design-owed items (2026-06-29)
+
+**Goal.** Design depth only (DELIVERY § depth verbs): settle the open questions for the
+five active `design-owed` items via a Q&A with the developer, write the settled prose into
+`backlog.json`, flip each `design-owed → designed`. No tasks, no code, no authority-doc
+edits (those land with the work).
+
+**Decisions (developer's calls, via two Q&A rounds):**
+- **BL-061 app-driven mouse** — minimal deterministic capture. A `{x,y,active}` cursor-source
+  struct on `ui_state` that canvases read instead of the raw IO mouse; live app feeds the real
+  mouse, `--verify` leaves it inactive (hover off) unless a script sets `verify.mouse` /
+  `verify.hover_tile`. No scripted click/drag this pass.
+- **BL-062 hotkeys** — dev-fixed central action→binding keymap, `canvas_command` subsumed into
+  it, F1 cheat-sheet overlay generated from the keymap. No player rebinding UI yet.
+- **BL-020 tooltips** — lens-contextual "why" on the BL-060 hover-card: name + ≤2 lens-relevant
+  stats + a why-line; data stays in ledgers. Deliverable is the content contract + 2-3 exemplars;
+  the exhaustive sweep is execution.
+- **BL-053 country generation** — clustered seeds, strongly varied sizes (~12-16 on Kepler:
+  a few great powers, several mid, many small), plus a light merge/fragment post-pass for grown
+  borders. Not a historical sim. Cleared the dangling `requires: BL-052` (no such item) and
+  superseded the old ~45-country direction (newest-dated wins).
+- **BL-063 tester graphs** — targeted to the key economic surfaces (Market Ledger price +
+  supply/demand trends; economy-panel running-balance / income-vs-expenditure) via one reusable
+  ImGui plot helper + a colourblind-safe palette; bounded ring-buffer history (coordinate with the
+  v0.0.9 data-creep audit).
+
+**Result.** All five flipped to `designed` (promote-ready); BL-020/BL-053 legacy BACKLOG.md
+bodies tombstoned. The active backlog is now design-complete bar finishing BL-057 off-sandbox.
+
+---
+
+## Session — BL-057 + BL-040 Batch Delivery (2026-06-28)
+
+**Goal.** Deliver the top two implementation-ready backlog items: BL-057 (cross-platform
+build) and BL-040 (full-set resource generation). Run from a native Linux remote
+environment with cmake 3.28 + g++ 13 — the first time the project has been compiled on
+Linux, which the work depended on.
+
+**Status: code complete, headless suite green (7/7). BL-040 complete; BL-057 partial
+(GUI/CI sign-off owed off-sandbox).**
+
+**BL-040 — full raw-set deposit authoring (complete).**
+- `build_rarity_profile(seed)` in `tile_generation.cpp` builds a per-body, seeded
+  per-resource rarity scalar [0,1], raw-tier only. The v0.0.4 seven-resource subset is
+  pinned at 1.0 so its hand-calibrated authoring is left untouched; the six additions
+  (silica, coal, iron-nickel ore, copper ore, rare-earth ore, PGM) carry fixed
+  base rarities ordered by base price + small seeded jitter.
+- A `put_rare` block authors the additions per terrain affinity (RESOURCES.md Tier 1),
+  the scalar gating presence (frequency) and scaling magnitude.
+- **Determinism decision.** The additions draw from an *independent* per-tile rng stream
+  (`rare_rng`), never the shared `tile_rng`. Adding draws to `tile_rng` would shift every
+  downstream draw and `derive_environment`, silently changing the calibrated economy. With
+  the separate stream, `econ_harness`/`econ_stability` are bit-identical.
+- `world_audit` gained the BL-040 distribution audit (R1: all six additions authored
+  somewhere; R2: PGM strictly rarer than copper). Observed: silica 7431, copper 5979, coal
+  3776, rare-earth 3767, iron-nickel 116, PGM 57 tiles — metallic pair scarce because
+  metallic terrain only exists on the Pallas asteroid (correct for Era 0).
+- Design propagated to RESOURCES.md and TILE_GENERATION.md; legacy BACKLOG.md body
+  tombstoned. Brought forward from its v0.2 schedule at user request.
+
+**BL-057 — cross-platform build (partial; the real blocker fixed).**
+- **The genuinely new finding:** the prior design's claim that "the source is already
+  Linux-clean" was wrong. Three `nation_component` fields were named identically to their
+  enum types (`ideology ideology`, `expansionism expansionism`, `economic_focus
+  economic_focus`) — ill-formed per `[basic.scope.class]`, rejected by GCC
+  (`-Wchanges-meaning`) though MSVC accepts it. Never caught because the code had never
+  built on Linux. Renamed to `politics`/`posture`/`focus` (matching the tile_component
+  convention) across the 8 reference sites; serialization layout unaffected (no reorder/retype).
+- Fixed a stale headless harness: `construction_harness` R4 asserted `insufficient_funds`
+  but BL-043's Port-coastal rule makes a non-coastal Port return `invalid_tile` first. R4
+  now uses a fresh valid tile + processing_facility so it tests the funds path it intends.
+- **Result:** all seven `tools/verify/*.cpp` harnesses build and pass under g++ — the CI
+  guard's headless tier is verified locally for the first time.
+- Refreshed `build.yml`'s stale "unverified" note; documented the Linux/headless build
+  recipe + the enum-naming gotcha in TECH_FOUNDATIONS.md (font fix was already present).
+- **Owed (cannot be done from this sandbox — GitHub clones for FetchContent are
+  403-blocked by egress policy):** the full GUI/CMake app build on Linux, visual-verify of
+  the bundled font on a real window, and the first GitHub Actions run of `build.yml`. These
+  land on the Linux dev box / in CI. BL-057 left `designed`, progress recorded in its item.
+
+**Env note.** This is a native Linux git clone, not the Cowork Windows-bridge shell, so the
+BL-058 git-write restriction does not apply; `.gitattributes` keeps line endings clean.
+
+---
+
 ## Session — v0.0.6 Improved Core-Loop Batch Delivery (2026-06-17)
 
 **Goal.** Deliver all six v0.0.6 backlog items as a Batch Delivery: BL-050 (saturated

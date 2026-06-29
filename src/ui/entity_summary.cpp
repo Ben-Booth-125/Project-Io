@@ -296,9 +296,9 @@ void draw_nation_summary(const world& w, entity_id id)
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", n.name.c_str());
 
     ImGui::Text("Tiles: %zu", n.tiles.size());
-    ImGui::Text("Ideology: %s", ideology_name(n.ideology));
-    ImGui::Text("Expansionism: %s", expansionism_name(n.expansionism));
-    ImGui::Text("Economic focus: %s", economic_focus_name(n.economic_focus));
+    ImGui::Text("Ideology: %s", ideology_name(n.politics));
+    ImGui::Text("Expansionism: %s", expansionism_name(n.posture));
+    ImGui::Text("Economic focus: %s", economic_focus_name(n.focus));
 
     // Top resources by abundance: collect non-zero entries, sort descending,
     // and show the leading three with their identity swatches.
