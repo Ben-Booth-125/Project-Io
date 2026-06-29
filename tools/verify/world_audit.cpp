@@ -254,7 +254,26 @@ int main()
     std::printf("  BL-040 R2 rarity ordering (PGM %d < copper %d): %s\n",
                 pgm, copper, ordering_ok ? "PASS" : "FAIL");
 
+    // --- BL-053: country count + size-variance audit ---
+    // Only Kepler generates nations, so w.nations is the Kepler political layer.
+    const int nation_n = static_cast<int>(w.nations.size());
+    int min_tiles = -1, max_tiles = 0;
+    for (const auto& [nid, nat] : w.nations)
+    {
+        const int t = static_cast<int>(nat.tiles.size());
+        if (min_tiles < 0 || t < min_tiles) min_tiles = t;
+        if (t > max_tiles) max_tiles = t;
+    }
+    if (min_tiles < 0) min_tiles = 0;
+    const bool count_ok    = nation_n >= 12 && nation_n <= 16;
+    const bool variance_ok = min_tiles > 0 && max_tiles >= 3 * min_tiles;
+    std::printf("Nations: %d (min tiles %d, max tiles %d)\n", nation_n, min_tiles, max_tiles);
+    std::printf("  BL-053 R1 nation count in [12,16]: %s\n", count_ok ? "PASS" : "FAIL");
+    std::printf("  BL-053 R2 strong size variance (max >= 3x min): %s\n",
+                variance_ok ? "PASS" : "FAIL");
+
     return (fw_frac >= 3.0f && bad == 0 && seed_bad == 0 && seam_bad == 0
             && unclaimed_land == 0 && holdings_bad == 0
-            && absent == 0 && ordering_ok) ? 0 : 1;
+            && absent == 0 && ordering_ok
+            && count_ok && variance_ok) ? 0 : 1;
 }

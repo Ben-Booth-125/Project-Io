@@ -121,8 +121,11 @@ world make_hard_coded_world()
     // (substrate density) can reference them during nation territory assignment.
     generate_population_centres(w, kepler, /*seed=*/0x70701001u);
 
+    // BL-053: over-seed (18) with tighter separation, then merge down to 14 so the
+    // map reads as a varied, "grown" political layer — a few large powers, several
+    // mid, many small — rather than ~10 near-uniform Voronoi cells.
     generate_nations(w, kepler, kepler_tiles, 180, 84,
-        nation_params{ .nation_count = 10, .min_seed_separation = 6 },
+        nation_params{ .nation_count = 18, .min_seed_separation = 5, .merge_to = 14 },
         /*seed=*/0x4A71012u);
 
     // Attach installations to the first two land tiles found in raster order.

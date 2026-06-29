@@ -18,13 +18,21 @@
 /// Tunable parameters for a single nation generation run.
 struct nation_params
 {
-    /// Number of nations to place on the body. Clamped internally to the number
+    /// Number of seeds to place on the body. Clamped internally to the number
     /// of available land tiles, so it is safe to set higher than the land area.
+    /// With merge_to set, this is the pre-merge seed count (BL-053).
     int nation_count = 10;
 
     /// Minimum grid-distance (Chebyshev, column-wrapped) between any two nation
     /// seeds placed in Pass 1. Raise to spread nations further apart.
     int min_seed_separation = 6;
+
+    /// Final nation count after the light "in history" merge pass (BL-053): the
+    /// smallest nations are absorbed into their largest adjacent neighbour until
+    /// this many remain, giving varied sizes and irregular, grown borders. 0
+    /// disables merging (nation_count nations are kept as-is). Ignored if >=
+    /// nation_count.
+    int merge_to = 0;
 };
 
 /// Generate nations over the tile map of one body and register all results in @p w.

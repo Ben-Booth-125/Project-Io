@@ -6,6 +6,33 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — Deliver BL-053 country generation (2026-06-29)
+
+**Goal.** Promote + deliver one of the five just-designed items. Of the five, four are GUI-side
+(app.cpp / ui_state.hpp / canvas+ledger surfaces) and cannot be compiled in this sandbox — the
+SDL3/ImGui/sol2 FetchContent clones are GitHub-egress-blocked here (same wall as BL-057's GUI
+half). **BL-053 is the exception** — it lives entirely in the SDL/Lua-free `src/world/` headless
+tier, so it can be built *and* verified here. Delivered it; the GUI four stay promotable for the
+Linux box / CI.
+
+**What landed (`nation_generation.cpp` + header + hard_coded_world + world_audit):**
+- **Pass 1b — growth weights.** Each seed gets a skewed weight (cube of a uniform draw → most
+  small, few large); the BFS step cost is divided by the owner's weight, so high-weight seeds
+  claim more. Turns near-uniform Voronoi cells into strongly varied sizes.
+- **Pass 2c — light "in history" merges.** Over-seed, then absorb the smallest nations into their
+  largest cardinally-adjacent neighbour until `merge_to` remain; compact indices. Deterministic
+  (no RNG), giving irregular grown borders. New `merge_to` field on `nation_params`.
+- **Kepler config:** 18 seeds, min_sep 5, merge_to 14.
+- **Acceptance:** world_audit BL-053 R1 (count in [12,16]) + R2 (max ≥ 3× min). Observed: **14
+  nations, sizes 24..2150 tiles** (~90× spread — a few great powers, many small states).
+
+**Isolation / determinism.** The econ harnesses build their own small worlds, and substrate is
+injected as a per-body sum over nations (invariant under re-partition), so only world_audit is
+affected. Full headless suite 7/7 green — no regression. Design propagated to NATION_GENERATION.md;
+BL-053 marked complete; REFINED group cleared.
+
+---
+
 ## Session — Design pass: five design-owed items (2026-06-29)
 
 **Goal.** Design depth only (DELIVERY § depth verbs): settle the open questions for the

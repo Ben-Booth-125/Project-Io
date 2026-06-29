@@ -209,6 +209,14 @@ wave. Verify retroactively — do not assume an agent's self-reported success.
 
 ---
 
+## BL-053 country generation (promoted 2026-06-29) — **COMPLETE**
+
+Delivered: Pass 1b growth weights + Pass 2c merge in `nation_generation.cpp`; Kepler 18 seeds →
+14 nations (sizes 24..2150 tiles). world_audit BL-053 R1/R2 green; full headless suite green.
+Design propagated to NATION_GENERATION.md. Tasks A–D complete.
+
+---
+
 ## Archived — Layer 3 economy publish set
 
 The eight-Brief Layer 3 economy set has been **published** (all groups complete) and

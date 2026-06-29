@@ -556,7 +556,7 @@
       "short_name": "COUNTRY_GENERATION",
       "category": "Environment",
       "title": "Country generation — more countries, generated 'in history'",
-      "status": "designed",
+      "status": "complete",
       "glyph": "✓",
       "priority": "B",
       "difficulty": 4,
@@ -572,7 +572,8 @@
       "design": "More countries than today's single-pass Voronoi partition, with a sense of history. (Brief migrated from BACKLOG.md 2026-06-29.)\n\n**Design settled (2026-06-29) — clustered seeds, varied sizes, light history.** Target ~12-16 countries on Kepler with a STRONGLY varied size distribution: a few large \"great powers\", several mid-sized, and many small states — not the near-uniform cells a flat Voronoi gives. Method: raise the seed count and draw seed *weights* from a skewed distribution so BFS cell growth is deliberately uneven; then run a LIGHT post-pass for \"in history\" texture — a small number of seeded merges (a large neighbour absorbs an adjacent small one) and/or fragments — to give irregular, grown-looking borders. This is explicitly NOT a historical simulation: no exclaves, disputed zones, or sentiment modelling (those remain in the parked BL-054). Couples to the saturated substrate (BL-050, shipped): more countries enrich the background supply/demand aggregation but are not a hard prerequisite. The dangling requires (BL-052, no such item) is cleared. Open at promotion: the exact skew parameters and the merge/fragment counts (tune against the rendered map). Authority: docs/generation/NATION_GENERATION.md.",
       "waits_on": [
         "SATURATED_SUBSTRATE"
-      ]
+      ],
+      "completion_note": "Pass 1b growth weights + Pass 2c merge in nation_generation.cpp (merge_to param); Kepler 18 seeds -> 14 nations, sizes 24..2150 tiles. world_audit BL-053 R1/R2 green; full headless suite 7/7 green. Design propagated to NATION_GENERATION.md. 2026-06-29."
     },
     {
       "id": "BL-054",

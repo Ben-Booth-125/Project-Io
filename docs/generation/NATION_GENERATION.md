@@ -40,13 +40,21 @@ Seeds prefer habitable compositions (grassland, forest, wetland) but can land on
 tile. This produces nations that form around productive cores rather than uniformly across
 terrain.
 
+### Pass 1b — Growth weights (BL-053)
+
+Each seed is assigned a **growth weight** drawn from a skewed distribution (the cube of a
+uniform draw → most seeds small, a few large). A seed's BFS step cost is divided by its weight,
+so high-weight seeds expand cheaper, reach further, and claim more land. This turns the
+near-uniform Voronoi cells the flat approach produces into a **strongly varied size
+distribution** — a few large "great powers", several mid-sized, many small.
+
 ### Pass 2 — Territory expansion (Voronoi BFS)
 
 Each seed expands outward via BFS. Ocean tiles are never claimed. The expansion follows a
-weighted Voronoi approach: expansion probability decays with distance from the seed, and
-high-`H` tiles (mountains, highlands) act as soft barriers — they can be claimed but reduce
-the expansion budget of the claiming nation, producing mountain ranges that naturally fall
-near or at borders.
+weighted Voronoi approach: step cost decays with distance from the seed and is **divided by the
+seed's growth weight** (Pass 1b); high-`H` tiles (mountains, highlands) act as soft barriers —
+they can be claimed but reduce the expansion budget of the claiming nation, producing mountain
+ranges that naturally fall near or at borders.
 
 Expansion continues until all claimable land tiles are assigned.
 
@@ -59,6 +67,18 @@ and each whole component is assigned to the nation owning the **nearest already-
 tile across the water** (by Chebyshev grid distance; ties break to the lower nation index,
 then the lower tile index). After this pass every non-ocean land tile on the body belongs to
 a nation — there are no unclaimed islands.
+
+### Pass 2c — Light "in history" merges (BL-053)
+
+A deterministic post-pass gives the map a "grown in history" feel without simulating history.
+The body is **over-seeded** (Pass 1 places more seeds than the final target), then the smallest
+nations are repeatedly **absorbed into their largest cardinally-adjacent neighbour** until the
+`merge_to` target count remains; surviving owner indices are compacted. The result amplifies the
+size spread (rich-get-richer) and produces **irregular, non-convex borders** — a nation may be
+the union of a core and an absorbed neighbour. Tie-breaks are fully deterministic (smallest by
+tile count then lowest index; absorbing neighbour by tile count then lowest index; an island
+with no land neighbour is absorbed into the globally largest nation). This is *not* historical
+fragmentation (exclaves, disputed zones) — that remains an open item.
 
 ### Pass 3 — Resource profile derivation
 
@@ -95,7 +115,8 @@ phoneme table. No human-authored list of specific names is required.
 In the prototype, Kepler is the only body with nation generation. Selene, Cinder, and Pallas
 are unclaimed territory.
 
-Nation count for Kepler: **8–12**, tunable via campaign parameters.
+Nation count for Kepler: **~14** (BL-053: 18 seeds merged down to 14), with strongly varied
+sizes; tunable via campaign parameters (`nation_count`, `min_seed_separation`, `merge_to`).
 
 Nation system behaviour — taxes, laws, diplomatic actions, military response, territorial
 ambition — is **not implemented in the prototype**. Nations are generated and exist as data
@@ -125,9 +146,10 @@ become de-facto powers above states, with the nation layer diminishing in author
 game progresses. This has significant implications for what nations need to be able to *do*
 and how that capability decays. It is noted here but not yet scoped.
 
-**Fragmentation and history.** The current pipeline produces geographically coherent nations.
-A production pass could add historical fragmentation — exclaves, disputed zones, contested
-tiles — to produce more realistic and strategically interesting political maps.
+**Fragmentation and history.** A *light* "in history" pass landed with BL-053 (Pass 2c:
+over-seed + merge-smallest, giving varied sizes and irregular borders). Full historical
+fragmentation — exclaves, disputed zones, contested tiles — remains a deferred production pass
+(parked BL-054, nation behaviour).
 
 **Non-Kepler politics.** As colonies establish on other bodies, some form of jurisdiction
 and governance will be needed there. Whether this extends the nation model or introduces a

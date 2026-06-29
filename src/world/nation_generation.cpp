@@ -180,6 +180,9 @@ struct bfs_entry
 /// @param tiles        Tile components, for landform lookup.
 /// @param tile_ids     Raster-order tile entity IDs.
 /// @param gw, gh       Grid dimensions.
+/// @param weight       Per-seed growth weight; a seed's step cost is divided by
+///                     its weight, so high-weight seeds expand cheaper and claim
+///                     larger territory (BL-053 — strongly varied nation sizes).
 /// @param rng          Seeded RNG for jitter.
 /// @return             Per-tile nation index (-1 = unclaimed/ocean). Indexed as row*gw+col.
 std::vector<int> expand_territory(const std::vector<int>& seeds,
@@ -187,6 +190,7 @@ std::vector<int> expand_territory(const std::vector<int>& seeds,
                                   const world& w,
                                   const std::vector<entity_id>& tile_ids,
                                   int gw, int gh,
+                                  const std::vector<float>& weight,
                                   std::mt19937& rng)
 {
     const int total = gw * gh;
@@ -244,7 +248,11 @@ std::vector<int> expand_territory(const std::vector<int>& seeds,
                     cost_step = expansion_cost(it->second.landform);
             }
 
-            const float new_cost = cur.cost + cost_step + jitter(rng);
+            // BL-053: divide the step by the owning seed's growth weight, so
+            // high-weight seeds accumulate cost slower, reach further, and claim
+            // more tiles — turning near-uniform Voronoi cells into varied sizes.
+            const float w_owner = weight[static_cast<std::size_t>(cur.nation_idx)];
+            const float new_cost = cur.cost + (cost_step + jitter(rng)) / w_owner;
 
             if (new_cost < dist[static_cast<std::size_t>(nidx)])
             {
@@ -385,6 +393,110 @@ void assign_orphan_islands(std::vector<int>& owner_map,
         for (int cidx : component)
             owner_map[static_cast<std::size_t>(cidx)] = best_nation;
     }
+}
+
+// ---------------------------------------------------------------------------
+// Pass 2c — light "in history" merges (BL-053)
+// ---------------------------------------------------------------------------
+
+/// Reduce the nation set from `seed_count` down to `target_count` by repeatedly
+/// absorbing the smallest nation into its largest cardinally-adjacent neighbour,
+/// then compacting owner indices into [0, final_count). This amplifies the size
+/// spread (rich-get-richer) and produces irregular, grown-looking borders — a
+/// light stand-in for "generated in history", not a historical simulation.
+///
+/// Fully deterministic (no RNG): the smallest nation is chosen by tile count then
+/// lowest index; the absorbing neighbour by tile count then lowest index; an
+/// island nation with no land neighbour is absorbed into the globally largest
+/// nation so the pass always progresses. `owner_map` is mutated in place; ocean
+/// tiles stay -1.
+///
+/// @return the final nation count (distinct nations after compaction).
+int merge_small_nations(std::vector<int>& owner_map, int seed_count,
+                        int target_count, int gw, int gh)
+{
+    const int total = gw * gh;
+
+    std::vector<int> count(static_cast<std::size_t>(seed_count), 0);
+    for (int idx = 0; idx < total; ++idx)
+    {
+        const int ni = owner_map[static_cast<std::size_t>(idx)];
+        if (ni >= 0)
+            ++count[static_cast<std::size_t>(ni)];
+    }
+
+    std::vector<bool> active(static_cast<std::size_t>(seed_count), false);
+    int distinct = 0;
+    for (int ni = 0; ni < seed_count; ++ni)
+        if (count[static_cast<std::size_t>(ni)] > 0) { active[static_cast<std::size_t>(ni)] = true; ++distinct; }
+
+    while (distinct > target_count)
+    {
+        // Smallest active nation (tie: lowest index).
+        int small = -1;
+        for (int ni = 0; ni < seed_count; ++ni)
+        {
+            if (!active[static_cast<std::size_t>(ni)]) continue;
+            if (small < 0 || count[static_cast<std::size_t>(ni)] < count[static_cast<std::size_t>(small)])
+                small = ni;
+        }
+        if (small < 0) break;
+
+        // Largest active nation cardinally adjacent to `small` (tie: lowest index).
+        int best = -1;
+        std::vector<bool> seen(static_cast<std::size_t>(seed_count), false);
+        for (int idx = 0; idx < total; ++idx)
+        {
+            if (owner_map[static_cast<std::size_t>(idx)] != small) continue;
+            const int col = idx % gw, row = idx / gw;
+            std::pair<int,int> nbrs[4]; int n = 0;
+            cardinal_neighbours(col, row, gw, gh, nbrs, n);
+            for (int i = 0; i < n; ++i)
+            {
+                const int no = owner_map[static_cast<std::size_t>(
+                    raster_idx(nbrs[i].first, nbrs[i].second, gw))];
+                if (no < 0 || no == small || !active[static_cast<std::size_t>(no)]) continue;
+                if (seen[static_cast<std::size_t>(no)]) continue;
+                seen[static_cast<std::size_t>(no)] = true;
+                if (best < 0
+                 || count[static_cast<std::size_t>(no)] > count[static_cast<std::size_t>(best)]
+                 || (count[static_cast<std::size_t>(no)] == count[static_cast<std::size_t>(best)] && no < best))
+                    best = no;
+            }
+        }
+
+        // Island with no land neighbour: absorb into the globally largest nation.
+        if (best < 0)
+            for (int ni = 0; ni < seed_count; ++ni)
+            {
+                if (!active[static_cast<std::size_t>(ni)] || ni == small) continue;
+                if (best < 0 || count[static_cast<std::size_t>(ni)] > count[static_cast<std::size_t>(best)])
+                    best = ni;
+            }
+        if (best < 0) break; // only one nation remains
+
+        for (int idx = 0; idx < total; ++idx)
+            if (owner_map[static_cast<std::size_t>(idx)] == small)
+                owner_map[static_cast<std::size_t>(idx)] = best;
+        count[static_cast<std::size_t>(best)]  += count[static_cast<std::size_t>(small)];
+        count[static_cast<std::size_t>(small)]  = 0;
+        active[static_cast<std::size_t>(small)] = false;
+        --distinct;
+    }
+
+    // Compact surviving indices into [0, final_count) in ascending order.
+    std::vector<int> remap(static_cast<std::size_t>(seed_count), -1);
+    int next = 0;
+    for (int ni = 0; ni < seed_count; ++ni)
+        if (active[static_cast<std::size_t>(ni)])
+            remap[static_cast<std::size_t>(ni)] = next++;
+    for (int idx = 0; idx < total; ++idx)
+    {
+        const int ni = owner_map[static_cast<std::size_t>(idx)];
+        if (ni >= 0)
+            owner_map[static_cast<std::size_t>(idx)] = remap[static_cast<std::size_t>(ni)];
+    }
+    return next;
 }
 
 // ---------------------------------------------------------------------------
@@ -559,6 +671,7 @@ std::vector<entity_id> generate_nations(
     // Distinct seed offsets keep each pass's RNG stream independent.
     const uint32_t seed_seeds  = seed ^ 0xA3B4C5D6u;
     const uint32_t seed_expand = seed ^ 0x1F2E3D4Cu;
+    const uint32_t seed_weight = seed ^ 0x6D2B79F5u;
     const uint32_t seed_pol    = seed ^ 0x8C7B6A59u;
     const uint32_t seed_name   = seed ^ 0x4E5F607Au;
 
@@ -587,17 +700,36 @@ std::vector<entity_id> generate_nations(
         params.nation_count, params.min_seed_separation,
         seed_rng);
 
-    const int nation_count = static_cast<int>(seeds.size());
-    if (nation_count == 0)
+    const int seed_count = static_cast<int>(seeds.size());
+    if (seed_count == 0)
         return {};
 
-    // --- Pass 2: territory expansion ---
+    // --- Pass 1b: per-seed growth weights (BL-053) ---
+    // Skewed so most seeds stay small and a few become "great powers": the cube of
+    // a uniform draw maps to w in [0.4, 3.4], heavily massed at the low end.
+    std::mt19937 weight_rng(seed_weight);
+    std::vector<float> weights(static_cast<std::size_t>(seed_count));
+    {
+        std::uniform_real_distribution<float> u(0.0f, 1.0f);
+        for (int i = 0; i < seed_count; ++i)
+        {
+            const float t = u(weight_rng);
+            weights[static_cast<std::size_t>(i)] = 0.4f + 3.0f * t * t * t;
+        }
+    }
+
+    // --- Pass 2: territory expansion (weighted) ---
     std::mt19937 expand_rng(seed_expand);
     std::vector<int> owner_map = expand_territory(
-        seeds, is_ocean, w, tile_ids, gw, gh, expand_rng);
+        seeds, is_ocean, w, tile_ids, gw, gh, weights, expand_rng);
 
     // --- Pass 2b: orphan-island assignment (claim water-disconnected land) ---
     assign_orphan_islands(owner_map, is_ocean, gw, gh);
+
+    // --- Pass 2c: light "in history" merges down to the target count (BL-053) ---
+    int nation_count = seed_count;
+    if (params.merge_to > 0 && params.merge_to < seed_count)
+        nation_count = merge_small_nations(owner_map, seed_count, params.merge_to, gw, gh);
 
     // --- Allocate nation_component stubs (populated in Passes 3–5) ---
     std::vector<nation_component> nation_data(static_cast<std::size_t>(nation_count));
