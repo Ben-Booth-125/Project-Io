@@ -6,6 +6,32 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — BL-057 first native Linux GUI build (2026-06-29)
+
+**Context.** Bringing the full GUI/CMake app up on a fresh Ubuntu 24.04 laptop — the piece
+BL-057 left owed because the egress-restricted sandbox can't run the SDL3/Lua/sol2/ImGui
+`FetchContent` clones. Two real, previously-unhit build blockers surfaced and were fixed; the
+app now configures, builds, and runs natively on Linux.
+
+**What landed.**
+- **C declared as a project language.** `project(ProjectIo LANGUAGES CXX)` →
+  `LANGUAGES C CXX`. Lua 5.4 is built from `.c` files, but C was only ever enabled as a side
+  effect of SDL3's own `FetchContent` `project(LANGUAGES C)`. When that didn't hold, configure
+  failed with `CMAKE_C_COMPILE_OBJECT / CMAKE_C_ARCHIVE_* not set`. Now explicit.
+- **sol2 v3.3.0 → v3.5.0.** GCC 14+/Clang 19+ reject v3.3.0's `optional<T&>::emplace`
+  (`has no member named construct [-Wtemplate-body]`). Fixed upstream in sol2 PR #1606
+  (merged Jul 2024), released in v3.5.0. Our sol2 surface is the stable core
+  (`sol::state/table/optional`, `safe_script_file`) — unchanged across the bump, so risk is low.
+  Until this landed, the workaround was building with GCC 13.
+
+**Verification status.** The C-language fix is verified (the build progressed past Lua). The
+sol2 bump is **not yet compile-verified by me** — this session's sandbox still has no
+FetchContent egress and only GCC 13 — so it must be confirmed on the GCC-14 laptop by building
+with the *default* compiler (no gcc-13 override). Docs (TECH_FOUNDATIONS § Building) updated;
+BL-057 stays `designed` pending that confirmation + the still-owed CI first-run and visual-verify.
+
+---
+
 ## Session — Deliver BL-053 country generation (2026-06-29)
 
 **Goal.** Promote + deliver one of the five just-designed items. Of the five, four are GUI-side

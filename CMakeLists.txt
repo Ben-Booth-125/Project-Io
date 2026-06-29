@@ -43,10 +43,17 @@ endif()
 # ---------------------------------------------------------------------------
 # sol2  (header-only — skip its CMake so it does not search for system Lua)
 # ---------------------------------------------------------------------------
+# v3.5.0 (not the older v3.3.0): GCC 14+ and Clang 19+ parse template bodies
+# strictly and reject sol2 v3.3.0's optional<T&>::emplace, which calls a
+# `construct` member that specialisation lacks ("has no member named construct"
+# [-Wtemplate-body]). Fixed upstream in sol2 PR #1606 (merged Jul 2024) and
+# released in v3.5.0, so a fresh build on a modern toolchain compiles without
+# pinning an older compiler. Our usage is the stable core (sol::state/table/
+# optional, safe_script_file) — unchanged across v3.3.0 → v3.5.0.
 FetchContent_Declare(
     sol2_src
     GIT_REPOSITORY https://github.com/ThePhD/sol2.git
-    GIT_TAG        v3.3.0
+    GIT_TAG        v3.5.0
     GIT_SHALLOW    TRUE
 )
 FetchContent_GetProperties(sol2_src)

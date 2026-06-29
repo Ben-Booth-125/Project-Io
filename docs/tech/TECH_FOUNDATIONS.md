@@ -90,6 +90,21 @@ cmake --build build -j
 
 On Linux this needs the SDL3 system build deps (X11/Wayland + GL/EGL + audio dev
 headers); the exact apt set is the `linux` job in `.github/workflows/build.yml`.
+The native Linux GUI build is **confirmed working** (Ubuntu 24.04, configure +
+build + run) — the cross-platform path is no longer source-audit-only.
+
+**Toolchain requirements (settled while bringing up the first native Linux build).**
+
+- *C and C++ are both project languages.* `project(... LANGUAGES C CXX)` — Lua 5.4
+  is compiled from `.c` sources (`lua54`), so C must be enabled explicitly. It must
+  not rely on SDL3's own `FetchContent` `project(LANGUAGES C)` enabling C as a side
+  effect; when that ordering doesn't hold, configure fails with
+  `CMAKE_C_COMPILE_OBJECT / CMAKE_C_ARCHIVE_* not set`.
+- *sol2 ≥ v3.5.0 for modern compilers.* GCC 14+ and Clang 19+ parse template bodies
+  strictly and reject sol2 v3.3.0's `optional<T&>::emplace` (calls a `construct`
+  member the specialisation lacks — `[-Wtemplate-body]`). The pinned tag is v3.5.0,
+  which carries the upstream fix; on an older sol2 the workaround is to build with
+  GCC 13.
 
 **Headless verification tier** (the `tools/verify/*.cpp` harnesses over `world/*`,
 deliberately SDL/Lua/ImGui-free) builds with nothing but a C++20 compiler — no
