@@ -177,8 +177,8 @@
       "short_name": "TOOLTIP_SIMPLIFICATION",
       "category": "Canvas",
       "title": "Tooltip simplification — lens-specific, why not what",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "designed",
+      "glyph": "✓",
       "priority": "C",
       "difficulty": 4,
       "parked": false,
@@ -190,7 +190,7 @@
       "files": [],
       "authority_doc": "docs/ui/TOOLTIP.md",
       "summary": "Reframe tooltips: less data, lens-specific, explain WHY a system behaves (ledgers are for data). Defer nested tooltips. A large multi-round sweep over every visible entity. Design owed: the per-entity/per-lens content sweep.",
-      "design": "@BACKLOG.md",
+      "design": "Reframe tooltips from data-dumps to lens-specific \"why, not what\": the ledgers hold the data; a tooltip explains why a system behaves as it does. (Brief migrated from BACKLOG.md 2026-06-29.)\n\n**Design settled (2026-06-29) — lens-contextual \"why\" on the hover-card.** Tooltips ride the BL-060 hover-card primitive (complete). For the entity under the cursor and the ACTIVE lens, the card shows only: the entity name, the ONE or TWO stats that lens is about, and a short \"why\" line explaining the current state (e.g. under the Market lens on a tile: \"Price high — local demand outruns supply\"). It is never a mirror of the Selection panel or the ledger — full data stays in the ledgers; deeper detail surfaces on the pinned/expanded card (BL-060). The deliverable is (a) the content CONTRACT — a per-(entity-kind, lens) builder returning {title, <=2 stat lines, why-line} — and (b) 2-3 worked EXEMPLARS proving it end-to-end: a tile under the Resource lens, a building under the Supply lens, a market-centre under the Market lens. The exhaustive per-entity/per-lens authoring is execution work, promoted in waves, not folded into this design. Nested tooltips stay deferred. Authority: docs/ui/TOOLTIP.md.",
       "waits_on": [
         "HOVER_CARD_PRIMITIVE"
       ]
@@ -556,14 +556,12 @@
       "short_name": "COUNTRY_GENERATION",
       "category": "Environment",
       "title": "Country generation — more countries, generated 'in history'",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "designed",
+      "glyph": "✓",
       "priority": "B",
       "difficulty": 4,
       "parked": false,
-      "requires": [
-        "BL-052"
-      ],
+      "requires": [],
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
@@ -571,7 +569,7 @@
       ],
       "authority_doc": "docs/generation/NATION_GENERATION.md",
       "summary": "More countries than today's Voronoi partition, with a sense of history: v0.1.0 target is clustering seeds with a varied size distribution (some larger, some smaller). Couples to SATURATED_SUBSTRATE. Design owed: clustered-seed sizing, what 'in history' means, count target.",
-      "design": "@BACKLOG.md",
+      "design": "More countries than today's single-pass Voronoi partition, with a sense of history. (Brief migrated from BACKLOG.md 2026-06-29.)\n\n**Design settled (2026-06-29) — clustered seeds, varied sizes, light history.** Target ~12-16 countries on Kepler with a STRONGLY varied size distribution: a few large \"great powers\", several mid-sized, and many small states — not the near-uniform cells a flat Voronoi gives. Method: raise the seed count and draw seed *weights* from a skewed distribution so BFS cell growth is deliberately uneven; then run a LIGHT post-pass for \"in history\" texture — a small number of seeded merges (a large neighbour absorbs an adjacent small one) and/or fragments — to give irregular, grown-looking borders. This is explicitly NOT a historical simulation: no exclaves, disputed zones, or sentiment modelling (those remain in the parked BL-054). Couples to the saturated substrate (BL-050, shipped): more countries enrich the background supply/demand aggregation but are not a hard prerequisite. The dangling requires (BL-052, no such item) is cleared. Open at promotion: the exact skew parameters and the merge/fragment counts (tune against the rendered map). Authority: docs/generation/NATION_GENERATION.md.",
       "waits_on": [
         "SATURATED_SUBSTRATE"
       ]
@@ -737,8 +735,8 @@
       "short_name": "APP_DRIVEN_MOUSE",
       "category": "Development",
       "title": "Application-driven mouse — scriptable cursor override for deterministic capture",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "designed",
+      "glyph": "✓",
       "priority": "B",
       "difficulty": 3,
       "parked": false,
@@ -752,15 +750,15 @@
       ],
       "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
       "summary": "A verify/app-controlled synthetic cursor so the real OS mouse position cannot leak into --verify captures (hover highlight + hover-card perturb the frame -> flaky goldens). Also the foundation for scripted pointer input (move/click/drag) in the verify harness. Design owed: synthetic-vs-real source switch, global hover-suppress vs explicit positioning, click/drag API surface.",
-      "design": "**Problem.** Headless `--verify` captures read the live `ImGui::GetIO().MousePos`, so wherever the real OS cursor happens to sit leaks into the frame as a hovered-tile highlight (and the hover-card). A cursor that moves between or during captures changes the rendered frame -> golden flake. Observed in the Lens & Legibility batch (2026-06-17): the draw-order sort fixed the `unordered_map` half of the nondeterminism, but a moving mouse is the other half. See [[reference_worktree_gui_build]].\n\n**Proposal.** An **application-driven mouse**: a single source-of-truth cursor position the canvases consume instead of the raw IO mouse, with an override the verify harness (and later scripted input) sets. In `--verify`, hover is **off by default** (no synthetic position) and a script opts in with an explicit `verify.mouse(x,y)` / `verify.hover_tile(col,row)`; in the live app the source is the real mouse. This makes captures deterministic regardless of the OS cursor and is the groundwork for **scripted pointer input** (move/click/drag) the verify harness currently lacks.\n\n**Open questions (design owed):** where the synthetic-vs-real switch lives (ui_state flag? a thin input source abstraction?); whether to suppress hover globally in verify or require explicit positioning; whether to generalise to full scripted click/drag now or stub the API; interaction with the existing `verify.center_tile`/`canvas_command` vocabulary. Pairs with [[the hotkey/input system]] (BL: HOTKEY_SYSTEM) — both want a small input-dispatch layer. Relates to the determinism work landed in the lens batch."
+      "design": "**Problem.** Headless `--verify` captures read the live `ImGui::GetIO().MousePos`, so wherever the real OS cursor happens to sit leaks into the frame as a hovered-tile highlight (and the hover-card). A cursor that moves between or during captures changes the rendered frame -> golden flake. Observed in the Lens & Legibility batch (2026-06-17): the draw-order sort fixed the `unordered_map` half of the nondeterminism, but a moving mouse is the other half. See [[reference_worktree_gui_build]].\n\n**Proposal.** An **application-driven mouse**: a single source-of-truth cursor position the canvases consume instead of the raw IO mouse, with an override the verify harness (and later scripted input) sets. In `--verify`, hover is **off by default** (no synthetic position) and a script opts in with an explicit `verify.mouse(x,y)` / `verify.hover_tile(col,row)`; in the live app the source is the real mouse. This makes captures deterministic regardless of the OS cursor and is the groundwork for **scripted pointer input** (move/click/drag) the verify harness currently lacks.\n\n**Open questions (design owed):** where the synthetic-vs-real switch lives (ui_state flag? a thin input source abstraction?); whether to suppress hover globally in verify or require explicit positioning; whether to generalise to full scripted click/drag now or stub the API; interaction with the existing `verify.center_tile`/`canvas_command` vocabulary. Pairs with [[the hotkey/input system]] (BL: HOTKEY_SYSTEM) — both want a small input-dispatch layer. Relates to the determinism work landed in the lens batch.\n\n**Design settled (2026-06-29) — minimal deterministic capture.** Scope is deterministic --verify capture only; no scripted click/drag this pass. A single app-owned cursor source — a small struct {float x, y; bool active;} on ui_state (e.g. `mouse_source`) — is what the canvases read instead of `ImGui::GetIO().MousePos`. The live app copies the real OS mouse into it each frame (active=true). In --verify, active defaults to FALSE, so hover is suppressed and the OS cursor cannot leak into a golden; a script opts in with `verify.mouse(x,y)` / `verify.hover_tile(col,row)`, which set the struct and active=true. Full scripted pointer input (move/click/drag) is explicitly deferred — but this lays the one seam a later input-dispatch layer (BL-062) can share. Authority: docs/development/DEVELOPMENT_PRACTICES.md."
     },
     {
       "id": "BL-062",
       "short_name": "HOTKEY_SYSTEM",
       "category": "Menu",
       "title": "Full hotkey system — unified, rebindable keymap + discoverability",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "designed",
+      "glyph": "✓",
       "priority": "C",
       "difficulty": 4,
       "parked": false,
@@ -773,15 +771,15 @@
       ],
       "authority_doc": "docs/ui/MENU.md",
       "summary": "Replace the ad-hoc, partly-hardcoded input (canvas_command vocabulary + Space=pause, 1-5 speed, lens cycle) with a unified hotkey system: a central action->binding keymap, rebindable, discoverable (help/cheat-sheet overlay), covering canvas nav, lens selection, time control, ledger toggles, and build. Design owed: binding storage, conflict/chord handling, the help surface, context scoping, how it subsumes canvas_command.",
-      "design": "**Problem.** Input bindings are scattered and partly hardcoded: the `canvas_command` vocabulary (pan/zoom/ascend/descend/body+lens cycle) plus hardcoded keys (Space = pause, 1-5 = speed, lens cycle), with no single place a player or developer can see or change them. There is no discoverability and no rebinding.\n\n**Proposal (to design).** A **unified hotkey system**: one central **action -> binding** keymap that every input flows through, covering canvas navigation, lens selection (the curated strip + cycle), time control, ledger/panel toggles, and build/placement. Rebindable, with a **discoverable cheat-sheet / help overlay**. The existing `canvas_command` enum is a natural action vocabulary to build on / subsume.\n\n**Open questions (design owed):** binding storage (a keymap file vs settings.json vs in-engine config); conflict detection and resolution; chord / modifier support; the help-overlay surface and how it lists bindings; **context scoping** (do bindings differ by canvas rung / modal state / placement mode?); whether `canvas_command` becomes the action layer or is replaced; player-facing rebinding UI vs developer-only config for the prototype. Bundled with [[the application-driven mouse]] (BL: APP_DRIVEN_MOUSE) as the project's input strand — both could share a small input-dispatch layer; sequence the keymap on top of, or alongside, that. Consider whether a dedicated `docs/ui/HOTKEYS.md` authority doc is warranted over MENU.md."
+      "design": "**Problem.** Input bindings are scattered and partly hardcoded: the `canvas_command` vocabulary (pan/zoom/ascend/descend/body+lens cycle) plus hardcoded keys (Space = pause, 1-5 = speed, lens cycle), with no single place a player or developer can see or change them. There is no discoverability and no rebinding.\n\n**Proposal (to design).** A **unified hotkey system**: one central **action -> binding** keymap that every input flows through, covering canvas navigation, lens selection (the curated strip + cycle), time control, ledger/panel toggles, and build/placement. Rebindable, with a **discoverable cheat-sheet / help overlay**. The existing `canvas_command` enum is a natural action vocabulary to build on / subsume.\n\n**Open questions (design owed):** binding storage (a keymap file vs settings.json vs in-engine config); conflict detection and resolution; chord / modifier support; the help-overlay surface and how it lists bindings; **context scoping** (do bindings differ by canvas rung / modal state / placement mode?); whether `canvas_command` becomes the action layer or is replaced; player-facing rebinding UI vs developer-only config for the prototype. Bundled with [[the application-driven mouse]] (BL: APP_DRIVEN_MOUSE) as the project's input strand — both could share a small input-dispatch layer; sequence the keymap on top of, or alongside, that. Consider whether a dedicated `docs/ui/HOTKEYS.md` authority doc is warranted over MENU.md.\n\n**Design settled (2026-06-29) — dev-fixed keymap + help overlay.** Prototype scope: one central action->binding keymap in code that every input flows through; NO player-facing rebinding UI yet. The existing `canvas_command` enum is SUBSUMED into (extended as) that single action vocabulary — not kept as a parallel path — and the hardcoded keys (Space=pause, 1-5 speed, lens cycle) move into the table. Discoverability: a toggle key (F1) opens a cheat-sheet overlay that lists every action->key, generated from the keymap so it never drifts. Rebinding storage, conflict/chord handling, and context scoping are recorded as the follow-on (full-rebindable) extension, out of prototype scope. Pairs with BL-061 as the input strand and can sit on the same small input layer. Keep it in MENU.md for now; graduate to docs/ui/HOTKEYS.md only if it grows. Authority: docs/ui/MENU.md."
     },
     {
       "id": "BL-063",
       "short_name": "TESTER_LEGIBILITY_GRAPHS",
       "category": "Ledger",
       "title": "Tester-legibility pass — graph/data-viz-forward read surfaces",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "designed",
+      "glyph": "✓",
       "priority": "B",
       "difficulty": 3,
       "parked": false,
@@ -795,7 +793,7 @@
       ],
       "authority_doc": "docs/ui/LAYOUT.md",
       "summary": "Accessibility/legibility pass so an art-less prototype reads clearly for early testers, via graph/data-viz-forward read surfaces (trends, supply/demand, balance over time) plotted in ImGui. Extends the existing ledger/lens/ui::icons direction (the v0.0.6 legibility theme). Design owed: which surfaces get graphs, what series, colourblind-safe palettes, time-window/sampling, plotting helper. Considered-and-rejected: a 100%-emoji UI (determinism + cross-platform cost — see design).",
-      "design": "**Origin.** Raised 2026-06-29 while planning accessibility options for early testing. Two framings were weighed — a **100%-emoji** visual language vs a **graph/data-viz-forward** one — and the graph direction was chosen.\n\n**Why graphs, not emoji (settled direction; mechanics still to design).** The project is already legibility-forward (ImGui ledgers, the lens system, hover cards, and the hand-drawn `ui::icons` vector glyph vocabulary); the whole v0.0.6 theme is making the economy legible. Graphs extend that naturally, use ImGui's built-in plotting, and are **deterministic and cross-platform-safe**.\n\nA literal **100%-emoji UI was rejected** because emoji are colour/bitmap glyphs that render differently per OS (Segoe UI Emoji / Noto Color Emoji / Apple), which would (1) break the cross-platform consistency just established in BL-057, and (2) make the **visual golden-image diff harness non-deterministic across machines** — the harness the project relies on for verification. It would also need a bundled colour-emoji font (large; extra ImGui/FreeType setup) and would largely reinvent `ui::icons`, which is the deterministic equivalent. **Guidance:** where iconic, at-a-glance reads are wanted, extend `ui::icons` rather than pulling in an emoji font; reserve graphs for trends/quantities.\n\n**Proposal (to design).** A legibility pass that gives the read surfaces a data-viz-forward treatment for testers: e.g. supply/demand and price **trend plots** in the Market Ledger, a **running-balance / income-vs-expenditure** graph in the economy panel, and sparkline-style summaries where a full plot is too heavy. Build on the ledger conventions already in place.\n\n**Open questions (design owed):** which surfaces get graphs and which stay tabular; what series and time windows (and how history is sampled/retained without data-creep — coordinate with the v0.0.9 data-creep audit); a small reusable ImGui plotting helper vs per-panel one-offs; **colourblind-safe palettes** (true accessibility, beyond legibility) and how that interacts with `presentation.hpp` identity colours; whether any of this needs its own authority doc over LAYOUT.md. Pairs with the existing legibility strand (economy-panel refit, market-ledger dashboard) rather than duplicating it. `src/`-changing and renders in the GUI -> brief-spanning `visual` requirement (a `scripts/verify/*.lua` golden) at promotion."
+      "design": "**Origin.** Raised 2026-06-29 while planning accessibility options for early testing. Two framings were weighed — a **100%-emoji** visual language vs a **graph/data-viz-forward** one — and the graph direction was chosen.\n\n**Why graphs, not emoji (settled direction; mechanics still to design).** The project is already legibility-forward (ImGui ledgers, the lens system, hover cards, and the hand-drawn `ui::icons` vector glyph vocabulary); the whole v0.0.6 theme is making the economy legible. Graphs extend that naturally, use ImGui's built-in plotting, and are **deterministic and cross-platform-safe**.\n\nA literal **100%-emoji UI was rejected** because emoji are colour/bitmap glyphs that render differently per OS (Segoe UI Emoji / Noto Color Emoji / Apple), which would (1) break the cross-platform consistency just established in BL-057, and (2) make the **visual golden-image diff harness non-deterministic across machines** — the harness the project relies on for verification. It would also need a bundled colour-emoji font (large; extra ImGui/FreeType setup) and would largely reinvent `ui::icons`, which is the deterministic equivalent. **Guidance:** where iconic, at-a-glance reads are wanted, extend `ui::icons` rather than pulling in an emoji font; reserve graphs for trends/quantities.\n\n**Proposal (to design).** A legibility pass that gives the read surfaces a data-viz-forward treatment for testers: e.g. supply/demand and price **trend plots** in the Market Ledger, a **running-balance / income-vs-expenditure** graph in the economy panel, and sparkline-style summaries where a full plot is too heavy. Build on the ledger conventions already in place.\n\n**Open questions (design owed):** which surfaces get graphs and which stay tabular; what series and time windows (and how history is sampled/retained without data-creep — coordinate with the v0.0.9 data-creep audit); a small reusable ImGui plotting helper vs per-panel one-offs; **colourblind-safe palettes** (true accessibility, beyond legibility) and how that interacts with `presentation.hpp` identity colours; whether any of this needs its own authority doc over LAYOUT.md. Pairs with the existing legibility strand (economy-panel refit, market-ledger dashboard) rather than duplicating it. `src/`-changing and renders in the GUI -> brief-spanning `visual` requirement (a `scripts/verify/*.lua` golden) at promotion.\n\n**Design settled (2026-06-29) — targeted to the key economic surfaces.** First pass is focused, not board-wide: (1) Market Ledger — price and supply/demand plotted over time per resource (a trend, not just the current row); (2) economy panel — a running-balance line plus an income-vs-expenditure view over time. Both go through ONE reusable ImGui plotting helper so later surfaces reuse it, and a single colourblind-safe palette defined once (interacting with, not duplicating, presentation.hpp identity colours). History sampling MUST be bounded (a ring-buffer per series) — coordinate the retention window with the v0.0.9 data-creep audit so plotting never becomes an unbounded-growth source. Sparklines-everywhere and lens overlays are out of this pass. Authority: docs/ui/LAYOUT.md (+ the ledger surfaces)."
     }
   ]
 }

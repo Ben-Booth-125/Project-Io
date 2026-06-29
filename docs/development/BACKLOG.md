@@ -111,13 +111,7 @@ categories: § Ledger (multiple-markets visibility), § Trade (warm-start pass),
 
 *(BL-019 prose promoted to backlog.json 2026-06-17.)*
 
-- **[C4 ~] Tooltip simplification — lens-specific, "why" not "what".** *(Written 2026-06-16, v0.0.6
-  brief intake.)* Tooltips give too much data. Reframe them: **less information, lens-specific**, and
-  aimed at **explaining *why* a system behaves as it does** — not at gathering data for quick
-  decisions (that is the ledgers' job). **Defer nested tooltips.** Flagged by the user as a **large,
-  multi-round, detailed Brief touching every visible entity** — a sweep, not a single edit. Couples to
-  the hover-card primitive ([B3 ✓] above) and `docs/ui/TOOLTIP.md`. **Design owed:** the per-entity,
-  per-lens content sweep. Authority `docs/ui/TOOLTIP.md`.
+*(BL-020 prose promoted to backlog.json 2026-06-29 — design settled.)*
 
 ## Menu
 
@@ -458,17 +452,7 @@ Design authority: `docs/generation/NATION_GENERATION.md`.
 
 *(BL-052 prose promoted to backlog.json 2026-06-17.)*
 
-- **[B4 ~] Country generation — more countries, generated "in history".** *(Written 2026-06-16,
-  v0.0.6 brief intake.)* The world needs **more countries** than today's nation generation produces,
-  generated with a sense of **history** rather than a flat Voronoi partition. Couples to
-  NATION_GENERATION (Voronoi BFS today) and the saturated-substrate Brief (§ Environment
-  cross-cutting). **Design direction (2026-06-16, partial):** target **~45 countries** on Kepler
-  (Earth-like density — Earth has hundreds; 45 is a manageable analogue given the lens readability
-  constraint). Size distribution: **open** — keep the design flexible and tune based on the generated
-  landmass and land shapes; a visual review pass after generation is the arbiter (not a fixed
-  formula). "Generated in history" model: **still owed** — what fragmentation, historical conflict,
-  or clustering logic produces this distribution at prototype depth. Count target and distribution
-  are **open for visual revision** post-generation. Authority `docs/generation/NATION_GENERATION.md`.
+*(BL-053 prose promoted to backlog.json 2026-06-29 — design settled; supersedes the earlier ~45-country direction.)*
 
 - **[F5 ~] Deferred — nation behaviour & production passes.** Per NATION_GENERATION.md
   § Open items: the nation *system* (tax, licences, war, infrastructure), the

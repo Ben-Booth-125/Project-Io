@@ -6,6 +6,37 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — Design pass: five design-owed items (2026-06-29)
+
+**Goal.** Design depth only (DELIVERY § depth verbs): settle the open questions for the
+five active `design-owed` items via a Q&A with the developer, write the settled prose into
+`backlog.json`, flip each `design-owed → designed`. No tasks, no code, no authority-doc
+edits (those land with the work).
+
+**Decisions (developer's calls, via two Q&A rounds):**
+- **BL-061 app-driven mouse** — minimal deterministic capture. A `{x,y,active}` cursor-source
+  struct on `ui_state` that canvases read instead of the raw IO mouse; live app feeds the real
+  mouse, `--verify` leaves it inactive (hover off) unless a script sets `verify.mouse` /
+  `verify.hover_tile`. No scripted click/drag this pass.
+- **BL-062 hotkeys** — dev-fixed central action→binding keymap, `canvas_command` subsumed into
+  it, F1 cheat-sheet overlay generated from the keymap. No player rebinding UI yet.
+- **BL-020 tooltips** — lens-contextual "why" on the BL-060 hover-card: name + ≤2 lens-relevant
+  stats + a why-line; data stays in ledgers. Deliverable is the content contract + 2-3 exemplars;
+  the exhaustive sweep is execution.
+- **BL-053 country generation** — clustered seeds, strongly varied sizes (~12-16 on Kepler:
+  a few great powers, several mid, many small), plus a light merge/fragment post-pass for grown
+  borders. Not a historical sim. Cleared the dangling `requires: BL-052` (no such item) and
+  superseded the old ~45-country direction (newest-dated wins).
+- **BL-063 tester graphs** — targeted to the key economic surfaces (Market Ledger price +
+  supply/demand trends; economy-panel running-balance / income-vs-expenditure) via one reusable
+  ImGui plot helper + a colourblind-safe palette; bounded ring-buffer history (coordinate with the
+  v0.0.9 data-creep audit).
+
+**Result.** All five flipped to `designed` (promote-ready); BL-020/BL-053 legacy BACKLOG.md
+bodies tombstoned. The active backlog is now design-complete bar finishing BL-057 off-sandbox.
+
+---
+
 ## Session — BL-057 + BL-040 Batch Delivery (2026-06-28)
 
 **Goal.** Deliver the top two implementation-ready backlog items: BL-057 (cross-platform
