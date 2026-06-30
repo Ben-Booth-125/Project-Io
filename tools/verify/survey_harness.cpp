@@ -153,6 +153,37 @@ int main()
     check( survey_tile_visible(w2.bodies[b2].survey, 80, 80, 0, 0),  "region 0 visible mid-scan");
     check(!survey_tile_visible(w2.bodies[b2].survey, 80, 80, 79, 79), "last region still masked mid-scan");
 
+    // --- ETA must count down by exactly 1/day through transit AND scan ---
+    // Regression guard for the scanning-phase ETA freeze: a single-region body is the
+    // sharp case (regions_done never moves mid-scan, so an ETA derived from it stalls).
+    std::printf("\nETA countdown (scanning ETA must not freeze)\n");
+    {
+        world w3;
+        const entity_id h3   = add_body(w3, 1.0f, 40, 40);
+        const entity_id n3   = add_body(w3, 1.2f,  8,  8);   // 1 region — the frozen-ETA case
+        const entity_id f3   = add_body(w3, 5.0f, 80, 80);   // 100 regions
+        w3.home_body = h3;
+        const entity_id c3 = w3.create_entity();
+        { corporation_component cc; cc.balance = 50000.0f; cc.is_player = true; w3.corporations[c3] = cc; }
+        w3.player_entity = c3;
+        init_survey_states(w3);
+        const survey_schedule en = survey_compute_schedule(w3, n3);
+        const survey_schedule ef = survey_compute_schedule(w3, f3);
+        dispatch_survey(w3, n3);
+        dispatch_survey(w3, f3);
+        bool near_ok = true, far_ok = true;
+        for (int day = 1; day <= ef.total_ticks; ++day)
+        {
+            advance_surveys(w3, 1);
+            if (w3.bodies[n3].survey.phase != survey_phase::surveyed &&
+                survey_eta_days(w3, n3) != en.total_ticks - day) near_ok = false;
+            if (w3.bodies[f3].survey.phase != survey_phase::surveyed &&
+                survey_eta_days(w3, f3) != ef.total_ticks - day) far_ok = false;
+        }
+        check(near_ok, "single-region body ETA counts down 1/day (no freeze)");
+        check(far_ok,  "multi-region body ETA counts down 1/day through scan");
+    }
+
     std::printf("\n%s — %d failure(s)\n", g_failures ? "FAILED" : "PASSED", g_failures);
     return g_failures ? 1 : 0;
 }

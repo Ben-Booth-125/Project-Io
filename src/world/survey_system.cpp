@@ -82,9 +82,13 @@ int survey_eta_days(const world& w, entity_id body)
     const survey_schedule sched = survey_compute_schedule(w, body);
     if (s.phase == survey_phase::hidden)     return sched.total_ticks;
     if (s.phase == survey_phase::in_transit) return s.ticks_remaining + sched.scan_ticks;
-    // scanning: days elapsed into the scan = completion day of the regions done so far.
-    const int elapsed = region_complete_day(s.regions_done, sched.regions_total, sched.scan_ticks);
-    return std::max(0, sched.scan_ticks - elapsed);
+    // scanning: `ticks_remaining` is the days left to the *next* region boundary
+    // (within-region progress); add the completion-day span from that next region to
+    // the last. Deriving "elapsed" from regions_done alone would freeze the ETA between
+    // boundaries — wrong on every day a region does not complete.
+    const int after_next = sched.scan_ticks
+                         - region_complete_day(s.regions_done + 1, sched.regions_total, sched.scan_ticks);
+    return std::max(0, s.ticks_remaining + after_next);
 }
 
 void init_survey_states(world& w)
