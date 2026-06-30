@@ -12,6 +12,9 @@
       "Bash(git checkout*)",
       "Bash(git restore*)",
       "Bash(git worktree*)",
+      "Bash(git merge*)",
+      "Bash(git cherry-pick*)",
+      "Bash(git fetch*)",
       "Bash(cmake *)",
       "Bash(ctest*)",
       "Bash(& \"build*)",
@@ -25,10 +28,9 @@
     ],
     "deny": [
       "Bash(rm -rf *)",
-      "Bash(git push --force*)",
+      "Bash(git push --force )",
       "Bash(git reset --hard*)",
       "Bash(git clean*)",
-      "Bash(git merge*)",
       "mcp__github__merge_pull_request",
       "mcp__github__enable_pr_auto_merge"
     ]
