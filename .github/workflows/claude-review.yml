@@ -44,12 +44,29 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
+    env:
+      # Surfaced so the gate step can detect a missing secret without interpolating
+      # it into a shell command. The review step is skipped (not failed) when unset,
+      # so the workflow stays green until the one-time secret is added.
+      REVIEW_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
     steps:
+      - name: Gate on credential presence
+        id: gate
+        run: |
+          if [ -n "$REVIEW_TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::claude-review skipped — set the CLAUDE_CODE_OAUTH_TOKEN secret to enable (see docs/development/REVIEW_AUTOMATION.md)."
+          fi
+
       - uses: actions/checkout@v4
+        if: steps.gate.outputs.enabled == 'true'
         with:
           fetch-depth: 0   # full history so the reviewer can diff against the base
 
       - uses: anthropics/claude-code-action@v1
+        if: steps.gate.outputs.enabled == 'true'
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: |
