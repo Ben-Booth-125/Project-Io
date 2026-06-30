@@ -34,9 +34,12 @@ but its build is gated on a dependency (named in the lens section).
 
 The strip presents a **curated subset** in this order (BL-013): **Corporation →
 Country → Resource → Market → Population → Opportunity → Production → Scarcity**.
-Supply is off the strip (Layer-5, reached by keyboard lens-cycle). The default
-active lens at campaign start is **Corporation**; the strip is single-select with a
-null state (re-selecting the active lens clears to plain terrain).
+Supply is off the strip (Layer-5, reached by keyboard lens-cycle). The campaign
+opens on **no lens** (`overlay_mode::none`, the plain canvas) — a click only updates
+the Selection element and never re-skins the canvas, so the canvas starts unskinned
+and the player picks a lens deliberately (reverses BL-013's Corporation-default,
+2026-06-30). The strip is single-select with a null state (re-selecting the active
+lens clears to plain terrain).
 
 The per-rung representation of every strip lens (the BL-012 sweep). "—" = no
 representation intended; "✓" = built and active; "(later)" = specified but gated on

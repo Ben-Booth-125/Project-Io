@@ -354,10 +354,12 @@ void app::setup_world()
     // Routed through the shared focus helper rather than poking ui_state.
     ui::focus_on_surface(m_world, m_ui, start_body);
 
-    // Open with the Corporation lens active (BL-013): the player reads their own
-    // footprint first. Single-select with a null state — re-clicking the active
-    // lens clears to overlay_mode::none. See LENSES.md, docs/ui § lens strip.
-    m_ui.overlay = overlay_mode::corporation;
+    // Open on plain terrain — no lens imposed at campaign start. A click only ever
+    // updates the Selection element; it never re-skins the canvas, so the canvas
+    // should likewise start unskinned and let the player pick a lens deliberately
+    // from the strip. (Reverses BL-013's Corporation-default.) Single-select with a
+    // null state — re-clicking the active lens clears back here. See LENSES.md.
+    m_ui.overlay = overlay_mode::none;
 
     // Seed survey states (BL-067): home (and the star) open surveyed; every other
     // body opens hidden until the player dispatches a survey. Shared by run() and
