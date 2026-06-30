@@ -39,8 +39,11 @@ namespace ui {
 ///                 the bottom-right minimap (pass the minimap's left edge less a
 ///                 margin) instead of behind it.
 /// @param bottom_y Bottom edge to anchor the panel against, screen pixels.
+/// @param height   Target bar height, screen pixels — pass the minimap's box
+///                 height so the bar reads as its left-hand twin. Clamped up to
+///                 the minimum needed to show the header + content rows.
 void draw_selection_panel(const world& w, const recipe_registry& reg,
                           const economy_report& report, ui_state& ui,
-                          float left_x, float right_x, float bottom_y);
+                          float left_x, float right_x, float bottom_y, float height);
 
 } // namespace ui

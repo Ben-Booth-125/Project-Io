@@ -401,7 +401,7 @@ void draw_building_profit(const world& w, const recipe_registry& reg,
 
 void draw_selection_panel(const world& w, const recipe_registry& reg,
                           const economy_report& report, ui_state& ui,
-                          float left_x, float right_x, float bottom_y)
+                          float left_x, float right_x, float bottom_y, float height)
 {
     const selection_kind kind = selection_kind_of(w, ui.selected_entity);
 
@@ -416,19 +416,21 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
     // The bar is anchored by its bottom-left corner to (left_x, bottom_y) and
     // spans across to right_x — the gap between the nav pane and the bottom-right
     // minimap — so it sits beside the minimap rather than running behind it.
-    // Height is fixed to fit portrait + header + two content rows (~5 ImGui rows).
     const float bar_w        = std::max(0.0f, right_x - left_x);
     constexpr float portrait_w = 88.0f;  // portrait column width
     const float line_h = ImGui::GetTextLineHeightWithSpacing();
     const float frame_h = ImGui::GetFrameHeight();
     const ImGuiStyle& style = ImGui::GetStyle();
-    // Bar height: header row + separator + two content rows + top+bottom padding.
-    const float bar_h = style.WindowPadding.y * 2.0f
+    // Height matches the minimap (caller passes its box height) so the bar reads as
+    // the minimap's left-hand twin. We never shrink below what the content needs:
+    // header row + separator + two content rows + top/bottom padding.
+    const float min_h = style.WindowPadding.y * 2.0f
                       + frame_h                          // header row
                       + style.ItemSpacing.y
                       + 1.0f                             // separator
                       + style.ItemSpacing.y
                       + line_h * 4.0f;                  // content rows
+    const float bar_h = std::max(min_h, height);
 
     ImGui::SetNextWindowPos({left_x, bottom_y}, ImGuiCond_Always, {0.0f, 1.0f});
     ImGui::SetNextWindowSize({bar_w, bar_h}, ImGuiCond_Always);
@@ -441,6 +443,7 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
         ImGuiWindowFlags_NoNav                 |
         ImGuiWindowFlags_NoBringToFrontOnFocus |
         ImGuiWindowFlags_NoScrollbar           |
+        ImGuiWindowFlags_NoScrollWithMouse     |
         ImGuiWindowFlags_NoSavedSettings;
     ImGui::Begin("##selection_info", nullptr, flags);
 
@@ -466,20 +469,23 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
     ImGui::SameLine();
 
     // ── Content area (right of portrait) ─────────────────────────────────────
-    const float content_x = ImGui::GetCursorPosX();
     const float content_w = ImGui::GetContentRegionAvail().x;
     ImGui::BeginGroup();
 
-    // Header row: name (tinted) + type label on the left; [Go To] [✕] on the right.
+    // Header row: name (tinted) + type label on the left; [Go to] [x] on the right.
     {
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
                            "%s", selection_title(w, kind, ui.selected_entity));
         ImGui::SameLine();
         ImGui::TextDisabled("%s", selection_kind_name(kind));
 
-        const float btn   = frame_h;
-        const float right = content_x + content_w - style.WindowPadding.x;
-        ImGui::SameLine(right - 2.0f * btn - style.ItemSpacing.x);
+        // Right-align [go to] [close] at the content column's right edge. SameLine's
+        // offset is measured from THIS group's origin (the content column), so it
+        // must use content_w directly and NOT re-add content_x — adding content_x
+        // pushed the pair ~one column past the window's right edge, where ImGui
+        // clipped them away unseen (the bug that hid these buttons entirely).
+        const float btn = frame_h;
+        ImGui::SameLine(content_w - style.WindowPadding.x - 2.0f * btn - style.ItemSpacing.x);
 
         if (ImGui::Button(">", {btn, btn}))
             focus_on_entity(w, ui, ui.selected_entity);
@@ -502,7 +508,8 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
 
     // Section A
     ImGui::BeginChild("##sel_section_a", {half_w, 0.0f}, false,
-                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings);
+                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
+                      ImGuiWindowFlags_NoSavedSettings);
     draw_summary(w, kind, ui.selected_entity);
     ImGui::EndChild();
 
@@ -510,7 +517,8 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
 
     // Section B
     ImGui::BeginChild("##sel_section_b", {half_w, 0.0f}, false,
-                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings);
+                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
+                      ImGuiWindowFlags_NoSavedSettings);
     draw_lens_supplement(w, reg, report, ui, kind);
     if (kind == selection_kind::tile)
         draw_build_front_door(w, reg, ui, ui.selected_entity);
