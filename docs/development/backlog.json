@@ -39,7 +39,7 @@
       "short_name": "TIME_CONTROL_VIEW",
       "category": "Canvas",
       "title": "Clarify the time control view",
-      "status": "designed",
+      "status": "complete",
       "glyph": "✓",
       "priority": "F",
       "difficulty": 3,
@@ -52,7 +52,7 @@
         "src/ui/canvas_command.hpp"
       ],
       "authority_doc": "docs/ui/TIME_CONTROLS.md",
-      "summary": "Production clock: year+quarter+month/day, a worded days-until-next-quarter countdown (Q2 in 47d), speed curve; Space=pause, 1-5=speed via canvas_command. v0.0.8 polish.",
+      "summary": "Production clock: year+quarter+month/day, a worded days-until-next-quarter countdown (Q2 in 47d), speed curve; Space=pause, 1-5=speed via canvas_command. v0.0.8 polish. [COMPLETE 2026-06-30: econ-tick days-until-next-quarter countdown shipped in the time panel (src/core/app.cpp).]",
       "design": "@BACKLOG.md"
     },
     {
@@ -175,8 +175,8 @@
       "short_name": "TOOLTIP_SIMPLIFICATION",
       "category": "Canvas",
       "title": "Tooltip simplification — lens-specific, why not what",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "complete",
+      "glyph": "✓",
       "priority": "C",
       "difficulty": 4,
       "parked": false,
@@ -187,7 +187,7 @@
       "written": "2026-06-16",
       "files": [],
       "authority_doc": "docs/ui/TOOLTIP.md",
-      "summary": "Reframe tooltips: less data, lens-specific, explain WHY a system behaves (ledgers are for data). The 2026-06-24 accessibility review adds a cognitive-accessibility rationale — a 'why not what' tooltip reduces the interpretive load of the colour-coded lenses, pairing with BL-016's labels/legend. Defer nested tooltips. A large multi-round sweep over every visible entity. Design owed: the per-entity/per-lens content sweep.",
+      "summary": "Reframe tooltips: less data, lens-specific, explain WHY a system behaves (ledgers are for data). The 2026-06-24 accessibility review adds a cognitive-accessibility rationale — a 'why not what' tooltip reduces the interpretive load of the colour-coded lenses, pairing with BL-016's labels/legend. Defer nested tooltips. A large multi-round sweep over every visible entity. Design owed: the per-entity/per-lens content sweep. [COMPLETE 2026-06-30: shipped as lens-contextual hover-card content (src/ui/hover_content.cpp; 3 exemplars Tile×Resource, Building×Supply, Market×Market + graceful fallback). Per-combo coverage is incremental follow-on.]",
       "design": "**Problem.** Tooltips give too much data. Reframe them: **less information, lens-specific**, aimed at explaining **why** a system behaves as it does — not at gathering data for quick decisions (that is the ledgers' job). The 2026-06-24 accessibility review adds a **cognitive-accessibility** rationale: the colour-coded lenses impose interpretive load, and a 'why, not what' tooltip that names what a lens is showing reduces that load (and pairs with the on-canvas labels/legend in BL-016).\n\n**Defer nested tooltips.** Flagged as a **large, multi-round sweep** touching every visible entity — a sweep, not a single edit. Couples to the hover-card primitive (BL-060) and `docs/ui/TOOLTIP.md`.\n\n**Open questions (design owed):** the per-entity, per-lens content sweep; the 'why' phrasing per lens; how it coordinates with the BL-016 legend so the two do not duplicate. The **cognitive half** of the accessibility strand. Authority `docs/ui/TOOLTIP.md`. *(Written 2026-06-16, v0.0.6 brief intake; cognitive-accessibility note 2026-06-24.)*",
       "waits_on": [
         "HOVER_CARD_PRIMITIVE"
@@ -491,7 +491,7 @@
       "short_name": "LAYER4_INDEX",
       "category": "Infrastructure",
       "title": "Layer 4 — population centres + building management (index)",
-      "status": "designed",
+      "status": "complete",
       "glyph": "✓",
       "priority": "S",
       "difficulty": 5,
@@ -501,7 +501,7 @@
       "written": null,
       "files": [],
       "authority_doc": "docs/development/ROADMAP.md",
-      "summary": "Umbrella index (NOT promotable) over the population + building-management layer. Fully decomposed 2026-06-15 into its child items (POPULATION_STATIC_MVP, POPULATION_DYNAMIC, WORKFORCE_POOL_STEP2, the ledger family, BUILDING_MANAGEMENT). No design owed at this level.",
+      "summary": "Umbrella index (NOT promotable) over the population + building-management layer. Fully decomposed 2026-06-15 into its child items (POPULATION_STATIC_MVP, POPULATION_DYNAMIC, WORKFORCE_POOL_STEP2, the ledger family, BUILDING_MANAGEMENT). No design owed at this level. [COMPLETE 2026-06-30: umbrella index; all child items (population static/dynamic, workforce pool, ledger family, building management) shipped across v0.0.5–v0.0.7.]",
       "design": "@BACKLOG.md"
     },
     {
@@ -641,7 +641,7 @@
       "short_name": "CROSS_PLATFORM_BUILD",
       "category": "Development",
       "title": "Cross-platform build (Linux + Windows)",
-      "status": "designed",
+      "status": "complete",
       "glyph": "✓",
       "priority": "SSS",
       "difficulty": 4,
@@ -658,7 +658,7 @@
         "docs/tech/TECH_FOUNDATIONS.md"
       ],
       "authority_doc": "docs/tech/TECH_FOUNDATIONS.md",
-      "summary": "Linux+Windows build. Source already Linux-clean (FetchContent deps, LUA_USE_POSIX guarded) except src/ui/fonts.cpp's hardcoded Windows font paths; fix = bundle assets/fonts + SDL_GetBasePath prepend, Windows paths as fallback. Headless tier builds anywhere; GitHub Actions both-OS headless CI as the guard. Dev moves to Linux (dual-boot); visual-verify offscreen (dummy+software renderer / Xvfb) is a deferred spike.",
+      "summary": "Linux+Windows build. Source already Linux-clean (FetchContent deps, LUA_USE_POSIX guarded) except src/ui/fonts.cpp's hardcoded Windows font paths; fix = bundle assets/fonts + SDL_GetBasePath prepend, Windows paths as fallback. Headless tier builds anywhere; GitHub Actions both-OS headless CI as the guard. Dev moves to Linux (dual-boot); visual-verify offscreen (dummy+software renderer / Xvfb) is a deferred spike. [COMPLETE 2026-06-30: native Linux GCC-14 build confirmed (C language enabled, sol2 v3.5.0); Windows + dual-GCC CI green; advisory Xvfb visual-verify job added.]",
       "design": "**Origin.** Linux + Windows cross-platform was original CONCEPT scope. Surfaced 2026-06-17 while wanting to run the build/verify loop from the Cowork Linux sandbox; Ben will move primary development to Linux (machine is dual-boot).\n\n**Finding — the source is already Linux-clean.** Audited all 93 `src/*` files: no `windows.h`, `WinMain`, `__declspec`, `_WIN32`/`_MSC_VER` guards, or `MAX_PATH`. Every dependency is cross-platform and acquired via CMake `FetchContent` (SDL3 release-3.2.0, Lua 5.4.7, sol2 v3.3.0, ImGui v1.91.6) — no vcpkg / system-package assumptions. `CMakeLists.txt` already guards Lua's `LUA_USE_POSIX` under `if(UNIX)`. So this is a build-environment job, not a source port — with one exception.\n\n**The one source gap — font loading.** `src/ui/fonts.cpp` hardcodes Windows system fonts (`C:/Windows/Fonts/segoeui.ttf`, tahoma, arial, verdana); `fonts.hpp` already flags this as Windows-only per TECH_FOUNDATIONS and names the intended fix. Fix: bundle a redistributable TTF under `assets/fonts/`, resolve it relative to the executable (`SDL_GetBasePath`) and prepend it to the candidate list; keep the Windows paths as a trailing fallback so Windows builds are unchanged. Built-in ProggyClean stays the final fallback. Small and self-contained — but it changes `src/` and renders in the GUI, so it must be visually verified on a real build (i.e. on Ben's Linux box), not blind-shipped from the sandbox.\n\n**Tiers — what runs where.**\n- *Headless tier* (`tools/verify/*.cpp` over `world/*`, deliberately SDL/Lua/ImGui-free): builds anywhere with g++/cmake. Already portable; nothing owed. The Cowork/CI-friendly target.\n- *Windowed app on Linux*: needs cmake + SDL3 build deps (X11/Wayland + GL dev headers) + the font fix. No code changes beyond fonts. Runnable natively once Ben is on Linux.\n- *Visual-verify tier* (`ProjectIo --verify` → PNG golden diff): `app.cpp` creates a real `SDL_Window` + `SDL_CreateRenderer`, so it runs natively on a Linux desktop. For *headless CI* it needs offscreen rendering (`SDL_VIDEODRIVER=dummy` + the SDL software renderer feeding `SDL_RenderReadPixels` → `png_writer`), else an Xvfb virtual display. **Open spike:** confirm dummy + software-renderer pixel readback under SDL3 3.2.0; fall back to Xvfb in CI if it won't read back. Contained — blocks neither the headless tier nor native Linux runs.\n\n**Settled decisions (2026-06-17).**\n- *Primary dev OS → Linux* (Ben's dual-boot machine). Makes native GUI + visual-verify available locally and flips Windows to the at-risk platform.\n- *CI → GitHub Actions, both OS, headless tier now.* Build `ubuntu-latest` + `windows-latest` and run the headless harnesses on push — the standing guard against Windows drift now that dev is Linux-side. Cache `FetchContent` deps to keep runs cheap. Visual-verify is added to CI **after** the offscreen spike, not on day one.\n\n**Recommended sequence.**\n1. Font portability fix (`assets/fonts/*.ttf` + candidate-list change) — unblocks any Linux GUI/visual build. *(touches src — verify the render on Linux.)*\n2. Confirm a native Linux configure+build of the full app; document the recipe (cmake + SDL3 deps) in TECH_FOUNDATIONS.\n3. CI workflow: ubuntu + windows build + headless harnesses, with dep caching.\n4. Offscreen-render spike; if green, add the visual-verify tier to CI.\n\n**Out of scope:** packaging/installers, macOS, broader runtime asset-path overhaul beyond fonts.\n\n**Cowork-session note (2026-06-17):** the design above is settled here, but the build/verify steps cannot be exercised in the Cowork sandbox (no cmake, no SDL3 deps, ephemeral dep re-pull). Execution — font edit, native build, CI YAML — lands on Ben's Linux box or in CI itself."
     },
     {
@@ -734,8 +734,8 @@
       "short_name": "APP_DRIVEN_MOUSE",
       "category": "Development",
       "title": "Application-driven mouse — scriptable cursor override for deterministic capture",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "complete",
+      "glyph": "✓",
       "priority": "B",
       "difficulty": 3,
       "parked": false,
@@ -748,7 +748,7 @@
         "src/ui/ui_state.hpp"
       ],
       "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
-      "summary": "A verify/app-controlled synthetic cursor so the real OS mouse position cannot leak into --verify captures (hover highlight + hover-card perturb the frame -> flaky goldens). Also the foundation for scripted pointer input (move/click/drag) in the verify harness. Design owed: synthetic-vs-real source switch, global hover-suppress vs explicit positioning, click/drag API surface.",
+      "summary": "A verify/app-controlled synthetic cursor so the real OS mouse position cannot leak into --verify captures (hover highlight + hover-card perturb the frame -> flaky goldens). Also the foundation for scripted pointer input (move/click/drag) in the verify harness. Design owed: synthetic-vs-real source switch, global hover-suppress vs explicit positioning, click/drag API surface. [COMPLETE 2026-06-30: application-driven mouse (ui_state::mouse + verify Lua mouse()/hover_tile()) shipped; OS cursor suppressed in --verify captures.]",
       "design": "**Problem.** Headless `--verify` captures read the live `ImGui::GetIO().MousePos`, so wherever the real OS cursor happens to sit leaks into the frame as a hovered-tile highlight (and the hover-card). A cursor that moves between or during captures changes the rendered frame -> golden flake. Observed in the Lens & Legibility batch (2026-06-17): the draw-order sort fixed the `unordered_map` half of the nondeterminism, but a moving mouse is the other half. See [[reference_worktree_gui_build]].\n\n**Proposal.** An **application-driven mouse**: a single source-of-truth cursor position the canvases consume instead of the raw IO mouse, with an override the verify harness (and later scripted input) sets. In `--verify`, hover is **off by default** (no synthetic position) and a script opts in with an explicit `verify.mouse(x,y)` / `verify.hover_tile(col,row)`; in the live app the source is the real mouse. This makes captures deterministic regardless of the OS cursor and is the groundwork for **scripted pointer input** (move/click/drag) the verify harness currently lacks.\n\n**Open questions (design owed):** where the synthetic-vs-real switch lives (ui_state flag? a thin input source abstraction?); whether to suppress hover globally in verify or require explicit positioning; whether to generalise to full scripted click/drag now or stub the API; interaction with the existing `verify.center_tile`/`canvas_command` vocabulary. Pairs with [[the hotkey/input system]] (BL: HOTKEY_SYSTEM) — both want a small input-dispatch layer. Relates to the determinism work landed in the lens batch."
     },
     {
@@ -756,8 +756,8 @@
       "short_name": "HOTKEY_SYSTEM",
       "category": "Menu",
       "title": "Full hotkey system — unified, rebindable keymap + discoverability",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "complete",
+      "glyph": "✓",
       "priority": "C",
       "difficulty": 4,
       "parked": false,
@@ -769,7 +769,7 @@
         "src/core/app.cpp"
       ],
       "authority_doc": "docs/ui/MENU.md",
-      "summary": "Replace the ad-hoc, partly-hardcoded input (canvas_command vocabulary + Space=pause, 1-5 speed, lens cycle) with a unified hotkey system: a central action->binding keymap, rebindable, discoverable (help/cheat-sheet overlay), covering canvas nav, lens selection, time control, ledger toggles, and build. Design owed: binding storage, conflict/chord handling, the help surface, context scoping, how it subsumes canvas_command. Reframed 2026-06-24 as the motor-accessibility half of the accessibility strand — keyboard-complete, rebindable operation is the top motor-access win.",
+      "summary": "Replace the ad-hoc, partly-hardcoded input (canvas_command vocabulary + Space=pause, 1-5 speed, lens cycle) with a unified hotkey system: a central action->binding keymap, rebindable, discoverable (help/cheat-sheet overlay), covering canvas nav, lens selection, time control, ledger toggles, and build. Design owed: binding storage, conflict/chord handling, the help surface, context scoping, how it subsumes canvas_command. Reframed 2026-06-24 as the motor-accessibility half of the accessibility strand — keyboard-complete, rebindable operation is the top motor-access win. [COMPLETE 2026-06-30: unified hotkey dispatch (s_bindings, dispatch_action) + F1 cheat-sheet overlay shipped (src/core/app.cpp, canvas_command.*).]",
       "design": "**Problem.** Input bindings are scattered and partly hardcoded: the `canvas_command` vocabulary (pan/zoom/ascend/descend/body+lens cycle) plus hardcoded keys (Space = pause, 1-5 = speed, lens cycle), with no single place a player or developer can see or change them. There is no discoverability and no rebinding.\n\n**Proposal (to design).** A **unified hotkey system**: one central **action -> binding** keymap that every input flows through, covering canvas navigation, lens selection (the curated strip + cycle), time control, ledger/panel toggles, and build/placement. Rebindable, with a **discoverable cheat-sheet / help overlay**. The existing `canvas_command` enum is a natural action vocabulary to build on / subsume.\n\n**Open questions (design owed):** binding storage (a keymap file vs settings.json vs in-engine config); conflict detection and resolution; chord / modifier support; the help-overlay surface and how it lists bindings; **context scoping** (do bindings differ by canvas rung / modal state / placement mode?); whether `canvas_command` becomes the action layer or is replaced; player-facing rebinding UI vs developer-only config for the prototype. Bundled with [[the application-driven mouse]] (BL: APP_DRIVEN_MOUSE) as the project's input strand — both could share a small input-dispatch layer; sequence the keymap on top of, or alongside, that. Consider whether a dedicated `docs/ui/HOTKEYS.md` authority doc is warranted over MENU.md.\n\n**Accessibility (2026-06-24 review).** This item is the **motor-accessibility** half of the prototype's accessibility strand: keyboard-complete operation is the single biggest win for players who cannot use a mouse precisely (the UI is otherwise mouse-only, with small targets — the icon nav rail, the tight time-control buttons, individual hexes), and **rebindable** bindings matter for switch-access and one-handed users. Companion to BL-063 (legibility/contrast) and BL-016 (colour-vision). The review is a concrete argument for raising this above its current C priority."
     },
     {
@@ -791,16 +791,15 @@
         "src/ui/presentation.hpp"
       ],
       "authority_doc": "docs/ui/ACCESSIBILITY.md",
-      "summary": "Legibility baseline from the 2026-06-24 accessibility UX review: a global UI-scale control (ImGui FontGlobalScale / font re-load) and a secondary-text contrast pass to clear WCAG AA on dim header/label/ledger text. The non-colour half of accessibility — colour-vision stays in BL-016, motor/keyboard in BL-062. Design owed: scale storage/persistence, the FontGlobalScale-vs-refont tradeoff, a measured contrast token audit, whether a docs/ui/ACCESSIBILITY.md is warranted.",
+      "summary": "Legibility baseline from the 2026-06-24 accessibility UX review: a global UI-scale control (ImGui FontGlobalScale / font re-load) and a secondary-text contrast pass to clear WCAG AA on dim header/label/ledger text. The non-colour half of accessibility — colour-vision stays in BL-016, motor/keyboard in BL-062. Design owed: scale storage/persistence, the FontGlobalScale-vs-refont tradeoff, a measured contrast token audit, whether a docs/ui/ACCESSIBILITY.md is warranted. [NOTE 2026-06-30: this is the WCAG-contrast + UI-scale item; distinct from the shipped tester-legibility trend plots now tracked as BL-066. The 'BL-063' label on the trend-plots commits predates this slot's reassignment.]",
       "design": "**Problem.** A UX/accessibility review (2026-06-24) of the blessed golden captures surfaced two legibility barriers no existing item covers:\n\n1. **Low secondary-text contrast.** Label/secondary text is dim grey on near-black — the header fields (`Parent`, `Standing`, `NET ±0/qtr`), the EXPLORER placeholder, and ledger sub-labels sit below the WCAG AA 4.5:1 body-text ratio.\n2. **Single fixed UI scale.** Everything renders at one scale. The dense monospace ledgers (balance, corp dashboard, building management) are already small at 1280×720 and become punishing on high-DPI displays; there is no user control to enlarge.\n\nBoth hurt low-vision players, ageing eyes, and high-glare settings.\n\n**Proposal (to design).** A deliberately *narrow* legibility baseline — the non-colour half of accessibility (colour-vision lives in BL-016, motor/keyboard in BL-062):\n\n- **Global UI scale.** A user-adjustable scale through ImGui — either `FontGlobalScale` (cheap, slightly blurry) or re-loading the font atlas at a chosen px in `src/ui/fonts.cpp` (`load_ui_font`, crisp, heavier) — persisted in settings. Likely a discrete step set (e.g. 1.0 / 1.25 / 1.5) so layouts are tested at known sizes rather than a free slider.\n- **Secondary-text contrast pass.** Lift the dim secondary/label tokens to clear AA. Identity colours live in `src/ui/presentation.hpp`; the base theme is `StyleColorsDark()` at `src/core/app.cpp:129`.\n\n**Open questions (design owed):** where the scale setting lives (settings.json vs an in-engine options surface) and how it persists; `FontGlobalScale` vs font-atlas re-load; discrete steps vs continuous; which exact tokens are below AA and their replacement values (needs a measured contrast audit of `presentation.hpp` + the dark theme); whether this warrants a dedicated `docs/ui/ACCESSIBILITY.md` authority doc (proposed) or folds into `LAYOUT.md`. Companion to BL-016 (colour-vision) and BL-062 (motor/keyboard) — together the three are the prototype's **accessibility strand**. *(Written 2026-06-24, accessibility UX review.)*"
-    }
-    ,
+    },
     {
       "id": "BL-064",
       "short_name": "CLOCK_ROMAN_NUMERALS",
       "category": "UI",
       "title": "Clock speed buttons — Roman numeral labels",
-      "status": "designed",
+      "status": "complete",
       "glyph": "✓",
       "priority": "C",
       "difficulty": 1,
@@ -813,7 +812,7 @@
         "docs/ui/TIME_CONTROLS.md"
       ],
       "authority_doc": "docs/ui/TIME_CONTROLS.md",
-      "summary": "Relabel the five speed buttons from Arabic numerals (1–5) to Roman numerals (I–V). Roman numerals are the established convention for speed tiers in grand strategy games and read more naturally as an ordinal scale than multiplicative fractions.",
+      "summary": "Relabel the five speed buttons from Arabic numerals (1–5) to Roman numerals (I–V). Roman numerals are the established convention for speed tiers in grand strategy games and read more naturally as an ordinal scale than multiplicative fractions. [COMPLETE 2026-06-30: speed buttons relabelled I–V, pause as || (src/core/app.cpp).]",
       "design": "**Change.** The five speed buttons in the time panel (right column) currently show `1` `2` `3` `4` `5`. Replace them with `I` `II` `III` `IV` `V`. The pause button already uses `II` (a double vertical bar / pause glyph); review whether this visually conflicts with speed button `II` and, if so, consider a distinct pause glyph (e.g. `⏸` drawn via `ui::icons`, or a filled `||` variant, or the word `PAUSE`) to keep the two visually distinct. The underlying multiplier mapping (0.25×, 0.5×, 1×, 4×, 16×) and the keyboard shortcuts (1–5 keys, Space = pause) are **unchanged** — this is purely a label change. Keyboard shortcuts are not relabelled to match (pressing `I` does not mean speed I; the digit keys remain the shortcuts), so the on-screen label and the key that triggers it deliberately differ — consistent with genre convention. Update the button strings in the time panel rendering code (`src/core/app.cpp`) and propagate the label change into `docs/ui/TIME_CONTROLS.md`."
     },
     {
@@ -821,7 +820,7 @@
       "short_name": "SELECTION_BOTTOM_BAR",
       "category": "UI",
       "title": "Selection info element — full-width bottom bar layout",
-      "status": "designed",
+      "status": "complete",
       "glyph": "✓",
       "priority": "B",
       "difficulty": 3,
@@ -836,8 +835,88 @@
         "docs/ui/LAYOUT.md"
       ],
       "authority_doc": "docs/ui/SELECTION.md",
-      "summary": "Redesign the Selection info element from a narrow bottom-left pinned panel to a full-width bar spanning the bottom of the screen, tall enough to show an entity portrait alongside multiple content sections simultaneously in one view.",
+      "summary": "Redesign the Selection info element from a narrow bottom-left pinned panel to a full-width bar spanning the bottom of the screen, tall enough to show an entity portrait alongside multiple content sections simultaneously in one view. [COMPLETE 2026-06-30: full-width bottom selection bar with portrait column + summary/lens-supplement sections shipped (src/ui/selection_panel.cpp).]",
       "design": "**Motivation.** The current spec pins the Selection element to the bottom-left, above the overlay strip, at the same compact height as the overlay controls. That height is insufficient to show an entity portrait (photo/emblem) alongside multiple stat sections at once — the user has to scroll or the content is hidden. A full-width bottom bar solves this: it keeps every section visible simultaneously and reserves a portrait column on the left.\n\n**Layout proposal.**\n```\n┌──────────────────────────────────────────────────────────────────────┐\n│ [Portrait] │ Header (name + type + icon) [Go To] [✕] │              │\n│            ├──────────────────────────────────────────┤  Section C   │\n│  (image /  │  Section A           │  Section B        │              │\n│   emblem)  │  (primary stat block)│  (secondary info) │              │\n└──────────────────────────────────────────────────────────────────────┘\n```\n- **Span**: full canvas width (nav rail to right edge), pinned to the bottom of the screen, above nothing (the overlay control strip is folded in or repositioned).\n- **Height**: fixed at a value that accommodates a portrait plus 2–3 rows of text content simultaneously — approximately the height of 4–5 standard ImGui rows (tentative; tune during implementation).\n- **Portrait column** (leftmost, fixed width ~80–100 px): entity image or emblem drawn via ImGui image or a placeholder glyph from `ui::icons` while real portraits are absent.\n- **Content area** (remainder): split horizontally into two or three sections depending on selection kind. Each section is a vertical stack of labelled rows (using the shared content builders from `entity_summary`). The header row (name + type + icon + 'Go to' + close) spans the full content area at the top.\n- **Overlay control strip**: currently bottom-left; with the bar taking the full bottom edge, the overlay strip either (a) moves to a floating position over the canvas (near the lens-icon cluster), or (b) is inlined into the bar when a selection is active and shown at its original position when nothing is selected. This is the main layout conflict to resolve at implementation time.\n\n**Behaviour is unchanged from SELECTION.md**: single-click selects, double-click navigates, the bar hides when nothing is selected, close hides it. The 'go to' button and polymorphic content-by-kind model are unaffected — only the chrome and layout change.\n\n**Multi-section content examples:**\n- *Tile*: portrait = terrain icon; Section A = composition × landform, hazard, habitability; Section B = deposit profile; Section C = Build here affordance.\n- *Body*: portrait = body graphic/icon; Section A = name, type, orbit, parent; Section B = surface summary (terrain histogram); Section C = market headline / ownership.\n- *Building*: portrait = building glyph; Section A = type, recipe, throughput; Section B = host tile stats; Section C = action buttons (decommission, upgrade — deferred).\n\n**Requirements.** A `visual` requirement (golden capture via `scripts/verify/selection_bar.lua`) should confirm the bar renders at the correct position and height, and that the portrait + sections are visible simultaneously without scrolling, for a representative selection kind (e.g. Tile)."
+    },
+    {
+      "id": "BL-066",
+      "short_name": "TREND_PLOTS",
+      "category": "Ledger",
+      "title": "Tester-legibility trend plots — balance/market history graphs",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-06-30",
+      "files": [
+        "src/ui/plot_history.hpp",
+        "src/ui/economy_panel.cpp",
+        "src/ui/economy_panel.hpp",
+        "src/ui/market_ledger.cpp",
+        "src/ui/market_ledger.hpp"
+      ],
+      "authority_doc": "docs/ui/LAYOUT.md",
+      "summary": "Income/expenditure and market-price history captured into capped ring buffers and drawn as sparkline trend plots in the Economy panel and Market Ledger (Okabe-Ito palette). [COMPLETE 2026-06-30: shipped in the v0.0.7 batch; originally committed under the 'BL-063' label before that slot was reassigned to the accessibility item — recorded here to keep the shipped history queryable.]",
+      "design": "Shipped. See src/ui/plot_history.hpp (push_capped ring buffer, draw_plot, Okabe-Ito colours) and the Economy panel / Market Ledger integration. Authority on landing: docs/ui/LAYOUT.md."
+    },
+    {
+      "id": "BL-067",
+      "short_name": "SURVEY_SYSTEM",
+      "category": "Discovery",
+      "title": "Survey system — bodies start unsurveyed; survey action reveals tile map + deposit bands",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "A",
+      "difficulty": 5,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-06-30",
+      "files": [],
+      "authority_doc": "docs/development/ROADMAP.md",
+      "summary": "v0.0.8 discovery strand. Bodies start unsurveyed: tile map + deposit profile hidden until a player-dispatched survey completes (credit cost + N ticks). Solar canvas marks survey status; planetary canvas shows a locked state pre-survey. Earth/home body start surveyed. Deposit richness revealed as a band (rich/moderate/sparse) at survey; exact amounts confirmed on first extraction-site placement. DESIGN OWED.",
+      "design": ""
+    },
+    {
+      "id": "BL-068",
+      "short_name": "VISIBILITY_MODEL",
+      "category": "Discovery",
+      "title": "Visibility model — competitor info asymmetry (markers public, production/stockpile private, markets public)",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "A",
+      "difficulty": 4,
+      "parked": false,
+      "requires": [
+        "BL-067"
+      ],
+      "blocked_on": [],
+      "written": "2026-06-30",
+      "files": [],
+      "authority_doc": "docs/development/ROADMAP.md",
+      "summary": "v0.0.8 discovery strand. Competitor buildings visible as on-canvas markers (physical, unambiguous). Hover cards on rival installations show type + owner only; production rates and stockpile quantities are PRIVATE. Market supply/demand aggregates and prices are PUBLIC (the intelligence channel). Hover cards and the Selection panel branch on corp ownership. Requires survey (BL-067). DESIGN OWED.",
+      "design": ""
+    },
+    {
+      "id": "BL-069",
+      "short_name": "POPULATION_LEGIBILITY",
+      "category": "UI",
+      "title": "Population legibility — surface habitability→workforce reasoning in lens / hover / selection",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "B",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-06-30",
+      "files": [],
+      "authority_doc": "docs/development/ROADMAP.md",
+      "summary": "v0.0.8 discovery strand. Mechanics already simulate habitability→workforce feedback; this surfaces it. Population lens, hover cards, and the Selection panel show population-centre scale, local habitability, and the derived workforce cap so the player can reason about siting. No new mechanics — surfacing only. DESIGN OWED.",
+      "design": ""
     }
   ]
 }

@@ -6,6 +6,45 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — branch merge + backlog reconciliation (2026-06-30)
+
+**Context.** Brought `main` up to date by merging the five active feature branches
+(`current-build-compile`, `top-5-backlog-items`, `backlog-item-count`, the BL-010 fix + Roadmap
+advance cherry-picked from `lens-tile-selection-bug`, and finally the authoritative
+`game-clock-layout-updates`). 23 commits landed on `main`. Then reconciled `backlog.json`, whose
+statuses had drifted out of sync with what actually shipped.
+
+**Merge resolutions.**
+- sol2 pinned to **v3.5.0** via HTTPS tarball (resolving the `GIT_REPOSITORY` vs `URL` conflict in
+  `CMakeLists.txt` in favour of the URL form on the GCC-14-compatible tag).
+- Settings deny-list: removed the `git merge*` blanket deny (it blocked the very merges this task
+  required) and re-tightened `git push --force ` (trailing space) so plain `--force` stays denied
+  while `--force-with-lease` is allowed.
+
+**Backlog reconciliation — the load-bearing cleanup.** Seven items shipped in the v0.0.7 batch but
+were still flagged `designed`/`design-owed`, inflating the open count. Marked **complete**: BL-008
+(econ countdown), BL-020 (lens hover-card content), BL-061 (app-driven mouse), BL-062 (hotkey
+system + F1), BL-064 (Roman-numeral speed labels), BL-065 (full-width selection bar), BL-057
+(cross-platform build). BL-046 (Layer 4 umbrella) → complete (all children shipped).
+
+**Two merge-induced ID problems, both resolved.**
+1. **BL-063 collision.** The tester-legibility **trend plots** shipped under the `BL-063` commit
+   label, but the `backlog-item-count` branch had meanwhile reassigned the `BL-063` *slot* to a
+   distinct, unshipped **accessibility & legibility baseline** item (WCAG contrast + UI scale). Kept
+   BL-063 = accessibility (still `design-owed`); recorded the shipped trend-plots work as new
+   **BL-066** (`complete`) so the history stays queryable.
+2. **Lost v0.0.8 items.** The Roadmap cherry-pick intended `BL-064 SURVEY_SYSTEM` /
+   `BL-065 VISIBILITY_MODEL`, but game-clock's BL-064/065 (Roman numerals / selection bar) won the
+   `backlog.json` auto-merge, dropping survey & visibility. Re-created the v0.0.8 discovery theme as
+   **BL-067** (survey system), **BL-068** (visibility model, `requires` BL-067), **BL-069**
+   (population legibility) — all `design-owed`, design to be authored next.
+
+**State after.** Open work is now legible: 1 `designed` (BL-040, parked to v0.2) and 10
+`design-owed`, of which the A-priority pair BL-067/BL-068 is the next design target (v0.0.8
+Discovery & Intelligence). `REFINED.md` still carries the v0.0.6/v0.0.7 archived task groups — left
+in place pending an explicit call on whether to trim it back to its empty-between-blocks resting
+state.
+
 ## Session — BL-057 first native Linux GUI build (2026-06-29)
 
 **Context.** Bringing the full GUI/CMake app up on a fresh Ubuntu 24.04 laptop — the piece
