@@ -6,7 +6,8 @@
 void apply_budget(world& w,
                   const recipe_registry& reg,
                   const std::unordered_map<entity_id, corp_cash_flow>& flows,
-                  const std::map<std::pair<entity_id, entity_id>, float>& contention)
+                  const std::map<std::pair<entity_id, entity_id>, float>& contention,
+                  std::map<entity_id, corp_budget>* breakdown)
 {
     // BL-042B: mean habitability per body (from population centres) for wage scaling.
     std::map<entity_id, float> mean_habitability_by_body;
@@ -30,13 +31,23 @@ void apply_budget(world& w,
 
     for (auto& [corp, cc] : w.corporations)
     {
+        // Capture the flows into `bud` for the BL-072 breakdown, but keep the
+        // balance update on the SAME interleaved `delta` the pre-BL-072 code used,
+        // so the shipped economy is bit-identical (grouping the sums could drift by
+        // a float ULP and, compounded over thousands of ticks, perturb the
+        // deterministic sim — see io-standing-rules § Determinism).
+        corp_budget bud;
         float delta = 0.0f;
 
         // Market cash flow (sales income less input purchases), valued at the
         // price resolved this tick by clear_markets.
         const auto fit = flows.find(corp);
         if (fit != flows.end())
-            delta += fit->second.income - fit->second.expenditure;
+        {
+            bud.income      = fit->second.income;
+            bud.expenditure = fit->second.expenditure;
+            delta += bud.income - bud.expenditure;
+        }
 
         // Operating costs: per-building maintenance + wages. Wages are paid on the
         // effective (allocated) workforce — the requested target throttled by the
@@ -67,14 +78,22 @@ void apply_budget(world& w,
                                         : e.maintenance * wt_scalar - material_cost;
             // Guard against negative labour_cost when wt_scalar < 0.3 (the material
             // floor already covers more than the scaled total in that edge case).
-            delta -= material_cost + std::max(0.0f, labour_cost);
+            const float maint_i = material_cost + std::max(0.0f, labour_cost);
+            bud.maintenance += maint_i;
+            delta           -= maint_i;
             const float hab  = [&]() -> float {
                 const auto it = mean_habitability_by_body.find(body);
                 return (it != mean_habitability_by_body.end()) ? std::clamp(it->second, 0.1f, 2.0f) : 1.0f;
             }();
-            delta -= b.decommissioned ? 0.0f : b.workforce_assigned * scalar * e.base_wage * wt_scalar * hab;
+            const float wage_i = b.decommissioned
+                                 ? 0.0f
+                                 : b.workforce_assigned * scalar * e.base_wage * wt_scalar * hab;
+            bud.wages += wage_i;
+            delta     -= wage_i;
         }
 
-        cc.balance += delta; // may go negative — allowed in the prototype
+        cc.balance += delta; // bit-identical to the pre-BL-072 arithmetic; may go negative
+        if (breakdown)
+            (*breakdown)[corp] = bud;
     }
 }

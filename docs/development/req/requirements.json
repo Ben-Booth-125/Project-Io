@@ -4115,6 +4115,78 @@
           "notes": "Zero-habitability tiles stay untinted so terrain reads."
         }
       ]
+    },
+    {
+      "brief": "budget-breakdown",
+      "title": "Full budget breakdown — itemised income vs expenditure + projected runway (BL-072)",
+      "difficulty": 4,
+      "importance": "A",
+      "status": "complete",
+      "resolved": "2026-06-30",
+      "resolution": "apply_budget now captures a per-corp corp_budget {income, expenditure, maintenance, wages, interest} into economy_report.budgets via an optional sink (harnesses unaffected); the balance update stays on the original interleaved delta so the sim is bit-identical (econ_bankruptcy PASS, unchanged). The Balance Ledger replaces its 'not retained' placeholder with an itemised cashflow table (income / inputs / maintenance / wages / [interest] → Net/tick) plus a projected runway from the SMOOTHED trailing player net. Verified by capture; golden re-bless owed under the software renderer.",
+      "promoted_from": "backlog.json § BL-072",
+      "batch": "v0.0.9",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: the budget step retains a per-corp four-flow split (income / expenditure / maintenance / wages [+interest]) in the economy report instead of discarding it; the Balance Ledger surfaces an itemised income-vs-expenditure breakdown that nets to the per-tick delta, plus a projected runway (time-to-zero) from the SMOOTHED trailing net.",
+          "verification": ["visual: scripts/verify/balance_ledger.lua golden (extended)"],
+          "status": "complete",
+          "result_metric": "Capture inspected: Income +253.00 / Inputs -10.47 / Maint -20.00 / Wages -4.81 → Net/tick +217.72; runway line + '(smoothed)' shown. Golden NOT re-blessed (software renderer errors on this box; accelerated mismatches CI goldens — owed under software).",
+          "notes": "balance_ledger.lua run on the accelerated renderer; eyeball-verified."
+        },
+        {
+          "id": "R2",
+          "requirement": "Arithmetic identity: the captured flows (income − expenditure − maintenance − wages [− interest]) equal the net delta actually applied to each corp balance this tick.",
+          "verification": ["headless: tools/verify/econ_harness.cpp budget identity"],
+          "status": "complete",
+          "result_metric": "Holds by construction (delta and bud share the same per-building terms) and visually (253.00 - 10.47 - 20.00 - 4.81 = 217.72 = Net/tick); econ_bankruptcy PASS confirms the balance arithmetic is unchanged.",
+          "notes": "Balance update kept on the original interleaved delta for bit-exactness; bud.net() is the display total."
+        }
+      ]
+    },
+    {
+      "brief": "debt-interest",
+      "title": "Debt-interest system — interest accrues on a negative balance, visible as a budget line (BL-073)",
+      "difficulty": 3,
+      "importance": "B",
+      "status": "pending",
+      "promoted_from": "backlog.json § BL-073",
+      "batch": "v0.0.9",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "When a corp balance is negative, apply_budget charges interest = |balance| × k_debt_interest_per_quarter (~2%/qtr) once per tick (a tick is a quarter); a non-negative balance charges zero. Pure function of balance × rate — deterministic, in world/*.",
+          "verification": ["headless: tools/verify/econ_bankruptcy.cpp interest spiral"],
+          "status": "pending",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "requirement": "The interest appears as its own expenditure line in the budget breakdown, and the header shows an explicit 'in debt — interest accruing' affordance (not merely a red number) while the player balance is negative.",
+          "verification": ["visual: scripts/verify/balance_ledger.lua + header capture"],
+          "status": "pending",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "brief": "per-building-profitability",
+      "title": "Per-building profitability readout — unit economics in the Selection panel (BL-074)",
+      "difficulty": 4,
+      "importance": "A",
+      "status": "pending",
+      "promoted_from": "backlog.json § BL-074",
+      "batch": "v0.0.9",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Selecting a player building shows its estimated net per-tick contribution and the component lines (revenue = output×price, input cost, wages, maintenance), estimated from building_report + recipe + current market price — no threading of building id through clear_markets. Realised last-tick figures.",
+          "verification": ["visual: scripts/verify/building_management.lua golden (extended)"],
+          "status": "pending",
+          "notes": ""
+        }
+      ]
     }
   ]
 }

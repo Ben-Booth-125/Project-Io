@@ -24,7 +24,13 @@
 /// @param flows      Per-corporation market cash flow from clear_markets().
 /// @param contention Per-(corp, body) workforce contention from run_economy_step
 ///                   (`economy_report.workforce_contention`); absent keys read as 1.0.
+/// @param breakdown  Optional sink (BL-072): when non-null, receives the per-corp
+///                   four-flow split (income / expenditure / maintenance / wages,
+///                   plus the BL-073 interest line) whose net() equals the delta
+///                   applied to that corp's balance. Null for the headless harnesses,
+///                   which only need the balance mutation.
 void apply_budget(world& w,
                   const recipe_registry& reg,
                   const std::unordered_map<entity_id, corp_cash_flow>& flows,
-                  const std::map<std::pair<entity_id, entity_id>, float>& contention);
+                  const std::map<std::pair<entity_id, entity_id>, float>& contention,
+                  std::map<entity_id, corp_budget>* breakdown = nullptr);

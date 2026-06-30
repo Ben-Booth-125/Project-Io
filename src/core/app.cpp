@@ -283,7 +283,8 @@ void app::step_economy()
     advance_convoys(m_world);
     m_last_econ_report = run_economy_step(m_world, m_registry);
     auto flows = clear_markets(m_world, m_registry, m_last_econ_report, m_ui.sell_orders);
-    apply_budget(m_world, m_registry, flows, m_last_econ_report.workforce_contention);
+    apply_budget(m_world, m_registry, flows, m_last_econ_report.workforce_contention,
+                 &m_last_econ_report.budgets);
     credit_arrived_convoys(m_world);
 
     // Record player balance, income, and expenditure for the header sparkline and
@@ -1052,7 +1053,7 @@ void app::render()
     }
     ui::draw_construction_panel(m_world, m_registry, m_ui, &m_ui.show_construction_panel);
     ui::draw_market_ledger(m_world, m_ui, m_market_history, m_ui.show_market_ledger);
-    ui::draw_balance_ledger(m_world, m_ui, m_ui.show_balance_ledger);
+    ui::draw_balance_ledger(m_world, m_last_econ_report, m_balance_history, m_ui.show_balance_ledger);
     ui::draw_corporation_panel(m_world, m_ui, m_ui.show_corporation_panel);
 
     // Overlay-lens controls — a bottom-left strip from the nav-pane edge inward,

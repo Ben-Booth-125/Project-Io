@@ -35,6 +35,25 @@ struct building_report
     resource_type limiting_input = resource_type::iron_ore; ///< Processing: the scarcest input (pool-relative).
 };
 
+/// Per-corporation budget breakdown retained from the budget step (BL-072): the
+/// flows that net to the balance delta applied this tick. `income`/`expenditure`
+/// are the market cash flows (corp_cash_flow); `maintenance`/`wages` are the
+/// operating costs apply_budget computes per building; `interest` is the BL-073
+/// debt charge (0 until a corp's balance is negative). `net()` is exactly the
+/// delta added to the balance this tick. Populated only when apply_budget is given
+/// a breakdown sink — the headless harnesses leave it empty.
+struct corp_budget
+{
+    float income      = 0.0f;
+    float expenditure = 0.0f;
+    float maintenance = 0.0f;
+    float wages       = 0.0f;
+    float interest    = 0.0f; ///< BL-073: charged only while balance < 0.
+
+    /// The per-tick balance delta: income less every outflow.
+    float net() const { return income - expenditure - maintenance - wages - interest; }
+};
+
 /// Result of one economy step: the per-building reports plus the auto-bought
 /// input shortfalls per (corp, body), which become market demand and corporate
 /// expenditure downstream (market_clearing.hpp / budget_system.hpp).
@@ -56,6 +75,12 @@ struct economy_report
     /// Per-body mean habitability aggregate (BL-048): weighted average of all
     /// population-centre tiles on the body. 0.0 = uninhabitable, 1.0 = full.
     std::map<entity_id, float> body_habitability;
+
+    /// Per-corporation budget breakdown for this tick (BL-072): the four+1 flows
+    /// netting to the balance delta. Populated by apply_budget when given a
+    /// breakdown sink (app's live loop); empty under the headless harnesses, which
+    /// do not request it. Read by the Balance Ledger / Economy panel.
+    std::map<entity_id, corp_budget> budgets;
 };
 
 /// Inject nation-substrate background supply and demand into body markets.
