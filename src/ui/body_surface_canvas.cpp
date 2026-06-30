@@ -706,8 +706,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
     }
 
-    const ImVec2 mouse = ui.mouse.active
-                         ? ImVec2{ui.mouse.x, ui.mouse.y}
+    const ImVec2 mouse = state.mouse.active
+                         ? ImVec2{state.mouse.x, state.mouse.y}
                          : ImVec2{-1.0f, -1.0f}; // off-screen sentinel suppresses hover
 
     // Hover resolves to a single tile copy. Adjacent hexes' circular hit-tests
