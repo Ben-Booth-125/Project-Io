@@ -28,115 +28,115 @@ where one is likely.
 
 ---
 
-## Where we are — v0.0.5
+## Where we are — v0.0.7
 
-The engine, data model, primary canvases, world generation, the single-body economy loop, and
-the Layer 4 foundations are complete:
+The interactive economy loop is mechanically complete:
 
 - **Layer 0–2** — SDL3 + fixed-timestep simulation + economy tick + sol2; the core data
-  model; the Solar / Body-Surface canvases with the minimap zoom ladder.
-- **World generation (v0.0.3)** — procedural tiles (two-axis terrain), nations (Voronoi BFS),
-  and corporations (asset placement, financial profile).
+  model; the Solar / Circumplanetary / Planetary canvases with the minimap zoom ladder.
+- **World generation (v0.0.3)** — procedural tiles (two-axis terrain), nations (14 Voronoi
+  BFS countries with weighted sizes and history-pass merges), and corporations (asset
+  placement, financial profile).
 - **Layer 3 economy (v0.0.4)** — extraction → processing → per-`(corp, body)` stockpile →
   per-body market with supply/demand **price resolution** → budget; finite **deposit
-  depletion**; a warm-start so the world opens live; the player's balance in the header.
-- **Layer 4 foundations (v0.0.5)** — the reusable placement-rules seam, the multi-tick
-  economy-stability harness, the workforce-pool/model groundwork, uniform ledger-window chrome,
-  and the Layer 4 UI scaffold; plus the visual-verification **golden-image** harness (with
-  pass/fail diffing live), the Resource / Market / Population / Scarcity **map lenses**, the
-  multiple-market-centres seam (one market per body today, tile-centred catchment ready), and
-  the world-gen fixes (orphan-island claim, lean focus-shaped corp holdings).
+  depletion**; warm-start; player balance in the header.
+- **Layer 4 foundations (v0.0.5)** — placement-rules seam, stability harness, workforce pool
+  groundwork, ledger-window chrome; the golden-image visual-verification harness; the full
+  **map lens strip** (Corp → Country → Resource → Market → Population → Opportunity →
+  Production → Scarcity); multiple market centres per body (tile-centred catchment); world-gen
+  fixes (orphan-island claim, lean corp holdings).
+- **Improved core-loop (v0.0.6)** — matched price-time **order book**; **saturated substrate**
+  (nation-owned background supply/demand filling the world); supply **convoy** routing with
+  logistics costs and inter-body price convergence; the Market/Balance/Construction **ledger
+  family** + Corp Dashboard; market centre seeding from population centres; warm-start surface.
+- **Interactive & legible (v0.0.7)** — player **construction** (placement + resource build
+  cost + terrain/deposit validation + slot rules); **recipe and workforce control** per
+  building; **population centres** (static MVP + dynamic habitability→workforce feedback);
+  **selectable entity markers** (buildings, market centres) with lens-contextual hover cards;
+  canvas hit-testing and the Selection panel; the **placement-suitability surface** (armed
+  build mode tints affinity tiles); the **lens-driven selection** panel; full **hotkey system**
+  with F1 cheat-sheet overlay; balance/market **trend plots** in the Economy panel and Market
+  Ledger; app-driven mouse for deterministic verify captures; cross-platform build (Linux
+  primary, Windows CI).
 
-The economy *runs* but is not yet *played*: the player observes authored assets rather than
-building and managing them. Closing that gap is the spine of the road to v0.1.0.
+The economy is now *interactive* — the player builds, manages, and observes the effects. The
+gap is *playability*: all bodies are revealed from the start (no discovery), rival corporations
+are passive stubs, and the player lacks the intelligence signals needed to make strategic
+building decisions. Closing that gap drives the road to v0.1.0.
 
 ---
 
 ## The road to v0.1.0
 
-Four minor versions, then the cut. Each is a single theme; v0.0.7 (the merged interactive build)
-is the certain split point.
+Three more minor versions, then the cut. The v0.0.6 and v0.0.7 themes have shipped; the
+remaining road is discovery, budget clarity, and the final quality gate.
 
-### v0.0.6 — Improved core-loop
+### v0.0.8 — Discovery & intelligence
 
-*Theme: deepen and make the economy that already runs legible — no new player verbs yet.* The
-loop (extraction → processing → market → budget) runs but is shallow and merely observed; this
-minor sharpens it *before* v0.0.7 makes it interactive. Three strands:
+*Theme: give the economy its missing strategic dimension — information asymmetry.* The economy
+is interactive but trivially legible: all bodies are fully revealed, rivals are passive, and
+nothing gates *where* the player should build or *why*. This minor closes that gap with three
+focused strands:
 
-- **Market depth.** Replace the flat anonymous auto-clear with the matched price-time **order
-  book** (intra-body; the cross-body reachability bias waits on supply), and run the **inter-body
-  market feasibility probe** — the convoy-free minimal coupling that tests whether the model
-  carries its weight without triggering per-body data-creep.
-- **A saturated world.** Generate the **nation-owned background substrate** so the map reads as a
-  saturated earth-like economy to trade against, with real market liquidity, rather than the
-  sparse world the lean corporation holdings leave today.
-- **Legibility.** Refit the economy panel onto the shared ledger conventions (the convention
-  reference the v0.0.7 ledger family lifts from), and the time-control clarity pass — non-linear
-  speed curve and the days-until-next-quarter countdown.
+- **Survey system.** Bodies start *unsurveyed* — the tile map and deposit profile are hidden
+  until a player-dispatched survey action completes (credit cost + N ticks). The solar system
+  canvas marks each body's survey status; the planetary canvas shows a locked state until
+  survey is complete. Earth begins surveyed. This is the exploration loop: identify a promising
+  body by orbital position and type, spend to survey, then decide whether the deposit profile
+  justifies building. *Deposit richness is revealed at survey time as a band (rich / moderate /
+  sparse); exact amounts are confirmed once an extraction site is placed.*
+- **Visibility model.** On-canvas markers for competitor buildings are visible — they are
+  physical structures and unambiguously present. Hover cards on competitor installations show
+  type and owner only; production rates and stockpile quantities are **private**. Market
+  supply/demand aggregates and prices are **public** (the intentional intelligence channel).
+  Players infer competitor state from market signals: a rising price in a resource Kepler
+  Industries is known to extract means their output is down, or demand elsewhere is up — not
+  a fact to read off a panel. This rule shapes which decisions are interesting and which are
+  trivial.
+- **Population legibility.** The mechanics already simulate habitability→workforce feedback;
+  what's missing is *legibility*: the player needs to see why workforce is constrained, not
+  just observe a lower rate. The Population lens, hover cards, and the Selection panel should
+  surface: population centre scale, local habitability, and the derived workforce cap — enough
+  that the player can reason about siting (build labour-heavy industries near large, habitable
+  centres; use autonomous extraction on hostile bodies). No new mechanics; only surfacing what
+  is already simulated.
 
-Lower-risk consolidation that pays back when v0.0.7 piles player interaction onto the loop.
+The economic picture this creates: the player is not omniscient. They must spend to learn, read
+markets to infer competitor state, and site buildings where the data supports it. The Opportunity
+lens and the market trend plots become the primary tools for that reasoning.
 
-### v0.0.7 — Building management, population & supply (Layers 4–5)
+### v0.0.9 — Budget clarity + polish
 
-*Theme: the economy becomes interactive and gains space.* The two large interactive builds,
-**merged into one theme** — they are adjacent and share the construction / market / ledger
-surfaces:
+*Theme: make the financial pressure legible.* The budget loop runs — income from sales,
+expenditure on wages and maintenance, balance going negative — but the player cannot easily read
+*why* their balance is moving or how much runway they have. Three strands:
 
-- **Building management + population (Layer 4).** Player **construction** (placement + build-cost
-  spend + terrain/deposit validation), **recipe / workforce / sell-order** control, and the
-  **Market / Balance / Construction** ledger family + corporation dashboard — coupled with
-  **population centres** (scale, agglomeration, land-use trade-offs, habitability feedback) and
-  the **workforce pool** that grounds labour supply.
-- **Supply routing (Layer 5).** Supply convoys with source/destination/cargo and fractional
-  progress; distance-based logistical cost; delivered cargo adjusting the destination market.
-  Inter-body market linkage completes here — **price diverges spatially**, the first real
-  spatial-strategic dimension, and the cross-body half of the order book unlocks.
+- **Full budget breakdown.** Income vs. expenditure itemised clearly (by building type, by
+  resource, by logistics cost); the running balance shown against a projected time-to-zero so
+  the player feels the pressure and can act before bankruptcy.
+- **Debt system.** When balance goes negative, interest accrues each tick — the economy
+  bankruptcy harness already models this; the player-facing surface does not. Interest charges
+  should appear in the budget breakdown as a distinct line so the player knows when they have
+  entered a self-accelerating decline.
+- **Polish pass.** Time-control clarity (non-linear speed curve, days-until-next-quarter
+  countdown); menu vocabulary cleanup; icon consistency sweep; any outstanding lens or UI
+  completeness work from v0.0.8.
 
-**By far the largest minor; certain to split** at promotion — building management ahead of
-population, construction ahead of the ledger family, and supply as its own slice. Planned as one
-theme; expected to land across several releases.
+### v0.1.0 — Quality audit + cut
 
-### v0.0.8 — Budget + hardening (Layer 6 + polish)
+*Theme: prove it holds up, then ship.* No new systems. Three audit instruments, then the cut:
 
-*Theme: legible and stable.* The full budget made legible (income vs. expenditure broken down,
-running balance under competing pressure); the shared hover-card system; completion of the
-lens system; the menu vocabulary; and the standing known-bug and icon-consistency work. No new
-systems — this minor consolidates and hardens what Layers 4–5 built.
+- **Frame budget.** Frame-time HUD: last / avg / max ms + 1% lows. Targets: **avg < 8 ms,
+  max < 16.7 ms** panning the full Kepler tile grid (15,120 tiles). If max spikes the HUD says
+  why — GPU present, draw-call volume, or allocation churn.
+- **Econ-tick scaling.** Extend `econ_stability` to print tick time. Target: **well under 1 ms**
+  for the prototype world; confirm it does not grow faster than linearly in bodies × corps.
+- **Data creep.** Entity/pool/market/convoy counters + RSS memory readout run long (100→1000+
+  ticks): counts and memory must **plateau**, not climb. A steady climb on an idle run names the
+  unbounded structure.
 
-### v0.0.9 — Code quality, performance & data-creep audit
-
-*Theme: prove it holds up before the cut.* No new systems — a dedicated pass to **measure and
-harden** what Layers 4–6 built, so v0.1.0 is cut on evidence rather than hope. Three things to
-assess, each with a rough target a non-specialist can read straight off an instrument:
-
-- **Frame budget (lag).** 60 FPS gives a **~16.7 ms** per-frame budget. The frame-time HUD (the
-  [B4] known-bug instrument in the backlog) reads last / avg / max ms plus the **1% lows** — the worst
-  1% of frames, which is what a player actually feels as a stutter. Rough targets: **avg < 8 ms,
-  max < 16.7 ms** while panning the dense Kepler grid (180×84 = 15,120 tiles). If max spikes, the
-  HUD's job is to say *why* — GPU present (vsync/compositor), draw-call volume (the immediate-mode
-  tile loop), or per-frame allocation churn.
-- **Econ-tick cost (scaling).** One economy tick should be invisible — **target well under 1 ms**
-  for the prototype world. Extend the existing `econ_stability` harness to print the tick time and
-  watch how it grows as bodies / corps / markets multiply. The thing to catch: a tick that grows
-  **faster than linearly** in (bodies × corps) — that is an algorithm quietly going quadratic.
-- **Data creep (the inter-body worry).** The concern flagged during the supply Q&A: structures
-  multiplying *per body* — the `(corp, body)` stockpile map, per-body markets, live convoys. Add
-  simple **counters** (entity count, pool entries, market entries, live convoys) and a **memory
-  readout** (RSS — the resident memory the process holds), then run the harness long (100 → 1000+
-  ticks): counts and memory should **plateau**, not climb without bound. A steady climb over a long
-  *idle* run is the signature of a leak or unbounded growth, and points straight at the structure
-  that is growing.
-
-Plus the cheap hygiene that needs no instrument: the build stays **warning-clean**, a **one-off
-static-analysis run** (cppcheck, or MSVC `/analyze`) read for genuine findings, and the headless
-harnesses kept green. None of this requires benchmarking expertise — it is reading three numbers
-off an instrument and checking they sit under a threshold. The detailed Briefs (what each
-instrument prints, the exact harness extensions) are settled in the backlog when this minor is designed.
-
-### v0.1.0 — Cut the prototype
-
-*Theme: validate and release.* No new systems. A final verification pass against the
-done-definition below, then the Cut.
+Plus hygiene: warning-clean build, one-off static-analysis (cppcheck), headless harnesses green.
+Final verification pass against the done-definition below, then the Cut.
 
 ---
 
@@ -146,17 +146,27 @@ v0.1.0 is the **economy loop, validated and playable end-to-end** — not the fu
 cut when all of the following hold:
 
 - The player can **construct and manage** buildings — placement with cost and validation,
-  recipe and workforce control, and sell orders — not merely observe authored assets.
-- **Population centres** ground workforce supply, wages, and demand.
+  recipe and workforce control — not merely observe authored assets. *(Shipped v0.0.7.)*
+- **Population centres** ground workforce supply via habitability feedback, and the player can
+  read why workforce is constrained and make siting decisions accordingly. *(Mechanics shipped
+  v0.0.7; legibility surface owed in v0.0.8.)*
 - Goods **move between bodies** via supply convoys, so **price diverges spatially** and
-  logistics affects margin.
-- The **full budget** reflects pressure from competing demands and can go negative.
-- The **read surfaces** — the ledger family and the hover-card system — make stockpiles,
-  markets, balances, and construction legible at a glance.
+  logistics affects margin. *(Shipped v0.0.7.)*
+- The player must **survey** a body to reveal its tile map and deposit profile — discovery is
+  gated, not omniscient. *(Owed v0.0.8.)*
+- **Corporate intelligence is appropriately scoped**: competitor buildings are visible on-canvas;
+  their production rates and stockpiles are private; market prices and supply/demand aggregates
+  are public — the player reasons from market signals rather than reading off a ledger. *(Owed
+  v0.0.8.)*
+- The **full budget** is legible — income vs. expenditure itemised, debt interest visible, runway
+  readable — so the player can act before bankruptcy rather than discover it. *(Owed v0.0.9.)*
+- The **read surfaces** — the ledger family, hover cards, trend plots, and the lens strip —
+  make stockpiles, markets, balances, workforce, and construction legible at a glance. *(Mostly
+  shipped v0.0.7; completeness in v0.0.8–9.)*
 - The build is **green** and the loop is **verified** (headless economy/generation harnesses
   and visual capture checks).
-- **Performance and data growth hold** (the v0.0.9 audit): frame and econ-tick budgets met, and
-  counts/memory plateau over a long run rather than creeping.
+- **Performance and data growth hold** (the v0.1.0 audit): frame and econ-tick budgets met,
+  and counts/memory plateau over a long idle run rather than creeping.
 - Excluded throughout, by scope: Conflict, Research, Policy, and Diplomacy beyond the
   data-model stub.
 
@@ -211,35 +221,37 @@ included** — not just "write a lot of code." Its load-bearing parts:
 
 ### The sessions
 
-*Interrupted 2026-06-16.* The earlier ordered session slices (verification + world-gen foundation
-→ the lens batch → UI polish → ledger foundation) were **largely worked through** by the v0.0.5
-close — the golden-image harness, the lens batch, tile-centred markets, and the world-gen fixes all
-landed. The plan was then **paused for a v0.0.6 backlog-intake session** (the 14 items filed across
-[`BACKLOG.md`](BACKLOG.md) on 2026-06-16). The next session slices will be **rebuilt from the refreshed
-backlog** rather than the stale per-session list that stood here.
+*Updated 2026-06-30.* The v0.0.6 and v0.0.7 themes are fully delivered; see DEVLOG for the
+per-session record. The active frontier is **v0.0.8 — Discovery & Intelligence**. No per-session
+slice list is frozen here — the backlog for v0.0.8 is still being designed (BL-064 survey system
+is the first item to promote); sessions will rebuild the slice list at promotion from the live
+backlog. The next session's first act is to design-settle and promote the survey system item.
+
+**What ships next (v0.0.8):**
+
+1. **BL-064 — Survey system** *(design-owed, filed 2026-06-30)*. Bodies start unsurveyed; a
+   survey action (credit cost + N ticks) reveals the tile map and deposit richness band. See the
+   backlog item for the full design.
+2. **BL-065 — Visibility model** *(design-owed, filed 2026-06-30)*. Explicit rules for what
+   the player can see about competitors: building presence public, production and stockpiles
+   private, market aggregates and prices public. Hover card updated for competitor markers.
+3. **Population legibility** — surfacing the habitability→workforce chain visibly in the
+   Population lens, hover cards, and Selection panel. Lightweight (no new mechanics; backlog
+   item needed if the coverage gap is confirmed at promotion).
+
+**v0.0.9 queue (budget clarity + polish):**
+
+- Full budget breakdown (income/expenditure by category, projected runway)
+- Debt-interest system (on-screen visibility of the self-accelerating decline)
+- Time-control clarity pass (BL-008, currently parked — reassess at v0.0.9 open)
+- Icon consistency sweep and menu vocabulary cleanup
 
 ### Out of scope for this plan (gated — do not pull in)
 
-- **v0.0.7 (Layer 4 half)**: corporation dashboard, Market/Balance/Construction ledgers,
-  population (S4 + dynamic), building management, workforce step 2.
-- **Selection trio**: non-spatial routing, canvas hit-testing, lens-driven resolution — blocked
-  on markers / ledgers existing.
-- **v0.0.7 (Layer 5 half)**: supply convoys (S5), logistics/infrastructure, and the cross-body
-  half of preferential purchasing — all blocked on Layer 5. *(The convoy-free inter-body
-  feasibility probe and the intra-body order book move up to v0.0.6 — improved core-loop.)*
-- **Design-owed (`~`)**: the v0.0.6 brief-intake (2026-06-16) parked a large design-owed backlog
-  that each needs a *design* pass before any publish — a **lens-redesign cluster** (strip
-  single-select/rename, the colour-scheme pass, per-rung representation, and the Production /
-  Placement-suitability / Reach / market-boundary / resource-density reworks plus tooltip
-  simplification); **core-loop design** (the nation-owned substrate, market-centre seeding,
-  construction-cost-in-resources, stricter placement rules, habitability→workforce); and
-  **world / country** work (Faction→Country rename, more countries generated "in history", nation
-  behaviour, and the tile-gen deep models). None are promotable until settled.
-- **v0.2**: resource-generation scarcity, full deposit authoring.
-
-*(Two entries — C1 nav-rail ordering, A3 design-pass propagation — read as largely doc-only and
-self-describe as already settled into their authority docs; check whether they are stale entries
-to **remove** rather than work to publish, before slotting either into a session.)*
+- **Design-owed (`~`) parked items**: BL-011 (Reach/logistics lens), BL-051 (tile-gen deep
+  models), BL-054 (nation behaviour) — each needs a design settle before promotion.
+- **Post-prototype**: Conflict, Research, Policy, Diplomacy beyond data-model stub; v0.2
+  resource-generation scarcity / full deposit authoring; rival corp AI beyond passive stub.
 
 ### Collision maps: built per session, not frozen here
 
