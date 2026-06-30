@@ -26,8 +26,13 @@ app now configures, builds, and runs natively on Linux.
 
 **Verification status.** Both fixes **confirmed on the GCC-14 laptop**: a clean build with the
 *default* compiler (no gcc-13 override) configures, builds, and runs — so the cross-platform
-break is fixed for a fresh modern-toolchain clone. Docs (TECH_FOUNDATIONS § Building) updated;
-BL-057 stays `designed` pending the still-owed CI first-run and font visual-verify.
+break is fixed for a fresh modern-toolchain clone. Docs (TECH_FOUNDATIONS § Building) updated.
+
+**CI regression guard.** `build.yml`'s `linux` job is now a **GCC 13 + GCC 14 matrix**
+(`fail-fast: false`, compiler-keyed dep cache, `$CXX` threaded through the headless-harness step)
+so the exact break we fixed can't silently regress — the default runner compiler is GCC 13, which
+wouldn't have caught it. Merged to `main`. BL-057 stays `designed` pending the CI first-run result
+and the font visual-verify (needs a real display; runs locally via `verifier-visual`).
 
 ---
 

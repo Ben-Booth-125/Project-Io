@@ -25,8 +25,22 @@ on:
 
 jobs:
   linux:
-    name: Linux (build + headless harnesses)
+    # Matrix over GCC 13 (ubuntu-latest default) and GCC 14. The 14 leg is the
+    # standing guard for BL-057: GCC 14+ parses template bodies strictly and
+    # rejected the old sol2 v3.3.0 (fixed by the v3.5.0 bump), and the default
+    # runner compiler wouldn't catch a regression of that. fail-fast off so a
+    # break on one compiler still reports the other.
+    name: Linux ${{ matrix.cxx }} (build + headless harnesses)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { cc: gcc-13, cxx: g++-13 }
+          - { cc: gcc-14, cxx: g++-14 }
+    env:
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
     steps:
       - uses: actions/checkout@v4
 
@@ -35,6 +49,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential cmake ninja-build \
+            ${{ matrix.cc }} ${{ matrix.cxx }} \
             libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev \
             libxinerama-dev libxss-dev \
             libwayland-dev wayland-protocols libxkbcommon-dev \
@@ -45,9 +60,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: build/_deps
-          key: deps-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
+          # Key on the compiler too — the two legs build the deps separately.
+          key: deps-${{ runner.os }}-${{ matrix.cxx }}-${{ hashFiles('CMakeLists.txt') }}
 
       - name: Configure
+        # CC / CXX from the matrix env steer CMake's compiler selection.
         run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
 
       - name: Build ProjectIo
@@ -60,14 +77,15 @@ jobs:
           # recipe_registry.cpp (the one TU that pulls sol2/Lua). This is a
           # superset of each harness's hand-listed sources, so it stays correct
           # as those lists evolve. See tools/verify/README.md for the per-harness
-          # MSVC recipes.
+          # MSVC recipes. Use the matrix compiler ($CXX) so both legs exercise
+          # the headless tier too.
           set -euo pipefail
           WORLD=$(ls src/world/*.cpp | grep -v 'recipe_registry.cpp')
           fail=0
           for h in tools/verify/*.cpp; do
             name=$(basename "$h" .cpp)
             echo "=== building $name ==="
-            g++ -std=c++20 -O2 -I src "$h" $WORLD -o "/tmp/$name"
+            "${CXX:-g++}" -std=c++20 -O2 -I src "$h" $WORLD -o "/tmp/$name"
             echo "=== running $name ==="
             if ! "/tmp/$name"; then
               echo "::error::headless harness $name failed"
