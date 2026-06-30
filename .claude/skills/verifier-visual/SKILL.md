@@ -17,9 +17,28 @@ The verify **script** to run, as a `scripts/verify/<name>.lua` path or just the
 feature name (e.g. `corporation_lens`). If omitted, list the available scripts in
 `scripts/verify/` (each `*.lua` except `lib.lua`) and ask which to run.
 
+## Determinism: software renderer + headless display (read first)
+
+Goldens must be **renderer- and machine-independent**, so always run `--verify`
+(and `--bless`) through the **software renderer** — set `SDL_RENDER_DRIVER=software`.
+A GPU/accelerated renderer rasterises tiles and text differently from the software
+path, so goldens blessed on a GPU diff ~8–45% against the CI software renderer
+(the BL-057 spike confirmed this). The software renderer is deterministic across
+machines, so CI and any dev box agree.
+
+- **Linux, no monitor:** wrap the run in `xvfb-run -a` (a virtual X display — the
+  capture uses `SDL_RenderReadPixels`, which is renderer-agnostic, so no real
+  display is needed). CI's `visual-verify` job does exactly this.
+- **Windows / a desktop with a display:** `SDL_RENDER_DRIVER=software` alone is
+  enough; the window can render on the real display.
+- **Re-bless everything at once:** `scripts/verify/bless_all.sh [path-to-exe]`
+  forces the software renderer (and Xvfb if present) and blesses every script.
+
 ## Procedure
 
-1. **Build** the Debug target so the binary and the copied scripts are current:
+1. **Build** the target so the binary and the copied scripts are current
+   (Linux/Ninja Release: `cmake --build build --target ProjectIo` → `./build/ProjectIo`;
+   Windows/MSVC Debug: `cmake --build build --config Debug --target ProjectIo`):
    `cmake --build build --config Debug --target ProjectIo`
    (the build copies `scripts/` next to the exe). If iterating on a script without
    a rebuild, run `--verify` against the **source** path instead, e.g.
@@ -54,14 +73,17 @@ one per named `capture()`.
   if any capture fails. No golden present = capture-only (the original behaviour), so
   the upgrade is incremental per check.
 - **Bless (regenerate goldens).** When a change is intentional, eyeball the captures
-  then regenerate the goldens with `--bless`:
+  then regenerate the goldens with `--bless` **through the software renderer** (so
+  the committed goldens match CI):
   ```
-  build/Debug/ProjectIo.exe --verify scripts/verify/<name>.lua --bless
+  SDL_RENDER_DRIVER=software ./build/ProjectIo --verify scripts/verify/<name>.lua --bless   # Linux
+  SDL_RENDER_DRIVER=software build/Debug/ProjectIo.exe --verify scripts/verify/<name>.lua --bless   # Windows
   ```
-  Each capture is written into `scripts/verify/golden/` instead of compared. **Run
-  the bless (and the iterating compare) against the source script path** so the
-  golden dir resolves to the committed source tree, not a stale build copy — the
-  golden directory is always derived from the script path's own parent.
+  Or re-bless every script at once with `scripts/verify/bless_all.sh`. Each capture is
+  written into `scripts/verify/golden/` instead of compared. **Run the bless (and the
+  iterating compare) against the source script path** so the golden dir resolves to the
+  committed source tree, not a stale build copy — the golden directory is always derived
+  from the script path's own parent.
 - **Tolerance knobs.** A pixel *differs* when its max R/G/B channel delta exceeds
   `T` (currently 8/255 — absorbs anti-aliasing and sub-pixel font jitter); a capture
   *fails* when the differing fraction exceeds `F` (currently 0.5%). These absorb

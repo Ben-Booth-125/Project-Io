@@ -46,7 +46,19 @@ GPU-independent output) that builds, runs all `scripts/verify/*.lua` under Xvfb,
 captures + `screenshots/diff/` images as artifacts — *not* a gate yet. The real open question is
 golden portability: the committed goldens were blessed on a GPU renderer and may diff against the
 software rasteriser beyond the 0.5 % tolerance; the advisory artifacts let us see the output before
-re-blessing in CI and promoting to a hard gate. BL-057 stays `designed` pending that decision.
+re-blessing in CI and promoting to a hard gate.
+
+**Spike result (advisory run on `main`).** The pipeline works end-to-end headless: all 24 scripts
+produced captures under Xvfb + software renderer, no crash, 105 artifacts uploaded. Golden compare:
+**4 clean, 20 diffed** against the GPU-blessed goldens — and the diffs are *systematic* (a consistent
+~7.7 % on zoom captures, ~26–45 % on full-canvas), i.e. a deterministic GPU-vs-software rasteriser
+delta, not flakiness. Confirms the fix is to make the **software renderer the reference of record**.
+
+**Gate prep (this session).** Updated the `verifier-visual` skill to mandate `SDL_RENDER_DRIVER=software`
+(+ the Xvfb invocation for headless), and added `scripts/verify/bless_all.sh` (forces software + Xvfb,
+blesses every script). **Pending Ben:** re-bless the goldens locally via `bless_all.sh` and commit
+them; then the CI job's `continue-on-error` is dropped to make visual-verify a hard gate — the last
+BL-057 item. Held the gate flip until the re-blessed goldens land (else CI would gate on stale ones).
 
 ---
 
