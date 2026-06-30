@@ -973,6 +973,127 @@
       "design": "**Problem.** The app has no application-level menu. Exit is only via the OS title-bar close button — which is Windows-only chrome and absent on a borderless/other-platform build — or a keyboard shortcut. A player should be able to leave (and later start/restart) the game by clicking, without knowing any hotkey. This is the session shell, deliberately separate from the nav-rail ledgers (broad per-system overviews, MENU.md) and from BL-062's rebindable keymap (the keyboard layer over the same actions).\n\n**Scope for the prototype (minimum).** A clickable **Exit Game** that cleanly tears down (the same path as the window-close / quit event). Pair it with **Pause/Resume** so the session-control verbs sit together. New/Restart and a full title screen are out of scope here — name them as the natural follow-on once a title/main screen lands.\n\n**Options for the surface (advisor call — pick at promotion):**\n\nA) **ImGui main menu bar** (BeginMainMenuBar) across the top with a Game menu (Exit, Pause). Cheapest; conventional; but it eats a strip of vertical space above the header panel and must be reconciled with the existing top-row layout (profile + header + time column).\n\nB) **Corner gear/hamburger button** that opens a small popup with the same items. Minimal footprint, no permanent chrome; fits the icon-rail visual language already used by the nav pane. **Recommended starting point** — lowest layout disruption.\n\nC) **Centred pause/system modal** toggled by Esc and by a button: dims the canvas and lists Resume / Exit (the classic pause menu). Best long-term home for session control and where a title screen would converge, but more than the minimum asks.\n\n**Open questions.** Confirm-on-exit (a 'really quit?' guard) yes/no; whether Esc should open option C even in the minimum build; whether this slot should also surface Save/Load once serialisation has a UI (currently save is not player-exposed). Authority: extend docs/ui/MENU.md with an 'Application / system menu' section when this lands (it currently documents only the nav-rail ledgers).\n\n**Note.** A standing development practice is the per-milestone ImGui panel rule (DEVELOPMENT_PRACTICES.md) — this surface is a candidate panel for the milestone it lands in. The OS window is created plain-resizable in app.cpp (SDL_CreateWindow(..., SDL_WINDOW_RESIZABLE)); this item does not change the OS window, it adds an in-app affordance over it."
     },
     {
+      "id": "BL-071",
+      "short_name": "BUILD_LEGIBILITY",
+      "category": "Canvas",
+      "title": "Build legibility — selected-tile affordances + 'why not here' placement reasons",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "A",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-06-30",
+      "files": [
+        "src/world/placement_rules.cpp",
+        "src/world/placement_rules.hpp",
+        "src/ui/tile_inspector.cpp",
+        "src/ui/selection_panel.cpp",
+        "src/ui/hover_content.cpp",
+        "src/ui/body_surface_canvas.cpp"
+      ],
+      "authority_doc": "docs/ui/SELECTION.md",
+      "summary": "Gameplay-clarity strand (filed 2026-06-30): 'it's not clear where buildings can be built'. BL-010's placement-suitability surface tints tiles only once a build is ARMED; the player still can't tell what a tile affords beforehand, nor WHY a tinted-invalid tile is rejected. Surfacing only, no new placement mechanics: (1) a selected-tile affordance readout (terrain, deposits subject to survey state, territory owner, and which building types thrive / are valid / are invalid here); (2) rejection reasons — placement_rules returns a REASON (wrong terrain / no deposit / occupied / outside territory / slot full) instead of a bare bool, surfaced when an armed build hovers an invalid tile.",
+      "design": "**Status:** design-owed — filed from a gameplay-clarity review (Ben, 2026-06-30). Captures intent; load-bearing calls below are open.\n\n### Problem\nThe placement-suitability surface (BL-010, complete) tints affinity tiles, but only **after** a building type is armed in the construction panel. Two legibility gaps remain:\n1. **Before arming** the player has no read on what a given tile is good for — they must arm each building in turn and eyeball the tint.\n2. **When a tile is invalid** the surface greys it but never says *why*, so the player can't tell a fixable problem (unsurveyed, occupied) from a fundamental one (wrong terrain).\n\n### Proposed surfacing (no new mechanics)\n- **Selected-tile affordance readout** (Selection panel / tile inspector): for the selected tile show terrain composition+landform, deposits (respecting survey state — bands not exact amounts pre-extraction), territory owner, and a short **\"thrives / valid / invalid\"** grouping of building types for that tile. This is the inverse of BL-010: BL-010 answers \"given a building, which tiles?\"; this answers \"given a tile, which buildings?\".\n- **Rejection reasons**: refactor `placement_rules` to return a result carrying a **reason code** (enum + human string) rather than a bool — wrong terrain, no required deposit, tile occupied, outside player territory, building-slot full, unsurveyed. Surface the reason on the hover card (or Selection panel) when build mode is armed over an invalid tile.\n\n### Open calls (Ben)\n- Reasons shown on the **hover card** vs the **Selection panel** vs both.\n- Whether to also add a **build-picker palette** that greys buildings unplaceable *anywhere* on the current body (bigger; could be a follow-on item).\n- Whether the affordance readout is always-on for any selected tile, or only while build mode is armed.\n\n### Authority\nLands into `docs/ui/SELECTION.md` (selected-tile content) with a cross-note in `docs/ui/LENSES.md` (the placement-suitability surface it complements). The reason-code refactor is a small change to the `placement_rules` seam (BL-043 authority)."
+    },
+    {
+      "id": "BL-072",
+      "short_name": "BUDGET_BREAKDOWN",
+      "category": "Ledger",
+      "title": "Full budget breakdown — income vs expenditure itemised + projected runway",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 4,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-06-30",
+      "files": [
+        "src/world/budget_system.cpp",
+        "src/world/budget_system.hpp",
+        "src/ui/economy_panel.cpp",
+        "src/ui/balance_ledger.cpp"
+      ],
+      "authority_doc": "docs/development/ROADMAP.md",
+      "summary": "v0.0.9 core strand (budget clarity) — directly answers 'how does the player make a profit'. The budget loop already computes balance += income − expenditure − maintenance − wages per corp (budget_system.hpp) but retains NO category split. Capture the four flows (and ideally by building type / resource / logistics) into the economy report, then surface an itemised income-vs-expenditure breakdown plus a running balance shown against a PROJECTED time-to-zero so the player feels the pressure and can act before bankruptcy.",
+      "design": "**Status:** design-owed — roadmap-named v0.0.9 strand, filed as a concrete item 2026-06-30.\n\n### What exists\n`apply_budget` (budget_system.hpp) already runs `balance += income − expenditure − maintenance − wages` per corp per tick, where income/expenditure are market cash flows at base_price, maintenance is flat per-building upkeep, and wages are `effective_workforce × base_wage`. The numbers are computed and discarded — only the net hits the balance.\n\n### Proposed\n1. **Capture** the four flows per corp into the economy report (retain at least the four-way split; ideally break income/expenditure **by building type and by resource**, and separate **logistics cost** once convoys charge it — BL-039/BL-045).\n2. **Surface** an itemised breakdown in the Economy panel / Balance Ledger: income lines vs expenditure lines, netting to the per-tick delta the header already shows.\n3. **Projected runway**: with the current per-tick delta and balance, show a **time-to-zero** (e.g. \"runway: ~6 quarters at current burn\") so negative deltas read as urgency, not just a falling number.\n\n### Open calls (Ben)\n- Granularity: four-way split (income/expenditure/maintenance/wages) as the MVP, or by-building/by-resource from the start.\n- Runway basis: instantaneous last-tick delta (noisy) vs a smoothed trailing average (the trend plots from BL-066 suggest the smoothed form).\n- Whether logistics cost is a distinct line now or deferred until convoy charging is itemised.\n\n### Pairs with\n[[BL-073]] debt interest (an expenditure line once balance is negative) and [[BL-074]] per-building profitability (the same captured flows, attributed to a single building). Settle the **flow-capture data shape once** for all three. Authority: `docs/development/ROADMAP.md` until v0.0.9 lands, then an economy/ledger doc.\n\n### Resolved (2026-06-30, Ben)\n- **Granularity:** four-way split per corp — income / expenditure / maintenance / wages (plus the [[BL-073]] interest line) — as the MVP. By-resource and by-building are deferred; by-building income is only ever an *estimate* against the pooled market (see [[BL-074]]), so it does not belong in the shared corp-level shape.\n- **Data shape (settle-once for all three):** add a per-corp `corp_budget { income, expenditure, maintenance, wages, interest }` to the economy report, populated in `apply_budget` — which already computes maintenance and wages per building before collapsing them into the net `delta`. Income/expenditure come from the existing `corp_cash_flow`; the other flows are the budget step's own and just need retaining instead of discarding.\n- **Runway basis:** smoothed trailing average of the net delta (pairs with the BL-066 trend store), not the noisy last-tick value. Surface as a `runway: ~N quarters` read beside the header NET, red when the trend is negative.\n- **Logistics line:** deferred until convoys actually charge it (BL-039 / BL-045). Nothing to itemise today — reserve the line in the shape but do not populate it."
+    },
+    {
+      "id": "BL-073",
+      "short_name": "DEBT_INTEREST",
+      "category": "Trade",
+      "title": "Debt-interest system — interest accrues on negative balance, visible as a budget line",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [
+        "BL-072"
+      ],
+      "blocked_on": [],
+      "written": "2026-06-30",
+      "files": [
+        "src/world/budget_system.cpp",
+        "src/world/budget_system.hpp",
+        "src/ui/economy_panel.cpp",
+        "src/ui/balance_ledger.cpp",
+        "src/ui/header_panel.cpp"
+      ],
+      "authority_doc": "docs/development/ROADMAP.md",
+      "summary": "v0.0.9 strand. When a corp balance goes negative, interest accrues each tick — the econ_bankruptcy harness (BL-056) already models this for calibration, but no player-facing surface exists (grep for 'interest' in src/ returns nothing). Add the interest charge to apply_budget and surface it as a DISTINCT expenditure line in the budget breakdown so the player sees when they have entered a self-accelerating decline.",
+      "design": "**Status:** design-owed — roadmap-named v0.0.9 strand, filed 2026-06-30. Requires [[BL-072]] (it is a line in that breakdown).\n\n### What exists\nThe `econ_bankruptcy` harness (BL-056) already models interest on a negative balance to calibrate a 10–20 year runway, but the live simulation does not charge it and nothing surfaces it. A grep for `interest`/`debt` across `src/` is empty — this is genuinely unbuilt in the running game.\n\n### Proposed\n- **Charge** interest in `apply_budget`: when `balance < 0`, `balance -= balance_owed × per_tick_rate`. Reuse the rate the bankruptcy harness calibrated so the harness and the live loop agree (single source of the constant).\n- **Surface** it as its own expenditure line in the budget breakdown ([[BL-072]]) and, when active, a warning affordance in the header/balance area so the self-accelerating decline is unmistakable.\n\n### Open calls (Ben)\n- Rate source/value — confirm the bankruptcy-harness rate is the one to adopt, and where the constant lives (recipe_registry-style constants vs a budget constant).\n- Whether interest compounds per tick or per quarter (determinism + legibility trade-off).\n- Header treatment: a passive coloured balance vs an explicit \"in debt — interest accruing\" badge.\n\nDeterminism note: interest is a pure function of balance and a fixed rate — keep it in the deterministic `world/*` budget loop, no wall-clock.\n\n### Resolved (2026-06-30, Ben)\n- **Premise correction (important):** the filed text above is wrong that `econ_bankruptcy` \"already models interest on a negative balance to calibrate a 10–20 year runway\". It does **not** — the harness only measures time-to-zero from a fixed maintenance+wages burn; there is no interest charge or calibrated rate anywhere in `tools/verify/econ_bankruptcy.cpp`, and `grep interest src/` is empty. There was no rate to inherit, so we pick one.\n- **Rate:** ~2 % per quarter (≈ 8 %/yr) on a negative balance — round, legible, corporate-distressed-debt feel. An underwater balance roughly doubles in ~9 years: real pressure without an unrecoverable death spiral.\n- **Compounding:** charged once per economy tick on the current negative balance. A tick **is** a quarter (`k_ticks_per_year = 4`), so per-tick = per-quarter simple compounding. Pure function of balance × rate — stays in the deterministic `world/*` budget loop, no wall-clock.\n- **Constant home:** one named constant (e.g. `k_debt_interest_per_quarter`) in a single header shared by the live budget loop **and** the bankruptcy harness, so the two never drift. Adopting it in the harness finally makes it model the spiral it was always meant to.\n- **Header treatment:** an explicit \"in debt — interest accruing\" affordance when `balance < 0`, not merely a red number, so the self-accelerating decline is unmistakable."
+    },
+    {
+      "id": "BL-074",
+      "short_name": "BUILDING_PROFITABILITY",
+      "category": "Ledger",
+      "title": "Per-building profitability readout — make each building's unit economics legible",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 4,
+      "parked": false,
+      "requires": [
+        "BL-072"
+      ],
+      "blocked_on": [],
+      "written": "2026-06-30",
+      "files": [
+        "src/world/budget_system.cpp",
+        "src/world/budget_system.hpp",
+        "src/ui/selection_panel.cpp",
+        "src/ui/construction_panel.cpp",
+        "src/ui/hover_content.cpp"
+      ],
+      "authority_doc": "docs/development/ROADMAP.md",
+      "summary": "Gameplay-clarity strand (filed 2026-06-30) — the most direct answer to 'how does the player make a profit'. Today the player sees only the corp-wide balance; they cannot tell WHICH buildings earn and which bleed. Attribute the four budget flows ([[BL-072]]) to the individual building and show its net per-tick contribution (output sales − input cost − wages − maintenance) in the Selection panel for a selected building, so siting and recipe decisions become legible at the unit level.",
+      "design": "**Status:** design-owed — filed from the same gameplay-clarity review as [[BL-071]] (Ben, 2026-06-30). Requires [[BL-072]] (shares its per-flow capture).\n\n### Problem\nProfit is currently legible only in aggregate (the corp balance and the trend plots). The player builds a refinery and cannot tell whether *that refinery* makes money — only that the whole corp's balance moved. This is the crux of the 'how do I make a profit' confusion: the unit economics are invisible.\n\n### Proposed\nWhen [[BL-072]] captures the budget flows, attribute them **per building** (each building already has wages, maintenance, and — via its recipe — input purchases and output sales). Surface the building's **net per-tick contribution** and its components in the **Selection panel** when a building is selected, and optionally a compact margin hint on the hover card. In the construction panel, an *estimated* margin for a building type at a candidate tile would close the loop with [[BL-071]] (legible placement → legible profitability), but that estimate is harder (depends on market price) — flag as a stretch.\n\n### Open calls (Ben)\n- Attribution granularity: exact per-building flows (requires threading building id through the market clear) vs a per-building **estimate** from its recipe × current market price (cheaper, approximate).\n- Where it lives: Selection panel only (MVP) vs also a per-building column in the Construction Ledger.\n- Whether to show realised (last tick) vs smoothed contribution.\n\nThis is the surfacing that turns the economy from 'balance goes up or down' into 'this building at this site earns X' — the strategic read the whole construction loop is meant to reward.\n\n### Resolved (2026-06-30, Ben)\n- **Attribution = estimate, not exact.** The pooled (body, resource) market commingles every building's output into the corp pool, so a sale cannot be traced back to one building without fighting the market model. Instead **estimate** per building from data already in `building_report`: output value = `output_quantity × current market price`; input cost = recipe inputs × runs × price; wages and maintenance are already computed per building in `apply_budget`. Net = value − inputs − wages − maintenance. No threading of building id through `clear_markets`.\n- **Where:** the Selection panel when a building is selected (MVP) — net per-tick contribution plus its component lines (revenue / input cost / wages / maintenance). A per-building column in the Construction Ledger and a compact hover-card margin hint are stretch follow-ons.\n- **Realised, not smoothed:** show the last-tick estimate. The figure is already an approximation; smoothing an estimate doubles the fuzz. The smoothed view lives at the corp level in [[BL-072]].\n- **Construction-panel pre-build estimate** (margin for a type at a candidate tile, closing the loop with [[BL-071]]) stays a flagged stretch — it depends on *projecting* a market price the building has not yet sold into, which the realised readout sidesteps."
+    },
+    {
+      "id": "BL-075",
+      "short_name": "CORP_TERRAIN_VIABILITY",
+      "category": "Development",
+      "title": "Corp × terrain viability test matrix — every generated corp has a buildable, profitable chain",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "B",
+      "difficulty": 4,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-06-30",
+      "files": [
+        "tools/verify/corp_terrain_matrix.cpp",
+        "tools/verify/README.md"
+      ],
+      "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+      "summary": "Testing strand (filed 2026-06-30): 'unit tests for different corps in different generated terrains'. A new headless harness (verifier-headless pattern) that sweeps multiple world seeds and, for each generated corporation on its assigned body, asserts a viable economic start: starting assets sit on legal terrain, the corp's industrial focus has at least one VALID placement on its body, and at least one output resource has a market — i.e. a generated corp can actually build something profitable on the terrain it was dealt. Guards against world-gen handing a corp a body where it is economically stranded.",
+      "design": "**Status:** design-owed — filed from a gameplay-clarity review (Ben, 2026-06-30). A `world/*`-only harness, so it follows the **verifier-headless** skill (tools/verify/*.cpp over the SDL/Lua-free logic).\n\n### Why\nThe generation layer (corporation + tile + nation) is deterministic but the *interaction* — does a corp's industrial focus actually fit the terrain it was placed on? — is untested. A corp generated onto a body with no valid tiles for its buildings, or no market for its outputs, is economically stranded from turn one. This is a generation-validity check, complementary to the existing `world_audit` and `construction_harness`.\n\n### Proposed harness\nFor a set of seeds (sweep, not a single world), for each generated corporation:\n1. **Asset legality** — every starting building/asset sits on terrain its `placement_rules` accept (no illegal authored placements).\n2. **Buildable focus** — the corp's industrial focus (CORPORATION_GENERATION.md) has **≥1 valid candidate tile** on its assigned body for at least one building in that focus.\n3. **Reachable market** — at least one output resource of that focus has a market centre on the body (or reachable via convoy), so production can be sold.\n4. (Stretch) **Profitable chain** — a coarse check that the chain's output base_price exceeds its input + wage + maintenance cost, so the focus is not structurally loss-making on that terrain.\n\nReport PASS/FAIL per (seed, corp) with the failing assertion named. Author the harness, then either add it to the verifier-headless skill's named list or, if skill edit is denied, run it as a one-off and note it (per CLAUDE.md § Tool creation is skill creation).\n\n### Open calls (Ben)\n- Seed set: a fixed small list (reproducible) vs a larger deterministic sweep.\n- Whether assertion 4 (profitability) belongs here or is too coupled to economy tuning — could split into a separate econ-side check.\n- Whether a FAIL is a hard test failure (gen bug) or a tuning warning (some bodies are *meant* to be marginal).\n\nServes both gameplay clarity now and the **v0.1.0 quality audit** later (generation validity is part of 'the loop is verified')."
+    },
+    {
       "id": "BL-076",
       "title": "Display options window — resolution / fullscreen / vsync, persisted",
       "short_name": "DISPLAY_OPTIONS",
