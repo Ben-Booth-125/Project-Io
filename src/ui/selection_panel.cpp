@@ -5,15 +5,31 @@
 #include "selection.hpp"
 #include "view_nav.hpp"
 
+#include "world/economy_system.hpp" // economy_report (workforce cap, BL-069)
 #include "world/market_clearing.hpp"
 #include "world/placement_rules.hpp"
 #include "world/survey_system.hpp"
+#include "world/workforce.hpp"      // workforce_efficiency (BL-069)
 
 #include <imgui.h>
 
 namespace ui {
 
 namespace {
+
+// BL-069: population-centre scale label (1–5 → village … metropolis).
+const char* scale_label(int scale)
+{
+    switch (scale)
+    {
+        case 1:  return "village";
+        case 2:  return "town";
+        case 3:  return "city";
+        case 4:  return "conurbation";
+        case 5:  return "metropolis";
+        default: return "settlement";
+    }
+}
 
 // --- Build front door (tile Selection element) -------------------------------
 // The per-tile entry to construction (docs/ui/SELECTION.md): offers the buildable
@@ -133,14 +149,53 @@ const char* selection_title(const world& w, selection_kind kind, entity_id id)
     return "?";
 }
 
-// Dispatch to the matching shared content builder (entity_summary.hpp).
+// BL-068 competitor layout: the Selection panel for a *rival* building. Public
+// facts only (type, owner, location) plus explicit teaching rows that render the
+// withheld channels (production, stockpile) as visible 'private' placeholders, so
+// the asymmetry is legible rather than a silent omission. The panel never leaks
+// more than the hover card's facts; markets remain the sanctioned public channel.
+void draw_rival_building_summary(const world& w, entity_id id)
+{
+    const auto it = w.buildings.find(id);
+    if (it == w.buildings.end())
+    {
+        ImGui::TextDisabled("\xe2\x80\x94");
+        return;
+    }
+    const building_component& b = it->second;
+
+    // Owner corporation (public) — the building type already heads the panel.
+    const auto cit = w.corporations.find(owner_corp_of(w, id));
+    if (cit != w.corporations.end())
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
+                           "Owner: %s", cit->second.name.c_str());
+
+    // Tile location (public — the marker already sits on the surveyed map).
+    const auto tile_it = w.tiles.find(b.tile);
+    if (tile_it != w.tiles.end())
+        ImGui::Text("Tile [%d, %d]  %s", tile_it->second.grid_x, tile_it->second.grid_y,
+                    composition_name(tile_it->second.composition));
+
+    // Withheld channels as explicit 'private' teaching rows: the grey value makes
+    // the asymmetry legible rather than a silent omission. Markets stay the
+    // sanctioned public channel, so the player infers output from price, not here.
+    ImGui::TextDisabled("Production:  private");
+    ImGui::TextDisabled("Stockpile:   private");
+}
+
+// Dispatch to the matching shared content builder (entity_summary.hpp). Buildings
+// branch on ownership (BL-068): the player's own show full management detail; a
+// rival shows the competitor layout above.
 void draw_summary(const world& w, selection_kind kind, entity_id id)
 {
     switch (kind)
     {
         case selection_kind::body:        draw_body_summary(w, id);        break;
         case selection_kind::tile:        draw_tile_summary(w, id);        break;
-        case selection_kind::building:    draw_building_summary(w, id);    break;
+        case selection_kind::building:
+            if (is_player_owned(w, id)) draw_building_summary(w, id);
+            else                        draw_rival_building_summary(w, id);
+            break;
         case selection_kind::market:      draw_market_summary(w, id);      break;
         case selection_kind::unit:        draw_unit_summary(w, id);        break;
         case selection_kind::nation:      draw_nation_summary(w, id);      break;
@@ -202,7 +257,8 @@ void draw_survey_section(const world& w, ui_state& ui, entity_id body_id)
 
 // Draw the lens-contextual supplement into the current ImGui cursor position.
 // Extracted so it can be called from a child region inside the new bar layout.
-void draw_lens_supplement(const world& w, const recipe_registry& reg, ui_state& ui,
+void draw_lens_supplement(const world& w, const recipe_registry& reg,
+                          const economy_report& report, ui_state& ui,
                           selection_kind kind)
 {
     if (kind != selection_kind::tile)
@@ -266,9 +322,40 @@ void draw_lens_supplement(const world& w, const recipe_registry& reg, ui_state& 
             break;
         }
     }
+    else if (ui.overlay == overlay_mode::population)
+    {
+        // BL-069: surface the habitability → workforce reasoning for the population
+        // centre on the selected tile. Scale / population / local habitability are
+        // their own rows; the workforce cap is an absolute number — the body's
+        // effective labour pool for the player corp = supply × efficiency(body
+        // habitability), read from the economy report the panel already consumes.
+        entity_id centre = null_entity;
+        for (const auto& [cid, tid] : w.population_centre_tile)
+            if (tid == tile) { centre = cid; break; }
+
+        if (centre != null_entity)
+        {
+            const population_centre_component& pc = w.population_centres.at(centre);
+            ImGui::Text("Scale: %d (%s)", pc.scale, scale_label(pc.scale));
+            ImGui::Text("Population: %dk", pc.population);
+            ImGui::Text("Habitability: %.2f", static_cast<double>(pc.habitability));
+
+            const entity_id body = tit->second.body;
+            const auto hit = report.body_habitability.find(body);
+            const float body_hab = (hit != report.body_habitability.end()) ? hit->second : 1.0f;
+            const float cap = w.workforce_supply(w.player_entity, body)
+                            * workforce_efficiency(body_hab);
+            ImGui::Text("Workforce cap: %.1f", static_cast<double>(cap));
+        }
+        else
+        {
+            ImGui::TextDisabled("No population centre on this tile.");
+        }
+    }
 }
 
-void draw_selection_panel(const world& w, const recipe_registry& reg, ui_state& ui,
+void draw_selection_panel(const world& w, const recipe_registry& reg,
+                          const economy_report& report, ui_state& ui,
                           float left_x, float bottom_y)
 {
     const selection_kind kind = selection_kind_of(w, ui.selected_entity);
@@ -379,7 +466,7 @@ void draw_selection_panel(const world& w, const recipe_registry& reg, ui_state& 
     // Section B
     ImGui::BeginChild("##sel_section_b", {half_w, 0.0f}, false,
                       ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings);
-    draw_lens_supplement(w, reg, ui, kind);
+    draw_lens_supplement(w, reg, report, ui, kind);
     if (kind == selection_kind::tile)
         draw_build_front_door(w, reg, ui, ui.selected_entity);
     else if (kind == selection_kind::body)

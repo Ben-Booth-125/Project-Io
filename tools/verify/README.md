@@ -75,6 +75,28 @@ On Linux (the primary dev target), the same harness builds via CMake
 (`cmake --build build --target survey_harness`) or directly:
 `g++ -std=c++20 -I src tools/verify/survey_harness.cpp src/world/world.cpp src/world/survey_system.cpp -o survey_harness`.
 
+```bat
+:: Visibility model (BL-068) — read-side ownership accessors: owner_corp_of resolves
+:: a building to its owning corporation (null when unowned); is_player_owned is the
+:: single uniform rival branch point.
+cl /nologo /std:c++20 /EHsc /I src tools\verify\visibility_harness.cpp ^
+   src\world\world.cpp /Fe:visibility_harness.exe
+.\visibility_harness.exe
+```
+
+On Linux: `cmake --build build --target visibility_harness` or
+`g++ -std=c++20 -I src tools/verify/visibility_harness.cpp src/world/world.cpp -o visibility_harness`.
+
+```bat
+:: Population legibility (BL-069) — regression guard: workforce_efficiency reproduces
+:: the prior inline economy_system curve bit-identically across [0,1]. Header-only.
+cl /nologo /std:c++20 /EHsc /I src tools\verify\workforce_harness.cpp /Fe:workforce_harness.exe
+.\workforce_harness.exe
+```
+
+On Linux: `cmake --build build --target workforce_harness` or
+`g++ -std=c++20 -I src tools/verify/workforce_harness.cpp -o workforce_harness`.
+
 Each exits non-zero on a failed assertion. The economy *panel* (the visual class)
 is verified separately via `ProjectIo --verify scripts/verify/economy_panel.lua`
 (the `verifier-visual` skill).

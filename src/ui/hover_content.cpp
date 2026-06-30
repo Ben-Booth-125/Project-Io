@@ -2,6 +2,7 @@
 
 #include "presentation.hpp"
 #include "world/components.hpp"
+#include "world/workforce.hpp"
 
 #include <imgui.h>
 
@@ -40,6 +41,29 @@ void hover_tile_default(const tile_component& tile)
     ImGui::TextUnformatted(composition_name(tile.composition));
     ImGui::Text("Habitability: %.0f%%",
                 static_cast<double>(tile.habitability) * 100.0);
+}
+
+// --- BL-069: tile × population lens — quick workforce tell ----------------------
+// Under the Population lens the hover gives a glance read of the siting signal:
+// habitability and the workforce cap it implies. The cap reads the same shared
+// curve the simulation applies (workforce.hpp), so the glance cannot drift from
+// the lens tint or the sim.
+void hover_tile_population(const world& w, const tile_component& tile)
+{
+    ImGui::TextUnformatted(composition_name(tile.composition));
+    ImGui::Text("Habitability: %.0f%%",
+                static_cast<double>(tile.habitability) * 100.0);
+
+    const float eff = workforce_efficiency(tile.habitability);
+    const float cap = w.workforce_supply(w.player_entity, tile.body) * eff;
+    ImGui::Text("Workforce cap: %.1f", static_cast<double>(cap));
+
+    // Why-line: the 0.6 efficiency cliff is the whole point of the lens.
+    ImGui::Spacing();
+    if (tile.habitability >= 0.6f)
+        ImGui::TextDisabled("Full labour \xe2\x80\x94 habitability \xe2\x89\xa5 0.6");
+    else
+        ImGui::TextDisabled("Reduced labour \xe2\x80\x94 below the 0.6 cliff");
 }
 
 // --- Exemplar 2: building × supply lens (or any lens) ---------------------------
@@ -100,6 +124,27 @@ void hover_building_supply(const world& w, const building_component& b)
     {
         ImGui::TextDisabled("Active");
     }
+}
+
+// --- BL-068: rival building hover — type + owner only ---------------------------
+// The competitor information-asymmetry rule: a rival's marker, building type, and
+// owning corporation are public; production rate and stockpile are private. The
+// hover card therefore shows the two public facts and nothing about throughput.
+void hover_building_rival(const world& w, entity_id eid, const building_component& b)
+{
+    // Title: building type (public).
+    ImGui::TextUnformatted(building_type_name(b.type));
+
+    // Owner corporation (public) — the only other channel the card may reveal.
+    const auto cit = w.corporations.find(owner_corp_of(w, eid));
+    if (cit != w.corporations.end())
+        ImGui::Text("Owner: %s", cit->second.name.c_str());
+    else
+        ImGui::TextDisabled("Owner: unknown");
+
+    // Why-line: name the asymmetry rather than leak production / stockpile.
+    ImGui::Spacing();
+    ImGui::TextDisabled("Competitor \xe2\x80\x94 output private");
 }
 
 // --- Exemplar 3: market-centre × market lens ------------------------------------
@@ -191,16 +236,21 @@ void draw_hover_content(const world& w, const ui_state& ui, entity_id eid)
         const tile_component& tile = tile_it->second;
         if (ui.overlay == overlay_mode::resource)
             hover_tile_resource(tile, ui.lens_resource);
+        else if (ui.overlay == overlay_mode::population)
+            hover_tile_population(w, tile);
         else
             hover_tile_default(tile);
         return;
     }
 
-    // Dispatch: building
+    // Dispatch: building. Player-owned buildings show full operational detail;
+    // rivals show type + owner only (BL-068 visibility rule).
     if (const auto bld_it = w.buildings.find(eid); bld_it != w.buildings.end())
     {
-        // Supply lens (or any lens — the building card is lens-contextual on supply).
-        hover_building_supply(w, bld_it->second);
+        if (is_player_owned(w, eid))
+            hover_building_supply(w, bld_it->second);
+        else
+            hover_building_rival(w, eid, bld_it->second);
         return;
     }
 
