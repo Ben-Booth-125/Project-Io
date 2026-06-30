@@ -796,5 +796,50 @@
       "summary": "Accessibility/legibility pass so an art-less prototype reads clearly for early testers, via graph/data-viz-forward read surfaces (trends, supply/demand, balance over time) plotted in ImGui. Extends the existing ledger/lens/ui::icons direction (the v0.0.6 legibility theme). Design owed: which surfaces get graphs, what series, colourblind-safe palettes, time-window/sampling, plotting helper. Considered-and-rejected: a 100%-emoji UI (determinism + cross-platform cost — see design).",
       "design": "**Origin.** Raised 2026-06-29 while planning accessibility options for early testing. Two framings were weighed — a **100%-emoji** visual language vs a **graph/data-viz-forward** one — and the graph direction was chosen.\n\n**Why graphs, not emoji (settled direction; mechanics still to design).** The project is already legibility-forward (ImGui ledgers, the lens system, hover cards, and the hand-drawn `ui::icons` vector glyph vocabulary); the whole v0.0.6 theme is making the economy legible. Graphs extend that naturally, use ImGui's built-in plotting, and are **deterministic and cross-platform-safe**.\n\nA literal **100%-emoji UI was rejected** because emoji are colour/bitmap glyphs that render differently per OS (Segoe UI Emoji / Noto Color Emoji / Apple), which would (1) break the cross-platform consistency just established in BL-057, and (2) make the **visual golden-image diff harness non-deterministic across machines** — the harness the project relies on for verification. It would also need a bundled colour-emoji font (large; extra ImGui/FreeType setup) and would largely reinvent `ui::icons`, which is the deterministic equivalent. **Guidance:** where iconic, at-a-glance reads are wanted, extend `ui::icons` rather than pulling in an emoji font; reserve graphs for trends/quantities.\n\n**Proposal (to design).** A legibility pass that gives the read surfaces a data-viz-forward treatment for testers: e.g. supply/demand and price **trend plots** in the Market Ledger, a **running-balance / income-vs-expenditure** graph in the economy panel, and sparkline-style summaries where a full plot is too heavy. Build on the ledger conventions already in place.\n\n**Open questions (design owed):** which surfaces get graphs and which stay tabular; what series and time windows (and how history is sampled/retained without data-creep — coordinate with the v0.0.9 data-creep audit); a small reusable ImGui plotting helper vs per-panel one-offs; **colourblind-safe palettes** (true accessibility, beyond legibility) and how that interacts with `presentation.hpp` identity colours; whether any of this needs its own authority doc over LAYOUT.md. Pairs with the existing legibility strand (economy-panel refit, market-ledger dashboard) rather than duplicating it. `src/`-changing and renders in the GUI -> brief-spanning `visual` requirement (a `scripts/verify/*.lua` golden) at promotion.\n\n**Design settled (2026-06-29) — targeted to the key economic surfaces.** First pass is focused, not board-wide: (1) Market Ledger — price and supply/demand plotted over time per resource (a trend, not just the current row); (2) economy panel — a running-balance line plus an income-vs-expenditure view over time. Both go through ONE reusable ImGui plotting helper so later surfaces reuse it, and a single colourblind-safe palette defined once (interacting with, not duplicating, presentation.hpp identity colours). History sampling MUST be bounded (a ring-buffer per series) — coordinate the retention window with the v0.0.9 data-creep audit so plotting never becomes an unbounded-growth source. Sparklines-everywhere and lens overlays are out of this pass. Authority: docs/ui/LAYOUT.md (+ the ledger surfaces)."
     }
+    ,
+    {
+      "id": "BL-064",
+      "short_name": "CLOCK_ROMAN_NUMERALS",
+      "category": "UI",
+      "title": "Clock speed buttons — Roman numeral labels",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "C",
+      "difficulty": 1,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-06-30",
+      "files": [
+        "src/core/app.cpp",
+        "docs/ui/TIME_CONTROLS.md"
+      ],
+      "authority_doc": "docs/ui/TIME_CONTROLS.md",
+      "summary": "Relabel the five speed buttons from Arabic numerals (1–5) to Roman numerals (I–V). Roman numerals are the established convention for speed tiers in grand strategy games and read more naturally as an ordinal scale than multiplicative fractions.",
+      "design": "**Change.** The five speed buttons in the time panel (right column) currently show `1` `2` `3` `4` `5`. Replace them with `I` `II` `III` `IV` `V`. The pause button already uses `II` (a double vertical bar / pause glyph); review whether this visually conflicts with speed button `II` and, if so, consider a distinct pause glyph (e.g. `⏸` drawn via `ui::icons`, or a filled `||` variant, or the word `PAUSE`) to keep the two visually distinct. The underlying multiplier mapping (0.25×, 0.5×, 1×, 4×, 16×) and the keyboard shortcuts (1–5 keys, Space = pause) are **unchanged** — this is purely a label change. Keyboard shortcuts are not relabelled to match (pressing `I` does not mean speed I; the digit keys remain the shortcuts), so the on-screen label and the key that triggers it deliberately differ — consistent with genre convention. Update the button strings in the time panel rendering code (`src/core/app.cpp`) and propagate the label change into `docs/ui/TIME_CONTROLS.md`."
+    },
+    {
+      "id": "BL-065",
+      "short_name": "SELECTION_BOTTOM_BAR",
+      "category": "UI",
+      "title": "Selection info element — full-width bottom bar layout",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-06-30",
+      "files": [
+        "src/ui/selection_panel.cpp",
+        "src/ui/selection_panel.hpp",
+        "docs/ui/SELECTION.md",
+        "docs/ui/LAYOUT.md"
+      ],
+      "authority_doc": "docs/ui/SELECTION.md",
+      "summary": "Redesign the Selection info element from a narrow bottom-left pinned panel to a full-width bar spanning the bottom of the screen, tall enough to show an entity portrait alongside multiple content sections simultaneously in one view.",
+      "design": "**Motivation.** The current spec pins the Selection element to the bottom-left, above the overlay strip, at the same compact height as the overlay controls. That height is insufficient to show an entity portrait (photo/emblem) alongside multiple stat sections at once — the user has to scroll or the content is hidden. A full-width bottom bar solves this: it keeps every section visible simultaneously and reserves a portrait column on the left.\n\n**Layout proposal.**\n```\n┌──────────────────────────────────────────────────────────────────────┐\n│ [Portrait] │ Header (name + type + icon) [Go To] [✕] │              │\n│            ├──────────────────────────────────────────┤  Section C   │\n│  (image /  │  Section A           │  Section B        │              │\n│   emblem)  │  (primary stat block)│  (secondary info) │              │\n└──────────────────────────────────────────────────────────────────────┘\n```\n- **Span**: full canvas width (nav rail to right edge), pinned to the bottom of the screen, above nothing (the overlay control strip is folded in or repositioned).\n- **Height**: fixed at a value that accommodates a portrait plus 2–3 rows of text content simultaneously — approximately the height of 4–5 standard ImGui rows (tentative; tune during implementation).\n- **Portrait column** (leftmost, fixed width ~80–100 px): entity image or emblem drawn via ImGui image or a placeholder glyph from `ui::icons` while real portraits are absent.\n- **Content area** (remainder): split horizontally into two or three sections depending on selection kind. Each section is a vertical stack of labelled rows (using the shared content builders from `entity_summary`). The header row (name + type + icon + 'Go to' + close) spans the full content area at the top.\n- **Overlay control strip**: currently bottom-left; with the bar taking the full bottom edge, the overlay strip either (a) moves to a floating position over the canvas (near the lens-icon cluster), or (b) is inlined into the bar when a selection is active and shown at its original position when nothing is selected. This is the main layout conflict to resolve at implementation time.\n\n**Behaviour is unchanged from SELECTION.md**: single-click selects, double-click navigates, the bar hides when nothing is selected, close hides it. The 'go to' button and polymorphic content-by-kind model are unaffected — only the chrome and layout change.\n\n**Multi-section content examples:**\n- *Tile*: portrait = terrain icon; Section A = composition × landform, hazard, habitability; Section B = deposit profile; Section C = Build here affordance.\n- *Body*: portrait = body graphic/icon; Section A = name, type, orbit, parent; Section B = surface summary (terrain histogram); Section C = market headline / ownership.\n- *Building*: portrait = building glyph; Section A = type, recipe, throughput; Section B = host tile stats; Section C = action buttons (decommission, upgrade — deferred).\n\n**Requirements.** A `visual` requirement (golden capture via `scripts/verify/selection_bar.lua`) should confirm the bar renders at the correct position and height, and that the portrait + sections are visible simultaneously without scrolling, for a representative selection kind (e.g. Tile)."
+    }
   ]
 }
