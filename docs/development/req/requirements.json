@@ -3969,6 +3969,68 @@
           "notes": null
         }
       ]
+    },
+    {
+      "brief": "survey-system",
+      "title": "Survey system — bodies start unsurveyed; survey reveals tiles + deposit bands (BL-067)",
+      "difficulty": 5,
+      "importance": "A",
+      "evaluated_difficulty": 5,
+      "status": "complete",
+      "resolved": "2026-06-30",
+      "resolution": "Delivered BL-067 survey system: data model, survey_system.{hpp,cpp}, app per-day advance + dispatch seam, Solar badge / Planetary region mask / Selection survey section, icons, survey_harness (R2-R6) + survey.lua goldens (R1). All rows complete.",
+      "promoted_from": "BACKLOG § BL-067",
+      "batch": "v0.0.8",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: a survey.lua capture sequence shows an unsurveyed body masked on the Planetary canvas, a partial reveal after N ticks (some regions visible, some masked), then a full reveal; and the Solar-canvas survey badge in hidden / in-progress / surveyed states.",
+          "verification": ["visual: scripts/verify/survey.lua golden"],
+          "status": "complete",
+          "result_metric": "4/4 goldens PASS at 0.0000% diff, exit 0",
+          "notes": "verifier-visual: masked / partial raster reveal (100/253) / full; Solar badges hidden=? scanning=magnifier+k/N surveyed=none."
+        },
+        {
+          "id": "R2",
+          "requirement": "Survey cost and duration scale with both body size (tile count) and distance (heliocentric orbital radius from home): cost = base_dispatch + dist_cost_per_au*D + scan_cost_per_tile*T; duration = transit (distance) + scan (size). A near small body is cheap/fast; a far large body is expensive/slow.",
+          "verification": ["headless: survey_harness cost/duration formula assertions"],
+          "status": "complete",
+          "result_metric": "cost(near)=932, cost(far)=11700; transit grows with distance, scan with size; moon uses parent radius",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "requirement": "Region partition and reveal order are pure deterministic functions of grid dimensions and a fixed super-cell size S (raster, row-major) with no RNG: the same grid yields the same region count and the same reveal order across runs; a tile is visible iff its region's reveal-index < regions_done.",
+          "verification": ["headless: survey_harness deterministic partition + raster order assertions"],
+          "status": "complete",
+          "result_metric": "region_count/region_of raster row-major, deterministic; tile visible iff region < regions_done",
+          "notes": ""
+        },
+        {
+          "id": "R4",
+          "requirement": "world.home_body starts surveyed (regions_done == regions_total, phase surveyed); all other bodies start hidden.",
+          "verification": ["headless: survey_harness home-surveyed assertion"],
+          "status": "complete",
+          "result_metric": "home (and star) start surveyed; others hidden",
+          "notes": ""
+        },
+        {
+          "id": "R5",
+          "requirement": "Many bodies may be in transit/scanning at once with no concurrency cap; each carries its own survey_state and advances independently as advance_surveys is ticked.",
+          "verification": ["headless: survey_harness concurrent-survey independence assertion"],
+          "status": "complete",
+          "result_metric": "near (total 22d) and far (total 263d) advance independently to completion",
+          "notes": ""
+        },
+        {
+          "id": "R6",
+          "requirement": "dispatch_survey debits the survey cost from the player corporation upfront and returns success / insufficient_funds / already_surveyed / in_progress; it never starts a survey the player cannot afford.",
+          "verification": ["headless: survey_harness dispatch guard + upfront-debit assertions"],
+          "status": "complete",
+          "result_metric": "already_surveyed/invalid/insufficient_funds (no debit)/success (exact debit)/in_progress guards",
+          "notes": ""
+        }
+      ]
     }
   ]
 }

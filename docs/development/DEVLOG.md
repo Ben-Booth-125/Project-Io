@@ -6,6 +6,61 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — v0.0.8 Batch Delivery: BL-067 Survey system (2026-06-30)
+
+**Context.** Opened the v0.0.8 (Discovery & Intelligence) frontier. Three items were
+design-settled last session (BL-067 survey, BL-068 visibility, BL-069 population legibility).
+Delivered the load-bearing, independent one — **BL-067**, the survey system — end-to-end, and
+left BL-068 (now unblocked) + BL-069 for a handover. One-item Full-mode Delivery.
+
+**What was built.**
+- **Data model** — `survey_phase` enum + `survey_state` struct on `body_component`
+  (`components.hpp`): phase, regions_total, regions_done, ticks_remaining.
+- **Logic** — new `src/world/survey_system.{hpp,cpp}`: deterministic raster region partition
+  (`survey_region_count`/`survey_region_of`/`survey_tile_visible`, super-cell 8, no RNG);
+  `survey_cost` + `survey_compute_schedule` (cost/duration scale with size × distance; a moon
+  uses its parent's heliocentric radius); `dispatch_survey` (player-balance guard + upfront
+  debit + schedule arm); `advance_surveys` (event-stepping per-day phase/region crossing);
+  `init_survey_states` (home + star seeded surveyed); `survey_eta_days`.
+- **App** — per-day `advance_surveys` crossing in `app::run` (mirrors the econ-tick crossing,
+  new `m_last_survey_day`); `pending_survey_dispatch` executed in `render` (mirrors the
+  construction request seam); `init_survey_states` in `setup_world` (shared by run/run_verify);
+  a `verify.set_survey(body, regions_done)` hook for deterministic captures.
+- **UI** — Solar badge per phase (`icons::unknown` `?` for hidden, `icons::survey_badge`
+  magnifier + `k∕N` for in-progress, none when surveyed); Planetary region mask (unrevealed
+  regions render as a dark locked fill with no detail/markers/hit-testing; header survey-status
+  suffix); Selection-panel Survey section (Dispatch button with cost+ETA preview / En route /
+  Surveying k/N / Surveyed); two new glyphs in `ui::icons`.
+
+**Verification.**
+- **Headless** `tools/verify/survey_harness.cpp` (registered as a CMake target + in the README) —
+  41 assertions PASS covering R2 (cost/duration formulas), R3 (deterministic raster partition +
+  reveal), R4 (home surveyed), R5 (concurrent independence + full timeline), R6 (dispatch guards
+  + exact upfront debit), plus a partial-reveal progression.
+- **Visual** `scripts/verify/survey.lua` — 4 goldens blessed and PASS at 0.0000% (re-run
+  deterministic under xvfb + software renderer): Planetary masked → raster partial (100/253) →
+  full; Solar badges (Cinder scanning 100/253, Selene/Pallas hidden `?`, Kepler/Helios none).
+- Full `cmake` build green; `survey_harness` + `ProjectIo` both build clean.
+
+**In-session decisions.**
+- **Reveal schedule** stored in 4 fields only (the design's constraint): `advance_surveys`
+  recomputes the pure schedule per body per call and event-steps boundaries, so zero-day region
+  gaps (a small body with more regions than scan-days) all fire in one call.
+- **Calibration constants are placeholders** (base_dispatch 500, dist_cost_per_au 2000,
+  scan_cost_per_tile 0.5; transit 5 + 30/AU, scan 10 + 0.02/tile) — round and legible, tuned by
+  feel via the harness. A far large planet ≈ 11.7k cr / 263 d; a near small body ≈ 0.9k cr / 22 d.
+- **`set_survey` verify hook** added (the `seed_convoy` precedent) because the verify clock is
+  paused — it sets phase/regions directly so a golden can show every state without ticking.
+
+**Open / handover.** BL-068 (visibility model — competitor info asymmetry) is now unblocked and
+should layer its rival-marker region-reveal predicate on the survey gate already in
+`body_surface_canvas`. BL-069 (population legibility) is independent and light. The `verifier-visual`
+and `verifier-headless` skills should be updated to name `survey.lua` / `survey_harness` (a skill
+edit needs the owner's OK — flagged, not yet done). No save/load path exists in `world/*` yet, so
+`survey_state` has no serialisation seam to wire; flag it when one lands.
+
+---
+
 ## Session — branch merge + backlog reconciliation (2026-06-30)
 
 **Context.** Brought `main` up to date by merging the five active feature branches

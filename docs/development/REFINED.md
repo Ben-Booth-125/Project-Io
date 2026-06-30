@@ -1009,4 +1009,71 @@ Parallelisation note: single task.
 
 ---
 
-*Resume here: Wave 1 — BL-041-A (economy_system.cpp habitability cap).*
+*v0.0.7 Batch Delivery **COMPLETE** (shipped 2026-06-17; see ROADMAP § v0.0.7 and the DEVLOG).
+The breakdown above is retained for one cycle as the decomposition record. The stale "resume"
+pointer is cleared — the active worklist below is the v0.0.8 frontier.*
+
+---
+
+## v0.0.8 — Discovery & Intelligence — BL-067 Survey system (promoted 2026-06-30) — **COMPLETE**
+
+Delivered 2026-06-30. All tasks A–F complete. `survey_harness` R2–R6 (41 assertions PASS);
+`survey.lua` 4 goldens PASS at 0.0000%. Design propagated to systems.md / SOLAR / PLANETARY /
+SELECTION / ICONS / GLOSSARY; BL-067 marked complete in backlog.json; BL-068 unblocked. The task
+breakdown below is retained for one cycle as the decomposition record.
+
+Requirements: `docs/development/req/requirements.json § survey-system`. Full mode (difficulty 5,
+priority A). Independent root — unblocks BL-068 (visibility model piggybacks on the region mask).
+Authoritative design: `backlog.json` BL-067 `design` field.
+
+**Mode / fan-out call:** kept in the **main session, sequential**. The world/* logic (A, B) is a
+tight foundation; the UI surfaces (D, E, F) collide on the canvas/selection hotspots and need the
+shared `survey_state` types from A — the worktree-split win is negative for a single-item chain.
+
+- **[2] A — Survey data model.** Add `enum class survey_phase` and `struct survey_state` to
+  `components.hpp`; carry `survey_state survey` inline on `body_component`. Files:
+  `src/world/components.hpp`. Deps: foundation. **provides:** `survey_phase`, `survey_state`,
+  `body_component::survey`. Satisfies: R1–R6 (data substrate).
+- **[3] B — Survey system logic.** New `src/world/survey_system.{hpp,cpp}`:
+  `survey_cost`/`survey_schedule` (size×distance, pure), `region_count`/`region_of_tile`/
+  `region_reveal_index` (deterministic raster partition, no RNG), `advance_surveys(world&, int days)`
+  (phase crossing + `regions_done` bump), `dispatch_survey(world&, entity_id) -> survey_dispatch_result`
+  (player-balance guard + upfront debit + schedule). `home_body` seeded surveyed at world-gen / first
+  access. Files: `src/world/survey_system.{hpp,cpp}`, `src/world/world.hpp` (home-surveyed seam if
+  needed). Deps: A. **provides:** `advance_surveys`, `dispatch_survey`, `survey_dispatch_result`,
+  region helpers. **consumes:** A's types. Satisfies: R2, R3, R4, R5, R6.
+- **[2] C — Headless harness.** `tools/verify/survey_harness.cpp`: cost/duration formulas (R2),
+  deterministic partition + raster order (R3), home surveyed (R4), concurrent independence (R5),
+  dispatch guards + upfront debit (R6). Files: `tools/verify/survey_harness.cpp`. Deps: B.
+  Satisfies: R2–R6 verification.
+- **[1] D — Icons + ui_state seam.** Add `icons::survey_badge` + `icons::unknown` (the `?` glyph)
+  per ICONS.md recipe; add `entity_id pending_survey_dispatch = null_entity` to `ui_state`. Files:
+  `src/ui/icons.{hpp,cpp}`, `src/ui/ui_state.hpp`. Deps: foundation. **provides:** `icons::survey_badge`,
+  `icons::unknown`, `ui_state::pending_survey_dispatch`.
+- **[2] E — App integration.** Per-day `advance_surveys` crossing in `app::run` (mirror the
+  econ-tick crossing; new `m_last_survey_day`); execute `pending_survey_dispatch` in render (mirror
+  the construction request seam); seed `home_body` surveyed at startup. Files: `src/core/app.{hpp,cpp}`.
+  Deps: B, D. **consumes:** `advance_surveys`, `dispatch_survey`, `ui_state::pending_survey_dispatch`.
+- **[3] F — Canvas + selection surfaces.** Solar badge (`solar_system_canvas.cpp`) per phase;
+  Planetary region mask (`body_surface_canvas.cpp`) — masked regions dark/locked, revealed render
+  normally, header scan progress; Selection-panel Survey section (`selection_panel.cpp`) keyed on
+  phase (Dispatch button with cost+ETA / En route / Surveying k∕N / Surveyed). Files:
+  `src/ui/solar_system_canvas.cpp`, `src/ui/body_surface_canvas.cpp`, `src/ui/selection_panel.cpp`.
+  Deps: D, E. **consumes:** region helpers, `survey_state`, `icons::survey_badge`/`unknown`,
+  `pending_survey_dispatch`. Satisfies: R1 (visual).
+
+Parallelisation note: A → B → C; A,D foundation → E → F. Linear chain; no fan-out. Build after B
+(headless), then full `cmake` after F. `verifier-review` over the integrated diff before the full
+compile. Visual R1 via `verifier-visual` (`scripts/verify/survey.lua`) once the app builds.
+
+Collision map:
+
+| File | Tasks |
+|---|---|
+| `src/world/components.hpp` | A |
+| `src/world/survey_system.{hpp,cpp}` | B |
+| `src/world/world.hpp` | B (home-surveyed seam) |
+| `tools/verify/survey_harness.cpp` | C |
+| `src/ui/icons.{hpp,cpp}`, `src/ui/ui_state.hpp` | D |
+| `src/core/app.{hpp,cpp}` | E |
+| `src/ui/solar_system_canvas.cpp`, `src/ui/body_surface_canvas.cpp`, `src/ui/selection_panel.cpp` | F |

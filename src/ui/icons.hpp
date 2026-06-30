@@ -165,4 +165,24 @@ void scarcity(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Stroke colour.
 void market_centre(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw the "unknown / unsurveyed" glyph — a question mark — in @p colour. Marks a
+/// body whose surface and deposits are still hidden (survey system, BL-067). Shown
+/// dimmed as the Solar-canvas survey badge for `survey_phase::hidden`.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent (radius) of the glyph, screen pixels.
+/// @param colour Stroke colour.
+void unknown(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
+/// Draw the survey badge — a magnifying glass — in @p colour. Marks a body whose
+/// survey is in progress (`in_transit` / `scanning`); the canvas overlays a small
+/// progress read (k∕N) alongside it (survey system, BL-067).
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent (radius) of the glyph, screen pixels.
+/// @param colour Stroke colour.
+void survey_badge(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 } // namespace ui::icons

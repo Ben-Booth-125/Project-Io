@@ -126,4 +126,5 @@ private:
     int  m_prev_speed = 1; ///< Speed remembered across a pause, so unpausing restores it.
 
     double m_last_orbit_days = 0.0; ///< elapsed_days at the previous orbit advance; gives the per-frame delta.
+    int    m_last_survey_day = 0;   ///< Whole in-game day at the previous survey advance; drives the per-day survey crossing (BL-067).
 };

@@ -140,6 +140,25 @@ struct nation_substrate
     std::array<float, resource_count> background_demand = {};
 };
 
+/// Survey lifecycle of a body (BL-067, docs/ui/SOLAR.md § Survey badge).
+/// A body starts `hidden` — the player knows only its type, orbital position and
+/// grid size. Dispatching a survey moves it through `in_transit` (probe en route,
+/// nothing revealed) and `scanning` (regions revealed one at a time) to `surveyed`.
+enum class survey_phase : uint8_t { hidden, in_transit, scanning, surveyed };
+
+/// Per-body survey progress. Carried inline on `body_component` (bodies are few).
+/// The reveal is deterministic: `regions_total` partitions the grid by a fixed
+/// super-cell size, regions reveal in raster (row-major) order, and a tile is
+/// visible iff its region's reveal-index < `regions_done`. No RNG anywhere — the
+/// order is a pure function of grid dimensions (see survey_system.hpp).
+struct survey_state
+{
+    survey_phase phase           = survey_phase::hidden;
+    int          regions_total   = 0;  ///< Computed at dispatch from the grid + super-cell size.
+    int          regions_done    = 0;  ///< Regions revealed so far, in raster order.
+    int          ticks_remaining = 0;  ///< Days until the next phase / region boundary.
+};
+
 /// A celestial body — the primary unit of territorial control and the location
 /// where extraction, market activity, and conflict occur.
 ///
@@ -159,6 +178,11 @@ struct body_component
     float       orbital_angular_velocity_rad_per_day = 0.0f; ///< Angular speed; advances orbital_angle_rad over time. 0 = stationary.
     int         grid_width;           ///< Number of tile columns.
     int         grid_height;          ///< Number of tile rows.
+
+    /// Survey progress (BL-067). `home_body` is seeded `surveyed`; all others open
+    /// `hidden` until the player dispatches a survey. Advanced by advance_surveys
+    /// (survey_system.hpp); read by the Solar/Planetary canvases and the Selection panel.
+    survey_state survey;
 };
 
 /// Surface installation stub. Combat and production logic are added in later

@@ -176,3 +176,18 @@ target_include_directories(econ_bankruptcy PRIVATE
 )
 
 target_compile_features(econ_bankruptcy PRIVATE cxx_std_20)
+
+# ---------------------------------------------------------------------------
+# Headless survey-system harness (BL-067; no SDL / Lua / ImGui)
+# ---------------------------------------------------------------------------
+add_executable(survey_harness
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/survey_harness.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/survey_system.cpp"
+)
+
+target_include_directories(survey_harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)
+
+target_compile_features(survey_harness PRIVATE cxx_std_20)
