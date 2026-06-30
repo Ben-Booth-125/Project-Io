@@ -112,26 +112,43 @@ void apply_canvas_command(const world& w, ui_state& ui, canvas_command cmd)
         case canvas_command::lens_clear:
             ui.overlay = overlay_mode::none;
             break;
+
+        // These require sim_loop / app state; dispatched by app::dispatch_action.
+        case canvas_command::pause_toggle:
+        case canvas_command::speed_1:
+        case canvas_command::speed_2:
+        case canvas_command::speed_3:
+        case canvas_command::speed_4:
+        case canvas_command::speed_5:
+        case canvas_command::help_toggle:
+            break;
     }
 }
 
 std::optional<canvas_command> canvas_command_from_name(std::string_view name)
 {
     // Pairs the command vocabulary (verify scripts + keybinding table) to the enum.
-    static const std::array<std::pair<std::string_view, canvas_command>, 13> table = {{
-        {"descend",    canvas_command::descend},
-        {"ascend",     canvas_command::ascend},
-        {"body_next",  canvas_command::body_next},
-        {"body_prev",  canvas_command::body_prev},
-        {"pan_left",   canvas_command::pan_left},
-        {"pan_right",  canvas_command::pan_right},
-        {"pan_up",     canvas_command::pan_up},
-        {"pan_down",   canvas_command::pan_down},
-        {"zoom_in",    canvas_command::zoom_in},
-        {"zoom_out",   canvas_command::zoom_out},
-        {"lens_next",  canvas_command::lens_next},
-        {"lens_prev",  canvas_command::lens_prev},
-        {"lens_clear", canvas_command::lens_clear},
+    static const std::array<std::pair<std::string_view, canvas_command>, 20> table = {{
+        {"descend",       canvas_command::descend},
+        {"ascend",        canvas_command::ascend},
+        {"body_next",     canvas_command::body_next},
+        {"body_prev",     canvas_command::body_prev},
+        {"pan_left",      canvas_command::pan_left},
+        {"pan_right",     canvas_command::pan_right},
+        {"pan_up",        canvas_command::pan_up},
+        {"pan_down",      canvas_command::pan_down},
+        {"zoom_in",       canvas_command::zoom_in},
+        {"zoom_out",      canvas_command::zoom_out},
+        {"lens_next",     canvas_command::lens_next},
+        {"lens_prev",     canvas_command::lens_prev},
+        {"lens_clear",    canvas_command::lens_clear},
+        {"pause_toggle",  canvas_command::pause_toggle},
+        {"speed_1",       canvas_command::speed_1},
+        {"speed_2",       canvas_command::speed_2},
+        {"speed_3",       canvas_command::speed_3},
+        {"speed_4",       canvas_command::speed_4},
+        {"speed_5",       canvas_command::speed_5},
+        {"help_toggle",   canvas_command::help_toggle},
     }};
 
     for (const auto& [n, cmd] : table)

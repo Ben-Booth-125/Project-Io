@@ -48,6 +48,49 @@
 static constexpr int window_w = 1280;
 static constexpr int window_h = 720;
 
+// ---------------------------------------------------------------------------
+// Unified key-binding table (BL-062).
+// Every keyboard shortcut is defined once here.  handle_key_down loops over
+// this table and routes through dispatch_action, so the F1 help overlay is
+// generated from the same table and can never drift.  F12 is excluded because
+// it needs the renderer and is handled first in handle_key_down.
+// ---------------------------------------------------------------------------
+struct key_binding
+{
+    SDL_Scancode       scancode;
+    bool               shift;    ///< true = requires Shift modifier
+    ui::canvas_command cmd;
+    const char*        label;    ///< Human-readable action name (F1 overlay)
+    const char*        key_name; ///< Human-readable key string (F1 overlay)
+};
+
+static const std::array<key_binding, 20> s_bindings = {{
+    // Canvas navigation
+    {SDL_SCANCODE_RETURN,       false, ui::canvas_command::descend,      "Descend rung",      "Enter"},
+    {SDL_SCANCODE_BACKSPACE,    false, ui::canvas_command::ascend,       "Ascend rung",       "Backspace"},
+    {SDL_SCANCODE_RIGHTBRACKET, false, ui::canvas_command::body_next,    "Next body",         "]"},
+    {SDL_SCANCODE_LEFTBRACKET,  false, ui::canvas_command::body_prev,    "Previous body",     "["},
+    {SDL_SCANCODE_LEFT,         false, ui::canvas_command::pan_left,     "Pan left",          "←"},
+    {SDL_SCANCODE_RIGHT,        false, ui::canvas_command::pan_right,    "Pan right",         "→"},
+    {SDL_SCANCODE_UP,           false, ui::canvas_command::pan_up,       "Pan up",            "↑"},
+    {SDL_SCANCODE_DOWN,         false, ui::canvas_command::pan_down,     "Pan down",          "↓"},
+    {SDL_SCANCODE_EQUALS,       false, ui::canvas_command::zoom_in,      "Zoom in",           "="},
+    {SDL_SCANCODE_MINUS,        false, ui::canvas_command::zoom_out,     "Zoom out",          "-"},
+    // Lens
+    {SDL_SCANCODE_L,            false, ui::canvas_command::lens_next,    "Next lens",         "L"},
+    {SDL_SCANCODE_L,            true,  ui::canvas_command::lens_prev,    "Previous lens",     "Shift+L"},
+    {SDL_SCANCODE_0,            false, ui::canvas_command::lens_clear,   "Clear lens",        "0"},
+    // Time controls
+    {SDL_SCANCODE_SPACE,        false, ui::canvas_command::pause_toggle, "Pause / Resume",    "Space"},
+    {SDL_SCANCODE_1,            false, ui::canvas_command::speed_1,      "Speed I  (0.25×)",  "1"},
+    {SDL_SCANCODE_2,            false, ui::canvas_command::speed_2,      "Speed II (0.5×)",   "2"},
+    {SDL_SCANCODE_3,            false, ui::canvas_command::speed_3,      "Speed III (1×)",    "3"},
+    {SDL_SCANCODE_4,            false, ui::canvas_command::speed_4,      "Speed IV (4×)",     "4"},
+    {SDL_SCANCODE_5,            false, ui::canvas_command::speed_5,      "Speed V  (16×)",    "5"},
+    // UI
+    {SDL_SCANCODE_F1,           false, ui::canvas_command::help_toggle,  "Key bindings",      "F1"},
+}};
+
 namespace {
 
 /// Map a lens name (as used in the verify scripts) to its overlay_mode. Unknown
@@ -173,7 +216,8 @@ int app::run()
     constexpr int pre_game_ticks = 12;
     {
         const auto pit = m_world.corporations.find(m_world.player_entity);
-        m_balance_history.push_back(pit != m_world.corporations.end() ? pit->second.balance : 0.0f);
+        ui::push_capped(m_balance_history,
+            pit != m_world.corporations.end() ? pit->second.balance : 0.0f);
     }
     for (int t = 0; t < pre_game_ticks; ++t)
         step_economy();
@@ -230,14 +274,32 @@ void app::step_economy()
     apply_budget(m_world, m_registry, flows, m_last_econ_report.workforce_contention);
     credit_arrived_convoys(m_world);
 
-    // Record the player's post-tick balance for the header net figure + sparkline.
-    // Capped so the buffer stays small; the sparkline shows the most recent window.
+    // Record player balance, income, and expenditure for the header sparkline and
+    // economy panel graphs (BL-063).  All three are capped at plot_history_cap.
     {
         const auto cit = m_world.corporations.find(m_world.player_entity);
-        m_balance_history.push_back(cit != m_world.corporations.end() ? cit->second.balance : 0.0f);
-        constexpr std::size_t max_history = 64;
-        if (m_balance_history.size() > max_history)
-            m_balance_history.erase(m_balance_history.begin());
+        ui::push_capped(m_balance_history,
+            cit != m_world.corporations.end() ? cit->second.balance : 0.0f);
+
+        const auto fit = flows.find(m_world.player_entity);
+        ui::push_capped(m_income_history,
+            fit != flows.end() ? fit->second.income : 0.0f);
+        ui::push_capped(m_expenditure_history,
+            fit != flows.end() ? fit->second.expenditure : 0.0f);
+    }
+
+    // Record market price / supply / demand snapshots for the market ledger graphs.
+    for (const auto& [mid, mc] : m_world.markets)
+    {
+        auto& mh = m_market_history[mid];
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            if (mc.base_price[r] <= 0.0f)
+                continue; // resource not traded here; skip
+            ui::push_capped(mh[r].price,  mc.price[r]);
+            ui::push_capped(mh[r].supply, mc.supply[r]);
+            ui::push_capped(mh[r].demand, mc.demand[r]);
+        }
     }
 }
 
@@ -342,6 +404,28 @@ int app::run_verify(const std::string& script_path, bool bless)
         m_ui.planetary_pan_y += dy;
     });
     v.set_function("capture", [this](const std::string& name) { capture_frame(name); });
+
+    // BL-061: scriptable cursor override — sets the app-owned mouse source so a
+    // verify script can place the cursor at an exact screen position and trigger
+    // hover highlights deterministically, without the OS cursor leaking into goldens.
+    v.set_function("mouse", [this](float x, float y) {
+        m_ui.mouse = {x, y, true};
+    });
+    // Convenience: position the cursor over a specific tile (col, row) — the
+    // Planetary canvas computes the screen centre of that tile on its next draw,
+    // so this is a best-effort "close enough to trigger hover" helper.
+    v.set_function("hover_tile", [this](int col, int row) {
+        // Request a centre-on-tile so the canvas knows the tile's screen position,
+        // then place the mouse at approximately the grid centre. The canvas
+        // corrects hover on the following frame once it knows the real position.
+        m_ui.planetary_center_pending = true;
+        m_ui.planetary_center_col     = col;
+        m_ui.planetary_center_row     = row;
+        // Approximate screen position: place mouse near the canvas centre so the
+        // canvas' per-tile hit-test resolves it after the centre pan settles.
+        m_ui.mouse = {ImGui::GetIO().DisplaySize.x * 0.5f,
+                      ImGui::GetIO().DisplaySize.y * 0.5f, true};
+    });
 
     // Drive the economy headlessly: run N economy ticks (production → market →
     // budget) and open the economy panel so a capture shows live, populated data.
@@ -588,43 +672,57 @@ void app::process_events(bool& running)
 
 void app::handle_key_down(const SDL_KeyboardEvent& key)
 {
-    // F12 captures regardless of focus — the screenshot is an app concern (it
-    // needs the renderer), not a canvas_command.
+    // F12 captures regardless of focus — needs the renderer, so it stays outside
+    // the binding table.
     if (key.scancode == SDL_SCANCODE_F12)
     {
         m_capture_requested = true;
         return;
     }
 
-    // Canvas navigation keys are suppressed while ImGui owns the keyboard (a text
-    // field has focus), so typing into a panel never steers the canvas.
+    // All other bindings are suppressed while ImGui owns the keyboard.
     if (ImGui::GetIO().WantCaptureKeyboard)
         return;
 
-    // Map the keybinding table (CANVASES.md § Keyboard) onto the shared command
-    // vocabulary; apply_canvas_command is the same dispatch verify.command uses.
     const bool shift = (key.mod & SDL_KMOD_SHIFT) != 0;
-    auto dispatch = [this](ui::canvas_command cmd) {
-        ui::apply_canvas_command(m_world, m_ui, cmd);
-    };
-
-    switch (key.scancode)
+    for (const auto& b : s_bindings)
     {
-        case SDL_SCANCODE_RETURN:       dispatch(ui::canvas_command::descend);   break;
-        case SDL_SCANCODE_BACKSPACE:    dispatch(ui::canvas_command::ascend);    break;
-        case SDL_SCANCODE_RIGHTBRACKET: dispatch(ui::canvas_command::body_next); break;
-        case SDL_SCANCODE_LEFTBRACKET:  dispatch(ui::canvas_command::body_prev); break;
-        case SDL_SCANCODE_LEFT:         dispatch(ui::canvas_command::pan_left);  break;
-        case SDL_SCANCODE_RIGHT:        dispatch(ui::canvas_command::pan_right); break;
-        case SDL_SCANCODE_UP:           dispatch(ui::canvas_command::pan_up);    break;
-        case SDL_SCANCODE_DOWN:         dispatch(ui::canvas_command::pan_down);  break;
-        case SDL_SCANCODE_EQUALS:       dispatch(ui::canvas_command::zoom_in);   break;
-        case SDL_SCANCODE_MINUS:        dispatch(ui::canvas_command::zoom_out);  break;
-        case SDL_SCANCODE_L:
-            dispatch(shift ? ui::canvas_command::lens_prev : ui::canvas_command::lens_next);
-            break;
-        case SDL_SCANCODE_0:            dispatch(ui::canvas_command::lens_clear); break;
-        default: break;
+        if (key.scancode == b.scancode && shift == b.shift)
+        {
+            dispatch_action(b.cmd);
+            return;
+        }
+    }
+}
+
+void app::dispatch_action(ui::canvas_command cmd)
+{
+    switch (cmd)
+    {
+        // Time controls — need sim_loop, handled here rather than in apply_canvas_command.
+        case ui::canvas_command::pause_toggle:
+            if (m_sim_loop.paused())
+                m_sim_loop.set_speed(m_prev_speed);
+            else
+            {
+                m_prev_speed = m_sim_loop.speed();
+                m_sim_loop.set_speed(0);
+            }
+            return;
+        case ui::canvas_command::speed_1: m_prev_speed = 1; m_sim_loop.set_speed(1); return;
+        case ui::canvas_command::speed_2: m_prev_speed = 2; m_sim_loop.set_speed(2); return;
+        case ui::canvas_command::speed_3: m_prev_speed = 3; m_sim_loop.set_speed(3); return;
+        case ui::canvas_command::speed_4: m_prev_speed = 4; m_sim_loop.set_speed(4); return;
+        case ui::canvas_command::speed_5: m_prev_speed = 5; m_sim_loop.set_speed(5); return;
+
+        // UI toggles.
+        case ui::canvas_command::help_toggle:
+            m_show_help = !m_show_help;
+            return;
+
+        // Everything else is a canvas navigation command.
+        default:
+            ui::apply_canvas_command(m_world, m_ui, cmd);
     }
 }
 
@@ -633,6 +731,15 @@ void app::render()
     ImGui_ImplSDLRenderer3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
+
+    // Live-mode mouse feed: copy the real OS cursor into ui_state so canvases read
+    // a single app-owned source (BL-061). Skipped in --verify (m_golden_dir set) so
+    // hover is suppressed by default; a script opts in with verify.mouse(x,y).
+    if (m_golden_dir.empty())
+    {
+        const ImVec2 mp = ImGui::GetIO().MousePos;
+        m_ui.mouse = {mp.x, mp.y, true};
+    }
 
     // Shared window geometry. The minimap and the top-right time panels are all
     // sized off the minimap width so the right-hand column stays aligned.
@@ -757,7 +864,16 @@ void app::render()
             ImGui::TableSetColumnIndex(0);
             ImGui::Text("%d Q%d", date.year, date.quarter);
             ImGui::Text("%s %02d", ui::fmt::month_abbrev(date.month), date.day);
-            ImGui::ProgressBar(ui::fmt::quarter_progress(day), {-1.0f, 0.0f}, "");
+            {
+                const uint64_t days_left =
+                    static_cast<uint64_t>(sim_loop::econ_tick_days)
+                    - (day % static_cast<uint64_t>(sim_loop::econ_tick_days));
+                const int next_q = (date.quarter % 4) + 1;
+                ImGui::ProgressBar(ui::fmt::quarter_progress(day), {-1.0f, 0.0f},
+                                   "");
+                ImGui::TextDisabled("Q%d in %llud", next_q,
+                                    static_cast<unsigned long long>(days_left));
+            }
 
             // --- Right: the compressed speed controls.
             ImGui::TableSetColumnIndex(1);
@@ -767,14 +883,15 @@ void app::render()
                 ImGui::TextDisabled("(paused)");
             else
             {
-                static constexpr const char* mult_labels[] = {"", "1/4x", "1/2x", "1x", "4x", "16x"};
+                static constexpr const char* mult_labels[] = {"", "I", "II", "III", "IV", "V"};
                 const int s = m_sim_loop.speed();
                 ImGui::TextDisabled("(%s)", (s >= 1 && s <= sim_loop::max_speed) ? mult_labels[s] : "?");
             }
 
             // Pause plus speed buttons. The active speed is highlighted. The pause
             // label flips to a play symbol when paused so it reflects the toggle state.
-            const char* labels[] = {m_sim_loop.paused() ? ">" : "II", "1/4x", "1/2x", "1x", "4x", "16x"};
+            // Speed tiers use Roman numerals (I–V); pause uses || to stay distinct from speed II.
+            const char* labels[] = {m_sim_loop.paused() ? ">" : "||", "I", "II", "III", "IV", "V"};
             const int   speeds[] = { 0,    1,   2,   3,   4,   5 };
             const int   n        = 6;
             const float spacing  = ImGui::GetStyle().ItemSpacing.x;
@@ -843,9 +960,12 @@ void app::render()
     // Left navigation pane and the menus it opens. Starts below the profile.
     ui::draw_nav_pane(m_ui, ui::profile_panel_height);
     ui::draw_tile_inspector(m_world, m_ui, &m_ui.show_tile_ledger);
-    ui::draw_economy_panel(m_world, m_registry, m_last_econ_report, &m_ui.show_economy_panel);
+    {
+        const ui::player_plot_history phist{m_balance_history, m_income_history, m_expenditure_history};
+        ui::draw_economy_panel(m_world, m_registry, m_last_econ_report, phist, &m_ui.show_economy_panel);
+    }
     ui::draw_construction_panel(m_world, m_registry, m_ui, &m_ui.show_construction_panel);
-    ui::draw_market_ledger(m_world, m_ui, m_ui.show_market_ledger);
+    ui::draw_market_ledger(m_world, m_ui, m_market_history, m_ui.show_market_ledger);
     ui::draw_balance_ledger(m_world, m_ui, m_ui.show_balance_ledger);
     ui::draw_corporation_panel(m_world, m_ui, m_ui.show_corporation_panel);
 
@@ -889,6 +1009,39 @@ void app::render()
                 m_ui.construction.last_message = "Construction failed."; break;
         }
         m_ui.construction.pending_tile = null_entity; // consume the request
+    }
+
+    // F1 key-binding cheat-sheet — generated from s_bindings so it never drifts.
+    if (m_show_help)
+    {
+        ImGui::SetNextWindowPos(
+            ImVec2{disp.x * 0.5f, disp.y * 0.5f}, ImGuiCond_Appearing, ImVec2{0.5f, 0.5f});
+        ImGui::SetNextWindowSize(ImVec2{340.0f, 0.0f}, ImGuiCond_Appearing);
+        if (ImGui::Begin("Key Bindings", &m_show_help,
+                         ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse))
+        {
+            if (ImGui::BeginTable("##keys", 2,
+                    ImGuiTableFlags_Borders | ImGuiTableFlags_SizingStretchProp))
+            {
+                ImGui::TableSetupColumn("Action");
+                ImGui::TableSetupColumn("Key");
+                ImGui::TableHeadersRow();
+                for (const auto& b : s_bindings)
+                {
+                    ImGui::TableNextRow();
+                    ImGui::TableSetColumnIndex(0);
+                    ImGui::TextUnformatted(b.label);
+                    ImGui::TableSetColumnIndex(1);
+                    ImGui::TextDisabled("%s", b.key_name);
+                }
+                // F12 stays outside the table (it needs the renderer)
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted("Screenshot");
+                ImGui::TableSetColumnIndex(1); ImGui::TextDisabled("F12");
+                ImGui::EndTable();
+            }
+        }
+        ImGui::End();
     }
 
     ImGui::Render();

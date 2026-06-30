@@ -1,6 +1,7 @@
 #include "market_ledger.hpp"
 
 #include "ledger_chrome.hpp"
+#include "plot_history.hpp"
 #include "presentation.hpp"
 
 #include <imgui.h>
@@ -46,7 +47,8 @@ std::vector<entity_id> markets_on_body(const world& w, entity_id body)
 
 } // namespace
 
-void draw_market_ledger(const world& w, const ui_state& /*s*/, bool& open)
+void draw_market_ledger(const world& w, const ui_state& /*s*/,
+                        const market_plot_history& history, bool& open)
 {
     if (!open)
         return;
@@ -239,6 +241,59 @@ void draw_market_ledger(const world& w, const ui_state& /*s*/, bool& open)
 
     ImGui::Separator();
     ImGui::Text("Turnover this tick: %.1f", detail_cleared);
+
+    // --- Price / supply / demand trends (BL-063) ----------------------------
+    // Show trend plots for each traded resource in the selected market.
+    // A resource selector lets the player focus on one resource at a time.
+    const auto hist_it = history.find(selected_market);
+    if (hist_it != history.end())
+    {
+        ImGui::Separator();
+        ImGui::TextDisabled("Trends (selected market)");
+
+        // Build a list of traded resources for the selector.
+        static int selected_resource_idx = 0;
+        std::vector<std::size_t> traded;
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (mc.base_price[r] > 0.0f)
+                traded.push_back(r);
+
+        if (!traded.empty())
+        {
+            if (selected_resource_idx >= static_cast<int>(traded.size()))
+                selected_resource_idx = 0;
+
+            const resource_presentation& cur_rp =
+                presentation_of(static_cast<resource_type>(traded[static_cast<std::size_t>(selected_resource_idx)]));
+            if (ImGui::BeginCombo("##trend_res", cur_rp.name))
+            {
+                for (int i = 0; i < static_cast<int>(traded.size()); ++i)
+                {
+                    const resource_presentation& rp =
+                        presentation_of(static_cast<resource_type>(traded[static_cast<std::size_t>(i)]));
+                    const bool sel = (i == selected_resource_idx);
+                    ImGui::PushStyleColor(ImGuiCol_Text,
+                        ImGui::ColorConvertU32ToFloat4(rp.colour));
+                    if (ImGui::Selectable(rp.name, sel))
+                        selected_resource_idx = i;
+                    ImGui::PopStyleColor();
+                    if (sel) ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+
+            const std::size_t r = traded[static_cast<std::size_t>(selected_resource_idx)];
+            const auto& series  = hist_it->second[r];
+            const float third   = (ImGui::GetContentRegionAvail().x
+                                   - 2.0f * ImGui::GetStyle().ItemSpacing.x) / 3.0f;
+
+            draw_plot("##price",  series.price,  {third, 50.0f}, &plot_col_blue,   "price");
+            ImGui::SameLine();
+            draw_plot("##supply", series.supply, {third, 50.0f}, &plot_col_green,  "supply");
+            ImGui::SameLine();
+            draw_plot("##demand", series.demand, {third, 50.0f}, &plot_col_orange, "demand");
+        }
+    }
 
     ImGui::End();
 }

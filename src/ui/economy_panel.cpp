@@ -2,6 +2,7 @@
 
 #include "format.hpp"
 #include "ledger_chrome.hpp" // shared ledger-window size + spawn anchor
+#include "plot_history.hpp"
 #include "presentation.hpp"
 
 #include <imgui.h>
@@ -251,6 +252,24 @@ void draw_workforce(const world& w, const economy_report& report)
     }
 }
 
+// --- player balance trend (BL-063) -------------------------------------------
+void draw_balance_trend(const player_plot_history& hist)
+{
+    if (!ImGui::CollapsingHeader("Player balance trend"))
+        return;
+
+    ImGui::TextDisabled("Balance");
+    draw_plot("##balance", hist.balance, {-1.0f, 55.0f}, &plot_col_blue);
+
+    if (!hist.income.empty() || !hist.expenditure.empty())
+    {
+        const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
+        draw_plot("##income", hist.income, {half, 40.0f}, &plot_col_green, "income");
+        ImGui::SameLine();
+        draw_plot("##expend", hist.expenditure, {half, 40.0f}, &plot_col_orange, "spend");
+    }
+}
+
 // --- markets -----------------------------------------------------------------
 void draw_markets(const world& w)
 {
@@ -309,6 +328,7 @@ void draw_markets(const world& w)
 void draw_economy_panel(const world& w,
                         const recipe_registry& reg,
                         const economy_report& report,
+                        const player_plot_history& history,
                         bool* p_open)
 {
     if (p_open && !*p_open)
@@ -319,6 +339,7 @@ void draw_economy_panel(const world& w,
     ImGui::SetNextWindowSize(ledger_window_size, ImGuiCond_Once);
     ImGui::Begin("Economy", p_open);
 
+    draw_balance_trend(history);
     draw_balances(w);
     draw_buildings(w, reg, report);
     draw_workforce(w, report);

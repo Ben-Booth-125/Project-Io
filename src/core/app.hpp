@@ -8,6 +8,9 @@
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
 
+#include "ui/canvas_command.hpp"
+#include "ui/plot_history.hpp"
+
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -43,12 +46,21 @@ public:
 private:
     void process_events(bool& running);
 
-    /// Map a key-down event onto the shared canvas command vocabulary (see
-    /// docs/ui/CANVASES.md § Keyboard) and apply it, or trigger a capture (F12).
-    /// Navigation keys are ignored while ImGui is capturing the keyboard.
+    /// Map a key-down event onto the unified action table and dispatch it, or
+    /// trigger a capture (F12). Navigation keys are ignored while ImGui owns the
+    /// keyboard. The binding table lives in app.cpp alongside the F1 help overlay
+    /// that is generated from it (so table and overlay are always in sync).
     ///
     /// @param key The SDL key-down event.
     void handle_key_down(const SDL_KeyboardEvent& key);
+
+    /// Central dispatch for every app action — canvas navigation, time controls,
+    /// and UI toggles. Canvas-only commands route to apply_canvas_command; the
+    /// time-control and help-toggle commands are handled here (they need sim_loop /
+    /// app members that apply_canvas_command does not see).
+    ///
+    /// @param cmd Action to dispatch.
+    void dispatch_action(ui::canvas_command cmd);
 
     void render();
 
@@ -97,9 +109,13 @@ private:
     recipe_registry m_registry;          ///< Recipes + economy constants, loaded from Lua at startup.
     economy_report  m_last_econ_report;  ///< Most recent economy-step report; read by the economy panel.
     uint64_t        m_last_econ_tick = 0; ///< econ_tick() at the previous step; drives the boundary detection in run().
-    std::vector<float> m_balance_history;  ///< Recent player balances (one per econ tick, capped); feeds the header net + sparkline.
+    std::vector<float> m_balance_history;      ///< Recent player balances (one per econ tick, capped); feeds the header net + sparkline.
+    std::vector<float> m_income_history;      ///< Recent player income per econ tick (market sales); feeds economy panel graph.
+    std::vector<float> m_expenditure_history; ///< Recent player expenditure per econ tick (auto-buys + wages + maintenance); feeds economy panel graph.
+    ui::market_plot_history m_market_history; ///< Price / supply / demand history per market, per resource; feeds market ledger graphs.
 
-    bool        m_capture_requested = false; ///< Set by F12 / capture_frame, consumed in render().
+    bool        m_show_help        = false;   ///< Toggle for the F1 key-binding cheat-sheet overlay.
+    bool        m_capture_requested = false;  ///< Set by F12 / capture_frame, consumed in render().
     std::string m_capture_name;              ///< Base name for the next capture; empty = timestamped (F12).
 
     // Golden-image diffing (run_verify only; empty m_golden_dir = interactive F12,

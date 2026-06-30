@@ -47,3 +47,4 @@ screenshots/
 *.so
 
 # FetchContent cache lives inside build/ — covered above
+.claude/worktrees/

@@ -142,6 +142,14 @@ struct ui_state
     entity_id hovered_entity = null_entity; ///< Entity the cursor rested on last frame; used to detect stable hover.
     int       hover_ticks    = 0;           ///< Consecutive frames of stable hover over hovered_entity; resets on entity change.
 
+    // --- application-driven mouse (BL-061) ---
+    // Canvases read this instead of ImGui::GetIO().MousePos so the cursor
+    // position can be suppressed or overridden by the verify harness.
+    // In the live app, render() copies the real OS cursor each frame (active=true).
+    // In --verify, active defaults to false (hover suppressed); a script opts in
+    // with verify.mouse(x,y) or verify.hover_tile(col,row).
+    struct { float x = 0.f; float y = 0.f; bool active = false; } mouse;
+
     // --- pending centre request (verify harness) ---
     // verify.center_tile() sets these; the Planetary canvas consumes them on its
     // next draw, where the exact grid transform is known, and computes the pan that

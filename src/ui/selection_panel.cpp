@@ -150,6 +150,74 @@ void draw_summary(const world& w, selection_kind kind, entity_id id)
 
 } // namespace
 
+// Draw the lens-contextual supplement into the current ImGui cursor position.
+// Extracted so it can be called from a child region inside the new bar layout.
+void draw_lens_supplement(const world& w, const recipe_registry& reg, ui_state& ui,
+                          selection_kind kind)
+{
+    if (kind != selection_kind::tile)
+        return;
+
+    const entity_id tile = ui.selected_entity;
+    const auto tit = w.tiles.find(tile);
+    if (tit == w.tiles.end())
+        return;
+
+    if (ui.overlay == overlay_mode::corporation)
+    {
+        const corporation_component* owner_corp = nullptr;
+        for (const auto& [bld_id, bc] : w.buildings)
+        {
+            if (bc.tile != tile)
+                continue;
+            for (const auto& [corp_id, cc] : w.corporations)
+            {
+                for (entity_id a : cc.assets)
+                {
+                    if (a == bld_id) { owner_corp = &cc; break; }
+                }
+                if (owner_corp) break;
+            }
+            break;
+        }
+        if (owner_corp)
+            ImGui::TextColored({0.7f, 0.8f, 1.0f, 1.0f},
+                "Owner: %s", owner_corp->name.c_str());
+    }
+    else if (ui.overlay == overlay_mode::market)
+    {
+        const entity_id mkt_id = market_for_tile(w, tile);
+        const auto mkt_it = w.markets.find(mkt_id);
+        if (mkt_it != w.markets.end())
+        {
+            int idx = 1;
+            for (const auto& [mid, mk] : w.markets)
+            {
+                if (mk.body != tit->second.body) continue;
+                if (mid == mkt_id) break;
+                ++idx;
+            }
+            ImGui::Text("Market %d catchment", idx);
+            const std::size_t g = static_cast<std::size_t>(ui.lens_resource);
+            ImGui::Text("%s price: %.2f",
+                        resource_name(ui.lens_resource),
+                        static_cast<double>(mkt_it->second.price[g]));
+        }
+    }
+    else if (ui.overlay == overlay_mode::production)
+    {
+        for (const auto& [bld_id, bc] : w.buildings)
+        {
+            if (bc.tile != tile) continue;
+            const building_economics& eco = reg.economics(bc.type);
+            ImGui::Text("Base rate: %.1f / tick", static_cast<double>(eco.base_rate));
+            ImGui::Text("Workforce: %.0f%%",
+                        static_cast<double>(bc.workforce_assigned) * 100.0);
+            break;
+        }
+    }
+}
+
 void draw_selection_panel(const world& w, const recipe_registry& reg, ui_state& ui,
                           float left_x, float bottom_y)
 {
@@ -162,9 +230,27 @@ void draw_selection_panel(const world& w, const recipe_registry& reg, ui_state& 
     if (ui.selected_entity == ui.selection_hidden_for)
         return;
 
+    // --- Full-width bottom bar layout ---
+    // The bar is anchored by its bottom-left corner to (left_x, bottom_y) and
+    // spans to the right edge of the display. Height is fixed to fit portrait +
+    // header + two content rows (~5 standard ImGui rows).
+    const float display_w    = ImGui::GetIO().DisplaySize.x;
+    const float bar_w        = display_w - left_x;
+    constexpr float portrait_w = 88.0f;  // portrait column width
+    const float line_h = ImGui::GetTextLineHeightWithSpacing();
+    const float frame_h = ImGui::GetFrameHeight();
+    const ImGuiStyle& style = ImGui::GetStyle();
+    // Bar height: header row + separator + two content rows + top+bottom padding.
+    const float bar_h = style.WindowPadding.y * 2.0f
+                      + frame_h                          // header row
+                      + style.ItemSpacing.y
+                      + 1.0f                             // separator
+                      + style.ItemSpacing.y
+                      + line_h * 4.0f;                  // content rows
+
     ImGui::SetNextWindowPos({left_x, bottom_y}, ImGuiCond_Always, {0.0f, 1.0f});
-    ImGui::SetNextWindowSize({320.0f, 0.0f}, ImGuiCond_Always); // fixed width, auto height
-    ImGui::SetNextWindowBgAlpha(0.85f);
+    ImGui::SetNextWindowSize({bar_w, bar_h}, ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.88f);
     constexpr ImGuiWindowFlags flags =
         ImGuiWindowFlags_NoTitleBar            |
         ImGuiWindowFlags_NoResize              |
@@ -172,126 +258,83 @@ void draw_selection_panel(const world& w, const recipe_registry& reg, ui_state& 
         ImGuiWindowFlags_NoCollapse            |
         ImGuiWindowFlags_NoNav                 |
         ImGuiWindowFlags_NoBringToFrontOnFocus |
+        ImGuiWindowFlags_NoScrollbar           |
         ImGuiWindowFlags_NoSavedSettings;
     ImGui::Begin("##selection_info", nullptr, flags);
 
-    // --- Header: title + kind on the left, 'go to' and close on the right ---
-    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
-                       "%s", selection_title(w, kind, ui.selected_entity));
+    // ── Portrait column (left) ────────────────────────────────────────────────
+    // A placeholder rectangle in the portrait colour. Future work can substitute
+    // a real entity icon here without changing layout.
+    const ImVec2 portrait_tl = ImGui::GetCursorScreenPos();
+    const float  portrait_h  = bar_h - style.WindowPadding.y * 2.0f;
+    ImDrawList*  dl          = ImGui::GetWindowDrawList();
+    dl->AddRectFilled(portrait_tl,
+                      {portrait_tl.x + portrait_w - style.ItemSpacing.x,
+                       portrait_tl.y + portrait_h},
+                      IM_COL32(40, 50, 70, 200), 4.0f);
+    // Centred kind label inside the portrait box.
+    const char* kind_lbl = selection_kind_name(kind);
+    const ImVec2 lbl_sz  = ImGui::CalcTextSize(kind_lbl);
+    dl->AddText({portrait_tl.x + (portrait_w - style.ItemSpacing.x - lbl_sz.x) * 0.5f,
+                 portrait_tl.y + (portrait_h - lbl_sz.y) * 0.5f},
+                IM_COL32(120, 140, 180, 220), kind_lbl);
+
+    // Advance cursor past the portrait column; everything else is to its right.
+    ImGui::Dummy({portrait_w, portrait_h});
     ImGui::SameLine();
-    ImGui::TextDisabled("%s", selection_kind_name(kind));
 
-    // Right-align the two square buttons against the inner edge.
-    const float        btn   = ImGui::GetFrameHeight();
-    const ImGuiStyle&  style = ImGui::GetStyle();
-    const float        right = ImGui::GetWindowWidth() - style.WindowPadding.x;
-    ImGui::SameLine(right - 2.0f * btn - style.ItemSpacing.x);
+    // ── Content area (right of portrait) ─────────────────────────────────────
+    const float content_x = ImGui::GetCursorPosX();
+    const float content_w = ImGui::GetContentRegionAvail().x;
+    ImGui::BeginGroup();
 
-    // 'Go to' — same effect as a double-click on the selection. focus_on_entity
-    // resolves it to the most informative view (or, later, a ledger).
-    if (ImGui::Button(">", {btn, btn}))
-        focus_on_entity(w, ui, ui.selected_entity);
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Go to");
-    ImGui::SameLine();
+    // Header row: name (tinted) + type label on the left; [Go To] [✕] on the right.
+    {
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
+                           "%s", selection_title(w, kind, ui.selected_entity));
+        ImGui::SameLine();
+        ImGui::TextDisabled("%s", selection_kind_name(kind));
 
-    // Close — hides until the next selection; the panel is not destroyed.
-    if (ImGui::Button("x", {btn, btn}))
-        ui.selection_hidden_for = ui.selected_entity;
-    if (ImGui::IsItemHovered())
-        ImGui::SetTooltip("Close");
+        const float btn   = frame_h;
+        const float right = content_x + content_w - style.WindowPadding.x;
+        ImGui::SameLine(right - 2.0f * btn - style.ItemSpacing.x);
+
+        if (ImGui::Button(">", {btn, btn}))
+            focus_on_entity(w, ui, ui.selected_entity);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Go to");
+        ImGui::SameLine();
+
+        if (ImGui::Button("x", {btn, btn}))
+            ui.selection_hidden_for = ui.selected_entity;
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Close");
+    }
 
     ImGui::Separator();
 
-    // --- Body: polymorphic content for the selected kind ---
+    // Two side-by-side content sections below the header.
+    // Section A (primary): polymorphic entity stat block.
+    // Section B (secondary): lens supplement + build front door for tiles.
+    const float half_w = (content_w - style.ItemSpacing.x) * 0.5f;
+
+    // Section A
+    ImGui::BeginChild("##sel_section_a", {half_w, 0.0f}, false,
+                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings);
     draw_summary(w, kind, ui.selected_entity);
+    ImGui::EndChild();
 
-    // Lens-contextual supplement (BL-032): when a tile is selected and a lens is
-    // active, show the most relevant stat for that lens below the base summary.
-    if (kind == selection_kind::tile)
-    {
-        const entity_id tile = ui.selected_entity;
-        const auto tit = w.tiles.find(tile);
+    ImGui::SameLine();
 
-        if (tit != w.tiles.end())
-        {
-            if (ui.overlay == overlay_mode::corporation)
-            {
-                // Corporation lens: show which corp owns a building on this tile.
-                const corporation_component* owner_corp = nullptr;
-                for (const auto& [bld_id, bc] : w.buildings)
-                {
-                    if (bc.tile != tile)
-                        continue;
-                    for (const auto& [corp_id, cc] : w.corporations)
-                    {
-                        for (entity_id a : cc.assets)
-                        {
-                            if (a == bld_id)
-                            {
-                                owner_corp = &cc;
-                                break;
-                            }
-                        }
-                        if (owner_corp)
-                            break;
-                    }
-                    break;
-                }
-                if (owner_corp)
-                {
-                    ImGui::Separator();
-                    ImGui::TextColored({0.7f, 0.8f, 1.0f, 1.0f},
-                        "Owner: %s", owner_corp->name.c_str());
-                }
-            }
-            else if (ui.overlay == overlay_mode::market)
-            {
-                // Market lens: show which market's catchment covers this tile.
-                ImGui::Separator();
-                const entity_id mkt_id = market_for_tile(w, tile);
-                const auto mkt_it = w.markets.find(mkt_id);
-                if (mkt_it != w.markets.end())
-                {
-                    // Ordinal index for display (stable relative to iteration order).
-                    int idx = 1;
-                    for (const auto& [mid, mk] : w.markets)
-                    {
-                        if (mk.body != tit->second.body)
-                            continue;
-                        if (mid == mkt_id)
-                            break;
-                        ++idx;
-                    }
-                    ImGui::Text("Market %d catchment", idx);
-                    // Show selected-resource price.
-                    const std::size_t g = static_cast<std::size_t>(ui.lens_resource);
-                    ImGui::Text("%s price: %.2f",
-                                resource_name(ui.lens_resource),
-                                static_cast<double>(mkt_it->second.price[g]));
-                }
-            }
-            else if (ui.overlay == overlay_mode::production)
-            {
-                // Production lens: show base output of any building on this tile.
-                for (const auto& [bld_id, bc] : w.buildings)
-                {
-                    if (bc.tile != tile)
-                        continue;
-                    ImGui::Separator();
-                    const building_economics& eco = reg.economics(bc.type);
-                    ImGui::Text("Base rate: %.1f / tick", static_cast<double>(eco.base_rate));
-                    ImGui::Text("Workforce: %.0f%%",
-                                static_cast<double>(bc.workforce_assigned) * 100.0);
-                    break;
-                }
-            }
-        }
-    }
-
-    // Build front door — only for a selected tile (the per-tile construction entry).
+    // Section B
+    ImGui::BeginChild("##sel_section_b", {half_w, 0.0f}, false,
+                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings);
+    draw_lens_supplement(w, reg, ui, kind);
     if (kind == selection_kind::tile)
         draw_build_front_door(w, reg, ui, ui.selected_entity);
+    ImGui::EndChild();
+
+    ImGui::EndGroup();
 
     ImGui::End();
 }

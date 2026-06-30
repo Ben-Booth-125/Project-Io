@@ -32,6 +32,18 @@ enum class canvas_command
     lens_next,  ///< Cycle the overlay lens forward (wrapping).
     lens_prev,  ///< Cycle the overlay lens backward (wrapping).
     lens_clear, ///< Clear the overlay lens (overlay_mode::none).
+
+    // Time controls — driven by the unified hotkey table (app.cpp); also usable
+    // from verify scripts so a script can drive the clock deterministically.
+    pause_toggle, ///< Toggle pause / resume (restores previous speed on resume).
+    speed_1,      ///< Set speed to tier I (0.25×).
+    speed_2,      ///< Set speed to tier II (0.5×).
+    speed_3,      ///< Set speed to tier III (1×, normal-play reference).
+    speed_4,      ///< Set speed to tier IV (4×).
+    speed_5,      ///< Set speed to tier V (16×, fast-forward).
+
+    // UI toggles.
+    help_toggle,  ///< Toggle the key-binding cheat-sheet overlay (F1).
 };
 
 /// Apply a canvas command to the shared UI state. Pure state mutation — no

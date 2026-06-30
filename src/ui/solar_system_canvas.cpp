@@ -155,7 +155,9 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
     // The star is drawn in the body pass below (body_type::star, at the centre),
     // so it needs no dedicated draw here.
 
-    const ImVec2 mouse = ImGui::GetIO().MousePos;
+    const ImVec2 mouse = state.mouse.active
+                         ? ImVec2{state.mouse.x, state.mouse.y}
+                         : ImVec2{-1.0f, -1.0f};
 
     // Iterate bodies in a stable id order for deterministic overlap behaviour.
     std::vector<entity_id> body_ids;

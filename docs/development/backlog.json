@@ -794,5 +794,50 @@
       "summary": "Legibility baseline from the 2026-06-24 accessibility UX review: a global UI-scale control (ImGui FontGlobalScale / font re-load) and a secondary-text contrast pass to clear WCAG AA on dim header/label/ledger text. The non-colour half of accessibility — colour-vision stays in BL-016, motor/keyboard in BL-062. Design owed: scale storage/persistence, the FontGlobalScale-vs-refont tradeoff, a measured contrast token audit, whether a docs/ui/ACCESSIBILITY.md is warranted.",
       "design": "**Problem.** A UX/accessibility review (2026-06-24) of the blessed golden captures surfaced two legibility barriers no existing item covers:\n\n1. **Low secondary-text contrast.** Label/secondary text is dim grey on near-black — the header fields (`Parent`, `Standing`, `NET ±0/qtr`), the EXPLORER placeholder, and ledger sub-labels sit below the WCAG AA 4.5:1 body-text ratio.\n2. **Single fixed UI scale.** Everything renders at one scale. The dense monospace ledgers (balance, corp dashboard, building management) are already small at 1280×720 and become punishing on high-DPI displays; there is no user control to enlarge.\n\nBoth hurt low-vision players, ageing eyes, and high-glare settings.\n\n**Proposal (to design).** A deliberately *narrow* legibility baseline — the non-colour half of accessibility (colour-vision lives in BL-016, motor/keyboard in BL-062):\n\n- **Global UI scale.** A user-adjustable scale through ImGui — either `FontGlobalScale` (cheap, slightly blurry) or re-loading the font atlas at a chosen px in `src/ui/fonts.cpp` (`load_ui_font`, crisp, heavier) — persisted in settings. Likely a discrete step set (e.g. 1.0 / 1.25 / 1.5) so layouts are tested at known sizes rather than a free slider.\n- **Secondary-text contrast pass.** Lift the dim secondary/label tokens to clear AA. Identity colours live in `src/ui/presentation.hpp`; the base theme is `StyleColorsDark()` at `src/core/app.cpp:129`.\n\n**Open questions (design owed):** where the scale setting lives (settings.json vs an in-engine options surface) and how it persists; `FontGlobalScale` vs font-atlas re-load; discrete steps vs continuous; which exact tokens are below AA and their replacement values (needs a measured contrast audit of `presentation.hpp` + the dark theme); whether this warrants a dedicated `docs/ui/ACCESSIBILITY.md` authority doc (proposed) or folds into `LAYOUT.md`. Companion to BL-016 (colour-vision) and BL-062 (motor/keyboard) — together the three are the prototype's **accessibility strand**. *(Written 2026-06-24, accessibility UX review.)*"
     }
+    ,
+    {
+      "id": "BL-064",
+      "short_name": "CLOCK_ROMAN_NUMERALS",
+      "category": "UI",
+      "title": "Clock speed buttons — Roman numeral labels",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "C",
+      "difficulty": 1,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-06-30",
+      "files": [
+        "src/core/app.cpp",
+        "docs/ui/TIME_CONTROLS.md"
+      ],
+      "authority_doc": "docs/ui/TIME_CONTROLS.md",
+      "summary": "Relabel the five speed buttons from Arabic numerals (1–5) to Roman numerals (I–V). Roman numerals are the established convention for speed tiers in grand strategy games and read more naturally as an ordinal scale than multiplicative fractions.",
+      "design": "**Change.** The five speed buttons in the time panel (right column) currently show `1` `2` `3` `4` `5`. Replace them with `I` `II` `III` `IV` `V`. The pause button already uses `II` (a double vertical bar / pause glyph); review whether this visually conflicts with speed button `II` and, if so, consider a distinct pause glyph (e.g. `⏸` drawn via `ui::icons`, or a filled `||` variant, or the word `PAUSE`) to keep the two visually distinct. The underlying multiplier mapping (0.25×, 0.5×, 1×, 4×, 16×) and the keyboard shortcuts (1–5 keys, Space = pause) are **unchanged** — this is purely a label change. Keyboard shortcuts are not relabelled to match (pressing `I` does not mean speed I; the digit keys remain the shortcuts), so the on-screen label and the key that triggers it deliberately differ — consistent with genre convention. Update the button strings in the time panel rendering code (`src/core/app.cpp`) and propagate the label change into `docs/ui/TIME_CONTROLS.md`."
+    },
+    {
+      "id": "BL-065",
+      "short_name": "SELECTION_BOTTOM_BAR",
+      "category": "UI",
+      "title": "Selection info element — full-width bottom bar layout",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-06-30",
+      "files": [
+        "src/ui/selection_panel.cpp",
+        "src/ui/selection_panel.hpp",
+        "docs/ui/SELECTION.md",
+        "docs/ui/LAYOUT.md"
+      ],
+      "authority_doc": "docs/ui/SELECTION.md",
+      "summary": "Redesign the Selection info element from a narrow bottom-left pinned panel to a full-width bar spanning the bottom of the screen, tall enough to show an entity portrait alongside multiple content sections simultaneously in one view.",
+      "design": "**Motivation.** The current spec pins the Selection element to the bottom-left, above the overlay strip, at the same compact height as the overlay controls. That height is insufficient to show an entity portrait (photo/emblem) alongside multiple stat sections at once — the user has to scroll or the content is hidden. A full-width bottom bar solves this: it keeps every section visible simultaneously and reserves a portrait column on the left.\n\n**Layout proposal.**\n```\n┌──────────────────────────────────────────────────────────────────────┐\n│ [Portrait] │ Header (name + type + icon) [Go To] [✕] │              │\n│            ├──────────────────────────────────────────┤  Section C   │\n│  (image /  │  Section A           │  Section B        │              │\n│   emblem)  │  (primary stat block)│  (secondary info) │              │\n└──────────────────────────────────────────────────────────────────────┘\n```\n- **Span**: full canvas width (nav rail to right edge), pinned to the bottom of the screen, above nothing (the overlay control strip is folded in or repositioned).\n- **Height**: fixed at a value that accommodates a portrait plus 2–3 rows of text content simultaneously — approximately the height of 4–5 standard ImGui rows (tentative; tune during implementation).\n- **Portrait column** (leftmost, fixed width ~80–100 px): entity image or emblem drawn via ImGui image or a placeholder glyph from `ui::icons` while real portraits are absent.\n- **Content area** (remainder): split horizontally into two or three sections depending on selection kind. Each section is a vertical stack of labelled rows (using the shared content builders from `entity_summary`). The header row (name + type + icon + 'Go to' + close) spans the full content area at the top.\n- **Overlay control strip**: currently bottom-left; with the bar taking the full bottom edge, the overlay strip either (a) moves to a floating position over the canvas (near the lens-icon cluster), or (b) is inlined into the bar when a selection is active and shown at its original position when nothing is selected. This is the main layout conflict to resolve at implementation time.\n\n**Behaviour is unchanged from SELECTION.md**: single-click selects, double-click navigates, the bar hides when nothing is selected, close hides it. The 'go to' button and polymorphic content-by-kind model are unaffected — only the chrome and layout change.\n\n**Multi-section content examples:**\n- *Tile*: portrait = terrain icon; Section A = composition × landform, hazard, habitability; Section B = deposit profile; Section C = Build here affordance.\n- *Body*: portrait = body graphic/icon; Section A = name, type, orbit, parent; Section B = surface summary (terrain histogram); Section C = market headline / ownership.\n- *Building*: portrait = building glyph; Section A = type, recipe, throughput; Section B = host tile stats; Section C = action buttons (decommission, upgrade — deferred).\n\n**Requirements.** A `visual` requirement (golden capture via `scripts/verify/selection_bar.lua`) should confirm the bar renders at the correct position and height, and that the portrait + sections are visible simultaneously without scrolling, for a representative selection kind (e.g. Tile)."
+    }
   ]
 }
