@@ -4,6 +4,7 @@
 #include "entity_summary.hpp"
 #include "highlight.hpp"
 #include "hover_card.hpp"
+#include "hover_content.hpp"
 #include "icons.hpp"
 #include "nav_pane.hpp"
 #include "presentation.hpp"
@@ -1137,12 +1138,44 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     if (!input_enabled)
         return;
 
-    // Hover-card (BL-060). Track stable hover ticks against the resolved tile so
-    // the card appears after kHoverDelay frames of the cursor resting on the same
-    // entity. Content is lens-contextual: plain canvas shows terrain + habitability;
-    // Resource lens shows deposit depth of the selected resource.
+    // Hover-card (BL-060, BL-020). Resolve the hovered entity in marker-priority
+    // order (building > market_centre > tile — mirroring click priority). Track
+    // stable hover ticks and show the lens-contextual "why not what" card after
+    // kHoverDelay frames of rest on the same entity.
     {
-        const entity_id hover_eid = hovered_tile;
+        // Resolve the highest-priority entity under the cursor.
+        entity_id hover_eid    = null_entity;
+        float     best_bld_d2  = std::numeric_limits<float>::max();
+        float     best_mkt_d2  = std::numeric_limits<float>::max();
+        entity_id bld_hover    = null_entity;
+        entity_id mkt_hover    = null_entity;
+
+        for (const marker_hit_zone& hz : state.marker_hit_zones)
+        {
+            const float dx = mouse.x - hz.centre.x;
+            const float dy = mouse.y - hz.centre.y;
+            const float d2 = dx * dx + dy * dy;
+            if (d2 > hz.radius * hz.radius)
+                continue;
+            if (hz.kind == marker_hit_zone::kind::building && d2 < best_bld_d2)
+            {
+                best_bld_d2 = d2;
+                bld_hover   = hz.id;
+            }
+            else if (hz.kind == marker_hit_zone::kind::market_centre && d2 < best_mkt_d2)
+            {
+                best_mkt_d2 = d2;
+                mkt_hover   = hz.id;
+            }
+        }
+
+        if (bld_hover != null_entity)
+            hover_eid = bld_hover;
+        else if (mkt_hover != null_entity)
+            hover_eid = mkt_hover;
+        else
+            hover_eid = hovered_tile;
+
         if (hover_eid != state.hovered_entity)
         {
             state.hovered_entity = hover_eid;
@@ -1153,24 +1186,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             ++state.hover_ticks;
         }
 
-        if (hovered_tile != null_entity)
+        if (hover_eid != null_entity)
         {
-            const tile_component& ht = w.tiles.at(hovered_tile);
             draw_hover_card(mouse, state.hover_ticks, [&]() {
-                ImGui::TextUnformatted(composition_name(ht.composition));
-                if (state.overlay == overlay_mode::resource)
-                {
-                    const std::size_t sel = static_cast<std::size_t>(state.lens_resource);
-                    const float dep = ht.resource_deposit[sel];
-                    ImGui::Text("%s: %.2f",
-                                presentation_of(state.lens_resource).name,
-                                static_cast<double>(dep));
-                }
-                else
-                {
-                    ImGui::Text("Hab: %.0f%%",
-                                static_cast<double>(ht.habitability) * 100.0);
-                }
+                draw_hover_content(w, state, hover_eid);
             });
         }
     }
