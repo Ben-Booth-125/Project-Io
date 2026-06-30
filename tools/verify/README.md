@@ -62,6 +62,19 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\population_mvp.cpp ^
 .\population_mvp.exe
 ```
 
+```bat
+:: Survey system (BL-067) — cost/duration vs size+distance, deterministic raster
+:: region partition + reveal order, home starts surveyed, concurrent surveys
+:: advance independently, dispatch guards + upfront debit.
+cl /nologo /std:c++20 /EHsc /I src tools\verify\survey_harness.cpp ^
+   src\world\world.cpp src\world\survey_system.cpp /Fe:survey_harness.exe
+.\survey_harness.exe
+```
+
+On Linux (the primary dev target), the same harness builds via CMake
+(`cmake --build build --target survey_harness`) or directly:
+`g++ -std=c++20 -I src tools/verify/survey_harness.cpp src/world/world.cpp src/world/survey_system.cpp -o survey_harness`.
+
 Each exits non-zero on a failed assertion. The economy *panel* (the visual class)
 is verified separately via `ProjectIo --verify scripts/verify/economy_panel.lua`
 (the `verifier-visual` skill).

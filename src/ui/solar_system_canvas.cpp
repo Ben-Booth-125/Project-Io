@@ -3,6 +3,7 @@
 
 #include "canvas_scale.hpp"
 #include "highlight.hpp"
+#include "icons.hpp"
 #include "presentation.hpp"
 
 #include <algorithm>
@@ -208,6 +209,31 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
         // pinned is always false here.
         draw_body_highlight(dl, pos, radius,
             resolve_highlight(id == state.selected_entity, this_hovered, /*pinned=*/false));
+
+        // Survey badge (BL-067): mark each body's survey status at its upper-right.
+        // hidden → dimmed "?"; in_transit / scanning → magnifying glass + k∕N region
+        // count; surveyed (home, star, completed) → no badge. The badge tracks the
+        // live body position every frame.
+        if (body.survey.phase != survey_phase::surveyed)
+        {
+            const float  br = std::max(4.0f, 6.0f * element_scale);
+            const ImVec2 badge_pos{ pos.x + radius * 0.9f + br, pos.y - radius * 0.9f - br };
+            if (body.survey.phase == survey_phase::hidden)
+            {
+                icons::unknown(dl, badge_pos, br, IM_COL32(190, 190, 200, 150));
+            }
+            else // in_transit / scanning
+            {
+                icons::survey_badge(dl, badge_pos, br, IM_COL32(120, 215, 255, 230));
+                char prog[24];
+                if (body.survey.phase == survey_phase::scanning && body.survey.regions_total > 0)
+                    std::snprintf(prog, sizeof prog, "%d/%d", body.survey.regions_done, body.survey.regions_total);
+                else
+                    std::snprintf(prog, sizeof prog, "...");
+                dl->AddText({ badge_pos.x + br + 2.0f, badge_pos.y - 6.0f },
+                            IM_COL32(120, 215, 255, 230), prog);
+            }
+        }
 
         // Labelling: planets (and other notable bodies) carry a permanent
         // label; moons are labelled only while hovered, to keep the inner

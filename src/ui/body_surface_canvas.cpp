@@ -10,6 +10,7 @@
 #include "presentation.hpp"
 #include "world/market_clearing.hpp" // market_for_tile (Scarcity catchment, prices)
 #include "world/placement_rules.hpp"
+#include "world/survey_system.hpp"   // survey_tile_visible (region mask, BL-067)
 
 #include <algorithm>
 #include <array>
@@ -376,9 +377,23 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     if (draw_title)
     {
         title_h = ImGui::GetTextLineHeightWithSpacing();
-        char title[128];
-        std::snprintf(title, sizeof(title), "%s  -  %s  (%dx%d)",
-            body.name.c_str(), body_type_name(body.type), body.grid_width, body.grid_height);
+        // Survey status suffix (BL-067): a surveyed body shows none; others read
+        // their phase so the locked surface is explained in the header.
+        char survey_note[48] = "";
+        switch (body.survey.phase)
+        {
+            case survey_phase::hidden:
+                std::snprintf(survey_note, sizeof survey_note, "  -  UNSURVEYED"); break;
+            case survey_phase::in_transit:
+                std::snprintf(survey_note, sizeof survey_note, "  -  Survey en route"); break;
+            case survey_phase::scanning:
+                std::snprintf(survey_note, sizeof survey_note, "  -  Surveying %d/%d",
+                    body.survey.regions_done, body.survey.regions_total); break;
+            case survey_phase::surveyed: break;
+        }
+        char title[176];
+        std::snprintf(title, sizeof(title), "%s  -  %s  (%dx%d)%s",
+            body.name.c_str(), body_type_name(body.type), body.grid_width, body.grid_height, survey_note);
         dl->AddText(origin + ImVec2{4.0f, 2.0f}, IM_COL32(235, 235, 235, 255), title);
     }
 
@@ -872,6 +887,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             }
         }
 
+        // Survey mask (BL-067): tiles in regions not yet revealed render as a dark
+        // locked overlay with no lens detail, borders, markers, or hit-testing — the
+        // locked fill is drawn, then the per-copy detail is skipped. A fully surveyed
+        // body (home, the star, or a completed survey) reveals everything.
+        const bool revealed = survey_tile_visible(body.survey, gw, gh, tile.grid_x, tile.grid_y);
+        if (!revealed)
+            fill = IM_COL32(12, 14, 20, 255);
+
         // Range of wrap copies that land inside the canvas horizontally.
         const int k_min = (period_px > 0.0f)
             ? static_cast<int>(std::ceil((visible_left  - sc.x) / period_px)) : 0;
@@ -886,6 +909,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             ImVec2 verts[6];
             hex_vertices(verts, cx, cy, draw_r);
             dl->AddConvexPolyFilled(verts, 6, fill);
+
+            // Masked region: locked fill only — no borders, markers, selection, or
+            // hit-testing for this copy. (BL-068 will further gate rival markers on
+            // revealed regions; this gate already hides everything in a masked one.)
+            if (!revealed)
+                continue;
 
             // Nation borders (Country lens only). Draw a dark line on every hex
             // edge shared with a neighbour of a different owner — including the

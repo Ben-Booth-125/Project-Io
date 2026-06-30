@@ -7,6 +7,7 @@
 
 #include "world/market_clearing.hpp"
 #include "world/placement_rules.hpp"
+#include "world/survey_system.hpp"
 
 #include <imgui.h>
 
@@ -145,6 +146,55 @@ void draw_summary(const world& w, selection_kind kind, entity_id id)
         case selection_kind::nation:      draw_nation_summary(w, id);      break;
         case selection_kind::corporation: draw_corporation_summary(w, id); break;
         case selection_kind::none:        break;
+    }
+}
+
+// Survey section for a selected body (BL-067). Keyed on the body's survey phase:
+// hidden → a Dispatch button with the cost + ETA preview (disabled, with a reason,
+// when the player cannot afford it); in_transit / scanning → live progress + ETA;
+// surveyed → a settled note. The button only enqueues ui.pending_survey_dispatch;
+// app::render performs the debit + schedule against its mutable world.
+void draw_survey_section(const world& w, ui_state& ui, entity_id body_id)
+{
+    const auto bit = w.bodies.find(body_id);
+    if (bit == w.bodies.end() || bit->second.type == body_type::star)
+        return;
+    const survey_state& s = bit->second.survey;
+
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Survey");
+
+    switch (s.phase)
+    {
+        case survey_phase::surveyed:
+            ImGui::TextDisabled("Surveyed.");
+            break;
+        case survey_phase::in_transit:
+            ImGui::Text("En route - ETA %d d", survey_eta_days(w, body_id));
+            break;
+        case survey_phase::scanning:
+            ImGui::Text("Surveying %d/%d - ETA %d d",
+                        s.regions_done, s.regions_total, survey_eta_days(w, body_id));
+            break;
+        case survey_phase::hidden:
+        {
+            const float cost = survey_cost(w, body_id);
+            const int   eta  = survey_eta_days(w, body_id);
+            float balance = 0.0f;
+            const auto pit = w.corporations.find(w.player_entity);
+            if (pit != w.corporations.end())
+                balance = pit->second.balance;
+            const bool affordable = balance >= cost;
+
+            ImGui::BeginDisabled(!affordable);
+            if (ImGui::Button("Dispatch Survey"))
+                ui.pending_survey_dispatch = body_id;
+            ImGui::EndDisabled();
+            ImGui::SameLine();
+            ImGui::TextDisabled("%.0f cr - ETA %d d", static_cast<double>(cost), eta);
+            if (!affordable)
+                ImGui::TextDisabled("Insufficient funds.");
+            break;
+        }
     }
 }
 
@@ -332,6 +382,8 @@ void draw_selection_panel(const world& w, const recipe_registry& reg, ui_state& 
     draw_lens_supplement(w, reg, ui, kind);
     if (kind == selection_kind::tile)
         draw_build_front_door(w, reg, ui, ui.selected_entity);
+    else if (kind == selection_kind::body)
+        draw_survey_section(w, ui, ui.selected_entity);
     ImGui::EndChild();
 
     ImGui::EndGroup();

@@ -6,6 +6,9 @@ Any owned entity with economic or military value: a building, installation, unit
 **Body**
 Any discrete celestial object in the simulation — planet, moon, asteroid, or station. Bodies are the primary unit of territorial control and the locations where resources are extracted, colonies are built, and conflict occurs.
 
+**Survey**
+The action that reveals a body's tile surface and deposit richness bands. A body starts **unsurveyed** (`survey_phase::hidden`) — only its type, orbital position, and grid size are known. Dispatching a survey debits credits upfront and reveals the body over sim ticks: a **transit** phase (probe en route, nothing revealed) then a **scan** phase that reveals the surface one **region** at a time in deterministic raster order until it is **surveyed**. Cost and duration scale with body size and distance from home. The home planet starts surveyed. See `docs/systems.md` § Exploration.
+
 **Corporation**
 The player's controlling entity. Unlike nation-states, a corporation begins with no territorial claim or military force and must justify every asset through economic or strategic return. The corporation persists as long as it holds any asset.
 

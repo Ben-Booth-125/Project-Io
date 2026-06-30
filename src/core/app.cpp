@@ -29,6 +29,7 @@
 #include "ui/view_nav.hpp"
 #include "world/budget_system.hpp"
 #include "world/construction.hpp"
+#include "world/survey_system.hpp"
 #include "world/hard_coded_world.hpp"
 #include "world/market_clearing.hpp"
 #include "world/orbital_system.hpp"
@@ -234,6 +235,17 @@ int app::run()
         advance_orbits(m_world, now_days - m_last_orbit_days);
         m_last_orbit_days = now_days;
 
+        // Advance in-progress surveys on whole-day boundaries (one sim tick = one
+        // day). Crossing whole days — rather than fractional per-frame deltas —
+        // keeps the region-reveal schedule deterministic and frame-rate-independent,
+        // mirroring the econ-tick crossing below. Freezes while paused.
+        const int survey_day = static_cast<int>(now_days);
+        if (survey_day > m_last_survey_day)
+        {
+            advance_surveys(m_world, survey_day - m_last_survey_day);
+            m_last_survey_day = survey_day;
+        }
+
         // Resolve the economy on each econ-tick (quarter) boundary the clock crosses.
         const uint64_t econ = m_sim_loop.econ_tick();
         while (m_last_econ_tick < econ)
@@ -346,6 +358,12 @@ void app::setup_world()
     // footprint first. Single-select with a null state — re-clicking the active
     // lens clears to overlay_mode::none. See LENSES.md, docs/ui § lens strip.
     m_ui.overlay = overlay_mode::corporation;
+
+    // Seed survey states (BL-067): home (and the star) open surveyed; every other
+    // body opens hidden until the player dispatches a survey. Shared by run() and
+    // run_verify() so both start from the same deterministic survey state.
+    init_survey_states(m_world);
+    m_last_survey_day = 0;
 }
 
 int app::run_verify(const std::string& script_path, bool bless)
@@ -615,6 +633,27 @@ int app::run_verify(const std::string& script_path, bool bless)
             cv.corp           = m_world.player_entity;
             cv.speed          = 0.1f;
             m_world.convoys.push_back(cv);
+        });
+
+    // Set a body's survey state deterministically for capture (BL-067). regions_done
+    // 0 → hidden; >= region total → surveyed; in between → scanning with that many
+    // regions revealed. Lets a golden show the unsurveyed / partial / full states
+    // and the Solar badge without ticking the (paused) verify clock.
+    v.set_function("set_survey",
+        [this](const std::string& name, int regions_done)
+        {
+            const entity_id b = find_body(m_world, name);
+            const auto it = m_world.bodies.find(b);
+            if (it == m_world.bodies.end())
+                return;
+            survey_state& s = it->second.survey;
+            const int total = survey_region_count(it->second.grid_width, it->second.grid_height);
+            s.regions_total = total;
+            s.regions_done  = std::clamp(regions_done, 0, total);
+            s.ticks_remaining = 0;
+            s.phase = (s.regions_done <= 0)     ? survey_phase::hidden
+                    : (s.regions_done >= total) ? survey_phase::surveyed
+                                                : survey_phase::scanning;
         });
 
     try
@@ -1009,6 +1048,16 @@ void app::render()
                 m_ui.construction.last_message = "Construction failed."; break;
         }
         m_ui.construction.pending_tile = null_entity; // consume the request
+    }
+
+    // Execute any survey dispatch queued this frame by the Selection-panel Survey
+    // button. Centralised here (like construction) so the const-world UI surfaces
+    // only enqueue; the balance debit + schedule arming happen once against app's
+    // mutable world. See survey_system.hpp / SOLAR.md § Survey.
+    if (m_ui.pending_survey_dispatch != null_entity)
+    {
+        dispatch_survey(m_world, m_ui.pending_survey_dispatch);
+        m_ui.pending_survey_dispatch = null_entity; // consume the request
     }
 
     // F1 key-binding cheat-sheet — generated from s_bindings so it never drifts.

@@ -70,7 +70,7 @@ Each kind renders its own content and routes its 'go to' to the right place:
 
 | Selection kind | Content (stat block) | 'Go to' target |
 |---|---|---|
-| **Body** (planet/moon/asteroid/station/star) | Name, type, orbit, parent; surface summary. | Canvas: `focus_on_surface` — descend to the body's **Planetary tile surface**, the most informative rung. (Not `focus_on_body` / the orbital framing: landing on a sparse circumplanetary view reads as "nothing happened", which was the *only-works-for-Kepler* symptom.) |
+| **Body** (planet/moon/asteroid/station/star) | Name, type, orbit, parent; surface summary. Plus a **Survey section** (survey system, BL-067) — see below. | Canvas: `focus_on_surface` — descend to the body's **Planetary tile surface**, the most informative rung. (Not `focus_on_body` / the orbital framing: landing on a sparse circumplanetary view reads as "nothing happened", which was the *only-works-for-Kepler* symptom.) |
 | **Tile** | Composition × landform, hazard, habitability, deposits. | **No-op for now.** A tile is selected from the surface it lives on, so 'go to' has nothing to descend to; pan-to-tile is out of scope. |
 | **Building** | Type, recipe, throughput, host tile. | Canvas: `focus_on_tile` (host tile). |
 | **Market** | Body, headline prices / balances. | Canvas: `focus_on_surface`; or Market ledger. |
@@ -94,6 +94,23 @@ deliberate design choice that **building on one tile is a targeted action reache
 tile Selection element**, not a reserved menu — the nav-rail construction surface stays a
 broad overview (see `docs/ui/MENU.md`, BACKLOG § Ledger). The equivalent placement-mode canvas
 click enqueues the same request.
+
+### The body element is the survey front door
+
+Beyond its stat block, a selected **Body** carries a **Survey section** (survey system, BL-067)
+keyed on the body's survey phase, mirroring the tile build front door:
+
+- **`hidden`** — a **Dispatch Survey** button with a `cost cr · ETA days` preview (cost and ETA
+  derived from size + distance). Affordability-gated against the player corporation's balance;
+  disabled with an "Insufficient funds." reason when the player cannot pay.
+- **`in_transit`** — `En route — ETA <days> d`.
+- **`scanning`** — `Surveying <k>/<N> — ETA <days> d`.
+- **`surveyed`** — `Surveyed.`
+
+The button only **enqueues** `ui_state::pending_survey_dispatch`; the mutable-world pass in
+`app::render` performs the upfront debit and arms the schedule (`dispatch_survey`), exactly as
+construction requests are executed — the UI surfaces hold a `const world&`. The star carries no
+survey section.
 
 ---
 

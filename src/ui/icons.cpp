@@ -241,4 +241,27 @@ void market_centre(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     dl->AddLine({ centre.x, centre.y - arm }, { centre.x, centre.y + arm }, colour, 1.5f);
 }
 
+void unknown(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // Question-mark hook: an arc across the top, opening at the lower-left.
+    const ImVec2 hook_centre{ centre.x, centre.y - r * 0.25f };
+    dl->PathArcTo(hook_centre, r * 0.45f, -2.7f, 0.9f, 16);
+    dl->PathStroke(colour, 0, 1.6f);
+    // Short stem from the hook down toward the centre.
+    dl->AddLine({ centre.x, centre.y + r * 0.05f }, { centre.x, centre.y + r * 0.30f }, colour, 1.6f);
+    // Dot below.
+    dl->AddCircleFilled({ centre.x, centre.y + r * 0.62f }, std::max(1.0f, r * 0.10f), colour, 8);
+}
+
+void survey_badge(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // Magnifying glass: a lens circle with a diagonal handle (a "scan" connotation).
+    const float    lr   = r * 0.55f;
+    const ImVec2   lens{ centre.x - r * 0.18f, centre.y - r * 0.18f };
+    dl->AddCircle(lens, lr, colour, 0, 1.6f);
+    const ImVec2 h0{ lens.x + lr * 0.7f, lens.y + lr * 0.7f };
+    const ImVec2 h1{ centre.x + r * 0.7f, centre.y + r * 0.7f };
+    dl->AddLine(h0, h1, colour, 2.0f);
+}
+
 } // namespace ui::icons

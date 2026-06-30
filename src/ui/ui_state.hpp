@@ -114,6 +114,12 @@ struct ui_state
     /// Building-placement interaction state (Layer 4 UI groundwork scaffold). See construction_state.
     construction_state construction;
 
+    /// Pending survey dispatch (BL-067). The Selection-panel Survey button sets this
+    /// to the body to survey; app::render executes dispatch_survey() and clears it,
+    /// mirroring the construction request seam. Keeps the survey mutation in app while
+    /// the UI surfaces hold a const world. null_entity = nothing pending.
+    entity_id pending_survey_dispatch = null_entity;
+
     /// Player-authored standing sell orders (the manual market side). Re-evaluated
     /// every economy tick — passed to `clear_markets` by `app::step_economy`. Held
     /// here as player game-intent; authored from the construction / building-
