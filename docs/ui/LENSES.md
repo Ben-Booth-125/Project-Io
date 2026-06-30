@@ -462,3 +462,23 @@ per-tile heatmap to per-market shortfall blocks: a pre-pass collects each body m
 `max(0, demand−supply)` of the selected good and the body-max; the fill pass maps each tile to its
 market (`market_for_tile`) and composites the hot hue by the normalised shortfall. The on-canvas key
 reads "Market scarcity" (met → scarce).
+
+## Placement-suitability surface *(BL-010 — not a strip lens)*
+
+**Intent.** A siting aid: while a build is **armed**, every other tile is tinted by how well the
+**armed building** would do there — *where can this go, and where is it best?* It is **not** an
+`overlay_mode` and never appears in the strip; it is an additive surface in
+[`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp) that composites over whatever the
+active strip lens already drew.
+
+**Trigger (revised 2026-06-30).** Gated on **construction mode** (`construction.active`), keyed to
+the armed `construction.type` / `construction.target`. The original BL-010 build (2026-06-16) fired
+on **bare tile selection**, but re-tinting the whole map on every inspection click read as a
+spurious lens change and fought the active lens — so the trigger now requires an armed build. A
+plain selection never re-skins the map.
+
+**Colour.** Each non-selected tile: **invalid** (`can_place` false) → darkened 35%; **affine** →
+composited 24% toward green. Affinity applies to **extraction only** — a tile whose own richest
+extractable resource is the armed target reads as optimal; other building types carry no
+terrain-affinity signal, so a valid tile stays uncoloured. The armed-from tile is skipped (it is
+already outlined as the selection).

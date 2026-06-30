@@ -529,35 +529,20 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
     }
 
-    // Placement-suitability pre-pass (BL-010). Active when a tile is the selected
-    // entity. Derive the tile's best valid building (extraction > processing).
-    bool              suitability_active      = false;
-    building_type     suitability_btype       = building_type::none;
-    resource_type     suitability_target      = resource_type::iron_ore;
-    bool              suitability_affine      = false; // true when composition matters
-    terrain_composition suitability_composition = terrain_composition::ocean;
-    {
-        const auto sel_it = w.tiles.find(state.selected_entity);
-        if (sel_it != w.tiles.end() && sel_it->second.body == state.active_body)
-        {
-            const tile_component& stc = sel_it->second;
-            bool any_deposit = false;
-            const resource_type richest = placement_rules::richest_extractable(stc, any_deposit);
-            if (any_deposit && !placement_rules::is_ocean_tile(stc.composition))
-            {
-                suitability_btype       = building_type::extraction_site;
-                suitability_target      = richest;
-                suitability_affine      = true;
-                suitability_composition = stc.composition;
-            }
-            else if (!placement_rules::is_ocean_tile(stc.composition))
-            {
-                suitability_btype  = building_type::processing_facility;
-                suitability_affine = false;
-            }
-            suitability_active = true;
-        }
-    }
+    // Placement-suitability pre-pass (BL-010). A surface tied to *construction mode*,
+    // not bare selection: it activates only while a build is armed
+    // (state.construction.active) and is keyed to the armed building type/target, so a
+    // plain inspection click never re-skins the map (it used to fire on any tile
+    // selection, reading as a spurious lens change). Tints every other tile by how
+    // well the *armed* building would do there.
+    const bool          suitability_active = state.construction.active;
+    const building_type suitability_btype  = state.construction.type;
+    const resource_type suitability_target = state.construction.target;
+    // "Affine" (thrives-here) applies to extraction only: a tile whose own richest
+    // extractable resource is the armed target reads as optimal. Other building types
+    // carry no terrain-affinity signal — valid-but-not-affine tiles stay uncoloured.
+    const bool          suitability_affine_kind =
+        (suitability_btype == building_type::extraction_site);
 
     // Scarcity lens pre-pass (BL-018): a market-level field, not a per-tile one.
     // Scarcity is driven by **supply shortfall** — how much demand outran supply
@@ -866,17 +851,22 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         const building_type built_type = built ? built_it->second : building_type::none;
         const bool   selected  = (id == state.selected_entity);
 
-        // Placement-suitability overlay (BL-010): active when a tile is selected.
-        // Invalid tiles (can't build) darken; affine tiles (optimal terrain) tint green.
-        // Applies to *other* tiles — the selected tile itself is already outlined.
-        if (!selected && suitability_active && id != state.selected_entity)
+        // Placement-suitability overlay (BL-010): active only in construction mode.
+        // Invalid tiles (can't build) darken; affine tiles (the armed target is their
+        // richest extractable) tint green. Skips the selected tile (already outlined).
+        if (suitability_active && !selected)
         {
             const bool placeable = placement_rules::can_place(
                 tile, suitability_btype, suitability_target);
             if (!placeable)
                 fill = lerp_colour(fill, IM_COL32(0, 0, 0, 255), 0.35f);
-            else if (suitability_affine && tile.composition == suitability_composition)
-                fill = lerp_colour(fill, IM_COL32(100, 200, 100, 255), 0.24f);
+            else if (suitability_affine_kind)
+            {
+                bool any_dep = false;
+                const resource_type best = placement_rules::richest_extractable(tile, any_dep);
+                if (any_dep && best == suitability_target)
+                    fill = lerp_colour(fill, IM_COL32(100, 200, 100, 255), 0.24f);
+            }
         }
 
         // Range of wrap copies that land inside the canvas horizontally.
