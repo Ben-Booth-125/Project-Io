@@ -1060,10 +1060,14 @@ void app::render()
     ui::draw_overlay_controls(m_ui, ui::nav_pane_width, disp.y - margin);
 
     // Selection info element — pinned bottom-left, stacked directly above the
-    // overlay strip. Hidden until the player selects an entity. See SELECTION.md.
+    // overlay strip. It spans the gap between the nav pane and the bottom-right
+    // minimap (right edge = minimap's left edge less a margin) so it sits beside
+    // the minimap rather than running behind it. Hidden until the player selects
+    // an entity. See SELECTION.md.
     constexpr float overlay_strip_h = 40.0f; // approx height of the lens strip below
     ui::draw_selection_panel(m_world, m_registry, m_last_econ_report, m_ui,
                              ui::nav_pane_width,
+                             mm_origin.x - margin,
                              disp.y - margin - overlay_strip_h);
 
     // Execute any construction request queued this frame by the build front door

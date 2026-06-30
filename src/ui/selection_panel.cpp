@@ -13,6 +13,8 @@
 
 #include <imgui.h>
 
+#include <algorithm> // std::max (bar-width clamp)
+
 namespace ui {
 
 namespace {
@@ -356,7 +358,7 @@ void draw_lens_supplement(const world& w, const recipe_registry& reg,
 
 void draw_selection_panel(const world& w, const recipe_registry& reg,
                           const economy_report& report, ui_state& ui,
-                          float left_x, float bottom_y)
+                          float left_x, float right_x, float bottom_y)
 {
     const selection_kind kind = selection_kind_of(w, ui.selected_entity);
 
@@ -367,12 +369,12 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
     if (ui.selected_entity == ui.selection_hidden_for)
         return;
 
-    // --- Full-width bottom bar layout ---
+    // --- Bottom bar layout ---
     // The bar is anchored by its bottom-left corner to (left_x, bottom_y) and
-    // spans to the right edge of the display. Height is fixed to fit portrait +
-    // header + two content rows (~5 standard ImGui rows).
-    const float display_w    = ImGui::GetIO().DisplaySize.x;
-    const float bar_w        = display_w - left_x;
+    // spans across to right_x — the gap between the nav pane and the bottom-right
+    // minimap — so it sits beside the minimap rather than running behind it.
+    // Height is fixed to fit portrait + header + two content rows (~5 ImGui rows).
+    const float bar_w        = std::max(0.0f, right_x - left_x);
     constexpr float portrait_w = 88.0f;  // portrait column width
     const float line_h = ImGui::GetTextLineHeightWithSpacing();
     const float frame_h = ImGui::GetFrameHeight();

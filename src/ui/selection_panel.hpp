@@ -34,9 +34,13 @@ namespace ui {
 /// @param ui       UI state; read for the selection, written by 'go to' (focus),
 ///                 the close button (hide), and the build front door (enqueue).
 /// @param left_x   Left edge of the panel, screen pixels (the nav-pane inner edge).
+/// @param right_x  Right edge of the panel, screen pixels — the bar stops here
+///                 rather than running to the display edge, so it sits *beside*
+///                 the bottom-right minimap (pass the minimap's left edge less a
+///                 margin) instead of behind it.
 /// @param bottom_y Bottom edge to anchor the panel against, screen pixels.
 void draw_selection_panel(const world& w, const recipe_registry& reg,
                           const economy_report& report, ui_state& ui,
-                          float left_x, float bottom_y);
+                          float left_x, float right_x, float bottom_y);
 
 } // namespace ui
