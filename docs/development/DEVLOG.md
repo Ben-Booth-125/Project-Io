@@ -24,11 +24,10 @@ app now configures, builds, and runs natively on Linux.
   (`sol::state/table/optional`, `safe_script_file`) — unchanged across the bump, so risk is low.
   Until this landed, the workaround was building with GCC 13.
 
-**Verification status.** The C-language fix is verified (the build progressed past Lua). The
-sol2 bump is **not yet compile-verified by me** — this session's sandbox still has no
-FetchContent egress and only GCC 13 — so it must be confirmed on the GCC-14 laptop by building
-with the *default* compiler (no gcc-13 override). Docs (TECH_FOUNDATIONS § Building) updated;
-BL-057 stays `designed` pending that confirmation + the still-owed CI first-run and visual-verify.
+**Verification status.** Both fixes **confirmed on the GCC-14 laptop**: a clean build with the
+*default* compiler (no gcc-13 override) configures, builds, and runs — so the cross-platform
+break is fixed for a fresh modern-toolchain clone. Docs (TECH_FOUNDATIONS § Building) updated;
+BL-057 stays `designed` pending the still-owed CI first-run and font visual-verify.
 
 ---
 
