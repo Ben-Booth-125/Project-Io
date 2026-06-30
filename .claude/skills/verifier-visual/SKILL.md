@@ -17,6 +17,29 @@ The verify **script** to run, as a `scripts/verify/<name>.lua` path or just the
 feature name (e.g. `corporation_lens`). If omitted, list the available scripts in
 `scripts/verify/` (each `*.lua` except `lib.lua`) and ask which to run.
 
+## Available checks
+
+Every `scripts/verify/*.lua` (except `lib.lua`) is a runnable check — the list is
+**auto-discovered** from the directory, so a newly committed script is available
+without editing this file. The lens / canvas / panel checks form the bulk
+(`corporation_lens`, `country_lens`, `market_lens`, `population_lens`,
+`resource_lens`, `scarcity_lens`, `supply_lens`, `opportunity_lens`,
+`production_lens`; `building_management`, `construction_panel`, `selection_go_to`,
+the ledger checks, …). v0.0.8 (Discovery & Intelligence) additions, named here per
+the "authorising a new check = naming it" convention:
+
+- **`survey.lua`** (BL-067) — Planetary survey mask progression (masked → raster
+  partial → full) and the Solar-canvas survey badges (hidden `?` / scanning `k∕N` /
+  surveyed). Driver: `verify.set_survey(body, regions_done)`.
+- **`visibility.lua`** (BL-068) — competitor information asymmetry: selecting a rival
+  building shows the competitor Selection panel (owner + tile + `private` placeholders,
+  no production/stockpile) vs a player building's full management detail. Drivers:
+  `verify.select_building` / `select_tile`.
+- **`population_legibility.lua`** (BL-069) — the Population lens re-keyed to workforce
+  efficiency (the 0.6 cliff) plus the Selection panel population-centre read (scale /
+  population / habitability / absolute workforce cap). Driver: `verify.select_tile`,
+  `verify.population_centres()`.
+
 ## Determinism: software renderer + headless display (read first)
 
 Goldens must be **renderer- and machine-independent**, so always run `--verify`

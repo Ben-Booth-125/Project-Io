@@ -518,6 +518,26 @@ int app::run_verify(const std::string& script_path, bool bless)
             m_ui.planetary_center_pending = true;
         });
 
+    // Selection drivers (verify harness): set ui.selected_entity so a capture shows
+    // the Selection panel. select_tile picks the tile at (col,row) on the active
+    // surface body; select_building picks a building occupying that tile. Both are
+    // non-mutating — they only move the selection, exactly as a canvas click would.
+    v.set_function("select_tile", [this](int col, int row) {
+        for (const auto& [tid, tc] : m_world.tiles)
+            if (tc.body == m_ui.active_body && tc.grid_x == col && tc.grid_y == row)
+            { m_ui.selected_entity = tid; m_ui.selection_hidden_for = null_entity; break; }
+    });
+    v.set_function("select_building", [this](int col, int row) {
+        for (const auto& [bid, bc] : m_world.buildings)
+        {
+            const auto tit = m_world.tiles.find(bc.tile);
+            if (tit == m_world.tiles.end()) continue;
+            if (tit->second.body == m_ui.active_body &&
+                tit->second.grid_x == col && tit->second.grid_y == row)
+            { m_ui.selected_entity = bid; m_ui.selection_hidden_for = null_entity; break; }
+        }
+    });
+
     // Data accessor: return every corporation building as a Lua array of
     // {corp, player, body, x, y} records, so a script (or the lib's
     // tour_buildings helper) can centre/capture each one without hard-coding
@@ -655,6 +675,31 @@ int app::run_verify(const std::string& script_path, bool bless)
                     : (s.regions_done >= total) ? survey_phase::surveyed
                                                 : survey_phase::scanning;
         });
+
+    // Data accessor: return every population centre as a Lua array of
+    // {body, x, y, scale, population, habitability} records, so a BL-069 script can
+    // centre/select a centre's tile without hard-coding coordinates.
+    v.set_function("population_centres", [this]() {
+        sol::state& s = m_lua.state();
+        sol::table  out = s.create_table();
+        int idx = 0;
+        for (const auto& [cid, pc] : m_world.population_centres)
+        {
+            const auto tit = m_world.population_centre_tile.find(cid);
+            if (tit == m_world.population_centre_tile.end()) continue;
+            const auto tile_it = m_world.tiles.find(tit->second);
+            if (tile_it == m_world.tiles.end()) continue;
+            sol::table rec = s.create_table();
+            rec["body"]         = static_cast<unsigned>(tile_it->second.body);
+            rec["x"]            = tile_it->second.grid_x;
+            rec["y"]            = tile_it->second.grid_y;
+            rec["scale"]        = pc.scale;
+            rec["population"]   = pc.population;
+            rec["habitability"] = pc.habitability;
+            out[++idx]          = rec;
+        }
+        return out;
+    });
 
     try
     {
@@ -1015,7 +1060,8 @@ void app::render()
     // Selection info element — pinned bottom-left, stacked directly above the
     // overlay strip. Hidden until the player selects an entity. See SELECTION.md.
     constexpr float overlay_strip_h = 40.0f; // approx height of the lens strip below
-    ui::draw_selection_panel(m_world, m_registry, m_ui, ui::nav_pane_width,
+    ui::draw_selection_panel(m_world, m_registry, m_last_econ_report, m_ui,
+                             ui::nav_pane_width,
                              disp.y - margin - overlay_strip_h);
 
     // Execute any construction request queued this frame by the build front door

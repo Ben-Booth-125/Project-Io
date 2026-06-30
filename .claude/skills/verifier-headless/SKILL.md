@@ -44,6 +44,18 @@ in `tools/verify/README.md`.
   building/stockpile authoring and asset attachment, default-recipe seeding, and the
   insufficient-funds / unknown-corp / unknown-tile guards. Links `world.cpp`,
   `construction.cpp`, `placement_rules.cpp` (hand-builds a `recipe_registry`).
+- **`survey_harness`** — Survey system (BL-067): cost/duration formulas vs size×distance
+  (R2), deterministic raster region partition + reveal order (R3), home starts surveyed
+  (R4), concurrent surveys advance independently (R5), dispatch guards + upfront debit
+  (R6). Links `world.cpp`, `survey_system.cpp`. CMake target `survey_harness`.
+- **`visibility_harness`** — Visibility model (BL-068): the read-side ownership accessors
+  — `owner_corp_of` resolves a building to its owning corporation (null when unowned) and
+  `is_player_owned` is the single uniform rival branch point. Links `world.cpp` only.
+  CMake target `visibility_harness`.
+- **`workforce_harness`** — Population legibility (BL-069): regression guard asserting
+  `workforce_efficiency` (world/workforce.hpp) reproduces the prior inline economy_system
+  habitability→workforce curve bit-identically across [0,1], plus the named cliff/floor/
+  ceiling anchors. Header-only (no link sources). CMake target `workforce_harness`.
 
 ## Procedure
 

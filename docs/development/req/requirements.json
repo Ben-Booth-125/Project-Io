@@ -4031,6 +4031,90 @@
           "notes": ""
         }
       ]
+    },
+    {
+      "brief": "visibility-model",
+      "title": "Visibility model — competitor info asymmetry (BL-068)",
+      "difficulty": 4,
+      "importance": "A",
+      "evaluated_difficulty": 4,
+      "status": "complete",
+      "resolved": "2026-06-30",
+      "resolution": "Delivered BL-068 read-side visibility model: owner_corp_of / is_player_owned accessors (world.{hpp,cpp}), rival hover (type + owner only) and competitor Selection panel (public facts + explicit 'private' production/stockpile placeholders) branched on is_player_owned; rival-marker region gating piggybacks on the BL-067 survey gate (no separate gate). No stored fields / tick / determinism / serialisation impact. visibility_harness (R2) + visibility.lua goldens (R1) PASS.",
+      "promoted_from": "BACKLOG § BL-068",
+      "batch": "v0.0.8",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: on a surveyed body, selecting a RIVAL building opens the competitor Selection panel (type + owner + location, with explicit 'private' production/stockpile placeholder rows) and never renders production/stockpile; a PLAYER building still shows full management detail.",
+          "verification": ["visual: scripts/verify/visibility.lua golden"],
+          "status": "complete",
+          "result_metric": "2/2 goldens PASS at 0.0000% diff",
+          "notes": "visibility_rival_panel (Owner + Tile + Production/Stockpile private) vs visibility_player_panel (Workforce 50%)."
+        },
+        {
+          "id": "R2",
+          "requirement": "owner_corp_of resolves a building to its owning corporation (reverse of corporation_component::assets, null_entity when unowned) and is_player_owned is true only for the player corp's buildings (uniform rival treatment).",
+          "verification": ["headless: visibility_harness owner/is_player accessor assertions"],
+          "status": "complete",
+          "result_metric": "10/10 PASS (player/rivalA/rivalB/orphan/null resolution + branch)",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "requirement": "The building hover card branches on is_player_owned: a rival shows type + owner only (no production, no stockpile); a player-owned building shows the full supply-lens detail.",
+          "verification": ["code: hover_building_rival branch in hover_content.cpp"],
+          "status": "complete",
+          "result_metric": "",
+          "notes": "Rival why-line names the asymmetry ('Competitor — output private')."
+        },
+        {
+          "id": "R4",
+          "requirement": "Rival-marker visibility composes with the BL-067 survey region-reveal: a masked-region building is neither drawn nor hit-testable (no separate rival gate); markets stay public (no market-ledger change).",
+          "verification": ["code: survey gate in body_surface_canvas.cpp marker pass"],
+          "status": "complete",
+          "result_metric": "",
+          "notes": "Masked-region absence already proven by survey.lua; uniform is_player branch."
+        }
+      ]
+    },
+    {
+      "brief": "population-legibility",
+      "title": "Population legibility — surface habitability→workforce reasoning (BL-069)",
+      "difficulty": 3,
+      "importance": "B",
+      "evaluated_difficulty": 3,
+      "status": "complete",
+      "resolved": "2026-06-30",
+      "resolution": "Delivered BL-069 surfacing: extracted the habitability→workforce curve into world/workforce.hpp (single source of truth), refactored economy_system to call it (behaviour-identical, regression-guarded), re-keyed the Population lens + key + lens tooltip to workforce efficiency (shows the 0.6 cliff), added scale/population/habitability/workforce-cap rows to the Selection panel for a population centre, and a Tile×Population hover exemplar. workforce_harness (R2) + population_legibility.lua goldens (R1) PASS; population_lens.lua re-blessed.",
+      "promoted_from": "BACKLOG § BL-069",
+      "batch": "v0.0.8",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: the re-keyed Population lens shows the 0.6 workforce-efficiency cliff; the Selection panel on a population centre shows scale / population / local habitability rows and the workforce cap as an absolute number; a Tile×Population hover gives the quick read.",
+          "verification": ["visual: scripts/verify/population_legibility.lua golden"],
+          "status": "complete",
+          "result_metric": "3/3 goldens PASS at 0.0000% diff",
+          "notes": "lens_full / lens_zoom (efficiency tint + key 0.5x→1.0x) + centre_panel (Scale 5 metropolis, Pop 5000k, Hab 0.15, Workforce cap 2.6)."
+        },
+        {
+          "id": "R2",
+          "requirement": "workforce_efficiency (world/workforce.hpp) reproduces the prior inline economy_system curve EXACTLY across the habitability range — the regression guard on the only shipped-simulation refactor.",
+          "verification": ["headless: workforce_harness exact-curve regression"],
+          "status": "complete",
+          "result_metric": "1001 samples bit-identical + named anchors PASS",
+          "notes": "economy_system contention loop now calls the helper; bit-identical so determinism is preserved."
+        },
+        {
+          "id": "R3",
+          "requirement": "The Population lens (body_surface_canvas.cpp) tints by workforce_efficiency(tile.habitability); draw_population_key and the overlay.cpp lens tooltip read 'workforce efficiency' rather than 'habitability'.",
+          "verification": ["code: lens re-key + key + overlay_mode_name", "visual"],
+          "status": "complete",
+          "result_metric": "",
+          "notes": "Zero-habitability tiles stay untinted so terrain reads."
+        }
+      ]
     }
   ]
 }

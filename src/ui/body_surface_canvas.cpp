@@ -11,6 +11,7 @@
 #include "world/market_clearing.hpp" // market_for_tile (Scarcity catchment, prices)
 #include "world/placement_rules.hpp"
 #include "world/survey_system.hpp"   // survey_tile_visible (region mask, BL-067)
+#include "world/workforce.hpp"       // workforce_efficiency (Population lens, BL-069)
 
 #include <algorithm>
 #include <array>
@@ -279,22 +280,25 @@ void draw_population_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size)
     const float bar_w = box_w - 2.0f * pad;
     float       y     = p0.y + pad * 0.5f;
 
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Habitability");
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Workforce efficiency");
     y += line_h + 4.0f;
 
+    // Gradient maps the workforce-efficiency range the lens tints by (0.5×→1.0×),
+    // so the bar reads as the labour multiplier rather than raw habitability.
     constexpr ImU32 live = IM_COL32(80, 200, 110, 255);
     constexpr int segs = 24;
     for (int i = 0; i < segs; ++i)
     {
-        const float t0 = static_cast<float>(i) / segs;
-        const ImU32 c  = lerp_colour(IM_COL32(40, 40, 48, 255), live, 0.15f + 0.7f * t0);
+        const float t0  = static_cast<float>(i) / segs;
+        const float eff = 0.5f + 0.5f * t0; // 0.5× at the low end → 1.0× at full labour
+        const ImU32 c   = lerp_colour(IM_COL32(40, 40, 48, 255), live, 0.15f + 0.7f * eff);
         dl->AddRectFilled({ x + bar_w * t0, y },
                           { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
     }
     y += bar_h + 2.0f;
-    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "low");
-    const ImVec2 hts = ImGui::CalcTextSize("high");
-    dl->AddText({x + bar_w - hts.x, y}, IM_COL32(170, 175, 185, 255), "high");
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "0.5x");
+    const ImVec2 hts = ImGui::CalcTextSize("1.0x");
+    dl->AddText({x + bar_w - hts.x, y}, IM_COL32(170, 175, 185, 255), "1.0x");
 }
 
 /// On-canvas legend for the Scarcity lens: an abundant→scarce gradient bar (no tint
@@ -813,16 +817,20 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (col_it != market_catchment_colour.end())
                 fill = lerp_colour(fill, col_it->second, 0.55f);
         }
-        // Population lens: tint a tile by its habitability (0–1, already normalised) —
-        // a sequential dark→liveable-green gradient composited over terrain, so
-        // hospitable land reads bright and barren land barely tints.
+        // Population lens (re-keyed, BL-069): tint a tile by the *workforce
+        // efficiency* its habitability yields (workforce.hpp), not raw habitability.
+        // Tiles at/above habitability 0.6 read at full labour (flat brightest green);
+        // below 0.6 they grade down sharply — so the lens shows the 0.6 efficiency
+        // cliff, the siting signal "build where habitability ≥ 0.6 for full workforce".
+        // Zero-habitability tiles (ocean, barren) stay untinted so terrain still reads.
         else if (state.overlay == overlay_mode::population)
         {
             const float h = std::clamp(tile.habitability, 0.0f, 1.0f);
             if (h > 0.0f)
             {
+                const float eff = workforce_efficiency(h);
                 constexpr ImU32 live = IM_COL32(80, 200, 110, 255);
-                fill = lerp_colour(fill, live, 0.15f + 0.7f * h);
+                fill = lerp_colour(fill, live, 0.15f + 0.7f * eff);
             }
         }
         // Opportunity lens (BL-017): tint a tile by the net margin of the best valid
@@ -911,8 +919,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             dl->AddConvexPolyFilled(verts, 6, fill);
 
             // Masked region: locked fill only — no borders, markers, selection, or
-            // hit-testing for this copy. (BL-068 will further gate rival markers on
-            // revealed regions; this gate already hides everything in a masked one.)
+            // hit-testing for this copy. This single gate also *is* the rival-marker
+            // visibility rule (BL-068): a marker — yours or a rival's — shows iff its
+            // tile sits in a survey-revealed region, so no separate per-owner gate is
+            // needed on the marker pass below. The competitor information asymmetry
+            // lives at read time in the hover card and selection panel, not here.
             if (!revealed)
                 continue;
 
