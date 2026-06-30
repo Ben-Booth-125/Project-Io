@@ -98,12 +98,7 @@ categories: § Ledger (multiple-markets visibility), § Trade (warm-start pass),
 
 *(BL-015 prose promoted to backlog.json 2026-06-17.)*
 
-- **[F3 ~] Lens colour-scheme pass (deferred to a colour session).** *(Written 2026-06-16, v0.0.6
-  brief intake.)* A board-wide reconsideration of lens colours — some too harsh, some too soft.
-  **Deferred to a dedicated colour-scheme design session.** Also in scope: **on-canvas text labels**
-  naming items for some lenses (country/market), and a **legend for the Corporation lens**.
-  **Design owed:** the whole pass. Authority `docs/ui/LENSES.md`; identity colours in
-  `src/ui/presentation.hpp`.
+*(BL-016 prose promoted to backlog.json 2026-06-24.)*
 
 *(BL-017 prose promoted to backlog.json 2026-06-17.)*
 
@@ -111,7 +106,7 @@ categories: § Ledger (multiple-markets visibility), § Trade (warm-start pass),
 
 *(BL-019 prose promoted to backlog.json 2026-06-17.)*
 
-*(BL-020 prose promoted to backlog.json 2026-06-29 — design settled.)*
+*(BL-020 prose promoted to backlog.json 2026-06-24.)*
 
 ## Menu
 
@@ -326,7 +321,23 @@ inter-body-market note. Design authority `docs/SYSTEMS.md` § Supply, `docs/ui/L
 The resource economy's data and quality work — the substrate Layer 4 sits on. Design
 authority: `docs/economy/RESOURCES.md`, `docs/economy/PRODUCTION.md`.
 
-*(BL-040 completed 2026-06-28 — full raw-set deposit authoring landed in `tile_generation.cpp`; design propagated to `docs/economy/RESOURCES.md` § Deposit rarity & scarcity and `docs/generation/TILE_GENERATION.md`. See backlog.json BL-040.)*
+- **[B3 ✓] Resource generation — full-set deposit authoring + scarcity (direction settled; v0.2).**
+  Generation today authors deposits for the seven-resource prototype subset; extend it to the full
+  raw-material set with a plausible distribution and scarcity profile. **Design direction settled
+  (2026-06-15), scheduled to the v0.2 solar-generation roadmap** (with the tile-generation
+  refinement passes, § Environment): a **seeded per-resource rarity scalar** — a decimal in
+  `[0, 1]` (0 = trace/absent, 1 = near-universal ambient), **raw-tier resources only** (refined and
+  product goods are made, not mined, so carry no deposits). The scalar **modulates deposit
+  frequency and magnitude** on top of the existing terrain affinity, so a low scalar keeps a good
+  sparse even on affine terrain and a high one approaches the every-tile ambient floor; it is
+  **seeded** so a campaign's exact distribution varies while the rarity *ordering* (consistent with
+  each good's `RESOURCES.md` base-price rarity) stays stable. This is the *resource-economy* target;
+  the generation *mechanics* that consume the scalar are the tile-generation Brief (§ Environment),
+  the same v0.2 pass. Settled into `docs/economy/RESOURCES.md` § Deposit rarity & scarcity and
+  `docs/generation/TILE_GENERATION.md` § Deferred. Touches the deposit pass in
+  `src/world/tile_generation.cpp` (data-only — the deposit arrays already carry full enum width).
+  `src/`-changing → brief-spanning requirement (a `headless` deposit-distribution audit) at
+  promotion.
 
 ## Workforce
 
@@ -452,7 +463,17 @@ Design authority: `docs/generation/NATION_GENERATION.md`.
 
 *(BL-052 prose promoted to backlog.json 2026-06-17.)*
 
-*(BL-053 prose promoted to backlog.json 2026-06-29 — design settled; supersedes the earlier ~45-country direction.)*
+- **[B4 ~] Country generation — more countries, generated "in history".** *(Written 2026-06-16,
+  v0.0.6 brief intake.)* The world needs **more countries** than today's nation generation produces,
+  generated with a sense of **history** rather than a flat Voronoi partition. Couples to
+  NATION_GENERATION (Voronoi BFS today) and the saturated-substrate Brief (§ Environment
+  cross-cutting). **Design direction (2026-06-16, partial):** target **~45 countries** on Kepler
+  (Earth-like density — Earth has hundreds; 45 is a manageable analogue given the lens readability
+  constraint). Size distribution: **open** — keep the design flexible and tune based on the generated
+  landmass and land shapes; a visual review pass after generation is the arbiter (not a fixed
+  formula). "Generated in history" model: **still owed** — what fragmentation, historical conflict,
+  or clustering logic produces this distribution at prototype depth. Count target and distribution
+  are **open for visual revision** post-generation. Authority `docs/generation/NATION_GENERATION.md`.
 
 - **[F5 ~] Deferred — nation behaviour & production passes.** Per NATION_GENERATION.md
   § Open items: the nation *system* (tax, licences, war, infrastructure), the
