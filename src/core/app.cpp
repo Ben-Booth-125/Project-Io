@@ -405,6 +405,28 @@ int app::run_verify(const std::string& script_path, bool bless)
     });
     v.set_function("capture", [this](const std::string& name) { capture_frame(name); });
 
+    // BL-061: scriptable cursor override — sets the app-owned mouse source so a
+    // verify script can place the cursor at an exact screen position and trigger
+    // hover highlights deterministically, without the OS cursor leaking into goldens.
+    v.set_function("mouse", [this](float x, float y) {
+        m_ui.mouse = {x, y, true};
+    });
+    // Convenience: position the cursor over a specific tile (col, row) — the
+    // Planetary canvas computes the screen centre of that tile on its next draw,
+    // so this is a best-effort "close enough to trigger hover" helper.
+    v.set_function("hover_tile", [this](int col, int row) {
+        // Request a centre-on-tile so the canvas knows the tile's screen position,
+        // then place the mouse at approximately the grid centre. The canvas
+        // corrects hover on the following frame once it knows the real position.
+        m_ui.planetary_center_pending = true;
+        m_ui.planetary_center_col     = col;
+        m_ui.planetary_center_row     = row;
+        // Approximate screen position: place mouse near the canvas centre so the
+        // canvas' per-tile hit-test resolves it after the centre pan settles.
+        m_ui.mouse = {ImGui::GetIO().DisplaySize.x * 0.5f,
+                      ImGui::GetIO().DisplaySize.y * 0.5f, true};
+    });
+
     // Drive the economy headlessly: run N economy ticks (production → market →
     // budget) and open the economy panel so a capture shows live, populated data.
     // The durable verification method for the Layer 3 economy panel's visual rows.
@@ -710,6 +732,15 @@ void app::render()
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
 
+    // Live-mode mouse feed: copy the real OS cursor into ui_state so canvases read
+    // a single app-owned source (BL-061). Skipped in --verify (m_golden_dir set) so
+    // hover is suppressed by default; a script opts in with verify.mouse(x,y).
+    if (m_golden_dir.empty())
+    {
+        const ImVec2 mp = ImGui::GetIO().MousePos;
+        m_ui.mouse = {mp.x, mp.y, true};
+    }
+
     // Shared window geometry. The minimap and the top-right time panels are all
     // sized off the minimap width so the right-hand column stays aligned.
     ImGuiIO&     io     = ImGui::GetIO();
@@ -833,7 +864,16 @@ void app::render()
             ImGui::TableSetColumnIndex(0);
             ImGui::Text("%d Q%d", date.year, date.quarter);
             ImGui::Text("%s %02d", ui::fmt::month_abbrev(date.month), date.day);
-            ImGui::ProgressBar(ui::fmt::quarter_progress(day), {-1.0f, 0.0f}, "");
+            {
+                const uint64_t days_left =
+                    static_cast<uint64_t>(sim_loop::econ_tick_days)
+                    - (day % static_cast<uint64_t>(sim_loop::econ_tick_days));
+                const int next_q = (date.quarter % 4) + 1;
+                ImGui::ProgressBar(ui::fmt::quarter_progress(day), {-1.0f, 0.0f},
+                                   "");
+                ImGui::TextDisabled("Q%d in %llud", next_q,
+                                    static_cast<unsigned long long>(days_left));
+            }
 
             // --- Right: the compressed speed controls.
             ImGui::TableSetColumnIndex(1);

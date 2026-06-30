@@ -200,7 +200,9 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
         dl->AddCircle(to_screen({0.0f, 0.0f}), r, IM_COL32(38, 42, 52, 255), 0, 1.0f);
     }
 
-    const ImVec2 mouse = ImGui::GetIO().MousePos;
+    const ImVec2 mouse = state.mouse.active
+                         ? ImVec2{state.mouse.x, state.mouse.y}
+                         : ImVec2{-1.0f, -1.0f};
 
     // Draw the anchor first, then the moons on top. Each entry is (id, is_anchor).
     std::vector<std::pair<entity_id, bool>> draw_list;
