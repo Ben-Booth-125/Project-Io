@@ -115,7 +115,7 @@ struct ui_state
     entity_id    active_body   = null_entity;            // drives the lower rungs
     entity_id    active_tile   = null_entity;            // set by tile click; consumed by later layers
     canvas_level primary_level = canvas_level::solar;    // which rung fills the window
-    overlay_mode overlay       = overlay_mode::supply;   // active overlay lens; toggled by the bottom overlay control strip (defaults to the supply lens)
+    overlay_mode overlay       = overlay_mode::none;     // active overlay lens; toggled by the bottom overlay control strip (defaults to none — the plain canvas)
 
     bool show_tile_ledger = false;                       // owned by the nav pane, not the canvases
 

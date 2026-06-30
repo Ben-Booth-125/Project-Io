@@ -86,7 +86,7 @@ struct ui_state
     entity_id    selected_entity = null_entity;       ///< The entity the player single-clicked to inspect — drives the Selection info element. Distinct from the active_* anchors: selecting never moves the canvas. null_entity = nothing selected. See SELECTION.md, ui/selection.hpp.
     entity_id    selection_hidden_for = null_entity;   ///< The selection the player dismissed with the panel's close button. The Selection info element stays hidden while selected_entity equals this; a *new* selection re-shows it. See SELECTION.md (close hides, does not destroy).
     canvas_level primary_level = canvas_level::solar; ///< Which canvas rung fills the window.
-    overlay_mode overlay       = overlay_mode::corporation; ///< Active canvas overlay lens; toggled by the bottom overlay control strip. Defaults to the Corporation ownership lens at campaign start (BL-013); single-select with a null state (re-clicking clears to none).
+    overlay_mode overlay       = overlay_mode::none; ///< Active canvas overlay lens; toggled by the bottom overlay control strip. Defaults to none — the plain canvas — at campaign start (reverses BL-013's Corporation-default): a click never re-skins the canvas, so it opens unskinned. Single-select with a null state (re-clicking clears to none).
 
     // --- lens-local selector state (Resource / Market / Scarcity lenses) ---
     // One shared "which resource" selection drives the Resource lens's contiguous
