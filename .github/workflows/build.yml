@@ -111,3 +111,77 @@ jobs:
 
       - name: Build ProjectIo
         run: cmake --build build --config Release
+
+  visual-verify:
+    # ADVISORY headless visual-verify spike (BL-057 step 4). Runs ProjectIo
+    # --verify under Xvfb (a virtual X server — no monitor needed; the capture
+    # uses SDL_RenderReadPixels, which is renderer-agnostic) and uploads the PNG
+    # captures + golden-diff images as artifacts. SDL_RENDER_DRIVER=software
+    # forces the deterministic software rasteriser, so output is GPU-independent.
+    #
+    # NOT a gate yet (continue-on-error): the committed goldens were blessed on a
+    # GPU renderer and may diff against the software rasteriser beyond the 0.5 %
+    # tolerance. This run exists to *see* the software-rendered output and decide
+    # whether to re-bless goldens in CI before promoting this to a hard gate.
+    name: Linux visual-verify (Xvfb, advisory)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    env:
+      SDL_RENDER_DRIVER: software
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build + SDL3 + Xvfb dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake ninja-build xvfb \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev \
+            libxinerama-dev libxss-dev \
+            libwayland-dev wayland-protocols libxkbcommon-dev \
+            libegl1-mesa-dev libgl1-mesa-dev \
+            libpulse-dev libasound2-dev
+
+      - name: Cache FetchContent dependencies
+        uses: actions/cache@v4
+        with:
+          # Reuse the g++-13 leg's dependency build (default runner compiler).
+          key: deps-${{ runner.os }}-g++-13-${{ hashFiles('CMakeLists.txt') }}
+          path: build/_deps
+
+      - name: Configure
+        run: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build ProjectIo
+        run: cmake --build build -j
+
+      - name: Run visual-verify scripts under Xvfb (advisory)
+        shell: bash
+        run: |
+          # Advisory: no `set -e`. Each script's --verify exit code (non-zero on
+          # a golden diff) is recorded but never fails the step — we want every
+          # capture produced and uploaded regardless. Run from the repo root so
+          # the cwd-relative bundled font (assets/fonts/) and the scripts/verify
+          # golden dir both resolve.
+          set -uo pipefail
+          mkdir -p screenshots
+          pass=0; diffed=0
+          for s in scripts/verify/*.lua; do
+            [ "$(basename "$s")" = "lib.lua" ] && continue
+            echo "=== verify: $s ==="
+            if xvfb-run -a ./build/ProjectIo --verify "$s"; then
+              pass=$((pass+1))
+            else
+              echo "::warning::visual-verify advisory: $s reported golden diffs/failures"
+              diffed=$((diffed+1))
+            fi
+          done
+          echo "advisory summary: $pass clean, $diffed reported diffs/failures"
+
+      - name: Upload captures + diffs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-verify-captures
+          path: screenshots/**
+          if-no-files-found: warn

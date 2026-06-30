@@ -31,8 +31,22 @@ break is fixed for a fresh modern-toolchain clone. Docs (TECH_FOUNDATIONS § Bui
 **CI regression guard.** `build.yml`'s `linux` job is now a **GCC 13 + GCC 14 matrix**
 (`fail-fast: false`, compiler-keyed dep cache, `$CXX` threaded through the headless-harness step)
 so the exact break we fixed can't silently regress — the default runner compiler is GCC 13, which
-wouldn't have caught it. Merged to `main`. BL-057 stays `designed` pending the CI first-run result
-and the font visual-verify (needs a real display; runs locally via `verifier-visual`).
+wouldn't have caught it.
+
+**CI first-run — green.** First-ever Actions run of `build.yml` on `main` passed all three jobs:
+Linux **g++-14** (full app incl. sol2 v3.5.0 + headless harnesses — confirms the GCC-14 fix in CI,
+not just on the laptop), Linux **g++-13**, and the first-ever **Windows** build (confirms the
+C-language + sol2 changes didn't break MSVC). Cross-platform build is verified on both OSes.
+
+**Headless visual-verify (BL-057 step 4 — the offscreen spike).** Confirmed the visual tier needs
+no monitor: `SDL_RenderReadPixels` (the capture path) is renderer-agnostic, and `xvfb-run` gives a
+virtual display, so `xvfb-run ./ProjectIo --verify <script>` works unchanged. Added an **advisory**
+`visual-verify` CI job (`continue-on-error`, `SDL_RENDER_DRIVER=software` for deterministic
+GPU-independent output) that builds, runs all `scripts/verify/*.lua` under Xvfb, and uploads the
+captures + `screenshots/diff/` images as artifacts — *not* a gate yet. The real open question is
+golden portability: the committed goldens were blessed on a GPU renderer and may diff against the
+software rasteriser beyond the 0.5 % tolerance; the advisory artifacts let us see the output before
+re-blessing in CI and promoting to a hard gate. BL-057 stays `designed` pending that decision.
 
 ---
 
