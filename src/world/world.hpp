@@ -141,3 +141,29 @@ struct world
 private:
     uint32_t m_next_id = 1; ///< Zero is null_entity; live IDs start at 1.
 };
+
+// ---------------------------------------------------------------------------
+// Ownership accessors (BL-068 — competitor information asymmetry)
+// ---------------------------------------------------------------------------
+// Ownership lives in `corporation_component::assets` (the forward list of owned
+// buildings); there is no reverse index, so these scan the ~dozen corporations.
+// Read-side only — no stored backing, no tick, no determinism impact. A reverse
+// `building_to_corp` map is the natural O(1) backing if profiling ever warrants;
+// the accessor is the stable seam either way.
+
+/// Resolve the corporation that owns @p building by scanning each corporation's
+/// `assets`. Siblings of `pool_for` / `workforce_supply`.
+///
+/// @param w        Read-only world state.
+/// @param building Building entity id to resolve.
+/// @return         Owning corporation id, or `null_entity` if unowned.
+entity_id owner_corp_of(const world& w, entity_id building);
+
+/// True iff @p building is owned by the player's corporation. The single branch
+/// point for the visibility rule (BL-068): everything not player-owned is treated
+/// uniformly as a rival.
+///
+/// @param w        Read-only world state.
+/// @param building Building entity id to test.
+/// @return         Whether the owning corporation has `is_player` set.
+bool is_player_owned(const world& w, entity_id building);

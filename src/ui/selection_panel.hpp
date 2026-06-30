@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ui_state.hpp"
+#include "world/economy_system.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
 
@@ -28,11 +29,14 @@ namespace ui {
 ///
 /// @param w        Read-only world state (the content source).
 /// @param reg      Loaded registry — build costs for the build front door.
+/// @param report   Most recent economy step report — the Population lens reads its
+///                 body_habitability to show a population centre's workforce cap.
 /// @param ui       UI state; read for the selection, written by 'go to' (focus),
 ///                 the close button (hide), and the build front door (enqueue).
 /// @param left_x   Left edge of the panel, screen pixels (the nav-pane inner edge).
 /// @param bottom_y Bottom edge to anchor the panel against, screen pixels.
-void draw_selection_panel(const world& w, const recipe_registry& reg, ui_state& ui,
+void draw_selection_panel(const world& w, const recipe_registry& reg,
+                          const economy_report& report, ui_state& ui,
                           float left_x, float bottom_y);
 
 } // namespace ui

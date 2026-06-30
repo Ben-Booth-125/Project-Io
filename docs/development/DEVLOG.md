@@ -6,6 +6,76 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — v0.0.8 Batch Delivery: BL-068 Visibility + BL-069 Population legibility (2026-06-30)
+
+**Context.** Continued the v0.0.8 (Discovery & Intelligence) batch from the BL-067 handover and
+delivered the two remaining items, completing the trio. Both are light-but-Full work touching the
+economy/UI seam; run **main-session, sequential** because they share UI hotspot files
+(`body_surface_canvas.cpp`, `selection_panel.cpp`, `hover_content.*`) — no fan-out.
+
+**BL-068 — Visibility model (competitor info asymmetry).** A read-time access policy over existing
+data; **no new stored state, no tick, no determinism/serialisation impact**.
+- **Accessors** — `owner_corp_of` / `is_player_owned` free functions (siblings of `pool_for`) in
+  `world.{hpp,cpp}`, scanning `corporation_component::assets`. `is_player_owned` is the single
+  uniform branch point (everyone not the player is a rival).
+- **Hover** — `hover_content.{hpp,cpp}`: the building card branches on ownership; a rival shows
+  type + owner only with a why-line naming the asymmetry, never production/stockpile.
+- **Selection panel** — `selection_panel.cpp`: `draw_rival_building_summary` shows owner + tile
+  location + explicit `private` production/stockpile teaching rows; player buildings keep the full
+  management summary.
+- **Markers** — confirmed the BL-067 survey gate already hides masked-region markers (no separate
+  rival gate); updated the comment to record it. Markets stay public.
+
+**BL-069 — Population legibility.** Surfacing + one behaviour-preserving refactor.
+- **Shared helper** — new `src/world/workforce.hpp` `workforce_efficiency(float)` — the single
+  source of truth for the habitability→workforce curve. `economy_system.cpp` now calls it
+  (bit-identical; the contention loop's inline expression removed).
+- **Lens re-key** — the Population lens tints by `workforce_efficiency(tile.habitability)`, showing
+  the 0.6 efficiency cliff; `draw_population_key` (0.5x→1.0x) and the `overlay.cpp` lens tooltip
+  relabelled from "habitability" to "workforce efficiency".
+- **Selection / hover** — a population-centre Selection read (scale + population + local habitability
+  rows + absolute workforce cap = `workforce_supply(player,body) × efficiency(body_habitability)`,
+  threaded via the econ report now passed to `draw_selection_panel`); a Tile×Population hover
+  exemplar (habitability + workforce-cap glance read).
+
+**Verification.**
+- **Headless** — `tools/verify/visibility_harness.cpp` (10 asserts PASS: owner/is_player resolution
+  + uniform branch) and `tools/verify/workforce_harness.cpp` (1001-sample bit-identical regression
+  vs the prior inline curve + named cliff/floor/ceiling anchors). Both registered as CMake targets.
+- **Visual** — `scripts/verify/visibility.lua` (2 goldens: rival private panel vs player full
+  detail) and `scripts/verify/population_legibility.lua` (3 goldens: efficiency-tint lens full/zoom
+  + centre Selection panel) blessed and PASS at 0.0000%. `population_lens.lua` re-blessed to the
+  re-keyed efficiency tint (legitimate behaviour change).
+- Full `cmake` build green.
+
+**In-session decisions.**
+- **Competitor panel fits 4 rows** — the Selection bar is fixed-height (~4 content rows). Dropped
+  the redundant type line (already the panel header) and the `▁` redaction glyph (renders as `?` in
+  the bundled font); kept owner + tile + the two `private` teaching rows in plain grey. The
+  asymmetry stays legible without overflowing the bar.
+- **No separate rival-marker gate** — the design noted the survey region mask already gates markers;
+  confirmed in code and recorded, rather than adding a redundant predicate. Markers (yours and
+  rivals') are uniformly survey-gated; the asymmetry lives purely at read time (hover/panel).
+- **New verify hooks** — `verify.select_tile` / `verify.select_building` (set the selection on the
+  active body, as a click would) and a `verify.population_centres()` data accessor (mirrors
+  `buildings()`), so the panel/lens goldens are self-describing rather than hard-coding coordinates.
+- **Workforce cap is body-level** — the Selection cap uses `body_habitability` (the sim's
+  scale-weighted mean) while the habitability row shows the *tile's* local value, so local-vs-body is
+  legible. The hover uses the tile's own efficiency for a per-tile glance, matching the lens tint.
+
+**Open / handover.**
+- **Skill registration (needs owner OK).** `verifier-visual` should name `visibility.lua` +
+  `population_legibility.lua`; `verifier-headless` should name `visibility_harness` +
+  `workforce_harness` (and the still-pending `survey.lua` / `survey_harness` from BL-067). Skill
+  edits need the owner's authorisation — flagged, not yet applied.
+- **Pre-existing golden drift.** `building_management.lua` and `corp_dashboard.lua` goldens fail on
+  HEAD independently of this work (time-control button labels changed `1/4…16` → `I…V` and the econ
+  balance drifted, both predating these changes). Left untouched — re-blessing them is unrelated
+  scope.
+- No save/load path exists in `world/*`, so neither item adds a serialisation seam.
+
+---
+
 ## Session — v0.0.8 Batch Delivery: BL-067 Survey system (2026-06-30)
 
 **Context.** Opened the v0.0.8 (Discovery & Intelligence) frontier. Three items were

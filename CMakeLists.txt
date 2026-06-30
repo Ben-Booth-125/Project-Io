@@ -191,3 +191,32 @@ target_include_directories(survey_harness PRIVATE
 )
 
 target_compile_features(survey_harness PRIVATE cxx_std_20)
+
+# ---------------------------------------------------------------------------
+# Headless visibility-model harness (BL-068; no SDL / Lua / ImGui)
+# ---------------------------------------------------------------------------
+# Exercises the read-side ownership accessors (owner_corp_of / is_player_owned).
+add_executable(visibility_harness
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/visibility_harness.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world.cpp"
+)
+
+target_include_directories(visibility_harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)
+
+target_compile_features(visibility_harness PRIVATE cxx_std_20)
+
+# ---------------------------------------------------------------------------
+# Headless workforce-efficiency curve harness (BL-069; no SDL / Lua / ImGui)
+# ---------------------------------------------------------------------------
+# Header-only regression guard: workforce_efficiency == the prior inline curve.
+add_executable(workforce_harness
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/workforce_harness.cpp"
+)
+
+target_include_directories(workforce_harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)
+
+target_compile_features(workforce_harness PRIVATE cxx_std_20)

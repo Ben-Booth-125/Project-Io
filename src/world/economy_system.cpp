@@ -1,5 +1,7 @@
 #include "economy_system.hpp"
 
+#include "workforce.hpp"
+
 #include <algorithm>
 #include <limits>
 #include <unordered_set>
@@ -406,15 +408,15 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
             report.body_habitability[body] = (acc.second > 0.0f) ? acc.first / acc.second : 1.0f;
 
         // Apply habitability efficiency multiplier to effective_workforce via the
-        // economy-report contention entries.  Habitability > 0.6 → 1.0×; below 0.6 →
-        // linear from 1.0 down to 0.5× at habitability 0.
+        // economy-report contention entries.  The curve lives in workforce.hpp
+        // (BL-069) so the Population lens / Selection panel show exactly what the
+        // simulation applies — full labour at/above 0.6, ramping to 0.5× at 0.
         for (auto& [key, contention] : report.workforce_contention)
         {
             const entity_id body = key.second;
             const auto hit = report.body_habitability.find(body);
             const float hab = (hit != report.body_habitability.end()) ? hit->second : 1.0f;
-            const float hab_scalar = (hab >= 0.6f) ? 1.0f : (0.5f + (hab / 0.6f) * 0.5f);
-            contention *= hab_scalar;
+            contention *= workforce_efficiency(hab);
         }
     }
 
