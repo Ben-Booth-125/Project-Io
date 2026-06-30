@@ -1,0 +1,82 @@
+# Independent, cold, adversarial PR review (see docs/development/REVIEW_AUTOMATION.md).
+#
+# This is the "author != reviewer" leg of the review pipeline: it runs on PR-open
+# with NO authoring context, reads only the diff + the repo's standing rules +
+# the requirements spec, and posts findings as a single PR comment. It does NOT
+# approve, merge, or push — a human (or a separate gate) decides. The hard CI
+# gate (build + headless harnesses) lives in build.yml; this job is reasoning,
+# not re-running tests.
+#
+# SETUP (one-time):
+#   1. Add a repo secret with your Claude credential. Subscription (Claude Pro/Max)
+#      users: run `claude setup-token` and store it as CLAUDE_CODE_OAUTH_TOKEN.
+#      API-key users: store an Anthropic key as ANTHROPIC_API_KEY and swap the
+#      `with:` line below to `anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}`.
+#   2. That's it — the action uses the official Claude GitHub App context.
+#
+# COST / TIERING: this is the only piece that spends tokens per PR. It deliberately
+# skips pure-docs/markdown PRs (paths-ignore) — the "Light = CI only" tier. Drop the
+# model from opus to sonnet (claude_args below) to cut cost if PR volume grows.
+
+name: claude-review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review, reopened]
+    paths-ignore:
+      - "**/*.md"
+      - "docs/**"
+
+# Cancel a superseded review when a PR is pushed again.
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    # Skip drafts, forks (no secret access anyway), and bot-authored PRs.
+    if: >-
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so the reviewer can diff against the base
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            You are an INDEPENDENT, adversarial code reviewer. You did NOT write this
+            change and have no memory of why it was written. Your job is to find what
+            is WRONG, not to confirm it is right. Assume the change is broken until the
+            code proves otherwise; prefer a concrete failing scenario (inputs/state ->
+            wrong outcome) over a vague concern.
+
+            Read, in this order, before judging:
+            - the PR diff (this is the artifact under review);
+            - the repo's standing rules: CLAUDE.md and .claude/rules/io-standing-rules.md
+              (determinism, no tile data to Lua, no unprotected sol2, flat-binary
+              serialisation, AI a data-model stub) and docs/development/DELIVERY.md;
+            - the spec: docs/development/req/requirements.json — for any requirement the
+              PR claims, a row whose `verification` was not actually run is NOT met.
+            Do NOT trust the PR description's "why this is fine" narrative; verify against
+            the spec and the code.
+
+            Review priority: (1) correctness — logic, boundaries, error paths,
+            determinism; (2) spec coverage actually verified; (3) standing-invariant
+            violations; (4) integration seams / signature drift; (5) reuse & simplicity.
+
+            Post ONE PR comment: findings most-severe first, each with its failing
+            scenario, then a one-line verdict. If nothing real survives scrutiny, say so
+            plainly — do not invent findings. You do NOT approve or merge; you advise.
+          claude_args: |
+            --model claude-opus-4-8
+            --max-turns 6
+            --disallowedTools "Write,Edit,NotebookEdit,Bash(git commit:*),Bash(git push:*)"
