@@ -384,8 +384,8 @@
       "short_name": "RESOURCE_GENERATION_FULL_SET",
       "category": "Resources",
       "title": "Resource generation — full-set deposit authoring + scarcity (v0.2)",
-      "status": "designed",
-      "glyph": "✓",
+      "status": "design-owed",
+      "glyph": "~",
       "priority": "B",
       "difficulty": 3,
       "parked": false,
@@ -397,7 +397,7 @@
       ],
       "authority_doc": "docs/economy/RESOURCES.md",
       "summary": "Extend deposit authoring from the 7-resource subset to the full raw set via a seeded per-resource rarity scalar [0,1] (raw-tier only) modulating frequency/magnitude over terrain affinity. Scheduled to v0.2; data-only.",
-      "design": "@BACKLOG.md"
+      "design": "**Scope: v0.2 (post-prototype) -- deferred, NOT implemented.** The prototype targets v0.1.0 (ROADMAP); full-set deposit authoring is outside the current arc, so per the standing scope rule it is not built now.\n\n**Design pointer repaired 2026-07-01.** The prior @BACKLOG.md pointer was dangling -- no BL-040 body remained in BACKLOG.md. Intent recovered from the summary: extend deposit authoring from the 7-resource prototype subset to the full raw set via a seeded per-resource **rarity scalar [0,1]** (raw-tier only) that modulates deposit frequency/magnitude over the existing terrain-affinity model in src/world/tile_generation.cpp (authority: docs/economy/RESOURCES.md). Data-only, deterministic. The full design is to be settled when v0.2 work is scheduled; status returned to design-owed to reflect that it is not promote-ready."
     },
     {
       "id": "BL-041",
