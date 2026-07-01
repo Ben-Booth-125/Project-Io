@@ -1117,7 +1117,7 @@
       "design": "**Delivered 2026-07-01 (same-session).** Scope confirmed with the developer: window + options only (no main menu / app-state machine, no save/load).\n\n**Surface.** An ImGui Options window toggled by F10 (canvas_command::options_toggle, in the s_bindings table so it shows in the F1 cheat-sheet), modelled on the F1 help overlay. Contains a Display section: resolution combo (1280x720 / 1600x900 / 1920x1080 / 2560x1440, 'Custom' when a dragged size doesn't match), Fullscreen checkbox (borderless-desktop), VSync checkbox, a live 'Window: WxH' readout, and Close. Resolution is disabled while fullscreen is on.\n\n**Persistence.** Flat key=value options.cfg in CWD (window_w/h, fullscreen, vsync). load_settings()/apply_display_settings() run at the top of run() only — never in the constructor or run_verify(), so golden captures keep the fixed 1280x720 default and stay deterministic. Toggles/presets save on change; free drag-resizes are captured from SDL_EVENT_WINDOW_RESIZED in-memory and flushed by save_settings() on clean exit. Sizes clamped to a 640x480 floor against a corrupt file.\n\n**Follow-ons (out of scope, named).** Main menu / title screen + app-state machine (pairs with BL-070); save/load serialisation seam; UI-scale / font-size option; monitor selection."
     },
     {
-      "id": "BL-077",
+      "id": "BL-087",
       "short_name": "ERA1_TECH_QUEST_SYSTEM",
       "category": "Research",
       "title": "Era 1 tech / quest system — structure, itemisation schema & gate model (design)",

@@ -78,7 +78,7 @@ default-M); and a **fully worked keystone quest** — The Propellant Loop, ~25 t
 gates on a *sustained economic surplus*, not a research total. Marked scaffolding-not-authority, dated,
 supersedes the earlier parked "Design state" block.
 
-**Filed BL-077** (`Research`, design-owed, priority B) as the tracked design home. Six numbered
+**Filed BL-087** (`Research`, design-owed, priority B) as the tracked design home. Six numbered
 open questions remain (linear-vs-mesh, standing-lines-never-gate, unlock-vs-build, cross-quest deps,
 how-many-economic-gates, ERAS↔ROADMAP scope reconciliation). Scope-split recorded: the *lean gate-tech*
 (Rocketry/ISRU/Orbital) is prototype-relevant; the *full quest tree* is post-prototype (ROADMAP
@@ -86,14 +86,14 @@ excludes Research from v0.1.0) — reconcile the authority docs only when work l
 
 **In-session decisions.**
 - **Design store = the research doc, not ERAS.md.** Authority time-slicing: the sketch lives in
-  scaffolding while BL-077 is open; it propagates into ERAS.md / a new tech doc only when work lands.
+  scaffolding while BL-087 is open; it propagates into ERAS.md / a new tech doc only when work lands.
 - **Cost model B over uniform/bespoke.** Small S/M/L/XL vocabulary, default-M at sketch stage —
   answers "all the same?" now while leaving room to differentiate.
 - **New `Research` backlog category** (none existed).
 - **No code, no requirement group.** Doc-only item; the prototype's tech scope stays the lean 3-tech
-  gate, and that implementation is deferred to the BL-077 split, not started here.
+  gate, and that implementation is deferred to the BL-087 split, not started here.
 
-**Left for Ben.** Resolve the six open questions, then split BL-077 into a prototype-scoped lean
+**Left for Ben.** Resolve the six open questions, then split BL-087 into a prototype-scoped lean
 gate-tech implementation item vs the parked full tree. Branch left unpushed for review.
 
 ---

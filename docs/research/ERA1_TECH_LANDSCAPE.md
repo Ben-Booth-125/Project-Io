@@ -207,7 +207,7 @@ resolution: the *lean gate-tech* is in-scope (it makes the prototype's premise t
 > sketch produced from the ideation that followed the research pass — quest structure, the
 > itemisation schema, and one worked quest. It **supersedes the "Design state so far (parked)"
 > block above** where the two differ (newest-dated wins). It settles the *shape*; the numbered
-> open questions at the end are still owed. Tracked as **BL-077**.
+> open questions at the end are still owed. Tracked as **BL-087**.
 
 ## The threading insight — *gate, quest, and tech are the same object*
 
@@ -399,7 +399,7 @@ Three facts from the web pass that update the threads above:
    carry **long payback curves** (a bank-vs-rush tension), which maps onto open sub-decision #5.
    [MIT Tech Review](https://www.technologyreview.com/2019/06/26/134510/asteroid-mining-bubble-burst-history/)
 
-## Open questions (design-owed — carried into BL-077)
+## Open questions (design-owed — carried into BL-087)
 
 1. **Within a quest: linear spine or mesh?** Legibility favours a mostly-linear spine + a few optional
    branches, not a web.
