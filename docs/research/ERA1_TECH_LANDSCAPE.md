@@ -198,3 +198,220 @@ resolution: the *lean gate-tech* is in-scope (it makes the prototype's premise t
 *full quest-based tree* stays deferred; reconcile ERAS ↔ ROADMAP **when the work lands**, not before.
 
 **Next dig (suggested):** go a level deeper on Thread 2 (ISRU / propellant), the keystone.
+
+---
+
+# Tech-tree structure — first sketch (2026-07-01)
+
+> Still **scaffolding, not authority** (same header caveat as above). This section is the design
+> sketch produced from the ideation that followed the research pass — quest structure, the
+> itemisation schema, and one worked quest. It **supersedes the "Design state so far (parked)"
+> block above** where the two differ (newest-dated wins). It settles the *shape*; the numbered
+> open questions at the end are still owed. Tracked as **BL-077**.
+
+## The threading insight — *gate, quest, and tech are the same object*
+
+The Era 0→1 gate in `ERAS.md` is already a **heterogeneous condition set** met simultaneously:
+Rocketry researched **+** Launchpad built & staffed **+** propellant stockpile ≥ threshold. That is
+not a research bar — it mixes research, a structure, and an *economic state*.
+
+Generalise it. **An Era gate is a big quest; a quest is a chain of techs; a tech is a small gate** —
+all three are "a set of conditions that must hold to unlock something." The model is **self-similar**,
+and that self-similarity is what threads the research landscape, the schema, and the existing ERAS
+gate into one mechanism.
+
+The payoff: a tech's unlock condition need **not** be research-accrual alone. It can be an *economic
+state*. This captures Ben's phase-1 idea directly — "launch Corp rockets to the Moon" gated behind a
+corporation able to **supply a certain excess**, or a **market where rockets are sufficiently cheap**.
+Research and economy become the *same gating vocabulary*, which is exactly how you make the game
+**demand use of its systems** rather than let a player drift past them (the Terra Invicta lesson,
+below): some techs are *earned through the economy*, not merely ticked toward.
+
+### The condition vocabulary (what a gate/quest/tech unlock is built from)
+
+An unlock is an **AND/OR expression** over these primitives (keep it mostly-AND for legibility):
+
+| Condition | Holds when… | Example use |
+|---|---|---|
+| `research`  | accrued research points ≥ `cost` (the R&D Lab build+accrue mechanism) | most techs |
+| `structure` | a named building exists / is staffed on a body | Launchpad staffed |
+| `stockpile` | a resource on a body ≥ threshold | propellant reserve for the Era gate |
+| `market`    | a good's cleared price ≤/≥ threshold | "rockets cheap enough" to unlock Moon launch |
+| `surplus`   | a corp's sustained *excess* output of a good ≥ threshold for N ticks | "supply a certain excess" |
+| `era`       | a given Era is active | quest availability |
+
+The same vocabulary expresses a single tech, a quest capstone, and an Era gate — only the scale
+changes.
+
+## Two kinds of quest
+
+| | **Gate quests** | **Standing lines** |
+|---|---|---|
+| Purpose | define an Era's identity; capstone opens the next Era | persistent depth across *every* Era |
+| Count | 2–3 live per Era | 2–3 carried through all Eras |
+| Gates an Era? | yes (exactly one capstone tech per gate-quest) | never |
+| Examples | Rocketry, The Propellant Loop, Orbital Industry | **Logistics**, **Military**, Economy/Automation |
+
+The **standing lines** are where the ~100-hour depth lives and where **logistics and military** — flagged
+as large — belong: they never gate an Era, they only deepen, so "what opens the next Era" stays
+unambiguous.
+
+## Itemisation schema (mirrors `backlog.json`: a queryable index + a prose reasoning field)
+
+**Quest record:**
+
+```json
+{
+  "id": "E1-PROPLOOP", "name": "The Propellant Loop", "era": 1,
+  "type": "gate",                 // gate | standing
+  "thread": "ISRU",               // ties to the research threads above
+  "thesis": "Close the propellant loop off-world.",
+  "capstone": "E1-PL-23",         // the tech whose completion IS the quest goal
+  "gates": null,                  // which Era this capstone opens, or null for standing
+  "target_tech_count": 25, "status": "sketch"
+}
+```
+
+**Tech record:**
+
+```json
+{
+  "id": "E1-PL-09", "name": "Water Electrolysis", "quest": "E1-PROPLOOP",
+  "kind": "invention",            // invention (spine) | tier (upgrade)
+  "tier": null,                   // 1/2/3 for tier techs
+  "prereqs": ["E1-PL-08"],        // tech ids; MAY cross quests
+  "cost": "M",                    // cost model B — see below
+  "payoff": "recipe",             // taxonomy below
+  "unlocks": "Recipe: Water → LH₂ + LOX",
+  "condition": "research",        // condition-vocabulary primitive(s)
+  "value": "The keystone step — turns mined ice into propellant; without it the loop is inert.",
+  "grounding": "Real: water electrolysis yields the highest-Isp cryo propellants.",
+  "status": "sketch"
+}
+```
+
+**`payoff` taxonomy** (the queryable proxy for "what is actually valuable"), descending desire:
+`gate` (opens the next Era — one per gate-quest) · `resource` (new resource access) · `building`
+(new structure) · `recipe` (new recipe on an existing building) · `efficiency` (a tier upgrade:
+yield ↑, workforce scalar ↓, boil-off ↓, propellant-per-leg ↓) · `enabling` (pure prerequisite —
+use sparingly; these are the "boring" nodes). A healthy 25-tech quest audits to roughly
+1 `gate` + 2 `resource` + 3 `building` + 5 `recipe` + 13 `efficiency` + ~1 `enabling`.
+
+**Cost model — B (small vocabulary, default `M`).** `S / M / L / XL`, mirroring backlog difficulty.
+Inventions = `M`, tier chains escalate `S→M→L`, capstones = `XL`. At sketch stage **default every
+tech to `M`** and tag only the outliers — giving "all the same" simplicity now with a place to
+differentiate when tuning matters, no rework. (`A` uniform and `C` bespoke-numeric were the rejected
+alternatives.)
+
+**Every field is also a UI element** (why itemising is progress toward picturing the tree):
+`name`+`payoff` → node label/icon · `prereqs` → edges · `cost` → progress ring · `value`+`grounding`
+→ tooltip (where "fiction supplies the theory" lives) · `kind` → node size/shape.
+
+## Worked gate-quest — **The Propellant Loop** (`E1-PROPLOOP`, keystone, ~25 techs)
+
+Distinct spine **inventions** in bold; the rest are tier/efficiency fill. Note the capstone and two
+late nodes gate on **economic** conditions (`surplus` / `market` / `stockpile`), not research — the
+threading insight in practice.
+
+| id | tech | kind | pre | cost | payoff | condition | unlocks |
+|---|---|---|---|---|---|---|---|
+| E1-PL-01 | **Volatile Prospecting** | inv | — | M | resource | research | ice/water richness bands appear in survey |
+| E1-PL-02 | Volatile Prospecting II | tier2 | 01 | S | efficiency | research | survey range/accuracy ↑ |
+| E1-PL-03 | **Regolith Excavation** | inv | 01 | M | building | research | Surface/Ice extraction rig |
+| E1-PL-04 | Regolith Excavation II | tier2 | 03 | S | efficiency | research | throughput ↑ |
+| E1-PL-05 | Regolith Excavation III | tier3 | 04 | M | efficiency | research | throughput ↑ |
+| E1-PL-06 | **Water Extraction (thermal)** | inv | 03 | M | recipe | research | regolith/ice → raw water |
+| E1-PL-07 | Water Extraction II | tier2 | 06 | S | efficiency | research | yield ↑ |
+| E1-PL-08 | **Water Purification** | inv | 06 | M | recipe | research | raw water → clean water |
+| E1-PL-09 | **Water Electrolysis** | inv | 08 | M | recipe | research | water → LH₂ + LOX (keystone) |
+| E1-PL-10 | Water Electrolysis II | tier2 | 09 | S | efficiency | research | energy per kg ↓ |
+| E1-PL-11 | **Cryogenic Liquefaction** | inv | 09 | M | recipe | research | gas → liquid H₂/O₂ |
+| E1-PL-12 | **Cryogenic Storage** | inv | 11 | M | building | research | depot tank; boil-off baseline |
+| E1-PL-13 | Cryogenic Storage II | tier2 | 12 | S | efficiency | research | boil-off ↓ |
+| E1-PL-14 | Cryogenic Storage III | tier3 | 13 | M | efficiency | research | boil-off ↓ |
+| E1-PL-15 | **Sabatier Reactor** | inv | 09 | M | recipe | research | CO₂+H₂ → methane (the "methane tell") |
+| E1-PL-16 | Sabatier II | tier2 | 15 | S | efficiency | research | yield ↑ |
+| E1-PL-17 | **Methane Liquefaction** | inv | 15 | M | recipe | research | methalox propellant path |
+| E1-PL-18 | **Autonomous Mining Rig** | inv | 05 | M | efficiency | research | workforce scalar ↓ *(cross-links Automation line)* |
+| E1-PL-19 | Autonomous Rig II | tier2 | 18 | S | efficiency | research | workforce scalar ↓ |
+| E1-PL-20 | **In-Situ Tank Fabrication** | inv | 12 | M | building | `stockpile` | local depot without Earth lift (needs regolith/metal on body) |
+| E1-PL-21 | **Orbital Propellant Depot** | inv | 20 | L | building | `structure` | the demand-sink node *(cross-quest dep: Orbital Port)* |
+| E1-PL-22 | Depot Network II | tier2 | 21 | M | efficiency | research | transfer loss ↓ |
+| E1-PL-24 | **Boil-off Recovery** | inv | 14 | M | efficiency | research | reclaim vented gas |
+| E1-PL-25 | Propellant Market Hook | inv | 21 | S | — | `market` | depot *sells* propellant into the space market (creates the price signal) |
+| **E1-PL-23** | **Closed-Loop Certification** | **capstone** | 21,17 | **XL** | **gate** | **`surplus`** | **quest goal: propellant loop closed on one off-world body** (body produces propellant excess ≥ threshold for N ticks) |
+
+Reads as a story — *find it → dig it → split it → store it → sell it → close the loop* — and the
+capstone **is** Era 1's strategic thesis, so completing the quest and proving the Era's premise are
+the same act. The capstone gates on a *sustained economic surplus*, not a research total: you don't
+research your way into Era 2, you **build an economy that earns it**.
+
+## Quest map — Era 0 & Era 1 (stubs, to expand)
+
+| id | quest | era | type | thread | thesis / capstone |
+|---|---|---|---|---|---|
+| E0-HEAVY   | Heavy Industry            | 0 | gate | — | steel/chem/refining base |
+| E0-ELEC    | Electronics & Computing   | 0 | gate | — | Info-Age footing; feeds the R&D Lab input |
+| E0-ROCKET  | Rocketry                  | 0 | gate | Launch | **capstone gates Era 1** (operable Launchpad) |
+| E1-LAUNCH  | Launch & Access           | 1 | gate | Launch | cheap reusable lift *(may fold into E0-ROCKET's tail)* |
+| E1-PROPLOOP| The Propellant Loop       | 1 | gate | ISRU | **worked above** — close the loop off-world |
+| E1-ORBITAL | Orbital Industry          | 1 | gate | Orbital Constr. | Assembly Plant + Orbital Port |
+| L-LOG      | Logistics *(standing)*    | 0→ | standing | Propulsion | deepens into the convoy/propellant tax (chemical → ion → nuclear-thermal → *parked* Epstein) |
+| L-MIL      | Military *(standing)*     | 0→ | standing | — | **reserved** — do not enumerate until the combat *system* is mapped |
+| L-AUTO     | Economy / Automation *(standing)* | 0→ | standing | Power/Automation | workforce-scalar & power substrate behind every quest |
+
+## Comparable — Terra Invicta (what to take, what to avoid)
+
+The one near-future game that does space-building at depth; a different core loop, but instructive.
+**Take:** it forces players spaceward with *three stacked pressures* — an external clock (alien
+threat), a soft economic pull (Earth resources cost lift; space resources pool free), and a
+**shifting bottleneck** (early game gated by *Boost/lift*, then the binding constraint *switches* to
+*Mission Control*). The shifting bottleneck is the model to steal — the thing that limits you changes
+as you grow, so the optimal action changes and you keep re-engaging different systems. Io's analogue:
+the concept's **"WW3-scale rupture"** as a *visible countdown* is the external clock that stops the
+Earth-conquest player from stalling indefinitely; the launch-vs-ISRU cost gradient is the soft pull.
+**Avoid:** TI's UI is widely reviled ("dense, obtuse, tiny icons"); the **tech tree specifically** is
+"an inaccessible mess" (no hover summaries, must exit the tree to act); and the **mid-game drags**
+because the propulsion tiers offer no meaningful choices. Direct cautions for our propulsion line
+(give *middle* tiers real range/thrust/fuel trade-offs) and for the tech-tree UI (hover = the `value`
+tooltip; act without leaving the tree). Sources:
+[MIT Tech Review — asteroid-mining bubble](https://www.technologyreview.com/2019/06/26/134510/asteroid-mining-bubble-burst-history/) ·
+[TI beginner's guide (wiki)](https://wiki.hoodedhorse.com/Terra_Invicta/Help:Gameplay_Guides/Beginner's_Guide) ·
+[TI "UI absolutely repulsive?" thread](https://steamcommunity.com/app/1176470/discussions/0/3361398331724778980/) ·
+[TI Mission Control (wiki)](https://wiki.hoodedhorse.com/Terra_Invicta/Mission_Control_Priority).
+
+## Corrections to the research above (2026-07-01 web pass)
+
+Three facts from the web pass that update the threads above:
+
+1. **DRACO (nuclear-thermal) was cancelled** in the FY2026 budget (May 2025) — no NTP/NEP funding.
+   Thread 3's "demo ~2025–27" is stale. This *helps* the design: nuclear-thermal becomes a clean
+   *parked/plausible* propulsion capstone (with the Epstein drive beyond it), not an active-real node.
+   [Aerospace America](https://aerospaceamerica.aiaa.org/nasa-and-darpa-are-cautioned-against-overselling-the-performance-of-their-nuclear-rocket-tech/)
+2. **Launch (Thread 1) and ISRU (Thread 2) are partly *rivals*, not pure complements.** Cheap
+   reusable lift *undercuts* the off-world-propellant business case below a distance/scale threshold
+   (breakeven ≈ $40k/kg to cislunar). That rivalry *is* the Era 1 strategic tension — mine-in-place
+   only pays past a distance/scale line, matching the Selene-vs-belt choice.
+   [ISRU economics (arXiv)](https://arxiv.org/pdf/2303.09011) ·
+   [Water on the Moon (New Space Tracker)](https://newspacetracker.com/articles/water-ice-on-the-moon/)
+3. **The asteroid-mining bust was as much a *capital/runway* failure as a demand failure** — the
+   decades-long gap between investment and revenue outran VC patience. Argues extraction techs should
+   carry **long payback curves** (a bank-vs-rush tension), which maps onto open sub-decision #5.
+   [MIT Tech Review](https://www.technologyreview.com/2019/06/26/134510/asteroid-mining-bubble-burst-history/)
+
+## Open questions (design-owed — carried into BL-077)
+
+1. **Within a quest: linear spine or mesh?** Legibility favours a mostly-linear spine + a few optional
+   branches, not a web.
+2. **Do standing lines gate anything, ever?** Lean: no — pure depth keeps "what opens the next Era"
+   unambiguous.
+3. **Is a "tech" a passive unlock or a required *build*?** concept.md says build-it; at 25/quest, most
+   techs likely unlock a *capability/upgrade* on existing buildings, and only spine techs add
+   structures.
+4. **Cross-quest dependencies** (E1-PL-21 needs the Orbital Port; E1-PL-18 the Automation line) —
+   allowed, or kept disjoint? Real interdependency is richer but costs "disjoint tree" legibility.
+5. **How many economic-gated techs?** Powerful for "demand use of systems," but over-used they stall a
+   player who is behind economically. Likely reserve for *capstones* and a few marquee unlocks.
+6. **Scope reconciliation.** The *lean gate-tech* (Rocketry/ISRU/Orbital) is prototype-relevant; the
+   *full quest tree* is post-prototype. ROADMAP currently excludes Research from v0.1.0 — reconcile
+   ERAS ↔ ROADMAP **only when the work lands** (authority time-slicing), not from this sketch.

@@ -6,6 +6,57 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — Era 1 tech / quest system: research → first structural sketch (2026-07-01)
+
+**Context.** Tech-research session on branch `claude/era1-tech-research`. Deliberately worked from
+the *conceptual* docs only (`concept.md`, `ERAS.md`) plus the existing `docs/research/ERA1_TECH_LANDSCAPE.md`
+scaffolding — not the code. Goal: take the quest-based tech system named in concept.md from research
+into a first *structural* design, and land it in the design canon. **No `src/` change** — design +
+backlog only.
+
+**Web pass.** Surfaced articles against the research doc's own threads (ISRU/propellant keystone,
+reusable-launch economics, the asteroid-mining demand-loop bust) and a **Terra Invicta comparative**
+(how a near-future space game *forces* players spaceward: an external clock + a shifting Boost→Mission
+Control bottleneck; and its widely-reviled UI / "inaccessible" tech tree as a what-to-avoid). Three
+factual corrections folded into the doc: DRACO/nuclear-thermal cancelled FY2026; launch vs ISRU are
+partly *rivals* not complements (the Era 1 tension); the mining bust was a capital/runway failure as
+much as a demand one.
+
+**The threading insight (load-bearing).** The `ERAS.md` Era 0→1 gate is already a heterogeneous
+condition set (research + structure + stockpile). Generalised: **an Era gate, a quest, and a single
+tech are the same object** — an AND/OR expression over a shared condition vocabulary
+(`research`/`structure`/`stockpile`/`market`/`surplus`/`era`). So a tech can gate on an *economic
+state* (a corp supplying an excess, or a market where a good is cheap enough — Ben's phase-1 idea),
+which is the mechanism for making the game **demand use of its systems** rather than let a player
+drift past them.
+
+**Sketch landed** (`ERA1_TECH_LANDSCAPE.md` § "Tech-tree structure — first sketch"): two quest kinds
+(gate quests vs standing lines — Logistics/Military live in the latter); an itemisation schema
+mirroring `backlog.json` (quest + tech records, a `payoff` value taxonomy, cost model B = S/M/L/XL
+default-M); and a **fully worked keystone quest** — The Propellant Loop, ~25 techs, whose capstone
+gates on a *sustained economic surplus*, not a research total. Marked scaffolding-not-authority, dated,
+supersedes the earlier parked "Design state" block.
+
+**Filed BL-077** (`Research`, design-owed, priority B) as the tracked design home. Six numbered
+open questions remain (linear-vs-mesh, standing-lines-never-gate, unlock-vs-build, cross-quest deps,
+how-many-economic-gates, ERAS↔ROADMAP scope reconciliation). Scope-split recorded: the *lean gate-tech*
+(Rocketry/ISRU/Orbital) is prototype-relevant; the *full quest tree* is post-prototype (ROADMAP
+excludes Research from v0.1.0) — reconcile the authority docs only when work lands.
+
+**In-session decisions.**
+- **Design store = the research doc, not ERAS.md.** Authority time-slicing: the sketch lives in
+  scaffolding while BL-077 is open; it propagates into ERAS.md / a new tech doc only when work lands.
+- **Cost model B over uniform/bespoke.** Small S/M/L/XL vocabulary, default-M at sketch stage —
+  answers "all the same?" now while leaving room to differentiate.
+- **New `Research` backlog category** (none existed).
+- **No code, no requirement group.** Doc-only item; the prototype's tech scope stays the lean 3-tech
+  gate, and that implementation is deferred to the BL-077 split, not started here.
+
+**Left for Ben.** Resolve the six open questions, then split BL-077 into a prototype-scoped lean
+gate-tech implementation item vs the parked full tree. Branch left unpushed for review.
+
+---
+
 ## Session — Gameplay-clarity / profit strand: budget cluster delivered (2026-06-30 → 07-01)
 
 **Context.** A gameplay-clarity review ("where can I build?", "how do I make a profit?") became a

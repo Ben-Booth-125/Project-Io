@@ -4,6 +4,9 @@ build-web/
 out/
 .cmake/
 
+# Runtime-generated user settings (BL-076 display options)
+options.cfg
+
 # Backups
 backups/
 generic files/
