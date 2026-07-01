@@ -872,6 +872,22 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 fill = lerp_colour(fill, hot, 0.6f * scar);
             }
         }
+        // Player-owned tile? Drives the persistent, lens-independent ownership
+        // accent: a subtle wash at the plain default plus an outline under every
+        // lens (drawn in the border pass), so "these tiles are mine" reads without
+        // the player having to pick the Corporation lens.
+        bool is_player_tile = false;
+        if (!tile_to_corp.empty())
+        {
+            const auto pc_it = tile_to_corp.find(id);
+            is_player_tile = (pc_it != tile_to_corp.end() && pc_it->second == w.player_entity);
+        }
+        // Plain-default wash: tint the player's own tiles with the player identity
+        // colour when no lens is active. Suppressed under any lens — the outline
+        // carries identity there, so the wash never fights a lens fill.
+        if (is_player_tile && state.overlay == overlay_mode::none)
+            fill = lerp_colour(fill, corp_identity(w.player_entity), 0.30f);
+
         const auto   built_it  = built_tiles.find(id);
         const bool   built     = built_it != built_tiles.end();
         const building_type built_type = built ? built_it->second : building_type::none;
@@ -990,15 +1006,17 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 }
             }
 
-            // Corporation lens: outline the player's own tiles so the player's
-            // footprint reads at a glance against rivals' flat tints. Rival tiles
-            // are distinguished by their fill colour alone (see the fill pass).
-            if (state.overlay == overlay_mode::corporation)
+            // Persistent player footprint: outline the player's own tiles under
+            // EVERY lens (and the plain default), so "these are mine" never
+            // disappears when a lens is picked. Under the Corporation lens the fill
+            // is already the player colour, so the bright selection accent keeps the
+            // edge visible; elsewhere the player identity colour reads as ownership
+            // against terrain and value fills. Rival tiles carry no ring.
+            if (is_player_tile)
             {
-                const auto corp_it = tile_to_corp.find(id);
-                if (corp_it != tile_to_corp.end() && corp_it->second == w.player_entity)
-                    dl->AddPolyline(verts, 6, palette::selection,
-                                    ImDrawFlags_Closed, 2.0f);
+                const ImU32 ring = (state.overlay == overlay_mode::corporation)
+                    ? palette::selection : corp_identity(w.player_entity);
+                dl->AddPolyline(verts, 6, ring, ImDrawFlags_Closed, 2.0f);
             }
 
             if (built)

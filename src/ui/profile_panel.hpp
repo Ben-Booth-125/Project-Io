@@ -1,15 +1,18 @@
 #pragma once
 
+#include "world/world.hpp"
+
 namespace ui {
 
 /// Draw the player corporation profile panel.
 ///
 /// A compact, fixed panel pinned to the top-left corner of the window, above the
 /// navigation pane. Shows the player faction at a glance: a portrait placeholder,
-/// the corporation name, and a line or two of basic standing. Layer 2 is a static
-/// placeholder — faction identity is still undecided (see docs/CONCEPT.md) so the
-/// panel only reserves the shape of the data. See docs/ui/PROFILE.md.
-void draw_profile_panel();
+/// the corporation name, its parent (registering) nation, and its industrial
+/// focus — read live from the player corporation in @p w. See docs/ui/PROFILE.md.
+///
+/// @param w World — read for the player corporation and its home nation.
+void draw_profile_panel(const world& w);
 
 /// Width of the profile panel in pixels. The profile keeps its own width — wide
 /// enough for the portrait and name — independent of the narrow icon nav rail

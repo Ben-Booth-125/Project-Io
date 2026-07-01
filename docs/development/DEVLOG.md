@@ -6,6 +6,124 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — Discovery: trade-route fog design (BL-088 + BL-089) + roadmap re-sync (2026-07-01)
+
+**Context.** Design session (advisor mode, **no `src/` change** — backlog + docs only). Opened on
+"what's next on the roadmap", reconciled a **stale roadmap slice list**, then took Ben's
+information-asymmetry idea from a realism framing to a settled two-item design over two Q&A rounds.
+
+**Roadmap re-sync (Light).** The roadmap's operational § "The sessions" still named retired IDs —
+BL-064 Survey / BL-065 Visibility as *design-owed next* — when they had shipped renumbered as
+**BL-067 (survey) / BL-068 (visibility) / BL-071 (build legibility)**. Updated the v0.0.8 "what
+ships next" block to the real frontier: the **legibility cluster BL-083–086** (all `designed`), with
+the renumber noted. Also flagged the v0.0.9 queue: **BL-072 (budget breakdown) / BL-073 (debt
+interest)** shipped *early* in the gameplay-clarity cluster, so v0.0.9 now reads as a lighter polish
+minor — struck them from the queue.
+
+**The design pivot (load-bearing).** Ben's first steer killed the realism framing: a public/inferable/
+private "what would a company hide" matrix is a *simulator's* answer. The fog's job is to **keep the
+spotlight on the player and make commercial reach felt** — not model corporate secrecy. That reframed
+the whole thing around his proposal: **trade routes as the light source** — where your goods flow, the
+world lights up, radiating from your own activity so growth opens the map. Fog *is* Trade (tone rule
+satisfied), and the absence of a military/espionage system stops being a hole.
+
+**The reconciliation that split it into two items.** Convoys today are **transient** —
+`convoy_component` is auto-dispatched to fill a shortfall and *erased on arrival*; `world.convoys` has
+"no persistent identity". So there is **no durable lane for a fog to read** → the fog needs a
+persistent route object *first*. Hence Ben's "both": a trade-system tweak **and** a visibility system.
+
+**Q&A settled (two rounds, 8 calls).** R1 — routes **emergent** from convoy traffic (no new verb);
+**player commerce only** lights the map; **mild decay** to a greyed 'stale' (never back to Unknown);
+survey and route-fog are **independent axes** (not chained — the cleaner choice: two layered fogs,
+geographic vs activity). R2 — **corridor + proximity glow** illumination (route past a frontier body to
+peek at it); **Known reveals a coarse market pulse + activity**, not internals; **one completed convoy
+establishes** a route; **Visible** = an active lane **OR** a building present.
+
+**Filed, both `designed` (priority A):**
+- **BL-088 TRADE_ROUTES** *(Trade, diff 3)* — persistent `trade_route {body_a, body_b, corp,
+  last_tick, convoy_count}` in `world.trade_routes`, upserted in `credit_arrived_convoys` when a convoy
+  completes (needs a `body_of_market` accessor). Data + population only; never-erased (aging is a
+  read-time concern); joins the flat-binary seam. `requires` nothing; is the prerequisite for BL-089.
+- **BL-089 COMMERCIAL_SPHERE_FOG** *(Discovery, diff 4, `requires` BL-088)* — a pure-function
+  `body_activity_visibility → {unknown, known_stale, known, visible}` read from routes + live convoys +
+  ownership; Solar-canvas per-body badge + corridor + a **deterministic proximity glimpse sampled at a
+  convoy's completion tick** (chosen over a per-frame test that would flicker with orbital drift);
+  coarse market-pulse read on Known+ bodies; composes with BL-067/068's survey-gated geographic fog.
+
+**In-session decisions.**
+- **Independent axes over reach-gates-survey.** Ben's call; yields two clean layered fogs (geographic =
+  survey, activity = routes) rather than one chain. A body can be Known-but-unsurveyed.
+- **Proximity glimpse is a discrete sample at convoy-completion tick**, not a per-frame proximity test —
+  keeps determinism trivial (positions are a pure function of tick) and avoids flicker as bodies drift.
+- **Aging is read-time, routes are never deleted** — no flicker, no deletion logic; freshness =
+  `now − last_tick`, owned by the reader (BL-089).
+- **Authority doc owed on landing:** discovery now spans BL-067/068/088/089 and outgrows the ROADMAP
+  note — spin out `docs/ui/DISCOVERY.md` when the work lands and repoint BL-067/068.
+- **No `src/` change, no requirement groups yet** — design-only; requirement groups authored at
+  promotion (both items name their `visual`/`headless` checks in the design).
+
+**Left for Ben.** Promote BL-088 → BL-089 as a small Discovery batch when ready (BL-088 first —
+foundation). Calibration constants (`route_fresh_ticks`, proximity radius `R`) are headless-tuning at
+build time. Branch left unpushed for review.
+
+---
+
+## Session — QOL: main menu + campaign-start framing/legibility (2026-07-01)
+
+**Context.** Two QOL asks from Ben: (1) add a **main menu** so launch has a deliberate entry point
+(no saving in scope yet); (2) fix the **default framing** — on open it's unclear *who you are* and
+*where you are*. Grounded first with a headless open→build-a-building walkthrough
+(`scripts/verify/build_walkthrough.lua`): the friction is almost entirely the first two steps — you
+drop onto an unframed world with no identity cue. Directly addresses the "(A) where is the player"
+half of the visibility strand (BL-083–086) below.
+
+**Main menu (`app.cpp`/`app.hpp`).** Added an `app_screen { menu, in_game }` state; `run()` opens
+on `menu` and defers world/economy/warm-start into a new `start_new_game()` fired by the **New Game**
+button (so nothing simulates behind the menu and the sim clock rebases to when play starts). **Quit**
+sets `m_quit_requested`. The menu is folded into `render()`'s single Render/clear/capture tail so it
+is golden-verifiable; `run_verify()` sets `in_game` up front (existing checks unaffected) and a new
+`verify.show_menu` hook re-enters it for capture. `handle_key_down` ignores game bindings while on the
+menu. Live New Game → in-game transition confirmed by Ben clicking it mid-session.
+
+**Campaign-start framing + persistent ownership accent** (`app.cpp`, `body_surface_canvas.cpp`,
+`view_nav.cpp`). Per two design calls (framing on HQ; persistent accent, keep lens `none`):
+- **Frame on HQ:** `setup_world` centres the opening Planetary view on the centroid of the player
+  corp's buildings on the start body (zoom 11), falling back to whole-surface if none.
+- **Persistent, lens-independent player accent:** player-owned tiles get a subtle player-colour wash
+  at the plain default *and* a player-colour outline drawn under **every** lens (was Corporation-lens
+  only), so "these are mine" never disappears. Wash suppressed under any active lens; Corporation lens
+  unchanged (blue fill + bright selection ring). Rivals carry no ring.
+- **`focus_on_surface` now clears `planetary_center_pending`** — a deliberate navigation cancels the
+  queued start-framing, so it can't bleed into later `goto_surface` (kept the harness's other goldens
+  from shifting).
+- **Player identity card wired to real data** (`profile_panel.cpp`, follow-up in the same session).
+  The top-left card was hardcoded `"Unnamed Corp" / Parent: — / Standing: —`; it now reads the player
+  corp's real name, `Parent: <home nation>`, and `Focus: <industrial focus>` (all already in the data
+  model — pure display wiring). Dropped the "Standing" line (reputation isn't modeled). Minor known
+  clip: long nation names overflow the fixed 200px panel — ellipsis is a follow-up.
+- **Geometric corp emblem in the identity card** (`profile_panel.cpp`). The portrait placeholder is now
+  a geometric emblem — one of 6 shapes (circle/square/triangle/diamond/hexagon/pentagon) filled in the
+  player identity colour (corp slot 0), the shape picked deterministically from the corp id (so it's
+  stable and corp-distinct). Colour matches the map ownership tint, so card and canvas agree. Ben chose
+  "prototype in the card now"; promotion to a shared `ui::icons` emblem family + map/selection markers
+  (and the full shape/assignment system) is backlogged. Corp *names* left as-is per Ben's call.
+
+**Verification.** New golden checks `scripts/verify/main_menu.lua` and `scripts/verify/start_framing.lua`
+(6 captures) blessed and passing at 0.0000%. Requirement groups `main-menu` and `start-framing` added
+to `req/requirements.json` (both complete).
+
+**In-session decisions.**
+- *No Load/Save on the menu* — deliberately out of prototype scope (Ben: "won't need saving right
+  now"). New Game / Quit only.
+- *Accent = wash + outline, not a new HQ glyph.* Kept the change contained to the existing tile
+  fill/border passes; a dedicated HQ pin and **naming the corp** ("Unnamed Corp / Parent: ? /
+  Standing: ?") are noted as easy follow-ups, not done unprompted.
+
+**Open items.**
+- Corp identity is still "Unnamed Corp" — even perfect framing leaves you nameless. Small follow-up.
+- Start framing uses a fixed zoom (11) and a naive centroid (fine for the clustered prototype start;
+  revisit if holdings ever straddle the horizontal wrap seam).
+
 ## Session — Visibility pass: design Q&A → backlog cluster (2026-07-01)
 
 **Context.** Design session (advisor mode, **no `src/` change** — backlog only) on the "visibility

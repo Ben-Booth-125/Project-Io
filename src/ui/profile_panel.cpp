@@ -1,10 +1,66 @@
 #include "profile_panel.hpp"
+#include "presentation.hpp"
 
 #include <imgui.h>
 
+#include <cstdint>
+
 namespace ui {
 
-void draw_profile_panel()
+namespace {
+/// Human-readable label for a corporation's industrial focus.
+const char* focus_label(industrial_focus f)
+{
+    switch (f)
+    {
+        case industrial_focus::extraction: return "Extraction";
+        case industrial_focus::processing: return "Processing";
+        case industrial_focus::trade:      return "Trade";
+    }
+    return "—";
+}
+
+/// Number of distinct geometric corp emblems. A corporation's emblem is
+/// (shape, identity colour); the shape is chosen deterministically from the
+/// corp entity id so it is stable for a campaign and distinct between corps.
+/// Prototype scope: rendered in the player identity card only. Promotion to a
+/// shared ui::icons glyph family + map/selection markers is a backlog item.
+constexpr int emblem_shape_count = 6;
+
+/// Draw corporation emblem @p shape (0..emblem_shape_count-1) centred at @p c
+/// with circumradius @p r, filled in @p col. Simple, legible primitives so the
+/// emblem reads at portrait size and later at marker size.
+void draw_corp_emblem(ImDrawList* dl, ImVec2 c, float r, int shape, ImU32 col)
+{
+    switch (shape % emblem_shape_count)
+    {
+        case 0: // circle
+            dl->AddCircleFilled(c, r, col, 24);
+            break;
+        case 1: // square
+            dl->AddRectFilled({c.x - r * 0.85f, c.y - r * 0.85f},
+                              {c.x + r * 0.85f, c.y + r * 0.85f}, col);
+            break;
+        case 2: // upward triangle
+            dl->AddTriangleFilled({c.x, c.y - r},
+                                  {c.x + r * 0.92f, c.y + r * 0.7f},
+                                  {c.x - r * 0.92f, c.y + r * 0.7f}, col);
+            break;
+        case 3: // diamond
+            dl->AddQuadFilled({c.x, c.y - r}, {c.x + r, c.y},
+                              {c.x, c.y + r}, {c.x - r, c.y}, col);
+            break;
+        case 4: // hexagon
+            dl->AddNgonFilled(c, r, col, 6);
+            break;
+        default: // 5 — pentagon
+            dl->AddNgonFilled(c, r, col, 5);
+            break;
+    }
+}
+} // namespace
+
+void draw_profile_panel(const world& w)
 {
     ImGui::SetNextWindowPos({0.0f, 0.0f});
     ImGui::SetNextWindowSize({profile_panel_width, profile_panel_height});
@@ -21,21 +77,45 @@ void draw_profile_panel()
 
     ImGui::Begin("##profile_panel", nullptr, flags);
 
-    // Portrait placeholder: a filled square to the left, with the corporation
-    // name and basic standing stacked beside it. A real emblem/picture replaces
-    // the square later.
+    // Resolve the player corporation and its parent (registering) nation. Both are
+    // set by corporation generation; fall back to placeholders only if the lookup
+    // fails (e.g. a world with no player corp).
+    const char* corp_name   = "Unnamed Corp";
+    const char* parent_name = "—";
+    const char* focus_name  = "—";
+    // Emblem: the player's identity colour (corp slot 0) and a shape chosen
+    // deterministically from the corp id so it is stable and corp-distinct.
+    ImU32 emblem_col   = palette::corp_colour(0);
+    int   emblem_shape = 0;
+    const auto  corp_it = w.corporations.find(w.player_entity);
+    if (corp_it != w.corporations.end())
+    {
+        const corporation_component& corp = corp_it->second;
+        if (!corp.name.empty())
+            corp_name = corp.name.c_str();
+        focus_name = focus_label(corp.focus);
+        const auto nat_it = w.nations.find(corp.home_nation);
+        if (nat_it != w.nations.end() && !nat_it->second.name.empty())
+            parent_name = nat_it->second.name.c_str();
+        emblem_shape = static_cast<int>(
+            (static_cast<uint32_t>(w.player_entity) * 2654435761u) % emblem_shape_count);
+    }
+
+    // Portrait slot: a dark rounded plate carrying the corporation's geometric
+    // emblem (shape + identity colour), with the name / parent / focus beside it.
     constexpr float portrait = 56.0f;
     const ImVec2    p0       = ImGui::GetCursorScreenPos();
-    ImGui::GetWindowDrawList()->AddRectFilled(
-        p0, {p0.x + portrait, p0.y + portrait}, IM_COL32(60, 70, 90, 255));
-    ImGui::GetWindowDrawList()->AddRect(
-        p0, {p0.x + portrait, p0.y + portrait}, IM_COL32(110, 120, 140, 255));
+    ImDrawList*     dl       = ImGui::GetWindowDrawList();
+    dl->AddRectFilled(p0, {p0.x + portrait, p0.y + portrait}, IM_COL32(28, 32, 42, 255), 4.0f);
+    draw_corp_emblem(dl, {p0.x + portrait * 0.5f, p0.y + portrait * 0.5f},
+                     portrait * 0.34f, emblem_shape, emblem_col);
+    dl->AddRect(p0, {p0.x + portrait, p0.y + portrait}, IM_COL32(110, 120, 140, 255), 4.0f);
 
     ImGui::SameLine(portrait + ImGui::GetStyle().ItemSpacing.x * 2.0f);
     ImGui::BeginGroup();
-    ImGui::TextUnformatted("Unnamed Corp"); // placeholder corporation name
-    ImGui::TextDisabled("Parent: —");  // parent nation, TBD
-    ImGui::TextDisabled("Standing: —"); // headline standing, TBD
+    ImGui::TextUnformatted(corp_name);
+    ImGui::TextDisabled("Parent: %s", parent_name);
+    ImGui::TextDisabled("Focus: %s", focus_name);
     ImGui::EndGroup();
 
     ImGui::End();

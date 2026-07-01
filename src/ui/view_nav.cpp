@@ -52,6 +52,12 @@ void focus_on_surface(const world& w, ui_state& ui, entity_id body)
     ui.planetary_pan_x = 0.0f;
     ui.planetary_pan_y = 0.0f;
     ui.planetary_zoom  = planetary_default_zoom;
+
+    // Focusing a surface resets the view, so cancel any pending centre-on-tile
+    // request — a deliberate navigation supersedes a queued recentre (e.g. the
+    // campaign-start HQ framing set in app::setup_world). Without this, a stale
+    // pending centre would fire on the newly focused body's first draw.
+    ui.planetary_center_pending = false;
 }
 
 void focus_on_tile(const world& w, ui_state& ui, entity_id tile)
