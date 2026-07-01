@@ -220,3 +220,31 @@ target_include_directories(workforce_harness PRIVATE
 )
 
 target_compile_features(workforce_harness PRIVATE cxx_std_20)
+
+# ---------------------------------------------------------------------------
+# Headless corp-terrain viability harness (BL-075; no SDL / Lua / ImGui)
+# ---------------------------------------------------------------------------
+# For every generated corporation in the canonical world, runs a two-tier
+# viability matrix: tier-1 asset legality + buildable focus (hard FAIL), tier-2
+# reachable market + profitable chain (WARN). Links the SDL/Lua-free world-gen
+# translation units (world, hard_coded_world + its generation passes, and the
+# placement-rules seam); recipe_registry.cpp (the Lua loader) is intentionally
+# NOT linked — the harness hand-builds a coarse reference registry via the
+# header's inline setters.
+add_executable(corp_terrain_matrix
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/corp_terrain_matrix.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/hard_coded_world.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/tile_generation.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/nation_generation.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/population_generation.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/corporation_generation.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/orbital_system.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/placement_rules.cpp"
+)
+
+target_include_directories(corp_terrain_matrix PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)
+
+target_compile_features(corp_terrain_matrix PRIVATE cxx_std_20)
