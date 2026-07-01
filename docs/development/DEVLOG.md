@@ -6,6 +6,47 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — Visibility pass: design Q&A → backlog cluster (2026-07-01)
+
+**Context.** Design session (advisor mode, **no `src/` change** — backlog only) on the "visibility
+pass" Ben raised: it's not clear (A) *where the player is* or (B) *what they can do*, and the world
+reads as "Resources with industry shoved on top" — the connective tissue from Resource World →
+Corporation World is missing. Two rounds of design Q&A settled eight calls; then a ground-truth pass
+(Explore sub-agent + backlog reconciliation) reshaped what the work actually *is*.
+
+**The load-bearing reconciliation.** Most of the machinery already exists — this is a *rendering /
+legibility* pass, not new mechanics:
+- **Population centres are generated** (`population_centre_component`, `generate_population_centres`,
+  20–40/body) but **drawn as nothing** — the human layer is invisible, which *is* the "industry
+  shoved on top" symptom.
+- **The saturated substrate is already economically live.** Ben chose "economically live now", but
+  **BL-050 already shipped it** — `substrate_density` → `nation_substrate` → `background_supply/demand`
+  injected into market clearing. BL-050 *deferred only the visual* ("industry-density lens deferred
+  to v2.0.0, **user to flag**"). Ben is now flagging it → this collapses to promoting a parked
+  rendering Brief, dodging the Full-mode economy risk entirely. (`GENERATION_STRATEGY.md` [B4]
+  "described, not generated" note is now **stale** — fix on landing.)
+- **Player identity is lens-gated** (Corp lens only); `home_body` never marked; no initial focus.
+- **Growth signals are build-mode-gated**; BL-071 (designed) covers the panel side, not the map side.
+
+**The design knot — RESOLVED (refined (b)).** BL-083's population-density field and BL-084's substrate
+field are **near-collinear by construction** (`substrate_density = (1 − dist/ripple) × strength`) *when
+both are drawn as raw density*. Broken by two moves: (1) population is the **discrete markers** (BL-083),
+not a smooth field — so "field + named anchors" resolves as anchors=BL-083, field=BL-084; (2) the
+industry lens reads **economic throughput, not density** — the already-computed, resource-/terrain-affinity-
+weighted `background_supply/demand`, which varies by terrain and is *not* collinear with headcount.
+This is the differentiation the specialist-vs-saturated premise wants, delivered as **pure rendering**
+(no `substrate_density`/market-arithmetic change → no Full-mode/determinism cost). Rejected (a) one
+merged glow and (b-heavy) changing generation. Yields a **three-layer visual language**: Settlements
+(markers) · Industry (throughput field) · You (identity chrome) — non-overlapping.
+
+**Filed** the visibility-pass cluster, all **designed**: **BL-083** POP_CENTRE_MARKERS (A) — tiered/named
+settlement markers, aggregate+label existing, civic-neutral colour; **BL-084** SUBSTRATE_LENS (B) —
+promote BL-050's deferred industry-density lens as a throughput field (field-model resolved 2026-07-01);
+**BL-085** PLAYER_PRESENCE (A) — always-on identity chrome + home ring/HQ pip + initial focus;
+**BL-086** AMBIENT_OPPORTUNITY (B) — glanceable growth read, map-side companion to BL-071.
+
+---
+
 ## Session — Era 1 tech / quest system: research → first structural sketch (2026-07-01)
 
 **Context.** Tech-research session on branch `claude/era1-tech-research`. Deliberately worked from

@@ -1227,6 +1227,98 @@
       "authority_doc": "docs/ui/SELECTION.md",
       "summary": "Playtest finding (2026-07-01, menu_planetary_build / menu_reject_reason captures): with build mode armed, the Construction panel overlaps the Selection/Tile panel and occludes the very BL-071 surfaces a player reads *during* placement \u2014 the selected-tile affordance readout and the build front-door rejection reason. The two placement-time reads compete for the same screen region. The delivery-time companion to BL-071.",
       "design": "**Status:** design-owed \u2014 filed from the 2026-07-01 playtest.\n\nWhen the Construction panel is open (the only time build mode is armed), it sits over the Selection/Tile panel, hiding the affordance readout ('Suited for' thrives/valid/invalid) and the build front-door reason line that BL-071 added expressly for the placement moment. Open: reposition/resize the panels so the tile affordances + reason stay visible while constructing, or fold the reason-code text into the Construction panel itself (single source, no overlap). Provenance: 2026-07-01 captures. Related: BL-071 (the surface being occluded)."
+    },
+    {
+      "id": "BL-083",
+      "short_name": "POP_CENTRE_MARKERS",
+      "category": "Canvas",
+      "title": "Population-centre markers \u2014 draw the generated centres as tiered, named settlements",
+      "status": "designed",
+      "glyph": "\u2713",
+      "priority": "A",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-01",
+      "files": [
+        "src/ui/body_surface_canvas.cpp",
+        "src/ui/icons.hpp",
+        "src/ui/icons.cpp",
+        "src/ui/presentation.hpp"
+      ],
+      "authority_doc": "docs/economy/POPULATION.md",
+      "summary": "Visibility-pass cluster (2026-07-01): the world reads as 'Resources with industry shoved on top' because the human layer is invisible. `population_centre_component` is generated (20\u201340/body, scale 1\u20135, `generate_population_centres`) but drawn as NOTHING on the Planetary canvas \u2014 the Population lens tints workforce-efficiency, not centre locations. Draw the centres as tiered, named settlement markers so the world reads as inhabited.",
+      "design": "**Status:** designed \u2014 settled via design Q&A 2026-07-01 (Ben). Presentation-only; no simulation or generation change.\n\n### Problem\nPopulation centres are generated and tracked (`population_centre_component`: scale 1\u20135, population, habitability; `generate_population_centres` places 20\u201340/body with agglomeration weighting) but never rendered as entities. The player sees deposits + their own buildings and nothing of the lived-in economy the industry grew out of \u2014 hence 'Resources with industry shoved on top'.\n\n### Approach \u2014 aggregate + label existing (answer 2026-07-01)\nKeep the generated centres and their workforce/demand grounding **unchanged**; add a **presentation layer** on the Planetary canvas:\n- **Cluster contiguous centres into named conurbations** for display, so 20\u201340 scale-1\u20135 centres read as a legible hierarchy (a handful of cities + towns, not a dust of villages).\n- **Tiered markers** keyed on scale (Outpost\u2192Metropolis) in the `ui::icons` vocabulary; **label only City+** so labels don't clutter.\n- Markers are **always-on chrome** on the surface (not lens-gated) \u2014 part of reading 'where is the civilisation', complementing BL-085's player 'you are here'.\n\n### Open sub-details (non-load-bearing)\n- **Naming source** \u2014 generated per-centre names vs derived from host nation (nation naming already exists in `nation_generation`). Lean: derive from nation + a settlement suffix bank.\n- **Label density threshold** \u2014 City+ is the starting call; tune at promotion.\n\n### Authority\nLands into `docs/economy/POPULATION.md` (centre rendering) with a new glyph catalogued in `docs/ui/ICONS.md` and a cross-note in `docs/ui/CANVASES.md`. Part of the 2026-07-01 visibility-pass cluster (BL-084/085/086).\n\n### Visual language (settled 2026-07-01)\n- The markers **are** the population read \u2014 no separate smooth density field (that role goes to BL-084's industry field, which reads a distinct quantity). 'Field + named anchors' resolves as: BL-083 = anchors, BL-084 = field.\n- **Colour = civic-neutral**, not a corp identity colour (settlements aren't corp-owned; a corp tint would misread as ownership). Markers pick up the **host-nation tint only under the Country lens**; **tier is carried by size/glyph**, keeping colour out of the ownership channel."
+    },
+    {
+      "id": "BL-084",
+      "short_name": "SUBSTRATE_LENS",
+      "category": "Canvas",
+      "title": "Industry-density (substrate) lens \u2014 render the already-live nation-owned substrate",
+      "status": "designed",
+      "glyph": "\u2713",
+      "priority": "B",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-01",
+      "files": [
+        "src/ui/body_surface_canvas.cpp",
+        "src/ui/ui_state.hpp",
+        "src/ui/overlay.cpp",
+        "src/ui/icons.hpp",
+        "src/ui/icons.cpp"
+      ],
+      "authority_doc": "docs/ui/LENSES.md",
+      "summary": "Visibility-pass cluster (2026-07-01): promote the industry-density lens BL-050 deferred ('deferred to v2.0.0, user to flag' \u2014 now flagged). The saturated nation-owned substrate is ALREADY economically live (`substrate_density` \u2192 `nation_substrate` \u2192 `background_supply/demand` injected into market clearing) but invisible \u2014 felt only as market liquidity. Render it as a throughput field so the world reads as saturated. Field model resolved 2026-07-01 (refined-(b)).",
+      "design": "**Status:** designed \u2014 field-model call resolved 2026-07-01 (Ben). Filed 2026-07-01 from the visibility-pass Q&A.\n\n### What already exists (BL-050, shipped)\nThe substrate is mechanically live: per-tile `substrate_density [0,1]`, aggregated to `nation_substrate` per (nation, body), injected each economy tick as `background_supply[]`/`background_demand[]` into per-body market clearing; player buildings claim the `(1 \u2212 density)` headroom. BL-050 explicitly **deferred the visual** ('dedicated industry-density lens deferred to v2.0.0, user to flag'). This item is that promotion \u2014 **rendering only, no economy change**. Fold the now-stale `GENERATION_STRATEGY.md` [B4] 'described, not generated' note on landing.\n\n### Field model \u2014 RESOLVED (refined (b), 2026-07-01)\nThe raw-density collinearity with population (`substrate_density = (1 \u2212 dist/ripple) \u00d7 strength`) is broken by keying the lens to **economic throughput, not density**: render the substrate's **resource-weighted market contribution** \u2014 `background_supply[r]`/`background_demand[r]`, already scaled by per-resource **terrain affinity** \u2014 so industrial intensity varies by terrain and reads 'where the existing *industry* is', distinct from raw headcount (which BL-083's discrete markers carry). The differentiation the specialist-vs-saturated premise wants, delivered as **pure rendering** \u2014 no change to `substrate_density` or the market arithmetic, so no determinism/Full-mode cost. Rejected: (a) one merged density glow (industry adds no signal over population); (b-heavy) re-deriving `substrate_density` with independent industrial character (re-opens market coupling \u2014 only if the throughput field proves too weak).\n\n**Caveat to confirm at promotion:** that `background_supply/demand` is per-tile-derivable in `economy_system.cpp`, not collapsed to a per-body aggregate before render. If aggregated too early, render the equivalent per-tile `substrate_density \u00d7 affinity(resource, terrain)` product directly \u2014 same result.\n\n### Three-layer visual language (cluster)\nSettlements (BL-083, discrete markers) \u00b7 Industry (this item, throughput field) \u00b7 You (BL-085, identity chrome) \u2014 three non-overlapping reads, none redundant. Together they make the world read as populated + industrialised with the player's specialist foothold on top.\n\n### Authority\n`docs/ui/LENSES.md` (adds the industry-density lens to the Supply/Market/Faction/Resource family), glyph in `docs/ui/ICONS.md`. Depends conceptually on BL-050 (shipped). Part of the 2026-07-01 visibility-pass cluster."
+    },
+    {
+      "id": "BL-085",
+      "short_name": "PLAYER_PRESENCE",
+      "category": "Canvas",
+      "title": "Player presence \u2014 always-on 'you are here' identity + home marker + initial focus",
+      "status": "designed",
+      "glyph": "\u2713",
+      "priority": "A",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-01",
+      "files": [
+        "src/ui/body_surface_canvas.cpp",
+        "src/ui/ui_state.hpp",
+        "src/ui/presentation.hpp",
+        "src/app.cpp"
+      ],
+      "authority_doc": "docs/ui/CANVASES.md",
+      "summary": "Visibility-pass cluster (2026-07-01): the player can't tell where they are. Own buildings are distinguished ONLY under the Corporation lens (`palette::selection` outline, body_surface_canvas.cpp); `w.home_body` exists in world data but is never marked, and the campaign doesn't open focused on home. Add an always-on 'you are here'.",
+      "design": "**Status:** designed \u2014 settled via design Q&A 2026-07-01 (Ben). Rendering only; touches no economy.\n\n### Problem\nPlayer identity is lens-gated: buildings get the ownership outline + identity colour only under the Corporation lens; on the default view the player's holdings are indistinguishable, `w.home_body` is never drawn, and the initial camera does not frame home. 'Where am I' is unanswered until the player hunts for a lens.\n\n### Approach \u2014 identity is chrome, above lenses (answer 2026-07-01)\n- **Always-on player-holdings identity** \u2014 the player corp's buildings carry their identity tint/marker on **any** view, not just the Corp lens. Designed to **not fight** the Corp lens's own player outline (that lens owns ownership colour for *all* corps; the always-on layer is the player-only home read). Dedupe the two so a player building under the Corp lens isn't double-drawn.\n- **Persistent home marker** \u2014 a ring/label around the player's starting holdings cluster on the Planetary canvas, and a marker on `home_body` in the Solar canvas.\n- **Initial camera focus** \u2014 the campaign opens framed on `home_body` / the home cluster rather than a neutral default.\n\n### Authority\n`docs/ui/CANVASES.md` (player-identity chrome + home marker across the zoom ladder), cross-note in `docs/ui/LENSES.md` (interaction with the Corp lens). Part of the 2026-07-01 visibility-pass cluster. Related: BL-080 (player corp identity chip reads 'Unnamed Corp').\n\n### Visual language (settled 2026-07-01)\n- **Home marker** = a **ring around the starting holdings cluster** + a distinct **HQ pip** (ring = 'my region', pip = 'my origin'), plus a **halo on `home_body`** in the Solar canvas.\n- **Initial camera** opens on the home surface (`focus_on_surface`), framed on the cluster.\n- **Dedup:** the always-on player accent and the Corporation lens's player outline are the **same** visual, drawn once \u2014 the Corp lens doesn't add a second outline, it extends that identity treatment to rivals."
+    },
+    {
+      "id": "BL-086",
+      "short_name": "AMBIENT_OPPORTUNITY",
+      "category": "Canvas",
+      "title": "Ambient opportunity read \u2014 make the 'where to grow' signal glanceable without arming build mode",
+      "status": "designed",
+      "glyph": "\u2713",
+      "priority": "B",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-01",
+      "files": [
+        "src/ui/body_surface_canvas.cpp",
+        "src/ui/ui_state.hpp",
+        "src/ui/overlay.cpp"
+      ],
+      "authority_doc": "docs/ui/LENSES.md",
+      "summary": "Visibility-pass cluster (2026-07-01): growth signals are build-mode-gated. The Opportunity lens + placement-suitability tint only surface once construction is armed, so 'how do I grow' isn't answerable from the map at rest. Make the opportunity read glanceable without arming build mode. Complements BL-071 (which answers it on the selected-tile/panel side).",
+      "design": "**Status:** designed \u2014 settled via design Q&A 2026-07-01 (Ben). Surfacing only; reuses the computed opportunity/margin estimate, no new mechanics.\n\n### Problem\nThe suitability tint and per-tile margin (Opportunity lens, `body_surface_canvas.cpp`) exist but mostly surface *after* a building type is armed. BL-071 makes the selected-tile affordances always-on (panel/hover side); this item is the **ambient-map side** the same Q&A asked for \u2014 the map itself should read 'where value can be made' at rest.\n\n### Approach \u2014 ambient map layer (answer 2026-07-01)\n- Make the **Opportunity read glanceable without arming build mode** \u2014 the diverging profit/loss margin tint readable as a normal lens selection (or a soft always-available read), so the player sees growth headroom directly on the terrain.\n- Consider **opening the campaign with the Opportunity read active** (cheapest surfacing) \u2014 confirm at promotion vs. leaving it a manual lens pick.\n\n### Authority\n`docs/ui/LENSES.md` (Opportunity lens surfacing). Complements BL-071 (selected-tile affordances) \u2014 the map-side vs panel-side halves of the same 'how do I grow' gap. Part of the 2026-07-01 visibility-pass cluster."
     }
   ]
 }
