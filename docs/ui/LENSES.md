@@ -469,8 +469,11 @@ reads "Market scarcity" (met → scarce).
 ## Placement-suitability surface *(BL-010 — not a strip lens)*
 
 **Intent.** A siting aid: while a build is **armed**, every other tile is tinted by how well the
-**armed building** would do there — *where can this go, and where is it best?* It is **not** an
-`overlay_mode` and never appears in the strip; it is an additive surface in
+**armed building** would do there — *where can this go, and where is it best?* Its **inverse** is
+the selected-tile affordance readout (BL-071, `SELECTION.md`): *given this tile, which buildings?*
+— always-on, no arming required. The two share the `placement_rules` seam; this surface is the
+map-wide "which tiles for a building", the readout is the per-tile "which buildings for a tile".
+It is **not** an `overlay_mode` and never appears in the strip; it is an additive surface in
 [`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp) that composites over whatever the
 active strip lens already drew.
 

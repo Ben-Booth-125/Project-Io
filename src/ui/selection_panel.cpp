@@ -15,10 +15,91 @@
 #include <imgui.h>
 
 #include <algorithm> // std::max (bar-width clamp)
+#include <string>    // affordance-row labels (BL-071)
+#include <utility>   // std::move
+#include <vector>    // affordance groupings (BL-071)
 
 namespace ui {
 
 namespace {
+
+// --- Selected-tile affordance readout (BL-071) -------------------------------
+// The inverse of the placement-suitability surface: given a *tile*, which building
+// types suit it? Always-on for any selected tile (docs/ui/SELECTION.md), so the
+// player can read a tile before arming a building. Shows the tile's territory owner
+// and a thrives / valid / invalid grouping over the prototype-buildable types,
+// reading the same placement_rules seam the build front door and the armed hover
+// card use.
+void draw_tile_affordances(const world& w, entity_id tile_id)
+{
+    const auto tit = w.tiles.find(tile_id);
+    if (tit == w.tiles.end())
+        return;
+    const tile_component& tc = tit->second;
+
+    ImGui::Separator();
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Suited for");
+
+    // Territory owner: the nation whose territory contains this tile, if any.
+    const char* territory = "unclaimed";
+    for (const auto& [nid, nc] : w.nations)
+    {
+        bool found = false;
+        for (entity_id t : nc.tiles)
+            if (t == tile_id) { found = true; break; }
+        if (found) { territory = nc.name.c_str(); break; }
+    }
+    ImGui::TextDisabled("Territory: %s", territory);
+
+    struct fit { std::string label; const char* reason; };
+    std::vector<fit> thrives, valid, invalid;
+
+    // Extraction: one entry per extractable resource actually deposited here; a
+    // rich deposit 'thrives', a thinner one is merely 'valid'. When nothing
+    // extractable is present, a single invalid line names the reason.
+    bool any_ext = false;
+    for (const resource_type r : placement_rules::k_extractable)
+    {
+        const float dep = tc.resource_deposit[static_cast<std::size_t>(r)];
+        if (dep <= 0.0f)
+            continue;
+        any_ext = true;
+        fit f{std::string("Extraction: ") + resource_name(r), nullptr};
+        if (dep >= 0.6f) thrives.push_back(std::move(f));
+        else             valid.push_back(std::move(f));
+    }
+    if (!any_ext)
+        invalid.push_back({"Extraction",
+            placement_rules::placement_reason_text(placement_rules::placement_reason::no_deposit)});
+
+    // Processing facility + Port: the world-level check (a port needs a coast).
+    const auto classify = [&](building_type type, const char* label) {
+        const placement_rules::placement_result pr =
+            placement_rules::can_place_in_world(w, tile_id, type, resource_type::iron_ore);
+        if (pr) valid.push_back({label, nullptr});
+        else    invalid.push_back({label, pr.message()});
+    };
+    classify(building_type::processing_facility, "Processing facility");
+    classify(building_type::port, "Port");
+
+    // Render the three groups; skip an empty group. Only 'invalid' carries a reason.
+    const auto group = [](const char* head, const ImVec4& col,
+                          const std::vector<fit>& rows, bool with_reason) {
+        if (rows.empty())
+            return;
+        ImGui::TextColored(col, "%s", head);
+        for (const fit& f : rows)
+        {
+            if (with_reason && f.reason)
+                ImGui::BulletText("%s - %s", f.label.c_str(), f.reason);
+            else
+                ImGui::BulletText("%s", f.label.c_str());
+        }
+    };
+    group("Thrives", ImVec4{0.55f, 0.90f, 0.55f, 1.0f}, thrives, false);
+    group("Valid",   ImVec4{0.80f, 0.80f, 0.80f, 1.0f}, valid,   false);
+    group("Invalid", ImVec4{0.90f, 0.55f, 0.55f, 1.0f}, invalid, true);
+}
 
 // BL-069: population-centre scale label (1–5 → village … metropolis).
 const char* scale_label(int scale)
@@ -50,9 +131,15 @@ void draw_build_front_door(const world& w, const recipe_registry& reg,
     ImGui::Separator();
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Build here");
 
-    if (placement_rules::is_ocean_tile(tc.composition))
+    // A whole-tile blocker (ocean) means no building type is offerable here; show
+    // the reason-code text rather than a bare hardcoded string (BL-071). A generic
+    // non-extraction building surfaces the tile-level verdict.
+    if (const placement_rules::placement_result r =
+            placement_rules::can_place(tc, building_type::processing_facility,
+                                       resource_type::iron_ore);
+        !r)
     {
-        ImGui::TextDisabled("Cannot build on water.");
+        ImGui::TextDisabled("%s.", r.message());
         return;
     }
 
@@ -521,7 +608,12 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
                       ImGuiWindowFlags_NoSavedSettings);
     draw_lens_supplement(w, reg, report, ui, kind);
     if (kind == selection_kind::tile)
+    {
+        // BL-071: always-on "what is this tile good for?" readout (the inverse of
+        // the placement-suitability surface), above the "build here" front door.
+        draw_tile_affordances(w, ui.selected_entity);
         draw_build_front_door(w, reg, ui, ui.selected_entity);
+    }
     else if (kind == selection_kind::body)
         draw_survey_section(w, ui, ui.selected_entity);
     else if (kind == selection_kind::building && is_player_owned(w, ui.selected_entity))
