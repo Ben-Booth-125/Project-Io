@@ -4377,6 +4377,15 @@
             "visual: scripts/verify/start_framing.lua 'start_default' (wash + ring at plain default), 'start_under_production_lens' (ring persists over a value fill, wash suppressed), 'start_under_corp_lens' (unchanged blue fill + bright ring)"
           ],
           "notes": "Ring colour: player identity colour generally; the bright selection accent under the Corporation lens (where the fill is already the player colour). Selection highlight is a separate pass drawn on top, so it still outranks the ownership ring."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "The top-left player identity card (draw_profile_panel) reads live from the player corporation instead of the hardcoded 'Unnamed Corp' placeholder: the real generated corp name, 'Parent: <home nation name>', and 'Focus: <industrial focus>'. The dead 'Standing' line is dropped (reputation is not modeled yet). Falls back to placeholders only if the player corp lookup fails.",
+          "verification": [
+            "visual: scripts/verify/start_framing.lua 'start_default' capture shows the real corp name / parent nation / focus in the top-left card"
+          ],
+          "notes": "Data already existed (corporation_component.name/home_nation/focus, set at generation); this was pure display wiring. Known minor: long nation names clip at the fixed 200px panel width - ellipsis/width is a follow-up."
         }
       ]
     }

@@ -1180,7 +1180,7 @@ void app::render()
     }
 
     // Corporation profile — top-left corner, above the navigation pane.
-    ui::draw_profile_panel();
+    ui::draw_profile_panel(m_world);
 
     // Budget + resource header — spans the top between the profile and the
     // time column, clear of both. Starts at the profile's right edge (the profile
