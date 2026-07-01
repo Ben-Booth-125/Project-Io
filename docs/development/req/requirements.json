@@ -4329,6 +4329,56 @@
           ]
         }
       ]
+    },
+    {
+      "batch": "v0.0.9",
+      "brief": "main-menu",
+      "title": "Main menu at launch - New Game / Quit entry screen (QOL)",
+      "promoted_from": "direct request (2026-07-01 QOL sweep)",
+      "difficulty": 2,
+      "importance": "B",
+      "status": "complete",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "Launch (app::run) opens on a centred main-menu screen (title 'PROJECT IO' + New Game / Quit), with no world, economy, or sim clock built yet. 'New Game' calls start_new_game() - reset sim clock, setup_world, load_economy, pre-game warm start - and switches to the in-game screen; 'Quit' exits. run_verify() jumps straight to in_game so existing checks are unaffected; the menu is capturable via verify.show_menu.",
+          "verification": [
+            "visual: scripts/verify/main_menu.lua capture (verify.show_menu re-enters the menu)",
+            "manual: launch ProjectIo, click New Game, confirm transition into the world (confirmed live this session)"
+          ],
+          "notes": "No Load/Save - deliberately out of scope for the prototype (no saving yet). Menu folded into render()'s single capture/present tail so it is golden-verifiable."
+        }
+      ]
+    },
+    {
+      "batch": "v0.0.9",
+      "brief": "start-framing",
+      "title": "Campaign-start framing - open on the player HQ + persistent lens-independent ownership accent (QOL / visibility)",
+      "promoted_from": "direct request (2026-07-01 QOL sweep); relates to the visibility strand (BL-083-086)",
+      "difficulty": 2,
+      "importance": "A",
+      "status": "complete",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "The Planetary surface opens framed on the player's holdings: setup_world centres the view on the centroid of the player corp's buildings on the start body and zooms to a regional framing (planetary_zoom 11). Falls back to the default whole-surface view when the player has no building there. A deliberate focus_on_surface (navigation) cancels the pending recentre (planetary_center_pending) so the start framing never bleeds into later navigation.",
+          "verification": [
+            "visual: scripts/verify/start_framing.lua 'start_default' capture (no goto - keeps the queued HQ framing)"
+          ],
+          "notes": "Shared by run() (via start_new_game) and run_verify(); a script that goto_surface-es first gets standard framing because focus_on_surface now clears the pending centre."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "Player-owned tiles carry a persistent, lens-independent ownership accent: a subtle player-colour wash at the plain default (overlay none), plus a player-colour outline drawn under EVERY lens so 'these are mine' never disappears when a lens is picked. Rival tiles carry no ring. The wash is suppressed under any active lens (the outline carries identity there, without fighting the lens fill). The Corporation lens is unchanged - player tiles filled blue with the bright selection-accent ring.",
+          "verification": [
+            "visual: scripts/verify/start_framing.lua 'start_default' (wash + ring at plain default), 'start_under_production_lens' (ring persists over a value fill, wash suppressed), 'start_under_corp_lens' (unchanged blue fill + bright ring)"
+          ],
+          "notes": "Ring colour: player identity colour generally; the bright selection accent under the Corporation lens (where the fill is already the player colour). Selection highlight is a separate pass drawn on top, so it still outranks the ownership ring."
+        }
+      ]
     }
   ]
 }

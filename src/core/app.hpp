@@ -64,6 +64,17 @@ private:
 
     void render();
 
+    /// Draw the main menu — the deliberate entry point shown at launch (no world
+    /// loaded yet). Wires the "New Game" button to start_new_game() and "Quit" to
+    /// m_quit_requested. Called from render() when m_screen == menu; folded into
+    /// render()'s single capture path so the menu is golden-verifiable.
+    void draw_main_menu();
+
+    /// Start a fresh campaign from the menu: reset the sim clock, build the world,
+    /// load the economy, run the pre-game warm start, and switch to the in-game
+    /// screen. Everything run() used to do inline before its loop.
+    void start_new_game();
+
     /// Build the prototype world and frame the opening view. Shared by run() and
     /// run_verify() so both start from the same deterministic state.
     void setup_world();
@@ -116,6 +127,13 @@ private:
     void save_settings() const;
     /// Apply m_settings to the live SDL window + renderer (size, fullscreen, vsync).
     void apply_display_settings();
+
+    /// Which top-level screen is active. run() opens on the menu; run_verify()
+    /// jumps straight to in_game (the harness renders the live world, not the menu,
+    /// unless a script asks for it via verify.show_menu).
+    enum class app_screen { menu, in_game };
+    app_screen m_screen = app_screen::menu;
+    bool       m_quit_requested = false;  ///< Set by the menu's Quit button; breaks the run() loop.
 
     SDL_Window*   m_window   = nullptr;
     SDL_Renderer* m_renderer = nullptr;

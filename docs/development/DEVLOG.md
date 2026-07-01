@@ -6,6 +6,51 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — QOL: main menu + campaign-start framing/legibility (2026-07-01)
+
+**Context.** Two QOL asks from Ben: (1) add a **main menu** so launch has a deliberate entry point
+(no saving in scope yet); (2) fix the **default framing** — on open it's unclear *who you are* and
+*where you are*. Grounded first with a headless open→build-a-building walkthrough
+(`scripts/verify/build_walkthrough.lua`): the friction is almost entirely the first two steps — you
+drop onto an unframed world with no identity cue. Directly addresses the "(A) where is the player"
+half of the visibility strand (BL-083–086) below.
+
+**Main menu (`app.cpp`/`app.hpp`).** Added an `app_screen { menu, in_game }` state; `run()` opens
+on `menu` and defers world/economy/warm-start into a new `start_new_game()` fired by the **New Game**
+button (so nothing simulates behind the menu and the sim clock rebases to when play starts). **Quit**
+sets `m_quit_requested`. The menu is folded into `render()`'s single Render/clear/capture tail so it
+is golden-verifiable; `run_verify()` sets `in_game` up front (existing checks unaffected) and a new
+`verify.show_menu` hook re-enters it for capture. `handle_key_down` ignores game bindings while on the
+menu. Live New Game → in-game transition confirmed by Ben clicking it mid-session.
+
+**Campaign-start framing + persistent ownership accent** (`app.cpp`, `body_surface_canvas.cpp`,
+`view_nav.cpp`). Per two design calls (framing on HQ; persistent accent, keep lens `none`):
+- **Frame on HQ:** `setup_world` centres the opening Planetary view on the centroid of the player
+  corp's buildings on the start body (zoom 11), falling back to whole-surface if none.
+- **Persistent, lens-independent player accent:** player-owned tiles get a subtle player-colour wash
+  at the plain default *and* a player-colour outline drawn under **every** lens (was Corporation-lens
+  only), so "these are mine" never disappears. Wash suppressed under any active lens; Corporation lens
+  unchanged (blue fill + bright selection ring). Rivals carry no ring.
+- **`focus_on_surface` now clears `planetary_center_pending`** — a deliberate navigation cancels the
+  queued start-framing, so it can't bleed into later `goto_surface` (kept the harness's other goldens
+  from shifting).
+
+**Verification.** New golden checks `scripts/verify/main_menu.lua` and `scripts/verify/start_framing.lua`
+(6 captures) blessed and passing at 0.0000%. Requirement groups `main-menu` and `start-framing` added
+to `req/requirements.json` (both complete).
+
+**In-session decisions.**
+- *No Load/Save on the menu* — deliberately out of prototype scope (Ben: "won't need saving right
+  now"). New Game / Quit only.
+- *Accent = wash + outline, not a new HQ glyph.* Kept the change contained to the existing tile
+  fill/border passes; a dedicated HQ pin and **naming the corp** ("Unnamed Corp / Parent: ? /
+  Standing: ?") are noted as easy follow-ups, not done unprompted.
+
+**Open items.**
+- Corp identity is still "Unnamed Corp" — even perfect framing leaves you nameless. Small follow-up.
+- Start framing uses a fixed zoom (11) and a naive centroid (fine for the clustered prototype start;
+  revisit if holdings ever straddle the horizontal wrap seam).
+
 ## Session — Visibility pass: design Q&A → backlog cluster (2026-07-01)
 
 **Context.** Design session (advisor mode, **no `src/` change** — backlog only) on the "visibility

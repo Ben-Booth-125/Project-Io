@@ -202,39 +202,23 @@ int app::run()
 
     m_lua.load("scripts/init.lua");
 
-    // Apply Lua config now that the script has run. Constructing a fresh
-    // sim_loop here resets its internal timer to the current wall clock, which
-    // is the right start point — not app construction time.
-    {
-        sol::table cfg = m_lua.state()["config"];
-        m_sim_loop = sim_loop();
-        m_sim_loop.set_speed(cfg.get_or("default_speed", 1));
-    }
-
-    setup_world();
-    load_economy();
-
-    // Pre-game warm start ([C3] pre-game profit): seed the balance history with the
-    // opening capital, then run the real economy loop forward a notional operating
-    // history before the first frame, so every corp opens onto non-empty pools,
-    // moved balances, and live market figures rather than a cold zero state. Run
-    // here (after load_economy) so it reuses the loaded registry rather than a
-    // duplicated one; run_verify stays deterministically cold and does not warm up.
-    // ~3 in-game years of quarterly econ ticks — long enough for a plausible history,
-    // short enough not to diverge under the prototype's un-tuned economy.
-    constexpr int pre_game_ticks = 12;
-    {
-        const auto pit = m_world.corporations.find(m_world.player_entity);
-        ui::push_capped(m_balance_history,
-            pit != m_world.corporations.end() ? pit->second.balance : 0.0f);
-    }
-    for (int t = 0; t < pre_game_ticks; ++t)
-        step_economy();
+    // Open on the main menu — the deliberate entry point. The world, economy, and
+    // sim clock are not built until the player picks "New Game" (start_new_game),
+    // so nothing simulates behind the menu and the clock starts when play does.
+    m_screen = app_screen::menu;
 
     bool running = true;
-    while (running)
+    while (running && !m_quit_requested)
     {
         process_events(running);
+
+        // On the menu, nothing simulates — just pump events and draw the menu.
+        if (m_screen == app_screen::menu)
+        {
+            render();
+            continue;
+        }
+
         m_sim_loop.tick();
 
         // Advance orbital motion by the in-game days elapsed this frame. Freezes
@@ -269,6 +253,40 @@ int app::run()
     // saved on change). Fullscreen: keep the last windowed size, don't overwrite it.
     save_settings();
     return 0;
+}
+
+void app::start_new_game()
+{
+    // Reset the sim clock so the campaign starts now, not at app construction —
+    // constructing a fresh sim_loop rebases its internal timer to the current wall
+    // clock. Speed comes from the Lua config loaded by init.lua in run().
+    {
+        sol::table cfg = m_lua.state()["config"];
+        m_sim_loop = sim_loop();
+        m_sim_loop.set_speed(cfg.get_or("default_speed", 1));
+    }
+
+    setup_world();
+    load_economy();
+
+    // Pre-game warm start ([C3] pre-game profit): seed the balance history with the
+    // opening capital, then run the real economy loop forward a notional operating
+    // history before the first frame, so every corp opens onto non-empty pools,
+    // moved balances, and live market figures rather than a cold zero state. Run
+    // here (after load_economy) so it reuses the loaded registry rather than a
+    // duplicated one; run_verify stays deterministically cold and does not warm up.
+    // ~3 in-game years of quarterly econ ticks — long enough for a plausible history,
+    // short enough not to diverge under the prototype's un-tuned economy.
+    constexpr int pre_game_ticks = 12;
+    {
+        const auto pit = m_world.corporations.find(m_world.player_entity);
+        ui::push_capped(m_balance_history,
+            pit != m_world.corporations.end() ? pit->second.balance : 0.0f);
+    }
+    for (int t = 0; t < pre_game_ticks; ++t)
+        step_economy();
+
+    m_screen = app_screen::in_game;
 }
 
 void app::load_economy()
@@ -367,6 +385,41 @@ void app::setup_world()
     // Routed through the shared focus helper rather than poking ui_state.
     ui::focus_on_surface(m_world, m_ui, start_body);
 
+    // Frame the opening view on the player's holdings so "where am I" is answered
+    // the moment the surface appears, rather than dropping the player onto the whole
+    // surface with their few tiles lost in it. Centre on the centroid of the player
+    // corp's buildings that sit on the start body and zoom in to a regional framing;
+    // if the player has no building there, keep the default whole-surface view.
+    // Consumed by body_surface_canvas on its next draw; a later focus_on_surface
+    // (deliberate navigation) cancels it via planetary_center_pending.
+    {
+        const auto pit = m_world.corporations.find(m_world.player_entity);
+        if (pit != m_world.corporations.end())
+        {
+            long long sum_col = 0, sum_row = 0;
+            int n = 0;
+            for (entity_id bld_id : pit->second.assets)
+            {
+                const auto bit = m_world.buildings.find(bld_id);
+                if (bit == m_world.buildings.end())
+                    continue;
+                const auto tit = m_world.tiles.find(bit->second.tile);
+                if (tit == m_world.tiles.end() || tit->second.body != start_body)
+                    continue;
+                sum_col += tit->second.grid_x;
+                sum_row += tit->second.grid_y;
+                ++n;
+            }
+            if (n > 0)
+            {
+                m_ui.planetary_center_col     = static_cast<int>(sum_col / n);
+                m_ui.planetary_center_row     = static_cast<int>(sum_row / n);
+                m_ui.planetary_center_pending = true;
+                m_ui.planetary_zoom           = 11.0f;
+            }
+        }
+    }
+
     // Open on plain terrain — no lens imposed at campaign start. A click only ever
     // updates the Selection element; it never re-skins the canvas, so the canvas
     // should likewise start unskinned and let the player pick a lens deliberately
@@ -389,6 +442,10 @@ int app::run_verify(const std::string& script_path, bool bless)
     setup_world();
     load_economy();
     m_sim_loop.set_speed(0);
+
+    // The harness renders the live world, not the main menu — flip past the launch
+    // screen. A menu-verification script re-enters the menu with verify.show_menu.
+    m_screen = app_screen::in_game;
 
     // Golden-image diffing: goldens live in a "golden" directory beside the verify
     // script, so running against the source script path (the skill's iteration
@@ -473,6 +530,12 @@ int app::run_verify(const std::string& script_path, bool bless)
     // Open/close a ledger panel by name — lets a lens check run econ ticks (which
     // open the economy panel) and then clear it so the panel does not obscure the
     // canvas capture. Unknown names are ignored.
+    // Re-enter (or leave) the main menu so a verify script can capture the launch
+    // screen — the harness otherwise starts past it, in-game.
+    v.set_function("show_menu", [this](bool on) {
+        m_screen = on ? app_screen::menu : app_screen::in_game;
+    });
+
     v.set_function("show_panel", [this](const std::string& name, bool open) {
         if (name == "economy")           m_ui.show_economy_panel = open;
         else if (name == "construction") m_ui.show_construction_panel = open;
@@ -796,6 +859,10 @@ void app::handle_key_down(const SDL_KeyboardEvent& key)
         return;
     }
 
+    // No game bindings while on the main menu — there is no world to navigate.
+    if (m_screen == app_screen::menu)
+        return;
+
     // All other bindings are suppressed while ImGui owns the keyboard.
     if (ImGui::GetIO().WantCaptureKeyboard)
         return;
@@ -845,11 +912,69 @@ void app::dispatch_action(ui::canvas_command cmd)
     }
 }
 
+void app::draw_main_menu()
+{
+    const ImVec2 disp = ImGui::GetIO().DisplaySize;
+
+    // A dark, centred title card. Borderless, non-interactive-move window sized to
+    // its contents; buttons carry the only input. Kept deliberately spare — this is
+    // the launch entry point, not a settings hub (no Load/Save in the prototype).
+    ImGui::SetNextWindowPos({disp.x * 0.5f, disp.y * 0.5f}, ImGuiCond_Always, {0.5f, 0.5f});
+    constexpr ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_AlwaysAutoResize |
+        ImGuiWindowFlags_NoBackground;
+    if (ImGui::Begin("##main_menu", nullptr, flags))
+    {
+        // Title, centred over the button column.
+        const char* title = "PROJECT IO";
+        const char* tag   = "Near-future corporate 4X";
+        auto centre_text = [&](const char* s, ImU32 col) {
+            const float w = ImGui::CalcTextSize(s).x;
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (280.0f - w) * 0.5f);
+            ImGui::PushStyleColor(ImGuiCol_Text, col);
+            ImGui::TextUnformatted(s);
+            ImGui::PopStyleColor();
+        };
+        centre_text(title, IM_COL32(225, 230, 240, 255));
+        centre_text(tag,   IM_COL32(120, 128, 145, 255));
+        ImGui::Dummy({0.0f, 18.0f});
+
+        const ImVec2 btn = {280.0f, 40.0f};
+        if (ImGui::Button("New Game", btn))
+            start_new_game();
+        ImGui::Dummy({0.0f, 6.0f});
+        if (ImGui::Button("Quit", btn))
+            m_quit_requested = true;
+    }
+    ImGui::End();
+}
+
 void app::render()
 {
     ImGui_ImplSDLRenderer3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
+
+    // Main menu — drawn instead of the canvases when no game is loaded. Shares the
+    // Render/clear/capture tail below so the menu is capturable like any frame.
+    if (m_screen == app_screen::menu)
+    {
+        draw_main_menu();
+
+        ImGui::Render();
+        SDL_SetRenderDrawColor(m_renderer, 15, 15, 20, 255);
+        SDL_RenderClear(m_renderer);
+        ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer);
+        if (m_capture_requested)
+        {
+            save_screenshot();
+            m_capture_requested = false;
+        }
+        SDL_RenderPresent(m_renderer);
+        return;
+    }
 
     // Live-mode mouse feed: copy the real OS cursor into ui_state so canvases read
     // a single app-owned source (BL-061). Skipped in --verify (m_golden_dir set) so
