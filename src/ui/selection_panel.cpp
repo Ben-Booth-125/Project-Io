@@ -5,6 +5,7 @@
 #include "selection.hpp"
 #include "view_nav.hpp"
 
+#include "world/building_profit.hpp" // per-building profitability estimate (BL-074)
 #include "world/economy_system.hpp" // economy_report (workforce cap, BL-069)
 #include "world/market_clearing.hpp"
 #include "world/placement_rules.hpp"
@@ -356,6 +357,48 @@ void draw_lens_supplement(const world& w, const recipe_registry& reg,
     }
 }
 
+// Per-building profitability readout (BL-074): the selected player building's
+// estimated net per-tick contribution and its component lines. Realised last-tick
+// figures; revenue/inputs are estimates (the pooled market resists exact per-building
+// attribution — see building_profit.hpp).
+void draw_building_profit(const world& w, const recipe_registry& reg,
+                          const economy_report& report, entity_id id)
+{
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
+                       "Profitability (est. / tick)");
+
+    const building_profit p = estimate_building_profit(w, reg, report, id);
+    if (!p.has_data)
+    {
+        ImGui::TextDisabled("Run an economy tick to estimate.");
+        return;
+    }
+
+    // Paired two-column layout — four component cells over two rows, then Net —
+    // so revenue/inputs/wages/maintenance + net all fit the fixed bar height.
+    const float v1 = 68.0f, l2 = 150.0f, v2 = 210.0f;
+    const auto val = [](float value, ImU32 col)
+    { ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(col), "%+.2f", value); };
+    const auto pair = [&](const char* la, float va, ImU32 ca,
+                          const char* lb, float vb, ImU32 cb)
+    {
+        ImGui::TextUnformatted(la);      ImGui::SameLine(v1); val(va, ca);
+        ImGui::SameLine(l2);
+        ImGui::TextUnformatted(lb);      ImGui::SameLine(v2); val(vb, cb);
+    };
+
+    pair("Revenue", +p.revenue,    palette::positive,
+         "Inputs",  -p.input_cost, palette::negative);
+    pair("Wages",   -p.wages,      palette::negative,
+         "Maint",   -p.maintenance,palette::negative);
+
+    const float net = p.net();
+    const ImU32 nc = (net < 0.0f) ? palette::negative
+                   : (net > 0.0f) ? palette::positive
+                                  : palette::neutral;
+    ImGui::TextUnformatted("Net");   ImGui::SameLine(v1); val(net, nc);
+}
+
 void draw_selection_panel(const world& w, const recipe_registry& reg,
                           const economy_report& report, ui_state& ui,
                           float left_x, float right_x, float bottom_y)
@@ -473,6 +516,8 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
         draw_build_front_door(w, reg, ui, ui.selected_entity);
     else if (kind == selection_kind::body)
         draw_survey_section(w, ui, ui.selected_entity);
+    else if (kind == selection_kind::building && is_player_owned(w, ui.selected_entity))
+        draw_building_profit(w, reg, report, ui.selected_entity); // BL-074
     ImGui::EndChild();
 
     ImGui::EndGroup();

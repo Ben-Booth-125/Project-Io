@@ -4292,7 +4292,9 @@
       "title": "Per-building profitability readout — unit economics in the Selection panel (BL-074)",
       "difficulty": 4,
       "importance": "A",
-      "status": "pending",
+      "status": "complete",
+      "resolved": "2026-07-01",
+      "resolution": "estimate_building_profit (building_profit.hpp) values this tick's reported output/inputs at the tile's current market price and reads maintenance+wages from the shared compute_building_opex helper extracted from apply_budget (bit-exact — econ_bankruptcy still 64485.92). Section B of the Selection bar shows Revenue / Inputs / Wages / Maint + Net for a selected player building, in a paired two-column layout that fits the fixed bar height. Verified via building_profit.lua: Revenue +126.50, Inputs -5.23, Wages -2.40, Maint -10.00, Net +108.86 (Maint 10/tick == econ_bankruptcy 40/yr ÷ 4, confirming the shared formula).",
       "promoted_from": "backlog.json § BL-074",
       "batch": "v0.0.9",
       "rows": [
@@ -4300,10 +4302,11 @@
           "id": "R1",
           "requirement": "Selecting a player building shows its estimated net per-tick contribution and the component lines (revenue = output×price, input cost, wages, maintenance), estimated from building_report + recipe + current market price — no threading of building id through clear_markets. Realised last-tick figures.",
           "verification": [
-            "visual: scripts/verify/building_management.lua golden (extended)"
+            "visual: scripts/verify/building_profit.lua capture"
           ],
-          "status": "pending",
-          "notes": ""
+          "status": "complete",
+          "result_metric": "Capture shows Revenue +126.50 / Inputs -5.23 / Wages -2.40 / Maint -10.00 / Net +108.86 for a player Processing Facility; no building id threaded through clear_markets.",
+          "notes": "Golden not blessed (software renderer unavailable on this box); eyeball-verified. Maint 10.00 == econ_bankruptcy 40/yr ÷ 4 confirms the shared opex formula."
         }
       ]
     },

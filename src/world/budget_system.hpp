@@ -18,6 +18,30 @@
 /// can never drift. Interest is a pure function of balance × rate (deterministic).
 inline constexpr float k_debt_interest_per_quarter = 0.02f;
 
+/// Per-building operating cost for one tick (BL-074): the maintenance and wage
+/// components apply_budget charges. Extracted as the single source of the formula so
+/// the per-building profitability estimate (building_profit.hpp) computes the same
+/// numbers the live budget loop does — no drift.
+struct building_opex
+{
+    float maintenance = 0.0f;
+    float wages       = 0.0f;
+};
+
+/// Compute a building's maintenance + wages for one tick. `contention_scalar` is the
+/// (corp, body) labour throttle (1.0 uncontended); `mean_hab` is the body's mean
+/// population habitability (clamped to [0.1, 2.0] internally, exactly as the budget
+/// loop does). Decommissioned buildings pay only fixed material maintenance, no wages.
+building_opex compute_building_opex(const building_component& b,
+                                    const building_economics& e,
+                                    float contention_scalar,
+                                    float mean_hab);
+
+/// Mean population-centre habitability on a body (BL-074 helper): the average of every
+/// population centre's habitability whose tile sits on `body`, or 1.0 when the body has
+/// none. Unclamped — callers clamp as needed (compute_building_opex does).
+float body_mean_habitability(const world& w, entity_id body);
+
 /// Apply one economy tick's money loop to every corporation balance:
 ///   balance += income − expenditure − maintenance − wages
 /// where income/expenditure are the market cash flows (goods sold / inputs bought
@@ -25,7 +49,7 @@ inline constexpr float k_debt_interest_per_quarter = 0.02f;
 /// are `effective_workforce × base_wage` per building, where effective workforce is
 /// the requested target throttled by the (corp, body) labour-pool contention scalar
 /// (a building pays for the labour it actually used, not its target). Balances may go
-/// negative (no insolvency consequence in the prototype).
+/// negative; a negative balance then accrues debt interest (BL-073).
 ///
 /// @param w          World; corporation balances are mutated.
 /// @param reg        Loaded registry (maintenance / wage constants per building type).
