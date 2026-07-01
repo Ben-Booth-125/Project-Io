@@ -87,6 +87,16 @@ void draw_header_panel(const world& w,
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(col), "%s", fmt::credits(balance).c_str());
     }
 
+    // BL-073: explicit in-debt affordance — a negative balance is now self-
+    // accelerating (interest accrues each quarter), so flag it plainly rather than
+    // relying on the red number alone.
+    if (balance < 0.0f)
+    {
+        ImGui::SameLine();
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative),
+                           "[in debt - interest accruing]");
+    }
+
     // --- Estimated stockpile valuation ---
     ImGui::SameLine();
     ImGui::TextDisabled("   |   STOCKPILE");

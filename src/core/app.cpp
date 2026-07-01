@@ -541,6 +541,16 @@ int app::run_verify(const std::string& script_path, bool bless)
         }
     });
 
+    // Force the player corp balance to an exact value (verify harness): lets a
+    // script stage a debt scenario so the BL-073 interest charge and the in-debt
+    // affordances (header badge + breakdown interest line) render deterministically.
+    // Non-economic — it only moves the number; the next econ tick charges interest.
+    v.set_function("set_balance", [this](float value) {
+        const auto it = m_world.corporations.find(m_world.player_entity);
+        if (it != m_world.corporations.end())
+            it->second.balance = value;
+    });
+
     // Data accessor: return every corporation building as a Lua array of
     // {corp, player, body, x, y} records, so a script (or the lib's
     // tour_buildings helper) can centre/capture each one without hard-coding

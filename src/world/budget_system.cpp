@@ -93,6 +93,17 @@ void apply_budget(world& w,
         }
 
         cc.balance += delta; // bit-identical to the pre-BL-072 arithmetic; may go negative
+
+        // BL-073: debt interest. Charged once per tick on the balance that is now
+        // negative (the outstanding debt after this tick's operating flows), so a
+        // corp underwater compounds its decline. Pure function of balance × the
+        // fixed rate — deterministic, no wall-clock. Zero while solvent.
+        if (cc.balance < 0.0f)
+        {
+            bud.interest = -cc.balance * k_debt_interest_per_quarter;
+            cc.balance  -= bud.interest;
+        }
+
         if (breakdown)
             (*breakdown)[corp] = bud;
     }

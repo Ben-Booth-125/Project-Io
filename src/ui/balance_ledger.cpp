@@ -104,7 +104,8 @@ void draw_balance_ledger(const world& w, const economy_report& report,
     if (cc.balance < 0.0f)
     {
         ImGui::SameLine();
-        ImGui::TextDisabled("(insolvent — no consequence in prototype)");
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative),
+                           "(in debt - interest accruing)");
     }
 
     // --- Cashflow (BL-072): the itemised per-tick flows apply_budget now retains. ---
@@ -188,8 +189,10 @@ void draw_balance_ledger(const world& w, const economy_report& report,
                                "Runway: ~%.0f quarters (%.1f yr) at current burn",
                                quarters, quarters / 4.0f);
         }
-        if (player && balance_history.size() >= 2)
+        if (player && balance_history.size() >= 2 && cc.balance >= 0.0f)
         {
+            // The smoothed-burn note only applies to the burn-based runway, not the
+            // flat "in debt" read.
             ImGui::SameLine();
             ImGui::TextDisabled("(smoothed)");
         }

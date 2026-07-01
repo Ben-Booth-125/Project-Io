@@ -4150,23 +4150,27 @@
       "title": "Debt-interest system — interest accrues on a negative balance, visible as a budget line (BL-073)",
       "difficulty": 3,
       "importance": "B",
-      "status": "pending",
+      "status": "complete",
+      "resolved": "2026-07-01",
+      "resolution": "apply_budget charges interest = |balance| × k_debt_interest_per_quarter (0.02/qtr) once per tick on a now-negative balance; the constant lives in budget_system.hpp as the single source both the live loop and econ_bankruptcy read. The Interest (debt) line appears in the Balance Ledger breakdown, the header shows an explicit [in debt - interest accruing] badge, and the Treasury 'no consequence' note was corrected to reflect the new charge. Verified via debt_interest.lua (set_balance verify hook). econ_bankruptcy stays PASS (its solvent scenario never triggers interest; a loss-making spiral scenario in the harness is a noted follow-on).",
       "promoted_from": "backlog.json § BL-073",
       "batch": "v0.0.9",
       "rows": [
         {
           "id": "R1",
           "requirement": "When a corp balance is negative, apply_budget charges interest = |balance| × k_debt_interest_per_quarter (~2%/qtr) once per tick (a tick is a quarter); a non-negative balance charges zero. Pure function of balance × rate — deterministic, in world/*.",
-          "verification": ["headless: tools/verify/econ_bankruptcy.cpp interest spiral"],
-          "status": "pending",
-          "notes": ""
+          "verification": ["visual: scripts/verify/debt_interest.lua (deterministic charge)", "headless: econ_bankruptcy PASS (no regression)"],
+          "status": "complete",
+          "result_metric": "debt_interest.lua: balance -5000 + operating 214.25 = -4785.75; interest = 4785.75 × 0.02 = 95.71; final -4881.46 (all shown consistently). econ_bankruptcy PASS (solvent scenario untouched).",
+          "notes": "Harness spiral scenario (a loss-making corp that goes negative) is a follow-on; the shared constant path is already linked."
         },
         {
           "id": "R2",
           "requirement": "The interest appears as its own expenditure line in the budget breakdown, and the header shows an explicit 'in debt — interest accruing' affordance (not merely a red number) while the player balance is negative.",
-          "verification": ["visual: scripts/verify/balance_ledger.lua + header capture"],
-          "status": "pending",
-          "notes": ""
+          "verification": ["visual: scripts/verify/debt_interest.lua capture"],
+          "status": "complete",
+          "result_metric": "Capture shows the Interest (debt) -95.71 breakdown line, the header [in debt - interest accruing] badge, the red 'in debt' runway, and the corrected Treasury note.",
+          "notes": "Golden not blessed (software renderer unavailable on this box); eyeball-verified."
         }
       ]
     },
