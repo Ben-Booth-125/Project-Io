@@ -101,6 +101,12 @@ menu. Live New Game → in-game transition confirmed by Ben clicking it mid-sess
   corp's real name, `Parent: <home nation>`, and `Focus: <industrial focus>` (all already in the data
   model — pure display wiring). Dropped the "Standing" line (reputation isn't modeled). Minor known
   clip: long nation names overflow the fixed 200px panel — ellipsis is a follow-up.
+- **Geometric corp emblem in the identity card** (`profile_panel.cpp`). The portrait placeholder is now
+  a geometric emblem — one of 6 shapes (circle/square/triangle/diamond/hexagon/pentagon) filled in the
+  player identity colour (corp slot 0), the shape picked deterministically from the corp id (so it's
+  stable and corp-distinct). Colour matches the map ownership tint, so card and canvas agree. Ben chose
+  "prototype in the card now"; promotion to a shared `ui::icons` emblem family + map/selection markers
+  (and the full shape/assignment system) is backlogged. Corp *names* left as-is per Ben's call.
 
 **Verification.** New golden checks `scripts/verify/main_menu.lua` and `scripts/verify/start_framing.lua`
 (6 captures) blessed and passing at 0.0000%. Requirement groups `main-menu` and `start-framing` added

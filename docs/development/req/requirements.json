@@ -4386,6 +4386,15 @@
             "visual: scripts/verify/start_framing.lua 'start_default' capture shows the real corp name / parent nation / focus in the top-left card"
           ],
           "notes": "Data already existed (corporation_component.name/home_nation/focus, set at generation); this was pure display wiring. Known minor: long nation names clip at the fixed 200px panel width - ellipsis/width is a follow-up."
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "requirement": "The player identity card portrait slot renders a geometric corp emblem (one of 6 shapes: circle / square / triangle / diamond / hexagon / pentagon) filled in the player identity colour (corp slot 0), replacing the plain placeholder square. The shape is chosen deterministically from the corp entity id so it is stable per campaign and distinct between corps. The emblem colour matches the map ownership tint so card and canvas agree.",
+          "verification": [
+            "visual: scripts/verify/start_framing.lua 'start_default' capture shows a filled geometric emblem in the top-left card, in the player blue"
+          ],
+          "notes": "Prototype scope (player card only), per design call. Promotion to a shared ui::icons emblem family + map/selection/hover markers + the full shape/assignment system is a backlog follow-up. draw_corp_emblem is currently local to profile_panel.cpp."
         }
       ]
     }
