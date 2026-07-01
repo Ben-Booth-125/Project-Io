@@ -971,6 +971,29 @@
       "authority_doc": "docs/ui/MENU.md",
       "summary": "There is no in-app menu for application-level control: today the only way to leave the game is the OS window close button (Windows-only chrome; the window is a plain SDL_WINDOW_RESIZABLE in app.cpp) or a keyboard shortcut. The player wants a minimal, clickable system container — at minimum an Exit Game affordance, reachable without memorising hotkeys and consistent across platforms. Distinct from BL-062 (the keyboard hotkey system) and from the nav-rail ledger menus (MENU.md): those are the keyboard layer and the per-system ledgers; this is the application/session shell (start, pause, exit). Design owed: the surface (top menu bar vs. corner gear button vs. centred pause/system modal), what it contains in the prototype (Exit Game at minimum; likely Resume/Pause; possibly New/Restart), whether a confirm-on-exit is wanted, and how it relates to a future title/main screen.",
       "design": "**Problem.** The app has no application-level menu. Exit is only via the OS title-bar close button — which is Windows-only chrome and absent on a borderless/other-platform build — or a keyboard shortcut. A player should be able to leave (and later start/restart) the game by clicking, without knowing any hotkey. This is the session shell, deliberately separate from the nav-rail ledgers (broad per-system overviews, MENU.md) and from BL-062's rebindable keymap (the keyboard layer over the same actions).\n\n**Scope for the prototype (minimum).** A clickable **Exit Game** that cleanly tears down (the same path as the window-close / quit event). Pair it with **Pause/Resume** so the session-control verbs sit together. New/Restart and a full title screen are out of scope here — name them as the natural follow-on once a title/main screen lands.\n\n**Options for the surface (advisor call — pick at promotion):**\n\nA) **ImGui main menu bar** (BeginMainMenuBar) across the top with a Game menu (Exit, Pause). Cheapest; conventional; but it eats a strip of vertical space above the header panel and must be reconciled with the existing top-row layout (profile + header + time column).\n\nB) **Corner gear/hamburger button** that opens a small popup with the same items. Minimal footprint, no permanent chrome; fits the icon-rail visual language already used by the nav pane. **Recommended starting point** — lowest layout disruption.\n\nC) **Centred pause/system modal** toggled by Esc and by a button: dims the canvas and lists Resume / Exit (the classic pause menu). Best long-term home for session control and where a title screen would converge, but more than the minimum asks.\n\n**Open questions.** Confirm-on-exit (a 'really quit?' guard) yes/no; whether Esc should open option C even in the minimum build; whether this slot should also surface Save/Load once serialisation has a UI (currently save is not player-exposed). Authority: extend docs/ui/MENU.md with an 'Application / system menu' section when this lands (it currently documents only the nav-rail ledgers).\n\n**Note.** A standing development practice is the per-milestone ImGui panel rule (DEVELOPMENT_PRACTICES.md) — this surface is a candidate panel for the milestone it lands in. The OS window is created plain-resizable in app.cpp (SDL_CreateWindow(..., SDL_WINDOW_RESIZABLE)); this item does not change the OS window, it adds an in-app affordance over it."
+    },
+    {
+      "id": "BL-076",
+      "title": "Display options window — resolution / fullscreen / vsync, persisted",
+      "short_name": "DISPLAY_OPTIONS",
+      "category": "Options",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 2,
+      "parked": false,
+      "blocked_on": [],
+      "requires": [],
+      "written": "2026-07-01",
+      "authority_doc": "docs/ui/MENU.md",
+      "files": [
+        "src/core/app.cpp",
+        "src/core/app.hpp",
+        "src/ui/canvas_command.hpp",
+        "src/ui/canvas_command.cpp"
+      ],
+      "summary": "Pre-playtest QOL: the player had no way to set or remember the window size/mode. The OS window is already SDL_WINDOW_RESIZABLE (free drag-resize worked), but the startup size was hard-coded 1280x720 with no fullscreen/vsync control and nothing persisted. Adds an F10 Options window (resolution presets, fullscreen, vsync) that applies live and persists to options.cfg, plus capture of free drag-resizes. Distinct from BL-070 (in-app system menu: exit/pause) which is the session shell; this is the display-settings surface.",
+      "design": "**Delivered 2026-07-01 (same-session).** Scope confirmed with the developer: window + options only (no main menu / app-state machine, no save/load).\n\n**Surface.** An ImGui Options window toggled by F10 (canvas_command::options_toggle, in the s_bindings table so it shows in the F1 cheat-sheet), modelled on the F1 help overlay. Contains a Display section: resolution combo (1280x720 / 1600x900 / 1920x1080 / 2560x1440, 'Custom' when a dragged size doesn't match), Fullscreen checkbox (borderless-desktop), VSync checkbox, a live 'Window: WxH' readout, and Close. Resolution is disabled while fullscreen is on.\n\n**Persistence.** Flat key=value options.cfg in CWD (window_w/h, fullscreen, vsync). load_settings()/apply_display_settings() run at the top of run() only — never in the constructor or run_verify(), so golden captures keep the fixed 1280x720 default and stay deterministic. Toggles/presets save on change; free drag-resizes are captured from SDL_EVENT_WINDOW_RESIZED in-memory and flushed by save_settings() on clean exit. Sizes clamped to a 640x480 floor against a corrupt file.\n\n**Follow-ons (out of scope, named).** Main menu / title screen + app-state machine (pairs with BL-070); save/load serialisation seam; UI-scale / font-size option; monitor selection."
     }
   ]
 }

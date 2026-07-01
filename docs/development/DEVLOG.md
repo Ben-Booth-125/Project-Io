@@ -6,6 +6,45 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — BL-076 Display options window (2026-07-01)
+
+**Context.** Pre-playtest QOL pass. The developer asked about resizing the window and about the
+basic session-shell features (saves, main menu, options). Scoped down (developer's call) to
+**window + options only** — no main-menu / app-state machine, no save/load serialisation — filed as
+a proper Full-mode item (BL-076) rather than a cowboy change. Saves and the main menu were named as
+the follow-on strand (saves is the serialisation seam and deserves its own careful pass).
+
+**State assessment recorded.** The OS window was already `SDL_WINDOW_RESIZABLE` (free drag-resize
+worked); what was missing was setting/remembering a size. Startup was hard-coded 1280x720
+(`window_w`/`window_h`), no fullscreen/vsync control, nothing persisted. No save system and no app
+state machine exist yet — both confirmed as future work.
+
+**BL-076 — Display options window.**
+- **Command + binding** — new `canvas_command::options_toggle`, bound to **F10** in `s_bindings`
+  (so it auto-appears in the F1 cheat-sheet) and added to `canvas_command_from_name`.
+- **Options window** (`app::render`, modelled on the F1 help overlay): Display section with a
+  resolution combo (1280x720 / 1600x900 / 1920x1080 / 2560x1440, "Custom" for a dragged size),
+  Fullscreen + VSync checkboxes, a live `Window: WxH` readout, and Close. Resolution disabled while
+  fullscreen is on. Changes apply live via `SDL_SetWindowSize` / `SDL_SetWindowFullscreen` /
+  `SDL_SetRenderVSync`.
+- **Persistence** — flat `options.cfg` (key=value) in CWD. `load_settings` / `apply_display_settings`
+  run at the **top of `run()` only** — never the constructor or `run_verify()`, so golden captures
+  keep the fixed 1280x720 default and stay deterministic. Toggles/presets save on change; free
+  drag-resizes captured from `SDL_EVENT_WINDOW_RESIZED` in-memory and flushed by `save_settings()`
+  on clean exit. Sizes clamped to a 640x480 floor against a corrupt file.
+
+**Verification.** Build green (ProjectIo target); manual smoke — launched with a seeded `options.cfg`,
+window opened at 1600x900, ran without crash. Not golden-diffable (window size is the variable), so
+the requirement (v0.0.9 / display-options) is marked verified-by-smoke.
+
+**Superseded note.** The old DEVLOG "Open item" that `window_w`/`window_h` are compile-time
+constants awaiting a config table — options.cfg is now that config surface for display.
+
+**Follow-ons (not done).** Main menu / title screen + app-state machine (pairs with BL-070);
+save/load serialisation seam; UI-scale/font option; monitor selection.
+
+---
+
 ## Session — v0.0.8 Batch Delivery: BL-068 Visibility + BL-069 Population legibility (2026-06-30)
 
 **Context.** Continued the v0.0.8 (Discovery & Intelligence) batch from the BL-067 handover and

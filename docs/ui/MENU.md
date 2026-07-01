@@ -116,6 +116,24 @@ Notes on the mapping:
     in the dashboard holdings roll-up; this slot is the *active construction* view (the
     Construction Ledger of the [A4] family).
 
+## Application / system menu — display options (BL-076)
+
+Separate from the nav-rail ledgers above (per-system overviews) and from the future in-app system
+menu (BL-070, session control: exit / pause). This is the **display-settings surface**.
+
+- **Options window** — toggled by **F10** (`canvas_command::options_toggle`; appears in the F1
+  cheat-sheet). A floating ImGui window with a **Display** section: resolution preset combo
+  (1280×720 / 1600×900 / 1920×1080 / 2560×1440, "Custom" when the live size matches no preset),
+  **Fullscreen** (borderless-desktop) and **VSync** toggles, a live `Window: W×H` readout, and
+  Close. Resolution is disabled while fullscreen is on.
+- **Persistence** — settings are stored in a flat `options.cfg` (key=value: `window_w`, `window_h`,
+  `fullscreen`, `vsync`) in the working directory, loaded at interactive startup only (never in the
+  `--verify` path, so golden captures stay at the fixed default). Preset/toggle changes save
+  immediately; a free drag-resize of the window frame is remembered and flushed on clean exit.
+- **Follow-ons** — this surface is the natural home for later non-display options (UI scale, font
+  size, monitor selection) and would sit beside a session menu (BL-070) and Save/Load once
+  serialisation is player-exposed.
+
 ## Open questions
 
 - Whether all menus open floating windows, or some become docked/persistent panels.

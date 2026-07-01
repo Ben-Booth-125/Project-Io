@@ -99,6 +99,24 @@ private:
     /// @param rgba The captured RGBA surface (read, not retained).
     void compare_to_golden(const std::string& name, SDL_Surface* rgba);
 
+    /// Persisted display/options settings (options.cfg, key=value). Loaded at
+    /// construction so the window opens at the player's last size/mode; re-written
+    /// whenever a setting changes in the F10 Options window.
+    struct display_settings
+    {
+        int  window_w   = 1280;
+        int  window_h   = 720;
+        bool fullscreen = false;  ///< Borderless-desktop fullscreen.
+        bool vsync      = true;
+    };
+
+    /// Read options.cfg into m_settings; a missing/partial file leaves defaults.
+    void load_settings();
+    /// Write m_settings to options.cfg.
+    void save_settings() const;
+    /// Apply m_settings to the live SDL window + renderer (size, fullscreen, vsync).
+    void apply_display_settings();
+
     SDL_Window*   m_window   = nullptr;
     SDL_Renderer* m_renderer = nullptr;
 
@@ -115,6 +133,8 @@ private:
     ui::market_plot_history m_market_history; ///< Price / supply / demand history per market, per resource; feeds market ledger graphs.
 
     bool        m_show_help        = false;   ///< Toggle for the F1 key-binding cheat-sheet overlay.
+    bool        m_show_options     = false;   ///< Toggle for the F10 display/options window.
+    display_settings m_settings;              ///< Persisted display settings (options.cfg).
     bool        m_capture_requested = false;  ///< Set by F12 / capture_frame, consumed in render().
     std::string m_capture_name;              ///< Base name for the next capture; empty = timestamped (F12).
 

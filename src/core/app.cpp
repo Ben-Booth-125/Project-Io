@@ -41,6 +41,7 @@
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -65,7 +66,7 @@ struct key_binding
     const char*        key_name; ///< Human-readable key string (F1 overlay)
 };
 
-static const std::array<key_binding, 20> s_bindings = {{
+static const std::array<key_binding, 21> s_bindings = {{
     // Canvas navigation
     {SDL_SCANCODE_RETURN,       false, ui::canvas_command::descend,      "Descend rung",      "Enter"},
     {SDL_SCANCODE_BACKSPACE,    false, ui::canvas_command::ascend,       "Ascend rung",       "Backspace"},
@@ -90,6 +91,7 @@ static const std::array<key_binding, 20> s_bindings = {{
     {SDL_SCANCODE_5,            false, ui::canvas_command::speed_5,      "Speed V  (16×)",    "5"},
     // UI
     {SDL_SCANCODE_F1,           false, ui::canvas_command::help_toggle,  "Key bindings",      "F1"},
+    {SDL_SCANCODE_F10,          false, ui::canvas_command::options_toggle, "Options",         "F10"},
 }};
 
 namespace {
@@ -192,6 +194,12 @@ app::~app()
 
 int app::run()
 {
+    // Apply the player's persisted display settings before anything renders, so
+    // the window opens at their last size/mode. Interactive-only: run_verify()
+    // never touches settings, keeping golden captures at the fixed default size.
+    load_settings();
+    apply_display_settings();
+
     m_lua.load("scripts/init.lua");
 
     // Apply Lua config now that the script has run. Constructing a fresh
@@ -256,6 +264,10 @@ int app::run()
 
         render();
     }
+
+    // Persist any free drag-resize captured this session (toggles/presets already
+    // saved on change). Fullscreen: keep the last windowed size, don't overwrite it.
+    save_settings();
     return 0;
 }
 
@@ -764,6 +776,13 @@ void app::process_events(bool& running)
             running = false;
         else if (event.type == SDL_EVENT_KEY_DOWN)
             handle_key_down(event.key);
+        else if (event.type == SDL_EVENT_WINDOW_RESIZED && !m_settings.fullscreen)
+        {
+            // Remember a free drag-resize so it persists across launches. Only
+            // in-memory here; save_settings() runs once on clean exit (run()).
+            m_settings.window_w = event.window.data1;
+            m_settings.window_h = event.window.data2;
+        }
     }
 }
 
@@ -815,6 +834,9 @@ void app::dispatch_action(ui::canvas_command cmd)
         // UI toggles.
         case ui::canvas_command::help_toggle:
             m_show_help = !m_show_help;
+            return;
+        case ui::canvas_command::options_toggle:
+            m_show_options = !m_show_options;
             return;
 
         // Everything else is a canvas navigation command.
@@ -1156,6 +1178,72 @@ void app::render()
         ImGui::End();
     }
 
+    // F10 display / options window (BL-076). Self-contained; changes apply live to
+    // the SDL window and persist to options.cfg immediately.
+    if (m_show_options)
+    {
+        ImGui::SetNextWindowPos(
+            ImVec2{disp.x * 0.5f, disp.y * 0.5f}, ImGuiCond_Appearing, ImVec2{0.5f, 0.5f});
+        ImGui::SetNextWindowSize(ImVec2{320.0f, 0.0f}, ImGuiCond_Appearing);
+        if (ImGui::Begin("Options", &m_show_options,
+                         ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse))
+        {
+            ImGui::SeparatorText("Display");
+
+            struct preset { int w, h; const char* label; };
+            static const preset presets[] = {
+                {1280, 720,  "1280 x 720"},
+                {1600, 900,  "1600 x 900"},
+                {1920, 1080, "1920 x 1080"},
+                {2560, 1440, "2560 x 1440"},
+            };
+            // Selection = the matching preset, or "Custom" for a free-dragged size.
+            int cur = -1;
+            for (int i = 0; i < IM_ARRAYSIZE(presets); ++i)
+                if (presets[i].w == m_settings.window_w && presets[i].h == m_settings.window_h)
+                    cur = i;
+            const char* preview = (cur >= 0) ? presets[cur].label : "Custom";
+
+            ImGui::BeginDisabled(m_settings.fullscreen);
+            if (ImGui::BeginCombo("Resolution", preview))
+            {
+                for (int i = 0; i < IM_ARRAYSIZE(presets); ++i)
+                {
+                    if (ImGui::Selectable(presets[i].label, i == cur))
+                    {
+                        m_settings.window_w = presets[i].w;
+                        m_settings.window_h = presets[i].h;
+                        apply_display_settings();
+                        save_settings();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+            ImGui::EndDisabled();
+
+            if (ImGui::Checkbox("Fullscreen", &m_settings.fullscreen))
+            {
+                apply_display_settings();
+                save_settings();
+            }
+            if (ImGui::Checkbox("VSync", &m_settings.vsync))
+            {
+                apply_display_settings();
+                save_settings();
+            }
+
+            // Live window size (also reflects a free drag-resize of the frame).
+            int win_w = 0, win_h = 0;
+            SDL_GetWindowSize(m_window, &win_w, &win_h);
+            ImGui::TextDisabled("Window: %d x %d", win_w, win_h);
+
+            ImGui::Separator();
+            if (ImGui::Button("Close"))
+                m_show_options = false;
+        }
+        ImGui::End();
+    }
+
     ImGui::Render();
     SDL_SetRenderDrawColor(m_renderer, 15, 15, 20, 255);
     SDL_RenderClear(m_renderer);
@@ -1169,6 +1257,66 @@ void app::render()
     }
 
     SDL_RenderPresent(m_renderer);
+}
+
+namespace {
+constexpr const char* k_settings_path = "options.cfg";
+} // namespace
+
+void app::load_settings()
+{
+    std::ifstream in(k_settings_path);
+    if (!in)
+        return; // no file yet — keep defaults
+
+    std::string line;
+    while (std::getline(in, line))
+    {
+        const auto eq = line.find('=');
+        if (eq == std::string::npos)
+            continue;
+        const std::string key = line.substr(0, eq);
+        const std::string val = line.substr(eq + 1);
+        try
+        {
+            if      (key == "window_w")   m_settings.window_w   = std::stoi(val);
+            else if (key == "window_h")   m_settings.window_h   = std::stoi(val);
+            else if (key == "fullscreen") m_settings.fullscreen = (std::stoi(val) != 0);
+            else if (key == "vsync")      m_settings.vsync      = (std::stoi(val) != 0);
+        }
+        catch (const std::exception&) { /* skip malformed value */ }
+    }
+
+    // Clamp to a sane floor so a corrupt file can't produce an unusable window.
+    m_settings.window_w = std::max(640, m_settings.window_w);
+    m_settings.window_h = std::max(480, m_settings.window_h);
+}
+
+void app::save_settings() const
+{
+    std::ofstream out(k_settings_path, std::ios::trunc);
+    if (!out)
+    {
+        SDL_Log("Options save failed: could not open %s", k_settings_path);
+        return;
+    }
+    out << "window_w="   << m_settings.window_w        << '\n'
+        << "window_h="   << m_settings.window_h        << '\n'
+        << "fullscreen=" << (m_settings.fullscreen ? 1 : 0) << '\n'
+        << "vsync="      << (m_settings.vsync ? 1 : 0)      << '\n';
+}
+
+void app::apply_display_settings()
+{
+    if (!m_window)
+        return;
+
+    // Windowed size only applies out of fullscreen; set it first so leaving
+    // fullscreen later restores the intended dimensions.
+    SDL_SetWindowSize(m_window, m_settings.window_w, m_settings.window_h);
+    SDL_SetWindowFullscreen(m_window, m_settings.fullscreen);
+    if (m_renderer)
+        SDL_SetRenderVSync(m_renderer, m_settings.vsync ? 1 : 0);
 }
 
 void app::save_screenshot()
