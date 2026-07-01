@@ -221,30 +221,57 @@ included** — not just "write a lot of code." Its load-bearing parts:
 
 ### The sessions
 
-*Updated 2026-06-30.* The v0.0.6 and v0.0.7 themes are fully delivered; see DEVLOG for the
-per-session record. The active frontier is **v0.0.8 — Discovery & Intelligence**. No per-session
-slice list is frozen here — the backlog for v0.0.8 is still being designed (BL-064 survey system
-is the first item to promote); sessions will rebuild the slice list at promotion from the live
-backlog. The next session's first act is to design-settle and promote the survey system item.
+*Updated 2026-07-01.* The v0.0.6 and v0.0.7 themes are fully delivered; see DEVLOG for the
+per-session record. The active frontier is **v0.0.8 — Discovery & Intelligence**, and its
+**discovery core has shipped**: the survey system (BL-067), the visibility model (BL-068), and
+build legibility (BL-071) are all complete. *(The IDs above supersede the earlier BL-064/BL-065
+references — those were renumbered on merge to avoid a cross-branch collision.)* What remains of
+v0.0.8 is the **legibility pass** — making the human/industry/player layers visible on the map —
+which the 2026-07-01 design session settled as a coherent four-item cluster, all now `designed`
+and ready to promote. No per-session slice list is frozen here; the next session rebuilds it from
+the live backlog at promotion.
 
-**What ships next (v0.0.8):**
+**What ships next (v0.0.8 legibility pass — BL-083–086, all `designed`, filed 2026-07-01):**
 
-1. **BL-064 — Survey system** *(design-owed, filed 2026-06-30)*. Bodies start unsurveyed; a
-   survey action (credit cost + N ticks) reveals the tile map and deposit richness band. See the
-   backlog item for the full design.
-2. **BL-065 — Visibility model** *(design-owed, filed 2026-06-30)*. Explicit rules for what
-   the player can see about competitors: building presence public, production and stockpiles
-   private, market aggregates and prices public. Hover card updated for competitor markers.
-3. **Population legibility** — surfacing the habitability→workforce chain visibly in the
-   Population lens, hover cards, and Selection panel. Lightweight (no new mechanics; backlog
-   item needed if the coverage gap is confirmed at promotion).
+A non-overlapping three-layer visual language — **Settlements · Industry · You**:
+
+1. **BL-083 — Population-centre markers** *(priority A)*. The generated settlements
+   (`generate_population_centres`, 20–40/body) are currently drawn as nothing; render them as
+   tiered, named markers. This is the roadmap's **population-legibility** strand — the human layer
+   made visible.
+2. **BL-085 — Player presence** *(priority A)*. Always-on "you are here" identity chrome + a home
+   ring / HQ pip on `home_body` + initial camera focus — replacing today's Corp-lens-gated,
+   never-marked identity.
+3. **BL-084 — Industry-density lens** *(priority B)*. Render BL-050's already-live nation-owned
+   substrate as an economic-**throughput** field (not raw density — see the DEVLOG design-knot
+   resolution). Pure rendering; no market-arithmetic change.
+4. **BL-086 — Ambient opportunity read** *(priority B)*. Make the "where to grow" signal
+   glanceable on the map without arming build mode — the map-side companion to BL-071's panel
+   affordances.
+
+**Also queued for v0.0.8 (Discovery — the fog-of-war completion, `designed` 2026-07-01):**
+
+5. **BL-088 — Persistent trade routes** *(Trade, priority A)*. Convoys are transient; add a durable
+   `trade_route` body-pair lane recorded from convoy traffic. Pure trade-system data; the prerequisite
+   for BL-089.
+6. **BL-089 — Commercial-sphere visibility** *(Discovery, priority A, `requires` BL-088)*. The
+   route-driven **activity fog** — Unknown/Known/Visible per body, lit by *your* trade radiating out
+   from your commerce, layered independently over the shipped survey (geographic) fog. Completes the
+   v0.0.8 "information asymmetry" theme with a player-centric spotlight rather than a secrecy sim.
 
 **v0.0.9 queue (budget clarity + polish):**
 
-- Full budget breakdown (income/expenditure by category, projected runway)
-- Debt-interest system (on-screen visibility of the self-accelerating decline)
+- ~~Full budget breakdown (income/expenditure by category, projected runway)~~ — **shipped early
+  as BL-072** (itemised cashflow table + smoothed runway; landed 2026-06-30 → 07-01).
+- ~~Debt-interest system (on-screen visibility of the self-accelerating decline)~~ — **shipped early
+  as BL-073** (per-quarter interest line + in-debt badge). *(Per-building profitability, BL-074,
+  also landed in the same cluster.)*
 - Time-control clarity pass (BL-008, currently parked — reassess at v0.0.9 open)
 - Icon consistency sweep and menu vocabulary cleanup
+- Remaining budget-legibility polish and any lens/UI completeness carried from v0.0.8
+
+*Note: the budget cluster landed ahead of its minor. v0.0.9 now reads as a lighter polish minor —
+reassess its scope when v0.0.8's legibility pass closes.*
 
 ### Out of scope for this plan (gated — do not pull in)
 
