@@ -5,6 +5,7 @@
 #include "selection.hpp"
 #include "view_nav.hpp"
 
+#include "world/building_profit.hpp" // per-building profitability estimate (BL-074)
 #include "world/economy_system.hpp" // economy_report (workforce cap, BL-069)
 #include "world/market_clearing.hpp"
 #include "world/placement_rules.hpp"
@@ -14,10 +15,91 @@
 #include <imgui.h>
 
 #include <algorithm> // std::max (bar-width clamp)
+#include <string>    // affordance-row labels (BL-071)
+#include <utility>   // std::move
+#include <vector>    // affordance groupings (BL-071)
 
 namespace ui {
 
 namespace {
+
+// --- Selected-tile affordance readout (BL-071) -------------------------------
+// The inverse of the placement-suitability surface: given a *tile*, which building
+// types suit it? Always-on for any selected tile (docs/ui/SELECTION.md), so the
+// player can read a tile before arming a building. Shows the tile's territory owner
+// and a thrives / valid / invalid grouping over the prototype-buildable types,
+// reading the same placement_rules seam the build front door and the armed hover
+// card use.
+void draw_tile_affordances(const world& w, entity_id tile_id)
+{
+    const auto tit = w.tiles.find(tile_id);
+    if (tit == w.tiles.end())
+        return;
+    const tile_component& tc = tit->second;
+
+    ImGui::Separator();
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Suited for");
+
+    // Territory owner: the nation whose territory contains this tile, if any.
+    const char* territory = "unclaimed";
+    for (const auto& [nid, nc] : w.nations)
+    {
+        bool found = false;
+        for (entity_id t : nc.tiles)
+            if (t == tile_id) { found = true; break; }
+        if (found) { territory = nc.name.c_str(); break; }
+    }
+    ImGui::TextDisabled("Territory: %s", territory);
+
+    struct fit { std::string label; const char* reason; };
+    std::vector<fit> thrives, valid, invalid;
+
+    // Extraction: one entry per extractable resource actually deposited here; a
+    // rich deposit 'thrives', a thinner one is merely 'valid'. When nothing
+    // extractable is present, a single invalid line names the reason.
+    bool any_ext = false;
+    for (const resource_type r : placement_rules::k_extractable)
+    {
+        const float dep = tc.resource_deposit[static_cast<std::size_t>(r)];
+        if (dep <= 0.0f)
+            continue;
+        any_ext = true;
+        fit f{std::string("Extraction: ") + resource_name(r), nullptr};
+        if (dep >= 0.6f) thrives.push_back(std::move(f));
+        else             valid.push_back(std::move(f));
+    }
+    if (!any_ext)
+        invalid.push_back({"Extraction",
+            placement_rules::placement_reason_text(placement_rules::placement_reason::no_deposit)});
+
+    // Processing facility + Port: the world-level check (a port needs a coast).
+    const auto classify = [&](building_type type, const char* label) {
+        const placement_rules::placement_result pr =
+            placement_rules::can_place_in_world(w, tile_id, type, resource_type::iron_ore);
+        if (pr) valid.push_back({label, nullptr});
+        else    invalid.push_back({label, pr.message()});
+    };
+    classify(building_type::processing_facility, "Processing facility");
+    classify(building_type::port, "Port");
+
+    // Render the three groups; skip an empty group. Only 'invalid' carries a reason.
+    const auto group = [](const char* head, const ImVec4& col,
+                          const std::vector<fit>& rows, bool with_reason) {
+        if (rows.empty())
+            return;
+        ImGui::TextColored(col, "%s", head);
+        for (const fit& f : rows)
+        {
+            if (with_reason && f.reason)
+                ImGui::BulletText("%s - %s", f.label.c_str(), f.reason);
+            else
+                ImGui::BulletText("%s", f.label.c_str());
+        }
+    };
+    group("Thrives", ImVec4{0.55f, 0.90f, 0.55f, 1.0f}, thrives, false);
+    group("Valid",   ImVec4{0.80f, 0.80f, 0.80f, 1.0f}, valid,   false);
+    group("Invalid", ImVec4{0.90f, 0.55f, 0.55f, 1.0f}, invalid, true);
+}
 
 // BL-069: population-centre scale label (1–5 → village … metropolis).
 const char* scale_label(int scale)
@@ -49,9 +131,15 @@ void draw_build_front_door(const world& w, const recipe_registry& reg,
     ImGui::Separator();
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Build here");
 
-    if (placement_rules::is_ocean_tile(tc.composition))
+    // A whole-tile blocker (ocean) means no building type is offerable here; show
+    // the reason-code text rather than a bare hardcoded string (BL-071). A generic
+    // non-extraction building surfaces the tile-level verdict.
+    if (const placement_rules::placement_result r =
+            placement_rules::can_place(tc, building_type::processing_facility,
+                                       resource_type::iron_ore);
+        !r)
     {
-        ImGui::TextDisabled("Cannot build on water.");
+        ImGui::TextDisabled("%s.", r.message());
         return;
     }
 
@@ -356,9 +444,51 @@ void draw_lens_supplement(const world& w, const recipe_registry& reg,
     }
 }
 
+// Per-building profitability readout (BL-074): the selected player building's
+// estimated net per-tick contribution and its component lines. Realised last-tick
+// figures; revenue/inputs are estimates (the pooled market resists exact per-building
+// attribution — see building_profit.hpp).
+void draw_building_profit(const world& w, const recipe_registry& reg,
+                          const economy_report& report, entity_id id)
+{
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
+                       "Profitability (est. / tick)");
+
+    const building_profit p = estimate_building_profit(w, reg, report, id);
+    if (!p.has_data)
+    {
+        ImGui::TextDisabled("Run an economy tick to estimate.");
+        return;
+    }
+
+    // Paired two-column layout — four component cells over two rows, then Net —
+    // so revenue/inputs/wages/maintenance + net all fit the fixed bar height.
+    const float v1 = 68.0f, l2 = 150.0f, v2 = 210.0f;
+    const auto val = [](float value, ImU32 col)
+    { ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(col), "%+.2f", value); };
+    const auto pair = [&](const char* la, float va, ImU32 ca,
+                          const char* lb, float vb, ImU32 cb)
+    {
+        ImGui::TextUnformatted(la);      ImGui::SameLine(v1); val(va, ca);
+        ImGui::SameLine(l2);
+        ImGui::TextUnformatted(lb);      ImGui::SameLine(v2); val(vb, cb);
+    };
+
+    pair("Revenue", +p.revenue,    palette::positive,
+         "Inputs",  -p.input_cost, palette::negative);
+    pair("Wages",   -p.wages,      palette::negative,
+         "Maint",   -p.maintenance,palette::negative);
+
+    const float net = p.net();
+    const ImU32 nc = (net < 0.0f) ? palette::negative
+                   : (net > 0.0f) ? palette::positive
+                                  : palette::neutral;
+    ImGui::TextUnformatted("Net");   ImGui::SameLine(v1); val(net, nc);
+}
+
 void draw_selection_panel(const world& w, const recipe_registry& reg,
                           const economy_report& report, ui_state& ui,
-                          float left_x, float right_x, float bottom_y)
+                          float left_x, float right_x, float bottom_y, float height)
 {
     const selection_kind kind = selection_kind_of(w, ui.selected_entity);
 
@@ -373,19 +503,21 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
     // The bar is anchored by its bottom-left corner to (left_x, bottom_y) and
     // spans across to right_x — the gap between the nav pane and the bottom-right
     // minimap — so it sits beside the minimap rather than running behind it.
-    // Height is fixed to fit portrait + header + two content rows (~5 ImGui rows).
     const float bar_w        = std::max(0.0f, right_x - left_x);
     constexpr float portrait_w = 88.0f;  // portrait column width
     const float line_h = ImGui::GetTextLineHeightWithSpacing();
     const float frame_h = ImGui::GetFrameHeight();
     const ImGuiStyle& style = ImGui::GetStyle();
-    // Bar height: header row + separator + two content rows + top+bottom padding.
-    const float bar_h = style.WindowPadding.y * 2.0f
+    // Height matches the minimap (caller passes its box height) so the bar reads as
+    // the minimap's left-hand twin. We never shrink below what the content needs:
+    // header row + separator + two content rows + top/bottom padding.
+    const float min_h = style.WindowPadding.y * 2.0f
                       + frame_h                          // header row
                       + style.ItemSpacing.y
                       + 1.0f                             // separator
                       + style.ItemSpacing.y
                       + line_h * 4.0f;                  // content rows
+    const float bar_h = std::max(min_h, height);
 
     ImGui::SetNextWindowPos({left_x, bottom_y}, ImGuiCond_Always, {0.0f, 1.0f});
     ImGui::SetNextWindowSize({bar_w, bar_h}, ImGuiCond_Always);
@@ -398,6 +530,7 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
         ImGuiWindowFlags_NoNav                 |
         ImGuiWindowFlags_NoBringToFrontOnFocus |
         ImGuiWindowFlags_NoScrollbar           |
+        ImGuiWindowFlags_NoScrollWithMouse     |
         ImGuiWindowFlags_NoSavedSettings;
     ImGui::Begin("##selection_info", nullptr, flags);
 
@@ -423,20 +556,23 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
     ImGui::SameLine();
 
     // ── Content area (right of portrait) ─────────────────────────────────────
-    const float content_x = ImGui::GetCursorPosX();
     const float content_w = ImGui::GetContentRegionAvail().x;
     ImGui::BeginGroup();
 
-    // Header row: name (tinted) + type label on the left; [Go To] [✕] on the right.
+    // Header row: name (tinted) + type label on the left; [Go to] [x] on the right.
     {
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
                            "%s", selection_title(w, kind, ui.selected_entity));
         ImGui::SameLine();
         ImGui::TextDisabled("%s", selection_kind_name(kind));
 
-        const float btn   = frame_h;
-        const float right = content_x + content_w - style.WindowPadding.x;
-        ImGui::SameLine(right - 2.0f * btn - style.ItemSpacing.x);
+        // Right-align [go to] [close] at the content column's right edge. SameLine's
+        // offset is measured from THIS group's origin (the content column), so it
+        // must use content_w directly and NOT re-add content_x — adding content_x
+        // pushed the pair ~one column past the window's right edge, where ImGui
+        // clipped them away unseen (the bug that hid these buttons entirely).
+        const float btn = frame_h;
+        ImGui::SameLine(content_w - style.WindowPadding.x - 2.0f * btn - style.ItemSpacing.x);
 
         if (ImGui::Button(">", {btn, btn}))
             focus_on_entity(w, ui, ui.selected_entity);
@@ -459,7 +595,8 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
 
     // Section A
     ImGui::BeginChild("##sel_section_a", {half_w, 0.0f}, false,
-                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings);
+                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
+                      ImGuiWindowFlags_NoSavedSettings);
     draw_summary(w, kind, ui.selected_entity);
     ImGui::EndChild();
 
@@ -467,12 +604,20 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
 
     // Section B
     ImGui::BeginChild("##sel_section_b", {half_w, 0.0f}, false,
-                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoSavedSettings);
+                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
+                      ImGuiWindowFlags_NoSavedSettings);
     draw_lens_supplement(w, reg, report, ui, kind);
     if (kind == selection_kind::tile)
+    {
+        // BL-071: always-on "what is this tile good for?" readout (the inverse of
+        // the placement-suitability surface), above the "build here" front door.
+        draw_tile_affordances(w, ui.selected_entity);
         draw_build_front_door(w, reg, ui, ui.selected_entity);
+    }
     else if (kind == selection_kind::body)
         draw_survey_section(w, ui, ui.selected_entity);
+    else if (kind == selection_kind::building && is_player_owned(w, ui.selected_entity))
+        draw_building_profit(w, reg, report, ui.selected_entity); // BL-074
     ImGui::EndChild();
 
     ImGui::EndGroup();

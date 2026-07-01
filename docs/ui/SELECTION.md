@@ -95,6 +95,24 @@ tile Selection element**, not a reserved menu — the nav-rail construction surf
 broad overview (see `docs/ui/MENU.md`, BACKLOG § Ledger). The equivalent placement-mode canvas
 click enqueues the same request.
 
+### The tile element reads back its affordances (BL-071)
+
+Above the "Build here" front door, a selected tile carries an **always-on affordance readout**
+— the *inverse* of the placement-suitability surface (`LENSES.md`, BL-010). That surface answers
+"given an armed building, which tiles?"; this answers "given this tile, which buildings?",
+**without arming anything**, so the player can read a tile before committing to a build. It shows
+the tile's **territory owner** and a **Thrives / Valid / Invalid** grouping over the
+prototype-buildable types (extraction per deposited resource, processing, port), reading the same
+`placement_rules` seam the front door and the armed canvas ghost use.
+
+Rejection is **reason-coded, not silent**. `placement_rules::can_place[_in_world]` return a
+`placement_result` — a `placement_reason` enum plus human string, implicitly convertible to
+`bool` so existing boolean call sites are untouched — so an invalid type shows *why*
+(`Cannot build on water`, `No extractable deposit here`, `A port must sit on the coast`, …). The
+same reason string enriches the build front door (replacing the former bare "Cannot build on
+water") and follows the cursor as a **"why not here"** label under the armed placement ghost on
+the Planetary canvas. One vocabulary, three surfaces.
+
 ### The body element is the survey front door
 
 Beyond its stat block, a selected **Body** carries a **Survey section** (survey system, BL-067)

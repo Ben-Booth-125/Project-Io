@@ -1139,12 +1139,27 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
         const float mr = std::max(2.0f, draw_r * 0.22f);
 
-        const tile_component& hovered = w.tiles.at(hovered_tile);
-        const bool placeable = placement_rules::can_place(
-            hovered, state.construction.type, state.construction.target);
-        const ImU32 ghost_col = placeable ? palette::positive : palette::negative;
+        // Full world-level check (coastal / launchpad, not just terrain) so the
+        // ghost is red — and the reason legible — *before* the click, not after
+        // construct_building refuses it (BL-071).
+        const placement_rules::placement_result pr = placement_rules::can_place_in_world(
+            w, hovered_tile, state.construction.type, state.construction.target);
+        const ImU32 ghost_col = pr ? palette::positive : palette::negative;
 
         icons::building(dl, {gx, gy}, mr, state.construction.type, ghost_col);
+
+        // 'Why not here': the rejection reason follows the cursor while build mode
+        // is armed, sat just below the ghost with a dark backdrop for contrast.
+        if (!pr)
+        {
+            const char* why = pr.message();
+            const ImVec2 tsz = ImGui::CalcTextSize(why);
+            const ImVec2 tp{gx - tsz.x * 0.5f, gy + mr + 3.0f};
+            dl->AddRectFilled({tp.x - 3.0f, tp.y - 1.0f},
+                              {tp.x + tsz.x + 3.0f, tp.y + tsz.y + 1.0f},
+                              IM_COL32(0, 0, 0, 180), 2.0f);
+            dl->AddText(tp, palette::negative, why);
+        }
     }
 
     dl->PopClipRect();

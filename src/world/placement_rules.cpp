@@ -4,6 +4,24 @@
 
 namespace placement_rules {
 
+const char* placement_reason_text(placement_reason r)
+{
+    switch (r)
+    {
+        case placement_reason::ok:                return "Can build here";
+        case placement_reason::ocean:             return "Cannot build on water";
+        case placement_reason::no_deposit:        return "No extractable deposit here";
+        case placement_reason::not_coastal:       return "A port must sit on the coast";
+        case placement_reason::launchpad_exists:  return "This body already has a launchpad";
+        case placement_reason::occupied:          return "Tile already built on";
+        case placement_reason::outside_territory: return "Outside your territory";
+        case placement_reason::unsurveyed:        return "Body not yet surveyed";
+        case placement_reason::slot_full:         return "No build slot free here";
+        case placement_reason::no_tile:           return "No such tile";
+    }
+    return "Cannot build here";
+}
+
 bool is_ocean_tile(terrain_composition comp)
 {
     return comp == terrain_composition::ocean;
@@ -52,26 +70,28 @@ bool can_place_population_centre(const tile_component& tc)
     return tc.habitability > 0.0f;
 }
 
-bool can_place(const tile_component& tc, building_type type, resource_type target)
+placement_result can_place(const tile_component& tc, building_type type, resource_type target)
 {
     // No building ever sits on water.
     if (is_ocean_tile(tc.composition))
-        return false;
+        return placement_reason::ocean;
 
     switch (type)
     {
         case building_type::extraction_site:
             // Extraction must sit on a non-zero deposit of a prototype-extractable
             // target resource.
-            return is_extractable(target)
-                && tc.resource_deposit[static_cast<std::size_t>(target)] > 0.0f;
+            if (is_extractable(target)
+                && tc.resource_deposit[static_cast<std::size_t>(target)] > 0.0f)
+                return placement_reason::ok;
+            return placement_reason::no_deposit;
 
         case building_type::processing_facility:
         case building_type::port:
         case building_type::none:
         default:
             // Any non-ocean land tile is valid for non-extraction buildings.
-            return true;
+            return placement_reason::ok;
     }
 }
 
@@ -121,19 +141,20 @@ bool is_coastal(const world& w, entity_id tile_id)
     return false;
 }
 
-bool can_place_in_world(const world& w, entity_id tile_id,
-                        building_type type, resource_type target)
+placement_result can_place_in_world(const world& w, entity_id tile_id,
+                                    building_type type, resource_type target)
 {
     const auto tc_it = w.tiles.find(tile_id);
     if (tc_it == w.tiles.end())
-        return false;
-    if (!can_place(tc_it->second, type, target))
-        return false;
+        return placement_reason::no_tile;
+    // Tile-level terrain/deposit check first — propagate its specific reason.
+    if (const placement_result tile_ok = can_place(tc_it->second, type, target); !tile_ok)
+        return tile_ok;
 
     if (type == building_type::port)
     {
         if (!is_coastal(w, tile_id))
-            return false;
+            return placement_reason::not_coastal;
     }
     else if (type == building_type::launchpad)
     {
@@ -145,11 +166,11 @@ bool can_place_in_world(const world& w, entity_id tile_id,
                 continue;
             const auto btc_it = w.tiles.find(bc.tile);
             if (btc_it != w.tiles.end() && btc_it->second.body == body)
-                return false; // Already one on this body.
+                return placement_reason::launchpad_exists; // Already one on this body.
         }
     }
 
-    return true;
+    return placement_reason::ok;
 }
 
 } // namespace placement_rules

@@ -3,31 +3,70 @@
 #include <algorithm>
 #include <map>
 
+float body_mean_habitability(const world& w, entity_id body)
+{
+    // Mirrors the accumulation apply_budget's batch used, filtered to one body, so
+    // the estimate and the live budget loop read an identical mean (bit-for-bit).
+    float sum = 0.0f;
+    int   count = 0;
+    for (const auto& [cid, pcc] : w.population_centres)
+    {
+        const auto tile_it = w.population_centre_tile.find(cid);
+        if (tile_it == w.population_centre_tile.end())
+            continue;
+        const auto tc_it = w.tiles.find(tile_it->second);
+        if (tc_it == w.tiles.end())
+            continue;
+        if (tc_it->second.body != body)
+            continue;
+        sum += pcc.habitability;
+        ++count;
+    }
+    return (count > 0) ? sum / static_cast<float>(count) : 1.0f;
+}
+
+building_opex compute_building_opex(const building_component& b,
+                                    const building_economics& e,
+                                    float contention_scalar,
+                                    float mean_hab)
+{
+    // Labour/material cost split (BL-049).
+    // Material cost: fixed 30 % overhead, charged even when decommissioned.
+    // Labour cost: scales with workforce_target; zero when decommissioned.
+    const float wt_scalar     = std::clamp(b.workforce_target / 100.0f, 0.0f, 2.0f);
+    const float material_cost = e.maintenance * 0.3f;
+    const float labour_cost   = b.decommissioned ? 0.0f
+                                : e.maintenance * wt_scalar - material_cost;
+    const float hab           = std::clamp(mean_hab, 0.1f, 2.0f);
+
+    building_opex o;
+    // Guard against negative labour_cost when wt_scalar < 0.3 (the material floor
+    // already covers more than the scaled total in that edge case).
+    o.maintenance = material_cost + std::max(0.0f, labour_cost);
+    o.wages       = b.decommissioned
+                    ? 0.0f
+                    : b.workforce_assigned * contention_scalar * e.base_wage * wt_scalar * hab;
+    return o;
+}
+
 void apply_budget(world& w,
                   const recipe_registry& reg,
                   const std::unordered_map<entity_id, corp_cash_flow>& flows,
                   const std::map<std::pair<entity_id, entity_id>, float>& contention,
                   std::map<entity_id, corp_budget>* breakdown)
 {
-    // BL-042B: mean habitability per body (from population centres) for wage scaling.
-    std::map<entity_id, float> mean_habitability_by_body;
-    {
-        std::map<entity_id, std::pair<float, int>> hab_accum; // body → (sum, count)
-        for (const auto& [cid, pcc] : w.population_centres)
-        {
-            const auto tile_it = w.population_centre_tile.find(cid);
-            if (tile_it == w.population_centre_tile.end())
-                continue;
-            const auto tc_it = w.tiles.find(tile_it->second);
-            if (tc_it == w.tiles.end())
-                continue;
-            auto& acc = hab_accum[tc_it->second.body];
-            acc.first  += pcc.habitability;
-            acc.second += 1;
-        }
-        for (const auto& [body, acc] : hab_accum)
-            mean_habitability_by_body[body] = (acc.second > 0) ? acc.first / acc.second : 1.0f;
-    }
+    // BL-042B: mean habitability per body (from population centres) scales wages.
+    // Cached per body — body_mean_habitability scans every centre, so compute each
+    // body once; building_profit.hpp's estimate reads the same helper (no drift).
+    std::map<entity_id, float> hab_cache;
+    const auto mean_hab_of = [&](entity_id body) -> float {
+        const auto it = hab_cache.find(body);
+        if (it != hab_cache.end())
+            return it->second;
+        const float v = body_mean_habitability(w, body);
+        hab_cache.emplace(body, v);
+        return v;
+    };
 
     for (auto& [corp, cc] : w.corporations)
     {
@@ -69,27 +108,15 @@ void apply_budget(world& w,
             if (cit != contention.end())
                 scalar = cit->second;
 
-            // Labour/material cost split (BL-049).
-            // Material cost: fixed 30 % overhead, charged even when decommissioned.
-            // Labour cost: scales with workforce_target; zero when decommissioned.
-            const float wt_scalar     = std::clamp(b.workforce_target / 100.0f, 0.0f, 2.0f);
-            const float material_cost = e.maintenance * 0.3f;
-            const float labour_cost   = b.decommissioned ? 0.0f
-                                        : e.maintenance * wt_scalar - material_cost;
-            // Guard against negative labour_cost when wt_scalar < 0.3 (the material
-            // floor already covers more than the scaled total in that edge case).
-            const float maint_i = material_cost + std::max(0.0f, labour_cost);
-            bud.maintenance += maint_i;
-            delta           -= maint_i;
-            const float hab  = [&]() -> float {
-                const auto it = mean_habitability_by_body.find(body);
-                return (it != mean_habitability_by_body.end()) ? std::clamp(it->second, 0.1f, 2.0f) : 1.0f;
-            }();
-            const float wage_i = b.decommissioned
-                                 ? 0.0f
-                                 : b.workforce_assigned * scalar * e.base_wage * wt_scalar * hab;
-            bud.wages += wage_i;
-            delta     -= wage_i;
+            // Maintenance + wages via the shared formula (BL-074), so the balance
+            // loop and the per-building profitability estimate never diverge. Kept
+            // in the same subtract-then-subtract order as the pre-extraction code,
+            // so the deterministic balance is bit-identical.
+            const building_opex opex = compute_building_opex(b, e, scalar, mean_hab_of(body));
+            bud.maintenance += opex.maintenance;
+            delta           -= opex.maintenance;
+            bud.wages       += opex.wages;
+            delta           -= opex.wages;
         }
 
         cc.balance += delta; // bit-identical to the pre-BL-072 arithmetic; may go negative

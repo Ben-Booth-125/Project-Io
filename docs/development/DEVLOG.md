@@ -6,6 +6,145 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — Visibility pass: design Q&A → backlog cluster (2026-07-01)
+
+**Context.** Design session (advisor mode, **no `src/` change** — backlog only) on the "visibility
+pass" Ben raised: it's not clear (A) *where the player is* or (B) *what they can do*, and the world
+reads as "Resources with industry shoved on top" — the connective tissue from Resource World →
+Corporation World is missing. Two rounds of design Q&A settled eight calls; then a ground-truth pass
+(Explore sub-agent + backlog reconciliation) reshaped what the work actually *is*.
+
+**The load-bearing reconciliation.** Most of the machinery already exists — this is a *rendering /
+legibility* pass, not new mechanics:
+- **Population centres are generated** (`population_centre_component`, `generate_population_centres`,
+  20–40/body) but **drawn as nothing** — the human layer is invisible, which *is* the "industry
+  shoved on top" symptom.
+- **The saturated substrate is already economically live.** Ben chose "economically live now", but
+  **BL-050 already shipped it** — `substrate_density` → `nation_substrate` → `background_supply/demand`
+  injected into market clearing. BL-050 *deferred only the visual* ("industry-density lens deferred
+  to v2.0.0, **user to flag**"). Ben is now flagging it → this collapses to promoting a parked
+  rendering Brief, dodging the Full-mode economy risk entirely. (`GENERATION_STRATEGY.md` [B4]
+  "described, not generated" note is now **stale** — fix on landing.)
+- **Player identity is lens-gated** (Corp lens only); `home_body` never marked; no initial focus.
+- **Growth signals are build-mode-gated**; BL-071 (designed) covers the panel side, not the map side.
+
+**The design knot — RESOLVED (refined (b)).** BL-083's population-density field and BL-084's substrate
+field are **near-collinear by construction** (`substrate_density = (1 − dist/ripple) × strength`) *when
+both are drawn as raw density*. Broken by two moves: (1) population is the **discrete markers** (BL-083),
+not a smooth field — so "field + named anchors" resolves as anchors=BL-083, field=BL-084; (2) the
+industry lens reads **economic throughput, not density** — the already-computed, resource-/terrain-affinity-
+weighted `background_supply/demand`, which varies by terrain and is *not* collinear with headcount.
+This is the differentiation the specialist-vs-saturated premise wants, delivered as **pure rendering**
+(no `substrate_density`/market-arithmetic change → no Full-mode/determinism cost). Rejected (a) one
+merged glow and (b-heavy) changing generation. Yields a **three-layer visual language**: Settlements
+(markers) · Industry (throughput field) · You (identity chrome) — non-overlapping.
+
+**Filed** the visibility-pass cluster, all **designed**: **BL-083** POP_CENTRE_MARKERS (A) — tiered/named
+settlement markers, aggregate+label existing, civic-neutral colour; **BL-084** SUBSTRATE_LENS (B) —
+promote BL-050's deferred industry-density lens as a throughput field (field-model resolved 2026-07-01);
+**BL-085** PLAYER_PRESENCE (A) — always-on identity chrome + home ring/HQ pip + initial focus;
+**BL-086** AMBIENT_OPPORTUNITY (B) — glanceable growth read, map-side companion to BL-071.
+
+---
+
+## Session — Era 1 tech / quest system: research → first structural sketch (2026-07-01)
+
+**Context.** Tech-research session on branch `claude/era1-tech-research`. Deliberately worked from
+the *conceptual* docs only (`concept.md`, `ERAS.md`) plus the existing `docs/research/ERA1_TECH_LANDSCAPE.md`
+scaffolding — not the code. Goal: take the quest-based tech system named in concept.md from research
+into a first *structural* design, and land it in the design canon. **No `src/` change** — design +
+backlog only.
+
+**Web pass.** Surfaced articles against the research doc's own threads (ISRU/propellant keystone,
+reusable-launch economics, the asteroid-mining demand-loop bust) and a **Terra Invicta comparative**
+(how a near-future space game *forces* players spaceward: an external clock + a shifting Boost→Mission
+Control bottleneck; and its widely-reviled UI / "inaccessible" tech tree as a what-to-avoid). Three
+factual corrections folded into the doc: DRACO/nuclear-thermal cancelled FY2026; launch vs ISRU are
+partly *rivals* not complements (the Era 1 tension); the mining bust was a capital/runway failure as
+much as a demand one.
+
+**The threading insight (load-bearing).** The `ERAS.md` Era 0→1 gate is already a heterogeneous
+condition set (research + structure + stockpile). Generalised: **an Era gate, a quest, and a single
+tech are the same object** — an AND/OR expression over a shared condition vocabulary
+(`research`/`structure`/`stockpile`/`market`/`surplus`/`era`). So a tech can gate on an *economic
+state* (a corp supplying an excess, or a market where a good is cheap enough — Ben's phase-1 idea),
+which is the mechanism for making the game **demand use of its systems** rather than let a player
+drift past them.
+
+**Sketch landed** (`ERA1_TECH_LANDSCAPE.md` § "Tech-tree structure — first sketch"): two quest kinds
+(gate quests vs standing lines — Logistics/Military live in the latter); an itemisation schema
+mirroring `backlog.json` (quest + tech records, a `payoff` value taxonomy, cost model B = S/M/L/XL
+default-M); and a **fully worked keystone quest** — The Propellant Loop, ~25 techs, whose capstone
+gates on a *sustained economic surplus*, not a research total. Marked scaffolding-not-authority, dated,
+supersedes the earlier parked "Design state" block.
+
+**Filed BL-087** (`Research`, design-owed, priority B) as the tracked design home. Six numbered
+open questions remain (linear-vs-mesh, standing-lines-never-gate, unlock-vs-build, cross-quest deps,
+how-many-economic-gates, ERAS↔ROADMAP scope reconciliation). Scope-split recorded: the *lean gate-tech*
+(Rocketry/ISRU/Orbital) is prototype-relevant; the *full quest tree* is post-prototype (ROADMAP
+excludes Research from v0.1.0) — reconcile the authority docs only when work lands.
+
+**In-session decisions.**
+- **Design store = the research doc, not ERAS.md.** Authority time-slicing: the sketch lives in
+  scaffolding while BL-087 is open; it propagates into ERAS.md / a new tech doc only when work lands.
+- **Cost model B over uniform/bespoke.** Small S/M/L/XL vocabulary, default-M at sketch stage —
+  answers "all the same?" now while leaving room to differentiate.
+- **New `Research` backlog category** (none existed).
+- **No code, no requirement group.** Doc-only item; the prototype's tech scope stays the lean 3-tech
+  gate, and that implementation is deferred to the BL-087 split, not started here.
+
+**Left for Ben.** Resolve the six open questions, then split BL-087 into a prototype-scoped lean
+gate-tech implementation item vs the parked full tree. Branch left unpushed for review.
+
+---
+
+## Session — Gameplay-clarity / profit strand: budget cluster delivered (2026-06-30 → 07-01)
+
+**Context.** A gameplay-clarity review ("where can I build?", "how do I make a profit?") became a
+five-item strand (BL-071–075). This session filed and designed all five, then implemented the
+budget/profit cluster (BL-072/073/074) end-to-end, plus a pinned selection-bar polish.
+
+**Selection-bar fix (Light).** The bar now takes the minimap's box height (clamped up to the
+content minimum) so the two read as a pair, and the header `[>]`/`[x]` buttons no longer clip off
+the right edge — their `SameLine` offset double-counted `content_x`. Added
+`scripts/verify/selection_bar.lua` (capture-only).
+
+**Design (BL-071–075 → all `designed`).** Resolved every "Open call (Ben)": four-flow `corp_budget`
+shape settled once; runway = smoothed trailing net; debt interest ~2%/qtr per-quarter simple, one
+shared constant; per-building profitability via recipe×price **estimate** (the pooled market resists
+exact attribution); BL-071 rejection reason on both hover card + panel with a `placement_result`
+reason enum; BL-075 two-tier FAIL/WARN harness semantics. Corrected a false premise in BL-073 (the
+`econ_bankruptcy` harness never modelled interest — `grep interest src/` was empty).
+
+**BL-072 — Full budget breakdown + runway.** `apply_budget` captures a per-corp
+`corp_budget {income, expenditure, maintenance, wages, interest}` into `economy_report.budgets` via
+an optional sink (harnesses untouched); the balance update stays on the original interleaved `delta`,
+so the sim is **bit-identical** (`econ_bankruptcy` unchanged at 64485.92). The Balance Ledger's
+"not retained" placeholder became an itemised cashflow table netting to the per-tick delta, plus a
+smoothed projected runway. Verified: 253.00 − 10.47 − 20.00 − 4.81 = 217.72 = Net/tick.
+
+**BL-073 — Debt interest.** Interest = |balance| × `k_debt_interest_per_quarter` (0.02) charged once
+per tick on a now-negative balance; the constant is shared by the live loop and the harness. Surfaced
+as an "Interest (debt)" breakdown line, a header `[in debt - interest accruing]` badge, and an "in
+debt" runway; corrected the Treasury "no consequence" note. Added `verify.set_balance` +
+`scripts/verify/debt_interest.lua`. Verified spiral maths end-to-end.
+
+**BL-074 — Per-building profitability.** `building_profit.{hpp,cpp}` estimates a building's per-tick
+net (revenue = output×price, inputs = recipe×runs×price) with maintenance+wages from a shared
+`compute_building_opex` extracted from `apply_budget` (bit-exact). Section B of the Selection bar
+shows Revenue / Inputs / Wages / Maint + Net for a player building. Verified: a Processing Facility
+reads Net +108.86, and Maint 10.00/tick == the bankruptcy harness's 40/yr ÷ 4 (shared-formula
+cross-check). Requirement groups (`budget-breakdown`, `debt-interest`, `per-building-profitability`)
+all complete; goldens owed a software-renderer re-bless (this Linux box's software path errors).
+
+**Branch-split reconciliation.** The shared checkout was switched to `claude/era1-tech-research`
+mid-session (external actor, Era 1 note + BL-076), so BL-072/073/074 landed there while the
+selection-bar fix + BL-071–075 design stayed on `claude/gameplay-clarity-and-profit`, and `main`
+absorbed BL-072/073 code without their backlog items. Consolidated everything onto
+`era1-tech-research` by cherry-picking the selection-bar fix + the two backlog commits (backlog.json
+resolved to the BL-071–076 union). Consolidated tree builds green; BL-072/073/074 marked `complete`,
+BL-071/075 remain `designed`. Left unpushed for the developer to review and PR to `main`.
+
 ## Session — BL-076 Display options window (2026-07-01)
 
 **Context.** Pre-playtest QOL pass. The developer asked about resizing the window and about the
