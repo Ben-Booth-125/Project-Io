@@ -6,6 +6,53 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — Gameplay-clarity / profit strand: budget cluster delivered (2026-06-30 → 07-01)
+
+**Context.** A gameplay-clarity review ("where can I build?", "how do I make a profit?") became a
+five-item strand (BL-071–075). This session filed and designed all five, then implemented the
+budget/profit cluster (BL-072/073/074) end-to-end, plus a pinned selection-bar polish.
+
+**Selection-bar fix (Light).** The bar now takes the minimap's box height (clamped up to the
+content minimum) so the two read as a pair, and the header `[>]`/`[x]` buttons no longer clip off
+the right edge — their `SameLine` offset double-counted `content_x`. Added
+`scripts/verify/selection_bar.lua` (capture-only).
+
+**Design (BL-071–075 → all `designed`).** Resolved every "Open call (Ben)": four-flow `corp_budget`
+shape settled once; runway = smoothed trailing net; debt interest ~2%/qtr per-quarter simple, one
+shared constant; per-building profitability via recipe×price **estimate** (the pooled market resists
+exact attribution); BL-071 rejection reason on both hover card + panel with a `placement_result`
+reason enum; BL-075 two-tier FAIL/WARN harness semantics. Corrected a false premise in BL-073 (the
+`econ_bankruptcy` harness never modelled interest — `grep interest src/` was empty).
+
+**BL-072 — Full budget breakdown + runway.** `apply_budget` captures a per-corp
+`corp_budget {income, expenditure, maintenance, wages, interest}` into `economy_report.budgets` via
+an optional sink (harnesses untouched); the balance update stays on the original interleaved `delta`,
+so the sim is **bit-identical** (`econ_bankruptcy` unchanged at 64485.92). The Balance Ledger's
+"not retained" placeholder became an itemised cashflow table netting to the per-tick delta, plus a
+smoothed projected runway. Verified: 253.00 − 10.47 − 20.00 − 4.81 = 217.72 = Net/tick.
+
+**BL-073 — Debt interest.** Interest = |balance| × `k_debt_interest_per_quarter` (0.02) charged once
+per tick on a now-negative balance; the constant is shared by the live loop and the harness. Surfaced
+as an "Interest (debt)" breakdown line, a header `[in debt - interest accruing]` badge, and an "in
+debt" runway; corrected the Treasury "no consequence" note. Added `verify.set_balance` +
+`scripts/verify/debt_interest.lua`. Verified spiral maths end-to-end.
+
+**BL-074 — Per-building profitability.** `building_profit.{hpp,cpp}` estimates a building's per-tick
+net (revenue = output×price, inputs = recipe×runs×price) with maintenance+wages from a shared
+`compute_building_opex` extracted from `apply_budget` (bit-exact). Section B of the Selection bar
+shows Revenue / Inputs / Wages / Maint + Net for a player building. Verified: a Processing Facility
+reads Net +108.86, and Maint 10.00/tick == the bankruptcy harness's 40/yr ÷ 4 (shared-formula
+cross-check). Requirement groups (`budget-breakdown`, `debt-interest`, `per-building-profitability`)
+all complete; goldens owed a software-renderer re-bless (this Linux box's software path errors).
+
+**Branch-split reconciliation.** The shared checkout was switched to `claude/era1-tech-research`
+mid-session (external actor, Era 1 note + BL-076), so BL-072/073/074 landed there while the
+selection-bar fix + BL-071–075 design stayed on `claude/gameplay-clarity-and-profit`, and `main`
+absorbed BL-072/073 code without their backlog items. Consolidated everything onto
+`era1-tech-research` by cherry-picking the selection-bar fix + the two backlog commits (backlog.json
+resolved to the BL-071–076 union). Consolidated tree builds green; BL-072/073/074 marked `complete`,
+BL-071/075 remain `designed`. Left unpushed for the developer to review and PR to `main`.
+
 ## Session — BL-076 Display options window (2026-07-01)
 
 **Context.** Pre-playtest QOL pass. The developer asked about resizing the window and about the
