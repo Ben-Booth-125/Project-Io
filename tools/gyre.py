@@ -31,6 +31,10 @@ def yellow(s): return c(s, "33")
 def cyan(s):   return c(s, "36")
 
 PRIORITY_ORDER = ["SSS", "S", "A", "B", "C", "F"]  # highest first
+# Terminal statuses. The Gyre schema archives delivered work in a separate
+# delivered[] array; the Io schema leaves it in items[] under these statuses.
+# Counting both keeps the delivered/progress numbers correct in either repo.
+TERMINAL_STATUS = {"delivered", "complete", "shipped"}
 
 def load_backlog():
     with open(BACKLOG) as f:
@@ -66,28 +70,32 @@ def commit_records():
 def view_items():
     d = load_backlog()
     items, delivered = d.get("items", []), d.get("delivered", [])
+    # Terminal items live in items[] (Io) or the delivered[] array (Gyre); count both.
+    done_in_items = [i for i in items if i.get("status") in TERMINAL_STATUS]
+    open_items = [i for i in items if i.get("status") not in TERMINAL_STATUS]
+    n_delivered = len(delivered) + len(done_in_items)
     total = len(items) + len(delivered)
     print(bold("── Backlog ──"))
-    print(f"  {yellow(str(len(items)))} open   "
-          f"{green(str(len(delivered)))} delivered   "
+    print(f"  {yellow(str(len(open_items)))} open   "
+          f"{green(str(n_delivered))} delivered   "
           f"{dim(str(total)+' total')}")
     if total:
-        pct = 100 * len(delivered) / total
+        pct = 100 * n_delivered / total
         print(f"  progress: {green(f'{pct:.0f}%')} delivered")
 
-    by_status = Counter(i.get("status", "?") for i in items)
+    by_status = Counter(i.get("status", "?") for i in open_items)
     if by_status:
         print("  open by status: " +
               "  ".join(f"{k}={v}" for k, v in sorted(by_status.items())))
 
-    by_pri = Counter(i.get("priority", "?") for i in items)
+    by_pri = Counter(i.get("priority", "?") for i in open_items)
     if by_pri:
         ordered = [(p, by_pri[p]) for p in PRIORITY_ORDER if p in by_pri]
         ordered += [(p, n) for p, n in by_pri.items() if p not in PRIORITY_ORDER]
         print("  open by priority: " +
               "  ".join(f"{p}={n}" for p, n in ordered))
 
-    blocked = [i for i in items if i.get("blocked_on") or i.get("waits_on")]
+    blocked = [i for i in open_items if i.get("blocked_on") or i.get("waits_on")]
     if blocked:
         print(f"  {yellow(str(len(blocked)))} open item(s) waiting/blocked:")
         for i in blocked:
