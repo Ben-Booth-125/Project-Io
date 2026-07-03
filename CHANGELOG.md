@@ -12,7 +12,60 @@ authoritative version-history record. A local-only snapshot of `src/` is also ke
 
 ## [Unreleased]
 
-_Nothing yet._
+Work in progress toward **v0.0.8 — Discovery & intelligence** (not yet cut). Landed so far: the
+survey system (bodies start unsurveyed; a survey action reveals the tile map + deposit bands), the
+competitor-visibility model, population legibility, and — shipped early from the v0.0.9 theme — the
+budget cluster (itemised cashflow breakdown, debt-interest visibility, per-building profitability).
+The v0.0.8 legibility pass (population-centre markers, player-presence chrome, industry-density lens,
+ambient opportunity read) and the trade-route commercial-sphere fog remain outstanding before the cut.
+
+> **Note (2026-07-03):** v0.0.6 and v0.0.7 were developed and merged as batches but never formally
+> cut. Their tags and the entries below were reconstructed retroactively from the roadmap and DEVLOG;
+> the tags point at the theme-boundary commits (`v0.0.6` → `ab7e28f`, `v0.0.7` → `61d9946`) rather
+> than a dedicated changelog-stamp commit.
+
+## [0.0.7] — 2026-06-30
+
+Interactive & legible — the economy becomes something the player *drives*, not just observes.
+
+### Added
+- **Player construction** — armed build mode with placement validation (terrain/deposit affinity,
+  slot rules), a resource build-cost model, and the construction panel as the build front door.
+- **Recipe & workforce control** — per-building recipe selection and workforce allocation, with the
+  contention scalar feeding production and wages.
+- **Population centres** — static MVP placement plus the dynamic habitability→workforce feedback
+  loop that grounds labour supply per body.
+- **Selectable entity markers** — buildings and market centres are hit-testable on-canvas with
+  lens-contextual hover cards; the pinned **Selection panel** shows polymorphic per-entity detail.
+- **Placement-suitability surface** — armed build mode tints affinity tiles so siting is legible.
+- **Lens-driven selection** — the Selection panel content follows the active map lens.
+- **Full hotkey system** — unified keyboard control with an F1 cheat-sheet overlay.
+- **Trend plots** — balance/market trend graphs in the Economy panel and Market Ledger.
+- **App-driven mouse** — deterministic pointer input for reproducible verify captures.
+
+### Changed
+- **Cross-platform build** — Linux is the primary target with Windows CI; source-portability fixes
+  and a GCC-14 / sol2 v3.5.0 regression guard.
+
+## [0.0.6] — 2026-06-17
+
+Improved core-loop — the market gains depth, spatial reach, and a read surface.
+
+### Added
+- **Matched price-time order book** — `clear_markets` restructured around an order book so bids and
+  asks match by price then time rather than a single clearing pass.
+- **Saturated substrate** — nation-owned background supply and demand that fills the world so the
+  player trades into a live economy rather than a vacuum.
+- **Supply convoys** — inter-body convoy routing with logistics costs, driving spatial **price
+  convergence** between bodies.
+- **Ledger family** — the Market, Balance, and Construction ledgers plus the Corp Overview dashboard,
+  wired into the nav pane.
+- **Market-centre seeding** — market centres seeded from population centres; multi-market dashboard.
+- **Warm-start surface** — pre-game economy warm-up so a campaign opens on a settled market.
+
+### Changed
+- Backlog/process refit: JSON backlog (`backlog.json`) with schema v2 (`waits_on` → `requires`),
+  the `verifier-review` skill, and the native-only git-write standing rule (BL-058).
 
 ## [0.0.5] — 2026-06-16
 
@@ -92,7 +145,9 @@ Layer 2 finalisation.
 
 Initial prototype snapshot — application shell, canvases, and the hard-coded world.
 
-[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.5...HEAD
+[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.7...HEAD
+[0.0.7]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.6...v0.0.7
+[0.0.6]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.5...v0.0.6
 [0.0.5]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.4...v0.0.5
 [0.0.4]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.3...v0.0.4
 [0.0.3]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.2...v0.0.3

@@ -15,12 +15,14 @@ The project is in **prototype phase**, solo-developed in C++ with Lua scripting.
 technical documentation lives under [`docs/`](docs/) — start with
 [`docs/CONCEPT.md`](docs/CONCEPT.md) and [`docs/SYSTEMS.md`](docs/SYSTEMS.md).
 
-## Latest release — v0.0.5
+## Latest release — v0.0.7
 
-Layer 4 foundations: the reusable placement-rules seam, a multi-tick economy-stability harness,
-the workforce pool (step 1), and the Layer 4 UI scaffold. Adds the Resource / Market / Population /
-Scarcity **map lenses**, tile-centred markets, player sell-orders, golden-image visual
-verification, and world-generation fixes (full land claim, lean corporation holdings). Full
+Interactive & legible: the economy becomes something the player *drives*. Adds **player
+construction** (validated placement, resource build cost, recipe & workforce control),
+**population centres** with habitability→workforce feedback, **selectable entity markers** with
+lens-contextual hover cards and the pinned Selection panel, the placement-suitability surface, a
+full **hotkey system** (F1 cheat-sheet), balance/market **trend plots**, and a **cross-platform
+build** (Linux primary, Windows CI). v0.0.8 (Discovery & intelligence) is in progress. Full
 history in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Versioning & releases
