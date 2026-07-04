@@ -58,6 +58,9 @@ The icon vocabulary — every hand-drawn vector glyph in the `ui::icons` namespa
 **`docs/ui/LENSES.md`**
 The map-lens system — the overlay modes (`overlay_mode` in `src/ui/ui_state.hpp`) selectable from the canvas control strip. The **Corporation** lens is fully settled (tile ownership tint, player vs. rival colours, Planetary-only); the **Supply / Market / Faction** sections currently record existing behaviour and the proposed **Resource** lens is a stub — completing them is a backlog item under BACKLOG § Canvas. Read before any work on overlay modes, lens rendering, or the lens icon vocabulary (which propagates to ICONS.md).
 
+**`docs/ui/DISCOVERY.md`**
+The discovery & intelligence model — how the player *learns about the world*. Owns the two independent "fogs": the **geographic fog** (the Survey system, BL-067 — bodies start unsurveyed; a paid survey reveals tiles + deposit bands region-by-region) and the **activity fog** (the commercial sphere, BL-089 — a body-level Unknown/Known/Stale/Visible tier lit by the player's own trade routes + presence, `body_activity_visibility`), plus the **competitor-visibility rule** (BL-068 — rival buildings visible, internals private, markets public) and **persistent trade routes** (BL-088, the substrate the activity fog reads). The two fogs are independent axes (a body can be Known-but-unsurveyed). Read before any work on survey, competitor intelligence, trade-route recording, or the activity fog; the canvas rendering lives in SOLAR/PLANETARY/SELECTION, the glyphs in ICONS.
+
 **`docs/economy/RESOURCES.md`**
 The canonical resource list: all 23 resources organised into three tiers (raw → refined → product), their terrain affinity and body availability, the Era 0 / Era 1 split, and the seven-resource prototype subset. Read before any work involving resource types, tile deposits, or market goods.
 
