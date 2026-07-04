@@ -24,10 +24,11 @@ are not defined here — they live in [`presentation.hpp`](../../src/ui/presenta
 
 ## Shared conventions
 
-Every glyph function takes the same positional contract:
+Every glyph function shares the same positional prefix; the trailing parameters
+are per-glyph (type, tier, and/or colour):
 
 ```cpp
-void glyph(ImDrawList* dl, ImVec2 centre, float r, /* colour or type */);
+void glyph(ImDrawList* dl, ImVec2 centre, float r, /* trailing type/tier/colour per glyph */);
 ```
 
 - **`dl`** — the draw list to render into (background list for canvases, window
@@ -38,6 +39,9 @@ void glyph(ImDrawList* dl, ImVec2 centre, float r, /* colour or type */);
   `2r × 2r` box centred on `centre`. Callers pass the radius, not the diameter.
 - **colour** — either a caller-supplied `ImU32`, or *derived* (the `resource`
   glyph pulls its colour from `presentation_of`). See the catalogue for which.
+- **trailing parameters** — most glyphs take a single colour; the two
+  multi-parameter cases are `building` (a `building_type` + `fill`) and
+  `settlement` (a `tier` + `colour`).
 
 Two settled visual sub-conventions (the resolution of former Open clarifications 3–4):
 
@@ -46,9 +50,10 @@ Two settled visual sub-conventions (the resolution of former Open clarifications
   family (`building`, `unit`). The resource **pip** is the single documented exception: as a
   strip/swatch/deposit glyph it stays **outline-less**.
 - **`colour` means fill or stroke per family, fixed:** the filled families
-  (`building`, `country`, `corporation`, `unit`, resource `pip`) treat `colour` as the **fill**;
-  the stroke families (`supply`, `market`, `ledger`, `placeholder`, resource-**lens**) treat it as
-  the **stroke** line colour and have no fill.
+  (`building`, `country`, `corporation`, `unit`, resource `pip`, `settlement`, `industry`) treat
+  `colour` as the **fill**; the stroke families (`supply`, `convoy`, `market`, `ledger`,
+  `placeholder`, resource-**lens**) treat it as the **stroke** line colour and have no fill;
+  `hq` and `activity` span both — the one `colour` fills the core *and* strokes the ring.
 
 ---
 
@@ -66,9 +71,13 @@ Glyphs fall into three families by role.
 | **Building (none/other)** | `building(…, none, fill)` | Filled circle (dot) | Caller `fill` | Fallback building marker |
 | **Resource pip** | `resource(…, res)` | Filled diamond (no outline) | **Derived** — `presentation_of(res).colour` | Resource strips, deposit markers |
 | **Unit / convoy** | `unit(…, colour)` | Open upward chevron (V) — two stroke lines meeting at a bottom point, open at the top; drawn with a dark 2 px shadow pass then a 1.5 px colour pass; stroke-only so it never reads as the filled port triangle | Caller `colour` (e.g. a corp colour) | Unit stacks, Layer 5 convoy heads |
+| **Convoy** | `convoy(…, colour)` | Rightward chevron (→) — two stroke lines meeting at a right point (goods in transit); points *right*, never confusable with the *unit* marker's upward chevron | Caller stroke | Supply-lens on-canvas convoy marker — drawn on tiles a player convoy passes through, Planetary canvas |
 | **Market centre** | `market_centre(…, colour)` | Circle outline with a centred cross (+); arms reach 60 % of the radius | Caller stroke | Market-centre marker, Planetary canvas |
+| **Settlement** | `settlement(…, tier, colour)` | Tiered skyline — 1–5 filled towers (count = `tier`, clamped) on a baseline + per-tower outline, the middle tallest, heights tapering to the edges; an outpost reads as a lone tower, a metropolis as a dense cluster | Caller `colour` — civic-neutral `palette::settlement` (parchment); host-nation tint (`palette::nation_colour`) only under the Country lens | Population-centre conurbation marker, Planetary canvas (BL-083) |
 | **Unknown** | `unknown(…, colour)` | Question mark — a top hook arc, a short stem, and a dot | Caller stroke (dimmed) | Survey badge for an **unsurveyed** body, Solar canvas (BL-067) |
 | **Survey badge** | `survey_badge(…, colour)` | Magnifying glass — a lens circle with a diagonal handle (scan motif) | Caller stroke | Survey badge for an **in-progress** survey, Solar canvas; the canvas overlays a `k∕N` region count (BL-067) |
+| **HQ** | `hq(…, colour)` | Ringed eight-point star — a diamond overlaid with an axis-aligned square, enclosed by a ring, with a dark centre dot so it reads against a same-colour ownership fill | Caller `colour` (the player identity colour) | The player's HQ/origin building, Planetary canvas (BL-085, folding BL-092) |
+| **Activity** | `activity(…, colour)` | Concentric pulse — a filled core ringed by a signal ring (commercial-beacon motif; deliberately distinct from the survey magnifier and the unknown "?") | Caller `colour` — per activity tier (`palette::activity_known` / `activity_stale` / `activity_visible`) | Commercial-activity fog badge, Solar canvas — lower-left of the body, offset from the survey badge's upper-right so the two fogs read apart (BL-089; see [DISCOVERY.md](DISCOVERY.md)) |
 
 On the Planetary canvas the **building** glyph's `fill` now encodes the *owning
 corporation* (player corp = corp slot 0; rivals a hashed slot), so the
@@ -94,6 +103,7 @@ silhouette reads the building **type** and the fill reads **who owns it**.
 | **Opportunity** | `opportunity(…, colour)` | Open circle with an inner "+" (stroke only) — a "potential gain / margin" motif (where value could be made) | Caller stroke | `overlay_mode::opportunity` |
 | **Production** | `production(…, colour)` | Filled upward-pointing triangle over a short baseline (output / throughput rising motif); distinct from the market bars and the scarcity hollow down-triangle | Caller fill | `overlay_mode::production` |
 | **Scarcity** | `scarcity(…, colour)` | Hollow downward-pointing triangle (empty / depleted motif; inverse of the filled resource pip) | Caller stroke | `overlay_mode::scarcity` |
+| **Industry** | `industry(…, colour)` | Factory silhouette — a filled body block with a two-tooth sawtooth roof and a left chimney rising above the roofline; distinct from the production up-triangle and the market bars (BL-084) | Caller fill | `overlay_mode::industry` |
 
 In the strip ([`overlay.cpp`](../../src/ui/overlay.cpp), `draw_overlay_controls`)
 each lens is an invisible button with its glyph drawn over the rect; the active
@@ -143,8 +153,10 @@ firmed up (several feed the **lens-design** Brief):
 
 5. **The lens set is now complete.** The curated strip order is
    corporation / country / resource / market / population / **opportunity** /
-   **production** / scarcity; all are ratified in [LENSES.md](LENSES.md) and
-   catalogued above (`supply` exists but is off the strip). Note `resource` is **overloaded**:
+   **production** / scarcity / **industry** (Industry joined the strip with BL-084;
+   catalogued here 2026-07-04, its LENSES.md section still owed); the rest are
+   ratified in [LENSES.md](LENSES.md) and all are catalogued above (`supply`
+   exists but is off the strip). Note `resource` is **overloaded**:
    `resource(…, resource_type)` is the identity-coloured *pip* (a diamond), while
    `resource(…, ImU32)` is the *lens* glyph (the strata motif) — same name,
    disambiguated by the final argument type and by context (strip vs. canvas pip).
