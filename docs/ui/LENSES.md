@@ -1,29 +1,37 @@
 # Project Io — Map Lenses
 
 The **lens system** is the set of data overlays the player toggles over the
-canvases from the bottom overlay control strip
-([`overlay.cpp`](../../src/ui/overlay.cpp), `draw_overlay_controls`). One lens is
-active at a time — the active mode is a single `overlay_mode` enum value
-([`ui_state.hpp`](../../src/ui/ui_state.hpp)); `overlay_mode::none` is the plain
-canvas. Each lens has one distinct vector glyph in the strip
-(see [ICONS.md](ICONS.md) § Map-lens glyphs) and re-skins or annotates the canvas
-when active.
+canvases from the lens mode bar on the **minimap**
+([`overlay.cpp`](../../src/ui/overlay.cpp), `draw_overlay_controls`; see
+[MINIMAP.md](MINIMAP.md)). One lens is active at a time — the active mode is a
+single `overlay_mode` enum value ([`ui_state.hpp`](../../src/ui/ui_state.hpp));
+`overlay_mode::none` is the plain canvas. Each on-screen lens has one distinct
+vector glyph in the bar (see [ICONS.md](ICONS.md) § Map-lens glyphs) and re-skins
+or annotates the canvas when active.
 
 This document is the *design* authority for what each lens shows, which rung of
 the [canvas zoom ladder](CANVASES.md) it applies to, and how its legend reads.
 Glyph shapes live in [ICONS.md](ICONS.md); identity colours live in
 [`presentation.hpp`](../../src/ui/presentation.hpp) (the `palette` namespace).
 
-> **Status.** All strip lenses are built except where a section names a gating
+> **Status.** All lenses are built except where a section names a gating
 > dependency. The **Lens & Legibility** batch (BL-013/052/019/017/009/018) settled
 > the curated single-select strip, renamed Faction → **Country**, reworked the
 > **Resource** lens to a flat contiguous-deposit fill, reworked **Scarcity** to a
 > per-market shortfall field, and added the **Opportunity** (net-margin) and
 > **Production** (intensity) lenses. The 2026-07-01 visibility-pass cluster added
-> the **Industry** lens (BL-084, per-tile nation-substrate throughput field) as the
-> strip's ninth entry, and **re-keyed Population** (BL-069) from raw habitability
-> to workforce efficiency. The **Market** lens's per-catchment surface still waits
-> on multi-market seeding (BL-036); **Supply** waits on Layer-5 route geometry.
+> the **Industry** lens (BL-084, per-tile nation-substrate throughput field), and
+> **re-keyed Population** (BL-069) from raw habitability to workforce efficiency.
+> **BL-093** (2026-07-04) relocated the lens bar from the bottom-left strip onto
+> the **minimap** (a single row of 7 glyphs fits its width) and trimmed the
+> on-screen set to **Corp, Country, Resource, Market, Population, Opportunity,
+> Production** — **Scarcity** and **Industry** dropped off the visible bar to
+> **keyboard-cycle only**, joining Supply (all three `overlay_mode` values still
+> exist and still render when selected by keyboard; they are just not glyphed on
+> the bar). The resource/good selector (shared by Resource/Market/Scarcity) is now
+> a **popup** opened from the minimap bar — the old 140px inline combo does not
+> fit there. The **Market** lens's per-catchment surface still waits on
+> multi-market seeding (BL-036); **Supply** waits on Layer-5 route geometry.
 > Identity colours live in `presentation.hpp`; the corporation-identity helper is
 > `palette::corp_colour` (renamed from `faction_colour`, BL-052).
 
@@ -35,23 +43,25 @@ Which lenses are meaningful on each rung of the ladder. "—" = no representatio
 intended; "✓" = built and active; "(later)" = a representation is specified here
 but its build is gated on a dependency (named in the lens section).
 
-The strip presents a **curated subset** in this order (BL-013, extended BL-084):
-**Corporation → Country → Resource → Market → Population → Opportunity →
-Production → Scarcity → Industry**. Supply is off the strip (Layer-5, reached by
-keyboard lens-cycle). The campaign
+The lens bar — now on the **minimap** (BL-093, relocated from the bottom-left
+strip; see [MINIMAP.md](MINIMAP.md)) — presents a **curated subset** in this order
+(BL-013, extended BL-084, trimmed BL-093): **Corporation → Country → Resource →
+Market → Population → Opportunity → Production**. **Scarcity** and **Industry**
+are off the bar, reached by **keyboard lens-cycle only** — joining **Supply**,
+which remains off-bar pending Layer-5 route geometry. The campaign
 opens on **no lens** (`overlay_mode::none`, the plain canvas) — a click only updates
 the Selection element and never re-skins the canvas, so the canvas starts unskinned
 and the player picks a lens deliberately (reverses BL-013's Corporation-default,
-2026-06-30). The strip is single-select with a null state (re-selecting the active
+2026-06-30). The bar is single-select with a null state (re-selecting the active
 lens clears to plain terrain).
 
-The per-rung representation of every strip lens (the BL-012 sweep). "—" = no
+The per-rung representation of every lens, on-bar or keyboard-only (the BL-012 sweep). "—" = no
 representation intended; "✓" = built and active; "(later)" = specified but gated on
 a dependency (named in the lens section).
 
 | Lens | Solar | Circumplanetary | Planetary |
 |---|---|---|---|
-| Supply *(off strip)* | (later) inter-body route lines | (later) per-body throughput badge | (later) per-tile route + stockpile |
+| Supply *(keyboard-cycle only)* | (later) inter-body route lines | (later) per-body throughput badge | (later) per-tile route + stockpile |
 | **Corporation** | — | — | **✓ tile tint + player border** |
 | **Country** | — | — | **✓ tile tint + owner borders** |
 | **Resource** | — | — | **✓ contiguous-deposit flat fill + key** |
@@ -59,8 +69,8 @@ a dependency (named in the lens section).
 | **Population** | — | — | **✓ workforce-efficiency tint + gradient key (BL-069)** |
 | **Opportunity** | — | — | **✓ best-building net-margin tint + key** |
 | **Production** | — | (later) per-body output-throughput badge | **✓ production-intensity tint + key** |
-| **Scarcity** | — | (later) per-body shortfall badge | **✓ per-market shortfall blocks + key** |
-| **Industry** | — | — | **✓ substrate-throughput amber tint + key** |
+| **Scarcity** *(keyboard-cycle only)* | — | (later) per-body shortfall badge | **✓ per-market shortfall blocks + key** |
+| **Industry** *(keyboard-cycle only)* | — | — | **✓ substrate-throughput amber tint + key** |
 
 **BL-012 per-lens rung notes.** Corporation, Country, Resource, Population,
 Opportunity, and Industry are **Planetary-only** — their unit of meaning (a tile, a
@@ -78,11 +88,14 @@ dependency** (tile `resource_deposit` is already generated), so it landed direct
 Planetary render pass. See its section for the full spec.
 
 Interaction notes shared by all lenses: lenses are **Planetary-first** in this
-prototype, single-select (one `overlay_mode` at a time), and do not yet propagate
-to the minimap. Selecting the already-active lens clears back to
-`overlay_mode::none` (`toggle_overlay`). Coarser Solar/Circumplanetary
-representations, where specified, are additive render passes guarded behind the
-same `overlay_mode` — they do not change the Planetary behaviour.
+prototype, single-select (one `overlay_mode` at a time). Since BL-093 (2026-07-04)
+the mode bar itself lives on the **minimap** rather than a canvas-bottom strip (see
+[MINIMAP.md](MINIMAP.md)) — the lens still re-skins whichever Planetary canvas is
+open; only the *control's* location moved. Selecting the already-active lens
+clears back to `overlay_mode::none` (`toggle_overlay`). Coarser
+Solar/Circumplanetary representations, where specified, are additive render
+passes guarded behind the same `overlay_mode` — they do not change the Planetary
+behaviour.
 
 ---
 
@@ -253,7 +266,8 @@ Planetary wash in `body_surface_canvas.cpp` (`diverging_colour`, composited over
 alpha); the per-body strip in **`circumplanetary_canvas.cpp`** — the Circumplanetary rung, *not*
 `solar_system_canvas.cpp` as the Session-2 handoff's file list said (Solar has no market surface).
 The good-selector is the shared combo from the Resource lens (`overlay.cpp`, bound to
-`ui_state.lens_resource`). On-canvas keys/strip are inset past the nav rail (`nav_pane_width`) and
+`ui_state.lens_resource`; since BL-093 a popup opened from the minimap bar rather than an inline
+combo). On-canvas keys/strip are inset past the nav rail (`nav_pane_width`) and
 vertically centred. Verified by `scripts/verify/market_lens.lua`, which runs `verify.econ_step(12)`
 to diverge prices from base before capture (and a new `verify.show_panel("economy", false)` hook to
 clear the panel `econ_step` opens), against blessed goldens.
@@ -339,8 +353,9 @@ on-canvas key: the selected resource's identity swatch + name and the note
 "filled = deposit present". Flat, not a gradient — the lens shows deposit *shape*.
 
 **Interaction notes.** Planetary-only, single-select. The resource selector is the
-shared combo in the control strip (form shared with the Market and Scarcity
-selectors, bound to `ui_state.lens_resource`). No new data, no tick dependency.
+shared combo (form shared with the Market and Scarcity selectors, bound to
+`ui_state.lens_resource`) — since BL-093 a popup opened from the minimap lens bar
+rather than an inline strip combo. No new data, no tick dependency.
 
 **Implemented 2026-06-17** (Lens & Legibility batch, BL-019). `overlay_mode::resource`
 Planetary pass in `body_surface_canvas.cpp`: a tile with `resource_deposit[sel] > 0` is
@@ -456,7 +471,13 @@ diverging key.
 so buildings produce and the report populates before capture. Verified by
 `scripts/verify/production_lens.lua`.
 
-## Scarcity lens *(built 2026-06-16 — no data dependency)*
+## Scarcity lens *(built 2026-06-16 — no data dependency; keyboard-cycle only since BL-093, 2026-07-04)*
+
+**Off the on-screen bar (BL-093).** Scarcity dropped off the visible minimap lens bar in the
+BL-093 trim (a single row of 7 fits; Scarcity and Industry were cut to make room) and is now
+reached by **keyboard lens-cycle only**, joining Supply. The `overlay_mode::scarcity` render pass
+below is unchanged and still fires when selected by keyboard — only the glyph's presence on the
+bar was removed.
 
 **Intent.** The inverse of the Resource lens: read the map as an *absence surface* — where a chosen
 good is **scarce or absent**, so the player sees gaps rather than concentrations. Answers "where is
@@ -483,8 +504,8 @@ it gains spatial variation once multiple centres are seeded (BL-036).
 the inverse of the filled resource pip.
 
 **Legend.** An abundant→scarce gradient bar plus the selected resource's name and identity swatch,
-same placement as the others. Tooltip "Resource scarcity". The resource selector appears in the
-control strip when the lens is active (shared form with Resource/Market).
+same placement as the others. Tooltip "Resource scarcity". The resource selector appears as the
+shared popup (form shared with Resource/Market) when the lens is active via keyboard-cycle.
 
 **Interaction notes.** Planetary-only, single-select. The script runs `verify.econ_step(12)` so
 market supply/demand populate before capture. Verified by `scripts/verify/scarcity_lens.lua`
@@ -496,7 +517,12 @@ per-tile heatmap to per-market shortfall blocks: a pre-pass collects each body m
 market (`market_for_tile`) and composites the hot hue by the normalised shortfall. The on-canvas key
 reads "Market scarcity" (met → scarce).
 
-## Industry lens *(built 2026-07-04 — BL-084)*
+## Industry lens *(built 2026-07-04 — BL-084; keyboard-cycle only since BL-093, 2026-07-04)*
+
+**Off the on-screen bar (BL-093).** Industry shipped the same day it was trimmed off the visible
+minimap lens bar — the BL-093 redesign keeps the on-screen row to 7 glyphs, so Industry (like
+Scarcity) is reached by **keyboard lens-cycle only**, joining Supply. The `overlay_mode::industry`
+render pass below is unaffected; only the bar presence changed.
 
 **Intent.** Read the map as an *economic-throughput surface*: where the existing, nation-owned
 industry already is — distinct from where people live (BL-083's markers) or where labour is
