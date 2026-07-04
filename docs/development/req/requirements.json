@@ -4540,11 +4540,11 @@
       "promoted_from": "backlog.json BL-086 (v0.0.8 visibility-pass cluster); map-side complement to BL-071",
       "difficulty": 2,
       "importance": "B",
-      "status": "active",
+      "status": "complete",
       "rows": [
         {
           "id": "R1",
-          "status": "active",
+          "status": "complete",
           "requirement": "Brief-spanning: the Opportunity lens's diverging profit→loss margin surface is fully readable at rest (not gated on an armed building type) and carries an on-canvas profit→loss key so growth headroom reads directly off the terrain. It is NOT auto-activated at campaign start (the canvas opens unskinned per the BL-013 reversal). Golden-verified with no build mode armed.",
           "verification": ["visual: scripts/verify/opportunity_ambient.lua golden"],
           "notes": "Reuses the existing per-tile margin estimate; no new mechanics."
