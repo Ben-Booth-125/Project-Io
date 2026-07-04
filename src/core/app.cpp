@@ -315,7 +315,7 @@ void app::step_economy()
     auto flows = clear_markets(m_world, m_registry, m_last_econ_report, m_ui.sell_orders);
     apply_budget(m_world, m_registry, flows, m_last_econ_report.workforce_contention,
                  &m_last_econ_report.budgets);
-    credit_arrived_convoys(m_world);
+    credit_arrived_convoys(m_world, static_cast<int>(m_sim_loop.day_tick()));
 
     // Record player balance, income, and expenditure for the header sparkline and
     // economy panel graphs (BL-063).  All three are capped at plot_history_cap.

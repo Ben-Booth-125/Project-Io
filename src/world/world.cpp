@@ -24,3 +24,11 @@ bool is_player_owned(const world& w, entity_id building)
     const auto it = w.corporations.find(corp);
     return it != w.corporations.end() && it->second.is_player;
 }
+
+entity_id body_of_market(const world& w, entity_id market)
+{
+    if (market == null_entity)
+        return null_entity;
+    const auto it = w.markets.find(market);
+    return it != w.markets.end() ? it->second.body : null_entity;
+}

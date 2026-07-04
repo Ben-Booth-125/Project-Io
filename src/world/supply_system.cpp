@@ -19,7 +19,7 @@ void advance_convoys(world& w)
     }
 }
 
-void credit_arrived_convoys(world& w)
+void credit_arrived_convoys(world& w, int tick)
 {
     // Credit in insertion order, then erase in one sweep.
     for (const auto& convoy : w.convoys)
@@ -39,6 +39,37 @@ void credit_arrived_convoys(world& w)
 
         // Inject into market supply so the next clearing pass prices it.
         mit->second.supply[static_cast<std::size_t>(convoy.cargo_resource)] += convoy.cargo_qty;
+
+        // Record the persistent trade route this completed lane ran (BL-088). The
+        // route is body-level, so collapse both market endpoints to their bodies;
+        // skip intra-body lanes (they light nothing) and lanes with an unresolved
+        // source. The route is upserted (never duplicated) and never erased — its
+        // last-traffic stamp lets the fog (BL-089) age it to 'stale' at read time.
+        const entity_id src_body = body_of_market(w, convoy.source_market);
+        if (src_body != null_entity && dest_body != null_entity && src_body != dest_body)
+        {
+            const auto same_lane = [&](const trade_route& r) {
+                return r.corp == convoy.corp &&
+                       ((r.body_a == src_body && r.body_b == dest_body) ||
+                        (r.body_a == dest_body && r.body_b == src_body));
+            };
+            const auto rit = std::find_if(w.trade_routes.begin(), w.trade_routes.end(), same_lane);
+            if (rit == w.trade_routes.end())
+            {
+                trade_route route;
+                route.body_a       = src_body;
+                route.body_b       = dest_body;
+                route.corp         = convoy.corp;
+                route.last_tick    = tick;
+                route.convoy_count = 1;
+                w.trade_routes.push_back(route);
+            }
+            else
+            {
+                rit->last_tick = tick;
+                ++rit->convoy_count;
+            }
+        }
     }
 
     // Retire arrived convoys.

@@ -222,6 +222,24 @@ target_include_directories(workforce_harness PRIVATE
 target_compile_features(workforce_harness PRIVATE cxx_std_20)
 
 # ---------------------------------------------------------------------------
+# Headless trade-routes harness (BL-088; no SDL / Lua / ImGui)
+# ---------------------------------------------------------------------------
+# Exercises credit_arrived_convoys' persistent-route upsert (correct body-pair,
+# last_tick stamp, no duplicate on a repeat/reverse lane, intra-body records
+# nothing) and body_of_market resolution. Links only world + supply_system.
+add_executable(trade_routes_harness
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/trade_routes_harness.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/supply_system.cpp"
+)
+
+target_include_directories(trade_routes_harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+)
+
+target_compile_features(trade_routes_harness PRIVATE cxx_std_20)
+
+# ---------------------------------------------------------------------------
 # Headless corp-terrain viability harness (BL-075; no SDL / Lua / ImGui)
 # ---------------------------------------------------------------------------
 # For every generated corporation in the canonical world, runs a two-tier

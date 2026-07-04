@@ -333,6 +333,28 @@ struct convoy_component
 };
 
 // ---------------------------------------------------------------------------
+// Trade route (BL-088)
+// ---------------------------------------------------------------------------
+
+/// A persistent body-pair trade lane that a corporation's commerce has actually
+/// run. Unlike convoy_component (transient — created at dispatch, erased on
+/// arrival), a trade_route is **never erased**: it accumulates and carries a
+/// last-traffic stamp so a reader can age it to 'stale' without any deletion
+/// logic. Keyed on the *unordered* (body_a, body_b) pair plus the dispatching
+/// corp. Upserted in credit_arrived_convoys when a convoy completes a lane
+/// between two distinct bodies. Consumed by the commercial-sphere fog (BL-089),
+/// which reads the player's routes to light the Solar canvas.
+/// See docs/economy/SUPPLY.md and supply_system.hpp.
+struct trade_route
+{
+    entity_id body_a       = null_entity; ///< One endpoint body (unordered relative to body_b).
+    entity_id body_b       = null_entity; ///< The other endpoint body.
+    entity_id corp         = null_entity; ///< Dispatching corporation (the fog reads the player's).
+    int       last_tick    = 0;           ///< Day (sim day tick) a convoy last COMPLETED this lane; drives stale-aging.
+    int       convoy_count = 0;           ///< Cumulative completions on this lane (telemetry / future volume model).
+};
+
+// ---------------------------------------------------------------------------
 // Corporation enumerations
 // ---------------------------------------------------------------------------
 

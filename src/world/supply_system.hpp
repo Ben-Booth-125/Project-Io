@@ -16,8 +16,17 @@ void advance_convoys(world& w);
 /// world.convoys. Called after clear_markets so the market supply injection takes
 /// effect at the *next* tick's clearing pass.
 ///
-/// @param w  World; pools, market supply, and convoys vector are mutated.
-void credit_arrived_convoys(world& w);
+/// Also **upserts a persistent trade_route** (BL-088) for each completed inter-body
+/// lane before the convoy is erased: the unordered (source-body, dest-body) pair for
+/// the convoy's corp gets `last_tick = tick` and its `convoy_count` incremented
+/// (a new route is created on first traffic). Intra-body convoys (source and dest on
+/// the same body) record nothing. Routes are never erased here — the commercial-sphere
+/// fog (BL-089) ages them at read time.
+///
+/// @param w    World; pools, market supply, convoys, and trade_routes are mutated.
+/// @param tick Current sim day tick, stamped onto routes as last-traffic time. The
+///             default keeps pre-BL-088 callers (and pure market/pool tests) compiling.
+void credit_arrived_convoys(world& w, int tick = 0);
 
 /// Auto-dispatch convoys to fill shortfalls. For each (corp, body, resource) where
 /// market demand exceeded supply in the last clearing pass (indicated by the market

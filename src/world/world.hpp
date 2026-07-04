@@ -100,6 +100,14 @@ struct world
     /// dispatch-time insertion; stable between ticks.
     std::vector<convoy_component> convoys;
 
+    /// Persistent trade routes — durable body-pair lanes a corporation's commerce
+    /// has run (BL-088). Upserted by credit_arrived_convoys when a convoy completes
+    /// a lane; never erased (aging to 'stale' is a read-time concern owned by the
+    /// commercial-sphere fog, BL-089). A std::vector mirroring `convoys`; insertion
+    /// order, stable between ticks. Joins the flat-binary serialisation seam
+    /// symmetrically when that path exists (none is wired in world/* yet).
+    std::vector<trade_route> trade_routes;
+
     /// Stockpile pool for a (corporation, body) pair, inserting an empty pool on
     /// first access. The single point through which the economy systems read and
     /// write the shared pool.
@@ -167,3 +175,12 @@ entity_id owner_corp_of(const world& w, entity_id building);
 /// @param building Building entity id to test.
 /// @return         Whether the owning corporation has `is_player` set.
 bool is_player_owned(const world& w, entity_id building);
+
+/// Resolve the body a market entity sits on. Collapses market-level identity to
+/// body-level for the trade-route / fog systems (a body may host several markets;
+/// all share one lane for visibility). Sibling of `owner_corp_of`.
+///
+/// @param w      Read-only world state.
+/// @param market Market entity id to resolve.
+/// @return       Owning body id, or `null_entity` if the market is unknown.
+entity_id body_of_market(const world& w, entity_id market);

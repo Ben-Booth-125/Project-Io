@@ -4405,25 +4405,25 @@
       "promoted_from": "backlog.json BL-088 (v0.0.8 discovery); prerequisite for BL-089",
       "difficulty": 3,
       "importance": "A",
-      "status": "active",
+      "status": "complete",
       "rows": [
         {
           "id": "R1",
-          "status": "active",
+          "status": "complete",
           "requirement": "Brief-spanning: a completed player convoy upserts exactly one persistent trade_route for the correct unordered body-pair with last_tick = completion tick; a second convoy on the same lane bumps convoy_count and last_tick without creating a duplicate; an intra-body convoy (source and dest resolve to the same body) records nothing; body_of_market resolves a market to its owning body. Headless-verified.",
           "verification": ["headless: tools/verify/trade_routes_harness.cpp"],
           "notes": ""
         },
         {
           "id": "R2",
-          "status": "active",
+          "status": "complete",
           "requirement": "world gains a trade_route struct {body_a, body_b, corp, last_tick, convoy_count} and a std::vector<trade_route> trade_routes (mirroring world.convoys). Routes are never erased by this item (aging is a read-time concern for BL-089). Flag the flat-binary serialisation seam at integration if/when one exists in world/* — do not invent a save path.",
           "verification": ["code"],
           "notes": "components.hpp + world.hpp"
         },
         {
           "id": "R3",
-          "status": "active",
+          "status": "complete",
           "requirement": "body_of_market(const world&, entity_id market) accessor added as a sibling of owner_corp_of; used by the upsert to collapse market pairs to body pairs.",
           "verification": ["code", "headless"],
           "notes": "world.{hpp,cpp}"
