@@ -1,14 +1,17 @@
 # Project Io — Selection Info Element
 
-The **Selection info element** is a pinned, polymorphic panel that shows detail
-about the **current selection** — whatever entity the player last single-clicked.
-It is the persistent "what is this?" surface that complements the transient
-hover card and the deep per-domain ledgers.
+The **Selection info element** is a pinned **action surface** that answers one
+question about the **current selection** — whatever entity the player last
+single-clicked: **"what's my move here?"** It is the opposite of a ledger: a
+ledger is exhaustive reference reached deliberately from the rail; this is a
+decision prompt that appears when you click. One primary **action** per
+selection kind, dominant; a slim line of decision-relevant **facts**; a
+**'go to'** for the deep ledger where reference detail actually lives.
 
-It is a *kind* of ledger (it presents per-entity detail and shares content
-builders with the ledgers and the future hover card), but unlike the floating
-ledgers it is **pinned chrome** and is **not** reachable from the navigation
-rail — the only way to open it is to select something.
+It is **not** reachable from the navigation rail — the only way to open it is
+to select something — and it is **not** the stat-block encyclopedia it once
+was (see § Removed: the stat-block polymorphism below); full per-entity detail
+lives in the Tile Ledger, Market Ledger, Balance Ledger, etc., one 'go to' away.
 
 See also: [LAYOUT.md](LAYOUT.md) (where it sits in the shell), [CANVASES.md](CANVASES.md)
 (the click model it revises), the deferred hover-card item in
@@ -59,51 +62,57 @@ zoom ladder. CANVASES.md and the minimap ascend gesture are updated to match.
 
 ---
 
-## Polymorphism — content by selection type
+## Action + Facts — content by selection type (BL-093)
 
-The panel is **polymorphic by selection kind**. The entity's kind is resolved by
-probing the `world` maps (the same discrimination `focus_on_entity` already
-does: `w.tiles`, `w.buildings`, `w.units`, `w.markets`, `w.bodies`, and later
-nations / corporations / logistics vessels).
+The panel is **polymorphic by selection kind**, but no longer as a stat block.
+The entity's kind is resolved by probing the `world` maps (the same
+discrimination `focus_on_entity` already does: `w.tiles`, `w.buildings`,
+`w.units`, `w.markets`, `w.bodies`, and later nations / corporations /
+logistics vessels), and each kind renders through the same two-column split:
 
-Each kind renders its own content and routes its 'go to' to the right place:
+- **Action** (left, dominant, ~58% of the content width) — the ONE primary
+  move for this kind, via `draw_selection_action` (`src/ui/selection_panel.cpp`).
+- **Facts** (right, muted) — only what informs that action, via
+  `draw_selection_facts`. Everything encyclopedic (orbit, composition,
+  deposits, prices) has moved to the ledgers.
 
-| Selection kind | Content (stat block) | 'Go to' target |
-|---|---|---|
-| **Body** (planet/moon/asteroid/station/star) | Name, type, orbit, parent; surface summary. Plus a **Survey section** (survey system, BL-067) and a **Commercial activity section** (activity fog, BL-089) — see below. | Canvas: `focus_on_surface` — descend to the body's **Planetary tile surface**, the most informative rung. (Not `focus_on_body` / the orbital framing: landing on a sparse circumplanetary view reads as "nothing happened", which was the *only-works-for-Kepler* symptom.) |
-| **Tile** | Composition × landform, hazard, habitability, deposits. | **No-op for now.** A tile is selected from the surface it lives on, so 'go to' has nothing to descend to; pan-to-tile is out of scope. |
-| **Building** | Type, recipe, throughput, host tile. Player-owned buildings carry a **profitability readout** (BL-074) — see below. | Canvas: `focus_on_tile` (host tile). |
-| **Market** | Body, headline prices / balances. | Canvas: `focus_on_surface`; or Market ledger. |
-| **Unit / logistics vessel** | Type, owner, location, status. | Canvas: `focus_on_surface` / vessel's position. |
-| **Nation** | Name, character, territory summary. | A ledger (no canvas of its own). |
-| **Corporation** | Name, parent nation, headline standing. | A ledger (no canvas of its own). |
+Each kind routes its 'go to' to the right place:
+
+| Selection kind | Action (hero) | Facts (muted) | 'Go to' target |
+|---|---|---|---|
+| **Tile** | **Build here** — the buildable-types front door + cost, affordability-gated (`draw_build_front_door`). | **Thrives / Valid / Invalid** affordance readout (BL-071) — territory owner + which building types suit this tile and why not. | **No-op for now.** A tile is selected from the surface it lives on, so 'go to' has nothing to descend to; pan-to-tile is out of scope. |
+| **Body** (planet/moon/asteroid/station/star) | Unsurveyed → **Dispatch Survey** (BL-067). Surveyed → **Go to surface** (descends via `focus_on_entity`). The star carries neither. | **Commercial activity** pulse (activity fog, BL-089) — see below. | Canvas: `focus_on_surface` — descend to the body's **Planetary tile surface**, the most informative rung. (Not `focus_on_body` / the orbital framing: landing on a sparse circumplanetary view reads as "nothing happened", which was the *only-works-for-Kepler* symptom.) |
+| **Building** (player-owned) | **Manage ▸** — routes to the building-management surface (`construction_panel.cpp`, which already owns the workforce slider / recipe / decommission controls). The panel does not duplicate those controls. | **Profitability readout** (BL-074) — Net/tick, the one decision fact — see below. | Canvas: `focus_on_tile` (host tile). |
+| **Building** (rival) | None — **"Competitor building - intel only."** | Owner name + explicit `private` rows for production/stockpile (BL-068). | Canvas: `focus_on_tile` (host tile). |
+| **Market / Unit** | **Go to** — locate on the canvas. | (none yet; stubbed) | Canvas: `focus_on_surface` / entity's position. |
+| **Nation / Corporation** | None — **"Open its ledger via [>]."** | (none yet; stubbed) | A ledger (no canvas of its own). |
 
 So 'go to' is itself polymorphic: spatial entities navigate a canvas;
 non-spatial entities (nation, corporation) open the relevant ledger. For the
 prototype the spatial kinds (body, tile, building) are wired first; the rest are
 designed here and stubbed.
 
-### The tile element is the build front door
+### The tile element's action is the build front door
 
-Beyond its stat block, the **Tile** selection carries a **"Build here" affordance** — the
-player's primary construction entry point. It lists the building types placeable on the
-selected tile (gated by `placement_rules::can_place`) with their registry build cost,
-affordability-gated against the player corporation's balance; choosing one enqueues a
-construction request that the mutable-world pass executes (`construct_building`). This is the
-deliberate design choice that **building on one tile is a targeted action reached through the
-tile Selection element**, not a reserved menu — the nav-rail construction surface stays a
-broad overview (see `docs/ui/MENU.md`, BACKLOG § Ledger). The equivalent placement-mode canvas
-click enqueues the same request.
+The **Tile** selection's hero action is **"Build here"** — the player's primary construction
+entry point (`draw_build_front_door`). It lists the building types placeable on the selected
+tile (gated by `placement_rules::can_place`) with their registry build cost, affordability-gated
+against the player corporation's balance; choosing one enqueues a construction request that the
+mutable-world pass executes (`construct_building`). This is the deliberate design choice that
+**building on one tile is a targeted action reached through the tile Selection element**, not a
+reserved menu — the nav-rail construction surface stays a broad overview (see `docs/ui/MENU.md`,
+BACKLOG § Ledger). The equivalent placement-mode canvas click enqueues the same request.
 
-### The tile element reads back its affordances (BL-071)
+### The tile element's facts are its affordance readout (BL-071)
 
-Above the "Build here" front door, a selected tile carries an **always-on affordance readout**
-— the *inverse* of the placement-suitability surface (`LENSES.md`, BL-010). That surface answers
-"given an armed building, which tiles?"; this answers "given this tile, which buildings?",
-**without arming anything**, so the player can read a tile before committing to a build. It shows
-the tile's **territory owner** and a **Thrives / Valid / Invalid** grouping over the
-prototype-buildable types (extraction per deposited resource, processing, port), reading the same
-`placement_rules` seam the front door and the armed canvas ghost use.
+In the Facts column, a selected tile carries an **always-on affordance readout**
+(`draw_tile_affordances`) — the *inverse* of the placement-suitability surface (`LENSES.md`,
+BL-010). That surface answers "given an armed building, which tiles?"; this answers "given this
+tile, which buildings?", **without arming anything**, so the player can read a tile before
+committing to a build — the decision fact the Build action needs. It shows the tile's
+**territory owner** and a **Thrives / Valid / Invalid** grouping over the prototype-buildable
+types (extraction per deposited resource, processing, port), reading the same `placement_rules`
+seam the front door and the armed canvas ghost use.
 
 Rejection is **reason-coded, not silent**. `placement_rules::can_place[_in_world]` return a
 `placement_result` — a `placement_reason` enum plus human string, implicitly convertible to
@@ -113,41 +122,43 @@ same reason string enriches the build front door (replacing the former bare "Can
 water") and follows the cursor as a **"why not here"** label under the armed placement ghost on
 the Planetary canvas. One vocabulary, three surfaces.
 
-### The building element carries a profitability readout (BL-074)
+### The building element's fact is a profitability readout (BL-074)
 
-A selected **Building** carries a **"Profitability (est. / tick)"** section: the estimated net
-per-tick contribution of that single building, broken into four component lines plus Net —
+A selected player-owned **Building**'s Facts column carries a **"Profitability (est. / tick)"**
+section (`draw_building_profit`) — the one decision fact for the Manage ▸ action: the estimated
+net per-tick contribution of that single building, broken into four component lines plus Net —
 **Revenue**, **Inputs** (input cost), **Wages**, **Maintenance**, laid out as two paired columns,
 then **Net** (coloured positive/negative/neutral by sign). Figures come from
 `estimate_building_profit` (`src/world/building_profit.hpp`) — realised last-tick revenue/cost
 where attributable, estimated where the pooled market resists exact per-building attribution.
 Before an economy tick has run, the section shows "Run an economy tick to estimate." instead.
-Rendered by `draw_building_profit` in `src/ui/selection_panel.cpp`.
 
-### The body element is the survey front door
+### The body element's action is the survey front door (then go-to-surface)
 
-Beyond its stat block, a selected **Body** carries a **Survey section** (survey system, BL-067)
-keyed on the body's survey phase, mirroring the tile build front door. See
-[DISCOVERY.md](DISCOVERY.md) for the model authority (the geographic fog this section reads).
+An unsurveyed **Body**'s hero action is its **Survey section** (survey system, BL-067),
+keyed on the body's survey phase (`draw_survey_section`, called from `draw_selection_action`).
+See [DISCOVERY.md](DISCOVERY.md) for the model authority (the geographic fog this section reads).
 
 - **`hidden`** — a **Dispatch Survey** button with a `cost cr · ETA days` preview (cost and ETA
   derived from size + distance). Affordability-gated against the player corporation's balance;
   disabled with an "Insufficient funds." reason when the player cannot pay.
 - **`in_transit`** — `En route — ETA <days> d`.
 - **`scanning`** — `Surveying <k>/<N> — ETA <days> d`.
-- **`surveyed`** — `Surveyed.`
+- **`surveyed`** — the hero action switches to **"Go to surface"**, which descends via
+  `focus_on_entity` — surveying is done, the move now is to look.
 
-The button only **enqueues** `ui_state::pending_survey_dispatch`; the mutable-world pass in
-`app::render` performs the upfront debit and arms the schedule (`dispatch_survey`), exactly as
-construction requests are executed — the UI surfaces hold a `const world&`. The star carries no
-survey section.
+The Dispatch Survey button only **enqueues** `ui_state::pending_survey_dispatch`; the
+mutable-world pass in `app::render` performs the upfront debit and arms the schedule
+(`dispatch_survey`), exactly as construction requests are executed — the UI surfaces hold a
+`const world&`. The star carries neither the survey action nor the go-to-surface action.
 
-### Commercial activity
+### The body element's fact is its commercial activity pulse (BL-089)
 
-Below the Survey section, a selected **Body** (not the star) carries a **Commercial activity**
-section keyed on `body_activity_visibility` (the activity fog, BL-089) — independent of survey
-phase, so it can be populated on an unsurveyed body and empty on a surveyed one. See
-[DISCOVERY.md](DISCOVERY.md) for the model authority (`activity_vis`, the tier derivation).
+A selected **Body**'s (not the star's) Facts column carries a **Commercial activity**
+section (`draw_activity_section`) keyed on `body_activity_visibility` (the activity fog,
+BL-089) — independent of survey phase, so it can be populated on an unsurveyed body and empty
+on a surveyed one. See [DISCOVERY.md](DISCOVERY.md) for the model authority (`activity_vis`,
+the tier derivation).
 
 - **`unknown`** — "Outside your trade network - no market data." No further content.
 - **`known` / `visible`** — a coarse **market pulse** (`busy` / `steady` / `quiet`, derived from
@@ -156,49 +167,69 @@ phase, so it can be populated on an unsurveyed body and empty on a surveyed one.
   (BL-068).
 - **`known_stale`** — greyed: "Route gone cold - last market read is stale."
 
-Rendered by `draw_activity_section` in `src/ui/selection_panel.cpp`.
-
 ---
 
-## Shared content builders (reuse)
+## Removed: the stat-block polymorphism (BL-093)
 
-The per-kind stat blocks are the same content the Tile Ledger renders today and
-the future **hover card** will render. To avoid three copies, factor each kind's
-summary into a reusable builder, e.g.:
+The panel's earlier form (pre-2026-07-04) rendered a **50/50 split** — an encyclopedic per-kind
+stat block (`draw_summary`, dispatching to `draw_body_summary` / `draw_tile_summary` /
+`draw_building_summary` / … in `entity_summary.hpp`) beside a **lens supplement**
+(`draw_lens_supplement`) that re-rendered overlay-keyed market price / production rate /
+population-workforce rows inline — literally duplicating the Market / Production / Population
+ledgers. Both **are removed**: `draw_summary` and `draw_lens_supplement` no longer exist in
+`src/ui/selection_panel.cpp`. Facts and actions carried equal weight and everything read as
+uniform flat text, so the panel had no clear reason to exist — it read as "an amalgamation of
+all the menu ledgers" (Ben's playtest finding, 2026-07-04). All that reference detail — orbit,
+parent, composition, deposits, prices — now lives in the ledgers, one `go to` away; the header
+identity line (name · type) is the only trace of it left in the panel itself.
 
-```
-void draw_body_summary   (const world&, entity_id);
-void draw_tile_summary   (const world&, entity_id);
-void draw_building_summary(const world&, entity_id);
-// …market, unit
-```
-
-- The **Selection info element** calls the builder for the selected kind.
-- The **Tile Ledger** (`tile_inspector.cpp`) is refactored to call the same
-  builders for its per-tile / per-building / per-market rows.
-- The **hover card** (deferred) calls them inside its tooltip frame.
-
-These builders lean on the existing presentation layer — `presentation.hpp`
-(names, identity colours, semantic palette), `format.hpp` (number/sign
-formatting), `icons.hpp` (glyphs). The builder is the appropriate abstraction
-seam; the *frame* around it (pinned panel vs. ledger row vs. tooltip) differs per
-caller, the *content* does not.
+The shared per-entity content builders in `entity_summary.hpp` (`draw_body_summary`,
+`draw_tile_summary`, `draw_building_summary`, …) are unaffected by this removal — they remain
+the Tile Ledger's content and the future hover card's planned content; only the Selection
+element stopped calling them.
 
 ---
 
 ## Layout & chrome
 
-- **Pinned**, not floating. It docks in the bottom-left, **above the overlay
-  lens / zoom control strip**, anchored to the shell like the nav rail (not a
-  draggable ImGui window).
-- **Header row:** title line (name + type + icon), a **'go to'** button, and a
-  **close** button.
+- **Pinned**, not floating. It docks in the bottom-left and now **owns the whole bottom-left
+  corner** (BL-093): anchored from the nav-rail's right edge to the minimap's left edge (less a
+  margin), and from the very bottom margin upward. The **lens strip no longer sits beneath
+  it** — it relocated onto the minimap (see § Lens strip relocation below), which is what freed
+  the vertical room the action/facts split needed.
+- **Sized to content, in text-line units (BL-093 fix).** `draw_selection_panel` computes a
+  `content_rows` count per selection kind (tile 9, body 5, player building 6, rival building 3,
+  default 4) and derives the window height from `ImGui::GetTextLineHeightWithSpacing()` /
+  `GetFrameHeight()` rather than pinning to the minimap's pixel height. This is deliberately
+  **resolution-robust**: a fixed-pixel height read fine at the resolution it was tuned on but
+  ballooned with empty space or clipped content at another — see
+  [DEVELOPMENT_PRACTICES.md § Display environment](../development/DEVELOPMENT_PRACTICES.md) for
+  the general rule this follows. The window still clamps to `[min_h, screen_h]` so it never
+  overruns the display or shrinks below three content lines.
+- **Header row:** a small coloured **kind icon** (`draw_selection_icon` — circle for body,
+  square for building, outlined square for tile, pentagon otherwise; a first pass ahead of a
+  richer per-entity icon), then the title line (name · type), then a right-aligned **`[>]`**
+  ('go to') button and **`[x]`** (close) button.
 - **Close hides, it does not destroy.** Closing sets the panel hidden; it
   reappears on the next selection. There is no nav-rail entry to reopen it —
   selection is the only opener.
 - **Empty / no-selection state:** when nothing is selected (fresh session, or
   after clicking empty space) the panel is hidden. It is shown only while a
   valid selection exists and has not been closed.
+
+### Lens strip relocation (BL-093)
+
+The overlay-lens control strip (`ui::draw_overlay_controls`, `src/ui/overlay.cpp`) no longer
+lives beneath the Selection element — it moved onto the **minimap**, reprising its pre-BL-013
+location. A lens mode bar now occupies the bottom row of the minimap box (chrome fill drawn in
+`app.cpp`'s minimap block; the interactive glyph row is `draw_overlay_controls(ui, x, top_y, w)`
+positioned over it), leaving the Selection element the full height it needs. The strip itself
+also trimmed from 9 lenses to a single row of **7**: Corporation, Country, Resource, Market,
+Population, Opportunity, Production. **Scarcity** and **Industry** dropped off the on-screen row
+(joining **Supply**) and are keyboard-cycle only — 9 glyphs did not fit the 240px minimap width.
+The Resource/Market/Scarcity resource-selector, formerly a 140px inline combo, is now a compact
+popup button opened from the bar (`draw_lens_selector`). Full detail: [LENSES.md](LENSES.md),
+[MINIMAP.md](MINIMAP.md).
 
 ---
 
