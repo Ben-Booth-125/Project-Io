@@ -4476,25 +4476,25 @@
       "promoted_from": "backlog.json BL-085 (v0.0.8 visibility-pass cluster); folds BL-092 (HQ marker)",
       "difficulty": 3,
       "importance": "A",
-      "status": "active",
+      "status": "complete",
       "rows": [
         {
           "id": "R1",
-          "status": "active",
+          "status": "complete",
           "requirement": "Brief-spanning: a persistent, always-on home marker reads 'you are here' — a ring around the player's starting-holdings cluster plus a distinct HQ pip on the origin building on the Planetary canvas, and a halo on home_body in the Solar canvas. Golden-verified. (Initial camera focus and the lens-independent ownership accent already shipped in start-framing and are NOT re-implemented here.)",
           "verification": ["visual: scripts/verify/player_presence.lua golden"],
           "notes": "Reconciled with the 2026-07-01 start-framing QOL group."
         },
         {
           "id": "R2",
-          "status": "active",
+          "status": "complete",
           "requirement": "The HQ pip distinguishes the player's headquarters building from ordinary player buildings (subsumes BL-092). Reuses the shipped ownership accent — no second identity outline is added; the ring/pip/halo compose with, not duplicate, the existing accent.",
           "verification": ["code", "visual"],
           "notes": "body_surface_canvas.cpp; folds BL-092"
         },
         {
           "id": "R3",
-          "status": "active",
+          "status": "complete",
           "requirement": "The Solar-canvas home halo is visually distinct from the survey badge and the selection/hover highlights, and persists across lenses.",
           "verification": ["code", "visual"],
           "notes": "solar_system_canvas.cpp + presentation.hpp"

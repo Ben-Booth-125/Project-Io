@@ -1257,6 +1257,67 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
     }
 
+    // Home presence (BL-085): on the player's home body, draw a ring enclosing the
+    // holdings cluster ("my region") and an HQ star on the building nearest the
+    // cluster centroid ("my origin"). Always-on identity chrome that composes with
+    // (does not duplicate) the per-tile ownership outline already drawn above; the
+    // camera-focus + ownership-accent halves shipped earlier (start-framing QOL).
+    if (state.active_body == w.home_body && w.home_body != null_entity)
+    {
+        std::vector<std::pair<entity_id, ImVec2>> mine; // player building tile -> local centre
+        for (const auto& [tid, corp] : tile_to_corp)
+        {
+            if (corp != w.player_entity)
+                continue;
+            const auto til = w.tiles.find(tid);
+            if (til == w.tiles.end() || til->second.body != state.active_body)
+                continue;
+            mine.emplace_back(tid, hex_local_centre(til->second.grid_x, til->second.grid_y, hex_size));
+        }
+        if (!mine.empty())
+        {
+            ImVec2 cen{ 0.0f, 0.0f };
+            for (const auto& [tid, lc] : mine) { cen.x += lc.x; cen.y += lc.y; }
+            cen.x /= static_cast<float>(mine.size());
+            cen.y /= static_cast<float>(mine.size());
+
+            float max_d = 0.0f;
+            entity_id hq_tile = mine.front().first;
+            float hq_best = std::numeric_limits<float>::max();
+            for (const auto& [tid, lc] : mine)
+            {
+                const float dx = lc.x - cen.x, dy = lc.y - cen.y;
+                const float d = std::sqrt(dx * dx + dy * dy);
+                max_d = std::max(max_d, d);
+                if (d < hq_best) { hq_best = d; hq_tile = tid; }
+            }
+
+            const ImU32 accent = corp_identity(w.player_entity);
+            const ImVec2 cen_s = to_screen(cen);
+            const float ring_r = (max_d + hex_size * 0.9f) * zoom;
+
+            // HQ local centre for the pip.
+            ImVec2 hq_lc = cen;
+            for (const auto& [tid, lc] : mine) if (tid == hq_tile) { hq_lc = lc; break; }
+            const ImVec2 hq_s = to_screen(hq_lc);
+            const float hq_r = std::max(4.0f, draw_r * 0.5f);
+
+            const int k_min = (period_px > 0.0f)
+                ? static_cast<int>(std::ceil((visible_left  - cen_s.x - ring_r) / period_px)) : 0;
+            const int k_max = (period_px > 0.0f)
+                ? static_cast<int>(std::floor((visible_right - cen_s.x + ring_r) / period_px)) : 0;
+            for (int k = k_min; k <= k_max; ++k)
+            {
+                const float off = static_cast<float>(k) * period_px;
+                // "My region" ring — soft translucent fill + a crisp player-colour edge.
+                dl->AddCircle({ cen_s.x + off, cen_s.y }, ring_r,
+                              IM_COL32(80, 150, 230, 120), 0, 2.5f);
+                // HQ star at the origin building.
+                icons::hq(dl, { hq_s.x + off, hq_s.y }, hq_r, accent);
+            }
+        }
+    }
+
     // Building-placement ghost preview. When construction mode is active and a tile
     // is hovered, draw a translucent-intent marker of the chosen building type at the
     // hovered copy's centre, tinted green when the placement-rules seam accepts the

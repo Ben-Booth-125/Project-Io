@@ -203,6 +203,17 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
 
         const bool this_hovered = (id == hovered_body);
 
+        // Home-body halo (BL-085): an always-on "you are here" ring around the
+        // player's home world, drawn behind the body so it reads as identity chrome
+        // distinct from the survey badge and the selection/hover highlight. Player
+        // identity colour (corp slot 0), with a soft glow so it carries at a glance.
+        if (id == w.home_body && w.home_body != null_entity)
+        {
+            const float hr = radius + std::max(3.0f, 4.0f * element_scale);
+            dl->AddCircleFilled(pos, hr, IM_COL32(80, 150, 230, 45));
+            dl->AddCircle(pos, hr, palette::corp_colour(0), 0, 2.0f);
+        }
+
         dl->AddCircleFilled(pos, radius, style.colour);
 
         // Shared selection / hover / pinned ring. Pinning is not yet wired, so

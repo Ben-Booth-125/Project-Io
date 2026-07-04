@@ -267,6 +267,27 @@ void settlement(ImDrawList* dl, ImVec2 centre, float r, int tier, ImU32 colour)
     }
 }
 
+void hq(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // Eight-point star = a diamond (N/E/S/W points) overlaid with an axis-aligned
+    // square (the NE/SE/SW/NW points), ringed. Reads as a "seat of power" distinct
+    // from the building/market/settlement glyphs.
+    const ImVec2 d[4] = {
+        { centre.x, centre.y - r }, { centre.x + r, centre.y },
+        { centre.x, centre.y + r }, { centre.x - r, centre.y },
+    };
+    dl->AddConvexPolyFilled(d, 4, colour);
+    const float s = r * 0.62f;
+    const ImVec2 sq[4] = {
+        { centre.x - s, centre.y - s }, { centre.x + s, centre.y - s },
+        { centre.x + s, centre.y + s }, { centre.x - s, centre.y + s },
+    };
+    dl->AddConvexPolyFilled(sq, 4, colour);
+    dl->AddCircle(centre, r * 1.35f, colour, 0, 1.6f);
+    // Dark centre dot so the star reads against a same-colour ownership fill.
+    dl->AddCircleFilled(centre, std::max(1.0f, r * 0.18f), outline, 8);
+}
+
 void unknown(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
 {
     // Question-mark hook: an arc across the top, opening at the lower-left.

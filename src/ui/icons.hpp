@@ -178,6 +178,17 @@ void market_centre(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Fill colour of the towers.
 void settlement(ImDrawList* dl, ImVec2 centre, float r, int tier, ImU32 colour);
 
+/// Draw the player's headquarters marker — a ringed eight-point star — in @p colour.
+/// Distinguishes the player's HQ building from ordinary holdings on the Planetary
+/// canvas (BL-085, folding BL-092). Distinct from the building glyphs, the market
+/// circle+cross, and the settlement skyline.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the star, screen pixels.
+/// @param colour Fill/stroke colour (the player identity colour).
+void hq(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 /// Draw the "unknown / unsurveyed" glyph — a question mark — in @p colour. Marks a
 /// body whose surface and deposits are still hidden (survey system, BL-067). Shown
 /// dimmed as the Solar-canvas survey badge for `survey_phase::hidden`.
