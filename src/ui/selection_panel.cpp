@@ -343,6 +343,50 @@ void draw_survey_section(const world& w, ui_state& ui, entity_id body_id)
     }
 }
 
+// Commercial-activity section for a selected body (BL-089). The activity fog is
+// independent of the survey fog: this reads the player's *commercial* reach, keyed
+// on body_activity_visibility. Unknown → outside the network; known/visible → a
+// coarse public market pulse (no internals — production/stockpiles stay private);
+// known_stale → a greyed "gone cold" note.
+void draw_activity_section(const world& w, entity_id body_id)
+{
+    const auto bit = w.bodies.find(body_id);
+    if (bit == w.bodies.end() || bit->second.type == body_type::star)
+        return;
+
+    const activity_vis av = body_activity_visibility(w, body_id, w.current_day_tick);
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Commercial activity");
+
+    if (av == activity_vis::unknown)
+    {
+        ImGui::TextDisabled("Outside your trade network - no market data.");
+        return;
+    }
+    if (av == activity_vis::known_stale)
+    {
+        ImGui::TextDisabled("Route gone cold - last market read is stale.");
+        return;
+    }
+
+    // Known / visible: a coarse public market pulse from throughput (supply+demand)
+    // across the body's markets. Deliberately imprecise — a strategy read, not a
+    // ledger; internals stay private (BL-068).
+    float throughput = 0.0f;
+    for (const auto& [mid, mk] : w.markets)
+    {
+        if (mk.body != body_id)
+            continue;
+        for (std::size_t r = 0; r < resource_count; ++r)
+            throughput += mk.supply[r] + mk.demand[r];
+    }
+    const char* level = (throughput > 400.0f) ? "busy"
+                      : (throughput > 120.0f) ? "steady"
+                                              : "quiet";
+    ImGui::Text("Market pulse: %s", level);
+    if (av == activity_vis::visible)
+        ImGui::TextDisabled("Live lane / your presence.");
+}
+
 } // namespace
 
 // Draw the lens-contextual supplement into the current ImGui cursor position.
@@ -615,7 +659,10 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
         draw_build_front_door(w, reg, ui, ui.selected_entity);
     }
     else if (kind == selection_kind::body)
+    {
         draw_survey_section(w, ui, ui.selected_entity);
+        draw_activity_section(w, ui.selected_entity);
+    }
     else if (kind == selection_kind::building && is_player_owned(w, ui.selected_entity))
         draw_building_profit(w, reg, report, ui.selected_entity); // BL-074
     ImGui::EndChild();

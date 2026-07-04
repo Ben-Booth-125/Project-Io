@@ -246,6 +246,25 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
             }
         }
 
+        // Commercial-activity badge (BL-089): the player's trade network lit up.
+        // Drawn at the body's lower-LEFT so it never collides with the survey badge
+        // (upper-right) — the two fogs (geographic vs activity) read apart. The home
+        // body carries its own halo, and unknown bodies stay a plain dot, so a badge
+        // shows only for known / stale / visible non-home bodies.
+        if (id != w.home_body)
+        {
+            const activity_vis av = body_activity_visibility(w, id, w.current_day_tick);
+            if (av != activity_vis::unknown)
+            {
+                const float  ar = std::max(4.0f, 6.0f * element_scale);
+                const ImVec2 ap{ pos.x - radius * 0.9f - ar, pos.y + radius * 0.9f + ar };
+                const ImU32  ac = (av == activity_vis::visible)     ? palette::activity_visible
+                                : (av == activity_vis::known)       ? palette::activity_known
+                                                                    : palette::activity_stale;
+                icons::activity(dl, ap, ar, ac);
+            }
+        }
+
         // Labelling: planets (and other notable bodies) carry a permanent
         // label; moons are labelled only while hovered, to keep the inner
         // system uncluttered.
@@ -262,6 +281,26 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
                 };
                 dl->AddText(label_pos, IM_COL32(255, 255, 255, 255), body.name.c_str());
             }
+        }
+    }
+
+    // Commercial-sphere corridors (BL-089): the player's persistent trade routes
+    // drawn as lit lanes so commercial reach is felt on the map — fresh routes glow,
+    // stale routes fade to grey. Always-on (independent of lens), primary view only.
+    if (apply_view)
+    {
+        for (const auto& r : w.trade_routes)
+        {
+            if (r.corp != w.player_entity)
+                continue;
+            if (w.bodies.find(r.body_a) == w.bodies.end() ||
+                w.bodies.find(r.body_b) == w.bodies.end())
+                continue;
+            const ImVec2 pa = to_screen(body_world(r.body_a, body_world));
+            const ImVec2 pb = to_screen(body_world(r.body_b, body_world));
+            const bool fresh = (w.current_day_tick - r.last_tick) <= route_fresh_ticks_default;
+            const ImU32 col  = fresh ? palette::activity_corridor : IM_COL32(140, 142, 150, 80);
+            dl->AddLine(pa, pb, col, fresh ? 2.0f : 1.5f);
         }
     }
 

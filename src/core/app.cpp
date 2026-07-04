@@ -239,6 +239,10 @@ int app::run()
             m_last_survey_day = survey_day;
         }
 
+        // Mirror the day tick onto the world so read-only UI surfaces can age trade
+        // routes for the activity fog (BL-089) without threading the tick everywhere.
+        m_world.current_day_tick = static_cast<int>(m_sim_loop.day_tick());
+
         // Resolve the economy on each econ-tick (quarter) boundary the clock crosses.
         const uint64_t econ = m_sim_loop.econ_tick();
         while (m_last_econ_tick < econ)

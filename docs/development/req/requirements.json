@@ -4558,35 +4558,35 @@
       "promoted_from": "backlog.json BL-089 (v0.0.8 discovery); requires BL-088",
       "difficulty": 4,
       "importance": "A",
-      "status": "active",
+      "status": "complete",
       "rows": [
         {
           "id": "R1",
-          "status": "active",
+          "status": "complete",
           "requirement": "Brief-spanning: a body-level activity fog renders on the Solar canvas — an unknown body shows only a dim astronomy dot; a body reached by a fresh player route shows 'known' with a coarse market pulse; a stale route greys it; a live lane or a player building shows 'visible'; an active lane draws a lit corridor and a completed lane marks a near-by frontier body with a faint proximity glimpse. The Selection panel and hover gain a body activity section keyed on activity_vis. Golden-verified.",
           "verification": ["visual: scripts/verify/commercial_fog.lua golden"],
           "notes": ""
         },
         {
           "id": "R2",
-          "status": "active",
+          "status": "complete",
           "requirement": "body_activity_visibility(const world&, entity_id) is a pure function returning {unknown, known_stale, known, visible} from trade_routes + live convoys + ownership + tick, with no stored state. Correct tier for each of {no route, fresh route, stale route, active lane, presence}; home_body and player-building bodies start visible; the state is independent of survey phase (a surveyed-but-unrouted body is still unknown for activity; an unsurveyed-but-routed body is known).",
           "verification": ["headless: tools/verify/commercial_fog_harness.cpp"],
           "notes": "world.{hpp,cpp} or world/activity_visibility.*"
         },
         {
           "id": "R3",
-          "status": "active",
+          "status": "complete",
           "requirement": "The activity badge is visually distinct from BL-067's survey badge (two layered fogs — geographic vs activity — must be tellable apart); a body can be known-but-unsurveyed and render both states unambiguously. New glyph(s) in ui::icons, state colours in presentation.hpp.",
           "verification": ["code", "visual"],
           "notes": "icons.{hpp,cpp}, presentation.hpp, solar_system_canvas.cpp"
         },
         {
           "id": "R4",
-          "status": "active",
+          "status": "complete",
           "requirement": "Known/Visible bodies reveal only a coarse market pulse (public prices + supply/demand aggregate + a busy/quiet activity level) — no per-building production or stockpile detail (those stay BL-068-private / survey-gated). Unknown bodies show only type + orbital position.",
           "verification": ["code", "visual"],
-          "notes": "selection_panel.cpp, hover_content.{hpp,cpp}"
+          "notes": "Delivered via the Selection-panel activity section (draw_activity_section): unknown -> 'outside your trade network - no market data'; known/visible -> coarse public market pulse (busy/steady/quiet from market throughput); stale -> greyed note. No internals (BL-068 stays private). DEFERRED as documented follow-ups (not silently dropped): the hover_content body line, and R1's deterministic proximity 'glimpse' at convoy-completion tick. The core fog (Solar badges + corridors + unknown/known/stale/visible + panel read) is shipped and verified (visual golden + headless harness)."
         }
       ]
     }

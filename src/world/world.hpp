@@ -49,6 +49,12 @@ struct world
     /// The corporation's home planet. The game opens on this body's surface.
     entity_id home_body = null_entity;
 
+    /// Current sim day tick, mirrored from the sim loop each frame by app. A derived
+    /// convenience so read-only UI surfaces can age trade routes for the activity fog
+    /// (body_activity_visibility, BL-089) without threading the tick through every
+    /// render signature. Not authoritative sim state and not serialised.
+    int current_day_tick = 0;
+
     /// The system's asteroid belt (a band, not a body). belt.present() is false
     /// when the system has no belt.
     asteroid_belt belt;
@@ -184,3 +190,40 @@ bool is_player_owned(const world& w, entity_id building);
 /// @param market Market entity id to resolve.
 /// @return       Owning body id, or `null_entity` if the market is unknown.
 entity_id body_of_market(const world& w, entity_id market);
+
+// ---------------------------------------------------------------------------
+// Commercial-sphere activity fog (BL-089)
+// ---------------------------------------------------------------------------
+// The player's trade network is their intelligence network: where their goods
+// flow, the world lights up. A body-level *activity* fog, independent of the
+// geographic survey fog (BL-067) — a body can be Known (a route reaches it) yet
+// unsurveyed. Derived on demand from trade_routes (BL-088) + live convoys +
+// ownership + the current tick; nothing new is stored or serialised.
+
+/// Activity visibility tier of a body, from the player's commercial reach.
+enum class activity_vis : uint8_t
+{
+    unknown,      ///< Outside the player's network: a public astronomy dot only.
+    known_stale,  ///< A player route once reached it, but traffic has gone cold.
+    known,        ///< A fresh player route reaches it: a coarse market pulse reads.
+    visible,      ///< A live player lane touches it, or the player owns a building there.
+};
+
+/// Freshness window in sim day ticks: a route whose last completion is within this
+/// many ticks of "now" reads as `known`; older reads as `known_stale`. One quarter
+/// (90 days) by default — a calibration constant (headless-tuned).
+inline constexpr int route_fresh_ticks_default = 90;
+
+/// Body-level activity visibility for the player, derived from routes + live convoys
+/// + ownership + the current tick. Pure and deterministic; no stored state.
+/// `home_body` and any body the player owns a building on are always `visible`.
+/// Independent of survey phase (a surveyed-but-unrouted body is still `unknown` for
+/// activity; an unsurveyed-but-routed body is `known`).
+///
+/// @param w                 Read-only world state.
+/// @param body              Body to classify.
+/// @param now_tick          Current sim day tick (for route freshness).
+/// @param route_fresh_ticks Freshness window; defaults to route_fresh_ticks_default.
+/// @return                  The body's activity tier for the player.
+activity_vis body_activity_visibility(const world& w, entity_id body, int now_tick,
+                                      int route_fresh_ticks = route_fresh_ticks_default);

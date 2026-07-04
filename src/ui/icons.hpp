@@ -210,6 +210,17 @@ void hq(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Stroke colour.
 void unknown(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw the commercial-activity badge — a concentric pulse (a filled core ringed by
+/// a signal ring) — in @p colour. Marks a body's activity-fog tier on the Solar
+/// canvas (BL-089): fresh commerce, gone-cold, or a live lane. Deliberately distinct
+/// from the survey magnifier and the unknown "?" so the two fogs read apart.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Stroke/fill colour (the activity-tier colour).
+void activity(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 /// Draw the survey badge — a magnifying glass — in @p colour. Marks a body whose
 /// survey is in progress (`in_transit` / `scanning`); the canvas overlays a small
 /// progress read (k∕N) alongside it (survey system, BL-067).

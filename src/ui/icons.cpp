@@ -320,6 +320,14 @@ void unknown(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     dl->AddCircleFilled({ centre.x, centre.y + r * 0.62f }, std::max(1.0f, r * 0.10f), colour, 8);
 }
 
+void activity(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // Concentric "pulse": a filled core ringed by a signal ring — reads as a live
+    // commercial beacon, distinct from the survey magnifier and the unknown hook.
+    dl->AddCircleFilled(centre, std::max(1.0f, r * 0.40f), colour, 12);
+    dl->AddCircle(centre, r * 0.85f, colour, 12, 1.4f);
+}
+
 void survey_badge(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
 {
     // Magnifying glass: a lens circle with a diagonal handle (a "scan" connotation).

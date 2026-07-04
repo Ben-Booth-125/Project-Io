@@ -77,6 +77,15 @@ inline constexpr ImU32 pinned    = IM_COL32(255, 200,  90, 255); ///< An Explore
 // colour. The host-nation tint is applied only under the Country lens.
 inline constexpr ImU32 settlement = IM_COL32(216, 206, 182, 255); ///< Civic-neutral settlement marker (parchment).
 
+// --- commercial-sphere activity fog (BL-089) ---
+// The activity badge on the Solar canvas, distinct in hue from the survey badge
+// (cyan magnifier). Keyed by activity_vis: known = fresh commerce, stale = gone
+// cold (greyed), visible = a live lane or the player's own presence.
+inline constexpr ImU32 activity_known   = IM_COL32(120, 205, 160, 255); ///< Fresh player route reaches it.
+inline constexpr ImU32 activity_stale   = IM_COL32(140, 142, 150, 210); ///< Route gone cold (greyed).
+inline constexpr ImU32 activity_visible = IM_COL32(150, 230, 190, 255); ///< Live lane / player presence.
+inline constexpr ImU32 activity_corridor= IM_COL32(120, 205, 160, 130); ///< Lit trade corridor between bodies.
+
 /// Number of reserved corporation colour slots. These are the on-canvas identity
 /// colours for corporations (player vs. rivals); slot 0 is the player's corp.
 /// (Renamed from faction_slot_count, BL-052 — this palette is corporation
