@@ -15,15 +15,15 @@ The project is in **prototype phase**, solo-developed in C++ with Lua scripting.
 technical documentation lives under [`docs/`](docs/) — start with
 [`docs/CONCEPT.md`](docs/CONCEPT.md) and [`docs/SYSTEMS.md`](docs/SYSTEMS.md).
 
-## Latest release — v0.0.7
+## Latest release — v0.0.8
 
-Interactive & legible: the economy becomes something the player *drives*. Adds **player
-construction** (validated placement, resource build cost, recipe & workforce control),
-**population centres** with habitability→workforce feedback, **selectable entity markers** with
-lens-contextual hover cards and the pinned Selection panel, the placement-suitability surface, a
-full **hotkey system** (F1 cheat-sheet), balance/market **trend plots**, and a **cross-platform
-build** (Linux primary, Windows CI). v0.0.8 (Discovery & intelligence) is in progress. Full
-history in [`CHANGELOG.md`](CHANGELOG.md).
+Discovery & intelligence: the economy gains information asymmetry and the map becomes legible. Adds
+the **survey system** (bodies start unsurveyed; survey to reveal tiles + deposits), a
+**competitor-visibility model** (rivals' internals private, markets public), **population-centre
+markers** and **player-presence** chrome, an **industry-density lens**, **persistent trade routes**,
+and the **commercial-sphere fog** — a body-level activity fog lit by your own trade, independent of
+the survey fog. Bundles the early **budget cluster** (itemised cashflow, debt interest, per-building
+profitability). Full history in [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Versioning & releases
 

@@ -12,17 +12,44 @@ authoritative version-history record. A local-only snapshot of `src/` is also ke
 
 ## [Unreleased]
 
-Work in progress toward **v0.0.8 — Discovery & intelligence** (not yet cut). Landed so far: the
-survey system (bodies start unsurveyed; a survey action reveals the tile map + deposit bands), the
-competitor-visibility model, population legibility, and — shipped early from the v0.0.9 theme — the
-budget cluster (itemised cashflow breakdown, debt-interest visibility, per-building profitability).
-The v0.0.8 legibility pass (population-centre markers, player-presence chrome, industry-density lens,
-ambient opportunity read) and the trade-route commercial-sphere fog remain outstanding before the cut.
+_Nothing yet._
 
-> **Note (2026-07-03):** v0.0.6 and v0.0.7 were developed and merged as batches but never formally
-> cut. Their tags and the entries below were reconstructed retroactively from the roadmap and DEVLOG;
-> the tags point at the theme-boundary commits (`v0.0.6` → `ab7e28f`, `v0.0.7` → `61d9946`) rather
-> than a dedicated changelog-stamp commit.
+## [0.0.8] — 2026-07-04
+
+Discovery & intelligence — the economy gains information asymmetry, and the human / industry / player
+layers become legible on the map.
+
+### Added
+- **Survey system** — bodies start unsurveyed; a player-dispatched survey (credit cost + N ticks)
+  reveals the tile map and deposit bands. Home begins surveyed. Surfaced on the Solar/Planetary
+  canvases and the Selection panel.
+- **Competitor-visibility model** — rival buildings are visible on-canvas; their production and
+  stockpiles are private; market prices and supply/demand aggregates are public (the intelligence channel).
+- **Population legibility** — the Population lens re-keyed to workforce efficiency; the Selection panel
+  and hover read scale / local habitability / workforce cap.
+- **Population-centre markers** — the generated settlements drawn as clustered conurbations with tiered
+  skyline markers (City+ labelled), civic-neutral by default and host-nation-tinted under the Country lens.
+- **Player presence** — always-on home-cluster ring + an HQ star on the origin building + a home halo
+  on the home body in the Solar canvas.
+- **Industry-density lens** — the already-live nation-owned substrate rendered as a resource-weighted
+  throughput field (occupation × terrain richness), distinct from the population read.
+- **Ambient opportunity read** — the Opportunity margin surface confirmed glanceable at rest with its
+  on-canvas key.
+- **Persistent trade routes** — durable body-pair lanes recorded from convoy traffic (the substrate the
+  fog reads).
+- **Commercial-sphere fog** — a body-level activity fog (unknown / known / stale / visible) lit by the
+  player's own trade and independent of the survey fog: Solar activity badges + lit corridors and a
+  coarse market-pulse section in the Selection panel.
+- **Budget cluster** (shipped early from the v0.0.9 theme) — itemised cashflow breakdown, debt-interest
+  visibility, per-building profitability, and a display-options window.
+
+### Changed
+- Verification tooling: added the `trade_routes` and `commercial_fog` headless harnesses and new visual
+  golden scripts (population markers, player presence, industry lens, ambient opportunity, commercial fog).
+
+> **Note:** v0.0.6 and v0.0.7 were developed and merged as batches but never formally cut; their tags
+> were reconstructed retroactively at the theme-boundary commits (`v0.0.6` → `ab7e28f`,
+> `v0.0.7` → `61d9946`). v0.0.8 is a normal cut.
 
 ## [0.0.7] — 2026-06-30
 
@@ -145,7 +172,8 @@ Layer 2 finalisation.
 
 Initial prototype snapshot — application shell, canvases, and the hard-coded world.
 
-[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.7...HEAD
+[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.8...HEAD
+[0.0.8]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.7...v0.0.8
 [0.0.7]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.6...v0.0.7
 [0.0.6]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.5...v0.0.6
 [0.0.5]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.4...v0.0.5
