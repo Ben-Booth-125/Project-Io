@@ -28,9 +28,10 @@ where one is likely.
 
 ---
 
-## Where we are — v0.0.7
+## Where we are — v0.0.8
 
-The interactive economy loop is mechanically complete:
+*Cut 2026-07-04, theme: **Discovery & intelligence**.* The interactive economy loop is
+mechanically complete and now has its missing strategic dimension — information asymmetry:
 
 - **Layer 0–2** — SDL3 + fixed-timestep simulation + economy tick + sol2; the core data
   model; the Solar / Circumplanetary / Planetary canvases with the minimap zoom ladder.
@@ -59,68 +60,56 @@ The interactive economy loop is mechanically complete:
   Ledger; app-driven mouse for deterministic verify captures; cross-platform build (Linux
   primary, Windows CI).
 
-The economy is now *interactive* — the player builds, manages, and observes the effects. The
-gap is *playability*: all bodies are revealed from the start (no discovery), rival corporations
-are passive stubs, and the player lacks the intelligence signals needed to make strategic
-building decisions. Closing that gap drives the road to v0.1.0.
+The economy is now *interactive and legible*: discovery is gated, competitor intelligence is
+appropriately scoped, and the budget is itemised. The gap left is narrower — a handful of open
+polish items and the final quality audit. Closing that drives the remaining road to v0.1.0.
+
+**v0.0.8 — Discovery & intelligence (cut 2026-07-04).** Gave the economy its missing strategic
+dimension — information asymmetry — across three focused strands, all landed: a **survey
+system** (BL-067) gating the tile map and deposit profile behind a player-dispatched action; a
+**visibility model** (BL-068) making competitor buildings visible but their production/stockpiles
+private, with markets as the public intelligence channel; and **population legibility** (BL-069)
+surfacing the already-simulated habitability→workforce feedback so siting decisions are
+reasoned, not guessed. The minor also absorbed the **legibility cluster** (BL-083–086 — settlement
+markers, the industry-density substrate lens, always-on player presence, ambient opportunity
+read), the **discovery-fog completion** (BL-088 persistent trade routes + BL-089 the
+route-driven commercial-sphere activity fog, layered independently over the geographic survey
+fog), **full budget/debt/per-building profitability legibility** (BL-072/073/074, pulled forward
+from v0.0.9), **display options** (BL-076), and the QOL main-menu/campaign-start framing. The
+discovery model — both fogs, the visibility rule, and their surfacing — is now landed design;
+its authority is [`../ui/DISCOVERY.md`](../ui/DISCOVERY.md), not this roadmap or the backlog.
+Per-item detail is in `DEVLOG.md`.
 
 ---
 
 ## The road to v0.1.0
 
-Three more minor versions, then the cut. The v0.0.6 and v0.0.7 themes have shipped; the
-remaining road is discovery, budget clarity, and the final quality gate.
-
-### v0.0.8 — Discovery & intelligence
-
-*Theme: give the economy its missing strategic dimension — information asymmetry.* The economy
-is interactive but trivially legible: all bodies are fully revealed, rivals are passive, and
-nothing gates *where* the player should build or *why*. This minor closes that gap with three
-focused strands:
-
-- **Survey system.** Bodies start *unsurveyed* — the tile map and deposit profile are hidden
-  until a player-dispatched survey action completes (credit cost + N ticks). The solar system
-  canvas marks each body's survey status; the planetary canvas shows a locked state until
-  survey is complete. Earth begins surveyed. This is the exploration loop: identify a promising
-  body by orbital position and type, spend to survey, then decide whether the deposit profile
-  justifies building. *Deposit richness is revealed at survey time as a band (rich / moderate /
-  sparse); exact amounts are confirmed once an extraction site is placed.*
-- **Visibility model.** On-canvas markers for competitor buildings are visible — they are
-  physical structures and unambiguously present. Hover cards on competitor installations show
-  type and owner only; production rates and stockpile quantities are **private**. Market
-  supply/demand aggregates and prices are **public** (the intentional intelligence channel).
-  Players infer competitor state from market signals: a rising price in a resource Kepler
-  Industries is known to extract means their output is down, or demand elsewhere is up — not
-  a fact to read off a panel. This rule shapes which decisions are interesting and which are
-  trivial.
-- **Population legibility.** The mechanics already simulate habitability→workforce feedback;
-  what's missing is *legibility*: the player needs to see why workforce is constrained, not
-  just observe a lower rate. The Population lens, hover cards, and the Selection panel should
-  surface: population centre scale, local habitability, and the derived workforce cap — enough
-  that the player can reason about siting (build labour-heavy industries near large, habitable
-  centres; use autonomous extraction on hostile bodies). No new mechanics; only surfacing what
-  is already simulated.
-
-The economic picture this creates: the player is not omniscient. They must spend to learn, read
-markets to infer competitor state, and site buildings where the data supports it. The Opportunity
-lens and the market trend plots become the primary tools for that reasoning.
+One more minor version, then the cut. The v0.0.6, v0.0.7, and v0.0.8 themes have shipped; the
+remaining road is a lighter polish pass and the final quality gate.
 
 ### v0.0.9 — Budget clarity + polish
 
-*Theme: make the financial pressure legible.* The budget loop runs — income from sales,
-expenditure on wages and maintenance, balance going negative — but the player cannot easily read
-*why* their balance is moving or how much runway they have. Three strands:
+*Theme: make the financial pressure legible.* The full budget breakdown and debt-interest system
+that anchored this minor's original brief **shipped early, folded into v0.0.8** (BL-072/073/074 —
+itemised income/expenditure, projected runway, and per-building profitability all landed
+2026-06-30–07-01). That leaves v0.0.9 reading as a **lighter polish minor**: close the remaining
+legibility rough edges and clear the smaller open items that don't warrant their own theme.
+Candidate strands (see § The sessions for the live, backlog-sourced list):
 
-- **Full budget breakdown.** Income vs. expenditure itemised clearly (by building type, by
-  resource, by logistics cost); the running balance shown against a projected time-to-zero so
-  the player feels the pressure and can act before bankruptcy.
-- **Debt system.** When balance goes negative, interest accrues each tick — the economy
-  bankruptcy harness already models this; the player-facing surface does not. Interest charges
-  should appear in the budget breakdown as a distinct line so the player knows when they have
-  entered a self-accelerating decline.
-- **Polish pass.** Time-control clarity (non-linear speed curve, days-until-next-quarter
-  countdown); menu vocabulary cleanup; icon consistency sweep; any outstanding lens or UI
-  completeness work from v0.0.8.
+- **In-app system menu** (BL-070) — Exit Game / pause reachable without the keyboard.
+- **Ledger and panel legibility bugs** (BL-081/082) — cramped economy-ledger cells; the
+  construction panel occluding the Selection/Tile panel during placement.
+- **The BL-089 documented deferrals** — a proximity-glimpse refinement and a hover activity-line
+  surfacing, both explicitly deferred at BL-089's landing rather than re-opening the item.
+- **Time-control reassessment** (BL-008) — the countdown/speed-curve work shipped in v0.0.8;
+  reassess whether anything further is worth doing here.
+- **Corp-emblem promotion** (BL-090) — a shared glyph family for the geometric emblem, used on
+  map and selection markers.
+
+Deeper opens queue toward the v0.0.9/v0.1.0 boundary rather than filling this minor: planetary
+logistics (BL-077), the two economy-dynamism design-owed items (BL-078/079), and the Era-1
+tech/quest design (BL-087) — each is either still design-owed or large enough to want its own
+assessment once the polish pass clears.
 
 ### v0.1.0 — Quality audit + cut
 
@@ -149,20 +138,21 @@ cut when all of the following hold:
   recipe and workforce control — not merely observe authored assets. *(Shipped v0.0.7.)*
 - **Population centres** ground workforce supply via habitability feedback, and the player can
   read why workforce is constrained and make siting decisions accordingly. *(Mechanics shipped
-  v0.0.7; legibility surface owed in v0.0.8.)*
+  v0.0.7; legibility surface shipped v0.0.8 — BL-069.)*
 - Goods **move between bodies** via supply convoys, so **price diverges spatially** and
   logistics affects margin. *(Shipped v0.0.7.)*
 - The player must **survey** a body to reveal its tile map and deposit profile — discovery is
-  gated, not omniscient. *(Owed v0.0.8.)*
+  gated, not omniscient. *(Shipped v0.0.8 — BL-067.)*
 - **Corporate intelligence is appropriately scoped**: competitor buildings are visible on-canvas;
   their production rates and stockpiles are private; market prices and supply/demand aggregates
-  are public — the player reasons from market signals rather than reading off a ledger. *(Owed
-  v0.0.8.)*
+  are public — the player reasons from market signals rather than reading off a ledger. *(Shipped
+  v0.0.8 — BL-068.)*
 - The **full budget** is legible — income vs. expenditure itemised, debt interest visible, runway
-  readable — so the player can act before bankruptcy rather than discover it. *(Owed v0.0.9.)*
+  readable — so the player can act before bankruptcy rather than discover it. *(Shipped v0.0.8,
+  pulled forward from v0.0.9 — BL-072/073/074.)*
 - The **read surfaces** — the ledger family, hover cards, trend plots, and the lens strip —
   make stockpiles, markets, balances, workforce, and construction legible at a glance. *(Mostly
-  shipped v0.0.7; completeness in v0.0.8–9.)*
+  shipped v0.0.7–8; remaining rough edges tracked in v0.0.9.)*
 - The build is **green** and the loop is **verified** (headless economy/generation harnesses
   and visual capture checks).
 - **Performance and data growth hold** (the v0.1.0 audit): frame and econ-tick budgets met,
@@ -221,57 +211,38 @@ included** — not just "write a lot of code." Its load-bearing parts:
 
 ### The sessions
 
-*Updated 2026-07-01.* The v0.0.6 and v0.0.7 themes are fully delivered; see DEVLOG for the
-per-session record. The active frontier is **v0.0.8 — Discovery & Intelligence**, and its
-**discovery core has shipped**: the survey system (BL-067), the visibility model (BL-068), and
-build legibility (BL-071) are all complete. *(The IDs above supersede the earlier BL-064/BL-065
-references — those were renumbered on merge to avoid a cross-branch collision.)* What remains of
-v0.0.8 is the **legibility pass** — making the human/industry/player layers visible on the map —
-which the 2026-07-01 design session settled as a coherent four-item cluster, all now `designed`
-and ready to promote. No per-session slice list is frozen here; the next session rebuilds it from
-the live backlog at promotion.
+*Updated 2026-07-04.* The v0.0.6, v0.0.7, and v0.0.8 themes are fully delivered; see DEVLOG for
+the per-session record. *(BL-064/BL-065 references anywhere upstream of this point refer to items
+renumbered on merge — BL-067/068 supersede them, to avoid a cross-branch collision.)*
 
-**What ships next (v0.0.8 legibility pass — BL-083–086, all `designed`, filed 2026-07-01):**
+*v0.0.8 is delivered in full* — see § Where we are above for the item roll-up, `DEVLOG.md` for the
+per-session record, and [`../ui/DISCOVERY.md`](../ui/DISCOVERY.md) for the landed discovery-model
+design.
 
-A non-overlapping three-layer visual language — **Settlements · Industry · You**:
+**The active frontier is v0.0.9 — Budget clarity + polish**, reassessed at this scope-review
+point per the note this section used to defer to. With the budget strands already shipped early,
+v0.0.9 is a **lighter polish minor**: no single theme, but a set of open items worth clearing
+before the v0.1.0 audit. Grouped by what they're *for*, not a task list:
 
-1. **BL-083 — Population-centre markers** *(priority A)*. The generated settlements
-   (`generate_population_centres`, 20–40/body) are currently drawn as nothing; render them as
-   tiered, named markers. This is the roadmap's **population-legibility** strand — the human layer
-   made visible.
-2. **BL-085 — Player presence** *(priority A)*. Always-on "you are here" identity chrome + a home
-   ring / HQ pip on `home_body` + initial camera focus — replacing today's Corp-lens-gated,
-   never-marked identity.
-3. **BL-084 — Industry-density lens** *(priority B)*. Render BL-050's already-live nation-owned
-   substrate as an economic-**throughput** field (not raw density — see the DEVLOG design-knot
-   resolution). Pure rendering; no market-arithmetic change.
-4. **BL-086 — Ambient opportunity read** *(priority B)*. Make the "where to grow" signal
-   glanceable on the map without arming build mode — the map-side companion to BL-071's panel
-   affordances.
+- **Reachability & chrome.** An in-app system menu (BL-070, `design-owed`) for Exit/pause without
+  the keyboard.
+- **Legibility bugs.** Cramped economy-ledger cells (BL-081) and the construction panel occluding
+  the Selection/Tile panel during placement (BL-082) — both `design-owed`, both regressions
+  against the legibility bar v0.0.8 just raised.
+- **Discovery fog follow-through.** The two deferrals BL-089 explicitly named at landing rather
+  than re-opening the item: a refined proximity-glimpse illumination and a hover-card activity
+  line. Small, scoped, and already speced in BL-089's own design note.
+- **Time-control reassessment** (BL-008) — the countdown/speed-curve work shipped inside v0.0.8;
+  this is the checkpoint to decide whether anything further earns a slot.
+- **Corp-emblem promotion** (BL-090, `designed`) — lift the geometric emblem into a shared glyph
+  family used consistently across map and selection markers.
 
-**Also queued for v0.0.8 (Discovery — the fog-of-war completion, `designed` 2026-07-01):**
-
-5. **BL-088 — Persistent trade routes** *(Trade, priority A)*. Convoys are transient; add a durable
-   `trade_route` body-pair lane recorded from convoy traffic. Pure trade-system data; the prerequisite
-   for BL-089.
-6. **BL-089 — Commercial-sphere visibility** *(Discovery, priority A, `requires` BL-088)*. The
-   route-driven **activity fog** — Unknown/Known/Visible per body, lit by *your* trade radiating out
-   from your commerce, layered independently over the shipped survey (geographic) fog. Completes the
-   v0.0.8 "information asymmetry" theme with a player-centric spotlight rather than a secrecy sim.
-
-**v0.0.9 queue (budget clarity + polish):**
-
-- ~~Full budget breakdown (income/expenditure by category, projected runway)~~ — **shipped early
-  as BL-072** (itemised cashflow table + smoothed runway; landed 2026-06-30 → 07-01).
-- ~~Debt-interest system (on-screen visibility of the self-accelerating decline)~~ — **shipped early
-  as BL-073** (per-quarter interest line + in-debt badge). *(Per-building profitability, BL-074,
-  also landed in the same cluster.)*
-- Time-control clarity pass (BL-008, currently parked — reassess at v0.0.9 open)
-- Icon consistency sweep and menu vocabulary cleanup
-- Remaining budget-legibility polish and any lens/UI completeness carried from v0.0.8
-
-*Note: the budget cluster landed ahead of its minor. v0.0.9 now reads as a lighter polish minor —
-reassess its scope when v0.0.8's legibility pass closes.*
+**Queued toward the v0.0.9/v0.1.0 boundary, not this minor's scope:** planetary logistics
+(BL-077, `designed` — terrain-weighted routing, roads & hubs, a larger vertical slice), the two
+economy-dynamism items (BL-078 inert product market, BL-079 boom-bust vs. steady processing with
+no competitive feedback — both `design-owed`), and the Era-1 tech/quest design gate (BL-087,
+`design-owed`). Each either still needs a design settle or is large enough to warrant its own
+assessment once the polish pass above clears.
 
 ### Out of scope for this plan (gated — do not pull in)
 
