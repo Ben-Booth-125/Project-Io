@@ -1137,6 +1137,126 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
     }
 
+    // Population-centre markers (BL-083). The generated settlements are drawn as
+    // always-on civic chrome (not lens-gated) so the surface reads as inhabited, not
+    // "resources with industry on top". Contiguous centres are clustered into
+    // conurbations for display — a handful of legible cities + towns rather than a
+    // dust of villages — each rendered at its highest-scale member with a tier glyph
+    // whose size grows with scale; only City+ conurbations are labelled to avoid
+    // clutter. Colour is civic-neutral except under the Country lens, where the host
+    // nation's tint applies (tier is carried by size, keeping colour out of ownership).
+    if (!w.population_centres.empty())
+    {
+        struct pop_centre { int col; int row; int scale; entity_id tile; };
+        std::vector<pop_centre> pcs;
+        pcs.reserve(w.population_centres.size());
+        for (const auto& [pid, pc] : w.population_centres)
+        {
+            const auto tit = w.population_centre_tile.find(pid);
+            if (tit == w.population_centre_tile.end())
+                continue;
+            const auto til = w.tiles.find(tit->second);
+            if (til == w.tiles.end() || til->second.body != state.active_body)
+                continue;
+            pcs.push_back({ til->second.grid_x, til->second.grid_y, pc.scale, tit->second });
+        }
+
+        // Cluster contiguous centres (transitive, Chebyshev grid distance <= 3,
+        // cylinder-wrapped in columns). Small counts (20-40/body) so O(n^2) is fine.
+        constexpr int cluster_dist = 3;
+        std::vector<int> cl(pcs.size(), -1);
+        int cluster_count = 0;
+        for (std::size_t i = 0; i < pcs.size(); ++i)
+        {
+            if (cl[i] != -1)
+                continue;
+            cl[i] = cluster_count;
+            std::vector<std::size_t> stack{ i };
+            while (!stack.empty())
+            {
+                const std::size_t a = stack.back();
+                stack.pop_back();
+                for (std::size_t j = 0; j < pcs.size(); ++j)
+                {
+                    if (cl[j] != -1)
+                        continue;
+                    int dcol = std::abs(pcs[a].col - pcs[j].col);
+                    dcol = std::min(dcol, gw - dcol); // east-west cylinder wrap
+                    const int drow = std::abs(pcs[a].row - pcs[j].row);
+                    if (std::max(dcol, drow) <= cluster_dist)
+                    {
+                        cl[j] = cluster_count;
+                        stack.push_back(j);
+                    }
+                }
+            }
+            ++cluster_count;
+        }
+
+        // Per cluster: anchor at the highest-scale member; tier = that max scale.
+        struct conurbation { int anchor = -1; int tier = 0; };
+        std::vector<conurbation> cons(cluster_count);
+        for (std::size_t i = 0; i < pcs.size(); ++i)
+        {
+            conurbation& c = cons[cl[i]];
+            if (c.anchor == -1 || pcs[i].scale > c.tier)
+            {
+                c.anchor = static_cast<int>(i);
+                c.tier   = pcs[i].scale;
+            }
+        }
+
+        // A small settlement-name bank; a City+ conurbation is named deterministically
+        // from its anchor tile id so the label is stable per campaign. (Deriving names
+        // from the host nation is a noted refinement; a stable bank suffices here.)
+        static const char* const settlement_names[] = {
+            "Meridian", "Ashford", "Kepler", "Halcyon", "Cordera", "Blackmere",
+            "Veranov", "Selwyn", "Marchand", "Tarsis", "Oberon", "Calderis",
+            "Ravensford", "Solene", "Highmark", "Dunmoor",
+        };
+        constexpr int settlement_name_count =
+            static_cast<int>(sizeof(settlement_names) / sizeof(settlement_names[0]));
+
+        for (const conurbation& c : cons)
+        {
+            if (c.anchor < 0)
+                continue;
+            const pop_centre& a = pcs[c.anchor];
+
+            ImU32 col = palette::settlement;
+            if (state.overlay == overlay_mode::country)
+            {
+                const auto nit = w.tile_to_nation.find(a.tile);
+                if (nit != w.tile_to_nation.end())
+                    col = palette::nation_colour(nit->second);
+            }
+
+            const float sr = std::max(3.0f, draw_r * (0.30f + 0.11f * static_cast<float>(c.tier)));
+            const ImVec2 lc = hex_local_centre(a.col, a.row, hex_size);
+            const ImVec2 sc = to_screen(lc);
+
+            const int k_min = (period_px > 0.0f)
+                ? static_cast<int>(std::ceil((visible_left  - sc.x) / period_px)) : 0;
+            const int k_max = (period_px > 0.0f)
+                ? static_cast<int>(std::floor((visible_right - sc.x) / period_px)) : 0;
+            for (int k = k_min; k <= k_max; ++k)
+            {
+                const ImVec2 mc = { sc.x + static_cast<float>(k) * period_px, sc.y };
+                icons::settlement(dl, mc, sr, c.tier, col);
+
+                // Label City+ conurbations (tier >= 4) only, to keep the map legible.
+                if (c.tier >= 4)
+                {
+                    const char* name = settlement_names[
+                        (static_cast<uint32_t>(a.tile) * 2654435761u) % settlement_name_count];
+                    const ImVec2 tp{ mc.x + sr + 3.0f, mc.y - sr };
+                    dl->AddText({ tp.x + 1.0f, tp.y + 1.0f }, IM_COL32(20, 22, 28, 200), name); // shadow
+                    dl->AddText(tp, IM_COL32(236, 230, 214, 255), name);
+                }
+            }
+        }
+    }
+
     // Building-placement ghost preview. When construction mode is active and a tile
     // is hovered, draw a translucent-intent marker of the chosen building type at the
     // hovered copy's centre, tinted green when the placement-rules seam accepts the

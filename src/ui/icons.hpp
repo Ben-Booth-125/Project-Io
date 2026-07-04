@@ -165,6 +165,19 @@ void scarcity(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Stroke colour.
 void market_centre(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw a settlement marker — a small skyline whose number of towers grows with
+/// @p tier (1 = outpost … 5 = metropolis) — in @p colour. The civilisation read on
+/// the Planetary canvas (population centres, BL-083); tier is carried by the glyph
+/// size/complexity, not colour (see palette::settlement). Distinct from the building
+/// square/diamond/triangle and the market-centre circle+cross.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param tier   Settlement scale 1–5 (clamped); drives the tower count and height.
+/// @param colour Fill colour of the towers.
+void settlement(ImDrawList* dl, ImVec2 centre, float r, int tier, ImU32 colour);
+
 /// Draw the "unknown / unsurveyed" glyph — a question mark — in @p colour. Marks a
 /// body whose surface and deposits are still hidden (survey system, BL-067). Shown
 /// dimmed as the Solar-canvas survey badge for `survey_phase::hidden`.

@@ -71,6 +71,12 @@ inline constexpr ImU32 selection = IM_COL32(255, 255, 255, 255); ///< The select
 inline constexpr ImU32 hover     = IM_COL32(120, 190, 255, 255); ///< The entity under the cursor.
 inline constexpr ImU32 pinned    = IM_COL32(255, 200,  90, 255); ///< An Explorer-pinned entity.
 
+// --- civic (settlements; BL-083) ---
+// Population-centre markers are civic-neutral: settlements are not corp-owned, so a
+// corp tint would misread as ownership, and tier is carried by the glyph size, not
+// colour. The host-nation tint is applied only under the Country lens.
+inline constexpr ImU32 settlement = IM_COL32(216, 206, 182, 255); ///< Civic-neutral settlement marker (parchment).
+
 /// Number of reserved corporation colour slots. These are the on-canvas identity
 /// colours for corporations (player vs. rivals); slot 0 is the player's corp.
 /// (Renamed from faction_slot_count, BL-052 — this palette is corporation

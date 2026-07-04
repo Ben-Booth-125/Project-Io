@@ -3,6 +3,7 @@
 #include "presentation.hpp"
 
 #include <algorithm>
+#include <cmath>
 
 namespace ui::icons {
 
@@ -239,6 +240,31 @@ void market_centre(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     const float arm = r * 0.6f;
     dl->AddLine({ centre.x - arm, centre.y }, { centre.x + arm, centre.y }, colour, 1.5f);
     dl->AddLine({ centre.x, centre.y - arm }, { centre.x, centre.y + arm }, colour, 1.5f);
+}
+
+void settlement(ImDrawList* dl, ImVec2 centre, float r, int tier, ImU32 colour)
+{
+    // A small skyline: `bars` towers sitting on a baseline, the middle tallest, the
+    // count rising with tier so an outpost reads as a lone tower and a metropolis as
+    // a dense cluster. Tier drives complexity; colour stays civic-neutral.
+    const int bars = std::max(1, std::min(tier, 5));
+    const float baseline = centre.y + r * 0.85f;
+    const float bw       = (2.0f * r) / (bars * 1.55f);   // tower width incl. a gap allowance
+    const float gap      = bw * 0.55f;
+    const float span     = bars * bw + (bars - 1) * gap;
+    float x = centre.x - span * 0.5f;
+    const float mid = (bars - 1) * 0.5f;
+    for (int i = 0; i < bars; ++i)
+    {
+        // Height peaks at the middle tower and tapers to the edges.
+        const float t = 1.0f - (mid > 0.0f ? std::abs(i - mid) / (mid + 0.6f) : 0.0f);
+        const float h = r * (0.7f + 1.05f * t);
+        const ImVec2 a{ x, baseline - h };
+        const ImVec2 b{ x + bw, baseline };
+        dl->AddRectFilled(a, b, colour);
+        dl->AddRect(a, b, outline, 0.0f, 0, 1.0f);
+        x += bw + gap;
+    }
 }
 
 void unknown(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)

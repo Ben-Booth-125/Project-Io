@@ -4437,32 +4437,32 @@
       "promoted_from": "backlog.json BL-083 (v0.0.8 visibility-pass cluster)",
       "difficulty": 3,
       "importance": "A",
-      "status": "active",
+      "status": "complete",
       "rows": [
         {
           "id": "R1",
-          "status": "active",
+          "status": "complete",
           "requirement": "Brief-spanning: the Planetary canvas draws the generated population_centres as always-on (not lens-gated) tiered settlement markers keyed on scale, with contiguous centres clustered into named conurbations for display and only City+ tiers labelled. Golden-verified.",
           "verification": ["visual: scripts/verify/pop_markers.lua golden"],
           "notes": ""
         },
         {
           "id": "R2",
-          "status": "active",
+          "status": "complete",
           "requirement": "Contiguous centres cluster into named conurbations for display so 20–40 scale-1–5 centres read as a legible hierarchy (a handful of cities + towns), not a dust of villages. Generation/simulation data unchanged — presentation only.",
           "verification": ["code", "visual"],
           "notes": "body_surface_canvas.cpp"
         },
         {
           "id": "R3",
-          "status": "active",
+          "status": "complete",
           "requirement": "A tiered settlement glyph family in ui::icons (Outpost→Metropolis), carried by size/glyph; catalogued in ICONS.md on landing.",
           "verification": ["code", "visual"],
           "notes": "icons.{hpp,cpp}"
         },
         {
           "id": "R4",
-          "status": "active",
+          "status": "complete",
           "requirement": "Marker colour is civic-neutral (not a corp identity colour); the host-nation tint applies only under the Country lens, keeping colour out of the ownership channel.",
           "verification": ["code", "visual"],
           "notes": "presentation.hpp"
