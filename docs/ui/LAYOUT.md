@@ -20,10 +20,11 @@ The prototype UI is built with Dear ImGui (see TECH_FOUNDATIONS). Everything her
 │ ▢  …     │     [ floating ledger windows ]     │   shortcuts) │
 │ ▦ (8)    │                                     │              │
 │ ▢  …     │                                     │              │
-│ ▢        │     [ overlay lens strip ]          ┌──────────────┐│
-│ ▢        │                                     │   Minimap    ││
-│          │                                     │ (inactive    ││
-│          │                                     │   canvas)    ││
+│ ▢        │  [ Selection info — action surface ]┌──────────────┐│
+│ ▢        │  (owns bottom-left corner)          │   Minimap    ││
+│          │                                     │ [lens bar]   ││
+│          │                                     │   (inactive  ││
+│          │                                     │    canvas)   ││
 └──────────┴─────────────────────────────────────┴─────────────┘
 ```
 
@@ -84,39 +85,59 @@ The canvases render behind the foreground panels, so the chrome currently occlud
 ## Minimap — bottom-right inset
 **Spec: `MINIMAP.md`**
 
-A fixed inset in the bottom-right corner showing the **zoom-out neighbour** of the primary canvas at reduced scale, framed by its own chrome — a title bar (the viewed body, or the star name; the game name at the top rung) above the inset. Clicking it **ascends** one rung. It shares the primary canvases' drawing code, parameterised by region size. The overlay-lens controls that once sat in a mode bar below the inset now live in a bottom-left **overlay control strip** (see below). `MINIMAP.md` is the authoritative spec for the minimap chrome and the ladder navigation; `CANVASES.md` covers the shared drawing path.
+A fixed inset in the bottom-right corner showing the **zoom-out neighbour** of the primary canvas at reduced scale, framed by its own chrome — a title bar (the viewed body, or the star name; the game name at the top rung) above the inset. Clicking it **ascends** one rung. It shares the primary canvases' drawing code, parameterised by region size. Since BL-093 the minimap also carries the **lens mode bar** along its bottom edge (see below); `MINIMAP.md` is the authoritative spec for the minimap chrome, the lens bar, and the ladder navigation, and `CANVASES.md` covers the shared drawing path.
 
 ---
 
-## Overlay control strip — bottom-left
-**Spec: `CANVASES.md` / `MINIMAP.md`**
+## Lens mode bar — on the minimap
+**Spec: `MINIMAP.md` / `LENSES.md`**
 
-A small horizontal strip pinned to the bottom-left of the shell, running from the
-nav-rail edge inward toward the centre (clear of the centred scale/zoom control on
-the Solar and Circumplanetary canvases). It toggles the **canvas overlay lens** —
-a labelled button per mode (Supply / Market / Faction); the active lens is
-highlighted, and clicking it again clears the overlay. This replaces the former
-minimap mode-bar dots. A default lens is active on load (the supply lens) rather
-than no overlay. See `overlay.hpp` (`draw_overlay_controls`).
+The overlay-lens controls no longer occupy their own bottom-left strip — BL-093
+relocated them onto the **minimap itself**, as a 7-glyph mode bar running along
+its bottom edge (`ui::draw_overlay_controls`, called from the minimap block in
+`src/core/app.cpp`). The on-screen seven are Corp, Country, Resource, Market,
+Population, Opportunity, and Production; Scarcity and Industry join Supply as
+**keyboard-cycle only** lenses (no bar glyph — the bar does not have room for
+all nine). Clicking a glyph toggles that lens; the active one is highlighted,
+and clicking it again clears the overlay. The lens-local resource/good picker
+(Resource, Market, Scarcity) is now a **popup button** on the bar rather than an
+inline combo — the fixed-width combo did not fit the bar's reduced footprint.
+Freeing the bottom-left strip is what lets the Selection info element (below)
+take over the whole corner.
 
-## Selection info element — bottom-left, above the overlay strip
+## Selection info element — bottom-left corner
 **Spec: `SELECTION.md`**
 
-A **pinned** panel docked in the bottom-left, directly **above the overlay lens /
-zoom control strip**. It shows detail about the **current selection** — whatever
-entity the player last single-clicked — and is **polymorphic by selection kind**
-(body, tile, building, market, unit, and later nation / corporation / logistics
-vessel), each rendering its own stat block.
+Since BL-093 the Selection info element **owns the whole bottom-left corner** —
+from the nav-rail edge across to the minimap's left edge, down to the bottom
+margin — rather than sharing it with a lens strip stacked below. It shows detail
+about the **current selection**, whatever entity the player last single-clicked.
 
-Its header carries a **'go to'** button (equivalent to a double-click on the
-selection; routes through `ui::focus_on_entity` — navigates a canvas for spatial
-entities, opens a ledger for non-spatial ones) and a **close** button (which
-*hides* the panel; it reappears on the next selection).
+It is now an **action surface**, not a stat block: a header row
+(`[kind icon] Name · type` on the left, **go-to** `>` and **close** `x` buttons
+on the right) over two columns — a dominant **ACTION** column (~58% width, the
+kind's primary affordance) beside a narrower, muted **FACTS** column. Per
+selection kind: a **tile** offers *Build here* as the hero action beside its
+Thrives/Valid placement facts; a **body** offers *Dispatch Survey* or *Go to
+surface* beside its commercial-activity pulse; a **player-owned building**
+offers a *Manage building* button that routes into the construction panel
+beside its profitability readout; a **rival building** is intel-only — owner
+and location facts, production/stockpile shown as explicit private rows. The
+old undifferentiated stat-block polymorphism and the separate lens-supplement
+section are gone — the action/facts split *is* the per-kind content now.
 
-Unlike the floating ledgers it is **not** reachable from the navigation rail —
-**selecting an entity is the only way to open it.** It introduces a click-model
-change shared across all canvases: **single-click selects** (fills this panel,
-no view change), **double-click navigates**. See `SELECTION.md` and `CANVASES.md`.
+The panel **sizes its height to its content** in text-line units (so it stays
+correct across resolutions) rather than matching a fixed neighbour's height,
+and is anchored bottom-left.
+
+The **go-to** button is equivalent to a double-click on the selection (routes
+through `ui::focus_on_entity` — navigates a canvas for spatial entities, opens a
+ledger for non-spatial ones); **close** hides the panel until the next
+selection. Unlike the floating ledgers it is **not** reachable from the
+navigation rail — **selecting an entity is the only way to open it.** It carries
+the click-model shared across all canvases: **single-click selects** (fills this
+panel, no view change), **double-click navigates**. See `SELECTION.md` and
+`CANVASES.md`.
 
 ## Time panel — top-right
 **Spec: `TIME_CONTROLS.md`**
