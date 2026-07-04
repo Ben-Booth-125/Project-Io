@@ -70,9 +70,9 @@ Each kind renders its own content and routes its 'go to' to the right place:
 
 | Selection kind | Content (stat block) | 'Go to' target |
 |---|---|---|
-| **Body** (planet/moon/asteroid/station/star) | Name, type, orbit, parent; surface summary. Plus a **Survey section** (survey system, BL-067) — see below. | Canvas: `focus_on_surface` — descend to the body's **Planetary tile surface**, the most informative rung. (Not `focus_on_body` / the orbital framing: landing on a sparse circumplanetary view reads as "nothing happened", which was the *only-works-for-Kepler* symptom.) |
+| **Body** (planet/moon/asteroid/station/star) | Name, type, orbit, parent; surface summary. Plus a **Survey section** (survey system, BL-067) and a **Commercial activity section** (activity fog, BL-089) — see below. | Canvas: `focus_on_surface` — descend to the body's **Planetary tile surface**, the most informative rung. (Not `focus_on_body` / the orbital framing: landing on a sparse circumplanetary view reads as "nothing happened", which was the *only-works-for-Kepler* symptom.) |
 | **Tile** | Composition × landform, hazard, habitability, deposits. | **No-op for now.** A tile is selected from the surface it lives on, so 'go to' has nothing to descend to; pan-to-tile is out of scope. |
-| **Building** | Type, recipe, throughput, host tile. | Canvas: `focus_on_tile` (host tile). |
+| **Building** | Type, recipe, throughput, host tile. Player-owned buildings carry a **profitability readout** (BL-074) — see below. | Canvas: `focus_on_tile` (host tile). |
 | **Market** | Body, headline prices / balances. | Canvas: `focus_on_surface`; or Market ledger. |
 | **Unit / logistics vessel** | Type, owner, location, status. | Canvas: `focus_on_surface` / vessel's position. |
 | **Nation** | Name, character, territory summary. | A ledger (no canvas of its own). |
@@ -113,10 +113,22 @@ same reason string enriches the build front door (replacing the former bare "Can
 water") and follows the cursor as a **"why not here"** label under the armed placement ghost on
 the Planetary canvas. One vocabulary, three surfaces.
 
+### The building element carries a profitability readout (BL-074)
+
+A selected **Building** carries a **"Profitability (est. / tick)"** section: the estimated net
+per-tick contribution of that single building, broken into four component lines plus Net —
+**Revenue**, **Inputs** (input cost), **Wages**, **Maintenance**, laid out as two paired columns,
+then **Net** (coloured positive/negative/neutral by sign). Figures come from
+`estimate_building_profit` (`src/world/building_profit.hpp`) — realised last-tick revenue/cost
+where attributable, estimated where the pooled market resists exact per-building attribution.
+Before an economy tick has run, the section shows "Run an economy tick to estimate." instead.
+Rendered by `draw_building_profit` in `src/ui/selection_panel.cpp`.
+
 ### The body element is the survey front door
 
 Beyond its stat block, a selected **Body** carries a **Survey section** (survey system, BL-067)
-keyed on the body's survey phase, mirroring the tile build front door:
+keyed on the body's survey phase, mirroring the tile build front door. See
+[DISCOVERY.md](DISCOVERY.md) for the model authority (the geographic fog this section reads).
 
 - **`hidden`** — a **Dispatch Survey** button with a `cost cr · ETA days` preview (cost and ETA
   derived from size + distance). Affordability-gated against the player corporation's balance;
@@ -129,6 +141,22 @@ The button only **enqueues** `ui_state::pending_survey_dispatch`; the mutable-wo
 `app::render` performs the upfront debit and arms the schedule (`dispatch_survey`), exactly as
 construction requests are executed — the UI surfaces hold a `const world&`. The star carries no
 survey section.
+
+### Commercial activity
+
+Below the Survey section, a selected **Body** (not the star) carries a **Commercial activity**
+section keyed on `body_activity_visibility` (the activity fog, BL-089) — independent of survey
+phase, so it can be populated on an unsurveyed body and empty on a surveyed one. See
+[DISCOVERY.md](DISCOVERY.md) for the model authority (`activity_vis`, the tier derivation).
+
+- **`unknown`** — "Outside your trade network - no market data." No further content.
+- **`known` / `visible`** — a coarse **market pulse** (`busy` / `steady` / `quiet`, derived from
+  the body's aggregate market throughput); `visible` additionally notes "Live lane / your
+  presence." No per-building production or stockpiles — competitor internals stay private
+  (BL-068).
+- **`known_stale`** — greyed: "Route gone cold - last market read is stale."
+
+Rendered by `draw_activity_section` in `src/ui/selection_panel.cpp`.
 
 ---
 
