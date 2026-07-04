@@ -6,6 +6,51 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — v0.0.8 legibility + fog batch delivered; version record reconciled (2026-07-04)
+
+**Context.** Fresh clone on a new PC (no toolchain). Set up the build, reconciled the skipped
+v0.0.6/v0.0.7 releases, then delivered the whole v0.0.8-completion batch — the three-layer visual
+language (Settlements · Industry · You) + ambient opportunity + the discovery fog.
+
+**Environment setup.** Installed CMake + VS 2022 Build Tools (winget). Worked around a CMake/schannel
+TLS **revocation-check hard-fail** on FetchContent by pre-fetching the four deps (SDL3, Lua, sol2,
+imgui) with `curl --ssl-no-revoke` into `C:\claude\io-deps` and pointing the build at them via
+`-DFETCHCONTENT_SOURCE_DIR_*` (non-invasive; no CMakeLists edit). Baseline build green.
+
+**Version reconcile (B).** v0.0.5 was the last *cut* release; v0.0.6/v0.0.7 were merged as batches but
+never cut. Created retroactive annotated tags at the theme-boundary commits (`v0.0.6` → `ab7e28f`,
+`v0.0.7` → `61d9946`), backfilled CHANGELOG `[0.0.6]`/`[0.0.7]` + compare links, advanced the README.
+Tags are local (unpushed).
+
+**Batch delivery (A) — six items, one commit each, build + verify per item:**
+- **BL-088** persistent trade routes — `trade_route` store upserted on convoy completion; `body_of_market`;
+  tick threaded into `credit_arrived_convoys`. *Headless: trade_routes_harness ALL PASS.*
+- **BL-083** population-centre markers — clustered conurbations, tiered `icons::settlement` skyline,
+  City+ labels, civic colour (nation tint under Country lens). *Visual: 3 goldens.*
+- **BL-085** player presence — home-cluster ring + `icons::hq` star (folds **BL-092**) + Solar home halo;
+  reuses the shipped ownership accent. *Visual: 2 goldens.* (Camera focus + accent already shipped in
+  start-framing — not re-done.)
+- **BL-084** industry-density lens — `overlay_mode::industry`, substrate-throughput field (occupation ×
+  terrain richness, decoupled from population), `icons::industry`. *Visual: 2 goldens.*
+- **BL-086** ambient opportunity — **no new code**: the shipped Opportunity lens already reads at rest with
+  its key and isn't auto-activated; pinned with a golden.
+- **BL-089** commercial-sphere fog — `activity_vis` + pure `body_activity_visibility` (routes + live
+  convoys + ownership + tick); Solar pulse badge (offset from the survey badge) + lit corridors;
+  Selection-panel activity section; `world.current_day_tick` mirror. *Headless 9/9 + visual golden.*
+
+**In-session decisions.**
+- **BL-085/086 scoped to deltas** over already-shipped start-framing/BL-017 work rather than
+  re-implementing; BL-092 folded into BL-085's HQ star. Reconciliations recorded in REFINED + requirements.
+- **BL-089 deferrals (documented, not dropped):** the deterministic proximity-**glimpse** peek and the
+  hover body line. Core fog (badges + corridors + tiers + panel) shipped and verified.
+- Two fogs stay **independent axes** — a body can be known (commerce) yet unsurveyed (geography); the
+  activity badge (lower-left) is offset from the survey badge (upper-right) so they read apart.
+
+**Left for next session.** Cut **v0.0.8** now its theme is complete (tag + CHANGELOG stamp). Spin out
+`docs/ui/DISCOVERY.md` (discovery now spans BL-067/068/088/089) and repoint BL-067/068. Optional
+follow-ups: BL-089 glimpse + hover; BL-090/091 emblem/overflow QOL; BL-077 planetary logistics.
+Branch `claude/v0.0.8-legibility-batch` + the two tags are **unpushed** (native push when ready).
+
 ## Session — Discovery: trade-route fog design (BL-088 + BL-089) + roadmap re-sync (2026-07-01)
 
 **Context.** Design session (advisor mode, **no `src/` change** — backlog + docs only). Opened on
