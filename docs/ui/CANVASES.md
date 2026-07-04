@@ -20,6 +20,13 @@ specifications for each rung are in their own documents:
 - [PLANETARY.md](PLANETARY.md) — Body Surface (Planetary) Canvas: tile grid, terrain colours, building markers, interaction.
 - [MINIMAP.md](MINIMAP.md) — the inset's chrome (title bar), what it shows at each rung, and the navigation model.
 
+The Planetary canvas additionally draws two always-on chrome layers, neither lens-gated: **civic
+chrome** — tiered population-centre conurbation markers, sized by scale and labelled at City+
+(BL-083; model in [`../economy/POPULATION.md`](../economy/POPULATION.md), glyph in
+[`ICONS.md`](ICONS.md)) — and **player-presence chrome** — a home-cluster ring + HQ star on
+`home_body` (BL-085), echoed by a home halo around the body on the Solar rung. Full detail in
+[PLANETARY.md](PLANETARY.md) and [SOLAR.md](SOLAR.md).
+
 ---
 
 ## Primary / minimap layout
