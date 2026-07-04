@@ -1179,7 +1179,7 @@
       "short_name": "PLAYER_CORP_UNNAMED",
       "category": "UI",
       "title": "Player corp renders as 'Unnamed Corp' in the identity chip",
-      "status": "design-owed",
+      "status": "complete",
       "glyph": "~",
       "priority": "C",
       "difficulty": 1,

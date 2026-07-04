@@ -4,10 +4,27 @@
 #include <imgui.h>
 
 #include <cstdint>
+#include <string>
 
 namespace ui {
 
 namespace {
+
+/// Truncate @p text with a trailing ellipsis so it fits within @p max_w pixels at
+/// the current font (BL-091: the fixed-width identity card clipped long corp / nation
+/// names). Returns the text unchanged when it already fits. ASCII-oriented (the
+/// prototype's generated names), so it trims by byte — adequate for the name banks.
+std::string fit_ellipsis(const char* text, float max_w)
+{
+    if (max_w <= 0.0f || ImGui::CalcTextSize(text).x <= max_w)
+        return text;
+    const float dots = ImGui::CalcTextSize("...").x;
+    std::string s = text;
+    while (!s.empty() && ImGui::CalcTextSize(s.c_str()).x + dots > max_w)
+        s.pop_back();
+    return s + "...";
+}
+
 /// Human-readable label for a corporation's industrial focus.
 const char* focus_label(industrial_focus f)
 {
@@ -113,9 +130,12 @@ void draw_profile_panel(const world& w)
 
     ImGui::SameLine(portrait + ImGui::GetStyle().ItemSpacing.x * 2.0f);
     ImGui::BeginGroup();
-    ImGui::TextUnformatted(corp_name);
-    ImGui::TextDisabled("Parent: %s", parent_name);
-    ImGui::TextDisabled("Focus: %s", focus_name);
+    // Ellipsize each line to the width remaining beside the portrait so long
+    // generated names never spill past the fixed card edge (BL-091).
+    const float avail = ImGui::GetContentRegionAvail().x;
+    ImGui::TextUnformatted(fit_ellipsis(corp_name, avail).c_str());
+    ImGui::TextDisabled("%s", fit_ellipsis((std::string("Parent: ") + parent_name).c_str(), avail).c_str());
+    ImGui::TextDisabled("%s", fit_ellipsis((std::string("Focus: ") + focus_name).c_str(), avail).c_str());
     ImGui::EndGroup();
 
     ImGui::End();
