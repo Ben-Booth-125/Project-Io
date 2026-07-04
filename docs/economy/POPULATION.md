@@ -33,6 +33,26 @@ that staffs it is seeded onto **their** territory:
 The exact tier thresholds and per-nation centre counts are tuning targets fixed at promotion;
 the decisions here are *nation-seeded, habitability-clustered, level-derived*.
 
+## Centre rendering (implemented 2026-07-04)
+
+The BL-083 presentation layer draws the generated centres on the Planetary canvas
+(`src/ui/body_surface_canvas.cpp`) as **always-on civic chrome** — not lens-gated — so the
+surface reads as inhabited rather than "resources with industry on top":
+
+- **Conurbation clustering** — contiguous `population_centres` are clustered transitively at
+  Chebyshev grid distance ≤ 3 (cylinder-wrapped east–west in columns), so the map shows a
+  handful of legible cities and towns rather than a dust of villages. Display-only; the
+  simulation entities are untouched.
+- **Anchor and tier** — each conurbation is anchored at its highest-scale member and takes
+  that member's scale as its tier.
+- **Marker** — the tiered `icons::settlement` skyline glyph (tower count and height grow with
+  tier), in the civic-neutral `palette::settlement` colour; the host nation's tint applies
+  only under the Country lens. Tier is carried by glyph size, keeping colour out of the
+  ownership vocabulary (see `docs/ui/ICONS.md`).
+- **Labels** — only City-and-above conurbations (tier ≥ 4) are labelled, named
+  deterministically from the anchor tile id against a fixed settlement name bank, so labels
+  are stable per campaign. Deriving names from the host nation is a noted refinement.
+
 ---
 
 Until v0.0.6, the prototype treats workforce as an authored constant (`workforce_assigned`) on each building. The population model is designed here to ensure that the workforce field, the habitability tile property, and the demand side of the market are all positioned correctly for the implementation.

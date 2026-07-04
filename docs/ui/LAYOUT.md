@@ -32,7 +32,7 @@ Two layers compose the screen:
 - **Background** — the canvases, drawn edge-to-edge via the ImGui background draw list.
 - **Foreground** — the ImGui panels below (profile, header, nav pane, explorer, time column, minimap, ledger windows), drawn on top of the canvases.
 
-The header, profile, and explorer are **not yet implemented** — they are specified here ahead of the work so the shell has a settled shape. Layer 2 ships the nav pane, canvases, time column, minimap, and the Tile Ledger window.
+The explorer is **not yet implemented** — it is specified here ahead of the work so the shell has a settled shape. Layer 2 ships the nav pane, canvases, time column, minimap, and the Tile Ledger window; the header (Layer 3 finalisation) and profile (`src/ui/profile_panel.cpp`) have since landed.
 
 ---
 
@@ -41,10 +41,10 @@ The header, profile, and explorer are **not yet implemented** — they are speci
 
 A compact panel pinned to the top-left corner, above the navigation pane and aligned to its width. Shows the player corporation at a glance:
 
-- **Corporation portrait** — a small picture/emblem identifying the player faction.
-- **Corporation name** and a line or two of basic detail (e.g. parent nation, founding, headline standing).
+- **Corporation emblem** — a geometric emblem (deterministic shape + identity colour) on a portrait plate.
+- **Corporation name**, plus `Parent: <home nation>` and `Focus: <industrial focus>`, read live from `corporation_component`.
 
-This is a static identity readout in the prototype — no interaction beyond, eventually, opening a fuller corporation screen. Faction identity is still undecided (see `CONCEPT.md`); the panel reserves the space and the shape of the data.
+This is a static identity readout in the prototype — no interaction beyond, eventually, opening a fuller corporation screen. Implemented in `src/ui/profile_panel.cpp`; see `PROFILE.md`.
 
 ---
 
@@ -215,7 +215,7 @@ These are **not implemented next** and have no dedicated spec yet. They are note
 
 ## Prototype / temporary notes
 
-- Profile, header, and explorer are specified but not yet implemented.
+- The explorer is specified but not yet implemented; profile and header are live.
 - Nav slot layout (count, ordering, the slot-8 Tile Ledger) is placeholder.
 - Canvases are not yet inset clear of the chrome.
 - Popup elements (context menus, dialogs) are deferred.
