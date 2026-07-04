@@ -4397,6 +4397,198 @@
           "notes": "Prototype scope (player card only), per design call. Promotion to a shared ui::icons emblem family + map/selection/hover markers + the full shape/assignment system is a backlog follow-up. draw_corp_emblem is currently local to profile_panel.cpp."
         }
       ]
+    },
+    {
+      "batch": "v0.0.8",
+      "brief": "trade-routes",
+      "title": "BL-088 Persistent trade routes — durable body-pair lanes recorded from convoy traffic",
+      "promoted_from": "backlog.json BL-088 (v0.0.8 discovery); prerequisite for BL-089",
+      "difficulty": 3,
+      "importance": "A",
+      "status": "active",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "active",
+          "requirement": "Brief-spanning: a completed player convoy upserts exactly one persistent trade_route for the correct unordered body-pair with last_tick = completion tick; a second convoy on the same lane bumps convoy_count and last_tick without creating a duplicate; an intra-body convoy (source and dest resolve to the same body) records nothing; body_of_market resolves a market to its owning body. Headless-verified.",
+          "verification": ["headless: tools/verify/trade_routes_harness.cpp"],
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "active",
+          "requirement": "world gains a trade_route struct {body_a, body_b, corp, last_tick, convoy_count} and a std::vector<trade_route> trade_routes (mirroring world.convoys). Routes are never erased by this item (aging is a read-time concern for BL-089). Flag the flat-binary serialisation seam at integration if/when one exists in world/* — do not invent a save path.",
+          "verification": ["code"],
+          "notes": "components.hpp + world.hpp"
+        },
+        {
+          "id": "R3",
+          "status": "active",
+          "requirement": "body_of_market(const world&, entity_id market) accessor added as a sibling of owner_corp_of; used by the upsert to collapse market pairs to body pairs.",
+          "verification": ["code", "headless"],
+          "notes": "world.{hpp,cpp}"
+        }
+      ]
+    },
+    {
+      "batch": "v0.0.8",
+      "brief": "pop-centre-markers",
+      "title": "BL-083 Population-centre markers — draw generated centres as tiered, named settlements",
+      "promoted_from": "backlog.json BL-083 (v0.0.8 visibility-pass cluster)",
+      "difficulty": 3,
+      "importance": "A",
+      "status": "active",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "active",
+          "requirement": "Brief-spanning: the Planetary canvas draws the generated population_centres as always-on (not lens-gated) tiered settlement markers keyed on scale, with contiguous centres clustered into named conurbations for display and only City+ tiers labelled. Golden-verified.",
+          "verification": ["visual: scripts/verify/pop_markers.lua golden"],
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "active",
+          "requirement": "Contiguous centres cluster into named conurbations for display so 20–40 scale-1–5 centres read as a legible hierarchy (a handful of cities + towns), not a dust of villages. Generation/simulation data unchanged — presentation only.",
+          "verification": ["code", "visual"],
+          "notes": "body_surface_canvas.cpp"
+        },
+        {
+          "id": "R3",
+          "status": "active",
+          "requirement": "A tiered settlement glyph family in ui::icons (Outpost→Metropolis), carried by size/glyph; catalogued in ICONS.md on landing.",
+          "verification": ["code", "visual"],
+          "notes": "icons.{hpp,cpp}"
+        },
+        {
+          "id": "R4",
+          "status": "active",
+          "requirement": "Marker colour is civic-neutral (not a corp identity colour); the host-nation tint applies only under the Country lens, keeping colour out of the ownership channel.",
+          "verification": ["code", "visual"],
+          "notes": "presentation.hpp"
+        }
+      ]
+    },
+    {
+      "batch": "v0.0.8",
+      "brief": "player-presence",
+      "title": "BL-085 Player presence — home ring + HQ pip + home_body halo (delta over shipped start-framing)",
+      "promoted_from": "backlog.json BL-085 (v0.0.8 visibility-pass cluster); folds BL-092 (HQ marker)",
+      "difficulty": 3,
+      "importance": "A",
+      "status": "active",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "active",
+          "requirement": "Brief-spanning: a persistent, always-on home marker reads 'you are here' — a ring around the player's starting-holdings cluster plus a distinct HQ pip on the origin building on the Planetary canvas, and a halo on home_body in the Solar canvas. Golden-verified. (Initial camera focus and the lens-independent ownership accent already shipped in start-framing and are NOT re-implemented here.)",
+          "verification": ["visual: scripts/verify/player_presence.lua golden"],
+          "notes": "Reconciled with the 2026-07-01 start-framing QOL group."
+        },
+        {
+          "id": "R2",
+          "status": "active",
+          "requirement": "The HQ pip distinguishes the player's headquarters building from ordinary player buildings (subsumes BL-092). Reuses the shipped ownership accent — no second identity outline is added; the ring/pip/halo compose with, not duplicate, the existing accent.",
+          "verification": ["code", "visual"],
+          "notes": "body_surface_canvas.cpp; folds BL-092"
+        },
+        {
+          "id": "R3",
+          "status": "active",
+          "requirement": "The Solar-canvas home halo is visually distinct from the survey badge and the selection/hover highlights, and persists across lenses.",
+          "verification": ["code", "visual"],
+          "notes": "solar_system_canvas.cpp + presentation.hpp"
+        }
+      ]
+    },
+    {
+      "batch": "v0.0.8",
+      "brief": "industry-lens",
+      "title": "BL-084 Industry-density (substrate) lens — render the nation-owned substrate as a throughput field",
+      "promoted_from": "backlog.json BL-084 (v0.0.8 visibility-pass cluster); promotes BL-050's deferred visual",
+      "difficulty": 3,
+      "importance": "B",
+      "status": "active",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "active",
+          "requirement": "Brief-spanning: a new overlay_mode::industry lens tints the Planetary surface per-tile by the substrate's resource-weighted economic throughput (industrial intensity), with a distinct strip glyph and an on-canvas key. Reads as 'where the existing industry is', distinct from BL-083's population markers. Golden-verified.",
+          "verification": ["visual: scripts/verify/industry_lens.lua golden"],
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "active",
+          "requirement": "The field is pure rendering — no change to substrate_density or the market arithmetic. Tint = per-tile substrate throughput (substrate_density × terrain-affinity resource weighting, i.e. the background_supply/demand contribution). If background_* is collapsed to a per-body aggregate before render, render the equivalent per-tile substrate_density × affinity(resource,terrain) product directly.",
+          "verification": ["code", "visual"],
+          "notes": "body_surface_canvas.cpp — confirm per-tile derivability at build (design caveat)"
+        },
+        {
+          "id": "R3",
+          "status": "active",
+          "requirement": "overlay_mode::industry is added to the enum, the lens control strip (name + short-name + glyph dispatch in overlay.cpp), and ui::icons (a throughput glyph). Catalogued in LENSES.md/ICONS.md on landing.",
+          "verification": ["code", "visual"],
+          "notes": "ui_state.hpp, overlay.cpp, icons.{hpp,cpp}"
+        }
+      ]
+    },
+    {
+      "batch": "v0.0.8",
+      "brief": "opportunity-ambient",
+      "title": "BL-086 Ambient opportunity read — make the 'where to grow' signal glanceable without arming build mode",
+      "promoted_from": "backlog.json BL-086 (v0.0.8 visibility-pass cluster); map-side complement to BL-071",
+      "difficulty": 2,
+      "importance": "B",
+      "status": "active",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "active",
+          "requirement": "Brief-spanning: the Opportunity lens's diverging profit→loss margin surface is fully readable at rest (not gated on an armed building type) and carries an on-canvas profit→loss key so growth headroom reads directly off the terrain. It is NOT auto-activated at campaign start (the canvas opens unskinned per the BL-013 reversal). Golden-verified with no build mode armed.",
+          "verification": ["visual: scripts/verify/opportunity_ambient.lua golden"],
+          "notes": "Reuses the existing per-tile margin estimate; no new mechanics."
+        }
+      ]
+    },
+    {
+      "batch": "v0.0.8",
+      "brief": "commercial-fog",
+      "title": "BL-089 Commercial-sphere visibility — route-driven three-level activity fog",
+      "promoted_from": "backlog.json BL-089 (v0.0.8 discovery); requires BL-088",
+      "difficulty": 4,
+      "importance": "A",
+      "status": "active",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "active",
+          "requirement": "Brief-spanning: a body-level activity fog renders on the Solar canvas — an unknown body shows only a dim astronomy dot; a body reached by a fresh player route shows 'known' with a coarse market pulse; a stale route greys it; a live lane or a player building shows 'visible'; an active lane draws a lit corridor and a completed lane marks a near-by frontier body with a faint proximity glimpse. The Selection panel and hover gain a body activity section keyed on activity_vis. Golden-verified.",
+          "verification": ["visual: scripts/verify/commercial_fog.lua golden"],
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "active",
+          "requirement": "body_activity_visibility(const world&, entity_id) is a pure function returning {unknown, known_stale, known, visible} from trade_routes + live convoys + ownership + tick, with no stored state. Correct tier for each of {no route, fresh route, stale route, active lane, presence}; home_body and player-building bodies start visible; the state is independent of survey phase (a surveyed-but-unrouted body is still unknown for activity; an unsurveyed-but-routed body is known).",
+          "verification": ["headless: tools/verify/commercial_fog_harness.cpp"],
+          "notes": "world.{hpp,cpp} or world/activity_visibility.*"
+        },
+        {
+          "id": "R3",
+          "status": "active",
+          "requirement": "The activity badge is visually distinct from BL-067's survey badge (two layered fogs — geographic vs activity — must be tellable apart); a body can be known-but-unsurveyed and render both states unambiguously. New glyph(s) in ui::icons, state colours in presentation.hpp.",
+          "verification": ["code", "visual"],
+          "notes": "icons.{hpp,cpp}, presentation.hpp, solar_system_canvas.cpp"
+        },
+        {
+          "id": "R4",
+          "status": "active",
+          "requirement": "Known/Visible bodies reveal only a coarse market pulse (public prices + supply/demand aggregate + a busy/quiet activity level) — no per-building production or stockpile detail (those stay BL-068-private / survey-gated). Unknown bodies show only type + orbital position.",
+          "verification": ["code", "visual"],
+          "notes": "selection_panel.cpp, hover_content.{hpp,cpp}"
+        }
+      ]
     }
   ]
 }

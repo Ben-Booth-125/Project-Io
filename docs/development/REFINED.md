@@ -1065,3 +1065,118 @@ Verification: `visibility_harness` (10 PASS) + `workforce_harness` (1001-sample 
 (2 goldens) all PASS at 0.0000%. Full `cmake` build green. Note: `building_management.lua` /
 `corp_dashboard.lua` goldens fail on HEAD independently of this work (stale time-control labels +
 economy-balance drift predating these changes) — left untouched as out of scope.
+
+---
+
+## v0.0.8 Batch Delivery — Legibility pass + commercial-sphere fog (promoted 2026-07-04)
+
+Promotes the roadmap's named v0.0.8-completion set: the three-layer visual language
+(Settlements · Industry · You) + the ambient-opportunity read, plus the discovery fog
+(trade routes -> commercial sphere). Six items: **BL-088, BL-083, BL-085, BL-084, BL-086, BL-089**.
+BL-077 (planetary logistics, d5) and BL-090/091 (emblem/overflow QOL) are **not** in this batch;
+**BL-092 (HQ marker) is folded into BL-085** (its HQ pip is the same visual).
+
+**Reconciliations against shipped work (2026-07-04).**
+- *BL-085* — the 2026-07-01 `start-framing` QOL group already shipped the **initial home camera
+  focus** and the **always-on lens-independent ownership accent** (wash + outline). BL-085 here is
+  scoped to the **remaining delta**: the home-cluster **ring + HQ pip** (Planetary) and the
+  **`home_body` halo** (Solar). No second identity outline — reuse the shipped accent.
+- *BL-086* — the Opportunity lens already renders the margin surface as a selectable lens. Scope is
+  the small delta: confirm it is fully **build-mode-independent** + add the missing on-canvas key.
+  **Not** auto-activated at start (respects the deliberate "opens unskinned" call, BL-013 reversal).
+
+### Sequence & fan-out
+Foundation-first, **serial in the main session** (the four legibility items collide on
+`body_surface_canvas.cpp` + `icons`/`ui_state`/`presentation`; single build/verify bottleneck on
+this machine). BL-088 is the one disjoint `world/*` slice; a worktree sub-agent is optional and
+only taken if it pays off. Build after every item; one commit per item.
+
+### BL-088 — Persistent trade routes (foundation; world/* only) — Satisfies R1/R2/R3
+- **[1] A — `trade_route` struct + store.** `world/components.hpp`: `struct trade_route {body_a,
+  body_b, corp, last_tick, convoy_count}`; `world/world.hpp`: `std::vector<trade_route> trade_routes;`
+  (mirrors `convoys`). Foundation. Satisfies R2.
+- **[1] B — `body_of_market` accessor.** `world/world.{hpp,cpp}`: resolve a market entity -> its body
+  (`markets.find(m)->second.body`). Sibling of `owner_corp_of`. Satisfies R3.
+- **[2] C — Upsert on completion.** `world/supply_system.cpp` `credit_arrived_convoys`: before erasing
+  an arrived convoy, resolve source/dest markets -> bodies; skip intra-body; find-or-insert the
+  unordered `(body_a,body_b,corp)` route; set `last_tick = tick`, `++convoy_count`. Thread the sim
+  tick into the signature (`supply_system.hpp`) from the caller. Deps: A, B. Satisfies R1.
+- **[2] D — Headless harness.** `tools/verify/trade_routes_harness.cpp` (+ CMake target): completion
+  upserts one route with correct pair + `last_tick`; repeat lane bumps `convoy_count` without
+  duplicating; intra-body records nothing; `body_of_market` resolves. Deps: A–C. Satisfies R1.
+- *Serialisation note:* `world.trade_routes` joins the flat-binary seam symmetrically **when that path
+  exists** (none wired in `world/*` today — flag at integration, do not invent a save path).
+- Parallelisation: self-contained `world/*` slice; safe as a worktree sub-agent. A->B->C->D serial within.
+
+### BL-083 — Population-centre markers (Planetary chrome) — Satisfies R1/R2/R3/R4
+- **[2] A — Settlement glyph family.** `icons.{hpp,cpp}`: tiered settlement glyph keyed on scale
+  (Outpost->Metropolis). Foundation. Satisfies R3.
+- **[1] B — Civic-neutral colour.** `presentation.hpp`: a civic settlement colour (not a corp slot);
+  host-nation tint applies only under the Country lens. Satisfies R4.
+- **[3] C — Cluster + draw pass.** `body_surface_canvas.cpp`: cluster contiguous
+  `population_centres` into named conurbations for display; draw tiered, always-on markers; label
+  City+ only. Reuse `hex_local_centre`/`to_screen` and `population_centre_tile`. Deps: A, B. Satisfies R1, R2.
+- **[3] D — Visual golden.** `scripts/verify/pop_markers.lua` + bless. Deps: C. Satisfies R1.
+- Hotspot: `body_surface_canvas.cpp`, `icons` — main session.
+
+### BL-085 — Player presence delta: home ring + HQ pip + Solar halo — Satisfies R1/R2/R3
+- **[2] A — Home-cluster ring + HQ pip (Planetary).** `body_surface_canvas.cpp`: ring around the
+  player's building cluster on `home_body`; a distinct HQ pip on the origin building (folds BL-092).
+  Reuse the shipped ownership accent — do **not** add a second outline. Satisfies R1, R2.
+- **[2] B — `home_body` halo (Solar).** `solar_system_canvas.cpp`: a home halo on `home_body` in the
+  body draw loop (~lines 196–255), distinct from the survey badge. Satisfies R2.
+- **[1] C — Presentation hook.** `presentation.hpp`: home-accent colour constant if one is needed
+  beyond the existing player identity colour. Satisfies R3.
+- **[3] D — Visual golden.** `scripts/verify/player_presence.lua` + bless (Planetary ring/pip + Solar
+  halo). Deps: A, B. Satisfies R1.
+- *Note:* initial camera focus + ownership accent already shipped (start-framing) — not re-done.
+- Hotspot: `body_surface_canvas.cpp` — main session; `solar_system_canvas.cpp` disjoint.
+
+### BL-084 — Industry-density (substrate) lens — Satisfies R1/R2/R3
+- **[1] A — `overlay_mode::industry`.** `ui_state.hpp`: add enum value + doc. `overlay.cpp`: name/
+  short-name + strip entry + glyph dispatch. Foundation. Satisfies R3.
+- **[2] B — Lens glyph.** `icons.{hpp,cpp}`: an industry throughput glyph for the strip. Deps: A. Satisfies R3.
+- **[3] C — Throughput field render.** `body_surface_canvas.cpp`: per-tile tint = substrate
+  throughput (`substrate_density × Σ affinity(resource,terrain)` or the per-tile `background_*`
+  product) — **confirm at build** that `nation_substrate`/`background_*` is per-tile-derivable, not
+  collapsed to a per-body aggregate before render; if aggregated, render the equivalent per-tile
+  product. No economy/arithmetic change. Deps: A. Satisfies R1, R2.
+- **[3] D — Visual golden.** `scripts/verify/industry_lens.lua` + bless. Deps: C. Satisfies R1.
+- Hotspot: `body_surface_canvas.cpp`, `icons`, `ui_state.hpp`, `overlay.cpp` — main session.
+
+### BL-086 — Ambient opportunity read (delta) — Satisfies R1
+- **[2] A — Glanceable-at-rest + key.** `body_surface_canvas.cpp`: confirm the Opportunity margin
+  surface renders under the lens without armed build mode; add the missing on-canvas
+  profit->loss key. `ui_state.hpp`/`overlay.cpp` touched only if a label/tooltip needs it. **No**
+  start auto-activation. Satisfies R1.
+- **[2] B — Visual golden.** `scripts/verify/opportunity_ambient.lua` + bless (lens read at rest, no
+  build armed). Deps: A. Satisfies R1.
+- Hotspot: `body_surface_canvas.cpp` — main session.
+
+### BL-089 — Commercial-sphere fog (requires BL-088) — Satisfies R1/R2/R3/R4
+- **[2] A — `activity_vis` + pure function.** `world/world.{hpp,cpp}` (or new
+  `world/activity_visibility.*`): `enum class activity_vis {unknown, known_stale, known, visible}` +
+  `body_activity_visibility(const world&, entity_id)` reading `trade_routes` + live `convoys` +
+  ownership + tick; `home_body`/player-building bodies start `visible`. Foundation. Satisfies R2.
+- **[2] B — Activity badge glyph(s).** `icons.{hpp,cpp}` + `presentation.hpp` state colours; distinct
+  from the survey badge. Deps: A. Satisfies R3.
+- **[3] C — Solar canvas fog.** `solar_system_canvas.cpp`: per-body activity badge; lit corridor for
+  active player lanes; deterministic proximity glimpse sampled at convoy-completion tick. Reconcile
+  the two-badge language with the survey badge. Deps: A, B. Satisfies R1, R3.
+- **[2] D — Selection + hover activity section.** `selection_panel.cpp` + `hover_content.{hpp,cpp}`:
+  a body activity section keyed on `activity_vis` (unknown -> "outside your network"; known/visible ->
+  coarse market pulse; stale -> greyed last-seen). No internals. Deps: A. Satisfies R1, R4.
+- **[2] E — Headless harness.** `tools/verify/commercial_fog_harness.cpp` (+ CMake target): the tier
+  for {no route, fresh, stale, active lane, presence}; `home_body` visible; independent of survey
+  phase. Deps: A. Satisfies R2.
+- **[3] F — Visual golden.** `scripts/verify/commercial_fog.lua` + bless. Deps: C, D. Satisfies R1.
+- *Authority-doc note:* discovery now spans BL-067/068/088/089 -> spin out `docs/ui/DISCOVERY.md` on
+  landing and repoint BL-067/068 (batch-close admin, not per-item).
+- Hotspot: `solar_system_canvas.cpp`, `icons`, `presentation.hpp` — main session; `world/*` disjoint.
+
+### Collision map (this batch)
+Hotspots (single-writer, main session): `body_surface_canvas.cpp` (083 C, 084 C, 085 A, 086 A),
+`icons.{hpp,cpp}` (083 A, 084 B, 089 B), `presentation.hpp` (083 B, 085 C, 089 B),
+`ui_state.hpp`/`overlay.cpp` (084 A, 086 A). Disjoint slices (worktree-eligible): BL-088 `world/*`;
+BL-089's `world/*` + `solar_system_canvas.cpp` + `selection_panel.cpp`/`hover_content.cpp` (but 089
+`requires` 088 and shares `icons`/`presentation`, so it lands last in main).
