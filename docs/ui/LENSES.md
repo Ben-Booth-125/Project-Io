@@ -19,10 +19,13 @@ Glyph shapes live in [ICONS.md](ICONS.md); identity colours live in
 > the curated single-select strip, renamed Faction → **Country**, reworked the
 > **Resource** lens to a flat contiguous-deposit fill, reworked **Scarcity** to a
 > per-market shortfall field, and added the **Opportunity** (net-margin) and
-> **Production** (intensity) lenses. The **Market** lens's per-catchment surface
-> still waits on multi-market seeding (BL-036); **Supply** waits on Layer-5 route
-> geometry. Identity colours live in `presentation.hpp`; the corporation-identity
-> helper is `palette::corp_colour` (renamed from `faction_colour`, BL-052).
+> **Production** (intensity) lenses. The 2026-07-01 visibility-pass cluster added
+> the **Industry** lens (BL-084, per-tile nation-substrate throughput field) as the
+> strip's ninth entry, and **re-keyed Population** (BL-069) from raw habitability
+> to workforce efficiency. The **Market** lens's per-catchment surface still waits
+> on multi-market seeding (BL-036); **Supply** waits on Layer-5 route geometry.
+> Identity colours live in `presentation.hpp`; the corporation-identity helper is
+> `palette::corp_colour` (renamed from `faction_colour`, BL-052).
 
 ---
 
@@ -32,9 +35,10 @@ Which lenses are meaningful on each rung of the ladder. "—" = no representatio
 intended; "✓" = built and active; "(later)" = a representation is specified here
 but its build is gated on a dependency (named in the lens section).
 
-The strip presents a **curated subset** in this order (BL-013): **Corporation →
-Country → Resource → Market → Population → Opportunity → Production → Scarcity**.
-Supply is off the strip (Layer-5, reached by keyboard lens-cycle). The campaign
+The strip presents a **curated subset** in this order (BL-013, extended BL-084):
+**Corporation → Country → Resource → Market → Population → Opportunity →
+Production → Scarcity → Industry**. Supply is off the strip (Layer-5, reached by
+keyboard lens-cycle). The campaign
 opens on **no lens** (`overlay_mode::none`, the plain canvas) — a click only updates
 the Selection element and never re-skins the canvas, so the canvas starts unskinned
 and the player picks a lens deliberately (reverses BL-013's Corporation-default,
@@ -52,22 +56,24 @@ a dependency (named in the lens section).
 | **Country** | — | — | **✓ tile tint + owner borders** |
 | **Resource** | — | — | **✓ contiguous-deposit flat fill + key** |
 | **Market** | — | ✓ per-body price strip | ✓ per-body price wash |
-| **Population** | — | — | **✓ habitability tint + gradient key** |
+| **Population** | — | — | **✓ workforce-efficiency tint + gradient key (BL-069)** |
 | **Opportunity** | — | — | **✓ best-building net-margin tint + key** |
 | **Production** | — | (later) per-body output-throughput badge | **✓ production-intensity tint + key** |
 | **Scarcity** | — | (later) per-body shortfall badge | **✓ per-market shortfall blocks + key** |
+| **Industry** | — | — | **✓ substrate-throughput amber tint** |
 
-**BL-012 per-lens rung notes.** Corporation, Country, Resource, Population, and
-Opportunity are **Planetary-only** — their unit of meaning (a tile, a building, a
-deposit, a margin) is sub-body and has no coherent inter-body surface, and nations
-are sub-body political units. Market and Supply are the genuinely multi-rung lenses
-(prices per body-market; logistics span the ladder). Production and Scarcity are
-Planetary today but each has a natural **Circumplanetary per-body badge** owed
-(total output / aggregate shortfall for the anchor body) — additive passes guarded
-behind the same `overlay_mode`, not changing the Planetary behaviour. None propagate
-to the Solar rung in the prototype.
+**BL-012 per-lens rung notes.** Corporation, Country, Resource, Population,
+Opportunity, and Industry are **Planetary-only** — their unit of meaning (a tile, a
+building, a deposit, a margin, a substrate-throughput reading) is sub-body and has
+no coherent inter-body surface, and nations are sub-body political units. Market
+and Supply are the genuinely multi-rung lenses (prices per body-market; logistics
+span the ladder). Production and Scarcity are Planetary today but each has a
+natural **Circumplanetary per-body badge** owed (total output / aggregate shortfall
+for the anchor body) — additive passes guarded behind the same `overlay_mode`, not
+changing the Planetary behaviour. None propagate to the Solar rung in the
+prototype.
 
-**Resource** is **built** (2026-06-16): unlike Supply and Market it had **no data
+**Resource** is **built** (2026-06-17): unlike Supply and Market it had **no data
 dependency** (tile `resource_deposit` is already generated), so it landed directly as a
 Planetary render pass. See its section for the full spec.
 
@@ -121,6 +127,17 @@ the port/unit filled triangle.
 strip glyph highlight and its hover tooltip (`overlay_mode_name` →
 "Corporation ownership"); no on-canvas colour key yet. A per-corp colour key is a
 follow-up shared with the Faction lens.
+
+**Cross-note (BL-085).** The player's white outline described above is drawn as part of the
+Corporation lens's own fill/border pass, but the *general* player-identity accent — a subtle wash
+on the player's tiles at the plain default, plus an outline drawn under **every** lens — is
+separate, always-on chrome (`is_player_tile`, `corp_identity(w.player_entity)` in
+`body_surface_canvas.cpp`) drawn once regardless of which lens (if any) is active; it is not a
+second player outline layered on top of the Corporation lens's own. The Corporation lens does not
+add a second player outline — it *extends the same identity language to rivals*, giving every
+corporation (not just the player) a readable tile tint. See also the BL-085 home ring / HQ star,
+drawn only on the player's home body, which is a further, distinct layer of the same identity
+chrome.
 
 ---
 
@@ -267,6 +284,7 @@ valid:
 | **Opportunity** | the tile (and its best-building margin breakdown) | Tile Ledger |
 | **Production** | the producing **building** under the pointer | Balance Ledger |
 | **Scarcity** | the tile's **market** (the catchment under the pointer) | Market Ledger |
+| **Industry** | the tile (no dedicated ledger route; falls through to the tile) | Tile Ledger |
 | **Supply** *(Layer 5)* | the **route segment / stockpile** under the pointer | (Supply surface) |
 
 A lens skips kinds it does not validate: under the Corporation lens a hovered *building* resolves
@@ -275,7 +293,7 @@ unit of meaning. Under no lens that same building resolves to itself. This is th
 *validity* function the resolution rule consumes; the gating on data/geometry per lens (Market,
 Supply) applies here too — a lens whose data does not yet exist contributes no valid target.
 
-## Resource lens *(settled — next to build; no data dependency)*
+## Resource lens *(built 2026-06-17 — no data dependency)*
 
 **Intent.** Read the map as a *deposit-density surface*: where the body's mineral
 and material wealth concentrates, so the player can site extraction before any
@@ -332,35 +350,47 @@ lens is always single). The on-canvas key sits at the left edge, vertically cent
 the nav rail. Verified by `scripts/verify/resource_lens.lua` against blessed goldens
 (deterministic after the draw-order fix).
 
-## Population lens *(built 2026-06-16 — no data dependency)*
+## Population lens *(built 2026-06-16, re-keyed 2026-06-30 — BL-069)*
 
 **Intent.** Read the map as a *liveability surface*: where land is hospitable, so the player can
 weigh siting and (later) population pressure. The complement to Resource's material read.
 
-**Data definition (settled).** Every tile carries a `habitability` value in `[0, 1]` from
-generation (`tile_component.habitability`). The lens reads it directly at draw time; **no new data
-is generated**. Population *density* (people per tile) is **deferred** — population centres are not
-yet generated — so this lens reads **habitability only** for now; the density half folds in when the
-population layer lands (§ Workforce / § Infrastructure Briefs).
+**Data definition (re-keyed, BL-069).** Every tile carries a `habitability` value in `[0, 1]` from
+generation (`tile_component.habitability`), but the lens no longer tints by that raw value. It tints
+by `workforce_efficiency(tile.habitability)` — the same curve `economy_system.cpp` applies to scale
+labour — from [`workforce.hpp`](../../src/world/workforce.hpp): full efficiency (`1.0`) at/above
+habitability `0.6`, ramping linearly down to `0.5` at habitability `0`. So the lens shows the
+**labour consequence**, including the `0.6` full-labour cliff, not the raw terrain habitability —
+"build where habitability ≥ 0.6 for full workforce" reads directly as a flat brightest-green band.
+No new data; population *density* (people per tile) is separately carried by the BL-083 population-
+centre markers, not this lens.
 
-**Rung.** Planetary only — habitability is per-tile and has no inter-body surface. Guarded behind
-`overlay_mode::population` in [`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp).
+**Rung.** Planetary only — workforce efficiency is per-tile and has no inter-body surface. Guarded
+behind `overlay_mode::population` in [`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp).
 
 **Colour.** A sequential dark→liveable-green gradient: a tile's terrain hue is composited toward a
-"liveable" green (`IM_COL32(80, 200, 110)`) at opacity `0.15 + 0.7·habitability` (`lerp_colour`), so
-hospitable land reads bright and barren land barely tints. Sequential (not diverging) — habitability
-has a single good direction. No per-faction colours.
+"liveable" green (`IM_COL32(80, 200, 110)`) at opacity `0.15 + 0.7·workforce_efficiency(habitability)`
+(`lerp_colour`), so full-labour land reads brightest and the lowest-efficiency land barely tints.
+Zero-habitability tiles (ocean, barren) stay untinted so terrain still reads. Sequential (not
+diverging) — efficiency has a single good direction. No per-faction colours.
 
 **Glyph.** A small figure — round head over a tapered torso (`icons::population`); reads as
-"people / habitability", distinct from the other lens glyphs.
+"people / workforce", distinct from the other lens glyphs.
 
-**Legend.** A low→high habitability gradient bar, left edge, vertically centred, inset past the nav
-rail (the Resource/Market key placement). Tooltip "Habitability".
+**Legend.** A low→high gradient bar (`draw_population_key`), left edge, vertically centred, inset
+past the nav rail (the Resource/Market key placement), labelled "Workforce efficiency" and mapping
+the bar's ends to `0.5×`→`1.0×` workforce efficiency (not `0`→`1` habitability) — so the key reads
+the same labour multiplier the tint shows. Tooltip "Workforce efficiency".
 
-**Interaction notes.** Planetary-only, single-select, no selector (the whole-body habitability
+**Interaction notes.** Planetary-only, single-select, no selector (the whole-body efficiency
 surface needs no resource pick). Verified by `scripts/verify/population_lens.lua` against blessed
-goldens. **Toward population density (future):** when population centres generate, this lens should
-gain a density read (a second mode or a blended signal) — owed with the population layer.
+goldens.
+
+**Re-keyed 2026-06-30** (BL-069, part of the BUILD_LEGIBILITY discovery strand). The lens was
+raw-habitability tint at ship (2026-06-16); the re-key swaps in `workforce_efficiency` so the
+Population lens, the Selection panel, and the hover card all surface the *same* habitability→labour
+feedback the economy applies, rather than the lens showing a different quantity than the sim
+consumes.
 
 ## Opportunity lens *(built 2026-06-17 — BL-017)*
 
@@ -465,6 +495,46 @@ per-tile heatmap to per-market shortfall blocks: a pre-pass collects each body m
 `max(0, demand−supply)` of the selected good and the body-max; the fill pass maps each tile to its
 market (`market_for_tile`) and composites the hot hue by the normalised shortfall. The on-canvas key
 reads "Market scarcity" (met → scarce).
+
+## Industry lens *(built 2026-07-04 — BL-084)*
+
+**Intent.** Read the map as an *economic-throughput surface*: where the existing, nation-owned
+industry already is — distinct from where people live (BL-083's markers) or where labour is
+efficient (Population). Part of the 2026-07-01 visibility-pass cluster's three-layer read:
+Settlements (BL-083, discrete markers) · Industry (this lens) · You (BL-085, identity chrome).
+
+**Data definition (settled).** The substrate is mechanically live from BL-050: every tile carries
+`substrate_density` in `[0, 1]`, the nation-owned background occupation injected each economy tick
+as `background_supply[]`/`background_demand[]` into the body's market clearing. Rendered raw,
+`substrate_density` ripples outward from population centres and reads collinear with the Population
+lens, so the lens instead renders a **throughput field**: each tile's `substrate_density` weighted
+by its **terrain deposit richness** (the sum of `resource_deposit` across all resources, normalised
+to the body's richest tile) — brightest where dense occupation sits on rich terrain, decoupling the
+field from the population ripple. **Pure rendering**: no change to `substrate_density` or the market
+arithmetic.
+
+**Rung.** Planetary only — the substrate field is per-tile and has no inter-body surface. Guarded
+behind `overlay_mode::industry` in
+[`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp).
+
+**Colour.** A sequential dark→amber gradient: a tile with any substrate composites its terrain hue
+toward industrial amber (`IM_COL32(210, 150, 70)`) at opacity `0.15 + 0.6·t`, where `t` is the
+tile's throughput normalised to the body's maximum. Tiles with no substrate (`substrate_density`
+`0`) keep their terrain hue untinted. Sequential (not diverging) — throughput has a single good
+direction. No per-faction colours.
+
+**Glyph.** A factory silhouette — a sawtooth-roofed block with a chimney (`icons::industry`; see
+[ICONS.md](ICONS.md)) — distinct from the Production lens's up-triangle and every other lens glyph.
+
+**Legend.** Strip glyph highlight + tooltip (`overlay_mode_name` → "Industry density"); **no
+on-canvas colour key yet** — unlike Resource/Market/Population/Opportunity/Production/Scarcity, the
+Industry lens shipped without a `draw_industry_key`-style gradient bar. A low→high amber key is an
+owed follow-up, matching the placement convention the other built lenses use (left edge, inset past
+the nav rail, vertically centred).
+
+**Interaction notes.** Planetary-only, single-select; the script runs `verify.econ_step(4)` so the
+substrate injection has settled before capture. Verified by `scripts/verify/industry_lens.lua`
+against blessed goldens (`industry_lens_full`, `industry_lens_zoom`).
 
 ## Placement-suitability surface *(BL-010 — not a strip lens)*
 
