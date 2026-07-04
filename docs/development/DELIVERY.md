@@ -147,6 +147,11 @@ large); for a `design-owed` item, **Design** is the implied first step.
    producer landed — early, when the fix is cheap. Its verdict gates the compile: resolve any
    Critical before building. This is a filter, not a substitute: always still compile. In a
    single-item Light change with no cross-item surface, skip it.
+
+   `verifier-review` is the *author-side, pre-compile* filter. It is **not** the deciding
+   review — the author must not sign off on its own work. The independent, cold, adversarial
+   review (the `code-reviewer` agent / the PR-open CI action) and the human accept gate are the
+   PR-level pipeline; see [`REVIEW_AUTOMATION.md`](REVIEW_AUTOMATION.md).
 5. **Commit** — once all tasks are terminal (complete or cancelled), one commit per item:
    ```
    <item title>
