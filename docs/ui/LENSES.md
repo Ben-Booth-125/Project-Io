@@ -60,7 +60,7 @@ a dependency (named in the lens section).
 | **Opportunity** | — | — | **✓ best-building net-margin tint + key** |
 | **Production** | — | (later) per-body output-throughput badge | **✓ production-intensity tint + key** |
 | **Scarcity** | — | (later) per-body shortfall badge | **✓ per-market shortfall blocks + key** |
-| **Industry** | — | — | **✓ substrate-throughput amber tint** |
+| **Industry** | — | — | **✓ substrate-throughput amber tint + key** |
 
 **BL-012 per-lens rung notes.** Corporation, Country, Resource, Population,
 Opportunity, and Industry are **Planetary-only** — their unit of meaning (a tile, a
@@ -526,11 +526,12 @@ direction. No per-faction colours.
 **Glyph.** A factory silhouette — a sawtooth-roofed block with a chimney (`icons::industry`; see
 [ICONS.md](ICONS.md)) — distinct from the Production lens's up-triangle and every other lens glyph.
 
-**Legend.** Strip glyph highlight + tooltip (`overlay_mode_name` → "Industry density"); **no
-on-canvas colour key yet** — unlike Resource/Market/Population/Opportunity/Production/Scarcity, the
-Industry lens shipped without a `draw_industry_key`-style gradient bar. A low→high amber key is an
-owed follow-up, matching the placement convention the other built lenses use (left edge, inset past
-the nav rail, vertically centred).
+**Legend.** Strip glyph highlight + tooltip (`overlay_mode_name` → "Industry density"), plus an
+on-canvas **low→high amber gradient key** (`draw_industry_key` in
+[`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp)) — a bar running the terrain-hue
+base to full industrial amber, matching the placement convention of the other built lenses (left
+edge, inset past the nav rail, vertically centred). The key landed in the 2026-07-04 reconciliation
+(the lens's original delivery shipped the tint but not the key).
 
 **Interaction notes.** Planetary-only, single-select; the script runs `verify.econ_step(4)` so the
 substrate injection has settled before capture. Verified by `scripts/verify/industry_lens.lua`
