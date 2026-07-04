@@ -27,16 +27,19 @@ const char* overlay_mode_short_name(overlay_mode m);
 /// @param m  Mode to toggle on (or off if it is already active).
 void toggle_overlay(ui_state& ui, overlay_mode m);
 
-/// Draw the overlay-lens control strip: a row of mode toggle buttons pinned to
-/// the bottom-left of the shell, running from the navigation-pane edge inward
-/// (clear of the centred scale/zoom control). The active lens's button is
-/// highlighted; clicking it again clears the overlay. This replaces the former
-/// minimap mode-bar dots, giving the controls a clearer, labelled affordance.
+/// Draw the overlay-lens mode bar: a single centred row of the seven on-screen
+/// lens glyphs, hosted along the bottom of the minimap (BL-093 — relocated there
+/// from the former bottom-left strip so the selection element can own the whole
+/// bottom-left corner). The active lens's glyph is highlighted; clicking it again
+/// clears the overlay. Scarcity and Industry are off the bar (keyboard-cycle only,
+/// like Supply); the Resource/Market resource-or-good selector opens as a popup
+/// from a small button on the bar, since the 140 px combo will not fit inline.
 ///
-/// @param ui       UI state; the buttons toggle ui.overlay (via toggle_overlay).
-/// @param left_x   Left edge of the strip, screen pixels (the nav-pane inner edge).
-/// @param bottom_y Bottom edge to anchor the strip against, screen pixels.
-void draw_overlay_controls(ui_state& ui, float left_x, float bottom_y);
+/// @param ui    UI state; the glyphs toggle ui.overlay (via toggle_overlay).
+/// @param x     Left edge of the bar rect (minimap left), screen pixels.
+/// @param top_y Top edge of the bar rect, screen pixels.
+/// @param w     Bar width (minimap width), screen pixels.
+void draw_overlay_controls(ui_state& ui, float x, float top_y, float w);
 
 /// Draw the overlay pass for a canvas, on top of the base canvas and below the
 /// ImGui chrome. Switches on ui.overlay (and the rung) to render the active

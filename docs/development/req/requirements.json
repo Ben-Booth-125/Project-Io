@@ -4589,6 +4589,28 @@
           "notes": "Delivered via the Selection-panel activity section (draw_activity_section): unknown -> 'outside your trade network - no market data'; known/visible -> coarse public market pulse (busy/steady/quiet from market throughput); stale -> greyed note. No internals (BL-068 stays private). DEFERRED as documented follow-ups (not silently dropped): the hover_content body line, and R1's deterministic proximity 'glimpse' at convoy-completion tick. The core fog (Solar badges + corridors + unknown/known/stale/visible + panel read) is shipped and verified (visual golden + headless harness)."
         }
       ]
+    },
+    {
+      "brief": "selection-action-surface",
+      "title": "Selection element redesign — action surface + lens relocation (BL-093)",
+      "difficulty": 4,
+      "importance": "A",
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "resolved": "2026-07-04",
+      "resolution": "Delivered and verified (selection_redesign.lua, 3 goldens blessed on Windows + eyeball). Action-first selection panel, lens strip relocated to the minimap, content-fit height (resolution-robust). Design propagated to SELECTION/LAYOUT/MINIMAP/LENSES.",
+      "promoted_from": "backlog.json § BL-093",
+      "batch": "BL-093",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "Item-spanning (visual): a selected TILE leads with the Build front door (action) + the BL-071 Thrives/Valid affordance read (facts) — no encyclopedic stat block, no lens supplement; a selected player BUILDING leads with Manage + the BL-074 profitability (facts); the minimap carries the 7-glyph lens mode bar and the bottom-left has no separate lens strip; the selection element occupies the full bottom-left corner and is fully visible (content-fit height).",
+          "verification": ["visual: scripts/verify/selection_redesign.lua"],
+          "result_metric": "3 goldens blessed (selection_tile_build, selection_building_manage, selection_lens_bar) on Windows; eyeball-confirmed at 1280x720 and reasoned resolution-robust",
+          "notes": "AlwaysAutoResize was tried first but reliably broke the tile build-front-door panel (ImGui edge case) — replaced with per-kind content-fit height in text-line units. Owed on the Linux box: re-bless the minimap-visible goldens invalidated by the lens-bar relocation (not blanket-re-blessed on Windows per the cross-platform-golden-mismatch policy)."
+        }
+      ]
     }
   ]
 }

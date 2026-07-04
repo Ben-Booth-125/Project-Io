@@ -273,27 +273,6 @@ void draw_rival_building_summary(const world& w, entity_id id)
     ImGui::TextDisabled("Stockpile:   private");
 }
 
-// Dispatch to the matching shared content builder (entity_summary.hpp). Buildings
-// branch on ownership (BL-068): the player's own show full management detail; a
-// rival shows the competitor layout above.
-void draw_summary(const world& w, selection_kind kind, entity_id id)
-{
-    switch (kind)
-    {
-        case selection_kind::body:        draw_body_summary(w, id);        break;
-        case selection_kind::tile:        draw_tile_summary(w, id);        break;
-        case selection_kind::building:
-            if (is_player_owned(w, id)) draw_building_summary(w, id);
-            else                        draw_rival_building_summary(w, id);
-            break;
-        case selection_kind::market:      draw_market_summary(w, id);      break;
-        case selection_kind::unit:        draw_unit_summary(w, id);        break;
-        case selection_kind::nation:      draw_nation_summary(w, id);      break;
-        case selection_kind::corporation: draw_corporation_summary(w, id); break;
-        case selection_kind::none:        break;
-    }
-}
-
 // Survey section for a selected body (BL-067). Keyed on the body's survey phase:
 // hidden → a Dispatch button with the cost + ETA preview (disabled, with a reason,
 // when the player cannot afford it); in_transit / scanning → live progress + ETA;
@@ -389,104 +368,6 @@ void draw_activity_section(const world& w, entity_id body_id)
 
 } // namespace
 
-// Draw the lens-contextual supplement into the current ImGui cursor position.
-// Extracted so it can be called from a child region inside the new bar layout.
-void draw_lens_supplement(const world& w, const recipe_registry& reg,
-                          const economy_report& report, ui_state& ui,
-                          selection_kind kind)
-{
-    if (kind != selection_kind::tile)
-        return;
-
-    const entity_id tile = ui.selected_entity;
-    const auto tit = w.tiles.find(tile);
-    if (tit == w.tiles.end())
-        return;
-
-    if (ui.overlay == overlay_mode::corporation)
-    {
-        const corporation_component* owner_corp = nullptr;
-        for (const auto& [bld_id, bc] : w.buildings)
-        {
-            if (bc.tile != tile)
-                continue;
-            for (const auto& [corp_id, cc] : w.corporations)
-            {
-                for (entity_id a : cc.assets)
-                {
-                    if (a == bld_id) { owner_corp = &cc; break; }
-                }
-                if (owner_corp) break;
-            }
-            break;
-        }
-        if (owner_corp)
-            ImGui::TextColored({0.7f, 0.8f, 1.0f, 1.0f},
-                "Owner: %s", owner_corp->name.c_str());
-    }
-    else if (ui.overlay == overlay_mode::market)
-    {
-        const entity_id mkt_id = market_for_tile(w, tile);
-        const auto mkt_it = w.markets.find(mkt_id);
-        if (mkt_it != w.markets.end())
-        {
-            int idx = 1;
-            for (const auto& [mid, mk] : w.markets)
-            {
-                if (mk.body != tit->second.body) continue;
-                if (mid == mkt_id) break;
-                ++idx;
-            }
-            ImGui::Text("Market %d catchment", idx);
-            const std::size_t g = static_cast<std::size_t>(ui.lens_resource);
-            ImGui::Text("%s price: %.2f",
-                        resource_name(ui.lens_resource),
-                        static_cast<double>(mkt_it->second.price[g]));
-        }
-    }
-    else if (ui.overlay == overlay_mode::production)
-    {
-        for (const auto& [bld_id, bc] : w.buildings)
-        {
-            if (bc.tile != tile) continue;
-            const building_economics& eco = reg.economics(bc.type);
-            ImGui::Text("Base rate: %.1f / tick", static_cast<double>(eco.base_rate));
-            ImGui::Text("Workforce: %.0f%%",
-                        static_cast<double>(bc.workforce_assigned) * 100.0);
-            break;
-        }
-    }
-    else if (ui.overlay == overlay_mode::population)
-    {
-        // BL-069: surface the habitability → workforce reasoning for the population
-        // centre on the selected tile. Scale / population / local habitability are
-        // their own rows; the workforce cap is an absolute number — the body's
-        // effective labour pool for the player corp = supply × efficiency(body
-        // habitability), read from the economy report the panel already consumes.
-        entity_id centre = null_entity;
-        for (const auto& [cid, tid] : w.population_centre_tile)
-            if (tid == tile) { centre = cid; break; }
-
-        if (centre != null_entity)
-        {
-            const population_centre_component& pc = w.population_centres.at(centre);
-            ImGui::Text("Scale: %d (%s)", pc.scale, scale_label(pc.scale));
-            ImGui::Text("Population: %dk", pc.population);
-            ImGui::Text("Habitability: %.2f", static_cast<double>(pc.habitability));
-
-            const entity_id body = tit->second.body;
-            const auto hit = report.body_habitability.find(body);
-            const float body_hab = (hit != report.body_habitability.end()) ? hit->second : 1.0f;
-            const float cap = w.workforce_supply(w.player_entity, body)
-                            * workforce_efficiency(body_hab);
-            ImGui::Text("Workforce cap: %.1f", static_cast<double>(cap));
-        }
-        else
-        {
-            ImGui::TextDisabled("No population centre on this tile.");
-        }
-    }
-}
 
 // Per-building profitability readout (BL-074): the selected player building's
 // estimated net per-tick contribution and its component lines. Realised last-tick
@@ -530,6 +411,123 @@ void draw_building_profit(const world& w, const recipe_registry& reg,
     ImGui::TextUnformatted("Net");   ImGui::SameLine(v1); val(net, nc);
 }
 
+namespace {
+
+// A small kind glyph for the header (BL-093) — a coloured primitive so each
+// selection kind reads at a glance in place of the former placeholder portrait
+// column. First pass; a richer per-entity icon (corp emblem, building marker) is
+// a polish follow-up.
+void draw_selection_icon(ImDrawList* dl, selection_kind kind, ImVec2 c, float r)
+{
+    const ImU32 col = palette::selection;
+    switch (kind)
+    {
+        case selection_kind::body:
+            dl->AddCircleFilled(c, r, col, 20);
+            break;
+        case selection_kind::building:
+            dl->AddRectFilled({c.x - r, c.y - r}, {c.x + r, c.y + r}, col, 2.0f);
+            break;
+        case selection_kind::tile:
+            dl->AddRect({c.x - r, c.y - r}, {c.x + r, c.y + r}, col, 2.0f, 0, 2.0f);
+            break;
+        default:
+            dl->AddNgonFilled(c, r, col, 5);
+            break;
+    }
+}
+
+// The hero: the ONE primary action for this selection kind (BL-093). Actions are
+// the panel's reason to exist, so they lead; reference detail is the ledgers' job.
+void draw_selection_action(const world& w, const recipe_registry& reg,
+                           ui_state& ui, selection_kind kind)
+{
+    const entity_id sel = ui.selected_entity;
+    switch (kind)
+    {
+        case selection_kind::tile:
+            // Build front door — the buildable types + cost, a tile's primary move.
+            draw_build_front_door(w, reg, ui, sel);
+            break;
+
+        case selection_kind::body:
+        {
+            const auto bit = w.bodies.find(sel);
+            const bool star = (bit != w.bodies.end() && bit->second.type == body_type::star);
+            if (!star && bit != w.bodies.end() &&
+                bit->second.survey.phase != survey_phase::surveyed)
+            {
+                draw_survey_section(w, ui, sel);   // the move is to survey it
+            }
+            else if (!star)
+            {
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Surface");
+                if (ImGui::Button("Go to surface"))
+                    focus_on_entity(w, ui, sel);   // surveyed — the move is to descend
+            }
+            break;
+        }
+
+        case selection_kind::building:
+            if (is_player_owned(w, sel))
+            {
+                // Manage — routes to the building-management panel (construction_panel),
+                // which owns the workforce / recipe / decommission controls.
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Manage");
+                if (ImGui::Button("Manage building"))
+                    ui.show_construction_panel = true;
+            }
+            else
+            {
+                ImGui::TextDisabled("Competitor building - intel only.");
+            }
+            break;
+
+        case selection_kind::market:
+        case selection_kind::unit:
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Locate");
+            if (ImGui::Button("Go to"))
+                focus_on_entity(w, ui, sel);
+            break;
+
+        case selection_kind::nation:
+        case selection_kind::corporation:
+            ImGui::TextDisabled("Open its ledger via [>].");
+            break;
+
+        default:
+            break;
+    }
+}
+
+// The facts: only what informs the action (BL-093) — slim and muted. Everything
+// encyclopedic (orbit, composition, deposits, prices) lives in the ledgers, one
+// 'go to' away.
+void draw_selection_facts(const world& w, const recipe_registry& reg,
+                          const economy_report& report, ui_state& ui, selection_kind kind)
+{
+    const entity_id sel = ui.selected_entity;
+    switch (kind)
+    {
+        case selection_kind::tile:
+            draw_tile_affordances(w, sel);          // BL-071: what this tile is good for
+            break;
+        case selection_kind::body:
+            draw_activity_section(w, sel);          // BL-089: commercial pulse
+            break;
+        case selection_kind::building:
+            if (is_player_owned(w, sel))
+                draw_building_profit(w, reg, report, sel);   // BL-074: is it profitable?
+            else
+                draw_rival_building_summary(w, sel);         // owner + private rows
+            break;
+        default:
+            break;
+    }
+}
+
+} // namespace
+
 void draw_selection_panel(const world& w, const recipe_registry& reg,
                           const economy_report& report, ui_state& ui,
                           float left_x, float right_x, float bottom_y, float height)
@@ -543,29 +541,38 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
     if (ui.selected_entity == ui.selection_hidden_for)
         return;
 
-    // --- Bottom bar layout ---
-    // The bar is anchored by its bottom-left corner to (left_x, bottom_y) and
-    // spans across to right_x — the gap between the nav pane and the bottom-right
-    // minimap — so it sits beside the minimap rather than running behind it.
-    const float bar_w        = std::max(0.0f, right_x - left_x);
-    constexpr float portrait_w = 88.0f;  // portrait column width
-    const float line_h = ImGui::GetTextLineHeightWithSpacing();
+    // --- Layout (BL-093: action surface) ---
+    // Owns the whole bottom-left corner — anchored bottom-left at (left_x, bottom_y),
+    // spanning to right_x (the minimap's left edge less a margin). The lens strip
+    // moved onto the minimap, so this drops to the bottom margin and stands tall.
+    const float bar_w   = std::max(0.0f, right_x - left_x);
+    const float line_h  = ImGui::GetTextLineHeightWithSpacing();
     const float frame_h = ImGui::GetFrameHeight();
     const ImGuiStyle& style = ImGui::GetStyle();
-    // Height matches the minimap (caller passes its box height) so the bar reads as
-    // the minimap's left-hand twin. We never shrink below what the content needs:
-    // header row + separator + two content rows + top/bottom padding.
-    const float min_h = style.WindowPadding.y * 2.0f
-                      + frame_h                          // header row
-                      + style.ItemSpacing.y
-                      + 1.0f                             // separator
-                      + style.ItemSpacing.y
-                      + line_h * 4.0f;                  // content rows
-    const float bar_h = std::max(min_h, height);
+    (void)height; // sizing is content-based, not the minimap's height
+
+    // Content-fit height per selection kind (BL-093), expressed in text-line units so
+    // it is identical and fully visible at ANY resolution — the earlier pinning to the
+    // resolution-scaled minimap height (mm_h) is what made it balloon with empty space
+    // / clip. Anchored by its bottom-left corner so it grows upward from the bottom.
+    int content_rows = 4;
+    switch (kind)
+    {
+        case selection_kind::tile:     content_rows = 9; break;                                   // build door + affordances
+        case selection_kind::body:     content_rows = 5; break;                                   // survey / go-to + activity
+        case selection_kind::building: content_rows = is_player_owned(w, ui.selected_entity) ? 6 : 3; break;
+        default:                       content_rows = 4; break;
+    }
+    const float header_h = frame_h + style.ItemSpacing.y + 1.0f + style.ItemSpacing.y;
+    const float pad_h    = style.WindowPadding.y * 2.0f;
+    const float min_h    = pad_h + header_h + line_h * 3.0f;
+    const float want_h   = pad_h + header_h + line_h * static_cast<float>(content_rows);
+    const float screen_h = std::max(min_h, bottom_y - 16.0f);
+    const float bar_h    = std::min(std::max(want_h, min_h), screen_h);
 
     ImGui::SetNextWindowPos({left_x, bottom_y}, ImGuiCond_Always, {0.0f, 1.0f});
     ImGui::SetNextWindowSize({bar_w, bar_h}, ImGuiCond_Always);
-    ImGui::SetNextWindowBgAlpha(0.88f);
+    ImGui::SetNextWindowBgAlpha(0.90f);
     constexpr ImGuiWindowFlags flags =
         ImGuiWindowFlags_NoTitleBar            |
         ImGuiWindowFlags_NoResize              |
@@ -578,52 +585,27 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
         ImGuiWindowFlags_NoSavedSettings;
     ImGui::Begin("##selection_info", nullptr, flags);
 
-    // ── Portrait column (left) ────────────────────────────────────────────────
-    // A placeholder rectangle in the portrait colour. Future work can substitute
-    // a real entity icon here without changing layout.
-    const ImVec2 portrait_tl = ImGui::GetCursorScreenPos();
-    const float  portrait_h  = bar_h - style.WindowPadding.y * 2.0f;
-    ImDrawList*  dl          = ImGui::GetWindowDrawList();
-    dl->AddRectFilled(portrait_tl,
-                      {portrait_tl.x + portrait_w - style.ItemSpacing.x,
-                       portrait_tl.y + portrait_h},
-                      IM_COL32(40, 50, 70, 200), 4.0f);
-    // Centred kind label inside the portrait box.
-    const char* kind_lbl = selection_kind_name(kind);
-    const ImVec2 lbl_sz  = ImGui::CalcTextSize(kind_lbl);
-    dl->AddText({portrait_tl.x + (portrait_w - style.ItemSpacing.x - lbl_sz.x) * 0.5f,
-                 portrait_tl.y + (portrait_h - lbl_sz.y) * 0.5f},
-                IM_COL32(120, 140, 180, 220), kind_lbl);
+    ImDrawList* dl = ImGui::GetWindowDrawList();
 
-    // Advance cursor past the portrait column; everything else is to its right.
-    ImGui::Dummy({portrait_w, portrait_h});
-    ImGui::SameLine();
-
-    // ── Content area (right of portrait) ─────────────────────────────────────
-    const float content_w = ImGui::GetContentRegionAvail().x;
-    ImGui::BeginGroup();
-
-    // Header row: name (tinted) + type label on the left; [Go to] [x] on the right.
+    // ── Header: [icon] Name · type ............................. [>] [x] ──
     {
+        const ImVec2 hc = ImGui::GetCursorScreenPos();
+        const float  ir = frame_h * 0.40f;
+        draw_selection_icon(dl, kind, {hc.x + ir, hc.y + frame_h * 0.5f}, ir);
+        ImGui::SetCursorScreenPos({hc.x + ir * 2.0f + style.ItemSpacing.x, hc.y});
+
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
                            "%s", selection_title(w, kind, ui.selected_entity));
         ImGui::SameLine();
         ImGui::TextDisabled("%s", selection_kind_name(kind));
 
-        // Right-align [go to] [close] at the content column's right edge. SameLine's
-        // offset is measured from THIS group's origin (the content column), so it
-        // must use content_w directly and NOT re-add content_x — adding content_x
-        // pushed the pair ~one column past the window's right edge, where ImGui
-        // clipped them away unseen (the bug that hid these buttons entirely).
         const float btn = frame_h;
-        ImGui::SameLine(content_w - style.WindowPadding.x - 2.0f * btn - style.ItemSpacing.x);
-
+        ImGui::SameLine(bar_w - style.WindowPadding.x - 2.0f * btn - style.ItemSpacing.x);
         if (ImGui::Button(">", {btn, btn}))
             focus_on_entity(w, ui, ui.selected_entity);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Go to");
         ImGui::SameLine();
-
         if (ImGui::Button("x", {btn, btn}))
             ui.selection_hidden_for = ui.selected_entity;
         if (ImGui::IsItemHovered())
@@ -632,42 +614,24 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
 
     ImGui::Separator();
 
-    // Two side-by-side content sections below the header.
-    // Section A (primary): polymorphic entity stat block.
-    // Section B (secondary): lens supplement + build front door for tiles.
-    const float half_w = (content_w - style.ItemSpacing.x) * 0.5f;
+    // ── Action (left, dominant) │ Facts (right, muted) ──
+    const float content_w = bar_w - style.WindowPadding.x * 2.0f;
+    const float action_w  = (content_w - style.ItemSpacing.x) * 0.58f;
 
-    // Section A
-    ImGui::BeginChild("##sel_section_a", {half_w, 0.0f}, false,
+    // Two fill-height columns: action leads at a fixed split, facts to its right.
+    ImGui::BeginChild("##sel_action", {action_w, 0.0f}, false,
                       ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
                       ImGuiWindowFlags_NoSavedSettings);
-    draw_summary(w, kind, ui.selected_entity);
+    draw_selection_action(w, reg, ui, kind);
     ImGui::EndChild();
 
     ImGui::SameLine();
 
-    // Section B
-    ImGui::BeginChild("##sel_section_b", {half_w, 0.0f}, false,
+    ImGui::BeginChild("##sel_facts", {0.0f, 0.0f}, false,
                       ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
                       ImGuiWindowFlags_NoSavedSettings);
-    draw_lens_supplement(w, reg, report, ui, kind);
-    if (kind == selection_kind::tile)
-    {
-        // BL-071: always-on "what is this tile good for?" readout (the inverse of
-        // the placement-suitability surface), above the "build here" front door.
-        draw_tile_affordances(w, ui.selected_entity);
-        draw_build_front_door(w, reg, ui, ui.selected_entity);
-    }
-    else if (kind == selection_kind::body)
-    {
-        draw_survey_section(w, ui, ui.selected_entity);
-        draw_activity_section(w, ui.selected_entity);
-    }
-    else if (kind == selection_kind::building && is_player_owned(w, ui.selected_entity))
-        draw_building_profit(w, reg, report, ui.selected_entity); // BL-074
+    draw_selection_facts(w, reg, report, ui, kind);
     ImGui::EndChild();
-
-    ImGui::EndGroup();
 
     ImGui::End();
 }

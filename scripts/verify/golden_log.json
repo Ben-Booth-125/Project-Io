@@ -421,6 +421,27 @@
       "reason_tag": "script-repair",
       "reason": "Same repair — player building full-detail panel (incl. BL-074 profitability) now in frame",
       "batch": "2026-07-04 reconciliation"
+    },
+    "selection_tile_build.png": {
+      "blessed_date": "2026-07-04",
+      "commit": "BL-093",
+      "reason_tag": "new-capture",
+      "reason": "BL-093 action surface — tile: Build front door hero + Thrives/Valid affordance facts; 7-lens minimap mode bar",
+      "batch": "BL-093 selection redesign"
+    },
+    "selection_building_manage.png": {
+      "blessed_date": "2026-07-04",
+      "commit": "BL-093",
+      "reason_tag": "new-capture",
+      "reason": "BL-093 action surface — player building: Manage hero + profitability facts, content-fit height",
+      "batch": "BL-093 selection redesign"
+    },
+    "selection_lens_bar.png": {
+      "blessed_date": "2026-07-04",
+      "commit": "BL-093",
+      "reason_tag": "new-capture",
+      "reason": "BL-093 — active Resource lens on the minimap mode bar + resource-selector popup button",
+      "batch": "BL-093 selection redesign"
     }
   }
 }

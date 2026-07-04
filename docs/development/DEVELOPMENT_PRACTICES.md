@@ -237,6 +237,27 @@ these are the recurring "do not" rules that come up while building:
 
 ---
 
+## Display environment
+
+The runtime display and the verification harness do **not** render at the same size, so UI chrome
+must be **resolution-robust** — sized from content and fixed anchors, never pinned to a
+resolution-scaled value.
+
+- The window opens at **1280×720** (`window_w`/`window_h` in `src/core/app.cpp`,
+  `SDL_WINDOW_RESIZABLE`) and persists its size to **`options.cfg`** in the run directory
+  (`app::load_settings`/`save_settings` — keys `window_w`/`window_h`/`fullscreen`/`vsync`).
+- The **`--verify` capture harness renders at 1280×720**; the interactive window can be larger.
+  The dev machine's desktop is **1920×1080 @ 60Hz, content-scale 1.0** (see the `display-environment`
+  memory). The app logs its runtime display on startup: `Display: window WxH, desktop WxH @ ..Hz,
+  content-scale ..` (`SDL_GetDesktopDisplayMode`).
+- **Anti-pattern (BL-093):** the Selection element once pinned its height to the minimap height
+  `mm_h` (`mm_w = max(240, 0.20·min(disp.x,disp.y))`), so it ballooned with empty space / clipped at
+  other resolutions. The fix was to size it to its content in **text-line units** per selection kind.
+  When adding chrome, size from `GetTextLineHeightWithSpacing()`/content and anchor to a shell edge;
+  do not derive a panel's extent from another element's resolution-scaled size.
+
+---
+
 ## Tone and approach
 
 - Every system should justify its existence by feeding into **Trade** or **Conflict**. Favour

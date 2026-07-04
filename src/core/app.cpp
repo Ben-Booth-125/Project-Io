@@ -171,6 +171,22 @@ app::app()
     m_renderer = SDL_CreateRenderer(m_window, nullptr);
     SDL_SetRenderVSync(m_renderer, 1);
 
+    // Record the display environment on startup so the runtime resolution is on the
+    // log. Verify captures render at window_w×window_h; the interactive window is
+    // resizable and the desktop may be far larger, so UI chrome must stay
+    // resolution-robust (BL-093 sized the Selection element to its content for this
+    // reason). See docs/development/DEVELOPMENT_PRACTICES.md § Display environment.
+    {
+        int win_w = 0, win_h = 0;
+        SDL_GetWindowSize(m_window, &win_w, &win_h);
+        const SDL_DisplayMode* dm = SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
+        SDL_Log("Display: window %dx%d, desktop %dx%d @ %.0fHz, content-scale %.2f",
+                win_w, win_h,
+                dm ? dm->w : 0, dm ? dm->h : 0,
+                dm ? static_cast<double>(dm->refresh_rate) : 0.0,
+                static_cast<double>(SDL_GetWindowDisplayScale(m_window)));
+    }
+
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
@@ -1010,8 +1026,11 @@ void app::render()
         // mode bar below the inset — they now live in a bottom-left strip
         // (ui::draw_overlay_controls), so the inset takes the full height here.
         const float  title_h      = ImGui::GetTextLineHeight() + 6.0f;
+        // BL-093: a lens mode bar occupies the bottom row of the minimap box; the
+        // inset canvas is carved down to leave room for it.
+        const float  lens_bar_h   = ImGui::GetFrameHeight() + 6.0f;
         const ImVec2 inset_origin = { mm_origin.x, mm_origin.y + title_h };
-        const ImVec2 inset_size   = { mm_w, mm_h - title_h };
+        const ImVec2 inset_size   = { mm_w, mm_h - title_h - lens_bar_h };
 
         // Route input: the whole minimap box blocks the primary behind it; only
         // the inset canvas receives minimap input. An ImGui panel under the
@@ -1074,8 +1093,20 @@ void app::render()
         bdl->AddRectFilled(mm_origin, {mm_origin.x + mm_w, mm_origin.y + title_h}, IM_COL32(28, 30, 40, 255));
         bdl->AddText({mm_origin.x + 5.0f, mm_origin.y + 3.0f}, IM_COL32(220, 225, 235, 255), mm_title);
 
+        // Lens mode bar along the bottom of the minimap box (BL-093). The bar fill
+        // is chrome (drawn here); the interactive seven-glyph row is an ImGui window
+        // positioned over it. Relocated from the former bottom-left strip so the
+        // selection element can own the whole bottom-left corner.
+        const float lens_bar_y = mm_origin.y + mm_h - lens_bar_h;
+        bdl->AddRectFilled({mm_origin.x, lens_bar_y},
+                           {mm_origin.x + mm_w, mm_origin.y + mm_h}, IM_COL32(28, 30, 40, 255));
+        bdl->AddLine({mm_origin.x, lens_bar_y}, {mm_origin.x + mm_w, lens_bar_y},
+                     IM_COL32(90, 95, 110, 255));
+
         // Border around the whole minimap box.
         bdl->AddRect(mm_origin, {mm_origin.x + mm_w, mm_origin.y + mm_h}, IM_COL32(90, 95, 110, 255));
+
+        ui::draw_overlay_controls(m_ui, mm_origin.x, lens_bar_y, mm_w);
     }
 
     // Time panel — top-right, same width as the minimap. Two columns: a compact
@@ -1218,21 +1249,16 @@ void app::render()
     ui::draw_balance_ledger(m_world, m_last_econ_report, m_balance_history, m_ui.show_balance_ledger);
     ui::draw_corporation_panel(m_world, m_ui, m_ui.show_corporation_panel);
 
-    // Overlay-lens controls — a bottom-left strip from the nav-pane edge inward,
-    // clear of the centred scale/zoom control. Replaces the old minimap mode bar.
-    ui::draw_overlay_controls(m_ui, ui::nav_pane_width, disp.y - margin);
-
-    // Selection info element — pinned bottom-left, stacked directly above the
-    // overlay strip. It spans the gap between the nav pane and the bottom-right
-    // minimap (right edge = minimap's left edge less a margin) so it sits beside
-    // the minimap rather than running behind it, and matches the minimap's height
-    // (mm_h) so the two read as a pair. Hidden until the player selects an entity.
-    // See SELECTION.md.
-    constexpr float overlay_strip_h = 40.0f; // approx height of the lens strip below
+    // Selection info element — pinned bottom-left, now owning the whole bottom-left
+    // corner (BL-093): the lens strip moved onto the minimap, so the element drops
+    // down to the very bottom margin and stands taller. It spans the gap between the
+    // nav pane and the bottom-right minimap (right edge = minimap's left edge less a
+    // margin). Height matches the minimap box plus the reclaimed strip band so the
+    // two read as a pair. Hidden until the player selects an entity. See SELECTION.md.
     ui::draw_selection_panel(m_world, m_registry, m_last_econ_report, m_ui,
                              ui::nav_pane_width,
                              mm_origin.x - margin,
-                             disp.y - margin - overlay_strip_h,
+                             disp.y - margin,
                              mm_h);
 
     // Execute any construction request queued this frame by the build front door
