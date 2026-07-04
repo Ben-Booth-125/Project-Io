@@ -87,11 +87,11 @@ Solar primary.
 ## Minimap chrome
 
 The minimap is framed by its own chrome — a **title bar** above the inset
-canvas — so it reads as a deliberate panel rather than a floating thumbnail. (It
-previously also carried a **mode bar** below the inset for the overlay-lens
-toggles; those controls have moved to a bottom-left overlay control strip — see
-*Overlay controls* below — and the inset now uses the full height under the
-title.)
+canvas and a **lens mode bar** below it — so it reads as a deliberate panel
+rather than a floating thumbnail. The lens controls briefly lived in a
+bottom-left overlay control strip; BL-093 moves them back onto the minimap
+itself, this time as a compact glyph bar rather than the old mode-bar dots
+(see *Overlay controls* below).
 
 ```
 ┌─────────────────────────┐
@@ -100,6 +100,8 @@ title.)
 │                         │
 │   [ inset canvas ]      │   ← the zoom-out neighbour, drawn at reduced scale
 │                         │
+├─────────────────────────┤
+│ [Co][Ctr][Rs][Mk][Pop][Op][Pr] │ ← lens mode bar: 7 glyph buttons + selector popup
 └─────────────────────────┘
 ```
 
@@ -121,21 +123,35 @@ The title bar is part of the minimap chrome, not the in-canvas title, so it is
 title/labels are suppressed for clutter. The two should not both draw; when the
 minimap chrome owns the title, the inset canvas suppresses its own.
 
-### Overlay controls (relocated off the minimap)
+### Overlay controls (back on the minimap — BL-093)
 
-The overlay-lens toggles used to be a thin **mode bar** along the bottom of the
-minimap (three dots, one per mode). They now live in a separate **overlay control
-strip** pinned to the bottom-left of the shell, running from the nav-rail edge
-inward (clear of the centred scale/zoom control). It holds a labelled button per
-mode — Supply / Market / Faction — with the active lens highlighted; clicking the
-active button clears the overlay. A **default lens** (supply) is active on load
-rather than no overlay. The overlay itself is the building block in
-`src/ui/overlay.hpp` (an overlay draw pass over each canvas, keyed by
-`ui_state::overlay`); the control strip is `draw_overlay_controls` in the same
-header. Until later layers add overlay data the draw pass renders nothing — the
-active lens is named by the control strip, not an on-canvas chip. (The zoom-ladder
-navigation lives in the body / minimap clicks described above, **not** in these
-controls.)
+The overlay-lens toggles briefly moved to a bottom-left overlay control strip;
+BL-093 (Selection element redesign + lens strip relocated to the minimap)
+brings them back onto the minimap, this time as a **lens mode bar** running
+along the bottom of the minimap box, under the inset canvas. This reverses the
+earlier "moved off the minimap" note below — the minimap box is now three
+tiers: **title bar** (top) → **inset canvas** (middle) → **lens mode bar**
+(bottom).
+
+The bar is a single row of **7 lens glyphs**: **Corp, Country, Resource,
+Market, Population, Opportunity, Production** — single-select with a null
+state (clicking the active glyph clears the lens). This is a curated subset of
+the full lens family in [LENSES.md](LENSES.md); **Scarcity** and **Industry**
+are keyboard-cycle only (joining **Supply**, which was already off any visible
+strip pending Layer-5 supply-route rendering), reflecting that the 7-wide bar
+is what fits the minimap's width. A **resource/good selector** — needed by the
+Resource and Market lenses — is a **popup button** on the bar rather than an
+inline combo; the old 140 px inline combo did not fit alongside the glyphs.
+
+The overlay itself is the building block in `src/ui/overlay.hpp` (an overlay
+draw pass over each canvas, keyed by `ui_state::overlay`); the bar is
+`draw_overlay_controls(ui, x, top_y, w)` in the same header, called from the
+minimap block in `src/core/app.cpp` rather than from a standalone bottom-left
+window. Until later layers add overlay data the draw pass renders nothing —
+the active lens is named by the bar, not an on-canvas chip. (The zoom-ladder
+navigation lives in the body / minimap clicks described above, **not** in
+these controls.) See [SELECTION.md](SELECTION.md) for the paired change to the
+Selection element that shipped alongside this relocation in BL-093.
 
 ---
 
@@ -167,11 +183,12 @@ done in this doc.
 Unchanged from `CANVASES.md` (authoritative there), with the chrome accounted for:
 
 - `mm_w = max(240, 0.20 × min(window width, height))`; `mm_h = mm_w × 0.75` (4:3)
-  governs the minimap box; the title bar takes a fixed-height strip at the top and
-  the inset canvas fills the rest beneath it.
+  governs the minimap box; the title bar and lens mode bar each take a
+  fixed-height strip (top and bottom respectively) and the inset canvas fills
+  the remaining height between them.
 - Anchored bottom-right with an 8 px margin.
 - In-canvas labels/title suppressed below ~320 px on the shorter edge; the chrome
-  title bar is exempt (always shown).
+  title bar and lens mode bar are exempt (always shown).
 
 ---
 
@@ -199,14 +216,14 @@ canvas holds the primary slot; the minimap always renders the default framing.
 
 ## Open questions
 
-- **Overlay control polish.** The overlay lens now toggles from a labelled
-  bottom-left control strip (Supply / Market / Faction), having moved off the
-  former minimap mode-bar dots. The button labels may want icons or richer state
-  once the lenses draw real data.
+- **Lens bar width ceiling.** The 7-glyph bar already fills the minimap's width
+  at the default `mm_w`; adding an eighth on-screen lens (or promoting Scarcity
+  / Industry back off keyboard-cycle) needs either a wider minimap or a
+  second row.
 - **Circumplanetary framing** for a planet with many vs. zero moons — how much
   local space to show, and at what scale, is for `CIRCUMPLANETARY.md`.
 - **Overlays.** Once supply routes / units land on the canvases, does the minimap
-  mirror them, and is that what the overlay control strip selects?
+  mirror them, and is that what the lens mode bar selects?
 
 ---
 
@@ -215,3 +232,7 @@ canvas holds the primary slot; the minimap always renders the default framing.
 - `CANVASES.md` — the ladder overview, shared drawing path, sizing, and the navigation model.
 - `SOLAR.md`, `CIRCUMPLANETARY.md`, `PLANETARY.md` — the three rungs.
 - `LAYOUT.md` — placement in the shell.
+- `LENSES.md` — the full lens family, each mode's surface and key; the minimap
+  bar surfaces a 7-lens curated subset of it.
+- `SELECTION.md` — the Selection element redesign (BL-093) that shipped
+  alongside this relocation.
