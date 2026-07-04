@@ -1,8 +1,6 @@
 # Project Io — Profile
 
-The **profile** is a compact panel pinned to the top-left corner of the shell, above the navigation pane and aligned to its width. It identifies the player corporation. See `LAYOUT.md` for placement.
-
-This document is a placeholder to be expanded; the notes below record current understanding.
+The **profile** is a compact identity card pinned to the top-left corner of the shell, above the navigation pane and aligned to its width. It identifies the player corporation. See `LAYOUT.md` for placement; implementation in `src/ui/profile_panel.cpp`.
 
 ---
 
@@ -10,22 +8,21 @@ This document is a placeholder to be expanded; the notes below record current un
 
 Give the player a persistent, at-a-glance sense of *who they are* in the world — the corporate identity they are steering.
 
-## Contents
+## Contents (implemented 2026-07-04)
 
-- **Corporation portrait** — a small picture or emblem representing the player faction.
-- **Corporation name**.
-- **Basic detail** — a line or two of headline standing: parent nation, founding/era, or a top-level reputation/standing indicator.
+- **Corporation emblem** — a geometric emblem (shape + identity colour) on a dark portrait plate. The shape is chosen deterministically from the corp entity id (stable per campaign, distinct between corps); the colour is the player's identity colour (`palette::corp_colour`).
+- **Corporation name** — read live from `corporation_component`; `Unnamed Corp` appears only as a lookup-failure fallback, e.g. a world with no player corp (BL-080, complete 2026-07-04).
+- **`Parent: <home nation>`** and **`Focus: <industrial focus>`** — read live from `corporation_component` (`home_nation` resolved through the nation table; focus rendered as a label).
+
+Long lines **ellipsize** to the width remaining beside the portrait, so generated names never spill past the fixed card edge; the full text is available as a hover tooltip (BL-091, landing 2026-07-04).
 
 The panel is a static identity readout in the prototype. Later it may become the entry point to a fuller corporation screen (holdings summary, standing, history).
 
-## Open questions
+## Open follow-up
 
-- Faction identity is still undecided — corporate entity vs. nation-state (see `CONCEPT.md`). The panel reserves the shape of the data ahead of that choice.
-- Source of the portrait: authored asset, player-chosen, or generated?
-- Which one or two "basic details" are most useful at a glance in the prototype.
+- **Shared-glyph promotion (BL-090)** — the geometric emblem family currently renders only in this card; promoting it to a shared `ui::icons` glyph family reusable as map/selection markers is the named follow-up.
 
 ## Related
 
 - `LAYOUT.md` — placement in the shell.
-- `CONCEPT.md` — player identity (the undecided corporate/nation-state choice).
 - `HEADER.md` — the adjacent budget/resource strip.
