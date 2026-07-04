@@ -96,9 +96,13 @@ designed here and stubbed.
 
 The **Tile** selection's hero action is **"Build here"** — the player's primary construction
 entry point (`draw_build_front_door`). It lists the building types placeable on the selected
-tile (gated by `placement_rules::can_place`) with their registry build cost, affordability-gated
-against the player corporation's balance; choosing one enqueues a construction request that the
-mutable-world pass executes (`construct_building`). This is the deliberate design choice that
+tile (gated by `placement_rules::can_place`) with their **full construction cost — budget *and*
+materials** (e.g. `100 cr · 20 Steel`, from the registry `build_cost` + `resource_build_cost`,
+BL-044). A type is affordability-gated on **both**: the player corporation's balance *and* its
+material pool on that body (`corp_body_pools`) — `construct_building` returns
+`insufficient_materials` when the resources are absent, so the requirement is surfaced up front
+rather than only on a failed click. Choosing an affordable type enqueues a construction request
+that the mutable-world pass executes (`construct_building`). This is the deliberate design choice that
 **building on one tile is a targeted action reached through the tile Selection element**, not a
 reserved menu — the nav-rail construction surface stays a broad overview (see `docs/ui/MENU.md`,
 BACKLOG § Ledger). The equivalent placement-mode canvas click enqueues the same request.

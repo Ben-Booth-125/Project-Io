@@ -15,6 +15,7 @@
 #include <imgui.h>
 
 #include <algorithm> // std::max (bar-width clamp)
+#include <cstring>   // std::strcmp (header title/kind de-dup)
 #include <string>    // affordance-row labels (BL-071)
 #include <utility>   // std::move
 #include <vector>    // affordance groupings (BL-071)
@@ -116,6 +117,36 @@ const char* scale_label(int scale)
 }
 
 // --- Build front door (tile Selection element) -------------------------------
+// Compact cost + material annotation for a build button (BL-044 legibility): the
+// budget cost plus every required material and whether the player corp's pool on this
+// body can cover it. `ok` gates the button (budget AND materials); the label makes the
+// material requirement visible instead of the former bare "(100)". Buildings genuinely
+// need these resources to construct (construction.cpp returns insufficient_materials) —
+// this surfaces that requirement up front rather than only on a failed click.
+struct build_afford { std::string label; bool ok; };
+build_afford build_cost_annotation(const world& w, const recipe_registry& reg,
+                                   building_type type, entity_id body, float balance)
+{
+    const building_economics& e = reg.economics(type);
+    const auto pit = w.corp_body_pools.find({w.player_entity, body});
+    const stockpile_component* pool = (pit != w.corp_body_pools.end()) ? &pit->second : nullptr;
+
+    std::string s = std::to_string(static_cast<int>(e.build_cost)) + " cr";
+    bool mats_ok = true;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        const float need = e.resource_build_cost[r];
+        if (need <= 0.0f)
+            continue;
+        const float have = pool ? pool->quantities[r] : 0.0f;
+        if (have < need)
+            mats_ok = false;
+        s += " · " + std::to_string(static_cast<int>(need)) + ' '
+           + resource_name(static_cast<resource_type>(r));
+    }
+    return { s, (balance >= e.build_cost) && mats_ok };
+}
+
 // The per-tile entry to construction (docs/ui/SELECTION.md): offers the buildable
 // types + cost and, on click, enqueues a construction request on this tile for the
 // player corporation. The request is executed by app against the mutable world —
@@ -185,13 +216,14 @@ void draw_build_front_door(const world& w, const recipe_registry& reg,
         }
         ImGui::NewLine();
 
-        const float cost = reg.economics(building_type::extraction_site).build_cost;
-        ImGui::BeginDisabled(balance < cost);
+        const build_afford ext =
+            build_cost_annotation(w, reg, building_type::extraction_site, tc.body, balance);
+        ImGui::BeginDisabled(!ext.ok);
         if (ImGui::Button("Build extraction site"))
             enqueue(building_type::extraction_site, ui.construction.target);
         ImGui::EndDisabled();
         ImGui::SameLine();
-        ImGui::TextDisabled("(%.0f)", cost);
+        ImGui::TextDisabled("%s", ext.label.c_str());
     }
     else
     {
@@ -199,21 +231,23 @@ void draw_build_front_door(const world& w, const recipe_registry& reg,
     }
 
     // --- Processing facility + Port: any non-ocean land tile ---
-    const float pc = reg.economics(building_type::processing_facility).build_cost;
-    ImGui::BeginDisabled(balance < pc);
+    const build_afford proc =
+        build_cost_annotation(w, reg, building_type::processing_facility, tc.body, balance);
+    ImGui::BeginDisabled(!proc.ok);
     if (ImGui::Button("Build processing facility"))
         enqueue(building_type::processing_facility, resource_type::iron_ore);
     ImGui::EndDisabled();
     ImGui::SameLine();
-    ImGui::TextDisabled("(%.0f)", pc);
+    ImGui::TextDisabled("%s", proc.label.c_str());
 
-    const float portc = reg.economics(building_type::port).build_cost;
-    ImGui::BeginDisabled(balance < portc);
+    const build_afford prt =
+        build_cost_annotation(w, reg, building_type::port, tc.body, balance);
+    ImGui::BeginDisabled(!prt.ok);
     if (ImGui::Button("Build port"))
         enqueue(building_type::port, resource_type::iron_ore);
     ImGui::EndDisabled();
     ImGui::SameLine();
-    ImGui::TextDisabled("(%.0f)", portc);
+    ImGui::TextDisabled("%s", prt.label.c_str());
 
     // Outcome of the most recent attempt, if any.
     if (!ui.construction.last_message.empty())
@@ -594,10 +628,16 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
         draw_selection_icon(dl, kind, {hc.x + ir, hc.y + frame_h * 0.5f}, ir);
         ImGui::SetCursorScreenPos({hc.x + ir * 2.0f + style.ItemSpacing.x, hc.y});
 
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
-                           "%s", selection_title(w, kind, ui.selected_entity));
-        ImGui::SameLine();
-        ImGui::TextDisabled("%s", selection_kind_name(kind));
+        const char* title = selection_title(w, kind, ui.selected_entity);
+        const char* kname = selection_kind_name(kind);
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", title);
+        // Suppress the redundant type label when the title is already the kind name
+        // (e.g. a tile titles as "Tile"), avoiding "Tile · Tile".
+        if (std::strcmp(title, kname) != 0)
+        {
+            ImGui::SameLine();
+            ImGui::TextDisabled("%s", kname);
+        }
 
         const float btn = frame_h;
         ImGui::SameLine(bar_w - style.WindowPadding.x - 2.0f * btn - style.ItemSpacing.x);
