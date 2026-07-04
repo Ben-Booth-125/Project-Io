@@ -159,6 +159,15 @@ large); for a `design-owed` item, **Design** is the implied first step.
    Tasks: <N completed>, <N cancelled>
    Requirements: <N completed>, <N pending>, <N failed>
    ```
+   Before committing, **close the loop and lint it.** The close-out is part of *this* commit, not a
+   later housekeeping pass that never comes: flip the item's `requirements.json` group to `complete`,
+   repoint its `authority_doc` off any process doc onto the subject's authority doc, and drain its
+   `REFINED.md` tasks. Then run **`node tools/session/backlog_lint.js`** (0 = clean; non-zero = a
+   contradiction between `backlog.json`, `requirements.json`, `BACKLOG.md` and `REFINED.md` — fix it
+   before committing). The linter is the machine check that "landed the code, skipped the bookkeeping"
+   can no longer pass silently; it exists because a 2026-07-04 currency audit found ~30 such loose
+   ends. *(Node is not installed on the Windows dev box as of 2026-07-04 — the lint runs on the Linux
+   dev box / CI; see BL-057/058.)*
 
 ### The symbol-level dependency contract (`provides` / `consumes`)
 
