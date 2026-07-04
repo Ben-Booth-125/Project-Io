@@ -66,10 +66,10 @@ owning doc's § Open items.
 - **Post-WW2 industrial grounding.** The focus→asset-mix patterns should be grounded in research
   on the post-WW2 industries that led to space-related capability, so a specialist's holdings
   read as a plausible pathway toward off-world reach rather than an arbitrary mix.
-- **Generating the saturated substrate.** The economic premise (above) says the Nation AI owns the
-  broad background industry, but that substrate is currently *described, not generated* — so the
-  world does not yet read as saturated. The representation is now settled to a **best-guess primary
-  direction** (a per-tile industry/productivity field that consumes shared tile building-slots +
-  resources, aggregated into the per-body markets on both supply and demand, surfaced as a map-lens
-  overlay, and player-displaceable) with residual sub-design left as open notes; see OPENS
-  § Environment → § Cross-cutting **[B4 ~] Generate the saturated nation-owned background substrate**.
+- **Generating the saturated substrate — closed 2026-07-04.** The economic premise (above) says
+  the Nation AI owns the broad background industry; this is no longer just described, it is
+  **generated** (BL-050, shipped 2026-06-17 — a per-tile industry/productivity field that consumes
+  shared tile building-slots + resources, aggregated into the per-body markets on both supply and
+  demand, player-displaceable) and now **rendered** as the Industry map-lens (BL-084, shipped
+  2026-07-04; see `docs/ui/LENSES.md`). **[B4]** is closed; residual sub-design (if any surfaces)
+  moves to a fresh item rather than reopening this one.
