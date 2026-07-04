@@ -33,6 +33,7 @@ enum class overlay_mode
     opportunity, ///< Per-tile best-building net-margin surface (red loss → green profit). See LENSES.md § Opportunity lens.
     production,  ///< Per-tile production-intensity surface (Σ output×price, log scale). See LENSES.md § Production lens.
     scarcity,    ///< Per-market supply-shortfall blocks (hot where demand outran supply). See LENSES.md § Scarcity lens.
+    industry,    ///< Per-tile nation-substrate throughput field (occupation × terrain richness). See LENSES.md § Industry lens (BL-084).
 };
 
 /// A selectable on-canvas marker registered each frame by the Planetary canvas

@@ -4508,25 +4508,25 @@
       "promoted_from": "backlog.json BL-084 (v0.0.8 visibility-pass cluster); promotes BL-050's deferred visual",
       "difficulty": 3,
       "importance": "B",
-      "status": "active",
+      "status": "complete",
       "rows": [
         {
           "id": "R1",
-          "status": "active",
+          "status": "complete",
           "requirement": "Brief-spanning: a new overlay_mode::industry lens tints the Planetary surface per-tile by the substrate's resource-weighted economic throughput (industrial intensity), with a distinct strip glyph and an on-canvas key. Reads as 'where the existing industry is', distinct from BL-083's population markers. Golden-verified.",
           "verification": ["visual: scripts/verify/industry_lens.lua golden"],
           "notes": ""
         },
         {
           "id": "R2",
-          "status": "active",
+          "status": "complete",
           "requirement": "The field is pure rendering — no change to substrate_density or the market arithmetic. Tint = per-tile substrate throughput (substrate_density × terrain-affinity resource weighting, i.e. the background_supply/demand contribution). If background_* is collapsed to a per-body aggregate before render, render the equivalent per-tile substrate_density × affinity(resource,terrain) product directly.",
           "verification": ["code", "visual"],
           "notes": "body_surface_canvas.cpp — confirm per-tile derivability at build (design caveat)"
         },
         {
           "id": "R3",
-          "status": "active",
+          "status": "complete",
           "requirement": "overlay_mode::industry is added to the enum, the lens control strip (name + short-name + glyph dispatch in overlay.cpp), and ui::icons (a throughput glyph). Catalogued in LENSES.md/ICONS.md on landing.",
           "verification": ["code", "visual"],
           "notes": "ui_state.hpp, overlay.cpp, icons.{hpp,cpp}"

@@ -28,6 +28,7 @@ void draw_lens_icon(ImDrawList* dl, overlay_mode m, ImVec2 rect_min, ImVec2 rect
         case overlay_mode::opportunity: icons::opportunity(dl, centre, r, colour); break;
         case overlay_mode::production:  icons::production (dl, centre, r, colour); break;
         case overlay_mode::scarcity:    icons::scarcity   (dl, centre, r, colour); break;
+        case overlay_mode::industry:    icons::industry   (dl, centre, r, colour); break;
         default: break;
     }
 }
@@ -78,6 +79,7 @@ const char* overlay_mode_name(overlay_mode m)
         case overlay_mode::opportunity: return "Opportunity (net margin)";
         case overlay_mode::production:  return "Production intensity";
         case overlay_mode::scarcity:    return "Market scarcity";
+        case overlay_mode::industry:    return "Industry density";
         default:                        return "None";
     }
 }
@@ -95,6 +97,7 @@ const char* overlay_mode_short_name(overlay_mode m)
         case overlay_mode::opportunity: return "Opportunity";
         case overlay_mode::production:  return "Production";
         case overlay_mode::scarcity:    return "Scarcity";
+        case overlay_mode::industry:    return "Industry";
         default:                        return "None";
     }
 }
@@ -111,10 +114,10 @@ void draw_overlay_controls(ui_state& ui, float left_x, float bottom_y)
     // with a null state — clicking the active lens clears to overlay_mode::none
     // (toggle_overlay). Supply is off the strip (Layer-5, reached by keyboard
     // cycle); the strip is a curated subset, not the exhaustive enum.
-    constexpr overlay_mode modes[8] = {
+    constexpr overlay_mode modes[9] = {
         overlay_mode::corporation, overlay_mode::country, overlay_mode::resource,
         overlay_mode::market, overlay_mode::population, overlay_mode::opportunity,
-        overlay_mode::production, overlay_mode::scarcity };
+        overlay_mode::production, overlay_mode::scarcity, overlay_mode::industry };
 
     ImGui::SetNextWindowPos({left_x, bottom_y}, ImGuiCond_Always, {0.0f, 1.0f});
     ImGui::SetNextWindowBgAlpha(0.65f);

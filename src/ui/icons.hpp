@@ -154,6 +154,17 @@ void population(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Stroke colour of the outline.
 void scarcity(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw the Industry-lens glyph — a factory silhouette (a block with a sawtooth
+/// roof and a chimney) — in @p colour. For the overlay-lens control strip; reads as
+/// "industry / throughput", distinct from the production up-triangle and the market
+/// bars. See LENSES.md § Industry lens (BL-084).
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Fill colour of the silhouette.
+void industry(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 /// Draw a market-centre marker — a small circle with a centred cross (+) — in
 /// @p colour. Distinct from the building square/diamond/triangle glyphs and the
 /// unit chevron. Used as an on-canvas selectable marker for market entities

@@ -232,6 +232,26 @@ void production(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     dl->AddLine({ centre.x - r, centre.y + r }, { centre.x + r, centre.y + r }, colour, 1.5f);
 }
 
+void industry(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // Factory: a body block with a two-tooth sawtooth roof and a chimney on the
+    // left. Reads as "industry", distinct from the production up-triangle.
+    const float bw = r;               // body half-width
+    const float top = centre.y - r * 0.15f;
+    const float bot = centre.y + r * 0.75f;
+    // Main body.
+    dl->AddRectFilled({ centre.x - bw, top }, { centre.x + bw, bot }, colour);
+    dl->AddRect({ centre.x - bw, top }, { centre.x + bw, bot }, outline, 0.0f, 0, 1.0f);
+    // Two sawtooth roof teeth over the right two-thirds.
+    const float rt = r * 0.55f;       // tooth height
+    const ImVec2 t1[3] = { { centre.x - bw * 0.2f, top }, { centre.x + bw * 0.3f, top }, { centre.x - bw * 0.2f, top - rt } };
+    const ImVec2 t2[3] = { { centre.x + bw * 0.3f, top }, { centre.x + bw * 0.8f, top }, { centre.x + bw * 0.3f, top - rt } };
+    dl->AddTriangleFilled(t1[0], t1[1], t1[2], colour);
+    dl->AddTriangleFilled(t2[0], t2[1], t2[2], colour);
+    // Chimney on the left, rising above the roofline.
+    dl->AddRectFilled({ centre.x - bw * 0.85f, centre.y - r }, { centre.x - bw * 0.5f, top }, colour);
+}
+
 void market_centre(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
 {
     // Circle outline.

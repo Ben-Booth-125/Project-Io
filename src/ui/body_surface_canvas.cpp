@@ -725,6 +725,39 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
     }
 
+    // Industry lens pre-pass (BL-084): render the already-live nation-owned
+    // substrate (tile.substrate_density, injected as background supply/demand each
+    // tick) as an economic-throughput field. Raw density ripples out from population
+    // centres and so reads collinear with the Population lens; weighting occupation
+    // by the tile's terrain resource richness decouples it — the field reads "where
+    // the existing *industry* is", brightest where dense occupation meets rich
+    // terrain. Pure rendering: no change to substrate_density or the market maths.
+    std::unordered_map<entity_id, float> industry_field;
+    float industry_max = 0.0f;
+    if (state.overlay == overlay_mode::industry)
+    {
+        float max_dep = 0.0f;
+        for (const auto& [tid, tile] : w.tiles)
+        {
+            if (tile.body != state.active_body)
+                continue;
+            float ds = 0.0f;
+            for (const float d : tile.resource_deposit) ds += d;
+            max_dep = std::max(max_dep, ds);
+        }
+        for (const auto& [tid, tile] : w.tiles)
+        {
+            if (tile.body != state.active_body || tile.substrate_density <= 0.0f)
+                continue;
+            float ds = 0.0f;
+            for (const float d : tile.resource_deposit) ds += d;
+            const float dep_norm = (max_dep > 0.0f) ? ds / max_dep : 0.0f;
+            const float thr = tile.substrate_density * (0.35f + 0.65f * dep_norm);
+            industry_field[tid] = thr;
+            industry_max = std::max(industry_max, thr);
+        }
+    }
+
     const ImVec2 mouse = state.mouse.active
                          ? ImVec2{state.mouse.x, state.mouse.y}
                          : ImVec2{-1.0f, -1.0f}; // off-screen sentinel suppresses hover
@@ -870,6 +903,20 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 const float scar = std::clamp(sf_it->second / scar_max_shortfall, 0.0f, 1.0f);
                 constexpr ImU32 hot = IM_COL32(220, 70, 55, 255);
                 fill = lerp_colour(fill, hot, 0.6f * scar);
+            }
+        }
+        // Industry lens (BL-084): tint a tile by the nation-substrate throughput field
+        // (occupation weighted by terrain richness, pre-pass above), normalised to the
+        // body max — brightest amber where the existing industry is densest. Tiles with
+        // no substrate keep their terrain hue.
+        else if (state.overlay == overlay_mode::industry)
+        {
+            const auto it = industry_field.find(id);
+            if (it != industry_field.end() && industry_max > 0.0f)
+            {
+                const float t = std::clamp(it->second / industry_max, 0.0f, 1.0f);
+                constexpr ImU32 ind = IM_COL32(210, 150, 70, 255); // industrial amber
+                fill = lerp_colour(fill, ind, 0.15f + 0.6f * t);
             }
         }
         // Player-owned tile? Drives the persistent, lens-independent ownership
