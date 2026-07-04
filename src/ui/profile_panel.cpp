@@ -25,6 +25,20 @@ std::string fit_ellipsis(const char* text, float max_w)
     return s + "...";
 }
 
+/// Draw @p text ellipsized to @p max_w (BL-091). When the line was truncated the
+/// full string is exposed as a hover tooltip, so long generated names stay
+/// readable without disturbing the fixed card geometry the header/nav key off.
+void text_ellipsized(const char* text, float max_w, bool disabled)
+{
+    const std::string fitted = fit_ellipsis(text, max_w);
+    if (disabled)
+        ImGui::TextDisabled("%s", fitted.c_str());
+    else
+        ImGui::TextUnformatted(fitted.c_str());
+    if (fitted != text)
+        ImGui::SetItemTooltip("%s", text);
+}
+
 /// Human-readable label for a corporation's industrial focus.
 const char* focus_label(industrial_focus f)
 {
@@ -131,11 +145,12 @@ void draw_profile_panel(const world& w)
     ImGui::SameLine(portrait + ImGui::GetStyle().ItemSpacing.x * 2.0f);
     ImGui::BeginGroup();
     // Ellipsize each line to the width remaining beside the portrait so long
-    // generated names never spill past the fixed card edge (BL-091).
+    // generated names never spill past the fixed card edge; a truncated line
+    // carries the full text as a hover tooltip (BL-091).
     const float avail = ImGui::GetContentRegionAvail().x;
-    ImGui::TextUnformatted(fit_ellipsis(corp_name, avail).c_str());
-    ImGui::TextDisabled("%s", fit_ellipsis((std::string("Parent: ") + parent_name).c_str(), avail).c_str());
-    ImGui::TextDisabled("%s", fit_ellipsis((std::string("Focus: ") + focus_name).c_str(), avail).c_str());
+    text_ellipsized(corp_name, avail, false);
+    text_ellipsized((std::string("Parent: ") + parent_name).c_str(), avail, true);
+    text_ellipsized((std::string("Focus: ") + focus_name).c_str(), avail, true);
     ImGui::EndGroup();
 
     ImGui::End();

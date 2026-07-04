@@ -301,6 +301,47 @@ void draw_population_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size)
     dl->AddText({x + bar_w - hts.x, y}, IM_COL32(170, 175, 185, 255), "1.0x");
 }
 
+/// On-canvas legend for the Industry lens (BL-084): a low→high amber gradient bar
+/// mapping the substrate-throughput tint (terrain hue → industrial amber), so the
+/// field reads as "where the existing industry is densest". Same placement as the others.
+void draw_industry_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size)
+{
+    const float pad    = 8.0f;
+    const float box_w  = 156.0f;
+    const float line_h = ImGui::GetTextLineHeight();
+    const float bar_h  = 10.0f;
+
+    const float body_h = pad + line_h + 4.0f + bar_h + 2.0f + line_h + pad;
+    const ImVec2 p0 = { area_origin.x + nav_pane_width + pad,
+                        area_origin.y + std::max(pad, (area_size.y - body_h) * 0.5f) };
+    const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
+    dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
+    dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
+
+    const float x     = p0.x + pad;
+    const float bar_w = box_w - 2.0f * pad;
+    float       y     = p0.y + pad * 0.5f;
+
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Industry throughput");
+    y += line_h + 4.0f;
+
+    // Gradient mirrors the tile tint lerp (terrain hue -> industrial amber at
+    // 0.15 + 0.6t), anchored on a neutral dark base so the bar reads standalone.
+    constexpr ImU32 ind  = IM_COL32(210, 150, 70, 255); // industrial amber (tile pass)
+    constexpr int   segs = 24;
+    for (int i = 0; i < segs; ++i)
+    {
+        const float t0 = static_cast<float>(i) / segs;
+        const ImU32 c  = lerp_colour(IM_COL32(40, 40, 48, 255), ind, 0.15f + 0.6f * t0);
+        dl->AddRectFilled({ x + bar_w * t0, y },
+                          { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
+    }
+    y += bar_h + 2.0f;
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "low");
+    const ImVec2 hts = ImGui::CalcTextSize("high");
+    dl->AddText({x + bar_w - hts.x, y}, IM_COL32(170, 175, 185, 255), "high");
+}
+
 /// On-canvas legend for the Scarcity lens: an abundant→scarce gradient bar (no tint
 /// → hot) plus the selected resource's name and swatch. Same placement as the others.
 void draw_scarcity_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size,
@@ -1425,6 +1466,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         draw_production_key(dl, grid_area_origin, grid_area_size);
     else if (state.overlay == overlay_mode::scarcity)
         draw_scarcity_key(dl, grid_area_origin, grid_area_size, state);
+    else if (state.overlay == overlay_mode::industry)
+        draw_industry_key(dl, grid_area_origin, grid_area_size);
 
     if (!input_enabled)
         return;

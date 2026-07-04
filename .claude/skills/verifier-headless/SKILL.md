@@ -56,11 +56,21 @@ in `tools/verify/README.md`.
   `workforce_efficiency` (world/workforce.hpp) reproduces the prior inline economy_system
   habitability→workforce curve bit-identically across [0,1], plus the named cliff/floor/
   ceiling anchors. Header-only (no link sources). CMake target `workforce_harness`.
+- **`trade_routes_harness`** — Persistent trade routes (BL-088): a completed convoy
+  upserts exactly one route with the correct unordered body-pair + `last_tick`; a repeat
+  lane bumps `convoy_count` without duplicating; an intra-body convoy records nothing;
+  `body_of_market` resolves. Links `world.cpp`, `supply_system.cpp`. CMake target
+  `trade_routes_harness`.
+- **`commercial_fog_harness`** — Commercial-sphere activity fog (BL-089):
+  `body_activity_visibility` returns the right tier for each of {no route, fresh route,
+  stale route, active lane, presence}; `home_body` starts visible; activity is independent
+  of survey phase (surveyed-but-unrouted stays `unknown`; unsurveyed-but-routed is
+  `known`). Links `world.cpp`, `supply_system.cpp`. CMake target `commercial_fog_harness`.
 
 ## Procedure
 
 1. **Compile** from the repo root, after sourcing the VS BuildTools `vcvars64`
-   (`C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Auxiliary\Build\vcvars64.bat`),
+   (`C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat`),
    with the harness's own source list (see `tools/verify/README.md`), e.g.:
    ```
    cl /nologo /std:c++20 /EHsc /I src tools\verify\econ_harness.cpp ^

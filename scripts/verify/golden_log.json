@@ -393,6 +393,34 @@
       "reason_tag": "unknown",
       "reason": "",
       "batch": ""
+    },
+    "industry_lens_full.png": {
+      "blessed_date": "2026-07-04",
+      "commit": "37560cd+",
+      "reason_tag": "feature-change",
+      "reason": "BL-084 on-canvas industry key landed (draw_industry_key, low->high amber gradient) — key now present in the capture",
+      "batch": "2026-07-04 reconciliation"
+    },
+    "industry_lens_zoom.png": {
+      "blessed_date": "2026-07-04",
+      "commit": "37560cd+",
+      "reason_tag": "feature-change",
+      "reason": "Same as industry_lens_full — key added by the BL-084 close-out",
+      "batch": "2026-07-04 reconciliation"
+    },
+    "visibility_rival_panel.png": {
+      "blessed_date": "2026-07-04",
+      "commit": "37560cd+",
+      "reason_tag": "script-repair",
+      "reason": "visibility.lua re-pointed from stale hard-coded tiles to verify.buildings() — the capture now actually shows the competitor panel (private rows); prior Linux-blessed golden photographed an empty canvas",
+      "batch": "2026-07-04 reconciliation"
+    },
+    "visibility_player_panel.png": {
+      "blessed_date": "2026-07-04",
+      "commit": "37560cd+",
+      "reason_tag": "script-repair",
+      "reason": "Same repair — player building full-detail panel (incl. BL-074 profitability) now in frame",
+      "batch": "2026-07-04 reconciliation"
     }
   }
 }
