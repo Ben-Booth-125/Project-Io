@@ -14,6 +14,40 @@ authoritative version-history record. A local-only snapshot of `src/` is also ke
 
 _Nothing yet._
 
+## [0.0.9] — 2026-07-05
+
+Budget clarity + polish — the remaining legibility rough edges cleared before the v0.1.0 quality
+audit. (The budget-clarity strands that originally named this minor shipped early, folded into
+v0.0.8.)
+
+### Added
+- **In-app system menu** — a corner gear (hamburger) button opens a session-control popup:
+  Pause/Resume (one shared flag with the Space hotkey) and Exit Game (inline "Really quit?" confirm,
+  since there is no save). Esc toggles the same popup.
+- **Corp emblem system** — the geometric corporation emblem promoted to a shared `ui::icons` glyph
+  family (shape + identity colour, both a pure function of the corp id), rendered for the player and
+  rivals wherever a corp is identified: the profile card, the Selection header, on-canvas
+  building/HQ owner tags, and the rival hover card. Card, markers, and canvas tint now share one
+  colour source of truth.
+- **Commercial-fog hover line** — the Solar-canvas body hover tooltip now carries a short activity
+  read keyed on the commercial-sphere fog (the first of the two BL-089 deferrals).
+
+### Changed
+- **Economy-panel legibility** — the Corporation-balances table widened to show full corp names and
+  full balances (no single-character cells); the Workforce, Stockpile-pools, and Markets tables
+  un-cramped the same way; the redundant per-building table removed (per-building profitability
+  lives in the Corp Dashboard).
+
+### Fixed
+- **Construction panel overlap** — the Construction panel no longer occludes the bottom-left
+  Selection element during placement, so the build front door and the Thrives/Valid affordance
+  readout stay visible while a build is armed.
+
+### Deferred
+- **Proximity-glimpse peek** — the third commercial-fog illumination geometry (a faint "peek" from
+  routing past a frontier body) held back: it needs a save-seam field or orbital back-computation,
+  disproportionate for a polish minor. Re-assess at the v0.1.0 boundary.
+
 ## [0.0.8] — 2026-07-04
 
 Discovery & intelligence — the economy gains information asymmetry, and the human / industry / player
@@ -172,7 +206,8 @@ Layer 2 finalisation.
 
 Initial prototype snapshot — application shell, canvases, and the hard-coded world.
 
-[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.8...HEAD
+[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.9...HEAD
+[0.0.9]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.8...v0.0.9
 [0.0.8]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.7...v0.0.8
 [0.0.7]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.6...v0.0.7
 [0.0.6]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.5...v0.0.6

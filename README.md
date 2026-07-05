@@ -89,15 +89,15 @@ it against a committed golden image:
 ./build/ProjectIo --verify scripts/verify/corporation_lens.lua
 ```
 
-## Latest release — v0.0.8
+## Latest release — v0.0.9
 
-Discovery & intelligence: the economy gains information asymmetry and the map becomes legible. Adds
-the **survey system** (bodies start unsurveyed; survey to reveal tiles + deposits), a
-**competitor-visibility model** (rivals' internals private, markets public), **population-centre
-markers** and **player-presence** chrome, an **industry-density lens**, **persistent trade routes**,
-and the **commercial-sphere fog** — a body-level activity fog lit by your own trade, independent of
-the survey fog. Bundles the early **budget cluster** (itemised cashflow, debt interest, per-building
-profitability). Full history in [`CHANGELOG.md`](CHANGELOG.md).
+Budget clarity + polish: the remaining legibility rough edges cleared before the v0.1.0 quality
+audit (the budget strands themselves shipped early in v0.0.8). Adds an **in-app system menu** (corner
+gear popup — Pause/Resume + Exit, Esc parity), a **corp emblem system** (a shared identity glyph on
+the card, Selection header, on-canvas markers, and hover, for player and rivals), and a
+**commercial-fog hover line**; **un-cramps the Economy panel** tables; and **fixes** the Construction
+panel occluding the Selection element during placement. Full history in
+[`CHANGELOG.md`](CHANGELOG.md).
 
 ## Versioning & releases
 
