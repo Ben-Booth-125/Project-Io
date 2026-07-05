@@ -7,7 +7,7 @@
 
 namespace {
 
-// --- Price resolution constants (TODO § Trade, settled 2026-06-15) ---------
+// --- Price resolution constants (backlog.json § Trade, settled 2026-06-15) ---------
 // Price is anchored to the rarity-derived base_price and pushed by this tick's
 // supply/demand ratio. A damped (sqrt) elasticity keeps swings readable; the
 // move is clamped to a band around base and eased across ticks so a single tick's

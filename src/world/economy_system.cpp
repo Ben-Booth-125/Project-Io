@@ -8,7 +8,7 @@
 
 namespace {
 
-// --- Deposit depletion constants (TODO § Environment, settled 2026-06-15) ---
+// --- Deposit depletion constants (backlog.json § Environment, settled 2026-06-15) ---
 // Each deposit carries a finite reserve (tile_component.resource_remaining, seeded
 // at generation to richness × a reserve factor). Extraction draws the reserve down;
 // as it nears empty the output tapers, then the building reports "out of resources".

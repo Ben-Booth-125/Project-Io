@@ -51,7 +51,7 @@ struct body_profile
 ///
 /// Generation is deterministic, so this is reproducible on demand rather than
 /// authoritative; the struct exists as the seam a future generation Ledger will
-/// read to explain *why* a tile turned out as it did (see docs/development/TODO.md
+/// read to explain *why* a tile turned out as it did (see docs/generation/GENERATION_LEDGER.md
 /// — "Generation Ledger"). It is filled only when a non-null record is passed to
 /// generate_body_tiles, so the common path pays nothing.
 struct generation_record

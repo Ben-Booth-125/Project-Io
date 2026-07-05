@@ -1631,7 +1631,7 @@ void app::save_screenshot()
 
 void app::compare_to_golden(const std::string& name, SDL_Surface* rgba)
 {
-    // Tolerance knobs (OPENS § Canvas [F3]): a pixel differs when its max R/G/B
+    // Tolerance knobs (see DEVELOPMENT_PRACTICES.md § Visual verification): a pixel differs when its max R/G/B
     // channel delta exceeds T; the capture fails when the differing fraction
     // exceeds F. Per-check overrides via the Lua API are a future follow-on.
     constexpr int   k_pixel_threshold    = 8;      // T (0..255)

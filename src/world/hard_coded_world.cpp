@@ -241,7 +241,7 @@ world make_hard_coded_world()
     // is system-level data the Solar canvas renders as a textured ring. One
     // notable asteroid (Pallas) sits within the band as a separate, selectable
     // body entity drawn over it, carrying a small tile grid (no water) so it is
-    // explorable like the planets. See TODO.md (asteroid belt) and SOLAR.md.
+    // explorable like the planets. See backlog.json (asteroid belt) and SOLAR.md.
     // -----------------------------------------------------------------------
     w.belt = asteroid_belt{ /*inner_radius_au=*/2.10f, /*outer_radius_au=*/3.30f };
 

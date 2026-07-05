@@ -33,7 +33,7 @@ public:
     /// world (seeded, sim paused), expose the `verify` Lua API (which drives view
     /// and overlay state directly and captures named PNG frames), execute the
     /// script, then exit. The driver of the project's `visual` requirement class.
-    /// See docs/development/DEVELOPMENT_PRACTICES.md and TODO § Canvas.
+    /// See docs/development/DEVELOPMENT_PRACTICES.md § Visual verification.
     ///
     /// @param script_path Path to the .lua verification script.
     /// @param bless       When true, each capture is written into the golden
@@ -157,7 +157,7 @@ private:
     std::string m_capture_name;              ///< Base name for the next capture; empty = timestamped (F12).
 
     // Golden-image diffing (run_verify only; empty m_golden_dir = interactive F12,
-    // no compare). See OPENS § Canvas [F3] and the verifier-visual skill.
+    // no compare). See DEVELOPMENT_PRACTICES.md § Visual verification and the verifier-visual skill.
     std::string m_golden_dir;            ///< Directory holding golden reference PNGs (script dir / "golden").
     bool        m_verify_bless = false;  ///< When true, captures overwrite the golden instead of comparing.
     int         m_verify_failures = 0;   ///< Count of captures that failed their golden diff; sets the exit code.

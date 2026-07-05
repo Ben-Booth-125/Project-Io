@@ -123,7 +123,7 @@ struct tile_component
 
     /// Reserved depletion reserve per resource type. **Unused in Layer 3** — the
     /// prototype economy never draws this down (richness sets the rate; deposits
-    /// do not deplete). Carried so the deferred depletion model (TODO § Environment)
+    /// do not deplete). Carried so the deferred depletion model (backlog.json § Environment)
     /// lands without a data-model retrofit. Indexed by resource_type, as above.
     std::array<float, resource_count> resource_remaining = {};
 
@@ -376,7 +376,7 @@ enum class industrial_focus : uint8_t
 /// All persistent data describing a single corporation at campaign start.
 /// Corporations take no autonomous actions in the prototype; this struct is
 /// generation output only. See docs/generation/CORPORATION_GENERATION.md and
-/// docs/development/TODO.md for the deferred behaviour design.
+/// docs/development/backlog.json for the deferred behaviour design.
 struct corporation_component
 {
     /// Generated name produced by Pass 5 of the corporation generation pipeline.
@@ -444,7 +444,7 @@ enum class economic_focus : uint8_t
 
 /// All persistent data describing a single nation at campaign start. Nations
 /// take no autonomous actions in the prototype; this struct is generation output
-/// only. See docs/generation/NATION_GENERATION.md and docs/development/TODO.md
+/// only. See docs/generation/NATION_GENERATION.md and docs/development/backlog.json
 /// for the deferred behaviour design.
 struct nation_component
 {

@@ -787,7 +787,7 @@ std::vector<entity_id> generate_corporations(
     // Pre-game profit (a simulated operating history seeding opening balances and
     // pools) is applied at app startup as the *long* economy warm-start — after the
     // Lua economy data is loaded, so it reuses the real registry rather than a
-    // duplicated one. See app::run() (TODO § Corporation generation — [C3]).
+    // duplicated one. See app::run() (backlog.json § Corporation generation).
 
     // ---------------------------------------------------------------------------
     // Player corporation flag — deterministic pick (seeded first-corp selection)
