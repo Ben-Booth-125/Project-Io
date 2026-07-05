@@ -66,6 +66,27 @@ in `tools/verify/README.md`.
   stale route, active lane, presence}; `home_body` starts visible; activity is independent
   of survey phase (surveyed-but-unrouted stays `unknown`; unsurveyed-but-routed is
   `known`). Links `world.cpp`, `supply_system.cpp`. CMake target `commercial_fog_harness`.
+- **`determinism_harness`** — Determinism guard (BL-106): generates `make_hard_coded_world()`
+  **twice** and asserts 23 field-identity checks (well-known entities + asteroid belt, every
+  component-store size + sorted entity-id key set, the `tile_to_nation` and
+  `population_centre_tile` mappings, and the `corp_body_pools` keys). Catches any clock/rand leak
+  or unordered_map iteration-order dependence in world generation — the standing determinism
+  invariant. Links the generation TU superset (as `world_audit`). CMake target
+  `determinism_harness`.
+
+## Running the whole suite (CTest — BL-104)
+
+As of BL-104 every `tools/verify/*.cpp` is a registered CTest test, so the whole logic tier runs
+with one command instead of per-harness `cl` lines:
+
+```
+ctest --test-dir build --output-on-failure          # all harnesses
+ctest --test-dir build -R determinism_harness        # one, by name
+```
+
+`check.bat` wraps `cmake --build build` + `ctest`. A single harness still builds standalone with
+`cmake --build build --target <name>` (no SDL/Lua needed). Use the per-harness `cl` recipe below
+only when building outside the CMake tree.
 
 ## Procedure
 
