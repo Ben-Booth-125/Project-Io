@@ -107,6 +107,20 @@ target_link_libraries(ProjectIo PRIVATE
 target_compile_definitions(ProjectIo PRIVATE IMGUI_DEFINE_MATH_OPERATORS)
 
 # ---------------------------------------------------------------------------
+# Compiler warnings (BL-101) — advisory diagnostics on OWNED targets only
+# ---------------------------------------------------------------------------
+# -Wall/-Wextra (GNU/Clang) or /W4 (MSVC), applied to ProjectIo and the
+# verification harnesses (below) — never the fetched SDL3/Lua/sol2/ImGui libs,
+# whose headers would flood the output. NOT -Werror yet: promote to a hard gate
+# in CI once the surfaced warnings are cleaned. IO_WARNING_FLAGS is reused by the
+# harness targets. See docs/development/DEVELOPMENT_PRACTICES.md.
+set(IO_WARNING_FLAGS
+    $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall>
+    $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wextra>
+    $<$<CXX_COMPILER_ID:MSVC>:/W4>)
+target_compile_options(ProjectIo PRIVATE ${IO_WARNING_FLAGS})
+
+# ---------------------------------------------------------------------------
 # Precompiled header
 # Covers headers present in 5+ TUs. Excluded: sol2 (3 TUs, very slow to
 # compile even once) and project-internal headers (invalidate PCH on edit).
@@ -282,3 +296,32 @@ target_include_directories(corp_terrain_matrix PRIVATE
 )
 
 target_compile_features(corp_terrain_matrix PRIVATE cxx_std_20)
+
+# ---------------------------------------------------------------------------
+# CTest wiring (BL-104) — one test per tools/verify/*.cpp, one local command
+# ---------------------------------------------------------------------------
+# The harnesses above keep their hand-tuned minimal link sets. This block then
+# (a) builds every REMAINING tools/verify/*.cpp not already declared — linking
+# the SDL/Lua/ImGui-free world superset (every src/world/*.cpp EXCEPT
+# recipe_registry.cpp, the one TU that pulls sol2/Lua), mirroring the CI headless
+# loop in .github/workflows/build.yml so CMake and CI stay in lockstep and a new
+# harness is picked up automatically — and (b) registers ALL harnesses
+# (hand-listed + globbed) as CTest tests. Run the whole logic tier with
+# `ctest --test-dir build --output-on-failure` (or check.bat, which wraps
+# build + ctest into one command).
+enable_testing()
+
+file(GLOB IO_WORLD_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/world/*.cpp")
+list(FILTER IO_WORLD_SOURCES EXCLUDE REGEX "recipe_registry\\.cpp$")
+
+file(GLOB IO_VERIFY_HARNESSES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/*.cpp")
+foreach(harness_src ${IO_VERIFY_HARNESSES})
+    get_filename_component(harness_name "${harness_src}" NAME_WE)
+    if(NOT TARGET ${harness_name})
+        add_executable(${harness_name} "${harness_src}" ${IO_WORLD_SOURCES})
+        target_include_directories(${harness_name} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+        target_compile_features(${harness_name} PRIVATE cxx_std_20)
+        target_compile_options(${harness_name} PRIVATE ${IO_WARNING_FLAGS})
+    endif()
+    add_test(NAME ${harness_name} COMMAND ${harness_name})
+endforeach()
