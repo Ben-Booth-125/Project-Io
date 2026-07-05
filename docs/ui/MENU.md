@@ -116,10 +116,33 @@ Notes on the mapping:
     in the dashboard holdings roll-up; this slot is the *active construction* view (the
     Construction Ledger of the [A4] family).
 
+## Application / system menu — session control (BL-070)
+
+Separate from the nav-rail ledgers above (per-system overviews) and from the display-options
+surface below (BL-076). This is the **session shell** — start/pause/exit — the application-level
+control the player reaches without knowing a hotkey. **Landed in v0.0.9** (`src/core/app.cpp`,
+`src/ui/ui_state.hpp`).
+
+- **Surface — corner gear (hamburger) button.** A small three-line glyph pinned to the **top-right**,
+  just left of the time column, clear of the header content and the time panel. Lowest layout
+  disruption, no permanent chrome, reuses the icon-rail visual language. (Option B of the design;
+  the top menu-bar and the centred pause-modal alternatives were rejected for the prototype
+  minimum — the centred modal is the right long-term home once a title screen lands.)
+- **Contents (prototype minimum).** **Pause / Resume** and **Exit Game**. Pause mirrors the
+  Space-hotkey pause — popup and keyboard drive **one** shared session-control flag (routed through
+  the same `pause_toggle` path / `sim_loop` speed-0 + remembered speed), not two. Exit is
+  **destructive** (there is no save), so it arms an **inline "Really quit?" confirm** in the same
+  popup rather than quitting on the first click.
+- **Keyboard parity.** **Esc** toggles the same popup (handled ahead of the ImGui keyboard guard so
+  it works while the popup or another panel holds focus); an armed exit-confirm backs out first, so
+  Esc cancels the confirm before it closes the menu.
+- **Reserved home.** New/Restart, a title screen, and **Save/Load** (once serialisation is
+  player-exposed) are the named follow-ons for this popup — it is the reserved session-control home.
+
 ## Application / system menu — display options (BL-076)
 
-Separate from the nav-rail ledgers above (per-system overviews) and from the future in-app system
-menu (BL-070, session control: exit / pause). This is the **display-settings surface**.
+Separate from the nav-rail ledgers above (per-system overviews) and from the in-app session menu
+(BL-070, above — exit / pause). This is the **display-settings surface**.
 
 - **Options window** — toggled by **F10** (`canvas_command::options_toggle`; appears in the F1
   cheat-sheet). A floating ImGui window with a **Display** section: resolution preset combo

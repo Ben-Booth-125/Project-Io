@@ -19,6 +19,7 @@
 #include "ui/fonts.hpp"
 #include "ui/format.hpp"
 #include "ui/header_panel.hpp"
+#include "ui/ledger_chrome.hpp" // ledger_window_spawn/size — construction-panel anchor (BL-082)
 #include "ui/nav_pane.hpp"
 #include "ui/overlay.hpp"
 #include "ui/presentation.hpp"
@@ -884,6 +885,21 @@ void app::handle_key_down(const SDL_KeyboardEvent& key)
     if (m_screen == app_screen::menu)
         return;
 
+    // Esc toggles the in-app system menu (BL-070) — cheap keyboard parity with the
+    // corner gear button. Handled before the ImGui keyboard guard so it works even
+    // while the popup (or another panel) holds focus. An armed exit-confirm backs
+    // out first, so Esc cancels the "Really quit?" rather than closing the menu.
+    if (key.scancode == SDL_SCANCODE_ESCAPE)
+    {
+        if (m_ui.confirm_exit_pending)
+            m_ui.confirm_exit_pending = false;
+        else if (m_ui.show_system_menu)
+            m_ui.show_system_menu = false;
+        else
+            m_ui.show_system_menu = true;
+        return;
+    }
+
     // All other bindings are suppressed while ImGui owns the keyboard.
     if (ImGui::GetIO().WantCaptureKeyboard)
         return;
@@ -1215,6 +1231,81 @@ void app::render()
         ImGui::End();
     }
 
+    // In-app system menu (BL-070): a corner gear button opening a small popup with
+    // session controls — Pause/Resume (mirroring the Space hotkey via the shared
+    // pause_toggle path) and Exit Game (inline "Really quit?" confirm, since there
+    // is no save). Sits at the top-right, just left of the time column; Esc toggles
+    // the same popup (handle_key_down). See docs/ui/MENU.md.
+    {
+        constexpr float gear = 26.0f;
+        const ImVec2 gear_pos{ (disp.x - margin - mm_w) - margin - gear, margin };
+
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0.0f, 0.0f});
+        ImGui::SetNextWindowPos(gear_pos);
+        ImGui::SetNextWindowSize({gear, gear});
+        constexpr ImGuiWindowFlags gear_flags =
+            ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoNav |
+            ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoSavedSettings;
+        ImGui::Begin("##sysmenu_gear", nullptr, gear_flags);
+        {
+            ImDrawList*  gdl = ImGui::GetWindowDrawList();
+            const ImVec2 g0  = ImGui::GetCursorScreenPos();
+            if (ImGui::InvisibleButton("##sysmenu_btn", {gear, gear}))
+            {
+                m_ui.show_system_menu = !m_ui.show_system_menu;
+                if (!m_ui.show_system_menu)
+                    m_ui.confirm_exit_pending = false;
+            }
+            const bool  hov = ImGui::IsItemHovered() || m_ui.show_system_menu;
+            const ImU32 gc  = hov ? IM_COL32(232, 236, 246, 255) : IM_COL32(170, 178, 192, 255);
+            const float cx  = g0.x + gear * 0.5f;
+            const float cy  = g0.y + gear * 0.5f;
+            const float hw  = gear * 0.28f;
+            for (int i = -1; i <= 1; ++i)
+                gdl->AddLine({cx - hw, cy + static_cast<float>(i) * 6.0f},
+                             {cx + hw, cy + static_cast<float>(i) * 6.0f}, gc, 2.0f);
+        }
+        ImGui::End();
+        ImGui::PopStyleVar();
+
+        if (m_ui.show_system_menu)
+        {
+            ImGui::SetNextWindowPos({gear_pos.x + gear, gear_pos.y + gear + 4.0f},
+                                    ImGuiCond_Always, {1.0f, 0.0f});
+            constexpr ImGuiWindowFlags menu_flags =
+                ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+                ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+                ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoNav |
+                ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings;
+            if (ImGui::Begin("##system_menu", nullptr, menu_flags))
+            {
+                constexpr float bw = 150.0f;
+                if (ImGui::Button(m_sim_loop.paused() ? "Resume" : "Pause", {bw, 0.0f}))
+                    dispatch_action(ui::canvas_command::pause_toggle);
+
+                ImGui::Separator();
+
+                if (!m_ui.confirm_exit_pending)
+                {
+                    if (ImGui::Button("Exit Game", {bw, 0.0f}))
+                        m_ui.confirm_exit_pending = true;
+                }
+                else
+                {
+                    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(IM_COL32(232, 150, 90, 255)),
+                                       "Really quit?");
+                    if (ImGui::Button("Yes, quit", {bw, 0.0f}))
+                        m_quit_requested = true;
+                    if (ImGui::Button("Cancel", {bw, 0.0f}))
+                        m_ui.confirm_exit_pending = false;
+                }
+            }
+            ImGui::End();
+        }
+    }
+
     // Corporation profile — top-left corner, above the navigation pane.
     ui::draw_profile_panel(m_world);
 
@@ -1244,7 +1335,20 @@ void app::render()
         const ui::player_plot_history phist{m_balance_history, m_income_history, m_expenditure_history};
         ui::draw_economy_panel(m_world, m_registry, m_last_econ_report, phist, &m_ui.show_economy_panel);
     }
-    ui::draw_construction_panel(m_world, m_registry, m_ui, &m_ui.show_construction_panel);
+    // Construction panel (BL-082): anchored top-left like the ledger family, but its
+    // default height is capped so its bottom stays clear of the bottom-left Selection
+    // element (top ~ disp.y - margin - mm_h). The panel used to spawn 600px tall and
+    // occlude the BL-071 affordance readout + build-reject reason exactly when the
+    // player reads them during placement. Movable/resizable after first open.
+    {
+        const ImVec2 spawn   = ui::ledger_window_spawn;
+        const float  sel_top = disp.y - margin - mm_h;
+        const float  avail_h = sel_top - margin - spawn.y;
+        const ImVec2 size{ ui::ledger_window_size.x,
+                           std::max(220.0f, std::min(ui::ledger_window_size.y, avail_h)) };
+        ui::draw_construction_panel(m_world, m_registry, m_ui,
+                                    &m_ui.show_construction_panel, spawn, size);
+    }
     ui::draw_market_ledger(m_world, m_ui, m_market_history, m_ui.show_market_ledger);
     ui::draw_balance_ledger(m_world, m_last_econ_report, m_balance_history, m_ui.show_balance_ledger);
     ui::draw_corporation_panel(m_world, m_ui, m_ui.show_corporation_panel);

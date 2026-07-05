@@ -198,6 +198,24 @@ different offsets). The **Market / Balance / Construction ledger family** (defer
 Layer 4 — OPENS § Ledger) inherits the same two constants when it is built. The header is
 exempt — it is persistent chrome, not a ledger.
 
+**Construction-panel exception (BL-082).** The Construction panel is the one ledger that does
+**not** take the shared spawn. Because it is open precisely when a build is armed — the moment the
+player reads the bottom-left Selection element's affordance readout and build front door
+(`SELECTION.md` §§ BL-071, BL-082) — it takes a **caller-supplied** spawn from `app`, anchored
+top-left like the family but **height-capped** so its bottom stays clear of the bottom-left
+Selection element (top ≈ `disp.y − margin − mm_h`). Movable/resizable after first open. Every
+other ledger keeps the two shared constants.
+
+### Economy-panel table legibility (BL-081)
+
+The Economy panel's tables use a **stretch name/resource column + fixed-width numeric columns**
+(not `SizingStretchProp`, which collapsed cells to a leading glyph — the balances column read
+`9 8 1 1…`). The **Corporation balances**, **Workforce**, **Stockpile pools**, and **Markets**
+tables all follow this pattern, so corp/body/resource identity and the full numeric values read at
+a glance. The former **per-building table was removed** from this panel — per-building profitability
+is the Corp Dashboard's job (BL-074), and duplicating it here was the redundancy that produced the
+finding.
+
 ### Ledger family conventions
 
 All ledger windows share four standing conventions, stated once here so each new ledger

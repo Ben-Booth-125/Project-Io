@@ -126,6 +126,14 @@ same reason string enriches the build front door (replacing the former bare "Can
 water") and follows the cursor as a **"why not here"** label under the armed placement ghost on
 the Planetary canvas. One vocabulary, three surfaces.
 
+**Placement-time coexistence with the Construction panel (BL-082).** These affordance surfaces are
+read *while a build is armed* — exactly when the Construction panel is open. The Construction panel
+therefore does **not** overlap the bottom-left Selection element: `app` anchors it top-left but
+**height-caps** it so its bottom stays clear of the Selection element's top (see `LAYOUT.md`
+§ Construction-panel exception). The fix is **reposition, not fold** — folding the reason string
+into the Construction panel would have rescued only the reason line, leaving the Thrives/Valid
+affordance readout occluded; both must stay visible at the placement moment.
+
 ### The building element's fact is a profitability readout (BL-074)
 
 A selected player-owned **Building**'s Facts column carries a **"Profitability (est. / tick)"**

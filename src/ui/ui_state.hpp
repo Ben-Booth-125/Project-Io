@@ -107,6 +107,15 @@ struct ui_state
     bool show_balance_ledger = false; ///< Whether the Balance Ledger is open.
     bool show_corporation_panel = false; ///< Whether the Corporation Overview Dashboard is open.
 
+    // --- application / system menu (BL-070) ---
+    // The corner gear popup for session control (Pause/Resume, Exit Game). Opened
+    // by the gear button and toggled by Esc; confirm_exit_pending arms the inline
+    // "Really quit?" confirm before the destructive quit (there is no save). Drawn
+    // and acted on in app::render, which owns the quit flag and the sim pause. See
+    // docs/ui/MENU.md § Application / system menu.
+    bool show_system_menu     = false; ///< Whether the corner system-menu popup is open.
+    bool confirm_exit_pending = false; ///< Within the popup, whether Exit is armed to the "Really quit?" confirm.
+
     /// Per-frame list of on-canvas markers (buildings, market centres). Cleared at
     /// the top of body_surface_canvas each frame and rebuilt during the draw pass
     /// so click/hover handling can hit-test in priority order. See marker_hit_zone.

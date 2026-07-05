@@ -345,13 +345,18 @@ void draw_sell_orders_section(const world& w, const recipe_registry& reg, ui_sta
 void draw_construction_panel(world& w,
                              const recipe_registry& reg,
                              ui_state& state,
-                             bool* p_open)
+                             bool* p_open,
+                             ImVec2 spawn_pos,
+                             ImVec2 spawn_size)
 {
     if (p_open && !*p_open)
         return;
 
-    ImGui::SetNextWindowPos(ledger_window_spawn, ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ledger_window_size, ImGuiCond_Once);
+    // Caller-supplied spawn (BL-082): app anchors the panel clear of the bottom-left
+    // Selection element so the BL-071 affordance readout + reject reason stay visible
+    // while a build is armed. Movable/resizable after first open (ImGuiCond_Once).
+    ImGui::SetNextWindowPos(spawn_pos, ImGuiCond_Once);
+    ImGui::SetNextWindowSize(spawn_size, ImGuiCond_Once);
     ImGui::Begin("Construction", p_open);
 
     draw_queue_section(w);
