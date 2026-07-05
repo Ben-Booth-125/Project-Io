@@ -348,8 +348,27 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
     if (hovered_body != null_entity)
     {
         const body_component& body = w.bodies.at(hovered_body);
-        ImGui::SetTooltip("%s\n%s\n%.2f AU",
-            body.name.c_str(), body_type_name(body.type), body.orbital_radius_au);
+
+        // Activity line (BL-089): a short commercial-sphere read mirroring the
+        // Selection panel's draw_activity_section. Stars carry no commerce, so
+        // they get no activity line (the panel early-returns for stars).
+        const char* activity_line = nullptr;
+        if (body.type != body_type::star)
+        {
+            switch (body_activity_visibility(w, hovered_body, w.current_day_tick))
+            {
+                case activity_vis::unknown:     activity_line = "Outside your trade network"; break;
+                case activity_vis::known_stale: activity_line = "Commerce: gone cold (stale)"; break;
+                case activity_vis::known:       activity_line = "Commerce: market pulse"; break;
+                case activity_vis::visible:     activity_line = "Commerce: live lane / your presence"; break;
+            }
+        }
+
+        char tip[256];
+        std::snprintf(tip, sizeof(tip), "%s\n%s\n%.2f AU%s%s",
+            body.name.c_str(), body_type_name(body.type), body.orbital_radius_au,
+            activity_line ? "\n" : "", activity_line ? activity_line : "");
+        ImGui::SetTooltip("%s", tip);
     }
 
     // Click handling. Single-click selects (fills the Selection info element, no

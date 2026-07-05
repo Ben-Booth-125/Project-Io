@@ -170,7 +170,15 @@ Rendered in `src/ui/solar_system_canvas.cpp` (see [`SOLAR.md`](SOLAR.md) for the
 - The deterministic **proximity glimpse** — sampling body positions at a convoy's completion tick to
   mark a near-by frontier body `known_stale` (a faint "peek" from routing past it). Chosen as a
   discrete tick sample rather than a per-frame proximity test (which would flicker with orbital
-  drift); left for a follow-up with its calibration constants (`R`, freshness window).
-- The **hover** body-activity line (the Selection panel carries the primary read today).
+  drift); left for a follow-up with its calibration constants (`R`, freshness window). **Still
+  deferred after the v0.0.9 pass:** a faithful implementation needs either a serialised
+  `last_glimpse_tick` on `body_component` (a save-seam change) or orbital back-computation from the
+  *mutated* `orbital_angle_rad` (position is not a pure function of tick today) — disproportionate
+  determinism/serialisation risk for a polish minor. Re-assess at the v0.1.0 boundary.
+- ~~The **hover** body-activity line~~ — **landed v0.0.9** (2026-07-05). The Solar-canvas body hover
+  tooltip now carries a short activity read keyed on `body_activity_visibility` (unknown → outside
+  network; known → market pulse; stale → gone cold; visible → live lane / presence), wording aligned
+  with the Selection panel's `draw_activity_section`; the star is excluded. Pure read, no new state
+  (`solar_system_canvas.cpp`).
 - **Rival routes** surfaced to the player (waits on rivals actually acting — the standing AI-stub
   rule); per-resource "where is X cheap" inference tooling; a persistent commercial-sphere minimap.
