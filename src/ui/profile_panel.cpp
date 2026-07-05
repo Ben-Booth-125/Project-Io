@@ -1,9 +1,9 @@
 #include "profile_panel.hpp"
+#include "icons.hpp"
 #include "presentation.hpp"
 
 #include <imgui.h>
 
-#include <cstdint>
 #include <string>
 
 namespace ui {
@@ -51,44 +51,6 @@ const char* focus_label(industrial_focus f)
     return "—";
 }
 
-/// Number of distinct geometric corp emblems. A corporation's emblem is
-/// (shape, identity colour); the shape is chosen deterministically from the
-/// corp entity id so it is stable for a campaign and distinct between corps.
-/// Prototype scope: rendered in the player identity card only. Promotion to a
-/// shared ui::icons glyph family + map/selection markers is a backlog item.
-constexpr int emblem_shape_count = 6;
-
-/// Draw corporation emblem @p shape (0..emblem_shape_count-1) centred at @p c
-/// with circumradius @p r, filled in @p col. Simple, legible primitives so the
-/// emblem reads at portrait size and later at marker size.
-void draw_corp_emblem(ImDrawList* dl, ImVec2 c, float r, int shape, ImU32 col)
-{
-    switch (shape % emblem_shape_count)
-    {
-        case 0: // circle
-            dl->AddCircleFilled(c, r, col, 24);
-            break;
-        case 1: // square
-            dl->AddRectFilled({c.x - r * 0.85f, c.y - r * 0.85f},
-                              {c.x + r * 0.85f, c.y + r * 0.85f}, col);
-            break;
-        case 2: // upward triangle
-            dl->AddTriangleFilled({c.x, c.y - r},
-                                  {c.x + r * 0.92f, c.y + r * 0.7f},
-                                  {c.x - r * 0.92f, c.y + r * 0.7f}, col);
-            break;
-        case 3: // diamond
-            dl->AddQuadFilled({c.x, c.y - r}, {c.x + r, c.y},
-                              {c.x, c.y + r}, {c.x - r, c.y}, col);
-            break;
-        case 4: // hexagon
-            dl->AddNgonFilled(c, r, col, 6);
-            break;
-        default: // 5 — pentagon
-            dl->AddNgonFilled(c, r, col, 5);
-            break;
-    }
-}
 } // namespace
 
 void draw_profile_panel(const world& w)
@@ -115,9 +77,11 @@ void draw_profile_panel(const world& w)
     const char* parent_name = "—";
     const char* focus_name  = "—";
     // Emblem: the player's identity colour (corp slot 0) and a shape chosen
-    // deterministically from the corp id so it is stable and corp-distinct.
-    ImU32 emblem_col   = palette::corp_colour(0);
-    int   emblem_shape = 0;
+    // deterministically from the corp id so it is stable and corp-distinct. Both
+    // route through the shared palette source of truth so the card, the Selection
+    // header, and the on-canvas markers agree (BL-090).
+    const ImU32 emblem_col   = palette::corp_identity_colour(w.player_entity, w.player_entity);
+    const int   emblem_shape = palette::corp_emblem_shape(w.player_entity);
     const auto  corp_it = w.corporations.find(w.player_entity);
     if (corp_it != w.corporations.end())
     {
@@ -128,8 +92,6 @@ void draw_profile_panel(const world& w)
         const auto nat_it = w.nations.find(corp.home_nation);
         if (nat_it != w.nations.end() && !nat_it->second.name.empty())
             parent_name = nat_it->second.name.c_str();
-        emblem_shape = static_cast<int>(
-            (static_cast<uint32_t>(w.player_entity) * 2654435761u) % emblem_shape_count);
     }
 
     // Portrait slot: a dark rounded plate carrying the corporation's geometric
@@ -138,8 +100,8 @@ void draw_profile_panel(const world& w)
     const ImVec2    p0       = ImGui::GetCursorScreenPos();
     ImDrawList*     dl       = ImGui::GetWindowDrawList();
     dl->AddRectFilled(p0, {p0.x + portrait, p0.y + portrait}, IM_COL32(28, 32, 42, 255), 4.0f);
-    draw_corp_emblem(dl, {p0.x + portrait * 0.5f, p0.y + portrait * 0.5f},
-                     portrait * 0.34f, emblem_shape, emblem_col);
+    ui::icons::corp_emblem(dl, {p0.x + portrait * 0.5f, p0.y + portrait * 0.5f},
+                           portrait * 0.34f, emblem_shape, emblem_col);
     dl->AddRect(p0, {p0.x + portrait, p0.y + portrait}, IM_COL32(110, 120, 140, 255), 4.0f);
 
     ImGui::SameLine(portrait + ImGui::GetStyle().ItemSpacing.x * 2.0f);

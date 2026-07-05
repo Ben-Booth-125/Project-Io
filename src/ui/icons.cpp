@@ -308,6 +308,41 @@ void hq(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     dl->AddCircleFilled(centre, std::max(1.0f, r * 0.18f), outline, 8);
 }
 
+void corp_emblem(ImDrawList* dl, ImVec2 centre, float r, int shape, ImU32 fill)
+{
+    // Simple, legible geometric primitives so the emblem reads at portrait size on
+    // the identity card, at header size in the Selection panel, and shrunk to a
+    // small on-canvas identity tag. Shape is chosen deterministically upstream by
+    // palette::corp_emblem_shape; here we just wrap the index into range.
+    const ImVec2 c = centre;
+    switch (((shape % palette::corp_emblem_shape_count) + palette::corp_emblem_shape_count)
+            % palette::corp_emblem_shape_count)
+    {
+        case 0: // circle
+            dl->AddCircleFilled(c, r, fill, 24);
+            break;
+        case 1: // square
+            dl->AddRectFilled({ c.x - r * 0.85f, c.y - r * 0.85f },
+                              { c.x + r * 0.85f, c.y + r * 0.85f }, fill);
+            break;
+        case 2: // upward triangle
+            dl->AddTriangleFilled({ c.x, c.y - r },
+                                  { c.x + r * 0.92f, c.y + r * 0.7f },
+                                  { c.x - r * 0.92f, c.y + r * 0.7f }, fill);
+            break;
+        case 3: // diamond
+            dl->AddQuadFilled({ c.x, c.y - r }, { c.x + r, c.y },
+                              { c.x, c.y + r }, { c.x - r, c.y }, fill);
+            break;
+        case 4: // hexagon
+            dl->AddNgonFilled(c, r, fill, 6);
+            break;
+        default: // 5 — pentagon
+            dl->AddNgonFilled(c, r, fill, 5);
+            break;
+    }
+}
+
 void unknown(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
 {
     // Question-mark hook: an arc across the top, opening at the lower-left.

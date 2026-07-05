@@ -550,18 +550,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
     }
 
-    // Identity colour for a corporation: the player's corp is corp slot 0;
-    // rivals get a stable per-corp slot via a multiplicative hash, kept off slot 0
-    // so a rival never collides with the player's colour. Shared by the marker
-    // pass and the Corporation lens so the two always agree.
+    // Identity colour for a corporation: delegates to the shared palette source of
+    // truth (BL-090) so the marker pass, the Corporation lens, the identity card,
+    // the Selection header, and the corp emblem tags all agree.
     auto corp_identity = [&](entity_id corp_id) -> ImU32 {
-        if (corp_id == w.player_entity)
-            return palette::corp_colour(0);
-        int slot = static_cast<int>(
-            (static_cast<uint32_t>(corp_id) * 2654435761u) % palette::corp_slot_count);
-        if (slot == 0)
-            slot = 1;
-        return palette::corp_colour(slot);
+        return palette::corp_identity_colour(corp_id, w.player_entity);
     };
 
     // Resource lens (BL-019): always single-resource. The lens fills the whole
@@ -1120,6 +1113,22 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     marker_col = corp_identity(corp_it->second);
 
                 icons::building(dl, {cx, cy}, mr, built_type, marker_col);
+
+                // Owner-identity tag (BL-090): a small corp emblem tucked at the
+                // building glyph's lower-right, for BOTH player and rival buildings —
+                // the owning corp is public under the BL-068 visibility model, so this
+                // adds no leak. Shape + colour route through the shared palette source
+                // of truth, so the tag matches the identity card and the Selection
+                // header. Kept small (~0.55x the building r) and offset so it never
+                // occludes the silhouette; does not affect hit-testing.
+                if (corp_it != tile_to_corp.end())
+                {
+                    const entity_id owner = corp_it->second;
+                    const float     er    = std::max(1.5f, mr * 0.55f);
+                    icons::corp_emblem(dl, {cx + mr * 0.9f, cy + mr * 0.9f}, er,
+                                       palette::corp_emblem_shape(owner),
+                                       palette::corp_identity_colour(owner, w.player_entity));
+                }
 
                 // Register hit zone (BL-059). Only the k==0 copy per tile so
                 // wrap copies don't produce duplicate zones; the single zone

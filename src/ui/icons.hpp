@@ -200,6 +200,23 @@ void settlement(ImDrawList* dl, ImVec2 centre, float r, int tier, ImU32 colour);
 /// @param colour Fill/stroke colour (the player identity colour).
 void hq(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw a corporation identity emblem — one of corp_emblem_shape_count geometric
+/// primitives (circle / square / triangle / diamond / hexagon / pentagon), chosen
+/// by @p shape (see palette::corp_emblem_shape), filled in @p fill (the corp's
+/// identity colour, see palette::corp_identity_colour). The shared faction-identity
+/// glyph: it reads consistently at portrait size on the identity card, at header
+/// size in the Selection panel, and as a small on-canvas identity tag beside a
+/// building/HQ marker (BL-090). Distinct in *role* from the building silhouette,
+/// the market circle+cross, and the settlement skyline — it names *whose* it is,
+/// not *what* it is.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent (circumradius) of the emblem, screen pixels.
+/// @param shape  Emblem shape index (wrapped modulo corp_emblem_shape_count).
+/// @param fill   Fill colour (the corporation's identity colour).
+void corp_emblem(ImDrawList* dl, ImVec2 centre, float r, int shape, ImU32 fill);
+
 /// Draw the "unknown / unsurveyed" glyph — a question mark — in @p colour. Marks a
 /// body whose surface and deposits are still hidden (survey system, BL-067). Shown
 /// dimmed as the Solar-canvas survey badge for `survey_phase::hidden`.

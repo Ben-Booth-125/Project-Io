@@ -92,12 +92,39 @@ inline constexpr ImU32 activity_corridor= IM_COL32(120, 205, 160, 130); ///< Lit
 /// identity, not nation territory, which keys off nation_colour.)
 inline constexpr int corp_slot_count = 6;
 
+/// Number of distinct geometric corp emblem shapes. A corporation's emblem is
+/// (shape, identity colour); the shape is chosen deterministically from the corp
+/// entity id (see corp_emblem_shape), so it is stable for a campaign and distinct
+/// between corps. Shared across the identity card, the Selection header, the
+/// on-canvas markers, and the rival hover card (BL-090).
+inline constexpr int corp_emblem_shape_count = 6;
+
 /// On-canvas identity colour for corporation slot @p slot, wrapping modulo
 /// corp_slot_count so any index is safe. Slot 0 is the player's corporation.
 ///
 /// @param slot Corporation index (player == 0).
 /// @return     The corporation's reserved colour.
 ImU32 corp_colour(int slot);
+
+/// Deterministic emblem *shape* index for a corporation, in
+/// [0, corp_emblem_shape_count). A multiplicative (Knuth) hash of the corp entity
+/// id, so the shape is a pure function of identity — stable for a campaign, no RNG
+/// or time. Pair with corp_identity_colour to form the full emblem (BL-090).
+///
+/// @param corp Corporation entity id.
+/// @return     Emblem shape index for ui::icons::corp_emblem.
+int corp_emblem_shape(entity_id corp);
+
+/// Identity colour for a corporation — the single source of truth shared by the
+/// on-canvas tile tint, building/HQ markers, the identity card, and the Selection
+/// header. The player's corp (@p corp == @p player) is corp slot 0; a rival gets a
+/// stable per-corp slot via a multiplicative hash, bumped off slot 0 so a rival
+/// never collides with the player's colour (BL-090).
+///
+/// @param corp   Corporation entity id.
+/// @param player The player corporation's entity id (world::player_entity).
+/// @return       The corporation's identity colour.
+ImU32 corp_identity_colour(entity_id corp, entity_id player);
 
 /// Number of distinct nation identity colours. Larger than corp_slot_count
 /// because a generated world holds many nations; the Country-lens tile tint

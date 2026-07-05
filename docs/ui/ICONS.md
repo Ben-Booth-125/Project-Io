@@ -77,6 +77,7 @@ Glyphs fall into three families by role.
 | **Unknown** | `unknown(…, colour)` | Question mark — a top hook arc, a short stem, and a dot | Caller stroke (dimmed) | Survey badge for an **unsurveyed** body, Solar canvas (BL-067) |
 | **Survey badge** | `survey_badge(…, colour)` | Magnifying glass — a lens circle with a diagonal handle (scan motif) | Caller stroke | Survey badge for an **in-progress** survey, Solar canvas; the canvas overlays a `k∕N` region count (BL-067) |
 | **HQ** | `hq(…, colour)` | Ringed eight-point star — a diamond overlaid with an axis-aligned square, enclosed by a ring, with a dark centre dot so it reads against a same-colour ownership fill | Caller `colour` (the player identity colour) | The player's HQ/origin building, Planetary canvas (BL-085, folding BL-092) |
+| **Corp emblem** | `corp_emblem(…, shape, fill)` | One of six geometric primitives (circle / square / triangle / diamond / hexagon / pentagon) chosen by `shape`; names *whose* an entity is, not *what* it is | Caller `fill` — the corp's identity colour (`palette::corp_identity_colour(corp, player)`); `shape` from `palette::corp_emblem_shape(corp)` | Faction-identity emblem (BL-090): the identity card portrait, the Selection-panel header (corporation + owned/rival building), a small identity tag beside each building marker (player **and** rival) on the Planetary canvas, and the rival hover card. The shared promotion of the former profile-card-only `draw_corp_emblem` |
 | **Activity** | `activity(…, colour)` | Concentric pulse — a filled core ringed by a signal ring (commercial-beacon motif; deliberately distinct from the survey magnifier and the unknown "?") | Caller `colour` — per activity tier (`palette::activity_known` / `activity_stale` / `activity_visible`) | Commercial-activity fog badge, Solar canvas — lower-left of the body, offset from the survey badge's upper-right so the two fogs read apart (BL-089; see [DISCOVERY.md](DISCOVERY.md)) |
 
 On the Planetary canvas the **building** glyph's `fill` now encodes the *owning
@@ -161,8 +162,11 @@ firmed up (several feed the **lens-design** Brief):
    `resource(…, ImU32)` is the *lens* glyph (the strata motif) — same name,
    disambiguated by the final argument type and by context (strip vs. canvas pip).
 
-6. **No dedicated nation / corporation entity glyph.** The political layer conveys
-   nations by tile *tint* (`palette::nation_colour`) and corporations by building
-   *fill* (`palette::corp_colour`), not by a glyph. If nations/corps become
-   directly canvas-selectable (the Ledger hit-testing follow-up), decide whether
-   they need their own markers.
+6. **Nation tint vs. corp emblem — UPDATED (2026-07-05, BL-090).** The political
+   layer conveys nations by tile *tint* (`palette::nation_colour`), still glyph-less.
+   Corporations now have a dedicated **`corp_emblem`** glyph (shape + identity colour,
+   both a pure function of the corp id) rendered wherever a corp is *identified* — the
+   identity card, the Selection header, a small tag beside each building marker, and
+   the rival hover card — in addition to the building *fill* (`palette::corp_colour`)
+   that still encodes ownership on the silhouette itself. The colour source is
+   unified: card, markers, and canvas tint all read `palette::corp_identity_colour`.

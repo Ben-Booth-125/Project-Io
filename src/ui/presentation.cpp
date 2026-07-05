@@ -125,6 +125,23 @@ ImU32 corp_colour(int slot)
     return corp_table[s];
 }
 
+int corp_emblem_shape(entity_id corp)
+{
+    return static_cast<int>(
+        (static_cast<uint32_t>(corp) * 2654435761u) % corp_emblem_shape_count);
+}
+
+ImU32 corp_identity_colour(entity_id corp, entity_id player)
+{
+    if (corp == player)
+        return corp_colour(0);
+    int slot = static_cast<int>(
+        (static_cast<uint32_t>(corp) * 2654435761u) % corp_slot_count);
+    if (slot == 0)
+        slot = 1;
+    return corp_colour(slot);
+}
+
 ImU32 nation_colour(entity_id id)
 {
     // Twelve hues stepped ~30 deg around the wheel at moderate saturation/value,

@@ -1,6 +1,7 @@
 #include "selection_panel.hpp"
 
 #include "entity_summary.hpp"
+#include "icons.hpp"
 #include "presentation.hpp"
 #include "selection.hpp"
 #include "view_nav.hpp"
@@ -449,9 +450,12 @@ namespace {
 
 // A small kind glyph for the header (BL-093) — a coloured primitive so each
 // selection kind reads at a glance in place of the former placeholder portrait
-// column. First pass; a richer per-entity icon (corp emblem, building marker) is
-// a polish follow-up.
-void draw_selection_icon(ImDrawList* dl, selection_kind kind, ImVec2 c, float r)
+// column. BL-090 promotes the corporation and building kinds to the shared corp
+// emblem (shape + identity colour), so the header reads *whose* it is and matches
+// the identity card and the on-canvas markers; body/tile keep their plain
+// primitives. @p id is the selected entity, used to resolve the owning corp.
+void draw_selection_icon(const world& w, ImDrawList* dl, selection_kind kind,
+                         entity_id id, ImVec2 c, float r)
 {
     const ImU32 col = palette::selection;
     switch (kind)
@@ -459,9 +463,23 @@ void draw_selection_icon(ImDrawList* dl, selection_kind kind, ImVec2 c, float r)
         case selection_kind::body:
             dl->AddCircleFilled(c, r, col, 20);
             break;
-        case selection_kind::building:
-            dl->AddRectFilled({c.x - r, c.y - r}, {c.x + r, c.y + r}, col, 2.0f);
+        case selection_kind::corporation:
+            // The selected entity *is* the corporation.
+            icons::corp_emblem(dl, c, r, palette::corp_emblem_shape(id),
+                               palette::corp_identity_colour(id, w.player_entity));
             break;
+        case selection_kind::building:
+        {
+            // The owning corp's emblem (player or rival — ownership is public,
+            // BL-068). Falls back to the plain square if the owner won't resolve.
+            const entity_id owner = owner_corp_of(w, id);
+            if (owner != null_entity)
+                icons::corp_emblem(dl, c, r, palette::corp_emblem_shape(owner),
+                                   palette::corp_identity_colour(owner, w.player_entity));
+            else
+                dl->AddRectFilled({c.x - r, c.y - r}, {c.x + r, c.y + r}, col, 2.0f);
+            break;
+        }
         case selection_kind::tile:
             dl->AddRect({c.x - r, c.y - r}, {c.x + r, c.y + r}, col, 2.0f, 0, 2.0f);
             break;
@@ -625,7 +643,8 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
     {
         const ImVec2 hc = ImGui::GetCursorScreenPos();
         const float  ir = frame_h * 0.40f;
-        draw_selection_icon(dl, kind, {hc.x + ir, hc.y + frame_h * 0.5f}, ir);
+        draw_selection_icon(w, dl, kind, ui.selected_entity,
+                            {hc.x + ir, hc.y + frame_h * 0.5f}, ir);
         ImGui::SetCursorScreenPos({hc.x + ir * 2.0f + style.ItemSpacing.x, hc.y});
 
         const char* title = selection_title(w, kind, ui.selected_entity);

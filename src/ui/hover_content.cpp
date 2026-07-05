@@ -1,5 +1,6 @@
 #include "hover_content.hpp"
 
+#include "icons.hpp"
 #include "presentation.hpp"
 #include "world/components.hpp"
 #include "world/workforce.hpp"
@@ -136,9 +137,23 @@ void hover_building_rival(const world& w, entity_id eid, const building_componen
     ImGui::TextUnformatted(building_type_name(b.type));
 
     // Owner corporation (public) — the only other channel the card may reveal.
-    const auto cit = w.corporations.find(owner_corp_of(w, eid));
+    // A tiny inline corp emblem (BL-090) precedes the name so the rival's identity
+    // reads the same shape/colour here as on the canvas marker and in the Selection
+    // header. Shape + colour route through the shared palette source of truth.
+    const entity_id owner = owner_corp_of(w, eid);
+    const auto      cit   = w.corporations.find(owner);
     if (cit != w.corporations.end())
+    {
+        const float  gr = ImGui::GetTextLineHeight() * 0.42f;
+        const ImVec2 gc = ImGui::GetCursorScreenPos();
+        icons::corp_emblem(ImGui::GetWindowDrawList(),
+                           {gc.x + gr, gc.y + ImGui::GetTextLineHeight() * 0.5f}, gr,
+                           palette::corp_emblem_shape(owner),
+                           palette::corp_identity_colour(owner, w.player_entity));
+        ImGui::Dummy({gr * 2.0f + ImGui::GetStyle().ItemSpacing.x, ImGui::GetTextLineHeight()});
+        ImGui::SameLine();
         ImGui::Text("Owner: %s", cit->second.name.c_str());
+    }
     else
         ImGui::TextDisabled("Owner: unknown");
 
