@@ -48,6 +48,11 @@
     "  walkthrough — the end-to-end flow BL-098 walks; ordered steps.",
     "  friction    — known rough edges feeding BL-098 ('' if none noted).",
     "  written     — capture date (absolute; newest-dated wins on conflict).",
+    "  testing     — {mode, note}. mode = manual | auto | mixed. HOW this story is verified:",
+    "     manual — strategic / UX-judgment; walk it live (the BL-098 activity).",
+    "     auto   — its requirement briefs carry runnable (golden/headless) verification; re-run them.",
+    "     mixed  — an automatable core plus a manual read on top. Enforced by tools/session/story_check.js:",
+    "              a story declared `auto`/`mixed` must have >=1 brief with runnable verification.",
     "",
     "SCOPE HONESTY. The `clusters` taxonomy maps the WHOLE game's intent so the axis is complete,",
     "but `stories` stay within prototype scope (economy loop). Post-prototype clusters (Conflict)",
@@ -96,7 +101,8 @@
         "The player selects home -> the Selection element frames the current state and available actions."
       ],
       "friction": "The 'what could I do next' half is the weak leg: identity/where landed with BL-085/BL-090/BL-092, but the opening view does not actively suggest a first move. Candidate BL-098 finding — an orient-time next-action nudge.",
-      "written": "2026-07-05"
+      "written": "2026-07-05",
+      "testing": {"mode": "manual", "note": "The orient / first-move experience is a UX judgment — walk it live. Presence + emblem renders are golden-backed, but 'what's my move next?' is the point."}
     },
     {
       "id": "US-002",
@@ -124,7 +130,8 @@
         "The player confirms -> the building is placed and cost debited."
       ],
       "friction": "BL-082: during placement the construction panel occluded the Selection/Tile panel (fixed in v0.0.9 — re-walk to confirm). The 'why not here' reasons (BL-071) and the material-cost / market-stock gate (BL-095, design-owed) should read as one coherent explanation, not two separate refusals.",
-      "written": "2026-07-05"
+      "written": "2026-07-05",
+      "testing": {"mode": "mixed", "note": "Cost debit + placement legality are auto (construction-pricing, building-placement-rules); the 'why-not reads as one explanation' legibility is a manual walk."}
     },
     {
       "id": "US-003",
@@ -150,7 +157,8 @@
         "The player judges 'is this asset carrying its weight?' and 'how long until I'm underwater?' without cross-referencing raw ledgers."
       ],
       "friction": "BL-081 addressed cramped economy-ledger cells and dropped the per-building table in favour of the on-selection read (v0.0.9). Coverage is served; watch that the profitability figure and the runway agree in sign and framing so they don't read as two contradictory stories.",
-      "written": "2026-07-05"
+      "written": "2026-07-05",
+      "testing": {"mode": "auto", "note": "Budget itemisation, interest accrual and runway are econ/headless invariants (budget-breakdown, debt-interest, per-building-profitability); eyeball the on-selection read."}
     },
     {
       "id": "US-004",
@@ -177,7 +185,8 @@
         "The player clicks the minimap to climb back up a rung, without losing selection context."
       ],
       "friction": "The click-model (single selects / double navigates) must stay consistent across all three canvases; a divergence here is a prime BL-098 finding since the ladder is the most-repeated player motion.",
-      "written": "2026-07-05"
+      "written": "2026-07-05",
+      "testing": {"mode": "manual", "note": "The single-selects / double-navigates click-model must FEEL consistent across all three canvases; hit-testing is code-backed but the feel is manual."}
     },
     {
       "id": "US-005",
@@ -202,7 +211,8 @@
         "The corner gear / Esc opens the system menu for Pause/Resume without touching the keyboard hotkeys."
       ],
       "friction": "Pause reachability landed twice (hotkey + gear menu, BL-070); confirm they agree and that the current speed is legible at a glance, not inferred from motion.",
-      "written": "2026-07-05"
+      "written": "2026-07-05",
+      "testing": {"mode": "auto", "note": "Speed states and pause reachability are mechanical (time-speed-curve, in-app-system-menu)."}
     },
     {
       "id": "US-006",
@@ -228,7 +238,8 @@
         "None of this requires arming build mode, so reading and deciding stay separate from committing."
       ],
       "friction": "Several lenses answer 'where to grow' from different angles; the risk is the player not knowing which lens answers which question. A lens colour-scheme pass (BL-016, design-owed) is the open refinement.",
-      "written": "2026-07-05"
+      "written": "2026-07-05",
+      "testing": {"mode": "auto", "note": "Every lens is a golden-verified render (opportunity-ambient, industry-lens, scarcity-lens-render, production-output-lens); re-bless on deliberate visual change."}
     },
     {
       "id": "US-007",
@@ -254,7 +265,8 @@
         "If workforce is short, the cap is shown as the reason, not a silent shortfall."
       ],
       "friction": "The workforce cap (habitability) and the target interact; the player needs to see 'you asked for X, the body allows Y' in one place. Ties into US-012 (population legibility).",
-      "written": "2026-07-05"
+      "written": "2026-07-05",
+      "testing": {"mode": "auto", "note": "'Recipe honoured next tick' is golden-verified (building-management); the workforce cap is headless (habitability-workforce)."}
     },
     {
       "id": "US-008",
@@ -280,7 +292,8 @@
         "The warm-start / Market ledger surfaces auto-buy vs auto-sell health so the player sees whether their stock is moving."
       ],
       "friction": "Sell orders, the anonymous auto-sell path, and the order book are three release mechanisms; the ledger must make clear which one moved a given unit, or profitability reads (US-003) become hard to trust.",
-      "written": "2026-07-05"
+      "written": "2026-07-05",
+      "testing": {"mode": "auto", "note": "Order clearing + floor precedence are econ-harness invariants (player-sell-orders, order-book); ledger surfacing is golden (multi-market-dashboard)."}
     },
     {
       "id": "US-009",
@@ -307,7 +320,8 @@
         "Persistent trade routes record the lanes (BL-088); the Market lens shows catchment boundaries and prices."
       ],
       "friction": "Logistics cost is what makes distant arbitrage marginal; the player needs the per-unit landed cost visible at decision time, or the 'is this trade worth it?' judgement is guesswork.",
-      "written": "2026-07-05"
+      "written": "2026-07-05",
+      "testing": {"mode": "mixed", "note": "Convoy logistics + spatial price convergence are headless (supply-layer); 'landed cost visible at decision time' is a manual read."}
     },
     {
       "id": "US-010",
@@ -334,7 +348,8 @@
         "Market prices and supply/demand aggregates are the public channel the player reasons from."
       ],
       "friction": "The activity fog and the geographic survey fog are independent axes (a body can be Known-but-unsurveyed); the UI must not conflate them. The proximity-glimpse refinement (BL-099, designed) is the open follow-on.",
-      "written": "2026-07-05"
+      "written": "2026-07-05",
+      "testing": {"mode": "manual", "note": "Inferring a rival from public signals is strategic judgment; the visibility RULE (public/private) is code-checkable but the read itself is manual."}
     },
     {
       "id": "US-011",
@@ -362,7 +377,8 @@
         "Deposit richness bands (rich/moderate/sparse) resolve; exact amounts wait for first extraction placement."
       ],
       "friction": "Cost is charged upfront before any reveal; the preview must make the gamble legible ('you pay N now, first tiles in T ticks') so a survey never feels like money vanished.",
-      "written": "2026-07-05"
+      "written": "2026-07-05",
+      "testing": {"mode": "mixed", "note": "Survey determinism + cost/ETA scaling are headless (survey-system); the 'is it worth it?' preview legibility is a manual walk."}
     },
     {
       "id": "US-012",
@@ -389,7 +405,8 @@
         "The player sites new extraction/processing where workforce can actually reach it."
       ],
       "friction": "The workforce cap surfaced here is the same cap US-007 hits when raising a workforce target; the two surfaces must tell one consistent story about the ceiling.",
-      "written": "2026-07-05"
+      "written": "2026-07-05",
+      "testing": {"mode": "auto", "note": "Population lens + centre markers are golden (population-lens-render, pop-centre-markers); the habitability->workforce cap is headless (population-legibility)."}
     }
   ]
 }

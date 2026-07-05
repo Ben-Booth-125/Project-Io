@@ -98,6 +98,26 @@ coverage-audit tool are the next passes.
 
 ---
 
+## Testing modes — walk it, or run it
+
+Each story carries a `testing.mode`. The split follows importance and feasibility: the strategic /
+UX-judgment goals are **walked by hand**; the mechanically-verifiable ones are **automated** against
+their linked requirement briefs. `tools/session/story_check.js` enforces that any `auto`/`mixed`
+story actually has something to run (a brief with golden/visual/headless verification).
+
+| Mode | Stories | How you verify it |
+|---|---|---|
+| **manual** | US-001 orient · US-004 navigation feel · US-010 read-a-rival | Walk the flow live (the BL-098 activity). The value is a judgment — "what's my move?", the click-model *feel*, inferring a rival — that no golden captures. |
+| **mixed** | US-002 build · US-009 convoys · US-011 survey | Run the automatable core (placement legality, convoy logistics, survey determinism), then a short **manual read** on the legibility on top. |
+| **auto** | US-003 · US-005 · US-006 · US-007 · US-008 · US-012 | Re-run the story's requirement briefs — mostly golden/visual renders + headless econ invariants. A red brief = a regression against that player goal. |
+
+**Run the automated set:** `node tools/session/story_check.js --commands` prints the concrete
+`ProjectIo --verify scripts/verify/*.lua` invocations per `auto`/`mixed` story (dispatch each via the
+`verifier-visual` / `verifier-headless` skills). On this Windows box, heed the golden-mismatch caveat
+(pre-v0.0.8 goldens are Linux-blessed — verify by eye, don't blanket re-bless).
+
+---
+
 ## Stories
 
 Each entry: the story sentence, **Up** (pillar · systems), **Down** (surfaces · backlog · *reqs*),
@@ -223,14 +243,18 @@ the walkthrough, and known friction. Requirement slugs are `req/requirements.jso
    its `cluster`, the `As the player…` sentence, a `coverage` + matching `glyph`, and `traces`.
    Fill at least one surface, one backlog id, **and one requirement brief** — a story with no
    downward trace isn't a route, and one with no requirement isn't testable.
-2. Set `written` to today's date (absolute).
-3. Render it here under its cluster.
+2. Set `written` to today's date (absolute), and a `testing` mode (`manual` / `auto` / `mixed`).
+3. Render it here under its cluster, and run `story_check` (below) — it will reject a dead trace or
+   an `auto`/`mixed` story with nothing to run.
 
-## Coverage audit (the tool this enables)
+## Coverage audit — `story_check.js`
 
-Because every trace is a real id/slug, this catalogue is machine-checkable. A future check
-(candidate `tools/` script → skill) can flag: (a) any `served` story whose `backlog`/`surfaces`/
-`requirements` are empty or point at ids/slugs that don't exist; (b) any backlog item or requirement
-brief that appears in **no** story (unstoried feature — scope to justify or a story to write); (c)
-any `gap` story with no owning backlog item. Until that exists, the audit runs by eye against this
-file.
+`node tools/session/story_check.js` machine-checks the catalogue against `backlog.json` and
+`requirements.json` (companion to `backlog_lint.js`; zero-dependency, exit 1 on FAIL). It flags:
+- **dead traces** — a `traces.backlog` id or `requirements` brief slug that doesn't exist;
+- **unroutable / untestable** — a non-`planned` story missing surfaces, backlog, or requirement links;
+- **dishonest mode** — an `auto`/`mixed` story whose linked briefs carry no runnable verification;
+- **reverse coverage (info)** — shipped player-facing backlog items in **no** story (candidates to cover — currently BL-015/020/055/056/062/065/080/091/093).
+
+`--commands` prints the concrete `ProjectIo --verify …` invocations for the `auto`/`mixed` set. Wire
+it into the Delivery close step next to `backlog_lint`.
