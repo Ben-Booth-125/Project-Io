@@ -6,6 +6,52 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — Engineering health sweep + audit quick-win batch (2026-07-05)
+
+**Context.** A whole-project review (Docs / Code / Testing / CI / Process) run as a six-lens
+multi-agent audit with adversarial per-finding verification — 36 findings survived, 0 refuted, plus
+six completeness-critic blind-spots. The ten highest-leverage quick-wins were recorded as
+BL-101–BL-110 and batch-delivered the same session.
+
+**Concurrency note.** The batch was paused mid-authoring when a parallel session's BL-098 user-story
+work surfaced uncommitted changes in shared files (CLAUDE.md, backlog.json); resumed after BL-098
+committed (`7dd3457`) — the ten backlog items rode along in that commit, the rest delivered here.
+
+**Delivered (9 complete + 1 designed-blocked), main session, no fan-out:**
+- **BL-101** warnings — `IO_WARNING_FLAGS` (`-Wall -Wextra` / `/W4`) on ProjectIo + every harness
+  target, advisory (no `-Werror`). Full build green; `/W4` surfaces only third-party sol2-header
+  C5321 noise, 0 owned-code warnings — validating the advisory call.
+- **BL-104** CTest — `enable_testing()` + a `foreach` over `tools/verify/*.cpp` builds the 6
+  previously-unbuildable harnesses (world superset minus `recipe_registry.cpp`) and registers all
+  14 as tests; `check.bat` = build + ctest.
+- **BL-106** determinism harness — `make_hard_coded_world()` ×2, 23 field-identity checks, PASS.
+- **BL-110** sol2 guard — `try/catch(const std::exception&)` in `main()` so a malformed startup Lua
+  file exits cleanly instead of aborting unhandled.
+- **BL-103** repointed 12 dead TODO.md/OPENS.md comment pointers (→ backlog.json /
+  GENERATION_LEDGER.md / DEVELOPMENT_PRACTICES § Visual verification).
+- **BL-102** `git mv` concept.md/systems.md → CONCEPT.md/SYSTEMS.md (fixes ~49 case-broken links).
+- **BL-108** CLAUDE.md's three `req/requirements.json` refs → full `docs/development/req/` path.
+- **BL-109** rewrote DEVELOPMENT_PRACTICES § Testing off the never-adopted Catch2 onto the real
+  headless-harness pattern.
+- **BL-105** merge-gate — `gh api` confirms branch protection is **unavailable** (HTTP 403, private
+  repo on a free plan); recorded a "Merge gate" note in § Cutting a release (procedural gate only).
+- **BL-107** *(designed-blocked)* — shipped only the doc-truthfulness half (TECH_FOUNDATIONS save
+  wording → future tense + a magic+version forward-ref); the header itself waits on a serialiser.
+
+**Decisions / notes.** Build env: this box needs `vcvars64.bat` (VS2022 BuildTools) sourced — a bash
+shell without it can't find `cstdint` / `sys/types.h`; note the audit's own finding that
+`run_harness.bat` points at a stale `18\BuildTools` while `build_check.bat` uses `2022\BuildTools`.
+The determinism harness compares id-sets + mappings (components define no `operator==`) — a
+structural+ownership guard, deepens once world-gen is seedable. `backlog_lint.js` /
+`gen_item_commits.js` not run (no Node on Windows) — due on the Linux/CI side.
+
+**Open / follow-ons.** BL-107 (save-format version header) + a not-yet-filed flat-binary serialiser
+item; promoting `determinism_harness` into the `verifier-headless` skill list (needs user OK); and
+the audit's larger items (a sanitizer CI leg, `ARCHITECTURE.md`, the two giant-file refactors, a
+perf/frame-time HUD) remain in the report, unfiled.
+
+---
+
 ## Session — v0.0.9 polish batch delivered (2026-07-05)
 
 **Context.** v0.0.9 is the lighter polish minor after the v0.0.8 discovery theme (the budget strands

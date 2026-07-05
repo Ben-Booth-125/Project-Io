@@ -123,6 +123,21 @@ session boundary is drawn *between* them.
 
 ---
 
+## 2026-07-05 Health-sweep batch — audit quick-wins (BL-101–BL-110) — **COMPLETE**
+
+Ten quick-wins from the 2026-07-05 engineering health sweep, delivered in one main-session batch (no
+fan-out — difficulty-1 edits, shared hotspots). **9 complete, 1 designed-blocked:** BL-101 warnings
+(`-Wall -Wextra` / `/W4`, advisory), BL-104 CTest `foreach` + `check.bat` (ctest -N = 14), BL-106
+determinism harness (23/23 PASS), BL-110 sol2 `main()` guard, BL-102 doc case-rename
+(concept/systems → CONCEPT/SYSTEMS), BL-103 12-pointer sweep, BL-108 CLAUDE.md req-path, BL-109
+testing-doc rewrite (Catch2 → harness reality), BL-105 merge-gate note (branch protection = 403,
+unavailable on private/free). **BL-107** shipped its doc-truthfulness half only (TECH_FOUNDATIONS
+save wording → future tense); the magic+version header stays `designed` + blocked on the serialiser.
+Verified via a vcvars2022 full build (green) + `ctest`. Requirements: the five group slugs in
+`req/requirements.json`, all complete. Permanent record: DEVLOG 2026-07-05. Summary retained one cycle.
+
+---
+
 ## Dividing work across agents & authoring tasks
 
 This is the method used to promote an item and (optionally) fan it out to

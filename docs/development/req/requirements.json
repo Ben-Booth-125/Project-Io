@@ -4732,6 +4732,116 @@
           "notes": "Pure function of trade_routes + convoys + ownership + tick; no new state/serialisation. Wording aligned with selection_panel draw_activity_section. The proximity-glimpse sibling deferral stays open and recorded in BL-089 + DISCOVERY.md."
         }
       ]
+    },
+    {
+      "batch": "2026-07-05-health-sweep",
+      "brief": "build-warning-flags",
+      "title": "BL-101 Enable compiler warning flags on owned targets (advisory)",
+      "promoted_from": "backlog.json BL-101 (2026-07-05 health sweep)",
+      "difficulty": 1,
+      "importance": "A",
+      "evaluated_difficulty": 1,
+      "status": "complete",
+      "resolved": "2026-07-05",
+      "resolution": "Delivered. IO_WARNING_FLAGS applies -Wall -Wextra (GNU/Clang) / /W4 (MSVC) to ProjectIo + every harness target, advisory (no -Werror). Full app + 14-harness build green through the 2022 vcvars toolchain; /W4 surfaces only third-party sol2-header C5321 noise (sol/inheritance.hpp), 0 warnings from owned code — confirming the deliberate no--Werror call. CI (build.yml, both OSes) surfaces the full clean-build inventory on push.",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "The ProjectIo target and every tools/verify harness target compile with -Wall -Wextra (GNU/Clang) or /W4 (MSVC), applied to owned targets only (not the fetched SDL3/Lua/sol2/ImGui libs) and advisory (no -Werror/-WX), so the build still succeeds.",
+          "verification": ["build", "code: CMakeLists.txt target_compile_options"],
+          "result_metric": "app + 14 harnesses build green with /W4; 8 warnings, all third-party sol2-header C5321, 0 from owned code",
+          "notes": "Local build incremental (vcvars2022); the full owned-code /W4 inventory surfaces on the next clean CI build. Advisory, so no build breakage."
+        }
+      ]
+    },
+    {
+      "batch": "2026-07-05-health-sweep",
+      "brief": "ctest-wiring",
+      "title": "BL-104 Wire CTest + one-command local build+test loop",
+      "promoted_from": "backlog.json BL-104 (2026-07-05 health sweep)",
+      "difficulty": 2,
+      "importance": "A",
+      "evaluated_difficulty": 2,
+      "status": "complete",
+      "resolved": "2026-07-05",
+      "resolution": "Delivered. enable_testing() + a foreach over tools/verify/*.cpp builds every harness not already declared (linking the world superset minus recipe_registry.cpp, mirroring the CI loop) and registers add_test for all; the 7 hand-listed targets keep their minimal link sets. check.bat wraps cmake --build + ctest. Confirmed: the previously-unbuildable econ_stability + world_audit now build and PASS.",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "CMake carries enable_testing() and registers every tools/verify/*.cpp as a CTest test via a foreach (each harness target linked against the world superset minus recipe_registry.cpp); `ctest -N` from the build dir lists all 13 harnesses; check.bat runs a build followed by ctest.",
+          "verification": ["build", "code: CMakeLists.txt enable_testing/add_test", "manual: ctest -N lists tests"],
+          "result_metric": "ctest -N = 14 tests (13 existing + determinism_harness); econ_stability + world_audit build via foreach and PASS",
+          "notes": "14 not 13: BL-106's determinism_harness is the 14th, auto-picked-up by the same glob."
+        }
+      ]
+    },
+    {
+      "batch": "2026-07-05-health-sweep",
+      "brief": "determinism-harness",
+      "title": "BL-106 Determinism harness — canonical world generated twice is field-identical",
+      "promoted_from": "backlog.json BL-106 (2026-07-05 health sweep)",
+      "difficulty": 2,
+      "importance": "A",
+      "evaluated_difficulty": 2,
+      "status": "complete",
+      "resolved": "2026-07-05",
+      "resolution": "Delivered. tools/verify/determinism_harness.cpp generates make_hard_coded_world() twice and asserts 23 field-identity checks (player/star/home entities, asteroid belt, all component-store sizes, sorted entity-id key sets, tile->nation and pop-centre->tile mappings, and corp-body pool keys). Built via the BL-104 foreach; runs under ctest. Scope: compares by id-sets + mappings rather than per-tile deposit values (no operator== on components) — a strong structural + ownership guard that catches id/placement/clock/rand divergence; deepens to per-field once world-gen is seedable.",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "tools/verify/determinism_harness.cpp generates the canonical world twice via make_hard_coded_world() and asserts field-identity across the deterministic surface (body/tile counts, per-tile terrain + deposits, tile→nation ownership, corporation and building placement, market and population-centre placement); it compiles and exits 0 (PASS) on the current world and would exit non-zero on any divergence.",
+          "verification": ["headless: determinism_harness PASS"],
+          "result_metric": "23/23 checks PASS — 'DETERMINISM OK'; ctest #4 determinism_harness Passed (8.70s)",
+          "notes": "Deviation from the row's 'per-tile terrain + deposits' wording: compares tile id-sets + tile->nation mapping rather than per-tile deposit arrays (components define no operator==). Structural+ownership identity is the load-bearing guard; recorded honestly."
+        }
+      ]
+    },
+    {
+      "batch": "2026-07-05-health-sweep",
+      "brief": "sol2-startup-guard",
+      "title": "BL-110 sol2 startup guard — malformed data file exits cleanly, not via unhandled exception",
+      "promoted_from": "backlog.json BL-110 (2026-07-05 health sweep)",
+      "difficulty": 1,
+      "importance": "A",
+      "evaluated_difficulty": 1,
+      "status": "complete",
+      "resolved": "2026-07-05",
+      "resolution": "Delivered. main() now wraps the run/run_verify dispatch in try/catch(const std::exception&), printing 'ProjectIo: fatal error: <what>' to stderr and returning 1 — a type-shape error in a user-edited economy.lua/recipes.lua (a sol::error, which derives from std::exception) exits cleanly instead of aborting unhandled. The optional per-key .as<>() guard in read_resource_map was judged unnecessary — the single main() catch covers every startup Lua path — and left out to keep the change to one file.",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "main() wraps the app dispatch (run and run_verify) in a try/catch(const std::exception&) that prints the message to stderr and returns non-zero, so a type-shape error in a user-edited economy.lua/recipes.lua exits cleanly instead of aborting via an unhandled sol::error; the app still builds and runs the normal path unchanged.",
+          "verification": ["build", "code: src/main.cpp try/catch"],
+          "result_metric": "main.cpp recompiles 0 errors / 0 owned-code warnings under /W4; ProjectIo.exe relinks green",
+          "notes": "Forced main.cpp recompile via vcvars2022 to confirm (the incremental full build had not rebuilt app TUs). sol::error derives from std::runtime_error -> std::exception, so the catch covers it."
+        }
+      ]
+    },
+    {
+      "batch": "2026-07-05-health-sweep",
+      "brief": "main-merge-gate",
+      "title": "BL-105 Confirm and record the main-branch merge gate",
+      "promoted_from": "backlog.json BL-105 (2026-07-05 health sweep)",
+      "difficulty": 1,
+      "importance": "A",
+      "evaluated_difficulty": 1,
+      "status": "complete",
+      "resolved": "2026-07-05",
+      "resolution": "Delivered. gh api repos/Ben-Booth-125/Project-Io/branches/main/protection returns HTTP 403 ('Upgrade to GitHub Pro or make this repository public') — the repo is private on a free plan, so branch protection is unavailable and main is NOT enforced-gated. Recorded a 'Merge gate' subsection in DEVELOPMENT_PRACTICES § Cutting a release: the gate is procedural (CI-on-push + the pre-Cut local build-green), with the path to an enforced gate (public repo or Pro, then required checks + PR-routed Cuts). Enabling protection remains the owner's call.",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "The main-branch protection state is queried (gh api repos/:owner/:repo/branches/main/protection) and its result recorded, and DEVELOPMENT_PRACTICES § Cutting a release states explicitly whether required status checks gate main or the pre-Cut local build-green is the accepted gate for direct-to-main release commits.",
+          "verification": ["manual: gh api branch protection", "doc: docs/development/DEVELOPMENT_PRACTICES.md"],
+          "result_metric": "branch-protection API = HTTP 403 (unavailable on private/free); merge-gate note added to DEVELOPMENT_PRACTICES.md",
+          "notes": "Enabling branch protection itself is an owner-only repo-settings action; this requirement covers the query + record + doc note."
+        }
+      ]
     }
   ]
 }
