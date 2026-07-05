@@ -1631,7 +1631,7 @@
       "files": [],
       "authority_doc": "docs/ui/LAYOUT.md",
       "summary": "Idea (2026-07-04, Ben): review the whole UX from the perspective of USER STORIES rather than per-feature. Write the player's goals as stories ('as the player, I want to find where to grow and build there'; 'I want to know if a building is making money'; 'I want to read what a rival is doing'; 'I want to survey a new body and decide if it's worth it'; 'I want to see why I can't afford / can't build here') and walk each flow end-to-end through the actual UI, surfacing friction, dead ends, missing affordances, and ordering problems. Produces a prioritised list of UX fixes (many likely small, some feeding existing items like BL-082 panel occlusion). The Selection-element redesign (BL-093) is the model outcome — a surface reframed around what the player is trying to DO.",
-      "design": "**Status:** design-owed — captured 2026-07-04 (Ben). A review pass, not a feature.\n\n### The idea\nEvaluate the UX by **user story**, not by feature list. For each core player goal, write the story and walk it through the real UI, noting every point of friction. The Selection-element redesign (BL-093) came from exactly this lens ('what's my move here?') and is the template for the kind of reframe this produces.\n\n### Candidate stories (starting set — expand at promotion)\n- **Orient:** as the player, on load I want to know *who I am and where I am* (start framing / BL-085) and *what I could do next*.\n- **Find opportunity:** I want to see *where to grow* at a glance without arming build mode (Opportunity/Industry lenses, BL-086).\n- **Build:** I want to pick a tile, see *what I can build, what it costs (budget + materials), and why not* (BL-071/BL-044/BL-095), and do it in a few clicks.\n- **Run my economy:** I want to know *if a building is profitable* and *whether I can afford things / my runway* (BL-074/BL-072/BL-073) without hunting across ledgers.\n- **Expand:** I want to *survey a new body* and judge if it's worth the cost/ETA (BL-067).\n- **Read the competition:** I want to *infer what rivals are doing* from public signals (BL-068/BL-089) — markets, activity, presence.\n- **Trade:** I want to see *where my goods flow* and where demand is (BL-088/BL-089, market/scarcity lenses).\n\n### Output\nA prioritised list of concrete UX fixes/reframes — most likely small (labels, ordering, an affordance moved into reach, a dead-end given a next step), some feeding or superseding existing items (e.g. BL-082 construction-panel occlusion, BL-081 ledger legibility). File the findings as their own items or a batch; this item is the *review*, its children are the work.\n\n### Method\nBest run as an advisor+Ben session walking the live app story by story (the headless walkthrough + captures ground it), or a structured heuristic pass. Proportional — the deliverable is the ranked friction list, not a rewrite. Authority `docs/ui/LAYOUT.md` for any shell-level change; per-surface docs for the rest."
+      "design": "**Status:** design-owed — captured 2026-07-04 (Ben). A review pass, not a feature.\n\n### The idea\nEvaluate the UX by **user story**, not by feature list. For each core player goal, write the story and walk it through the real UI, noting every point of friction. The Selection-element redesign (BL-093) came from exactly this lens ('what's my move here?') and is the template for the kind of reframe this produces.\n\n### Candidate stories (starting set — expand at promotion)\n- **Orient:** as the player, on load I want to know *who I am and where I am* (start framing / BL-085) and *what I could do next*.\n- **Find opportunity:** I want to see *where to grow* at a glance without arming build mode (Opportunity/Industry lenses, BL-086).\n- **Build:** I want to pick a tile, see *what I can build, what it costs (budget + materials), and why not* (BL-071/BL-044/BL-095), and do it in a few clicks.\n- **Run my economy:** I want to know *if a building is profitable* and *whether I can afford things / my runway* (BL-074/BL-072/BL-073) without hunting across ledgers.\n- **Expand:** I want to *survey a new body* and judge if it's worth the cost/ETA (BL-067).\n- **Read the competition:** I want to *infer what rivals are doing* from public signals (BL-068/BL-089) — markets, activity, presence.\n- **Trade:** I want to see *where my goods flow* and where demand is (BL-088/BL-089, market/scarcity lenses).\n\n### Output\nA prioritised list of concrete UX fixes/reframes — most likely small (labels, ordering, an affordance moved into reach, a dead-end given a next step), some feeding or superseding existing items (e.g. BL-082 construction-panel occlusion, BL-081 ledger legibility). File the findings as their own items or a batch; this item is the *review*, its children are the work.\n\n### Method\nBest run as an advisor+Ben session walking the live app story by story (the headless walkthrough + captures ground it), or a structured heuristic pass. Proportional — the deliverable is the ranked friction list, not a rewrite. Authority `docs/ui/LAYOUT.md` for any shell-level change; per-surface docs for the rest.\n\n### Substrate (2026-07-05) — the artifact this review consumes now exists.\nThe user-story catalogue is built: `docs/development/user_stories.json` (canonical) + `USER_STORIES.md` (readable view). Legacy-feature pass (2026-07-05) covers 12 stories across all seven prototype clusters (orient/find/build/operate/expand/trade/read-rivals), every story requirement-linked to req/requirements.json brief slugs — so each is a walkable, testable acceptance path. This item is the REVIEW; the catalogue is the ARTIFACT. Run the walkthrough against the catalogue rather than re-deriving the story set; findings accrete onto each story's `friction` field. New/expanded stories are authored in `user_stories.json`, not here. See CLAUDE.md § Documents (user_stories) and § Source of truth (Player-intent coverage)."
     },
     {
       "id": "BL-099",
@@ -1665,7 +1665,7 @@
       "status": "complete",
       "glyph": "✓",
       "resolved": "2026-07-05",
-      "resolution": "Delivered (v0.0.9 batch). The Solar-canvas body hover tooltip now appends a short activity line keyed on body_activity_visibility (unknown -> 'Outside your trade network'; known -> 'Commerce: market pulse'; known_stale -> 'Commerce: gone cold (stale)'; visible -> 'Commerce: live lane / your presence'), star excluded — wording aligned with the Selection panel's draw_activity_section. Pure read, no new state. DEVIATIONS from the design note (both deliberate, recorded honestly): (1) FILE — implemented in src/ui/solar_system_canvas.cpp (the SetTooltip body-hover site) rather than hover_content.cpp, because body hover is NOT routed through draw_hover_content (which handles only tile/building/market); the tooltip is where body hover actually lives. (2) DEPTH — a lean one-line tier read rather than the design's fuller busy/steady/quiet sublevel + 'last seen N days ago' age; the tier conveys the coarse read without duplicating the market-throughput scan in the render path. If the richer read is wanted it is a trivial follow-up. Code-verified (hover tooltip is not headlessly capturable — no synthetic mouse hook)."
+      "resolution": "Delivered (v0.0.9 batch). The Solar-canvas body hover tooltip now appends a short activity line keyed on body_activity_visibility (unknown -> 'Outside your trade network'; known -> 'Commerce: market pulse'; known_stale -> 'Commerce: gone cold (stale)'; visible -> 'Commerce: live lane / your presence'), star excluded — wording aligned with the Selection panel's draw_activity_section. Pure read, no new state. DEVIATIONS from the design note (both deliberate, recorded honestly): (1) FILE — implemented in src/ui/solar_system_canvas.cpp (the SetTooltip body-hover site) rather than hover_content.cpp, because body hover is NOT routed through draw_hover_content (which handles only tile/building/market); the tooltip is where body hover actually lives. (2) DEPTH — a lean one-line tier read rather than the design's fuller busy/steady/quiet sublevel + 'last seen N days ago' age; the tier conveys the coarse read without duplicating the market-throughput scan in the render path. If the richer read is wanted it is a trivial follow-up. Code-verified (hover tooltip is not headlessly capturable — no synthetic mouse hook).",
       "priority": "B",
       "difficulty": 1,
       "parked": false,
@@ -1680,6 +1680,217 @@
       "authority_doc": "docs/ui/DISCOVERY.md",
       "summary": "Deferred at BL-089's landing (recorded in its resolution): the hover-card body activity line. BL-089 shipped the Selection-panel activity section (market pulse keyed on activity_vis) but the equivalent body-hover line was cut to land the item. Small, scoped: body hover shows name/type always; when the body is known+ it also shows the market pulse + coarse activity level, greyed with an age when known_stale — mirroring the Selection-panel section BL-089 already built. Captured here as its own promote-ready item. (Renumbered from BL-096 on merge to main 2026-07-05 — a cross-branch collision with main's BL-096 market-generation item.)",
       "design": "**Status:** designed — the design is settled inside BL-089 (§ 'UI surfaces → Hover'); this item lifts that deferred slice out. Requires BL-089 (shipped v0.0.8).\n\n### What it adds\nBL-089 built the **Selection-panel** activity section — click a body and, if it is `known`/`visible`, you read its market pulse + coarse activity; `known_stale` shows the last-seen pulse greyed with an age; `unknown` shows 'Outside your network — no market data'. The matching **hover** line was deferred. This adds it, so the read is available on hover without a click.\n\n### Surface (mirrors the shipped Selection section)\nIn `hover_content.cpp`, body hover:\n- **Always:** name + type (as today — the public astronomy read).\n- **known / visible:** append the market-pulse line + coarse activity level (busy ◉◉◉○○ / quiet), from the same public-market throughput the Selection section uses.\n- **known_stale:** the last-seen pulse, greyed, with an age ('last seen N days ago').\n- **unknown:** no market line (name/type only) — do not imply data you don't have.\nKeyed on the same `body_activity_visibility(world, body)` pure function; no new state, no serialisation.\n\n### Files & seams\n- `src/ui/hover_content.cpp` — the body-hover activity line, keyed on `activity_vis`.\n- If the pulse/activity formatter currently lives inline in `selection_panel.cpp`, lift it to a small shared helper so hover and selection render one vocabulary — a refactor, not a second implementation. (This is the only real work in the item; the rest is calling it.)\n\n### Requirement (Full mode)\n- **`visual`** — extend `scripts/verify/commercial_fog.lua`: hovering an `unknown` body shows name/type only; hovering a `known` body adds the market pulse; a `known_stale` body shows the greyed last-seen line. Golden-blessed.\n\n### Authority\nLands into `docs/ui/DISCOVERY.md` (the hover surface of the activity fog), alongside the Selection-panel section BL-089 already documented there."
+    },
+    {
+      "id": "BL-101",
+      "short_name": "BUILD_WARNING_FLAGS",
+      "category": "Development",
+      "title": "Enable compiler warning flags on owned targets (advisory)",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 1,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-05",
+      "files": [
+        "CMakeLists.txt"
+      ],
+      "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+      "summary": "2026-07-05 engineering health sweep #1: the build enables zero diagnostics — no -Wall/-Wextra (GCC/Clang), no /W4 (MSVC) in CMakeLists.txt, and the CI harness loop compiles with only -std=c++20 -O2. For a determinism-critical C++20 sim the compiler is the one tool that reliably catches uninitialised reads, narrowing, and signed/unsigned bugs — a plausible contributor to the ~62% Windows golden false-fail.",
+      "design": "**Status:** designed — settled from the 2026-07-05 health sweep (quick-win #1).\n\nAdd one `target_compile_options` block after `add_executable(ProjectIo ...)` applying `-Wall -Wextra` (GNU/Clang, via a `$<$<CXX_COMPILER_ID:GNU,Clang>:...>` generator expression) or `/W4` (MSVC) to the **ProjectIo target and the harness targets only** — not the fetched third-party libs.\n\n**Advisory, not a gate (deliberate):** do NOT add `-Werror` / `/WX` yet — the ImGui/sol2/Lua headers pulled into project TUs will trip it. Warnings applied to owned targets stay advisory; promote to `-Werror` in CI only after the surfaced backlog is cleaned. This is the highest-leverage build-hygiene move on the sweep.\n\n**Authority:** docs/development/DEVELOPMENT_PRACTICES.md (build standards) on landing."
+    },
+    {
+      "id": "BL-102",
+      "short_name": "DOC_FILENAME_CASE",
+      "category": "Development",
+      "title": "Doc filename-case drift — 49 references 404 on a case-sensitive filesystem",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 1,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-05",
+      "files": [
+        "docs/concept.md",
+        "docs/systems.md"
+      ],
+      "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+      "summary": "2026-07-05 sweep #2: the two most-referenced design docs are docs/concept.md and docs/systems.md (lowercase on disk), but 49 references point uppercase — README's two headline entry links, CLAUDE.md's index, backlog.json authority_doc fields, requirements.json. core.ignorecase=true masks this on Windows; on the case-sensitive Linux the project plans to move to (BL-057) every one of these links 404s.",
+      "design": "**Status:** designed — settled from the 2026-07-05 health sweep (quick-win #2).\n\nThe cheapest correct fix is **two renames** — `concept.md` to `CONCEPT.md` and `systems.md` to `SYSTEMS.md` — so all ~49 existing uppercase references (including the README front door) resolve, matching the uppercase convention the whole repo already assumes. That is far less churn than rewriting 49 references to lowercase.\n\n**Mechanics:** on a case-insensitive filesystem a case-only `git mv` may need `git mv -f` or a two-step (rename to a temp, then to the target) so git records the case change. Verify with `git ls-files` afterwards.\n\n**Authority:** docs/development/DEVELOPMENT_PRACTICES.md on landing."
+    },
+    {
+      "id": "BL-103",
+      "short_name": "DEAD_DOC_POINTERS",
+      "category": "Development",
+      "title": "Repoint dead TODO.md / OPENS.md breadcrumbs in src/ comments",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 1,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-05",
+      "files": [
+        "src/core/app.cpp",
+        "src/core/app.hpp",
+        "src/main.cpp",
+        "src/world/components.hpp",
+        "src/world/corporation_generation.cpp",
+        "src/world/economy_system.cpp",
+        "src/world/hard_coded_world.cpp",
+        "src/world/tile_generation.hpp",
+        "src/world/market_clearing.cpp"
+      ],
+      "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+      "summary": "2026-07-05 sweep #3: 12 comment pointers across 9 src files cite docs/development/TODO.md, 'TODO §', or 'OPENS §', but both TODO.md and its rename OPENS.md are deleted (content dissolved into backlog.json); the rename commit itself admitted it left the src comments untouched. A maintainer or subagent following them dead-ends — the highest-count drift in the repo.",
+      "design": "**Status:** designed — settled from the 2026-07-05 health sweep (quick-win #3). Comment-only sweep; no logic change.\n\nRepoint each pointer to its real current home:\n- **Golden-diff / [F3] tolerance notes** (app.cpp, app.hpp, main.cpp) → `docs/development/DEVELOPMENT_PRACTICES.md § Visual verification` and the `verifier-visual` skill.\n- **Generation-ledger note** (tile_generation.hpp) → `docs/generation/GENERATION_LEDGER.md` (its real home).\n- **Deferred depletion / Environment / Trade constants** (components.hpp, economy_system.cpp, market_clearing.cpp) → `docs/development/backlog.json` (the Environment/Trade category items).\n- **Deferred nation behaviour** (components.hpp) → `docs/generation/NATION_GENERATION.md` + `docs/development/backlog.json`.\n- **Deferred corp-generation / asteroid-belt notes** (corporation_generation.cpp, hard_coded_world.cpp) → `docs/development/backlog.json` (and SOLAR.md, already cited, for the belt).\n\n**Authority:** docs/development/DEVELOPMENT_PRACTICES.md on landing."
+    },
+    {
+      "id": "BL-104",
+      "short_name": "CTEST_WIRING",
+      "category": "Development",
+      "title": "Wire CTest + a one-command local build+test loop",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-05",
+      "files": [
+        "CMakeLists.txt",
+        "check.bat"
+      ],
+      "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+      "summary": "2026-07-05 sweep #4: no enable_testing()/add_test — `ctest` finds zero tests; 6 of 13 harnesses have no CMake target (only the CI bash glob builds them); no single build+test command exists locally, so a solo+AI loop that iterates many times a day re-assembles the check sequence by memory each time.",
+      "design": "**Status:** designed — settled from the 2026-07-05 health sweep (quick-win #4).\n\nAdd `enable_testing()` and replace the hand-listed harness targets with a **`foreach` over `tools/verify/*.cpp`** that (a) creates each harness `add_executable`, linking the same 'all `src/world/*.cpp` except `recipe_registry.cpp`' superset the CI loop uses (build.yml:83), and (b) registers `add_test(NAME <harness> COMMAND <harness>)`. Harnesses already exit non-zero on failure (CI relies on it), so they map to CTest for free. This fixes the 6 unbuilt targets, keeps CMake in lockstep with the CI glob (auto-picks up new harnesses incl. BL-106), and lets CI later replace its bespoke bash loop with `ctest`.\n\nAdd a thin **`check.bat`** (and mirror `check.sh` if wanted): `cmake --build build --config Release && ctest --test-dir build --output-on-failure` — collapses the daily inner loop to one command.\n\n**Caveat:** over-linking the world superset is safe because those TUs are SDL/Lua-free (recipe_registry excepted); it mirrors what CI already does. **Authority:** docs/development/DEVELOPMENT_PRACTICES.md on landing."
+    },
+    {
+      "id": "BL-105",
+      "short_name": "MAIN_MERGE_GATE",
+      "category": "Development",
+      "title": "Confirm and record the main-branch merge gate",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 1,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-05",
+      "files": [
+        "docs/development/DEVELOPMENT_PRACTICES.md"
+      ],
+      "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+      "summary": "2026-07-05 sweep #5: nothing in-repo proves build.yml (Linux g++-13/14 + Windows + headless harnesses) must pass before a merge to main. The Cut process merges the working branch into main *locally* and pushes direct, so a PR-gated check would be bypassed on release commits regardless of branch protection; no CODEOWNERS/rulesets file present. Whether main is actually gated lives in GitHub settings, not in files.",
+      "design": "**Status:** designed — settled from the 2026-07-05 health sweep (quick-win #5). The biggest CI unknown; everything else assumes a gate that may not exist.\n\nTwo parts:\n1. **Query the actual state** — `gh api repos/:owner/:repo/branches/main/protection` (done in the delivery block; outcome recorded in the item resolution / DEVLOG).\n2. **Make the release gate explicit** in DEVELOPMENT_PRACTICES.md § Cutting a release: either route Cuts through a PR so the required checks (`linux (g++-13)`, `linux (g++-14)`, `windows`) apply, OR state plainly that the pre-Cut local build-green (step 1) is the accepted gate for direct-to-main release commits.\n\n**USER ACTION:** enabling branch protection on `main` is a repo-settings change only the owner can make — this item records the decision and the doc note; the actual toggle is Ben's. **Authority:** docs/development/DEVELOPMENT_PRACTICES.md."
+    },
+    {
+      "id": "BL-106",
+      "short_name": "DETERMINISM_HARNESS",
+      "category": "Development",
+      "title": "Determinism harness — the canonical world generated twice is field-identical",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-05",
+      "files": [
+        "tools/verify/determinism_harness.cpp"
+      ],
+      "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+      "summary": "2026-07-05 sweep #6: determinism is a hard standing invariant but no headless harness generates the world twice and compares the two for identity. corp_terrain_matrix builds one world and only checks per-corp viability. This is the cheapest possible guard for the project's central invariant and would catch any accidental unordered_map-iteration or clock/rand leak.",
+      "design": "**Status:** designed — settled from the 2026-07-05 health sweep (quick-win #6).\n\nNew `tools/verify/determinism_harness.cpp` (modelled on corp_terrain_matrix's source set) that calls `make_hard_coded_world()` **twice** and asserts the two worlds are field-identical across the deterministic surface: body count + ids, per-body tile grid dimensions, per-tile terrain composition/landform and deposit arrays, tile→nation ownership, corporation placement/focus, building positions/types, market and population-centre placement.\n\n**Scope note:** `make_hard_coded_world()` takes no seed (world-gen is not seedable today, per corp_terrain_matrix), so this guards the single canonical world's *reproducibility* — the property that actually protects determinism now. It widens to a seed sweep unchanged the day a seed is threaded through world-gen.\n\n**Integration:** auto-runs in CI via the `tools/verify/*.cpp` glob; wired to `ctest` by BL-104. Exits non-zero on any mismatch, naming the diverging field. **Follow-on (user permission):** name it in the `verifier-headless` skill's harness list. **Authority:** docs/development/DEVELOPMENT_PRACTICES.md."
+    },
+    {
+      "id": "BL-107",
+      "short_name": "SAVE_FORMAT_VERSION",
+      "category": "Infrastructure",
+      "title": "Save-format magic + version header (reject mismatched saves on load)",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [
+        "FLAT_BINARY_SERIALISATION"
+      ],
+      "written": "2026-07-05",
+      "files": [],
+      "authority_doc": "docs/tech/TECH_FOUNDATIONS.md",
+      "summary": "2026-07-05 sweep #7 + completeness critic: the flat-binary save model is a load-bearing invariant that will evolve, but it is unversioned by design (a schema handshake is deferred to multiplayer per MULTIPLAYER_PRINCIPLES.md). The moment save/load lands and a struct layout changes between two dev builds, an old save silently misreads as UB garbage with no version guard to reject it.",
+      "design": "**Status:** designed but BLOCKED — settled from the 2026-07-05 health sweep (quick-win #7).\n\n**Design:** reserve a fixed leading header on every flat-binary snapshot — a **magic uint32** (e.g. 'IOSV') plus a monotonically-incremented **format-version uint32** — written first and checked on load. A mismatched magic or version fails the load with a clear error rather than reading a struct-layout mismatch as garbage. Bump the version whenever a serialised struct's layout changes.\n\n**BLOCKED:** no flat-binary serialiser exists in `world/*` yet (grep finds only PNG `fwrite` in `core/*`), so there is nothing to version. This item is the FIRST thing to add the moment serialisation is implemented.\n\n**Shipped now under the 2026-07-05 batch:** the doc-truthfulness fix only — softening TECH_FOUNDATIONS' present-tense 'is serialised' / 'are written and read' claims to future tense so the invariant is not stated as already built.\n\n**Note:** the serialisation implementation itself is not yet a backlog item — file one before promoting this. **Authority:** docs/tech/TECH_FOUNDATIONS.md."
+    },
+    {
+      "id": "BL-108",
+      "short_name": "CLAUDE_REQ_PATH",
+      "category": "Development",
+      "title": "CLAUDE.md points Delivery at req/requirements.json — a path that does not resolve",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 1,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-05",
+      "files": [
+        "CLAUDE.md"
+      ],
+      "authority_doc": "CLAUDE.md",
+      "summary": "2026-07-05 sweep completeness-critic: CLAUDE.md's Delivery-lifecycle gate (steps 0 and 2) and the source-of-truth table tell every Full-mode delivery to write req/requirements.json, but from repo root that path does not exist — the file is at docs/development/req/requirements.json (its sibling rows in the same table use full docs/development/ paths). A subagent following the instruction literally writes a stray req/ tree; dead on case-sensitive Linux.",
+      "design": "**Status:** designed — settled from the 2026-07-05 health sweep (completeness-critic finding).\n\nChange the three CLAUDE.md references (the source-of-truth table row + Delivery-lifecycle steps 0 and 2) from `req/requirements.json` / `req/REQUIREMENTS.md` to the full **`docs/development/req/requirements.json`** and **`docs/development/req/REQUIREMENTS.md`**, matching the full-path convention the table's sibling rows (backlog.json, REFINED.md, DELIVERY.md) already use.\n\n`DELIVERY.md`'s relative `req/…` references are **correct** (it lives in docs/development/) and stay unchanged — this is a CLAUDE.md-at-repo-root problem only. **Authority:** CLAUDE.md."
+    },
+    {
+      "id": "BL-109",
+      "short_name": "TESTING_DOC_DRIFT",
+      "category": "Development",
+      "title": "DEVELOPMENT_PRACTICES names Catch2 as the test framework — it is used nowhere",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 1,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-05",
+      "files": [
+        "docs/development/DEVELOPMENT_PRACTICES.md"
+      ],
+      "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
+      "summary": "2026-07-05 sweep #9: the practices doc opens 'The project uses Catch2 for unit testing' with a full TEST_CASE/SECTION convention, but Catch2 is never fetched, included, or used — the only TEST_CASE hits repo-wide are in docs. Actual tests are the tools/verify/*.cpp printf-assert harnesses + the visual-verify tier. Misleads the AI assistant on every read.",
+      "design": "**Status:** designed — settled from the 2026-07-05 health sweep (quick-win #9).\n\nRewrite the § Testing section to describe what actually exists: the **headless printf-assert harness pattern** (`tools/verify/*.cpp`, own `check()`/PASS/FAIL macros, built by CMake + CI and — after BL-104 — runnable via `ctest`), what belongs in a harness (pure `world/*` logic: economy arithmetic, tile/nation/corp generation, placement audits), and the **visual-verify tier** (`ProjectIo --verify scripts/verify/*.lua` + golden PNGs) for rendering. Drop the Catch2 subsection, or demote it to a one-line 'evaluated, not adopted — harnesses instead' note.\n\n**Authority:** docs/development/DEVELOPMENT_PRACTICES.md (this doc is its own authority)."
+    },
+    {
+      "id": "BL-110",
+      "short_name": "SOL2_STARTUP_GUARD",
+      "category": "Development",
+      "title": "Unprotected sol2 .as<>() at startup can abort the process on a malformed data file",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 1,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-05",
+      "files": [
+        "src/main.cpp",
+        "src/world/recipe_registry.cpp"
+      ],
+      "authority_doc": "docs/tech/TECH_FOUNDATIONS.md",
+      "summary": "2026-07-05 sweep #10: read_resource_map converts Lua values with bare kv.first.as<std::string>() / kv.second.as<float>(); load_economy and main() have no try/catch, so a type-shape error in a user-edited economy.lua/recipes.lua throws sol::error and aborts with an unhandled exception. The standing rule forbids unprotected sol2 calls where errors can occur. Script LOADING is protected (safe_script_file); only type-shape errors within a well-formed script bite.",
+      "design": "**Status:** designed — settled from the 2026-07-05 health sweep (quick-win #10).\n\nSmallest covering fix: wrap the app dispatch in `main()` (both `run_verify` and `run`) in **one `try/catch (const std::exception&)`** that prints the message to stderr and returns non-zero — this covers every startup Lua load path (load_economy → recipe_registry) at once, turning an unhandled-exception abort into a clean error exit.\n\n**Optional hardening:** also guard the two `.as<>()` conversions in `read_resource_map` with the `sol::optional`/type-check pattern already used elsewhere in recipe_registry, for a precise per-key error message. Low severity — these are startup config files the solo dev controls, not a runtime hot path.\n\n**Authority:** docs/tech/TECH_FOUNDATIONS.md (the sol2-safety invariant) / io-standing-rules.md."
     }
   ]
 }

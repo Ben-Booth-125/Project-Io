@@ -1,0 +1,395 @@
+{
+  "_schema": "user-stories/io-v1",
+  "_note": [
+    "Canonical user-story catalogue for Project Io — the authoritative index of WHAT THE PLAYER",
+    "IS TRYING TO DO, decomposed by player intent rather than by system or by feature.",
+    "One story = one object in `stories`. USER_STORIES.md is the readable mirror (JSON wins on",
+    "any disagreement, exactly as backlog.json wins over BACKLOG.md).",
+    "",
+    "WHY THIS FILE EXISTS — the second route from docs to code.",
+    "  The design docs decompose the game by SYSTEM/SURFACE ('what is this thing?').",
+    "  backlog.json decomposes it by FEATURE ('what do we build next?').",
+    "  Neither decomposes it by PLAYER INTENT — an orthogonal axis. This catalogue is that axis.",
+    "  A story traced DOWNWARD (-> UI surface -> backlog item -> requirement) and UPWARD",
+    "  (-> system -> pillar) turns intent into a COVERAGE check: a story no surface serves is a",
+    "  gap to fill; a shipped feature no story needs is scope to justify. That check is the value",
+    "  the feature-backlog structurally cannot give.",
+    "",
+    "A PILLAR OF TESTING. Each story's `requirements` are the brief slugs in req/requirements.json",
+    "whose rows carry executable verification (visual/golden, headless, code). The story is the",
+    "player-goal framing; the linked briefs are how you PROVE the goal still holds after a change.",
+    "A story with a real requirement link is a walkable, testable acceptance path — walk it (BL-098)",
+    "or re-run its briefs (verifier-* skills). A `served` story whose briefs go red is a regression",
+    "against a player goal, caught on the intent axis rather than the feature axis.",
+    "",
+    "RELATIONSHIP TO BL-098. BL-098 ('UX review from the perspective of user stories') is the",
+    "REVIEW ACTIVITY — walk each story through the live UI and produce a friction list. This file",
+    "is the ARTIFACT that review consumes. Build the catalogue here; run BL-098 against it.",
+    "",
+    "COVERAGE (the served-state axis; distinct from the backlog's design-state ✓/~):",
+    "  served  (glyph ●) — the goal has a working home in the UI + code today.",
+    "  partial (glyph ◐) — partly served; a friction point or a missing step remains.",
+    "  gap     (glyph ○) — no home yet; a real hole in the software.",
+    "  planned (glyph ◇) — deliberately outside current scope (e.g. Conflict) or queued.",
+    "",
+    "FIELDS.",
+    "  id         — US-XXX, parallel to BL-XXX.",
+    "  cluster    — one of `clusters[].id`; the player-goal grouping this story belongs to.",
+    "  title      — short human name.",
+    "  story      — the canonical 'As the player, I want ... so that ...' sentence.",
+    "  coverage   — served | partial | gap | planned (see vocab above).",
+    "  glyph      — mirrors coverage 1:1 for skimming.",
+    "  traces     — the load-bearing links that make this a ROUTE, not just prose:",
+    "     pillars       (up)   — Trade | Conflict, from CONCEPT/SYSTEMS.",
+    "     systems       (up)   — SYSTEMS.md system names.",
+    "     surfaces      (down) — {doc, surface} the UI element(s) that serve the goal.",
+    "     backlog       (down) — BL-XXX ids that realise or affect the story.",
+    "     requirements  (down) — req/requirements.json brief slugs that verify it ([] = link owed).",
+    "  walkthrough — the end-to-end flow BL-098 walks; ordered steps.",
+    "  friction    — known rough edges feeding BL-098 ('' if none noted).",
+    "  written     — capture date (absolute; newest-dated wins on conflict).",
+    "",
+    "SCOPE HONESTY. The `clusters` taxonomy maps the WHOLE game's intent so the axis is complete,",
+    "but `stories` stay within prototype scope (economy loop). Post-prototype clusters (Conflict)",
+    "are present and marked `scope: post-prototype`, deliberately unpopulated — do not author",
+    "out-of-scope stories (io-standing-rules § Scope & sequence).",
+    "",
+    "COVERAGE STATE (2026-07-05). Legacy-feature pass: 12 stories spanning all seven prototype",
+    "clusters, every story requirement-linked. This baselines the shipped player-facing features",
+    "(lenses, navigation, time, build, recipe/workforce, sell, convoys, survey, rivals, population)",
+    "as `served`. Next passes: fill secondary stories, and build the coverage-audit tool (a check",
+    "that flags served stories with dead links, and backlog items in no story)."
+  ],
+  "clusters": [
+    { "id": "orient", "name": "Get my bearings", "intent": "Know who I am, where I am, and what I could do next; move around the world and control its clock.", "scope": "prototype" },
+    { "id": "find", "name": "Find opportunity", "intent": "See where to grow — good ground, unmet demand, room to expand — at a glance, without arming anything.", "scope": "prototype" },
+    { "id": "build", "name": "Build", "intent": "Pick a tile, understand what I can build and why-not, place it, and steer what it produces.", "scope": "prototype" },
+    { "id": "operate", "name": "Run my economy", "intent": "Know whether my assets make money, what my runway is, and why my workforce is constrained.", "scope": "prototype" },
+    { "id": "expand", "name": "Expand & explore", "intent": "Survey a new body, judge whether it's worth the cost and time, and reach it.", "scope": "prototype" },
+    { "id": "trade", "name": "Move goods & read demand", "intent": "Govern how my stock is released, ship it between bodies, and see where demand and price sit.", "scope": "prototype" },
+    { "id": "read-rivals", "name": "Read the competition", "intent": "Infer what rivals are doing from public signals — buildings, market prints, activity — without seeing their books.", "scope": "prototype" },
+    { "id": "contest", "name": "Contest territory", "intent": "Claim, defend, and invade ground; make an opponent's supply lines a target.", "scope": "post-prototype" }
+  ],
+  "stories": [
+    {
+      "id": "US-001",
+      "cluster": "orient",
+      "title": "Know who and where I am on load, and what I could do next",
+      "story": "As the player, when the campaign loads I want to see who I am, where my home is, and what my first move could be, so that I get my bearings before touching anything.",
+      "coverage": "partial",
+      "glyph": "◐",
+      "traces": {
+        "pillars": ["Trade"],
+        "systems": ["Budget", "Infrastructure", "Exploration"],
+        "surfaces": [
+          { "doc": "docs/ui/LAYOUT.md", "surface": "Profile panel (corp identity + emblem) and header balance" },
+          { "doc": "docs/ui/SOLAR.md", "surface": "Solar canvas opening focus + home-body marker + HQ pip" },
+          { "doc": "docs/ui/SELECTION.md", "surface": "Selection element ('what's my move here?')" }
+        ],
+        "backlog": ["BL-085", "BL-090", "BL-092"],
+        "requirements": ["player-presence", "start-framing", "corp-emblem-system"]
+      },
+      "walkthrough": [
+        "Campaign loads -> the view opens focused on the player's home body (BL-085 initial focus).",
+        "The Profile panel shows the corp identity + emblem (BL-090); the header shows the balance.",
+        "An always-on 'you are here' marker + HQ pip distinguishes home from rivals (BL-085/BL-092).",
+        "The player selects home -> the Selection element frames the current state and available actions."
+      ],
+      "friction": "The 'what could I do next' half is the weak leg: identity/where landed with BL-085/BL-090/BL-092, but the opening view does not actively suggest a first move. Candidate BL-098 finding — an orient-time next-action nudge.",
+      "written": "2026-07-05"
+    },
+    {
+      "id": "US-002",
+      "cluster": "build",
+      "title": "Pick a tile, see what I can build, its cost and why-not, and build it",
+      "story": "As the player, I want to select a tile and see what I can build there, what it costs in budget and materials, and why I can't build the things I can't, so that I can commit a construction in a few clicks with no guessing.",
+      "coverage": "partial",
+      "glyph": "◐",
+      "traces": {
+        "pillars": ["Trade"],
+        "systems": ["Infrastructure", "Budget", "Resources", "Environment"],
+        "surfaces": [
+          { "doc": "docs/ui/SELECTION.md", "surface": "Selection element build flow + disabled 'Insufficient funds.' reason" },
+          { "doc": "docs/ui/MENU.md", "surface": "Per-tile 'build here' flow" },
+          { "doc": "docs/ui/PLANETARY.md", "surface": "Placement-suitability tint on armed build mode" }
+        ],
+        "backlog": ["BL-071", "BL-044", "BL-095", "BL-082", "BL-043", "BL-010"],
+        "requirements": ["build-front-door", "construction-pricing", "placement-suitability", "building-placement-rules"]
+      },
+      "walkthrough": [
+        "The player selects a tile -> the Selection element reads the tile (terrain, deposits, buildings) without arming anything.",
+        "The buildable list shows each option with its budget + material cost (BL-044 construction pricing; BL-095 market-stock gate).",
+        "Options the player can't afford or place are shown with a reason — e.g. 'Insufficient funds.' or a terrain/deposit 'why not here' (BL-071).",
+        "The player arms build mode -> affinity tiles tint to show good placement (BL-010 placement-suitability surface).",
+        "The player confirms -> the building is placed and cost debited."
+      ],
+      "friction": "BL-082: during placement the construction panel occluded the Selection/Tile panel (fixed in v0.0.9 — re-walk to confirm). The 'why not here' reasons (BL-071) and the material-cost / market-stock gate (BL-095, design-owed) should read as one coherent explanation, not two separate refusals.",
+      "written": "2026-07-05"
+    },
+    {
+      "id": "US-003",
+      "cluster": "operate",
+      "title": "Know whether a building makes money and what my runway is",
+      "story": "As the player, I want to know whether a given building is profitable and whether I can afford my next moves, without hunting across ledgers, so that I can act before bankruptcy rather than discover it.",
+      "coverage": "served",
+      "glyph": "●",
+      "traces": {
+        "pillars": ["Trade"],
+        "systems": ["Budget", "Resources", "Workforce"],
+        "surfaces": [
+          { "doc": "docs/ui/LAYOUT.md", "surface": "Economy panel — itemised income/expenditure + projected runway + trend plots" },
+          { "doc": "docs/ui/SELECTION.md", "surface": "Per-building profitability read on selection" }
+        ],
+        "backlog": ["BL-072", "BL-073", "BL-074", "BL-081", "BL-066"],
+        "requirements": ["budget-breakdown", "debt-interest", "per-building-profitability", "economy-ledger-legibility", "economy-panel"]
+      },
+      "walkthrough": [
+        "The player opens the Economy panel -> income and expenditure are itemised, debt interest is a distinct line, and a projected runway is shown (BL-072/073).",
+        "The player selects a building -> its per-building profitability (revenue vs. running cost) reads on the Selection element (BL-074).",
+        "Balance/market trend plots (BL-066) show the trajectory, so 'am I improving?' is answerable, not just 'where am I now?'.",
+        "The player judges 'is this asset carrying its weight?' and 'how long until I'm underwater?' without cross-referencing raw ledgers."
+      ],
+      "friction": "BL-081 addressed cramped economy-ledger cells and dropped the per-building table in favour of the on-selection read (v0.0.9). Coverage is served; watch that the profitability figure and the runway agree in sign and framing so they don't read as two contradictory stories.",
+      "written": "2026-07-05"
+    },
+    {
+      "id": "US-004",
+      "cluster": "orient",
+      "title": "Navigate the zoom ladder — from the system down to a tile and back",
+      "story": "As the player, I want to drill from the solar view down to a single tile and climb back out, so that I can move fluidly between the strategic and the local without losing my place.",
+      "coverage": "served",
+      "glyph": "●",
+      "traces": {
+        "pillars": ["Trade"],
+        "systems": ["Exploration", "Infrastructure"],
+        "surfaces": [
+          { "doc": "docs/ui/CANVASES.md", "surface": "Zoom ladder — Solar / Circumplanetary / Planetary; click a body to descend" },
+          { "doc": "docs/ui/MINIMAP.md", "surface": "Minimap chrome — click to ascend a rung" },
+          { "doc": "docs/ui/SELECTION.md", "surface": "Selection 'go to' descends to the Planetary surface" }
+        ],
+        "backlog": ["BL-031", "BL-059", "BL-032"],
+        "requirements": ["canvas-hit-testing", "selectable-markers", "selection-go-to-planetary", "non-spatial-goto", "lens-driven-selection"]
+      },
+      "walkthrough": [
+        "On the Solar canvas the player clicks a body -> the view descends to its Circumplanetary / Planetary canvas.",
+        "Entity markers on the surface are hit-testable; a single click selects, a double click navigates (BL-031/BL-059).",
+        "The Selection element's 'go to' descends straight to a tile on the Planetary surface.",
+        "The player clicks the minimap to climb back up a rung, without losing selection context."
+      ],
+      "friction": "The click-model (single selects / double navigates) must stay consistent across all three canvases; a divergence here is a prime BL-098 finding since the ladder is the most-repeated player motion.",
+      "written": "2026-07-05"
+    },
+    {
+      "id": "US-005",
+      "cluster": "orient",
+      "title": "Control the flow of time — pause, resume, and change speed",
+      "story": "As the player, I want to pause, resume, change the simulation speed, and read the clock, so that I can slow down for a decision and speed through the quiet stretches.",
+      "coverage": "served",
+      "glyph": "●",
+      "traces": {
+        "pillars": ["Trade"],
+        "systems": ["Budget"],
+        "surfaces": [
+          { "doc": "docs/ui/TIME_CONTROLS.md", "surface": "Calendar block + speed buttons (Roman-numeral labels) + econ-tick progress bar" },
+          { "doc": "docs/ui/MENU.md", "surface": "In-app system menu Pause/Resume (Esc parity)" }
+        ],
+        "backlog": ["BL-008", "BL-064", "BL-070"],
+        "requirements": ["time-speed-curve", "in-app-system-menu"]
+      },
+      "walkthrough": [
+        "The player reads the calendar block (date + tick cadence) to know where they are in time.",
+        "They press a speed button (I/II/III) or pause; the econ-tick progress bar shows how close the next resolution is.",
+        "The corner gear / Esc opens the system menu for Pause/Resume without touching the keyboard hotkeys."
+      ],
+      "friction": "Pause reachability landed twice (hotkey + gear menu, BL-070); confirm they agree and that the current speed is legible at a glance, not inferred from motion.",
+      "written": "2026-07-05"
+    },
+    {
+      "id": "US-006",
+      "cluster": "find",
+      "title": "See where to grow at a glance, without arming build mode",
+      "story": "As the player, I want to read where opportunity is — good ground, dense industry, unmet demand — from the map alone, so that I can decide where to expand before committing to build mode.",
+      "coverage": "served",
+      "glyph": "●",
+      "traces": {
+        "pillars": ["Trade"],
+        "systems": ["Environment", "Resources", "Budget"],
+        "surfaces": [
+          { "doc": "docs/ui/LENSES.md", "surface": "Opportunity (net-margin), Industry (substrate), Scarcity, Production lenses on the control strip" },
+          { "doc": "docs/ui/PLANETARY.md", "surface": "Per-tile lens tint on the Planetary surface" }
+        ],
+        "backlog": ["BL-086", "BL-084", "BL-016"],
+        "requirements": ["opportunity-ambient", "industry-lens", "population-opportunity-lens", "scarcity-lens-render", "production-output-lens"]
+      },
+      "walkthrough": [
+        "The player selects the Opportunity lens -> tiles tint by net margin, showing where a chain would pay (BL-086).",
+        "They switch to the Industry lens -> the nation-owned substrate reads as a throughput field, showing where activity already concentrates (BL-084).",
+        "The Scarcity lens (per resource) shows where a good is absent -> unmet local demand.",
+        "None of this requires arming build mode, so reading and deciding stay separate from committing."
+      ],
+      "friction": "Several lenses answer 'where to grow' from different angles; the risk is the player not knowing which lens answers which question. A lens colour-scheme pass (BL-016, design-owed) is the open refinement.",
+      "written": "2026-07-05"
+    },
+    {
+      "id": "US-007",
+      "cluster": "build",
+      "title": "Set a building's recipe and workforce target",
+      "story": "As the player, I want to choose what an existing building produces and how much workforce it draws, so that I can steer my production to what the market needs rather than accept a fixed output.",
+      "coverage": "served",
+      "glyph": "●",
+      "traces": {
+        "pillars": ["Trade"],
+        "systems": ["Resources", "Workforce", "Infrastructure"],
+        "surfaces": [
+          { "doc": "docs/ui/SELECTION.md", "surface": "Per-building recipe + workforce controls on selection" },
+          { "doc": "docs/economy/PRODUCTION.md", "surface": "Recipe tables + workforce scalar model" }
+        ],
+        "backlog": ["BL-046", "BL-041"],
+        "requirements": ["building-management", "habitability-workforce", "layer4-ui-groundwork"]
+      },
+      "walkthrough": [
+        "The player selects a building -> its current recipe and workforce target read on the Selection element.",
+        "They change the recipe -> the economy honours the new recipe at the next tick (golden-verified).",
+        "They raise the workforce target -> output scales, capped by local habitability-gated workforce (BL-041).",
+        "If workforce is short, the cap is shown as the reason, not a silent shortfall."
+      ],
+      "friction": "The workforce cap (habitability) and the target interact; the player needs to see 'you asked for X, the body allows Y' in one place. Ties into US-012 (population legibility).",
+      "written": "2026-07-05"
+    },
+    {
+      "id": "US-008",
+      "cluster": "trade",
+      "title": "Govern how my stock is released — standing sell orders with a floor",
+      "story": "As the player, I want to place standing sell orders with a floor price and bias which counterparties I match, so that I control how my goods reach market instead of dumping everything at the cleared price.",
+      "coverage": "served",
+      "glyph": "●",
+      "traces": {
+        "pillars": ["Trade"],
+        "systems": ["Budget", "Resources"],
+        "surfaces": [
+          { "doc": "docs/SYSTEMS.md", "surface": "Trade pillar — standing sell orders (per body/resource qty + floor); preferential purchasing" },
+          { "doc": "docs/ui/LAYOUT.md", "surface": "Market ledger — order book + auto-sell/auto-buy health" }
+        ],
+        "backlog": ["BL-037", "BL-035", "BL-025"],
+        "requirements": ["player-sell-orders", "order-book", "warm-start-surface", "multi-market-dashboard"]
+      },
+      "walkthrough": [
+        "The player sets a standing sell order for a (body, resource): a quantity and a floor price.",
+        "At market clearing the order is honoured ahead of the anonymous auto-sell path, so stock is not dumped below the floor.",
+        "Preferential purchasing lets a buyer bias which seller it matches (BL-037).",
+        "The warm-start / Market ledger surfaces auto-buy vs auto-sell health so the player sees whether their stock is moving."
+      ],
+      "friction": "Sell orders, the anonymous auto-sell path, and the order book are three release mechanisms; the ledger must make clear which one moved a given unit, or profitability reads (US-003) become hard to trust.",
+      "written": "2026-07-05"
+    },
+    {
+      "id": "US-009",
+      "cluster": "trade",
+      "title": "Move goods between bodies and see where they flow",
+      "story": "As the player, I want to ship goods from where they're cheap to where they're dear and see the lanes that carry them, so that I can profit from spatial price differences net of logistics.",
+      "coverage": "served",
+      "glyph": "●",
+      "traces": {
+        "pillars": ["Trade"],
+        "systems": ["Supply", "Infrastructure", "Budget"],
+        "surfaces": [
+          { "doc": "docs/economy/SUPPLY.md", "surface": "Convoy layer — dispatch, logistics cost, arrival crediting" },
+          { "doc": "docs/ui/LENSES.md", "surface": "Market lens (boundaries + price readout) and Scarcity lens" },
+          { "doc": "docs/ui/DISCOVERY.md", "surface": "Persistent trade routes drawn from convoy traffic" }
+        ],
+        "backlog": ["BL-039", "BL-038", "BL-088", "BL-036"],
+        "requirements": ["supply-layer", "trade-routes", "market-centre-seeding", "market-boundary-lens"]
+      },
+      "walkthrough": [
+        "Terrestrial shortfalls auto-dispatch a convoy from the cheapest reachable source; the cargo leaves the source pool at dispatch (BL-039).",
+        "The convoy advances per tick and credits the destination on arrival, so the two bodies' prices converge net of logistics cost.",
+        "Space launches are always player-directed (never auto), gated on a Launchpad + Orbital Port and Era 1.",
+        "Persistent trade routes record the lanes (BL-088); the Market lens shows catchment boundaries and prices."
+      ],
+      "friction": "Logistics cost is what makes distant arbitrage marginal; the player needs the per-unit landed cost visible at decision time, or the 'is this trade worth it?' judgement is guesswork.",
+      "written": "2026-07-05"
+    },
+    {
+      "id": "US-010",
+      "cluster": "read-rivals",
+      "title": "Read what a rival is doing from public signals",
+      "story": "As the player, I want to infer a competitor's activity from what's public — their buildings, market prints, and commercial activity — without seeing their books, so that I can respond to rivals I can't directly observe.",
+      "coverage": "served",
+      "glyph": "●",
+      "traces": {
+        "pillars": ["Trade"],
+        "systems": ["Exploration", "Diplomacy"],
+        "surfaces": [
+          { "doc": "docs/ui/DISCOVERY.md", "surface": "Visibility rule (buildings public, production/stockpile private) + route-driven activity fog" },
+          { "doc": "docs/ui/SELECTION.md", "surface": "Rival building selection shows public facts only" },
+          { "doc": "docs/ui/ICONS.md", "surface": "Hover-card body activity line — market pulse when known+" }
+        ],
+        "backlog": ["BL-068", "BL-089", "BL-100", "BL-060", "BL-099"],
+        "requirements": ["visibility-model", "commercial-fog", "activity-hover-line", "hover-card"]
+      },
+      "walkthrough": [
+        "The player sees a rival's buildings on-canvas but selecting one reveals only public facts — no production rate or stockpile (BL-068).",
+        "A body carries an activity tier (Unknown/Known/Stale/Visible) lit by the player's own routes and presence (BL-089).",
+        "Hovering a known+ body surfaces its market pulse on the hover card (BL-100).",
+        "Market prices and supply/demand aggregates are the public channel the player reasons from."
+      ],
+      "friction": "The activity fog and the geographic survey fog are independent axes (a body can be Known-but-unsurveyed); the UI must not conflate them. The proximity-glimpse refinement (BL-099, designed) is the open follow-on.",
+      "written": "2026-07-05"
+    },
+    {
+      "id": "US-011",
+      "cluster": "expand",
+      "title": "Survey a new body and judge whether it's worth it",
+      "story": "As the player, I want to preview a survey's cost and time, dispatch it, and watch a body reveal region by region, so that I can decide whether an unknown body is worth investing in before I commit.",
+      "coverage": "served",
+      "glyph": "●",
+      "traces": {
+        "pillars": ["Trade"],
+        "systems": ["Exploration", "Budget"],
+        "surfaces": [
+          { "doc": "docs/ui/DISCOVERY.md", "surface": "Survey system — geographic fog, region-by-region reveal" },
+          { "doc": "docs/ui/SOLAR.md", "surface": "Per-body survey badge" },
+          { "doc": "docs/ui/SELECTION.md", "surface": "Survey section — cost/ETA preview + live progress" },
+          { "doc": "docs/ui/PLANETARY.md", "surface": "Unrevealed regions masked until scanned" }
+        ],
+        "backlog": ["BL-067", "BL-099"],
+        "requirements": ["survey-system"]
+      },
+      "walkthrough": [
+        "The player selects an unsurveyed body -> the Selection panel shows only its type, orbit, and grid size.",
+        "The Survey section previews cost and ETA, both scaling with body size and distance from home.",
+        "The player dispatches -> credits are debited upfront; a transit phase reveals nothing, then a scan phase reveals the surface one region at a time in deterministic order.",
+        "Deposit richness bands (rich/moderate/sparse) resolve; exact amounts wait for first extraction placement."
+      ],
+      "friction": "Cost is charged upfront before any reveal; the preview must make the gamble legible ('you pay N now, first tiles in T ticks') so a survey never feels like money vanished.",
+      "written": "2026-07-05"
+    },
+    {
+      "id": "US-012",
+      "cluster": "operate",
+      "title": "Understand why my workforce is constrained",
+      "story": "As the player, I want to see why workforce is limited on a body and where population concentrates, so that I can make siting decisions by reason rather than by guesswork.",
+      "coverage": "served",
+      "glyph": "●",
+      "traces": {
+        "pillars": ["Trade"],
+        "systems": ["Workforce", "Environment"],
+        "surfaces": [
+          { "doc": "docs/economy/POPULATION.md", "surface": "Habitability -> workforce feedback" },
+          { "doc": "docs/ui/LENSES.md", "surface": "Population / Habitability lens" },
+          { "doc": "docs/ui/SELECTION.md", "surface": "Habitability -> workforce reasoning on hover / selection" }
+        ],
+        "backlog": ["BL-069", "BL-083", "BL-041"],
+        "requirements": ["population-legibility", "pop-centre-markers", "population-lens-render", "habitability-workforce"]
+      },
+      "walkthrough": [
+        "The player selects the Population lens -> tiles tint by habitability, showing where labour can be sustained.",
+        "Population centres draw as tiered, named settlements (BL-083), so the workforce source is visible on the map.",
+        "Selecting a building or tile surfaces the habitability -> workforce chain: why the cap is what it is (BL-069).",
+        "The player sites new extraction/processing where workforce can actually reach it."
+      ],
+      "friction": "The workforce cap surfaced here is the same cap US-007 hits when raising a workforce target; the two surfaces must tell one consistent story about the ceiling.",
+      "written": "2026-07-05"
+    }
+  ]
+}

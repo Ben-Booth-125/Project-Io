@@ -43,6 +43,17 @@ item is **promoted** into file-scoped tasks when we act on it. **`DELIVERY.md`**
 authority — the Delivery lifecycle, design-state model, depth verbs, and worktree sub-agent model.
 Read DELIVERY.md before promoting or executing backlog work.
 
+**`docs/development/user_stories.json`** and **`docs/development/USER_STORIES.md`**
+The user-story catalogue — the game decomposed by **player intent** (what the player is *trying to
+do*), the axis neither the design docs (system/surface) nor the backlog (feature) provides. It is
+the **second route from docs to code**: each story traces *upward* to the systems/pillars that give
+it meaning and *downward* to the UI surface + backlog item + requirement that realise and verify it,
+turning intent into a coverage check (a story no surface serves is a gap; a feature no story needs
+is scope to justify). **`user_stories.json`** is canonical (mirrors `backlog.json`'s `_schema`/
+`_note`/coverage conventions); **`USER_STORIES.md`** is the readable mirror. Companion to — not a
+duplicate of — the backlog; it is the artifact **BL-098**'s UX-review activity consumes. Read
+before UX-review work, coverage audits, or when reasoning about whether a player goal has a home.
+
 **`docs/ui/CANVASES.md`**
 Overview of the three primary canvases — Solar, Circumplanetary, and Planetary — arranged as a **zoom ladder** (descend by clicking a body in the primary, ascend by clicking the minimap). Covers the shared layout, selection/view state, and implementation approach. Per-canvas detail lives in `SOLAR.md`, `CIRCUMPLANETARY.md`, and `PLANETARY.md`; the minimap chrome and ladder navigation are in `MINIMAP.md`. Authoritative reference for Layer 2 and for later work that adds overlays to these canvases.
 
@@ -119,6 +130,7 @@ backlog**, or **B) implement now** (smoke-test, then ask before committing).
 | Backlog **metadata** (status, priority, sequencing, files) | `docs/development/backlog.json` | Queryable; the JSON wins over any prose/glyph. |
 | Backlog **design prose** for an open item | `docs/development/backlog.json` (`design` field) | Design authority *while the item is open*; `BACKLOG.md` holds legacy bodies not yet migrated. |
 | **Active worklist** (promoted tasks) | `docs/development/REFINED.md` | Transient; empty between work blocks. |
+| **Player-intent coverage** (user stories) | `docs/development/user_stories.json` (view: `USER_STORIES.md`) | The second route — intent axis; companion to the backlog, consumed by BL-098's review. |
 | **Method** (lifecycle, depth verbs, batch, worktrees) | `docs/development/DELIVERY.md` | The long-form of this section. |
 | **Requirements** (data + history) | `req/requirements.json` (policy `req/REQUIREMENTS.md`) | |
 | **Standing invariants** | `.claude/rules/io-standing-rules.md` | Always-on; the "do not" rules. |
