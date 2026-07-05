@@ -52,12 +52,14 @@ void draw_balances(const world& w)
         corps.push_back(id);
     std::sort(corps.begin(), corps.end());
 
+    // BL-081: the name column stretches so the corp identity is never clipped;
+    // Focus/Balance get comfortable fixed widths so the full numeric value shows.
     if (ImGui::BeginTable("##balances", 3,
-            ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
+            ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
     {
-        ImGui::TableSetupColumn("Corporation");
-        ImGui::TableSetupColumn("Focus");
-        ImGui::TableSetupColumn("Balance");
+        ImGui::TableSetupColumn("Corporation", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("Focus", ImGuiTableColumnFlags_WidthFixed, 90.0f);
+        ImGui::TableSetupColumn("Balance", ImGuiTableColumnFlags_WidthFixed, 90.0f);
         ImGui::TableHeadersRow();
 
         for (entity_id id : corps)
@@ -81,78 +83,6 @@ void draw_balances(const world& w)
             // Negative balances are flagged red (palette::negative).
             const ImU32 col = (cc.balance < 0.0f) ? palette::negative : palette::positive;
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(col), "%.1f", cc.balance);
-        }
-        ImGui::EndTable();
-    }
-}
-
-// --- building states ---------------------------------------------------------
-void draw_buildings(const world& w, const recipe_registry& reg, const economy_report& report)
-{
-    if (!ImGui::CollapsingHeader("Buildings", ImGuiTreeNodeFlags_DefaultOpen))
-        return;
-
-    if (report.buildings.empty())
-    {
-        ImGui::TextDisabled("No production has run yet (advance to an economy tick).");
-        return;
-    }
-
-    if (ImGui::BeginTable("##buildings", 6,
-            ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
-    {
-        ImGui::TableSetupColumn("Corporation");
-        ImGui::TableSetupColumn("Type");
-        ImGui::TableSetupColumn("Makes");
-        ImGui::TableSetupColumn("Output");
-        ImGui::TableSetupColumn("State");
-        ImGui::TableSetupColumn("Limiting input");
-        ImGui::TableHeadersRow();
-
-        for (const building_report& br : report.buildings)
-        {
-            ImGui::TableNextRow();
-
-            ImGui::TableSetColumnIndex(0);
-            ImGui::TextUnformatted(corp_label(w, br.corp).c_str());
-
-            ImGui::TableSetColumnIndex(1);
-            ImGui::TextDisabled("%s", building_type_name(br.type));
-
-            ImGui::TableSetColumnIndex(2);
-            if (br.type == building_type::extraction_site)
-            {
-                resource_text(br.target_resource);
-            }
-            else if (br.type == building_type::processing_facility)
-            {
-                const recipe* rcp = reg.get_recipe(br.recipe);
-                if (rcp && !rcp->name.empty())
-                    ImGui::TextUnformatted(rcp->name.c_str());
-                else
-                    ImGui::TextDisabled("(no recipe)");
-            }
-            else
-            {
-                ImGui::TextDisabled("-");
-            }
-
-            ImGui::TableSetColumnIndex(3);
-            ImGui::Text("%.1f", br.output_quantity);
-
-            ImGui::TableSetColumnIndex(4);
-            if (br.active)
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::positive), "active");
-            else if (br.exhausted)
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative), "out of resources");
-            else
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::neutral), "idle");
-
-            ImGui::TableSetColumnIndex(5);
-            if (br.type == building_type::processing_facility && br.has_limiting)
-                resource_text(br.limiting_input);
-            else
-                ImGui::TextDisabled("-");
         }
         ImGui::EndTable();
     }
@@ -186,11 +116,12 @@ void draw_pools(const world& w)
             {
                 ImGui::TextDisabled("(empty)");
             }
-            else if (ImGui::BeginTable("##pool", 2,
-                         ImGuiTableFlags_Borders | ImGuiTableFlags_SizingStretchProp))
+            // BL-081: resource name stretches, quantity gets a fixed width, so the
+            // cells never collapse to a leading glyph (as the balances table did).
+            else if (ImGui::BeginTable("##pool", 2, ImGuiTableFlags_Borders))
             {
-                ImGui::TableSetupColumn("Resource");
-                ImGui::TableSetupColumn("Quantity");
+                ImGui::TableSetupColumn("Resource", ImGuiTableColumnFlags_WidthStretch);
+                ImGui::TableSetupColumn("Quantity", ImGuiTableColumnFlags_WidthFixed, 90.0f);
                 ImGui::TableHeadersRow();
                 for (std::size_t r = 0; r < resource_count; ++r)
                 {
@@ -228,11 +159,13 @@ void draw_workforce(const world& w, const economy_report& report)
         return;
     }
 
+    // BL-081: the corp@body label stretches, the staffing figure gets a fixed
+    // width, so neither collapses to a single leading character.
     if (ImGui::BeginTable("##workforce", 2,
-            ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingStretchProp))
+            ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
     {
-        ImGui::TableSetupColumn("Corp @ body");
-        ImGui::TableSetupColumn("Staffing");
+        ImGui::TableSetupColumn("Corp @ body", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("Staffing", ImGuiTableColumnFlags_WidthFixed, 150.0f);
         ImGui::TableHeadersRow();
         for (const auto& [key, scalar] : report.workforce_contention)
         {
@@ -293,13 +226,14 @@ void draw_markets(const world& w)
         const market_component& mc = w.markets.at(mid);
         if (ImGui::TreeNodeEx(body_label(w, mc.body).c_str(), ImGuiTreeNodeFlags_DefaultOpen))
         {
-            if (ImGui::BeginTable("##market", 4,
-                    ImGuiTableFlags_Borders | ImGuiTableFlags_SizingStretchProp))
+            // BL-081: resource name stretches; the three numeric columns get fixed
+            // widths so the values stay legible instead of collapsing.
+            if (ImGui::BeginTable("##market", 4, ImGuiTableFlags_Borders))
             {
-                ImGui::TableSetupColumn("Resource");
-                ImGui::TableSetupColumn("Supply");
-                ImGui::TableSetupColumn("Demand");
-                ImGui::TableSetupColumn("Price");
+                ImGui::TableSetupColumn("Resource", ImGuiTableColumnFlags_WidthStretch);
+                ImGui::TableSetupColumn("Supply", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+                ImGui::TableSetupColumn("Demand", ImGuiTableColumnFlags_WidthFixed, 80.0f);
+                ImGui::TableSetupColumn("Price",  ImGuiTableColumnFlags_WidthFixed, 80.0f);
                 ImGui::TableHeadersRow();
                 for (std::size_t r = 0; r < resource_count; ++r)
                 {
@@ -339,9 +273,12 @@ void draw_economy_panel(const world& w,
     ImGui::SetNextWindowSize(ledger_window_size, ImGuiCond_Once);
     ImGui::Begin("Economy", p_open);
 
+    // BL-081: per-building profitability now lives in the Corp Dashboard (BL-074);
+    // the recipe registry is no longer read here.
+    (void)reg;
+
     draw_balance_trend(history);
     draw_balances(w);
-    draw_buildings(w, reg, report);
     draw_workforce(w, report);
     draw_pools(w);
     draw_markets(w);
