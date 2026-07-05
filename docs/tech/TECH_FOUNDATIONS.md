@@ -63,14 +63,14 @@ The simulation runs in two loops:
 
 **In-flight actions at tick boundaries:** entities (supply convoys, construction jobs) carry a fractional progress value that increments each simulation step. Completion is evaluated at the economy tick boundary. The render layer reads progress values for interpolation; it does not modify them.
 
-**Save model:** tick-boundary snapshot. The full simulation state is serialised at each economy tick. This gives clean, deterministic save points that are cheap to implement and straightforward to debug. Manual save is a named copy of the most recent snapshot.
+**Save model:** tick-boundary snapshot (planned). The full simulation state *will be* serialised at each economy tick — giving clean, deterministic save points that are cheap to implement and straightforward to debug; manual save is a named copy of the most recent snapshot. *No save/load path is wired in `world/*` yet* — this describes the intended model, not one that is built.
 
 ### Tile and body data model
 All tiles for a body are **resident in memory simultaneously**. For the prototype — authored bodies, bounded tile counts, no procedural generation — this is the correct approach. Tile data is pure C++ structs packed into a contiguous array per body, accessed by coordinate index in O(1) with no query overhead.
 
 Tile data is **not Lua-scriptable at the per-tile level**. The scripting boundary is at higher levels: building definitions, market rules, faction behaviour. Exposing individual tile callbacks to Lua would introduce performance and complexity costs with no clear gain during the prototype phase.
 
-**Serialisation format: flat binary.** Tile structs are written and read as raw binary. This is the fastest format to implement and the fastest at runtime. The schema is fixed for the prototype; versioning is deferred until the data model stabilises.
+**Serialisation format: flat binary.** Tile structs *will be* written and read as raw binary — the fastest format to implement and the fastest at runtime. The schema is fixed for the prototype. **The first thing to add when the serialiser lands is a leading magic + version header**, so a stale save is rejected rather than silently misread as a changed struct layout (`backlog.json` BL-107); broader versioning is deferred until the data model stabilises.
 
 SQLite is the natural next step if the world grows to the point where bodies cannot all be held in memory, or where querying across tile properties becomes necessary. That decision is deferred deliberately — the data structures must not preclude it, but nothing is built for it now.
 

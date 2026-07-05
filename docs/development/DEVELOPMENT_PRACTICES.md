@@ -6,39 +6,27 @@ This document defines the coding standards, documentation conventions, and testi
 
 ## Testing
 
-The project uses **Catch2** for unit testing.
+Tests are **headless C++ harnesses**, not a unit-test framework. Each `tools/verify/<name>.cpp` is a standalone program that exercises a slice of the SDL/Lua/ImGui-free `world/*` logic and prints `PASS`/`FAIL` lines through its own small `check()`-style assertions, exiting non-zero on any failure. They are built and run by CMake/CTest (`ctest --test-dir build --output-on-failure`, or `check.bat`) and by the CI headless loop (`.github/workflows/build.yml`), which globs every `tools/verify/*.cpp` so a new harness is picked up automatically. *(Catch2 was evaluated as the unit-test framework but **not adopted** — the printf-assert harness pattern needs no dependency and mirrors how the code is actually structured. The `verifier-headless` skill runs a harness on demand.)*
 
-Tests are written alongside the layer they cover, not deferred to the end. Each milestone in `development/ROADMAP.md` should have tests for its core logic before the next begins.
+Tests are written alongside the layer they cover, not deferred to the end. Each milestone in `ROADMAP.md` should have a harness for its core logic before the next begins.
 
 ### What to test
 
-Focus tests on the simulation's pure logic — the parts that transform state deterministically:
+Focus on the simulation's pure, deterministic logic — the parts that transform state — in `world/*` (no SDL/Lua/ImGui):
 
-- Price resolution given a supply/demand ratio
-- Extraction yield given tile properties and workforce scalar
-- Convoy progress accumulation and completion evaluation at tick boundary
-- Budget arithmetic (revenue, outgoings, running balance)
+- Price resolution given a supply/demand ratio (`econ_harness`, `market_clearing`)
+- Extraction yield / workforce-efficiency curves (`workforce_harness`)
+- Convoy progress + persistent trade-route recording at the tick boundary (`trade_routes_harness`)
+- Budget arithmetic, debt, and bankruptcy (`econ_bankruptcy`, `econ_stability`)
+- Generation audits — tile/nation/corp placement legality and world determinism (`world_audit`, `corp_terrain_matrix`, `determinism_harness`)
 
-Do not test rendering, ImGui panels, or SDL3 platform behaviour. These are not unit-testable in a meaningful way and should be validated by observation.
+Do not test rendering, ImGui panels, or SDL3 platform behaviour in a harness — those are not unit-testable in a meaningful way and are validated by observation and by the **visual verification** tier below.
 
-### How Claude handles tests
+### Authoring a harness
 
-Claude will **suggest tests** when writing or reviewing logic, but will not write test files unprompted. When suggesting tests, Claude names the cases worth covering and explains why — the developer writes them. If asked to write a test directly, Claude will do so using Catch2 syntax.
-
-### Catch2 conventions
-
-```cpp
-#include <catch2/catch_test_macros.hpp>
-
-TEST_CASE("market price resolves from supply/demand ratio", "[market]") {
-    SECTION("excess supply drives price below base") { ... }
-    SECTION("excess demand drives price above base") { ... }
-}
-```
-
-- Tag each test with the system it covers in square brackets: `[market]`, `[extraction]`, `[supply]`, `[budget]`
-- One `TEST_CASE` per logical behaviour; use `SECTION` for variations
-- Test names are plain English descriptions of what the code should do, not how it does it
+- One `tools/verify/<name>.cpp` per behaviour; `#include` the `world/*` headers it needs and build a small fixture (usually `make_hard_coded_world()` or a hand-built registry).
+- Print one `PASS`/`FAIL`/`WARN` line per assertion, naming what failed, and `return` non-zero on any hard failure so CTest and the CI loop detect it.
+- Keep it free of SDL/Lua/ImGui so it links against the `world/*` superset (`recipe_registry.cpp` excepted — it pulls sol2/Lua). CMake's `foreach` over `tools/verify/*.cpp` wires each one into `ctest` automatically; name a genuinely new *check class* in the `verifier-headless` skill so it stays discoverable.
 
 ### Visual verification (rendering / lenses)
 
@@ -288,6 +276,23 @@ Work starts on a `feature/*` branch. To cut version `vX.Y.Z`:
 
 Tags are the source of truth — no `previous`/`stable` branch is maintained. Every released
 version is reachable by its tag, not just the most recent one.
+
+### Merge gate — what actually guards `main`
+
+Recorded 2026-07-05 (BL-105). `main` is **not** protected by GitHub branch-protection rules: the
+repository is private on a free plan, where the branch-protection API returns HTTP 403
+(*"Upgrade to GitHub Pro or make this repository public to enable this feature"*). There is
+therefore **no enforced required-check gate** — a push to `main` lands regardless of CI, and the
+Cut process merges the working branch into `main` locally (step 2) and pushes directly, never
+through a PR.
+
+The gate is thus **procedural, not enforced**: CI (`.github/workflows/build.yml` — Linux
+g++-13/g++-14 + the Windows build + the headless-harness tier) runs on every push as the signal,
+and the **pre-Cut local build-green** (step 1 above) is the human gate before a release commit
+lands. Treat a red CI run on `main` as stop-and-fix. To make the gate *enforced* later, either
+make the repo public (branch protection is free for public repos) or move to Pro, then require the
+`linux (g++-13)`, `linux (g++-14)`, and `windows` checks and route Cuts through a PR so the checks
+apply to the release commits.
 
 ## Lua files
 

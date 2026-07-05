@@ -132,18 +132,18 @@ backlog**, or **B) implement now** (smoke-test, then ask before committing).
 | **Active worklist** (promoted tasks) | `docs/development/REFINED.md` | Transient; empty between work blocks. |
 | **Player-intent coverage** (user stories) | `docs/development/user_stories.json` (view: `USER_STORIES.md`) | The second route — intent axis; companion to the backlog, consumed by BL-098's review. |
 | **Method** (lifecycle, depth verbs, batch, worktrees) | `docs/development/DELIVERY.md` | The long-form of this section. |
-| **Requirements** (data + history) | `req/requirements.json` (policy `req/REQUIREMENTS.md`) | |
+| **Requirements** (data + history) | `docs/development/req/requirements.json` (policy `docs/development/req/REQUIREMENTS.md`) | |
 | **Standing invariants** | `.claude/rules/io-standing-rules.md` | Always-on; the "do not" rules. |
 | What was built / why | `docs/development/DEVLOG.md` | |
 
 ### The Delivery lifecycle (Full mode)
 
 0. **Item-spanning requirement (gate — if the item changes `src/`).** Write one requirement
-   covering the whole item in its `req/requirements.json` group (usually a `visual` check), first,
+   covering the whole item in its `docs/development/req/requirements.json` group (usually a `visual` check), first,
    so decomposition is shaped by it. Doc-only items exempt.
 1. **Create tasks** — promote the item into `REFINED.md`: smallest independently-buildable steps
    (foundation first), each scoped to its files, dependencies marked.
-2. **Create requirements** — append the item's requirement group to `req/requirements.json`.
+2. **Create requirements** — append the item's requirement group to `docs/development/req/requirements.json`.
 3. **Plan parallelisation** — build the file **collision map**; it *informs how to split focused
    sub-agents* (see below), no longer gates them.
 4. **Complete tasks** — implement, review, verify against requirements. Blocked/out-of-scope tasks
