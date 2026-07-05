@@ -4611,6 +4611,127 @@
           "notes": "AlwaysAutoResize was tried first but reliably broke the tile build-front-door panel (ImGui edge case) — replaced with per-kind content-fit height in text-line units. Owed on the Linux box: re-bless the minimap-visible goldens invalidated by the lens-bar relocation (not blanket-re-blessed on Windows per the cross-platform-golden-mismatch policy)."
         }
       ]
+    },
+    {
+      "batch": "v0.0.9",
+      "brief": "in-app-system-menu",
+      "title": "BL-070 In-app system menu — corner gear popup (Pause/Resume, Exit Game)",
+      "promoted_from": "backlog.json BL-070 (v0.0.9 polish)",
+      "difficulty": 2,
+      "importance": "B",
+      "status": "complete",
+      "resolved": "2026-07-05",
+      "resolution": "Delivered. A corner gear (hamburger) button top-right, left of the time column, opens a small popup with Pause/Resume (routed through the shared pause_toggle path so popup and Space drive one flag) and Exit Game (inline 'Really quit?' confirm before the destructive quit; there is no save). Esc toggles the same popup and backs out of an armed confirm first. Gear placement + resting affordance golden-verified (v009_gear_and_profile); the popup interior is interaction-gated so it is code-verified.",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "Item-spanning (visual): a gear/hamburger button sits in a screen corner clear of the existing panels; clicking it (or pressing Esc) opens a small session-control popup containing Pause/Resume and Exit Game; Exit arms an inline 'Really quit?' confirm rather than quitting immediately.",
+          "verification": ["visual: scripts/verify/v009_batch.lua golden (v009_gear_and_profile — resting gear placement)", "code: app.cpp popup + Esc handler (interaction-gated interior)"],
+          "notes": "Popup open/close + confirm state cannot be driven by the headless verify API (no click/Esc hook), so the popup interior is code-verified and eyeball-reasoned; the gear affordance and its non-occluding placement are golden-blessed. app.cpp + ui_state.hpp."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "Popup Pause mirrors the Space-hotkey pause (one shared session-control flag, not two): both route through dispatch_action(pause_toggle)/the sim_loop speed-0 + m_prev_speed restore. Esc parity toggles the same popup without building a separate dimmed modal.",
+          "verification": ["code"],
+          "notes": "app.cpp dispatch_action(pause_toggle) reused; handle_key_down Esc branch before the WantCaptureKeyboard guard."
+        }
+      ]
+    },
+    {
+      "batch": "v0.0.9",
+      "brief": "economy-ledger-legibility",
+      "title": "BL-081 Economy ledger legibility — widen balances, drop per-building table, uncramp sibling tables",
+      "promoted_from": "backlog.json BL-081 (v0.0.9 polish)",
+      "difficulty": 2,
+      "importance": "B",
+      "status": "complete",
+      "resolved": "2026-07-05",
+      "resolution": "Delivered. The Corporation-balances table now stretches the name column and fixes the Focus/Balance columns so identity + full balance read (no single-char collapse); the per-building table is removed (per-building profitability is the Corp Dashboard's job, BL-074). Verification surfaced the SAME SizingStretchProp collapse in the sibling Workforce, Stockpile-pools, and Markets tables in the same panel — fixed identically (name/resource column stretches, numeric columns fixed-width), completing the item's stated 'tables cramped… rows unreadable' goal rather than leaving a half-fix. Golden-verified (v009_economy_refit).",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "Item-spanning (visual): the Economy panel's Corporation-balances table shows full corp names and full balance numbers (no single-character cells); the per-building table is gone; and the sibling Workforce/Pools/Markets tables in the same panel are equally legible (no collapsed cells).",
+          "verification": ["visual: scripts/verify/v009_batch.lua golden (v009_economy_refit)"],
+          "notes": "economy_panel.cpp only. The workforce/pools/markets extension beyond the design's balances+buildings scope was made at verification when the identical defect was observed next to the fixed table (same one-file, same-class fix)."
+        }
+      ]
+    },
+    {
+      "batch": "v0.0.9",
+      "brief": "construction-panel-overlap",
+      "title": "BL-082 Construction panel occludes the Selection element during placement",
+      "promoted_from": "backlog.json BL-082 (v0.0.9 polish); companion to BL-071, reconciled with BL-093",
+      "difficulty": 2,
+      "importance": "C",
+      "status": "complete",
+      "resolved": "2026-07-05",
+      "resolution": "Delivered. The Construction panel now takes its spawn geometry from the caller (app), which anchors it top-left like the ledger family but caps its default height so its bottom stays clear of the bottom-left Selection element (top ~ disp.y - margin - mm_h). The BL-071 affordance readout (Thrives/Valid) and the Build front door stay fully visible while a build is armed — the moment they exist for. Reposition, not fold (the fold rescued only the reason line). Golden-verified (v009_construction_no_overlap).",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "Item-spanning (visual): with build mode armed and the Construction panel open, the bottom-left Selection element's BL-071 affordance readout (Thrives/Valid) and Build front door remain visible — the Construction panel no longer overlaps them. Verified against the post-BL-093 layout (Selection owns the full bottom-left corner).",
+          "verification": ["visual: scripts/verify/v009_batch.lua golden (v009_construction_no_overlap)"],
+          "notes": "construction_panel.{hpp,cpp} (caller-supplied spawn_pos/spawn_size) + app.cpp (height-capped anchor). The tile-selection element is content-fit (taller than mm_h) so the cap uses a conservative estimate; the capture confirms the load-bearing affordance/front-door content is clear."
+        }
+      ]
+    },
+    {
+      "batch": "v0.0.9",
+      "brief": "corp-emblem-system",
+      "title": "BL-090 Corp emblem system — shared glyph family + map/selection/hover markers",
+      "promoted_from": "backlog.json BL-090 (v0.0.9 polish)",
+      "difficulty": 3,
+      "importance": "B",
+      "status": "complete",
+      "resolved": "2026-07-05",
+      "resolution": "Delivered. The former profile-card-only draw_corp_emblem is promoted to ui::icons::corp_emblem under the shared (dl, centre, r, shape, colour) contract, with palette::corp_emblem_shape(id) and palette::corp_identity_colour(corp, player) as the single deterministic source of truth for a corp's (shape, colour). Rendered at every corp-identification site for player AND rivals: the profile card, the Selection header, on-canvas building/HQ owner tags, and the rival hover card. body_surface_canvas's corp_identity lambda now delegates to the shared colour helper, so card, markers, canvas tint, and hover agree. Golden-verified (v009_emblem_selection_and_markers); catalogued in ICONS.md.",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "Item-spanning (visual): a corporation's geometric emblem (deterministic shape + identity colour from its entity id) renders consistently on the profile card, the Selection header, and beside on-canvas building markers, for the player and rivals. Golden-verified.",
+          "verification": ["visual: scripts/verify/v009_batch.lua golden (v009_emblem_selection_and_markers, v009_gear_and_profile)"],
+          "notes": "icons.{hpp,cpp}, profile_panel.cpp, body_surface_canvas.cpp, selection_panel.cpp, hover_content.cpp."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "Emblem shape (palette::corp_emblem_shape) and colour (palette::corp_identity_colour) are pure functions of entity ids — no RNG, no time — and the colour is the single source of truth shared with the on-canvas ownership tint (body_surface_canvas's corp_identity lambda delegates to it) so all surfaces agree. corp_colour(0) == player.",
+          "verification": ["code"],
+          "notes": "presentation.{hpp,cpp}. Determinism preserved (multiplicative Knuth hash on the id)."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "The emblem is promoted into the shared ui::icons namespace under the (dl, centre, r, ...) contract and catalogued in ICONS.md; the private profile_panel helper is removed.",
+          "verification": ["code", "visual"],
+          "notes": "icons.{hpp,cpp}, docs/ui/ICONS.md."
+        }
+      ]
+    },
+    {
+      "batch": "v0.0.9",
+      "brief": "activity-hover-line",
+      "title": "BL-100 hover-card body activity line (BL-089 deferral 1 of 2)",
+      "promoted_from": "backlog.json BL-100 (standalone item lifted from BL-089's deferrals on merge to main 2026-07-05)",
+      "difficulty": 1,
+      "importance": "C",
+      "status": "complete",
+      "resolved": "2026-07-05",
+      "resolution": "Delivered one of BL-089's two documented deferrals: the Solar-canvas body hover tooltip now carries a short commercial-activity line keyed on body_activity_visibility (mirroring the Selection panel's draw_activity_section wording), excluding the star. Pure read, no new state. The OTHER deferral — the deterministic proximity 'glimpse' — remains deferred (it needs either a serialised last_glimpse_tick on body_component or orbital back-computation from mutated orbital_angle_rad; disproportionate determinism/save-seam risk for a polish minor). Code-verified (tooltip is hover-gated, not headlessly capturable).",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "The Solar-canvas body hover tooltip appends a short activity line (unknown → outside network; known → active/pulse; known_stale → gone cold; visible → live lane/presence) derived purely from body_activity_visibility; the star gets no activity line, matching draw_activity_section.",
+          "verification": ["code: solar_system_canvas.cpp tooltip (hover-gated; no headless mouse hook)"],
+          "notes": "Pure function of trade_routes + convoys + ownership + tick; no new state/serialisation. Wording aligned with selection_panel draw_activity_section. The proximity-glimpse sibling deferral stays open and recorded in BL-089 + DISCOVERY.md."
+        }
+      ]
     }
   ]
 }

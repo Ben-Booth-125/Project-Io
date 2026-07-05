@@ -219,10 +219,20 @@ renumbered on merge — BL-067/068 supersede them, to avoid a cross-branch colli
 per-session record, and [`../ui/DISCOVERY.md`](../ui/DISCOVERY.md) for the landed discovery-model
 design.
 
-**The active frontier is v0.0.9 — Budget clarity + polish**, reassessed at this scope-review
-point per the note this section used to defer to. With the budget strands already shipped early,
-v0.0.9 is a **lighter polish minor**: no single theme, but a set of open items worth clearing
-before the v0.1.0 audit. Grouped by what they're *for*, not a task list:
+**v0.0.9 — Budget clarity + polish — the polish batch is delivered (2026-07-05).** The five
+promote-ready items landed in one batch: **BL-070** in-app system menu (corner gear popup:
+Pause/Resume + Exit with confirm, Esc parity), **BL-081** economy-ledger legibility (widened
+balances, per-building table dropped, sibling tables un-cramped), **BL-082** construction panel no
+longer occluding the Selection element during placement, **BL-090** the corp-emblem glyph family
+(player + rivals, on card / selection / markers / hover), and **1 of 2 BL-089 deferrals** (the
+hover-card body activity line). Still open toward the cut: the **BL-089 proximity-glimpse** deferral
+(held back — save-seam/determinism cost disproportionate to a polish minor; re-assess at the v0.1.0
+boundary) and **BL-008** (reassessed — no further work). The delivered set is recorded per-item in
+`DEVLOG.md`; what follows is the pre-delivery frame, retained for the boundary-queued items.
+
+With the budget strands already shipped early, v0.0.9 was a **lighter polish minor**: no single
+theme, but a set of open items worth clearing before the v0.1.0 audit. Grouped by what they're
+*for*, not a task list:
 
 - **Reachability & chrome.** An in-app system menu (BL-070, `design-owed`) for Exit/pause without
   the keyboard.

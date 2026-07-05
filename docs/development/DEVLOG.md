@@ -6,6 +6,67 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — v0.0.9 polish batch delivered (2026-07-05)
+
+**Context.** v0.0.9 is the lighter polish minor after the v0.0.8 discovery theme (the budget strands
+had already shipped early into v0.0.8). Batch-delivered the promote-ready polish items. Sub-agents
+were used: three focused agents ran the disjoint UI slices (BL-081, BL-090, BL-089-hover) in the
+shared worktree while the main session did the two `app.cpp`-touching items (BL-070, BL-082) — one
+integrating build, not three, given the Windows dep-override cost.
+
+**Delivered (5 items):**
+- **BL-070** in-app system menu — corner gear (hamburger) button top-right opens a popup with
+  Pause/Resume (shared `pause_toggle` path — one flag with the Space hotkey) and Exit Game (inline
+  "Really quit?" confirm, no save). **Esc** toggles the popup and backs out of an armed confirm
+  first. `app.cpp` + `ui_state.hpp`; MENU.md gained a session-control section.
+- **BL-081** economy-ledger legibility — Corporation-balances table widened (stretch name column +
+  fixed numeric columns; full names + full balances); per-building table dropped (Corp Dashboard
+  owns it, BL-074). **Scope extension made at verification:** the capture showed the *same*
+  `SizingStretchProp` collapse in the sibling **Workforce / Stockpile-pools / Markets** tables of
+  the same panel, so the identical fix was extended to them — completing the item's stated goal
+  rather than shipping a half-fix beside the fixed table. `economy_panel.cpp`; LAYOUT.md.
+- **BL-082** construction-panel overlap — the Construction panel now takes caller-supplied spawn
+  geometry from `app`, anchored top-left but **height-capped** so its bottom clears the bottom-left
+  Selection element; the BL-071 affordance readout + build front door stay visible while a build is
+  armed. Reposition, not fold. Reconciled with the post-BL-093 layout. `construction_panel.{hpp,cpp}`
+  + `app.cpp`; SELECTION.md.
+- **BL-090** corp emblem system — `draw_corp_emblem` promoted to `ui::icons::corp_emblem` under the
+  shared glyph contract; `palette::corp_emblem_shape` + `palette::corp_identity_colour` are the
+  single deterministic source of truth for (shape, colour). Rendered for player **and** rivals on
+  the profile card, Selection header, on-canvas building/HQ owner tags, and the rival hover card;
+  `body_surface_canvas`'s `corp_identity` lambda now delegates to the shared colour helper so all
+  surfaces agree. `icons`/`presentation`/`profile_panel`/`body_surface_canvas`/`selection_panel`/
+  `hover_content`; ICONS.md.
+- **BL-100** (the hover-card body activity line — BL-089 deferral 1 of 2, promoted to a standalone
+  item on merge) — the Solar body tooltip now carries a short activity read keyed on
+  `body_activity_visibility` (star excluded), wording aligned with the Selection panel. Pure read,
+  no new state. Implemented in `solar_system_canvas.cpp` (the tooltip site) not the item's assumed
+  `hover_content.cpp` — body hover is not routed through `draw_hover_content`; a lean one-line tier
+  read rather than the fuller busy/quiet + age spec. Both deviations recorded in the BL-100
+  resolution. DISCOVERY.md.
+
+**Deferred / decisions:**
+- **BL-099 proximity glimpse (BL-089 deferral 2 of 2) — held back.** A faithful implementation needs
+  either a serialised `last_glimpse_tick` on `body_component` (save-seam change) or orbital
+  back-computation from the *mutated* `orbital_angle_rad` (position is not a pure function of tick
+  today, contrary to the mechanic's premise) — disproportionate determinism/serialisation risk for a
+  polish minor. Recorded in BL-099 + BL-089 + DISCOVERY.md § Deferred extensions; re-assess at the
+  v0.1.0 boundary. Stays `designed`/promote-ready.
+- **BL-008 time-control reassessment — no further work.** The countdown/speed-curve shipped in
+  v0.0.8; the reassessment checkpoint concluded nothing further earns a slot here. (Already
+  `complete`; no backlog change.)
+
+**Verification.** Integrating build green (only the pre-existing `IMGUI_DEFINE_MATH_OPERATORS`
+redefinition warnings, in untouched files too). New visual check `scripts/verify/v009_batch.lua`
+authored + 4 goldens blessed on Windows (trustworthy per the v0.0.8+ policy): gear placement +
+profile emblem, selection-header + on-canvas emblems, construction/selection no-overlap, economy
+refit. The BL-070 popup interior and the BL-089 hover tooltip are interaction/hover-gated (no
+headless mouse/menu hook), so those are code-verified with the method recorded honestly in the
+requirement notes. *(Node absent on the Windows box, so `backlog_lint.js` runs on the Linux dev
+box / CI — JSON hand-checked here.)*
+
+---
+
 ## Session — v0.0.8 legibility + fog batch delivered; version record reconciled (2026-07-04)
 
 **Context.** Fresh clone on a new PC (no toolchain). Set up the build, reconciled the skipped

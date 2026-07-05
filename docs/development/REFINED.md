@@ -233,3 +233,23 @@ commercial-sphere fog (`af07ad0`); batch close `d3629a2`; v0.0.8 cut `8540878`. 
 `trade_routes` + `commercial_fog` headless harnesses and blessed visual goldens. Permanent
 record: DEVLOG 2026-07-04, `req/requirements.json`, `docs/ui/DISCOVERY.md`. Summary retained
 one cycle (from 2026-07-04).
+
+---
+
+## v0.0.9 Batch Delivery — polish pass (delivered 2026-07-05) — **COMPLETE**
+
+Five promote-ready polish items delivered in one batch, per-item commits: **BL-070** in-app system
+menu (gear popup — Pause/Resume + Exit-with-confirm, Esc parity), **BL-081** economy-ledger
+legibility (widened balances + dropped per-building table + un-cramped sibling Workforce/Pools/
+Markets tables), **BL-082** construction panel height-capped clear of the bottom-left Selection
+element during placement, **BL-090** corp-emblem glyph family (shared `ui::icons::corp_emblem` +
+`palette::corp_emblem_shape`/`corp_identity_colour`, rendered for player + rivals on card /
+selection header / on-canvas markers / hover), and **BL-089 deferral 1 of 2** (hover-card body
+activity line). Sub-agents ran the three disjoint UI slices (BL-081, BL-090, BL-089-hover); the two
+`app.cpp`-touching items (BL-070, BL-082) stayed in the main session; one integrating build.
+Verified by the new `scripts/verify/v009_batch.lua` (4 Windows-blessed goldens) + build-clean;
+interaction/hover-gated surfaces (BL-070 popup interior, BL-089 tooltip) code-verified.
+**Deferred (recorded, not dropped):** the BL-089 proximity-glimpse peek (save-seam/determinism cost
+disproportionate to a polish minor — re-assess at the v0.1.0 boundary). Permanent record: DEVLOG
+2026-07-05, `req/requirements.json`, backlog resolutions, `docs/ui/{MENU,LAYOUT,SELECTION,ICONS,
+DISCOVERY}.md`. Summary retained one cycle (from 2026-07-05).
