@@ -103,7 +103,7 @@
       ],
       "authority_doc": "docs/ui/LENSES.md",
       "summary": "Static reach surface (deployment/supply falloff from ports/launchpads). Underdefined until the Supply route model exists; may be a Supply sub-mode. Design owed.",
-      "design": "@BACKLOG.md"
+      "design": "**Status:** design-owed (parked, F). No BACKLOG.md body was preserved — the problem statement lives in this item's `summary`. Open: whether this is a standalone lens or a Supply sub-mode, and the reach / supply-falloff model from ports/launchpads. Blocked until the Supply route model exists. Authority docs/ui/LENSES.md; relates to BL-014."
     },
     {
       "id": "BL-014",
@@ -128,7 +128,7 @@
       ],
       "authority_doc": "docs/ui/LENSES.md",
       "summary": "Graph of trade connections between markets, edge thickness/colour from net trade worth. Aggregate edges once per frame. Blocked on inter-market trades existing. Design owed.",
-      "design": "@BACKLOG.md"
+      "design": "**Status:** design-owed (parked, F). No BACKLOG.md body was preserved — see this item's `summary`. Open: how to encode edge worth (thickness/colour from net trade worth) and per-frame edge aggregation. Blocked on inter-market trades existing. Authority docs/ui/LENSES.md; relates to BL-011."
     },
     {
       "id": "BL-015",
@@ -549,7 +549,7 @@
       ],
       "authority_doc": "docs/generation/TILE_GENERATION.md",
       "summary": "Generation-mechanics passes only (deposit data half moved to RESOURCE_GENERATION_FULL_SET): smooth band transitions + coastline refinement (buildable, cosmetic, deferred) and speculative orbital-derivation + tectonic landforms (design owed, beyond v0.1.0).",
-      "design": "@BACKLOG.md"
+      "design": "**Status:** design-owed (parked, F). No BACKLOG.md body was preserved — see this item's `summary`. Generation-mechanics passes only (the deposit-data half moved to BL-040). Open: smooth band transitions + coastline refinement (cosmetic, deferred); speculative orbital-derivation + tectonic landforms (beyond v0.1.0). Authority docs/generation/TILE_GENERATION.md."
     },
     {
       "id": "BL-053",
@@ -571,7 +571,7 @@
       ],
       "authority_doc": "docs/generation/NATION_GENERATION.md",
       "summary": "More countries than today's Voronoi partition, with a sense of history: v0.1.0 target is clustering seeds with a varied size distribution (some larger, some smaller). Couples to SATURATED_SUBSTRATE. Design owed: clustered-seed sizing, what 'in history' means, count target.",
-      "design": "@BACKLOG.md",
+      "design": "**Status:** design-owed (B). No BACKLOG.md body was preserved — see this item's `summary`. v0.1.0 target: more countries via clustered seeds with a varied size distribution. Open: clustered-seed sizing, what 'in history' means, the count target. Couples to the saturated substrate (BL-050). Authority docs/generation/NATION_GENERATION.md.",
       "waits_on": [
         "SATURATED_SUBSTRATE"
       ]
@@ -594,7 +594,7 @@
       ],
       "authority_doc": "docs/generation/NATION_GENERATION.md",
       "summary": "The nation SYSTEM (tax, licences, war, infrastructure), sentiment graph, historical fragmentation (exclaves/disputed zones), non-Kepler jurisdiction. Out of prototype scope; design owed when in scope.",
-      "design": "@BACKLOG.md"
+      "design": "**Status:** design-owed (parked, F) — out of prototype scope. No BACKLOG.md body was preserved — see this item's `summary`. Covers the nation SYSTEM (tax, licences, war, infrastructure), the sentiment graph, historical fragmentation (exclaves/disputed zones), non-Kepler jurisdiction. Design owed when in scope. Authority docs/generation/NATION_GENERATION.md."
     },
     {
       "id": "BL-055",
