@@ -56,8 +56,12 @@ ProjectIo --verify scripts/verify/<name>.lua
   helper" rather than a from-scratch script. Prefer them over raw `set_pan` math.
 - **Capture:** `capture("name")` renders one frame and writes `screenshots/name.png`
   (in-app `SDL_RenderReadPixels` → `write_png_rgba`; nothing leaves the window).
-- **Output:** PNGs for inspection. Golden-image diffing is not yet built — its **tolerance model
-  is now designed** (below); the build stays deferred.
+- **Output:** PNGs for inspection **and automatic pass/fail** — golden-image diffing is **built and
+  shipped** (BL `golden-image-diff`), no longer deferred. Each capture is diffed against its committed
+  reference at `scripts/verify/golden/<name>.png` (note: singular `golden/`); the harness logs
+  `Golden PASS/FAIL <name>: <pct>% differing` and exits non-zero on any fail. Re-bless a golden
+  deliberately with `ProjectIo --verify <script> --bless` (overwrites it — a reviewable diff in
+  version control). The tolerance model below is the **shipped** behaviour.
 
 #### Golden-image diffing — tolerance model (designed 2026-06-15, [F3]; build deferred)
 
@@ -78,6 +82,29 @@ a committed reference. The settled model:
 - **CI decision.** It runs as a **local pre-commit / on-demand** check first, not gated in CI —
   there is no rendering-capable CI runner today. Promotion into CI is a later call once a headless
   GPU/software-raster runner exists; the harness is designed to run identically in both.
+
+#### Golden staleness — shared chrome regresses every capture (observed 2026-07-05)
+
+A golden captures the **whole 1280×720 window**, so it regresses when *shared chrome* changes — the
+profile card, header, or minimap toolbar — **even if the feature under test is untouched**. So a
+change that edits shell chrome staleens **every** golden that shows it, at once. A full sweep on
+2026-07-05 found this concretely: **9 pass / 66 fail / 55 no-golden** across `scripts/verify/*.lua`.
+The 9 passes were exactly the goldens blessed *after* the v0.0.9 chrome cluster (BL-070 system menu,
+BL-080 corp name, BL-085 presence, BL-090 emblem, BL-093 lens-strip relocation), at ≤0.5%; the 66
+failures were pre-cluster goldens whose **only** delta is that chrome (confirmed by eye:
+`survey_planetary_masked` differs *only* in the chrome — the surveyed surface is pixel-identical).
+This is not a cross-platform or capture-timing artefact: if it were, the fresh goldens would fail too.
+Two disciplines follow:
+
+- **Re-bless dependent goldens as part of the chrome change** (DELIVERY step 5), not later — a stale
+  golden hides real regressions behind chrome noise, which is what "66 red" was masking.
+- **The canonical baseline platform is unresolved** — Linux (per memory
+  `cross-platform-golden-mismatch`) vs. this Windows box, where fresh goldens pass ≤0.5%, making
+  Windows-blessing self-consistent. Decide before any bulk re-bless; do **not** blanket `--bless`
+  until then.
+
+The **55 no-golden** captures are a second gap: they render frames but have no committed reference, so
+they enforce nothing — candidates to bless or retire.
 
 This is the standard tool for the `visual` verification class in
 [`req/REQUIREMENTS.md`](req/REQUIREMENTS.md). When a requirement's verification is

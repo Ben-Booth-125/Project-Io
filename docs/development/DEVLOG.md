@@ -6,6 +6,47 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — User-story testing pillar + local tooling + golden-staleness sweep (2026-07-05)
+
+**Context.** Continued the BL-098 user-story work into a testing pillar, installed local scripting
+tooling, and ran the first full visual sweep — which surfaced a systemic golden-staleness gap.
+
+**Delivered.**
+- **User-story catalogue → testing pillar.** Extended `user_stories.json` to 12 stories across all
+  seven prototype clusters, each requirement-linked to `requirements.json` brief slugs, and tagged
+  with a `testing.mode` (manual 3 / auto 6 / mixed 3). Added `tools/session/story_check.js` — a
+  zero-dep linter (companion to `backlog_lint.js`) that validates every story's backlog/requirement
+  traces, enforces that `auto`/`mixed` stories have runnable verification, and reports reverse
+  coverage (shipped player-facing items in no story). `--commands` emits the `ProjectIo --verify`
+  set per story. Commits `7dd3457`, `0752e3b`; pushed to origin.
+- **Local tooling.** Installed Python 3.12.10 + Node 24 (winget, user scope) — the repo's
+  `backlog_lint.js` had only ever run on CI/Linux. First real `json.load` immediately caught a
+  **missing-comma corruption in backlog.json** (BL-100 resolution) that made the file unparseable
+  (fixed). Cleared 5 `backlog_lint` FAILs (dead `@BACKLOG.md` design pointers, BL-011/014/051/053/054
+  → honest inline notes). Commit `99c9394`.
+
+**Finding — golden suite is mostly stale, not broken.** Full sweep of `scripts/verify/*.lua`:
+**9 pass / 66 fail / 55 no-golden**. The 9 passes are exactly the v0.0.9-era goldens (≤0.5%); the 66
+failures are pre-v0.0.9 goldens whose only delta is the shell chrome that changed under them when the
+v0.0.9 cluster (BL-070/080/085/090/093) shipped without a re-bless. Confirmed by eye
+(`survey_planetary_masked` differs only in chrome; the surveyed surface is pixel-identical) — **not**
+cross-platform AA and **not** capture timing (else the fresh goldens would fail too). The `--verify`
+capture path is healthy. Also found **3 dead golden references** in `requirements.json`
+(`market_ledger_dashboard/_warmstart` + `market_boundary_lens` — scripts don't exist; consolidated
+into `market_ledger.lua`/`market_lens.lua`). Headless side is green: **CTest 14/14 pass**.
+
+**Captured to docs.** DEVELOPMENT_PRACTICES § Visual verification: corrected the stale "golden diffing
+not yet built" text (it is built/shipped) and added a "Golden staleness — shared chrome" standing
+note. USER_STORIES.md: a "Relationship to the golden harness" note (stories index goldens, don't copy
+them).
+
+**Open / owed.**
+- **Golden re-bless pass** (66 stale + 55 unblessed) — blocked on deciding the **canonical baseline
+  platform** (Linux per `cross-platform-golden-mismatch` memory vs. this Windows box, where fresh
+  goldens pass ≤0.5%). Not filed as a backlog item yet.
+- Repoint the 3 dead golden references in `requirements.json`.
+- `~/.bashrc` PATH shim for `python`/`node` — harness blocked the profile write; left for the user.
+
 ## Session — Engineering health sweep + audit quick-win batch (2026-07-05)
 
 **Context.** A whole-project review (Docs / Code / Testing / CI / Process) run as a six-lens

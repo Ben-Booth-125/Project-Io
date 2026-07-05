@@ -116,6 +116,16 @@ story actually has something to run (a brief with golden/visual/headless verific
 `verifier-visual` / `verifier-headless` skills). On this Windows box, heed the golden-mismatch caveat
 (pre-v0.0.8 goldens are Linux-blessed — verify by eye, don't blanket re-bless).
 
+**Relationship to the golden harness — not a second copy.** The goldens (`scripts/verify/*.lua`) and
+headless harnesses (`tools/verify/*.cpp`) already form a per-*surface* / per-*feature* regression net.
+Stories don't replace that net — they **index** it by player intent: a golden regresses one surface,
+but a player goal spans several goldens + harnesses, plus a manual judgment ("does the why-not read
+as one thing?") that no golden captures. For a pure `auto` story that maps to a single golden, the
+story is just a friendly label — the distinctive value is in the `manual`/`mixed` stories and in the
+coverage/triage `story_check.js` gives (which goldens back which goal, which are stale, which goals
+have no check). If you never run story-scoped subsets or the coverage gate, the catalogue is overhead
+over the raw golden sweep.
+
 ---
 
 ## Stories
