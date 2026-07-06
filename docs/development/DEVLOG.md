@@ -6,6 +6,50 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — One-question-per-view sweep + corp-dashboard legibility (2026-07-06)
+
+**Context.** Directly after the BL-122 shell skeleton, whose narrow fold-out column was the
+forcing function: with the ledgers squeezed into ~244px, the one-question-per-view sweep
+(BL-117..121) and the corp-table legibility fix (BL-111) had a real reason to land. One
+main-session batch, no fan-out (shared `ui_state.hpp` + `foldout_column`; the verify loop is serial).
+
+**Shared widget.** Factored the Construction panel's inline `nav_button` lambda into a shared
+`ui::nav_button(label, id, view)` in `foldout_column.{hpp,cpp}` — the button-strip tab used because
+`ImGui::BeginTabBar` does not render in this build. Construction refactored onto it.
+
+**BL-117 — economy panel split.** The five stacked `CollapsingHeader` sections became a
+button-strip nav (`ui.economy_view`, persisted) over three single-question views: **Corps** (player
+balance trend + corporation balances + workforce — "how are the corps doing"), **Holdings**
+(stockpile pools — "what do I hold, where"), **Markets** ("what's the market doing"). Each section's
+`CollapsingHeader` became a `SeparatorText` sub-heading. Tightened the Corporation-balances columns
+(Focus 90→72, Balance 90→64) so the stretched name keeps room in the column.
+
+**BL-111 — corp-dashboard legibility.** `corporation_panel.cpp` used `SizingStretchProp` over 6
+columns, which collapsed every column to a leading glyph in the column ('C F H C B S' / 'F T C 9 1
+A'). Dropped it for a 3-column table: **Corporation** (stretch — the identity must win the width),
+**Focus** (fixed 70), **Balance** (fixed 62); dropped Home Nation (reachable via the Selection
+panel), Status (was only Player/Active, carried by the row tint), and building count. Names now read
+~10 chars. This reduction also settles **BL-121** (the panel is now cleanly one question).
+
+**Assessed, no split (BL-118/119/120/121).** Matching Ben's own framing on these — not every panel
+needs a menu. BL-118 Balance Ledger is a single financial read (Treasury/Cashflow/Assets are
+sub-parts, and the cashflow table already adapts). BL-119 Tile Ledger still *floats* (BL-122 kept it
+out of the column), so it isn't width-pressured; its tiles/Buildings/Market are facets of one body
+inspection — revisit at column migration. BL-120 Market Ledger and BL-121 Corporation panel are
+single-purpose already. The honest outcome of an *audit* sweep is that most panels pass.
+
+**Verified.** Rebuilt green; re-blessed `economy_panel` (Corps view), `corp_dashboard` (legible
+3-col table), and `foldout_shell` (economy fold-out now shows the split). The narrow column drove two
+rounds of column-width tightening — the first render still collapsed the corp name to one glyph
+because the fixed columns ate the width; caught on the capture, not in code. No verify API to toggle
+`economy_view`, so Holdings/Markets views (same gated section code) are covered by inspection.
+
+**Files.** `src/ui/foldout_column.{hpp,cpp}` (nav_button), `src/ui/economy_panel.{cpp,hpp}`,
+`src/ui/corporation_panel.cpp`, `src/ui/construction_panel.cpp`, `src/ui/ui_state.hpp`,
+`src/core/app.cpp`; goldens re-blessed. Authority: `docs/ui/LAYOUT.md`.
+
+---
+
 ## Session — BL-122 Paradox-style fold-out shell (skeleton) (2026-07-06)
 
 **Context.** First real playtest of the BL-117..121 one-question-per-view sweep + the

@@ -24,14 +24,6 @@ const char* focus_label(industrial_focus f)
     return "Unknown";
 }
 
-std::string nation_label(const world& w, entity_id nation_id)
-{
-    const auto it = w.nations.find(nation_id);
-    if (it != w.nations.end() && !it->second.name.empty())
-        return it->second.name;
-    return "Nation #" + std::to_string(nation_id);
-}
-
 } // namespace
 
 void draw_corporation_panel(const world& w, ui_state& s, bool& open)
@@ -53,19 +45,25 @@ void draw_corporation_panel(const world& w, ui_state& s, bool& open)
         corps.push_back(id);
     std::sort(corps.begin(), corps.end());
 
+    // BL-111: SizingStretchProp collapsed all six columns to a single leading glyph in
+    // the narrow shell column ('C F H C B S' headers, 'F T C 9 1 A' rows). Apply the
+    // BL-081 pattern — stretch the identity column, fixed widths for the numerics — and
+    // drop the two lowest-value columns so the four that matter fit legibly: Home Nation
+    // is reachable by selecting the corp (Selection panel), and Status was only
+    // Player/Active, already carried by the row tint + name colour. The reduced table is
+    // the single question "how is each corporation doing?" (settles BL-121).
     constexpr ImGuiTableFlags table_flags =
-        ImGuiTableFlags_Borders |
-        ImGuiTableFlags_RowBg   |
-        ImGuiTableFlags_SizingStretchProp;
+        ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg;
 
-    if (ImGui::BeginTable("##corps", 6, table_flags))
+    // In the ~244px shell column the name is the identity and must win the width, so it
+    // stretches while Focus/Balance take tight fixed widths (a generous fixed width here
+    // is exactly what re-collapsed the name to one glyph). Building count is dropped — a
+    // minor stat, still on the Selection panel when a corp is clicked.
+    if (ImGui::BeginTable("##corps", 3, table_flags))
     {
-        ImGui::TableSetupColumn("Corporation");
-        ImGui::TableSetupColumn("Focus");
-        ImGui::TableSetupColumn("Home Nation");
-        ImGui::TableSetupColumn("Cash Balance");
-        ImGui::TableSetupColumn("Buildings");
-        ImGui::TableSetupColumn("Status");
+        ImGui::TableSetupColumn("Corporation", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("Focus",   ImGuiTableColumnFlags_WidthFixed, 70.0f);
+        ImGui::TableSetupColumn("Balance", ImGuiTableColumnFlags_WidthFixed, 62.0f);
         ImGui::TableHeadersRow();
 
         for (entity_id id : corps)
@@ -76,14 +74,11 @@ void draw_corporation_panel(const world& w, ui_state& s, bool& open)
             ImGui::TableNextRow();
 
             if (is_player)
-            {
-                const ImVec4 tint = ImGui::ColorConvertU32ToFloat4(
-                    (palette::selection & 0x00FFFFFFu) | 0x28000000u);
                 ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg0,
                     IM_COL32(255, 255, 255, 40));
-            }
 
-            // Selectable spanning all columns via the first column.
+            // Selectable spanning all columns via the first; selecting routes full
+            // detail (incl. home nation) to the Selection panel.
             ImGui::TableSetColumnIndex(0);
             const bool selected = (s.selected_entity == id);
             if (ImGui::Selectable(cc.name.c_str(), selected,
@@ -97,24 +92,9 @@ void draw_corporation_panel(const world& w, ui_state& s, bool& open)
 
             ImGui::TableSetColumnIndex(2);
             {
-                const std::string nation = nation_label(w, cc.home_nation);
-                ImGui::TextUnformatted(nation.c_str());
-            }
-
-            ImGui::TableSetColumnIndex(3);
-            {
                 const ImU32 col = (cc.balance < 0.0f) ? palette::negative : palette::positive;
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(col), "%.1f", cc.balance);
             }
-
-            ImGui::TableSetColumnIndex(4);
-            ImGui::Text("%d", static_cast<int>(cc.assets.size()));
-
-            ImGui::TableSetColumnIndex(5);
-            if (is_player)
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::pinned), "Player");
-            else
-                ImGui::TextDisabled("Active");
         }
 
         ImGui::EndTable();

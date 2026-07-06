@@ -239,7 +239,27 @@ exempt — it is persistent chrome, not a ledger.
 > is dissolved** — the fold-out column sits entirely left of the Selection element, so the
 > panel can no longer occlude the build front door and needs no caller-supplied spawn.
 
-### Economy-panel table legibility (BL-081)
+### One-question-per-view splits (BL-117 sweep)
+
+Fold-out ledgers with more than one question split their content across a **button-strip nav**
+(`ui::nav_button`, `foldout_column.hpp` — a manual `Selectable`/`Button` strip, since
+`ImGui::BeginTabBar` does not render in this build), each view drawing exclusively. The
+**Construction** panel (Build / Manage / Sell Orders) and the **Economy** panel (Corps / Holdings /
+Markets, `ui_state::economy_view`) use this. The **Balance**, **Market**, **Corporation**, and (still-
+floating) **Tile** ledgers were audited and found to be single-question already — no split. The
+principle is *one question per view, a menu to move between views* — not a mandate to split every
+panel.
+
+### Economy-panel table legibility (BL-081, BL-111, BL-117)
+
+The Corporations dashboard (`corporation_panel.cpp`) and the economy tables were retuned for the
+narrow shell column: in ~244px a `SizingStretchProp` multi-column table collapses every column to a
+leading glyph, so the **identity column stretches and the numeric columns take tight fixed widths**
+(the BL-081 pattern), and low-value columns are dropped rather than clipped (the corp dashboard shows
+Corporation / Focus / Balance; Home Nation and Status moved to the Selection panel / row tint).
+Original BL-081 note follows.
+
+
 
 The Economy panel's tables use a **stretch name/resource column + fixed-width numeric columns**
 (not `SizingStretchProp`, which collapsed cells to a leading glyph — the balances column read

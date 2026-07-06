@@ -154,6 +154,22 @@ intended forcing function) and the Tile Ledger migration (still floats). Permane
 
 ---
 
+## One-question-per-view sweep + corp legibility (promoted from backlog.json § BL-117/111/118/119/120/121) — **COMPLETE**
+
+Delivered 2026-07-06 in one main-session batch right after BL-122, no fan-out (shared `ui_state.hpp`
++ `foldout_column` hotspots; the visual-verify loop is serial). **Real code changes (2):** BL-117 —
+economy panel split into Corps / Holdings / Markets via a new shared `ui::nav_button` (Construction
+refactored onto it), `ui.economy_view` persists the view; BL-111 — Corporations table dropped
+`SizingStretchProp` for a 3-col stretch-name + tight fixed Focus/Balance (also tightened the economy
+Corps view's balances columns for the narrow column). **Assessed, no split (4)** — matching Ben's own
+framing: BL-118 (Balance Ledger is one financial read), BL-119 (Tile Ledger floats, not
+width-pressured — deferred to column migration), BL-120 (Market Ledger single-purpose), BL-121
+(Corporation panel single-question after BL-111). Build green; goldens re-blessed (economy_panel,
+corp_dashboard, foldout_shell). Requirements `one-question-per-view-sweep` R1–R5 complete. Permanent
+record: DEVLOG 2026-07-06, `docs/ui/LAYOUT.md`. Summary retained one cycle.
+
+---
+
 ## Dividing work across agents & authoring tasks
 
 This is the method used to promote an item and (optionally) fan it out to

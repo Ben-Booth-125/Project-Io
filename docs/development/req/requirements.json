@@ -4926,6 +4926,60 @@
           "notes": "Selection left edge moved; its BL-093 content-height path untouched."
         }
       ]
+    },
+    {
+      "batch": "2026-07-06-one-question-sweep",
+      "brief": "one-question-per-view-sweep",
+      "title": "BL-117..121 one-question-per-view sweep + BL-111 corp-dashboard legibility",
+      "promoted_from": "backlog.json BL-117/BL-118/BL-119/BL-120/BL-121/BL-111 (2026-07-06, after BL-122 shell)",
+      "difficulty": 2,
+      "importance": "B",
+      "evaluated_difficulty": 2,
+      "status": "complete",
+      "resolved": "2026-07-06",
+      "resolution": "Sweep delivered. Real code changes: BL-117 (economy panel → Corps/Holdings/Markets button-strip via a new shared ui::nav_button, Construction refactored onto it) and BL-111 (Corporations table 6-col SizingStretchProp collapse → 3-col stretch-name + tight fixed Focus/Balance; also tightened the economy Corps view's balances columns for the narrow column). Assessed as already single-question (no split — matching Ben's own framing): BL-118 (Balance Ledger = one financial read; Treasury/Cashflow/Assets are sub-parts), BL-119 (Tile Ledger still floats, not width-pressured; tiles/Buildings/Market are facets of one body inspection — revisit at column migration), BL-120 (Market Ledger single-purpose), BL-121 (Corporation panel single-question after BL-111's reduction). Build green; goldens re-blessed (economy_panel, corp_dashboard, foldout_shell).",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "BL-117: the Economy panel splits its five stacked CollapsingHeader sections into a button-strip nav (shared ui::nav_button, Construction template) with single-question views — Corps (balance trend + corporation balances + workforce), Holdings (stockpile pools), Markets — each drawing exclusively; the panel_view persists in ui_state. Legible inside the narrow fold-out column.",
+          "verification": ["visual: scripts/verify/economy_panel.lua", "code"],
+          "result_metric": "economy_panel_overview golden re-blessed: Corps/Holdings/Markets strip, Corps view shows trend + balances + workforce, all legible in the column. ui.economy_view persists. nav_button shared into foldout_column; construction_panel refactored onto it.",
+          "notes": "Holdings/Markets views are the same section code gated by the switch (identical to Construction's proven strip); no verify API to toggle the view, so only the default Corps view is captured."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "BL-111: the Corporations panel (corporation_panel.cpp) table no longer collapses every column to a single character ('C F H C B S'); it uses the BL-081 pattern (stretch identity column + fixed-width numeric columns) so corp name and figures read at a glance in the column.",
+          "verification": ["visual: scripts/verify/corp_dashboard.lua", "code"],
+          "result_metric": "corp_dashboard golden re-blessed: Corporation | Focus | Balance, names show ~10 chars (Faros-Yele, Corix Indu, FararAthar), focus + balance fully legible. Dropped SizingStretchProp + Home Nation/Status/Bld columns.",
+          "notes": "In ~244px, 6 columns cannot be legible; name (identity) wins the stretch, secondary columns dropped (reachable via Selection)."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "BL-118: the Balance Ledger splits its three SeparatorText sections (Treasury, Cashflow last tick, Assets) into button-strip views (or confirms a single coherent question), each drawing exclusively, legible in the column.",
+          "verification": ["code"],
+          "result_metric": "Assessed: single question ('how is this corp's money doing'). Treasury=balance, Cashflow=breakdown+runway, Assets=one-line footnote are sub-parts of one financial read; the cashflow table's 2 stretch columns already adapt to the column. No button-strip — a split would be over-engineering.",
+          "notes": "No code change; matches Ben's 'arguably one question' note."
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "requirement": "BL-119: the Tile Ledger's Buildings vs Market sections are assessed as one question or two; if two, split via button-strip nav. (Tile Ledger still floats — not in the fold-out column.)",
+          "verification": ["code"],
+          "result_metric": "Assessed: the Tile Ledger still floats (BL-122 kept it out of the column), so it is not width-pressured; its tiles table + Buildings + Market are facets of one 'inspect this body' activity. No split now; revisit if/when it migrates into the column.",
+          "notes": "No code change; deferred to the Tile Ledger column migration."
+        },
+        {
+          "id": "R5",
+          "status": "complete",
+          "requirement": "BL-120 + BL-121: the Market Ledger and the Corporation panel are confirmed already single-question (no internal CollapsingHeader/SeparatorText stacking beyond one concern); recorded as verified, with any minor label/heading tweak applied. No forced split where the panel is already single-purpose.",
+          "verification": ["code", "visual"],
+          "result_metric": "Confirmed. Market Ledger: body selector -> markets on body -> price/supply/demand — single purpose, no stacking. Corporation panel: single question after BL-111's column reduction. No forced split.",
+          "notes": ""
+        }
+      ]
     }
   ]
 }
