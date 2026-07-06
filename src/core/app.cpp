@@ -790,6 +790,109 @@ int app::run_verify(const std::string& script_path, bool bless)
                     br.active ? "active" : "idle");
     });
 
+    // Data export (verify harness): write the live economy to a set of CSV files for
+    // external analysis / ledger mock-ups (e.g. Power BI). Read-only — run after
+    // econ_step(N) to snapshot the world. Writes corporations / stockpiles / markets /
+    // cashflow / workforce / buildings plus the player balance-trend time series. Names
+    // are quoted; the world is deterministic so the export is reproducible. See
+    // scripts/verify/export_mockdata.lua.
+    v.set_function("export_data", [this](const std::string& dir) {
+        std::error_code ec;
+        std::filesystem::create_directories(dir, ec);
+        const auto path = [&](const char* name) { return dir + "/" + name; };
+        const auto corp_name = [this](entity_id id) -> std::string {
+            const auto it = m_world.corporations.find(id);
+            return it != m_world.corporations.end() ? it->second.name
+                                                    : "corp#" + std::to_string(id);
+        };
+        const auto body_name = [this](entity_id id) -> std::string {
+            const auto it = m_world.bodies.find(id);
+            return it != m_world.bodies.end() ? it->second.name
+                                              : "body#" + std::to_string(id);
+        };
+        const auto focus_name = [](industrial_focus f) {
+            return f == industrial_focus::extraction ? "Extraction"
+                 : f == industrial_focus::processing ? "Processing" : "Trade";
+        };
+
+        // corporations.csv — one row per corp: identity + solvency.
+        {
+            std::ofstream f(path("corporations.csv"));
+            f << "corp_id,name,focus,home_nation,balance,starting_capital,since_start,buildings\n";
+            for (const auto& [cid, cc] : m_world.corporations)
+            {
+                std::string nation = "-";
+                const auto nit = m_world.nations.find(cc.home_nation);
+                if (nit != m_world.nations.end()) nation = nit->second.name;
+                f << cid << ",\"" << cc.name << "\"," << focus_name(cc.focus) << ",\"" << nation
+                  << "\"," << cc.balance << "," << cc.starting_capital << ","
+                  << (cc.balance - cc.starting_capital) << "," << cc.assets.size() << "\n";
+            }
+        }
+        // stockpiles.csv — one row per (corp, body, resource) with stock > 0.
+        {
+            std::ofstream f(path("stockpiles.csv"));
+            f << "corp_id,corp_name,body_id,body_name,resource,quantity\n";
+            for (const auto& [key, pool] : m_world.corp_body_pools)
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    if (pool.quantities[r] > 0.0f)
+                        f << key.first << ",\"" << corp_name(key.first) << "\"," << key.second
+                          << ",\"" << body_name(key.second) << "\","
+                          << ui::resource_name(static_cast<resource_type>(r)) << ","
+                          << pool.quantities[r] << "\n";
+        }
+        // markets.csv — one row per (body, tradeable resource).
+        {
+            std::ofstream f(path("markets.csv"));
+            f << "body_id,body_name,resource,supply,demand,price,base_price\n";
+            for (const auto& [mid, mc] : m_world.markets)
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    if (mc.base_price[r] > 0.0f)
+                        f << mc.body << ",\"" << body_name(mc.body) << "\","
+                          << ui::resource_name(static_cast<resource_type>(r)) << ","
+                          << mc.supply[r] << "," << mc.demand[r] << "," << mc.price[r] << ","
+                          << mc.base_price[r] << "\n";
+        }
+        // cashflow.csv — last tick's itemised per-corp budget (the Balance Ledger data).
+        {
+            std::ofstream f(path("cashflow.csv"));
+            f << "corp_id,corp_name,income,expenditure,maintenance,wages,interest,net\n";
+            for (const auto& [cid, bud] : m_last_econ_report.budgets)
+                f << cid << ",\"" << corp_name(cid) << "\"," << bud.income << ","
+                  << bud.expenditure << "," << bud.maintenance << "," << bud.wages << ","
+                  << bud.interest << "," << bud.net() << "\n";
+        }
+        // workforce.csv — per (corp, body) labour staffing this tick (100 = fully staffed).
+        {
+            std::ofstream f(path("workforce.csv"));
+            f << "corp_id,corp_name,body_id,body_name,staffing_pct\n";
+            for (const auto& [key, scalar] : m_last_econ_report.workforce_contention)
+                f << key.first << ",\"" << corp_name(key.first) << "\"," << key.second
+                  << ",\"" << body_name(key.second) << "\"," << (scalar * 100.0f) << "\n";
+        }
+        // buildings.csv — per-building output + run state this tick.
+        {
+            std::ofstream f(path("buildings.csv"));
+            f << "building_id,corp_id,corp_name,body_name,type,output,active,exhausted\n";
+            for (const building_report& br : m_last_econ_report.buildings)
+                f << br.building << "," << br.corp << ",\"" << corp_name(br.corp) << "\",\""
+                  << body_name(br.body) << "\"," << ui::building_type_name(br.type) << ","
+                  << br.output_quantity << "," << (br.active ? 1 : 0) << ","
+                  << (br.exhausted ? 1 : 0) << "\n";
+        }
+        // player_timeseries.csv — the player corp's balance / income / expenditure per
+        // econ tick (the trend series the header + economy panel already accumulate).
+        {
+            std::ofstream f(path("player_timeseries.csv"));
+            f << "tick,balance,income,expenditure\n";
+            for (std::size_t i = 0; i < m_balance_history.size(); ++i)
+                f << i << "," << m_balance_history[i] << ","
+                  << (i < m_income_history.size() ? m_income_history[i] : 0.0f) << ","
+                  << (i < m_expenditure_history.size() ? m_expenditure_history[i] : 0.0f) << "\n";
+        }
+        SDL_Log("export_data: wrote 7 CSVs to %s", dir.c_str());
+    });
+
     // Diagnostic: log every corporation building's grid position and owner so a
     // script author (or Claude) can aim the pan/zoom at the corporate tiles.
     v.set_function("log_buildings", [this]() {
