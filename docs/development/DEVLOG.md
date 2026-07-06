@@ -6,6 +6,53 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — BL-122 Paradox-style fold-out shell (skeleton) (2026-07-06)
+
+**Context.** First real playtest of the BL-117..121 one-question-per-view sweep + the
+Construction-panel redesign prompted Ben to reorganise the whole shell Paradox-style. Backlog audit
+first (A/B triage; also fixed `tools/status.ps1` to show the snake_case `short_name` beside each id),
+then a design pass on BL-122 settling its seven open questions, then delivery of the **skeleton** —
+scope Ben confirmed as the outer shell only, with the per-panel splits reassessed after.
+
+**Design decisions (locked via Q&A).** *Rail left, panel right* — the existing 56 px icon rail stays,
+each slot folds its ledger out into the `[56, W]` column to its right (one rail, not two). Column
+width `W = clamp(round(0.17·disp.x), 300, 360)` computed at **runtime** from DisplaySize (the
+display-robustness fix; the 300 px floor is the forcing function for BL-117..121). Accordion reused
+as-is (`nav_pane::close_all_panels` already enforced one-at-a-time). Manual `Selectable` strip, not
+`BeginTabBar` (confirmed non-rendering this build). Instant snap, no animation. Tile Ledger stays
+floating (its migration deferred).
+
+**Key simplification.** Because Selection now starts at `x = W` (right of the column) and the fold-out
+lives entirely in `[56, W]`, the two never overlap — so the column needs no bottom-clearance
+coordination and the **BL-082 Construction height-cap dissolves** entirely.
+
+**Build.** New `src/ui/foldout_column.{hpp,cpp}`: `shell_column_width`, `foldout_column_rect` (right
+of the rail, below the identity tile, to the bottom margin — pure function of DisplaySize), and
+`foldout_begin`/`foldout_end` (one pinned borderless window at the rect). The five named ledgers
+(Economy, Market, Balance, Corporations, Construction) swapped their floating `ImGui::Begin` +
+`ledger_window_spawn`/`size` for `foldout_begin`/`end` (mechanical End→foldout_end on every
+early-return path); `construction_panel` dropped its BL-082 `spawn_pos`/`spawn_size` params.
+`profile_panel` widened to `W` (with `profile_panel_width` retargeted to the still-floating Tile
+Ledger's spawn anchor). `app.cpp`: `header_left` and selection `left_x` → `shell_column_width(disp.x)`,
+BL-082 anchor block deleted. Build green (only unrelated sol2 warnings).
+
+**Verified.** `scripts/verify/foldout_shell.lua` — 3 goldens blessed @1280×720: bare shell (widened
+identity tile + rail + header/Selection starting at `x = W`, canvas through the `[56, W]` body),
+Construction folded out, Economy folded out with Construction closed (accordion swap). The 1920×1080
+case shares the `shell_column_width` path (W≈326); the harness window is fixed 1280×720 so it is not
+separately captured. Requirements `foldout-shell-skeleton` R1–R4 complete.
+
+**Known/deferred (as designed).** Economy panel tables are cramped in the ~244 px column (corp-name
+column clipped to ~3 chars) — the intended trigger for the **BL-117** one-question split, which will
+re-host each panel's settled views inside this same column. Tile Ledger migration and BL-118..121
+remain. Not committed yet: the earlier `tools/status.ps1` `short_name` tweak (separate Light fix).
+
+**Files.** `src/ui/foldout_column.{hpp,cpp}` (new), `src/ui/{profile_panel,economy_panel,market_ledger,
+balance_ledger,corporation_panel,construction_panel}.{cpp,hpp}`, `src/core/app.cpp`,
+`scripts/verify/foldout_shell.lua` (+ 3 goldens). Authority: `docs/ui/LAYOUT.md`.
+
+---
+
 ## Session — Corp starting resource stockpile: fixed give → generated (2026-07-06)
 
 **Context.** "Players need to start with a stockpile of resources" (Ben) — heading into v0.1.0

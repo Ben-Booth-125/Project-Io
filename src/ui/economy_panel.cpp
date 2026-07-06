@@ -2,7 +2,7 @@
 
 #include "format.hpp"
 #include "icons.hpp"
-#include "ledger_chrome.hpp" // shared ledger-window size + spawn anchor
+#include "foldout_column.hpp" // shell fold-out column host (BL-122)
 #include "plot_history.hpp"
 #include "presentation.hpp"
 
@@ -278,10 +278,9 @@ void draw_economy_panel(const world& w,
     if (p_open && !*p_open)
         return;
 
-    // Shared ledger-window chrome (docs/ui/LAYOUT.md § Uniform ledger-window chrome).
-    ImGui::SetNextWindowPos(ledger_window_spawn, ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ledger_window_size, ImGuiCond_Once);
-    ImGui::Begin("Economy", p_open);
+    // Re-hosted into the shell fold-out column (BL-122): pinned + borderless, no floating
+    // spawn. Closing is via the nav rail (accordion), not a title-bar 'x'.
+    ui::foldout_begin("Economy");
 
     // BL-081: per-building profitability now lives in the Corp Dashboard (BL-074);
     // the recipe registry is no longer read here.
@@ -293,7 +292,7 @@ void draw_economy_panel(const world& w,
     draw_pools(w);
     draw_markets(w);
 
-    ImGui::End();
+    ui::foldout_end();
 }
 
 } // namespace ui

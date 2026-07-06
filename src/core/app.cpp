@@ -19,7 +19,7 @@
 #include "ui/fonts.hpp"
 #include "ui/format.hpp"
 #include "ui/header_panel.hpp"
-#include "ui/ledger_chrome.hpp" // ledger_window_spawn/size — construction-panel anchor (BL-082)
+#include "ui/foldout_column.hpp" // shell_column_width — permanent left shell column (BL-122)
 #include "ui/nav_pane.hpp"
 #include "ui/overlay.hpp"
 #include "ui/presentation.hpp"
@@ -1445,11 +1445,11 @@ void app::render()
     // Corporation profile — top-left corner, above the navigation pane.
     ui::draw_profile_panel(m_world);
 
-    // Budget + resource header — spans the top between the profile and the
-    // time column, clear of both. Starts at the profile's right edge (the profile
-    // keeps its own width, wider than the narrow icon nav rail below it).
+    // Budget + resource header — spans the top between the identity tile and the
+    // time column, clear of both. Starts at the shell column's right edge (x = W):
+    // the identity tile / balance bar / Selection all clear the same permanent W (BL-122).
     {
-        const float header_left  = ui::profile_panel_width;
+        const float header_left  = ui::shell_column_width(disp.x);
         const float header_right = (disp.x - margin - tick_w) - margin;
         ui::draw_header_panel(m_world, m_balance_history, header_left, header_right);
     }
@@ -1471,32 +1471,22 @@ void app::render()
         const ui::player_plot_history phist{m_balance_history, m_income_history, m_expenditure_history};
         ui::draw_economy_panel(m_world, m_registry, m_last_econ_report, phist, &m_ui.show_economy_panel);
     }
-    // Construction panel (BL-082): anchored top-left like the ledger family, but its
-    // default height is capped so its bottom stays clear of the bottom-left Selection
-    // element (top ~ disp.y - margin - mm_h). The panel used to spawn 600px tall and
-    // occlude the BL-071 affordance readout + build-reject reason exactly when the
-    // player reads them during placement. Movable/resizable after first open.
-    {
-        const ImVec2 spawn   = ui::ledger_window_spawn;
-        const float  sel_top = disp.y - margin - mm_h;
-        const float  avail_h = sel_top - margin - spawn.y;
-        const ImVec2 size{ ui::ledger_window_size.x,
-                           std::max(220.0f, std::min(ui::ledger_window_size.y, avail_h)) };
-        ui::draw_construction_panel(m_world, m_registry, m_ui,
-                                    &m_ui.show_construction_panel, spawn, size);
-    }
+    // Construction panel — now an ordinary fold-out tab in the shell column (BL-122).
+    // The BL-082 height-cap that kept the old floating window clear of the bottom-left
+    // Selection element is gone: the column sits entirely left of Selection (x < W),
+    // so there is no occlusion to avoid.
+    ui::draw_construction_panel(m_world, m_registry, m_ui, &m_ui.show_construction_panel);
     ui::draw_market_ledger(m_world, m_ui, m_market_history, m_ui.show_market_ledger);
     ui::draw_balance_ledger(m_world, m_last_econ_report, m_balance_history, m_ui.show_balance_ledger);
     ui::draw_corporation_panel(m_world, m_ui, m_ui.show_corporation_panel);
 
-    // Selection info element — pinned bottom-left, now owning the whole bottom-left
-    // corner (BL-093): the lens strip moved onto the minimap, so the element drops
-    // down to the very bottom margin and stands taller. It spans the gap between the
-    // nav pane and the bottom-right minimap (right edge = minimap's left edge less a
-    // margin). Height matches the minimap box plus the reclaimed strip band so the
-    // two read as a pair. Hidden until the player selects an entity. See SELECTION.md.
+    // Selection info element — pinned bottom-left, anchored at the bottom margin
+    // (BL-093 content-height sizing preserved). Since BL-122 its left edge is the shell
+    // column's right edge (x = W) rather than the narrow nav rail, so it clears the
+    // fold-out column permanently; its right edge is the minimap's left edge less a
+    // margin. Hidden until the player selects an entity. See SELECTION.md.
     ui::draw_selection_panel(m_world, m_registry, m_last_econ_report, m_ui,
-                             ui::nav_pane_width,
+                             ui::shell_column_width(disp.x),
                              mm_origin.x - margin,
                              disp.y - margin,
                              mm_h);

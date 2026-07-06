@@ -1,6 +1,6 @@
 #include "corporation_panel.hpp"
 
-#include "ledger_chrome.hpp"
+#include "foldout_column.hpp" // shell fold-out column host (BL-122)
 #include "presentation.hpp"
 
 #include <imgui.h>
@@ -39,12 +39,10 @@ void draw_corporation_panel(const world& w, ui_state& s, bool& open)
     if (!open)
         return;
 
-    ImGui::SetNextWindowSize(ledger_window_size, ImGuiCond_Once);
-    ImGui::SetNextWindowPos(ledger_window_spawn, ImGuiCond_Once);
-
-    if (!ImGui::Begin("Corporations", &open))
+    // Re-hosted into the shell fold-out column (BL-122); closed via the nav rail.
+    if (!ui::foldout_begin("Corporations"))
     {
-        ImGui::End();
+        ui::foldout_end();
         return;
     }
 
@@ -125,7 +123,7 @@ void draw_corporation_panel(const world& w, ui_state& s, bool& open)
     ImGui::Separator();
     ImGui::TextDisabled("Corporations: %d", static_cast<int>(w.corporations.size()));
 
-    ImGui::End();
+    ui::foldout_end();
 }
 
 } // namespace ui

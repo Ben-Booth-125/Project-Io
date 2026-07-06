@@ -1,6 +1,6 @@
 #include "balance_ledger.hpp"
 
-#include "ledger_chrome.hpp"
+#include "foldout_column.hpp" // shell fold-out column host (BL-122)
 #include "presentation.hpp"
 
 #include <imgui.h>
@@ -44,12 +44,10 @@ void draw_balance_ledger(const world& w, const economy_report& report,
     if (!open)
         return;
 
-    ImGui::SetNextWindowPos(ledger_window_spawn, ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ledger_window_size, ImGuiCond_Once);
-
-    if (!ImGui::Begin("Balance Ledger", &open))
+    // Re-hosted into the shell fold-out column (BL-122); closed via the nav rail.
+    if (!ui::foldout_begin("Balance Ledger"))
     {
-        ImGui::End();
+        ui::foldout_end();
         return;
     }
 
@@ -89,7 +87,7 @@ void draw_balance_ledger(const world& w, const economy_report& report,
     if (cit == w.corporations.end())
     {
         ImGui::TextDisabled("No corporation data.");
-        ImGui::End();
+        ui::foldout_end();
         return;
     }
 
@@ -214,7 +212,7 @@ void draw_balance_ledger(const world& w, const economy_report& report,
     ImGui::SeparatorText("Assets");
     ImGui::Text("Buildings owned: %d", static_cast<int>(cc.assets.size()));
 
-    ImGui::End();
+    ui::foldout_end();
 }
 
 } // namespace ui

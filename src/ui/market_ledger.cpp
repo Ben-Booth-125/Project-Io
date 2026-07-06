@@ -1,6 +1,6 @@
 #include "market_ledger.hpp"
 
-#include "ledger_chrome.hpp"
+#include "foldout_column.hpp" // shell fold-out column host (BL-122)
 #include "plot_history.hpp"
 #include "presentation.hpp"
 
@@ -53,19 +53,17 @@ void draw_market_ledger(const world& w, const ui_state& /*s*/,
     if (!open)
         return;
 
-    ImGui::SetNextWindowPos(ledger_window_spawn, ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ledger_window_size, ImGuiCond_Once);
-
-    if (!ImGui::Begin("Market Ledger", &open))
+    // Re-hosted into the shell fold-out column (BL-122); closed via the nav rail.
+    if (!ui::foldout_begin("Market Ledger"))
     {
-        ImGui::End();
+        ui::foldout_end();
         return;
     }
 
     if (w.markets.empty())
     {
         ImGui::TextDisabled("No markets.");
-        ImGui::End();
+        ui::foldout_end();
         return;
     }
 
@@ -104,7 +102,7 @@ void draw_market_ledger(const world& w, const ui_state& /*s*/,
     if (body_markets.empty())
     {
         ImGui::TextDisabled("No markets on this body.");
-        ImGui::End();
+        ui::foldout_end();
         return;
     }
 
@@ -168,7 +166,7 @@ void draw_market_ledger(const world& w, const ui_state& /*s*/,
     // --- Detail: selected market's per-resource table ---
     if (w.markets.find(selected_market) == w.markets.end())
     {
-        ImGui::End();
+        ui::foldout_end();
         return;
     }
 
@@ -295,7 +293,7 @@ void draw_market_ledger(const world& w, const ui_state& /*s*/,
         }
     }
 
-    ImGui::End();
+    ui::foldout_end();
 }
 
 } // namespace ui

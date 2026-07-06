@@ -14,9 +14,13 @@ namespace ui {
 /// @param w World — read for the player corporation and its home nation.
 void draw_profile_panel(const world& w);
 
-/// Width of the profile panel in pixels. The profile keeps its own width — wide
-/// enough for the portrait and name — independent of the narrow icon nav rail
-/// below it. Exposed so the header can start at the profile's right edge.
+/// Legacy profile width, retained as the **floating-ledger spawn anchor** only
+/// (`ledger_chrome.hpp` seeds `ledger_window_spawn` off it, for the still-floating
+/// Tile Ledger). Since BL-122 the profile/identity tile takes the full shell-column
+/// width `shell_column_width(disp.x)` (foldout_column.hpp), not this constant, and the
+/// header starts at that same column edge — so this no longer describes the profile's
+/// width. Superseded for layout; kept until the Tile Ledger migrates off the floating
+/// spawn.
 inline constexpr float profile_panel_width = 200.0f;
 
 /// Height of the profile panel in pixels. Exposed so the navigation pane can

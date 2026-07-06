@@ -1,4 +1,5 @@
 #include "profile_panel.hpp"
+#include "foldout_column.hpp"
 #include "icons.hpp"
 #include "presentation.hpp"
 
@@ -55,8 +56,12 @@ const char* focus_label(industrial_focus f)
 
 void draw_profile_panel(const world& w)
 {
+    // The identity tile caps the permanent left shell column (BL-122): it takes the
+    // column's full width W, computed at runtime from the display so it stays legible
+    // across resolutions. The balance bar and Selection element clear the same W.
+    const float width = shell_column_width(ImGui::GetIO().DisplaySize.x);
     ImGui::SetNextWindowPos({0.0f, 0.0f});
-    ImGui::SetNextWindowSize({profile_panel_width, profile_panel_height});
+    ImGui::SetNextWindowSize({width, profile_panel_height});
 
     constexpr ImGuiWindowFlags flags =
         ImGuiWindowFlags_NoTitleBar          |

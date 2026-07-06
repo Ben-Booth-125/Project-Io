@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-#include "ledger_chrome.hpp" // shared ledger-window size + spawn anchor
+#include "foldout_column.hpp" // shell fold-out column host (BL-122)
 #include "presentation.hpp"
 #include "ui_state.hpp"
 
@@ -382,19 +382,15 @@ void draw_sell_orders_section(const world& w, const recipe_registry& reg, ui_sta
 void draw_construction_panel(world& w,
                              const recipe_registry& reg,
                              ui_state& state,
-                             bool* p_open,
-                             ImVec2 spawn_pos,
-                             ImVec2 spawn_size)
+                             bool* p_open)
 {
     if (p_open && !*p_open)
         return;
 
-    // Caller-supplied spawn (BL-082): app anchors the panel clear of the bottom-left
-    // Selection element so the BL-071 affordance readout + reject reason stay visible
-    // while a build is armed. Movable/resizable after first open (ImGuiCond_Once).
-    ImGui::SetNextWindowPos(spawn_pos, ImGuiCond_Once);
-    ImGui::SetNextWindowSize(spawn_size, ImGuiCond_Once);
-    ImGui::Begin("Construction", p_open);
+    // Re-hosted into the shell fold-out column (BL-122): pinned + borderless, no floating
+    // spawn. The BL-082 height-cap that kept the old floating window clear of the
+    // bottom-left Selection element is gone — the column sits entirely left of Selection.
+    ui::foldout_begin("Construction");
 
     int& view = state.construction.panel_view;
     auto nav_button = [&](const char* label, int id) {
@@ -432,7 +428,7 @@ void draw_construction_panel(world& w,
             break;
     }
 
-    ImGui::End();
+    ui::foldout_end();
 }
 
 } // namespace ui

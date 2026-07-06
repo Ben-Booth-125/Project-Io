@@ -37,10 +37,33 @@ The explorer is **not yet implemented** — it is specified here ahead of the wo
 
 ---
 
-## Profile — top-left
+## The shell column (BL-122)
+
+Since **BL-122** the left edge is a single **permanent shell column** of width
+`W = clamp(round(0.17 · display_width), 300, 360)` px (`ui::shell_column_width`,
+`src/ui/foldout_column.hpp`) — runtime-computed from the display so it stays legible
+across resolutions rather than a magic constant. The column is reserved down the whole
+left edge:
+
+- The **identity tile** (profile) caps it at top, taking the full width `W`.
+- The narrow **icon nav rail** (56 px) runs down its left sub-edge.
+- A **fold-out ledger** fills the rest of the column (`[nav_pane_width, W]`, below the
+  identity tile to the bottom margin) when a nav slot is active — see *Ledger windows*.
+- The **balance bar** (header) and the **Selection element** both start at `x = W`
+  permanently, whether or not any fold-out is open, so they always clear the column.
+
+The 300 px floor is deliberate: it is the constraint that forces the one-question-per-view
+panel splits (BL-117..121). The per-panel splits and the Tile Ledger's migration into the
+column are **not** part of BL-122 — the skeleton hosts each panel's current content.
+
+---
+
+## Profile — top-left (the identity tile)
 **Spec: `PROFILE.md`**
 
-A compact panel pinned to the top-left corner, above the navigation pane and aligned to its width. Shows the player corporation at a glance:
+The **identity tile**: a panel pinned to the top-left corner that caps the shell column,
+taking its full width `W` (BL-122; formerly a fixed 200 px box above the rail). Shows the
+player corporation at a glance:
 
 - **Corporation emblem** — a geometric emblem (deterministic shape + identity colour) on a portrait plate.
 - **Corporation name**, plus `Parent: <home nation>` and `Focus: <industrial focus>`, read live from `corporation_component`.
@@ -52,7 +75,7 @@ This is a static identity readout in the prototype — no interaction beyond, ev
 ## Header — top
 **Spec: `HEADER.md`**
 
-A full-width strip across the top of the canvas area, between the profile and the time column. It is the player's persistent financial dashboard, wired to the live economy as of the Layer 3 finalisation:
+A strip across the top of the canvas area, between the identity tile and the time column. Its left edge is the shell column's right edge (`x = W`, BL-122). It is the player's persistent financial dashboard, wired to the live economy as of the Layer 3 finalisation:
 
 - **Balance** — the player corporation's running treasury balance (negatives flagged red).
 - **Stockpile valuation** — an estimated liquid value of everything the player holds: its `(corporation, body)` pools summed at each body's current market price. A single money figure, not a per-resource inventory.
@@ -68,7 +91,7 @@ The header answers "can I afford this, and which way is it trending?" without op
 A fixed, full-height **icon rail** pinned to the left edge (`nav_pane_width`, currently 56 px), below the profile. Cannot move, resize, or collapse. The rail is narrow; the profile keeps its own (wider) `profile_panel_width` above it rather than matching the rail.
 
 - Holds a vertical strip of **ten square icon slots** — the home for the game's menus and ledgers. Each slot shows a **vector glyph** (`src/ui/icons.hpp`) instead of a worded label, with the menu name in a hover tooltip.
-- Each slot toggles a panel open/closed; the active slot is highlighted.
+- Each slot toggles a panel open/closed; the active slot is highlighted. Since BL-122 an active slot **folds its ledger out into the shell column** to the rail's right (`[nav_pane_width, W]`) rather than spawning a floating window; opening one collapses whichever was open (accordion, via `close_all_panels`).
 - **Layer 2 wires only one slot: the Tile Ledger** (a ruled-table glyph), parked at slot 8. The other nine are reserved, disabled placeholders (a neutral hollow-square glyph). Slot placement is temporary while canvas work takes priority over menu design.
 
 ---
@@ -108,10 +131,11 @@ take over the whole corner.
 ## Selection info element — bottom-left corner
 **Spec: `SELECTION.md`**
 
-Since BL-093 the Selection info element **owns the whole bottom-left corner** —
-from the nav-rail edge across to the minimap's left edge, down to the bottom
-margin — rather than sharing it with a lens strip stacked below. It shows detail
-about the **current selection**, whatever entity the player last single-clicked.
+The Selection info element sits in the bottom-left, anchored to the bottom margin.
+Since BL-093 it sizes its height from content; since BL-122 its **left edge is the
+shell column's right edge** (`x = W`) — so it clears the fold-out column permanently —
+and its right edge is the minimap's left edge. It shows detail about the **current
+selection**, whatever entity the player last single-clicked.
 
 It is now an **action surface**, not a stat block: a header row
 (`[kind icon] Name · type` on the left, **go-to** `>` and **close** `x` buttons
@@ -170,9 +194,19 @@ Not implemented in the prototype; specified here to reserve the region and the i
 
 ---
 
-## Ledger windows — floating
+## Ledger windows — fold-out (BL-122) and floating
 
-Menus opened from the nav pane appear as floating, movable, closable ImGui windows over the canvas area (rather than docking into the pane). The only one present in Layer 2 is the **Tile Ledger** (opened by tab 8): body selector, per-tile table, building list, and market readout. Its **✕** fully closes it; reopen from the tab. The set of menus that open these windows is described in **`MENU.md`**.
+Since **BL-122** the five named ledgers — **Construction, Economy, Market, Balance, and
+Corporations** — no longer float. Each draws as a **pinned, borderless panel filling the
+shell column** (`ui::foldout_begin`/`foldout_end`, `src/ui/foldout_column.hpp`) when its
+nav slot is active, and folds back to just the icon rail when toggled off or when another
+opens (accordion). There is no title-bar close — closing is the nav-rail toggle. The old
+uniform floating chrome (`ledger_window_spawn`/`size`, `ImGuiCond_Once` movable windows)
+and the Construction panel's BL-082 height-cap no longer apply to these five.
+
+The **Tile Ledger** (History, slot 9) is the exception — it **still floats** as a movable
+window (its migration into the column is deferred). The set of menus is described in
+**`MENU.md`**.
 
 **All ledgers start closed** on a fresh session — none are shown until the player opens them from the pane (see the policy in `MENU.md`).
 
@@ -198,13 +232,12 @@ different offsets). The **Market / Balance / Construction ledger family** (defer
 Layer 4 — OPENS § Ledger) inherits the same two constants when it is built. The header is
 exempt — it is persistent chrome, not a ledger.
 
-**Construction-panel exception (BL-082).** The Construction panel is the one ledger that does
-**not** take the shared spawn. Because it is open precisely when a build is armed — the moment the
-player reads the bottom-left Selection element's affordance readout and build front door
-(`SELECTION.md` §§ BL-071, BL-082) — it takes a **caller-supplied** spawn from `app`, anchored
-top-left like the family but **height-capped** so its bottom stays clear of the bottom-left
-Selection element (top ≈ `disp.y − margin − mm_h`). Movable/resizable after first open. Every
-other ledger keeps the two shared constants.
+> **Superseded by BL-122.** The uniform floating chrome above now applies **only to the
+> still-floating Tile Ledger**. The five named ledgers (Construction, Economy, Market,
+> Balance, Corporations) fold out into the shell column instead (see *Ledger windows*) and
+> no longer read `ledger_window_spawn`/`size`. The **BL-082 Construction-panel height-cap
+> is dissolved** — the fold-out column sits entirely left of the Selection element, so the
+> panel can no longer occlude the build front door and needs no caller-supplied spawn.
 
 ### Economy-panel table legibility (BL-081)
 

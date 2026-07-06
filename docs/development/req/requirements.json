@@ -4880,6 +4880,52 @@
           "notes": "Follow-on: author scripts/verify/new_world_setup.lua and run verifier-visual. Load-bearing determinism guarantee is covered headlessly by R1/R2."
         }
       ]
+    },
+    {
+      "batch": null,
+      "brief": "foldout-shell-skeleton",
+      "title": "BL-122 Paradox-style fold-out shell — skeleton",
+      "promoted_from": "backlog.json BL-122 (2026-07-06 design session; skeleton scope)",
+      "difficulty": 5,
+      "importance": "A",
+      "evaluated_difficulty": 3,
+      "status": "complete",
+      "resolved": "2026-07-06",
+      "resolution": "Skeleton delivered and blessed. New src/ui/foldout_column.{hpp,cpp} hosts the permanent left shell column: shell_column_width(disp.x)=clamp(round(0.17*x),300,360), foldout_column_rect() (right of the 56px rail, below the identity tile, to the bottom margin), and foldout_begin/foldout_end (pinned borderless window). The five named ledgers (Economy, Market, Balance, Corporations, Construction) swapped their floating ImGui::Begin/ledger_window_spawn for foldout_begin/end; Construction shed its BL-082 caller spawn. profile_panel widened to W; app.cpp header_left and selection left_x moved to shell_column_width(disp.x). Build green (ProjectIo links). Verified by scripts/verify/foldout_shell.lua (3 goldens blessed @1280x720): bare shell (widened tile + rail + narrowed header/Selection, canvas through the [56,W] body), Construction folded out, Economy folded out with Construction closed (accordion). Economy tables are cramped in the narrow column as expected — the forcing function for the BL-117..121 splits (out of scope).",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "Brief-spanning: at 1280x720 and 1920x1080 the identity tile, balance bar, and Selection element sit at their permanent widths (left edge at x = W); each of the five named ledgers (Construction, Economy, Market, Balance, Corporations) folds OUT into the [nav_pane_width, W] column and back to just the icon rail (not a floating window, not a thin collapsed bar); opening one collapses whichever was open (accordion); nothing clips or overlaps at either resolution.",
+          "verification": ["visual: scripts/verify/foldout_shell.lua"],
+          "result_metric": "3/3 goldens blessed @1280x720 (foldout_shell_{bare,construction,economy}). Construction + Economy fold out and swap (accordion); Market/Balance/Corporation share the identical foldout_begin path. 1920x1080 not separately captured (harness window is fixed 1280x720) — same shell_column_width() path, W clamps to ~326.",
+          "notes": "1920 case argued from the runtime formula, consistent with the display-robustness constraint (harness caps at 1280x720)."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "Column width W = clamp(round(0.17 * disp.x), 300, 360) px, computed at runtime from ImGui::GetIO().DisplaySize (not a compile-time constant). The identity tile width, the header's left origin, and the Selection element's left origin all key off the same W.",
+          "verification": ["code", "visual"],
+          "result_metric": "shell_column_width() in src/ui/foldout_column.cpp; profile_panel, app header_left, and selection left_x all call it. @1280 -> W=300 (floor), verified in captures.",
+          "notes": "shell_column_width() in the new src/ui/foldout_column.hpp; ~300 @1280, ~326 @1920."
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "The five named ledgers draw as pinned, borderless windows at the shared fold-out column rect (NoTitleBar/NoMove/NoResize, scroll allowed for overflow) instead of freely-floating ledger_window_spawn windows; at most one is open at a time (reusing nav_pane close_all_panels); Construction's BL-082 caller-supplied spawn/height-cap is removed, since the column sits left of Selection and no longer needs clearance.",
+          "verification": ["code", "visual"],
+          "result_metric": "All five swapped to foldout_begin/foldout_end; construction_panel signature dropped spawn_pos/spawn_size; app.cpp construction call + BL-082 anchor block removed. Captures show borderless pinned panels in the [56,W] column.",
+          "notes": "Shared foldout_begin/foldout_end host; column rect from foldout_column_rect()."
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "requirement": "The header's left origin (was profile_panel_width) and the Selection element's left_x (was nav_pane_width) move permanently to W, whether or not any fold-out is open; Selection's BL-093 content-height sizing is unchanged (only its left edge moves).",
+          "verification": ["code", "visual"],
+          "result_metric": "app.cpp header_left = shell_column_width(disp.x); selection left_x = shell_column_width(disp.x). Bare-shell capture shows header + Selection starting at x=W with no fold-out open (permanent).",
+          "notes": "Selection left edge moved; its BL-093 content-height path untouched."
+        }
+      ]
     }
   ]
 }

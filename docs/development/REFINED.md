@@ -138,6 +138,22 @@ Verified via a vcvars2022 full build (green) + `ctest`. Requirements: the five g
 
 ---
 
+## BL-122 Paradox-style fold-out shell — skeleton (promoted from backlog.json § BL-122) — **COMPLETE**
+
+Delivered 2026-07-06 in one main session (no fan-out — one shared helper + the app.cpp layout
+hotspot). All five tasks complete: **A** `src/ui/foldout_column.{hpp,cpp}` (the shell column —
+`shell_column_width`, `foldout_column_rect`, `foldout_begin`/`foldout_end`); **B** identity tile
+widened to `W` (profile_panel; `profile_panel_width` retargeted to the floating-ledger spawn anchor
+only); **C** the five named ledgers re-hosted via `foldout_begin`/`end`, Construction shed its
+BL-082 spawn params; **D** app.cpp `header_left`/selection `left_x` → `shell_column_width(disp.x)`,
+BL-082 anchor block deleted; **E** `scripts/verify/foldout_shell.lua`, 3 goldens blessed @1280×720.
+Build green. Requirements `foldout-shell-skeleton` R1–R4 all complete. **Deferred as designed:** the
+per-panel one-question splits (BL-117..121 — economy tables cramped in the narrow column, the
+intended forcing function) and the Tile Ledger migration (still floats). Permanent record: DEVLOG
+2026-07-06, `docs/ui/LAYOUT.md`. Summary retained one cycle.
+
+---
+
 ## Dividing work across agents & authoring tasks
 
 This is the method used to promote an item and (optionally) fan it out to
