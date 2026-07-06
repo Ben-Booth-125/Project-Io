@@ -86,7 +86,8 @@ if ($showTodo) {
     foreach ($it in $active) {
         if ($it.priority -ne $lastPri) { Write-Host ""; Write-Host "  [$($it.priority)]" -ForegroundColor Yellow; $lastPri = $it.priority }
         $blk  = Blockers $it
-        $line = "    {0} {1}  {2}  (d{3})" -f (Marker $it.status), $it.id, (Ascii $it.title), $it.difficulty
+        $name = if ($it.short_name) { "$($it.id) $($it.short_name)" } else { $it.id }
+        $line = "    {0} {1}  {2}  (d{3})" -f (Marker $it.status), $name, (Ascii $it.title), $it.difficulty
         if ($blk.Count) {
             Write-Host $line -ForegroundColor DarkGray
             Write-Host ("         waiting on: " + ($blk -join ', ')) -ForegroundColor DarkYellow
@@ -106,7 +107,8 @@ if ($showDone) {
     $take = [math]::Min($Recent, $resolved.Count)
     if ($take -gt 0) {
         foreach ($it in $resolved[0..($take - 1)]) {
-            Write-Host ("    {0}  {1}  {2}" -f $it.resolved, $it.id, (Ascii $it.title)) -ForegroundColor Green
+            $name = if ($it.short_name) { "$($it.id) $($it.short_name)" } else { $it.id }
+            Write-Host ("    {0}  {1}  {2}" -f $it.resolved, $name, (Ascii $it.title)) -ForegroundColor Green
         }
     }
     else { Write-Host "    (no items carry a 'resolved' date yet)" -ForegroundColor DarkGray }
