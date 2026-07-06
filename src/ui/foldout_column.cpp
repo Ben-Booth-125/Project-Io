@@ -54,4 +54,15 @@ void foldout_end()
     ImGui::End();
 }
 
+void nav_button(const char* label, int id, int& view)
+{
+    const bool active = (view == id);
+    if (active)
+        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+    if (ImGui::Button(label))
+        view = id;
+    if (active)
+        ImGui::PopStyleColor();
+}
+
 } // namespace ui

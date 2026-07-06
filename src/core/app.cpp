@@ -1469,7 +1469,7 @@ void app::render()
     ui::draw_tile_inspector(m_world, m_ui, &m_ui.show_tile_ledger);
     {
         const ui::player_plot_history phist{m_balance_history, m_income_history, m_expenditure_history};
-        ui::draw_economy_panel(m_world, m_registry, m_last_econ_report, phist, &m_ui.show_economy_panel);
+        ui::draw_economy_panel(m_world, m_registry, m_last_econ_report, phist, m_ui, &m_ui.show_economy_panel);
     }
     // Construction panel — now an ordinary fold-out tab in the shell column (BL-122).
     // The BL-082 height-cap that kept the old floating window clear of the bottom-left

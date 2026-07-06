@@ -4,6 +4,7 @@
 #include "icons.hpp"
 #include "foldout_column.hpp" // shell fold-out column host (BL-122)
 #include "plot_history.hpp"
+#include "ui_state.hpp"       // economy_view (BL-117 one-question nav)
 #include "presentation.hpp"
 
 #include <imgui.h>
@@ -53,8 +54,7 @@ void resource_text(resource_type r)
 // --- corporation balances ----------------------------------------------------
 void draw_balances(const world& w)
 {
-    if (!ImGui::CollapsingHeader("Corporation balances", ImGuiTreeNodeFlags_DefaultOpen))
-        return;
+    ImGui::SeparatorText("Corporation balances");
 
     std::vector<entity_id> corps;
     corps.reserve(w.corporations.size());
@@ -67,9 +67,11 @@ void draw_balances(const world& w)
     if (ImGui::BeginTable("##balances", 3,
             ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
     {
+        // Tightened from BL-081's 90/90 (tuned for the old wide floating window) so the
+        // stretched name keeps usable room in the narrow shell column (BL-117).
         ImGui::TableSetupColumn("Corporation", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableSetupColumn("Focus", ImGuiTableColumnFlags_WidthFixed, 90.0f);
-        ImGui::TableSetupColumn("Balance", ImGuiTableColumnFlags_WidthFixed, 90.0f);
+        ImGui::TableSetupColumn("Focus", ImGuiTableColumnFlags_WidthFixed, 72.0f);
+        ImGui::TableSetupColumn("Balance", ImGuiTableColumnFlags_WidthFixed, 64.0f);
         ImGui::TableHeadersRow();
 
         for (entity_id id : corps)
@@ -101,8 +103,7 @@ void draw_balances(const world& w)
 // --- (corp, body) pools ------------------------------------------------------
 void draw_pools(const world& w)
 {
-    if (!ImGui::CollapsingHeader("Stockpile pools (corp x body)", ImGuiTreeNodeFlags_DefaultOpen))
-        return;
+    ImGui::SeparatorText("Stockpile pools (corp x body)");
 
     if (w.corp_body_pools.empty())
     {
@@ -156,8 +157,7 @@ void draw_pools(const world& w)
 // reassuring "all fully staffed" line (POPULATION.md § Workforce model, step 1).
 void draw_workforce(const world& w, const economy_report& report)
 {
-    if (!ImGui::CollapsingHeader("Workforce (corp x body)", ImGuiTreeNodeFlags_DefaultOpen))
-        return;
+    ImGui::SeparatorText("Workforce (corp x body)");
 
     bool any = false;
     for (const auto& [key, scalar] : report.workforce_contention)
@@ -198,8 +198,7 @@ void draw_workforce(const world& w, const economy_report& report)
 // --- player balance trend (BL-063) -------------------------------------------
 void draw_balance_trend(const player_plot_history& hist)
 {
-    if (!ImGui::CollapsingHeader("Player balance trend"))
-        return;
+    ImGui::SeparatorText("Player balance trend");
 
     ImGui::TextDisabled("Balance");
     draw_plot("##balance", hist.balance, {-1.0f, 55.0f}, &plot_col_blue);
@@ -216,8 +215,7 @@ void draw_balance_trend(const player_plot_history& hist)
 // --- markets -----------------------------------------------------------------
 void draw_markets(const world& w)
 {
-    if (!ImGui::CollapsingHeader("Markets (supply / demand)", ImGuiTreeNodeFlags_DefaultOpen))
-        return;
+    ImGui::SeparatorText("Markets (supply / demand)");
 
     if (w.markets.empty())
     {
@@ -273,6 +271,7 @@ void draw_economy_panel(const world& w,
                         const recipe_registry& reg,
                         const economy_report& report,
                         const player_plot_history& history,
+                        ui_state& ui,
                         bool* p_open)
 {
     if (p_open && !*p_open)
@@ -286,11 +285,36 @@ void draw_economy_panel(const world& w,
     // the recipe registry is no longer read here.
     (void)reg;
 
-    draw_balance_trend(history);
-    draw_balances(w);
-    draw_workforce(w, report);
-    draw_pools(w);
-    draw_markets(w);
+    // BL-117: one question per view. The five former CollapsingHeader sections split
+    // across a button-strip nav (Construction template) into three single-question
+    // views — "how are the corps doing", "what do I hold where", "what's the market
+    // doing" — each drawing exclusively, so the panel reads in the narrow shell column.
+    int& view = ui.economy_view;
+    ui::nav_button("Corps", 0, view);
+    ImGui::SameLine();
+    ui::nav_button("Holdings", 1, view);
+    ImGui::SameLine();
+    ui::nav_button("Markets", 2, view);
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    switch (view)
+    {
+        case 0: // "How are the corporations doing?" — player trend + balances + labour.
+            draw_balance_trend(history);
+            draw_balances(w);
+            draw_workforce(w, report);
+            break;
+        case 1: // "What do I hold, and where?"
+            draw_pools(w);
+            break;
+        case 2: // "What is the market doing?"
+            draw_markets(w);
+            break;
+        default:
+            view = 0;
+            break;
+    }
 
     ui::foldout_end();
 }

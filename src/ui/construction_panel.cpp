@@ -393,20 +393,11 @@ void draw_construction_panel(world& w,
     ui::foldout_begin("Construction");
 
     int& view = state.construction.panel_view;
-    auto nav_button = [&](const char* label, int id) {
-        const bool active = (view == id);
-        if (active)
-            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-        if (ImGui::Button(label))
-            view = id;
-        if (active)
-            ImGui::PopStyleColor();
-    };
-    nav_button("Build", 0);
+    ui::nav_button("Build", 0, view);
     ImGui::SameLine();
-    nav_button("Manage", 1);
+    ui::nav_button("Manage", 1, view);
     ImGui::SameLine();
-    nav_button("Sell Orders", 2);
+    ui::nav_button("Sell Orders", 2, view);
     ImGui::Separator();
     ImGui::Spacing();
 

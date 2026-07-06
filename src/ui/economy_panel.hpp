@@ -7,6 +7,8 @@
 
 #include <vector>
 
+struct ui_state; // forward-declared; the full definition lives in ui_state.hpp.
+
 namespace ui {
 
 /// Player economy trend data passed into the economy panel for graph rendering.
@@ -36,11 +38,13 @@ struct player_plot_history
 /// @param reg     Loaded registry (recipe names for processor rows).
 /// @param report  The most recent economy step report (building states).
 /// @param history Player balance / income / expenditure series for trend graphs.
-/// @param p_open  Open/closed flag; cleared by the close button.
+/// @param ui      UI state — the one-question view selector (economy_view, BL-117).
+/// @param p_open  Open/closed flag; gates whether the panel draws.
 void draw_economy_panel(const world& w,
                         const recipe_registry& reg,
                         const economy_report& report,
                         const player_plot_history& history,
+                        ui_state& ui,
                         bool* p_open);
 
 } // namespace ui

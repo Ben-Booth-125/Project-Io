@@ -35,4 +35,11 @@ bool foldout_begin(const char* name);
 /// ImGui::Begin/End contract.
 void foldout_end();
 
+/// One tab button in a fold-out panel's button-strip nav — the one-question-per-view
+/// selector shared across the BL-117.. sweep (modelled on the Construction panel's
+/// Build/Manage/Sell strip). Highlights when `view == id`; sets `view = id` on click.
+/// Callers place buttons with `ImGui::SameLine()` between them and a `Separator` below.
+/// Used because `ImGui::BeginTabBar`'s header does not render in this build.
+void nav_button(const char* label, int id, int& view);
+
 } // namespace ui

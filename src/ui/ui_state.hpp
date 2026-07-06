@@ -112,6 +112,13 @@ struct ui_state
     bool show_balance_ledger = false; ///< Whether the Balance Ledger is open.
     bool show_corporation_panel = false; ///< Whether the Corporation Overview Dashboard is open.
 
+    // --- one-question-per-view nav selectors (BL-117 sweep) ---
+    // Each fold-out ledger with more than one question splits its content into
+    // button-strip views (ui::nav_button); this is the selected view per panel,
+    // persisted so a panel reopens where the player left it. See the Construction
+    // panel's construction.panel_view for the template.
+    int  economy_view = 0; ///< Economy panel: 0=Corps, 1=Holdings, 2=Markets (BL-117).
+
     // --- application / system menu (BL-070) ---
     // The corner gear popup for session control (Pause/Resume, Exit Game). Opened
     // by the gear button and toggled by Esc; confirm_exit_pending arms the inline
