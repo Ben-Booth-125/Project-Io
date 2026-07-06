@@ -7,11 +7,6 @@
 
 namespace ui {
 
-namespace {
-/// Shared shell margin — matches the 8px margin app.cpp lays the chrome out on.
-constexpr float shell_margin = 8.0f;
-} // namespace
-
 float shell_column_width(float disp_x)
 {
     float w = 0.17f * disp_x;
@@ -27,10 +22,13 @@ foldout_rect foldout_column_rect()
     const ImVec2 disp = ImGui::GetIO().DisplaySize;
     const float  W    = shell_column_width(disp.x);
     return {
-        nav_pane_width,                                 // x: right of the icon rail
-        profile_panel_height,                           // y: below the identity tile
-        W - nav_pane_width,                             // w: rail edge -> column edge
-        disp.y - profile_panel_height - shell_margin,   // h: down to the bottom margin
+        nav_pane_width,                       // x: right of the icon rail
+        profile_panel_height,                 // y: below the identity tile
+        W - nav_pane_width,                   // w: rail edge -> column edge
+        disp.y - profile_panel_height,        // h: to the bottom edge — flush with the
+                                              //    nav rail (same top and bottom, so the
+                                              //    menu and its fold-out items are equal
+                                              //    height, no gap below the ledger)
     };
 }
 
