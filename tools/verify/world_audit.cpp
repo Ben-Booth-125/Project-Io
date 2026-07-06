@@ -220,6 +220,69 @@ int main()
     std::printf("  B4 R1 every corp holding count within its focus ceiling (>=1): %s\n",
                 holdings_bad == 0 ? "PASS" : "FAIL");
 
+    // --- BL-114 (corp starting stockpile, R1): every corp that opens with at
+    // least one asset is seeded with the fixed prototype stockpile on its home
+    // body. make_hard_coded_world() is the cold generation state (no pre-game
+    // ticks), so pools equal the fixed give exactly. Non-prototype resources
+    // stay zero. Deterministic — the give uses no RNG. Keep want_stock in sync
+    // with compute_starting_stockpile() in corporation_generation.cpp. ---
+    auto home_body_of = [&](const corporation_component& corp) -> entity_id {
+        for (entity_id bid : corp.assets)
+        {
+            const auto bit = w.buildings.find(bid);
+            if (bit == w.buildings.end()) continue;
+            const auto tit = w.tiles.find(bit->second.tile);
+            if (tit != w.tiles.end()) return tit->second.body;
+        }
+        return null_entity;
+    };
+    std::array<float, resource_count> want_stock = {};
+    want_stock[ri(resource_type::iron_ore)]             = 200.0f;
+    want_stock[ri(resource_type::petroleum)]            = 150.0f;
+    want_stock[ri(resource_type::water)]                = 150.0f;
+    want_stock[ri(resource_type::agricultural_produce)] = 150.0f;
+    want_stock[ri(resource_type::steel)]                = 100.0f;
+    want_stock[ri(resource_type::refined_fuel)]         =  80.0f;
+    want_stock[ri(resource_type::food_rations)]         =  80.0f;
+
+    int stock_corps = 0, stock_bad = 0;
+    for (const auto& [cid, corp] : w.corporations)
+    {
+        if (corp.assets.empty()) continue;         // no holdings → no home body
+        const entity_id hb = home_body_of(corp);
+        if (hb == null_entity)
+        {
+            ++stock_bad;
+            std::printf("  BAD: corp=%u has assets but no resolvable home body\n",
+                        static_cast<unsigned>(cid));
+            continue;
+        }
+        ++stock_corps;
+        const auto pit = w.corp_body_pools.find(std::make_pair(cid, hb));
+        if (pit == w.corp_body_pools.end())
+        {
+            ++stock_bad;
+            std::printf("  BAD: corp=%u has no stockpile on its home body\n",
+                        static_cast<unsigned>(cid));
+            continue;
+        }
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            const float got = pit->second.quantities[r];
+            if (got < want_stock[r] - 1e-2f || got > want_stock[r] + 1e-2f)
+            {
+                if (stock_bad < 8)
+                    std::printf("  BAD: corp=%u res %zu stock=%.2f want=%.2f\n",
+                                static_cast<unsigned>(cid), r, got, want_stock[r]);
+                ++stock_bad;
+            }
+        }
+    }
+    std::printf("Corp starting stockpiles: %d stocked corps, %d discrepancies\n",
+                stock_corps, stock_bad);
+    std::printf("  BL-114 R1 every corp opens with the fixed prototype stockpile on its home body: %s\n",
+                stock_bad == 0 ? "PASS" : "FAIL");
+
     // --- BL-040: full raw-set deposit-distribution audit ---
     // Every raw resource the full-set pass adds must now be authored somewhere in
     // the world, and the seeded rarity ordering must hold: the ultra-rare
@@ -273,7 +336,7 @@ int main()
                 variance_ok ? "PASS" : "FAIL");
 
     return (fw_frac >= 3.0f && bad == 0 && seed_bad == 0 && seam_bad == 0
-            && unclaimed_land == 0 && holdings_bad == 0
+            && unclaimed_land == 0 && holdings_bad == 0 && stock_bad == 0
             && absent == 0 && ordering_ok
             && count_ok && variance_ok) ? 0 : 1;
 }

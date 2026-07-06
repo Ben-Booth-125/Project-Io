@@ -507,6 +507,45 @@ float compute_capital(float base_capital,
     return capital;
 }
 
+/// The opening resource stockpile every corporation is seeded with on its home
+/// body, so build / production / trade have materials from turn one rather than
+/// an empty pool warmed only by the pre-game ticks (CORPORATION_GENERATION.md
+/// § Pre-game operating history; addresses the construction deadlock a712b05).
+///
+/// BL-114 — the prototype "just give these": a fixed slug of the seven-resource
+/// prototype subset (RESOURCES.md), identical for every corporation. BL-115
+/// generalises this into a focus / wealth-shaped generated stockpile.
+std::array<float, resource_count> compute_starting_stockpile()
+{
+    std::array<float, resource_count> s = {};
+    s[static_cast<std::size_t>(resource_type::iron_ore)]             = 200.0f;
+    s[static_cast<std::size_t>(resource_type::petroleum)]            = 150.0f;
+    s[static_cast<std::size_t>(resource_type::water)]                = 150.0f;
+    s[static_cast<std::size_t>(resource_type::agricultural_produce)] = 150.0f;
+    s[static_cast<std::size_t>(resource_type::steel)]                = 100.0f;
+    s[static_cast<std::size_t>(resource_type::refined_fuel)]         =  80.0f;
+    s[static_cast<std::size_t>(resource_type::food_rations)]         =  80.0f;
+    return s;
+}
+
+/// The body a corporation opens on: the body of its first placed asset. Holdings
+/// cluster to one nation's territory (a single body in the prototype), so any
+/// asset resolves the home body. Returns null_entity if the corp placed nothing
+/// (a deposit-poor nation may yield zero holdings) — such a corp gets no pool.
+entity_id corp_home_body(const world& w, const std::vector<entity_id>& assets)
+{
+    for (const entity_id b : assets)
+    {
+        const auto bit = w.buildings.find(b);
+        if (bit == w.buildings.end())
+            continue;
+        const auto tit = w.tiles.find(bit->second.tile);
+        if (tit != w.tiles.end())
+            return tit->second.body;
+    }
+    return null_entity;
+}
+
 // ---------------------------------------------------------------------------
 // Pass 5 helpers — procedural naming
 // ---------------------------------------------------------------------------
@@ -777,11 +816,28 @@ std::vector<entity_id> generate_corporations(
         cc.balance          = corp_capitals[static_cast<std::size_t>(c)]; // opens at starting capital
         cc.is_player        = false;
 
+        // Home body resolved before the assets vector is moved into the component.
+        const entity_id home_body =
+            corp_home_body(w, corp_assets[static_cast<std::size_t>(c)]);
+
         cc.assets = std::move(corp_assets[static_cast<std::size_t>(c)]);
 
         const entity_id corp_id = w.create_entity();
         corp_ids.push_back(corp_id);
         w.corporations[corp_id] = std::move(cc);
+
+        // Starting resource stockpile (BL-114): seed the corp's opening pool on
+        // its home body so build / production / trade have materials from turn
+        // one. Populates the existing corp_body_pools map (no new save field);
+        // deterministic (no RNG). A corp with no holdings has no home body and
+        // is skipped. The pre-game warm-start then evolves this seed.
+        if (home_body != null_entity)
+        {
+            const auto stock = compute_starting_stockpile();
+            stockpile_component& pool = w.pool_for(corp_id, home_body);
+            for (std::size_t r = 0; r < resource_count; ++r)
+                pool.quantities[r] += stock[r];
+        }
     }
 
     // Pre-game profit (a simulated operating history seeding opening balances and
