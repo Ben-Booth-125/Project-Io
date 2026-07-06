@@ -31,10 +31,13 @@ in `tools/verify/README.md`.
   (`world.cpp`, `economy_system.cpp`, `market_clearing.cpp`, `budget_system.cpp`).
 - **`world_audit`** — builds the hard-coded world and audits Kepler biome balance
   (forest + wetland fraction), extraction-asset placement, deposit-reserve seeding,
-  and the reusable `placement_rules::can_place` seam (placed assets pass it; ocean /
-  zero-deposit tiles are rejected). Links the generation TUs (`tile_generation`,
-  `nation_generation`, `corporation_generation`, `population_generation`,
-  `placement_rules`, `hard_coded_world`, `orbital_system`, `world`).
+  the reusable `placement_rules::can_place` seam (placed assets pass it; ocean /
+  zero-deposit tiles are rejected), and the **generated corp starting stockpile**
+  (BL-115: every corp opens non-empty + prototype-scoped on its home body; extraction
+  opens richer in raws than trade; stockpiles identical across two generations).
+  Links the generation TUs (`tile_generation`, `nation_generation`,
+  `corporation_generation`, `population_generation`, `placement_rules`,
+  `hard_coded_world`, `orbital_system`, `world`).
 - **`supply_advance`** — Supply layer (BL-039 / BL-038 / BL-045): `advance_convoys` progress
   and arrival (R1), `recipe_registry` logistics-cost accessors (R4), `dispatch_convoys`
   gate check + balance debit + source-pool debit (R4–R6), and `credit_arrived_convoys`
