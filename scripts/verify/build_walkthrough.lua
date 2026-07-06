@@ -47,5 +47,11 @@ verify.capture("walk_07_placement_ghost")
 -- Step 6 — COMMIT THE BUILD. Actually place the armed building via the real
 -- construct_building path (not just disarm + select a pre-existing one) so the
 -- final capture shows a freshly placed building — a completed build, not a ghost.
+-- A real player never clicks Build at literal balance=0 — corps now open as new
+-- charters (base_capital=0, 2026-07-06) and earn their turn-one balance through
+-- app::start_new_game's 12-tick pre-game warm start, which run_verify's
+-- deterministically-cold path skips by design. Approximate that earned balance
+-- here so this walkthrough still reflects what turn one actually looks like.
+verify.set_balance(500.0)
 verify.build_first_valid()
 verify.capture("walk_08_built_building")

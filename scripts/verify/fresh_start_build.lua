@@ -11,6 +11,17 @@
 
 verify.goto_surface("home")
 
+-- Corps now open as new charters (base_capital=0, 2026-07-06 playtest patch) and
+-- earn their turn-one balance through app::start_new_game's 12-tick pre-game warm
+-- start (~3 in-game years of simulated production/wages/trade against the
+-- generation-time asset placement). run_verify stays deterministically cold by
+-- design (no warm-up, for golden reproducibility), so a literal balance=0 here
+-- would test a state that never occurs in real play. Approximate the earned
+-- turn-one balance instead (headless pregame_balance_harness measured ~400-2000cr
+-- across the warm-start window) so this still checks what "fresh player, turn
+-- one" can actually afford, per US-002.
+verify.set_balance(500.0)
+
 -- Arm the most basic building a fresh player would place first.
 verify.place_mode("extraction", "iron_ore")
 

@@ -216,6 +216,14 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
 {
     economy_report report;
 
+    // Build-time pacing (playtest patch, 2026-07-06): advance every building's
+    // construction timer one tick before anything else runs, so a building
+    // finishing this tick is already eligible for production/workforce demand
+    // below (mirrors treating "placed this tick" as "under construction this tick").
+    for (auto& [bid, b] : w.buildings)
+        if (b.ticks_remaining > 0)
+            --b.ticks_remaining;
+
     // Bodies that host a market — a processor on one auto-buys input shortfalls
     // rather than idling for want of pool stock (see run_processing).
     std::unordered_set<entity_id> bodies_with_market;
@@ -295,6 +303,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
             if (bit == w.buildings.end())
                 continue;
             const building_component& b = bit->second;
+            if (b.ticks_remaining > 0)
+                continue; // still under construction — no labour demand yet
             if (b.type != building_type::extraction_site &&
                 b.type != building_type::processing_facility)
                 continue; // ports and none demand no labour in L3
@@ -340,6 +350,9 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
 
             // Decommissioned buildings produce nothing — skip production entirely.
             if (b.decommissioned)
+                continue;
+            // Still under construction — no production yet (playtest patch, 2026-07-06).
+            if (b.ticks_remaining > 0)
                 continue;
 
             switch (b.type)

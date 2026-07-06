@@ -17,14 +17,16 @@ namespace ui {
 namespace {
 
 // --- Queue overview table ----------------------------------------------------
-// Section 1: all active construction items across all bodies. Progress cell is
+// All active construction items across all bodies. Progress cell is
 // colour-coded: dim (<25%) grey, mid (25–75%) yellow, high (>75%) green.
 // The construction queue data model is not yet authored (BL-029 precedes the
 // queue backend); until that lands, this always shows the empty-state message.
+// Lives under the "Build" tab (same question as placing something new: "what's
+// happening with my construction?"), not its own top-level section — see the
+// 2026-07-06 tabbed redesign note on draw_construction_panel.
 void draw_queue_section(const world& /*w*/)
 {
-    if (!ImGui::CollapsingHeader("Queue", ImGuiTreeNodeFlags_DefaultOpen))
-        return;
+    ImGui::SeparatorText("Queue");
 
     // When the queue backend lands, iterate the queue here.
     // For now the queue is always empty — show the placeholder.
@@ -78,10 +80,11 @@ void draw_queue_section(const world& /*w*/)
 }
 
 // --- Build section -----------------------------------------------------------
+// Answers one question: "what can I place, and what's it cost?" (the Queue
+// table above answers the closely-related "what's already in flight?").
 void draw_build_section(const recipe_registry& reg, ui_state& state)
 {
-    if (!ImGui::CollapsingHeader("Build", ImGuiTreeNodeFlags_DefaultOpen))
-        return;
+    ImGui::SeparatorText("Place a building");
 
     auto arm = [&state](building_type type) {
         state.construction.active = true;
@@ -149,22 +152,39 @@ void draw_build_section(const recipe_registry& reg, ui_state& state)
 }
 
 // --- Selected-building section -----------------------------------------------
-// Resolves the building whose tile is the current selection and shows its config,
+// Resolves the building the current selection refers to and shows its config,
 // plus live management controls: workforce slider, recipe selector, decommission.
+// `selected_entity` is a generic entity reference, not always a tile: normal
+// tile-click selection (SELECTION.md) sets it to the tile, but committing a
+// build (both the interactive click-to-build path, app.cpp's pending_tile
+// handler, and the verify harness's build_first_valid) sets it directly to the
+// newly-built building's own id so its Selection-panel card is right there.
+// Only matching on tile == selected_entity (the prior behaviour) missed that
+// second case entirely — right after placing a building, this section showed
+// "Select a building's tile to manage it." even though one was just built and
+// selected, forcing the player to click away and reselect the tile before they
+// could reach the recipe combo (found while investigating why processing-facility
+// management felt clunky, 2026-07-06 — every processor defaults to the steel
+// recipe at construction, so this was blocking the very first thing a player
+// would want to change).
+//
+// Own tab ("Manage", 2026-07-06 redesign): answers "how do I configure the
+// thing I have," a different question from "what can I place" (Build tab).
 void draw_selected_section(world& w, const recipe_registry& reg, const ui_state& state)
 {
-    if (!ImGui::CollapsingHeader("Selected building", ImGuiTreeNodeFlags_DefaultOpen))
-        return;
-
-    // Find the building sitting on the selected tile (buildings key on their own
-    // entity id, not their tile, so we scan for tile == selected_entity).
     building_component* found = nullptr;
-    for (auto& [id, bld] : w.buildings)
+    if (const auto bit = w.buildings.find(state.selected_entity); bit != w.buildings.end())
+        found = &bit->second;
+    else
     {
-        if (bld.tile == state.selected_entity)
+        // Fall back to tile-match for the normal "select a tile, see its building" case.
+        for (auto& [id, bld] : w.buildings)
         {
-            found = &bld;
-            break;
+            if (bld.tile == state.selected_entity)
+            {
+                found = &bld;
+                break;
+            }
         }
     }
 
@@ -247,12 +267,14 @@ void draw_selected_section(world& w, const recipe_registry& reg, const ui_state&
 }
 
 // --- Sell orders (player) ----------------------------------------------------
+// Own tab ("Sell Orders", 2026-07-06 redesign): "how do I sell what I make?" —
+// a market question that happens to live in this window today. Candidate to
+// move onto the market ledger in a later pass (flagged, not done here — moving
+// it is a cross-panel question, out of scope for this session's Construction
+// tabbing).
 void draw_sell_orders_section(const world& w, const recipe_registry& reg, ui_state& state)
 {
     (void)reg;
-    if (!ImGui::CollapsingHeader("Sell orders", ImGuiTreeNodeFlags_DefaultOpen))
-        return;
-
     const entity_id corp = w.player_entity;
     const entity_id body = (w.bodies.count(state.active_body) != 0) ? state.active_body
                                                                      : w.home_body;
@@ -342,6 +364,21 @@ void draw_sell_orders_section(const world& w, const recipe_registry& reg, ui_sta
 
 } // namespace
 
+// Tabbed redesign (2026-07-06, Ben's steer): "each view must address one
+// question; a menu allows navigation between views." The Construction window
+// is the bounded space for every construction question, but the four sections
+// used to sit stacked in one scrolling column, mixing "what can I build"
+// (Build+Queue), "how do I configure what I have" (Manage), and "how do I
+// sell" (Sell Orders) into a single undifferentiated view. Each now gets its
+// own bounded view (draws exclusively, nothing else stacked below it); a small
+// button-strip nav is the menu that switches between them (`state.construction.
+// panel_view`). Built with a plain Selectable-style button row rather than
+// ImGui::BeginTabBar/TabItem — the tab-bar header mysteriously never rendered
+// in this build/environment (BeginTabBar/BeginTabItem reported success and the
+// active tab's body drew correctly, but the clickable header strip itself was
+// never visible in any capture, even in an isolated two-tab test with no other
+// content) while ordinary buttons render reliably everywhere else in this
+// codebase, so this sidesteps the mystery rather than chasing it further.
 void draw_construction_panel(world& w,
                              const recipe_registry& reg,
                              ui_state& state,
@@ -359,13 +396,41 @@ void draw_construction_panel(world& w,
     ImGui::SetNextWindowSize(spawn_size, ImGuiCond_Once);
     ImGui::Begin("Construction", p_open);
 
-    draw_queue_section(w);
+    int& view = state.construction.panel_view;
+    auto nav_button = [&](const char* label, int id) {
+        const bool active = (view == id);
+        if (active)
+            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+        if (ImGui::Button(label))
+            view = id;
+        if (active)
+            ImGui::PopStyleColor();
+    };
+    nav_button("Build", 0);
+    ImGui::SameLine();
+    nav_button("Manage", 1);
+    ImGui::SameLine();
+    nav_button("Sell Orders", 2);
+    ImGui::Separator();
     ImGui::Spacing();
-    draw_build_section(reg, state);
-    ImGui::Spacing();
-    draw_selected_section(w, reg, state);
-    ImGui::Spacing();
-    draw_sell_orders_section(w, reg, state);
+
+    switch (view)
+    {
+        case 0:
+            draw_build_section(reg, state);
+            ImGui::Spacing();
+            draw_queue_section(w);
+            break;
+        case 1:
+            draw_selected_section(w, reg, state);
+            break;
+        case 2:
+            draw_sell_orders_section(w, reg, state);
+            break;
+        default:
+            view = 0;
+            break;
+    }
 
     ImGui::End();
 }

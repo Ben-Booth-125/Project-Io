@@ -150,6 +150,7 @@ void recipe_registry::load_from_lua(lua_state& lua)
             e.maintenance = b->get_or("maintenance", 0.0f);
             e.base_wage   = b->get_or("base_wage",   0.0f);
             e.build_cost  = b->get_or("build_cost",  0.0f);
+            e.build_duration_ticks = b->get_or("build_duration_ticks", 0.0f);
             // Optional resource material cost (BL-044).
             sol::optional<sol::table> rcosts = (*b)["resource_costs"];
             if (rcosts)

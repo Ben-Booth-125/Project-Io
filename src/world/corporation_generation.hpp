@@ -23,8 +23,18 @@ struct corporation_params
     /// The prototype targets 6–10 on Kepler.
     int corporation_count = 8;
 
-    /// Baseline starting capital before wealth variance is applied.
-    float base_capital = 100000.0f;
+    /// Baseline starting capital before wealth variance is applied. Set to 0
+    /// 2026-07-06 (playtest patch, Ben's steer) — model every corp as a *new
+    /// charter*: it opens with no seeded cash at all. Its actual opening balance
+    /// comes entirely from the pre-game warm start (app::start_new_game runs
+    /// 12 economy ticks — ~3 in-game years — against the generation-time asset
+    /// placement before turn one), so a corp's capital is *earned*, grounded in
+    /// its own simulated production/wages/trade rather than an arbitrary lump
+    /// sum. (Interim step was 4000, replacing an original 100000 that dwarfed
+    /// building costs by 200-1000x.) `compute_capital`/`compute_starting_stockpile`
+    /// already guard base_capital <= 0 (cap_scalar defaults to 1.0), so this is a
+    /// supported value, not a special case bolted on.
+    float base_capital = 0.0f;
 
     /// Fractional spread around base_capital. A value of 0.4 means each
     /// corporation's capital is drawn from [base × (1 − 0.4), base × (1 + 0.4)].

@@ -172,6 +172,32 @@ app::app()
         throw std::runtime_error(std::string("SDL_Init failed: ") + SDL_GetError());
 
     m_window   = SDL_CreateWindow("Project Io", window_w, window_h, SDL_WINDOW_RESIZABLE);
+
+    // Dev-machine preference (2026-07-06): Ben runs a two-monitor setup and wants
+    // the game on the secondary display, keeping the primary free. Pick the first
+    // enumerated display that is NOT the primary (SDL_WINDOWPOS_CENTERED_DISPLAY
+    // didn't reliably land on the physical second monitor - Windows' monitor
+    // numbering doesn't necessarily match SDL's enumeration order) and place the
+    // window at that display's bounds origin directly. No-op on one monitor.
+    {
+        int display_count = 0;
+        SDL_DisplayID* displays = SDL_GetDisplays(&display_count);
+        const SDL_DisplayID primary = SDL_GetPrimaryDisplay();
+        if (displays)
+        {
+            for (int i = 0; i < display_count; ++i)
+            {
+                if (displays[i] == primary)
+                    continue;
+                SDL_Rect bounds{};
+                if (SDL_GetDisplayBounds(displays[i], &bounds))
+                    SDL_SetWindowPosition(m_window, bounds.x + 40, bounds.y + 40);
+                break;
+            }
+        }
+        SDL_free(displays);
+    }
+
     m_renderer = SDL_CreateRenderer(m_window, nullptr);
     SDL_SetRenderVSync(m_renderer, 1);
 

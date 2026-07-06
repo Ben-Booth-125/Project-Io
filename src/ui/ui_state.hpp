@@ -72,6 +72,11 @@ struct construction_state
     /// Last construction outcome, set by app after executing a request — a short
     /// human string shown by the build UI ("Built.", "Can't afford it.", …).
     std::string   last_message;
+
+    /// Which bounded sub-view the Construction window shows (2026-07-06 tabbed
+    /// redesign — Build / Manage / Sell Orders are three different questions,
+    /// this is the nav selector between them). 0=Build, 1=Manage, 2=Sell Orders.
+    int           panel_view = 0;
 };
 
 /// Shared selection and view state for the three primary canvases.

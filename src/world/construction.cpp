@@ -1,5 +1,6 @@
 #include "construction.hpp"
 
+#include "market_clearing.hpp" // market_for_tile
 #include "placement_rules.hpp"
 
 construction_result construct_building(world& w, const recipe_registry& reg,
@@ -32,18 +33,37 @@ construction_result construct_building(world& w, const recipe_registry& reg,
 
     corporation_component& cc = corp_it->second;
     const building_economics& econ = reg.economics(type);
-    if (cc.balance < econ.build_cost)
-        return construction_result::insufficient_funds;
 
-    // Resource material cost (BL-044): check corp pool on the building's body.
-    const entity_id tile_body = tile_it->second.body;
-    stockpile_component& pool = w.pool_for(corp, tile_body);
+    // Material cost (BL-044/BL-095-lite): a building's resource_build_cost is
+    // displayed as materials but bought from the local market at its prevailing
+    // price, folded into the credit cost — "everything costs money", the
+    // resource line is what that money buys. This sidesteps the bootstrapping
+    // deadlock a corp-pool-only gate produced (a fresh corp's own pool starts
+    // empty and its refined surplus auto-sells each tick, so no building was
+    // ever placeable) without yet modelling a depletable market stockpile
+    // (that gate/charge distinction is the open question left to BL-095).
+    const market_component* mkt = nullptr;
+    {
+        const entity_id mid = market_for_tile(w, tile);
+        if (mid != null_entity)
+        {
+            const auto mit = w.markets.find(mid);
+            if (mit != w.markets.end())
+                mkt = &mit->second;
+        }
+    }
+    float material_cost = 0.0f;
     for (std::size_t r = 0; r < resource_count; ++r)
     {
-        if (econ.resource_build_cost[r] > 0.0f &&
-            pool.quantities[r] < econ.resource_build_cost[r])
-            return construction_result::insufficient_materials;
+        if (econ.resource_build_cost[r] <= 0.0f)
+            continue;
+        const float p = mkt ? (mkt->price[r] > 0.0f ? mkt->price[r] : mkt->base_price[r]) : 0.0f;
+        material_cost += econ.resource_build_cost[r] * p;
     }
+
+    const float total_cost = econ.build_cost + material_cost;
+    if (cc.balance < total_cost)
+        return construction_result::insufficient_funds;
 
     // Create and author the building, mirroring corporation_generation.cpp Pass 3.
     const entity_id bld_id = w.create_entity();
@@ -53,6 +73,9 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     bc.type               = type;
     // Staff producing buildings so they run; ports take no L3 production action.
     bc.workforce_assigned = (type == building_type::port) ? 0.0f : 0.5f;
+    // Build-time pacing (playtest patch, 2026-07-06): the building sits idle
+    // for build_duration_ticks economy ticks before economy_system lets it produce.
+    bc.ticks_remaining = static_cast<int>(econ.build_duration_ticks);
 
     if (type == building_type::extraction_site)
     {
@@ -69,10 +92,7 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     w.stockpiles[bld_id] = stockpile_component{};
 
     cc.assets.push_back(bld_id);
-    cc.balance -= econ.build_cost;
-    // Deduct material costs from corp pool (BL-044).
-    for (std::size_t r = 0; r < resource_count; ++r)
-        pool.quantities[r] -= econ.resource_build_cost[r];
+    cc.balance -= total_cost;
 
     out_building = bld_id;
     return construction_result::placed;

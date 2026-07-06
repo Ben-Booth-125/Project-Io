@@ -118,34 +118,43 @@ const char* scale_label(int scale)
 }
 
 // --- Build front door (tile Selection element) -------------------------------
-// Compact cost + material annotation for a build button (BL-044 legibility): the
-// budget cost plus every required material and whether the player corp's pool on this
-// body can cover it. `ok` gates the button (budget AND materials); the label makes the
-// material requirement visible instead of the former bare "(100)". Buildings genuinely
-// need these resources to construct (construction.cpp returns insufficient_materials) —
-// this surfaces that requirement up front rather than only on a failed click.
+// Compact cost + material annotation for a build button (BL-044/BL-095-lite
+// legibility): the credit cost plus every required material, priced at the
+// tile's local market and folded into the credit total. `ok` gates the button
+// on balance alone — materials are bought from the market, not drawn from the
+// corp's own pool, so the label communicates the requirement without a
+// separate pool-availability gate (construction.cpp mirrors this).
 struct build_afford { std::string label; bool ok; };
 build_afford build_cost_annotation(const world& w, const recipe_registry& reg,
-                                   building_type type, entity_id body, float balance)
+                                   building_type type, entity_id tile, float balance)
 {
     const building_economics& e = reg.economics(type);
-    const auto pit = w.corp_body_pools.find({w.player_entity, body});
-    const stockpile_component* pool = (pit != w.corp_body_pools.end()) ? &pit->second : nullptr;
 
+    const market_component* mkt = nullptr;
+    {
+        const entity_id mid = market_for_tile(w, tile);
+        if (mid != null_entity)
+        {
+            const auto mit = w.markets.find(mid);
+            if (mit != w.markets.end())
+                mkt = &mit->second;
+        }
+    }
+
+    float material_cost = 0.0f;
     std::string s = std::to_string(static_cast<int>(e.build_cost)) + " cr";
-    bool mats_ok = true;
     for (std::size_t r = 0; r < resource_count; ++r)
     {
         const float need = e.resource_build_cost[r];
         if (need <= 0.0f)
             continue;
-        const float have = pool ? pool->quantities[r] : 0.0f;
-        if (have < need)
-            mats_ok = false;
+        const float p = mkt ? (mkt->price[r] > 0.0f ? mkt->price[r] : mkt->base_price[r]) : 0.0f;
+        material_cost += need * p;
         s += " · " + std::to_string(static_cast<int>(need)) + ' '
            + resource_name(static_cast<resource_type>(r));
     }
-    return { s, (balance >= e.build_cost) && mats_ok };
+    const float total = e.build_cost + material_cost;
+    return { s, balance >= total };
 }
 
 // The per-tile entry to construction (docs/ui/SELECTION.md): offers the buildable
@@ -218,7 +227,7 @@ void draw_build_front_door(const world& w, const recipe_registry& reg,
         ImGui::NewLine();
 
         const build_afford ext =
-            build_cost_annotation(w, reg, building_type::extraction_site, tc.body, balance);
+            build_cost_annotation(w, reg, building_type::extraction_site, tile, balance);
         ImGui::BeginDisabled(!ext.ok);
         if (ImGui::Button("Build extraction site"))
             enqueue(building_type::extraction_site, ui.construction.target);
@@ -233,7 +242,7 @@ void draw_build_front_door(const world& w, const recipe_registry& reg,
 
     // --- Processing facility + Port: any non-ocean land tile ---
     const build_afford proc =
-        build_cost_annotation(w, reg, building_type::processing_facility, tc.body, balance);
+        build_cost_annotation(w, reg, building_type::processing_facility, tile, balance);
     ImGui::BeginDisabled(!proc.ok);
     if (ImGui::Button("Build processing facility"))
         enqueue(building_type::processing_facility, resource_type::iron_ore);
@@ -242,7 +251,7 @@ void draw_build_front_door(const world& w, const recipe_registry& reg,
     ImGui::TextDisabled("%s", proc.label.c_str());
 
     const build_afford prt =
-        build_cost_annotation(w, reg, building_type::port, tc.body, balance);
+        build_cost_annotation(w, reg, building_type::port, tile, balance);
     ImGui::BeginDisabled(!prt.ok);
     if (ImGui::Button("Build port"))
         enqueue(building_type::port, resource_type::iron_ore);

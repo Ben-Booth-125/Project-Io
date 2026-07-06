@@ -218,6 +218,15 @@ struct building_component
     /// field (the registry-wide index), which is updated when the player selects a
     /// different recipe via `active_recipe_index`.
     int  active_recipe_index = 0;
+
+    /// Economy ticks left before this building completes construction and starts
+    /// producing (playtest patch, 2026-07-06 — a build-spree headless check found
+    /// the player could place a dozen-plus buildings in a single instant burst
+    /// with zero ticks elapsed, since construction had no time cost at all; this
+    /// is the pacing gate). Set from `building_economics::build_duration_ticks`
+    /// at placement; decremented once per economy tick (economy_system.cpp) until
+    /// it reaches 0, at which point the building is built and operational.
+    int  ticks_remaining = 0;
 };
 
 /// Pooled resource quantities held by an entity.

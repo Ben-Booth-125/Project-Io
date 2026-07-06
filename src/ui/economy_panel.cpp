@@ -1,6 +1,7 @@
 #include "economy_panel.hpp"
 
 #include "format.hpp"
+#include "icons.hpp"
 #include "ledger_chrome.hpp" // shared ledger-window size + spawn anchor
 #include "plot_history.hpp"
 #include "presentation.hpp"
@@ -33,10 +34,19 @@ std::string body_label(const world& w, entity_id body)
     return "Body #" + std::to_string(body);
 }
 
-/// A resource name rendered in its identity colour (the shared swatch convention).
+/// A resource icon pip + name, so every listing carries a symbol the player can
+/// learn to recognise on sight, not just a colour-tinted word (playtest patch,
+/// 2026-07-06 — ICONS.md's per-resource glyph vocabulary is still one shape
+/// (the diamond pip) differentiated only by identity colour; distinct per-resource
+/// glyph shapes are a larger follow-on, not this quick pass).
 void resource_text(resource_type r)
 {
     const resource_presentation& rp = presentation_of(r);
+    const float sz = ImGui::GetTextLineHeight() * 0.4f;
+    const ImVec2 p = ImGui::GetCursorScreenPos();
+    icons::resource(ImGui::GetWindowDrawList(), ImVec2(p.x + sz, p.y + sz), sz, r);
+    ImGui::Dummy(ImVec2(sz * 2.0f, sz * 2.0f));
+    ImGui::SameLine(0.0f, 6.0f);
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(rp.colour), "%s", rp.name);
 }
 

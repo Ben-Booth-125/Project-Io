@@ -29,9 +29,15 @@ struct building_economics
     float base_wage   = 0.0f; ///< Wage per unit workforce per tick.
     float build_cost  = 0.0f; ///< One-off construction cost (Layer 4 build UI).
     /// Per-resource material cost of construction (BL-044). Indexed by
-    /// static_cast<std::size_t>(resource_type). Consumed from the corp's pool
-    /// on the body where the building is placed. Zero = no requirement for that good.
+    /// static_cast<std::size_t>(resource_type). Bought from the tile's local
+    /// market at its prevailing price, folded into the credit cost
+    /// (construction.cpp). Zero = no requirement for that good.
     std::array<float, resource_count> resource_build_cost = {};
+
+    /// Economy ticks the building spends under construction before it starts
+    /// producing (playtest patch, 2026-07-06). 0 = instant (pre-existing
+    /// behaviour), authored in scripts/economy.lua as `build_duration_ticks`.
+    float build_duration_ticks = 0.0f;
 };
 
 /// Startup-loaded registry of processing recipes and economy constants. Pure

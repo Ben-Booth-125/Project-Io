@@ -2042,6 +2042,106 @@
       "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
       "summary": "Idea (2026-07-06, Ben): the second, proper item — generate the starting stockpile instead of the BL-115 fixed give. Derive each corp's opening `corp_body_pools` from its `industrial_focus` + financial profile (seeded, deterministic), so starting materials read as focus-coherent the way Pass-3 assets and Pass-4 capital already do — extraction opens rich in its raws, processing with feed+output, trade with products. Model owed: which axes shape it, the per-focus resource mix, magnitude/variance. Supersedes BL-115; same seam (no new save field). Authority CORPORATION_GENERATION.md.",
       "design": "**Status:** design-owed — captured 2026-07-06 (Ben). The generative model that replaces BL-115's fixed give; model owed before promotion.\n\n### The idea\nThe opening stockpile should be **generated**, not flat — derived from the corporation's `industrial_focus` and financial profile so a corp's starting materials read as coherent with who it is, the same way starting assets (Pass 3) and starting capital (Pass 4) already are. An extraction corp opens rich in the raws it mines; a processing corp opens with feedstock + some refined output; a trade corp opens with tradeable products and thinner raws. Seeded and deterministic, consistent with the rest of corporation generation.\n\n### What exists today\nAfter BL-115, every corp opens with a **fixed** `corp_body_pools[{corp, home_body}]` stockpile (identical for all). Capital already varies (`compute_capital`, `wealth_variance`); assets already follow focus (Pass 3). The opening stockpile is the one dimension still flat.\n\n### Open design (owed)\n- **Shape function.** Stockpile as a function of what? Candidates: `industrial_focus` (mix per focus, mirroring the Pass-3 asset mix), `starting_capital` (wealthier corps open deeper), home-nation resource profile, or a blend — which axes and their weights.\n- **Per-focus resource mix.** Which resources each focus opens with (extraction → the raws it extracts; processing → feed + output; trade → products), grounded in the same focus→asset-mix patterns Pass 3 uses (and the open post-WW2 grounding item).\n- **Magnitude / variance.** A seeded range + a variance knob (cf. `wealth_variance`), tunable in a headless harness; how many turns of runway the opening stock represents.\n- **Player parity.** Symmetrical rules — the player generates on the same footing (CORPORATION_GENERATION.md § Player corporation); no special-case give.\n- **Pre-game warm-start interaction.** The generated stock seeds the 12-tick warm-start; decide whether magnitudes assume the warm-start runs (GUI) or the cold `--verify` state.\n\n### Seam / determinism\nSame seam as BL-115 — populates the existing `corp_body_pools` map at generation time; **no new serialised field**. Draw from a seeded RNG (like `capital_rng` / `seed_capital`) so it stays deterministic and reproducible under `--verify`.\n\n### Requirement (at promotion)\nHeadless: over a generated world, opening stockpiles correlate with focus (an extraction corp opens richer in its raws than a trade corp does) and with capital per the settled shape; deterministic (same seed → same pools). Replaces BL-115's fixed-give assertion.\n\n### Relationships\n- **Supersedes BL-115** (fixed prototype give) — generalises the flat opening stockpile into a focus/wealth-shaped one; land BL-115 first (cheap unblock), then replace its constants here. Not a hard `requires` (BL-116 could be built directly), but the intended sequence is prototype-first.\n- **Feeds BL-112** (STARTING_ECONOMY_VIABILITY) — a focus-coherent opening stock is part of a reachable starting economy.\n- Slots into corporation generation beside Pass 3 (asset mix) and Pass 4 (financial profile); shares their open **post-WW2 industrial grounding** item (CORPORATION_GENERATION.md § Open items).\n- Distinct from BL-095/096 (market stockpiles / market generation) — this is the corp's opening inventory, not the market's.\n- Touches generation only (no new save field) → determinism-sensitive, not a save-seam change. Do not edit CORPORATION_GENERATION.md ahead of the work (authority time-slicing).\n- Authority docs/generation/CORPORATION_GENERATION.md."
+    },
+    {
+      "id": "BL-117",
+      "short_name": "ECONOMY_PANEL_ONE_QUESTION_AUDIT",
+      "category": "UI",
+      "title": "Economy panel: split into bounded one-question views (precedent: Construction panel redesign)",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "B",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-06",
+      "files": [
+        "src/ui/economy_panel.cpp"
+      ],
+      "authority_doc": "docs/ui/LAYOUT.md",
+      "summary": "Idea (2026-07-06, Ben): 'each view must address one question; a menu allows navigation between multiple views.' Applied this session to the Construction panel (BL-095-lite session — Build / Manage / Sell Orders, a button-strip nav replacing four stacked CollapsingHeader sections). Economy panel is the next, most-overloaded candidate: it stacks FIVE CollapsingHeader sections (Corporation balances, Stockpile pools, Workforce, Player balance trend, Markets) in one scrolling column — at least three distinct questions ('how are corps doing', 'what do I have where', 'what's the market doing'). Audit + split using the Construction-panel button-strip nav as the template.",
+      "design": "**Status:** design-owed — captured 2026-07-06 (Ben's steer, applied first to Construction this session). Design owed: which sections group into which bounded view, and whether the nav is per-corp-scoped or global.\n\n### The principle (from the Construction-panel precedent)\nA panel is a **bounded space for one class of question**; when it answers several unrelated questions it should expose a small nav (tabs or a button strip — construction_panel.cpp's redesign this session used a manual button-strip because ImGui::BeginTabBar's header mysteriously didn't render in this build/environment; worth retrying tabs once that's understood, but the button strip works and is the fallback) between separate bounded views, not one long scrolling stack.\n\n### What's stacked today (economy_panel.cpp)\nFive `CollapsingHeader` sections in one window: **Corporation balances** (cross-corp comparison), **Stockpile pools** (corp x body inventory), **Workforce** (corp x body staffing), **Player balance trend** (a chart), **Markets** (supply/demand/price). These serve at least three different player questions: *how is everyone doing financially* (balances + trend), *what do I have and where* (stockpiles + workforce), *what's the market doing* (markets).\n\n### Open design (owed)\n- **Grouping.** Which sections share a bounded view? A natural split: \"Corporations\" (balances + trend), \"My Holdings\" (stockpiles + workforce), \"Markets\" (supply/demand/price) — but confirm against how players actually use it.\n- **Nav mechanism.** Reuse the Construction panel's button-strip pattern (`ui_state`-held `panel_view` int) for consistency, unless ImGui tabs are sorted out first.\n- **Scope bleed with Balance Ledger / Corporation panel.** economy_panel.cpp already overlaps in subject matter with balance_ledger.cpp (Treasury/Cashflow/Assets) and corporation_panel.cpp — worth checking whether a section belongs in a *different* window entirely, not just a different tab of this one.\n\n### Requirement (at promotion)\nVisual: each bounded view renders only its own question's content; the nav switches between them; no section answers more than one view's question.\n\n### Relationships\nSame principle as the Construction-panel redesign (this session, uncommitted at time of writing). Candidate sibling items: BL-118 (Balance Ledger), BL-119 (Tile Ledger), BL-120 (Market Ledger), BL-121 (Corporation panel) — run as a coherent sweep if picked up together, but each is independently scoped."
+    },
+    {
+      "id": "BL-118",
+      "short_name": "BALANCE_LEDGER_ONE_QUESTION_AUDIT",
+      "category": "UI",
+      "title": "Balance ledger: audit Treasury / Cashflow / Assets against the one-question-per-view principle",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "C",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-06",
+      "files": [
+        "src/ui/balance_ledger.cpp"
+      ],
+      "authority_doc": "docs/ui/LAYOUT.md",
+      "summary": "Idea (2026-07-06, Ben): the one-question-per-view sweep (see BL-117) applied to the Balance Ledger, which stacks three SeparatorText sections (Treasury, Cashflow last tick, Assets) in one window. Lighter than economy_panel (3 sections, arguably already coherent — all answer 'what's my financial position') but worth a quick pass to confirm, and to check overlap with economy_panel's own balance/trend sections (BL-117) before deciding whether these merge, split, or stay as-is.",
+      "design": "**Status:** design-owed — captured 2026-07-06 (Ben's steer). Lightest of the panel-audit sweep; likely confirms the existing layout rather than changing it.\n\n### What's there today\n`balance_ledger.cpp` stacks **Treasury**, **Cashflow (last tick)**, and **Assets** under `SeparatorText`, not `CollapsingHeader` (so all three are always visible, not independently collapsible) — a tighter, more defensible grouping than economy_panel's five, since all three plausibly answer one question: \"what's my corp's financial position right now.\"\n\n### Open design (owed)\n- Confirm the three sections genuinely serve one question, or whether Assets (a list of holdings) is really a different question (\"what do I own\") that belongs with economy_panel's Stockpile pools (BL-117) instead.\n- If confirmed single-question, this item resolves as \"no change needed\" — a real, useful outcome of the audit, not a failure to find work.\n\n### Requirement (at promotion)\nA short written verdict (merge/split/no-change) +, if changed, the same bounded-view treatment as BL-117.\n\n### Relationships\nPart of the same sweep as BL-117 (Economy panel), BL-119 (Tile Ledger), BL-120 (Market Ledger), BL-121 (Corporation panel). Overlaps economy_panel's balance/trend sections — resolve together if both are picked up."
+    },
+    {
+      "id": "BL-119",
+      "short_name": "TILE_LEDGER_ONE_QUESTION_AUDIT",
+      "category": "UI",
+      "title": "Tile Ledger: audit Buildings / Market sections against the one-question-per-view principle",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "C",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-06",
+      "files": [
+        "src/ui/tile_inspector.cpp"
+      ],
+      "authority_doc": "docs/ui/LAYOUT.md",
+      "summary": "Idea (2026-07-06, Ben): the one-question-per-view sweep (see BL-117) applied to the Tile Ledger, which stacks Buildings and Market SeparatorText sections. Only two sections — the smallest of the sweep — but check whether 'what's built here' and 'what's this tile's market doing' are actually one question (this place) or two, and whether it overlaps the tile Selection element (SELECTION.md) which already covers per-tile detail elsewhere.",
+      "design": "**Status:** design-owed — captured 2026-07-06 (Ben's steer). Smallest item in the panel-audit sweep.\n\n### What's there today\n`tile_inspector.cpp` stacks **Buildings** and **Market** under `SeparatorText`. Both are scoped to the *same tile/body*, which is a reasonable unifying question (\"what's here\"), unlike economy_panel's cross-cutting mix (BL-117).\n\n### Open design (owed)\n- Check for overlap with the tile **Selection element** (SELECTION.md) — the Tile Ledger and Selection panel both show per-tile detail today via shared content builders (per CLAUDE.md's SELECTION.md note); confirm this ledger isn't duplicating what Selection already answers, or clarify the division of labour (Selection = quick glance, Ledger = full detail table) if it's intentional.\n- If the tile-scoping already makes this one coherent question, likely resolves as \"no change needed.\"\n\n### Requirement (at promotion)\nA short written verdict (merge/split/no-change/clarify-vs-Selection) +, if changed, the bounded-view treatment from BL-117.\n\n### Relationships\nPart of the same sweep as BL-117 (Economy panel), BL-118 (Balance Ledger), BL-120 (Market Ledger), BL-121 (Corporation panel). Cross-check against SELECTION.md's per-entity content builders."
+    },
+    {
+      "id": "BL-120",
+      "short_name": "MARKET_LEDGER_ONE_QUESTION_AUDIT",
+      "category": "UI",
+      "title": "Market Ledger: audit against the one-question-per-view principle",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "C",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-06",
+      "files": [
+        "src/ui/market_ledger.cpp"
+      ],
+      "authority_doc": "docs/ui/LAYOUT.md",
+      "summary": "Idea (2026-07-06, Ben): the one-question-per-view sweep (see BL-117) applied to the Market Ledger. Unlike Economy/Balance/Tile, market_ledger.cpp has no internal CollapsingHeader/SeparatorText stacking today (single-purpose already) — this item is a confirmation pass, and the place to decide whether Construction panel's Sell Orders tab (this session's redesign) should actually live here instead, since 'how do I sell what I make' is a market question that currently sits in the Construction window.",
+      "design": "**Status:** design-owed — captured 2026-07-06 (Ben's steer). Likely confirms the panel is already fine; the real decision here is the Sell Orders relocation question.\n\n### What's there today\n`market_ledger.cpp` shows per-resource price/supply/demand and a trend combo — no internal multi-section stacking, so it likely already satisfies one-question-per-view on its own terms.\n\n### The open relocation question\nThis session's Construction-panel redesign added a **Sell Orders** tab/view (construction_panel.cpp) because that's where it already lived — but \"how do I sell what I make\" is arguably a *market* question, not a *construction* question, and its natural home may be a tab/section on the Market Ledger instead. Flagged there rather than moved this session (cross-panel moves are a bigger call than in-panel tabbing).\n\n### Requirement (at promotion)\nA written verdict on the Sell Orders relocation (move / stay / duplicate-with-a-reason) plus confirmation the rest of the panel needs no split.\n\n### Relationships\nPart of the same sweep as BL-117 (Economy panel), BL-118 (Balance Ledger), BL-119 (Tile Ledger), BL-121 (Corporation panel). Directly follows from this session's Construction-panel tabbed redesign (construction_panel.cpp's Sell Orders view)."
+    },
+    {
+      "id": "BL-121",
+      "short_name": "CORPORATION_PANEL_ONE_QUESTION_AUDIT",
+      "category": "UI",
+      "title": "Corporation panel: audit against the one-question-per-view principle",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "C",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-06",
+      "files": [
+        "src/ui/corporation_panel.cpp"
+      ],
+      "authority_doc": "docs/ui/LAYOUT.md",
+      "summary": "Idea (2026-07-06, Ben): the one-question-per-view sweep (see BL-117) applied to the Corporation panel (window title 'Corporations') — like Market Ledger, it has no internal CollapsingHeader/SeparatorText stacking today, so this is a confirmation pass plus a check for overlap with economy_panel's 'Corporation balances' section (BL-117), which shows the same cross-corp comparison in a different window.",
+      "design": "**Status:** design-owed — captured 2026-07-06 (Ben's steer). Confirmation pass; the open question is overlap with economy_panel, not internal structure.\n\n### What's there today\n`corporation_panel.cpp` (window \"Corporations\") has no internal multi-section stacking — single-purpose already on its own terms.\n\n### The open overlap question\neconomy_panel.cpp's \"Corporation balances\" section (flagged in BL-117) shows the same cross-corporation comparison this panel presumably also covers. Once BL-117 settles its grouping, check whether \"Corporations\" and economy_panel's balances section should merge into one, or are genuinely different views (e.g. this panel per-corp profile vs. economy_panel's list/comparison table).\n\n### Requirement (at promotion)\nA written verdict on the economy_panel overlap (merge / stay distinct with a stated reason) once BL-117 is settled.\n\n### Relationships\nPart of the same sweep as BL-117 (Economy panel — resolve together, this item is largely gated on BL-117's grouping decision), BL-118 (Balance Ledger), BL-119 (Tile Ledger), BL-120 (Market Ledger)."
     }
   ]
 }

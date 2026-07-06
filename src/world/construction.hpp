@@ -14,7 +14,7 @@ enum class construction_result : uint8_t
     no_corp,             ///< The corporation entity does not exist.
     no_tile,             ///< The tile entity does not exist.
     slot_occupied,       ///< The body's per-type cap is full (Launchpad: max 1 per body).
-    insufficient_materials, ///< The building's resource_build_cost cannot be met from the corp's pool (BL-044).
+    insufficient_materials, ///< Unreachable since BL-095-lite folded material cost into credits (kept for switch compat).
 };
 
 /// Attempt to construct a building of `type` (targeting `target` for an extraction
