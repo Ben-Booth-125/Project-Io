@@ -25,36 +25,45 @@ economy = {
     --   maintenance — flat per-tick upkeep charged to the owning corp.
     --   base_wage   — wage per unit workforce per tick (wage = workforce * base_wage).
     --   build_cost  — one-off construction cost (used by the Layer 4 build UI).
+    -- MATERIAL COSTS DISABLED (2026-07-06) — construction is credits-only until BL-095.
+    -- Why: BL-044 gave every building a steel material cost, checked against the
+    -- corp's own pool on the body (construction.cpp). But steel produced by a corp's
+    -- smelter is auto-sold as surplus each tick (market_clearing.cpp — only processor
+    -- inputs are retained, and construction is not a processor input), so the pool
+    -- steel never rises above ~0 and NO building is ever placeable from a fresh start
+    -- — a hard bootstrapping deadlock (you can't place your first building). The
+    -- proper fix is BL-095 (construction draws steel from the local MARKET stock,
+    -- paid in credits — the player has cash and the market has steel). Until BL-095
+    -- lands, `resource_costs = {}` restores the playable credits-only loop.
     buildings = {
         extraction_site = {
             base_rate   = 20.0,
             maintenance = 5.0,
             base_wage   = 8.0,
             build_cost  = 100.0,
-            -- Resource material cost (BL-044). Keys are resource_type names;
-            -- the loader maps them to resource_build_cost[].
-            resource_costs = { steel = 20.0 },
+            -- Resource material cost (BL-044) — re-enable via BL-095 (market-sourced).
+            resource_costs = { },
         },
         processing_facility = {
             base_rate   = 8.0,
             maintenance = 10.0,
             base_wage   = 12.0,
             build_cost  = 200.0,
-            resource_costs = { steel = 25.0 },
+            resource_costs = { },
         },
         port = {
             base_rate   = 0.0,
             maintenance = 8.0,
             base_wage   = 6.0,
             build_cost  = 150.0,
-            resource_costs = { steel = 20.0 },
+            resource_costs = { },
         },
         launchpad = {
             base_rate   = 0.0,
             maintenance = 20.0,
             base_wage   = 15.0,
             build_cost  = 500.0,
-            resource_costs = { steel = 50.0, refined_fuel = 20.0 },
+            resource_costs = { },
         },
     },
 }
