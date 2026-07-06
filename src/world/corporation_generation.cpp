@@ -507,24 +507,52 @@ float compute_capital(float base_capital,
     return capital;
 }
 
-/// The opening resource stockpile every corporation is seeded with on its home
-/// body, so build / production / trade have materials from turn one rather than
-/// an empty pool warmed only by the pre-game ticks (CORPORATION_GENERATION.md
+/// The opening resource stockpile a corporation is seeded with on its home body,
+/// so build / production / trade have materials from turn one rather than an
+/// empty pool warmed only by the pre-game ticks (CORPORATION_GENERATION.md
 /// § Pre-game operating history; addresses the construction deadlock a712b05).
 ///
-/// BL-114 — the prototype "just give these": a fixed slug of the seven-resource
-/// prototype subset (RESOURCES.md), identical for every corporation. BL-115
-/// generalises this into a focus / wealth-shaped generated stockpile.
-std::array<float, resource_count> compute_starting_stockpile()
+/// BL-115 — generated from industrial focus + financial profile (replaces the
+/// BL-114 fixed give). Per-focus weights over the seven-resource prototype
+/// subset (RESOURCES.md) read as "who holds what at the gate": extraction
+/// hoards the raws it mines; processing pairs feedstock with refined output;
+/// trade carries finished goods and thinner raws. Magnitude scales with
+/// starting capital; a seeded per-resource jitter varies it without disturbing
+/// the focus ordering. Deterministic: draws from `rng` once per prototype
+/// resource in a fixed order (every corp advances the stream identically).
+std::array<float, resource_count> generate_starting_stockpile(
+    industrial_focus focus, float capital, float base_capital, std::mt19937& rng)
 {
+    // Four raws (iron ore, petroleum, water, agricultural produce) then three
+    // refined (steel, refined fuel, food rations). Columns: extraction /
+    // processing / trade weights; weight 1.0 → ~base_units before scaling.
+    struct focus_stock { resource_type res; float extraction, processing, trade; };
+    static const focus_stock table[] = {
+        { resource_type::iron_ore,             2.0f, 1.0f, 0.5f },
+        { resource_type::petroleum,            1.5f, 0.8f, 0.5f },
+        { resource_type::water,                1.5f, 0.5f, 0.5f },
+        { resource_type::agricultural_produce, 1.5f, 0.8f, 0.5f },
+        { resource_type::steel,                0.3f, 1.2f, 1.2f },
+        { resource_type::refined_fuel,         0.3f, 1.0f, 1.2f },
+        { resource_type::food_rations,         0.3f, 0.8f, 1.0f },
+    };
+
+    constexpr float base_units = 100.0f;
+    float cap_scalar = (base_capital > 0.0f) ? capital / base_capital : 1.0f;
+    if (cap_scalar < 0.5f) cap_scalar = 0.5f;   // clamp the wealth spread so a
+    if (cap_scalar > 2.0f) cap_scalar = 2.0f;   // poor/rich corp stays sane
+
+    std::uniform_real_distribution<float> jitter(0.85f, 1.15f);
+
     std::array<float, resource_count> s = {};
-    s[static_cast<std::size_t>(resource_type::iron_ore)]             = 200.0f;
-    s[static_cast<std::size_t>(resource_type::petroleum)]            = 150.0f;
-    s[static_cast<std::size_t>(resource_type::water)]                = 150.0f;
-    s[static_cast<std::size_t>(resource_type::agricultural_produce)] = 150.0f;
-    s[static_cast<std::size_t>(resource_type::steel)]                = 100.0f;
-    s[static_cast<std::size_t>(resource_type::refined_fuel)]         =  80.0f;
-    s[static_cast<std::size_t>(resource_type::food_rations)]         =  80.0f;
+    for (const focus_stock& fs : table)         // fixed order → deterministic draws
+    {
+        const float w = (focus == industrial_focus::extraction) ? fs.extraction
+                      : (focus == industrial_focus::processing) ? fs.processing
+                      :                                            fs.trade;
+        const float j = jitter(rng);            // drawn for every resource, in order
+        s[static_cast<std::size_t>(fs.res)] = base_units * w * cap_scalar * j;
+    }
     return s;
 }
 
@@ -669,6 +697,7 @@ std::vector<entity_id> generate_corporations(
     const uint32_t seed_focus   = seed ^ 0x2F3E4D5Cu;
     const uint32_t seed_asset   = seed ^ 0x9D8C7B6Au;
     const uint32_t seed_capital = seed ^ 0x5A4B3C2Du;
+    const uint32_t seed_stock   = seed ^ 0xC3D4E5F6u;
     const uint32_t seed_name    = seed ^ 0xE1F2031Cu;
 
     const int corp_count = params.corporation_count;
@@ -778,6 +807,9 @@ std::vector<entity_id> generate_corporations(
             capital_rng);
     }
 
+    // Independent stream for the generated starting stockpile (BL-115).
+    std::mt19937 stock_rng(seed_stock);
+
     // ---------------------------------------------------------------------------
     // Pass 5 — naming
     // ---------------------------------------------------------------------------
@@ -826,14 +858,19 @@ std::vector<entity_id> generate_corporations(
         corp_ids.push_back(corp_id);
         w.corporations[corp_id] = std::move(cc);
 
-        // Starting resource stockpile (BL-114): seed the corp's opening pool on
-        // its home body so build / production / trade have materials from turn
-        // one. Populates the existing corp_body_pools map (no new save field);
-        // deterministic (no RNG). A corp with no holdings has no home body and
-        // is skipped. The pre-game warm-start then evolves this seed.
+        // Starting resource stockpile (BL-115): generate a focus / wealth-shaped
+        // opening stockpile and seed it on the corp's home body so build /
+        // production / trade have materials from turn one. Generated for every
+        // corp (fixed RNG-draw order) so the stream stays deterministic even
+        // when a holdless corp has no body to seed; only corps with a home body
+        // receive a pool. Populates the existing corp_body_pools map (no new
+        // save field). The pre-game warm-start then evolves this seed.
+        const auto stock = generate_starting_stockpile(
+            corp_focuses[static_cast<std::size_t>(c)],
+            corp_capitals[static_cast<std::size_t>(c)],
+            params.base_capital, stock_rng);
         if (home_body != null_entity)
         {
-            const auto stock = compute_starting_stockpile();
             stockpile_component& pool = w.pool_for(corp_id, home_body);
             for (std::size_t r = 0; r < resource_count; ++r)
                 pool.quantities[r] += stock[r];

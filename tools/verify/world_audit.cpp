@@ -220,12 +220,14 @@ int main()
     std::printf("  B4 R1 every corp holding count within its focus ceiling (>=1): %s\n",
                 holdings_bad == 0 ? "PASS" : "FAIL");
 
-    // --- BL-114 (corp starting stockpile, R1): every corp that opens with at
-    // least one asset is seeded with the fixed prototype stockpile on its home
-    // body. make_hard_coded_world() is the cold generation state (no pre-game
-    // ticks), so pools equal the fixed give exactly. Non-prototype resources
-    // stay zero. Deterministic — the give uses no RNG. Keep want_stock in sync
-    // with compute_starting_stockpile() in corporation_generation.cpp. ---
+    // --- BL-115 (generated corp starting stockpile): the opening stockpile is
+    // generated from industrial focus + starting capital (replaces BL-114's
+    // fixed give). make_hard_coded_world() is the cold generation state (no
+    // pre-game ticks), so pools equal the generated give exactly. Checks:
+    //   R1 every corp with holdings opens with a non-empty stockpile on its home
+    //      body, scoped to the seven prototype resources (nothing else stocked);
+    //   R2 focus correlation — extraction corps open richer in raws than trade;
+    //   R3 determinism — a second generation yields identical stockpiles. ---
     auto home_body_of = [&](const corporation_component& corp) -> entity_id {
         for (entity_id bid : corp.assets)
         {
@@ -236,16 +238,21 @@ int main()
         }
         return null_entity;
     };
-    std::array<float, resource_count> want_stock = {};
-    want_stock[ri(resource_type::iron_ore)]             = 200.0f;
-    want_stock[ri(resource_type::petroleum)]            = 150.0f;
-    want_stock[ri(resource_type::water)]                = 150.0f;
-    want_stock[ri(resource_type::agricultural_produce)] = 150.0f;
-    want_stock[ri(resource_type::steel)]                = 100.0f;
-    want_stock[ri(resource_type::refined_fuel)]         =  80.0f;
-    want_stock[ri(resource_type::food_rations)]         =  80.0f;
+    const resource_type prototype_set[] = {
+        resource_type::iron_ore, resource_type::petroleum, resource_type::water,
+        resource_type::agricultural_produce, resource_type::steel,
+        resource_type::refined_fuel, resource_type::food_rations };
+    const resource_type raw_set[] = {
+        resource_type::iron_ore, resource_type::petroleum,
+        resource_type::water, resource_type::agricultural_produce };
+    auto is_prototype = [&](std::size_t r) {
+        for (resource_type p : prototype_set) if (ri(p) == r) return true;
+        return false;
+    };
 
     int stock_corps = 0, stock_bad = 0;
+    double ext_raw_sum = 0.0, trade_raw_sum = 0.0;
+    int ext_n = 0, trade_n = 0;
     for (const auto& [cid, corp] : w.corporations)
     {
         if (corp.assets.empty()) continue;         // no holdings → no home body
@@ -266,22 +273,66 @@ int main()
                         static_cast<unsigned>(cid));
             continue;
         }
+        const auto& q = pit->second.quantities;
+        float total = 0.0f;
         for (std::size_t r = 0; r < resource_count; ++r)
         {
-            const float got = pit->second.quantities[r];
-            if (got < want_stock[r] - 1e-2f || got > want_stock[r] + 1e-2f)
+            total += q[r];
+            if (!is_prototype(r) && q[r] != 0.0f)
             {
-                if (stock_bad < 8)
-                    std::printf("  BAD: corp=%u res %zu stock=%.2f want=%.2f\n",
-                                static_cast<unsigned>(cid), r, got, want_stock[r]);
                 ++stock_bad;
+                std::printf("  BAD: corp=%u non-prototype res %zu stocked (%.2f)\n",
+                            static_cast<unsigned>(cid), r, q[r]);
             }
         }
+        if (total <= 0.0f)
+        {
+            ++stock_bad;
+            std::printf("  BAD: corp=%u opens with an empty stockpile\n",
+                        static_cast<unsigned>(cid));
+        }
+        float raw = 0.0f;
+        for (resource_type rr : raw_set) raw += q[ri(rr)];
+        if (corp.focus == industrial_focus::extraction) { ext_raw_sum += raw; ++ext_n; }
+        else if (corp.focus == industrial_focus::trade)  { trade_raw_sum += raw; ++trade_n; }
     }
     std::printf("Corp starting stockpiles: %d stocked corps, %d discrepancies\n",
                 stock_corps, stock_bad);
-    std::printf("  BL-114 R1 every corp opens with the fixed prototype stockpile on its home body: %s\n",
+    std::printf("  BL-115 R1 every corp opens non-empty, prototype-scoped, on its home body: %s\n",
                 stock_bad == 0 ? "PASS" : "FAIL");
+
+    bool focus_ok = true;
+    if (ext_n > 0 && trade_n > 0)
+    {
+        const double ext_mean   = ext_raw_sum / ext_n;
+        const double trade_mean = trade_raw_sum / trade_n;
+        focus_ok = ext_mean > trade_mean;
+        std::printf("  raw-stock mean: extraction=%.1f (n=%d)  trade=%.1f (n=%d)\n",
+                    ext_mean, ext_n, trade_mean, trade_n);
+        std::printf("  BL-115 R2 extraction opens richer in raws than trade: %s\n",
+                    focus_ok ? "PASS" : "FAIL");
+    }
+    else
+    {
+        std::printf("  BL-115 R2 focus correlation: SKIP (need >=1 extraction and >=1 trade; ext=%d trade=%d)\n",
+                    ext_n, trade_n);
+    }
+
+    world w2 = make_hard_coded_world();
+    bool det_ok = (w.corp_body_pools.size() == w2.corp_body_pools.size());
+    int det_bad = 0;
+    for (const auto& [key, pool] : w.corp_body_pools)
+    {
+        const auto it2 = w2.corp_body_pools.find(key);
+        if (it2 == w2.corp_body_pools.end()) { ++det_bad; continue; }
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (pool.quantities[r] != it2->second.quantities[r]) { ++det_bad; break; }
+    }
+    if (det_bad != 0) det_ok = false;
+    std::printf("  BL-115 R3 stockpiles identical across two generations (%zu pools, %d mismatched): %s\n",
+                w.corp_body_pools.size(), det_bad, det_ok ? "PASS" : "FAIL");
+
+    const bool stockpile_ok = (stock_bad == 0) && focus_ok && det_ok;
 
     // --- BL-040: full raw-set deposit-distribution audit ---
     // Every raw resource the full-set pass adds must now be authored somewhere in
@@ -336,7 +387,7 @@ int main()
                 variance_ok ? "PASS" : "FAIL");
 
     return (fw_frac >= 3.0f && bad == 0 && seed_bad == 0 && seam_bad == 0
-            && unclaimed_land == 0 && holdings_bad == 0 && stock_bad == 0
+            && unclaimed_land == 0 && holdings_bad == 0 && stockpile_ok
             && absent == 0 && ordering_ok
             && count_ok && variance_ok) ? 0 : 1;
 }
