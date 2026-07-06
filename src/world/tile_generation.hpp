@@ -80,6 +80,11 @@ struct generation_record
 /// @param gh      Grid height (rows); pole-to-pole, with the polar caps truncated.
 /// @param profile Solar parameters driving composition, ocean, and landforms.
 /// @param seed    Per-body RNG seed for independent, reproducible results.
+/// @param deposit_scalar Resource-abundance multiplier on generated deposits (BL-114).
+///                1.0 = the earth-like ceiling; leaner worlds pass a value below 1
+///                (GENERATION_STRATEGY.md § The resource ceiling). Applied as a pure
+///                post-multiply on the deposit array — it consumes no RNG, so a scalar
+///                of 1.0 reproduces the unscaled surface bit-for-bit.
 /// @param record  Optional out-param; when non-null, receives the per-pass intermediates.
 /// @return        Tile entity IDs in raster order (index = row * gw + col).
 std::vector<entity_id> generate_body_tiles(
@@ -88,6 +93,7 @@ std::vector<entity_id> generate_body_tiles(
     int gw, int gh,
     const body_profile& profile,
     uint32_t seed,
+    float deposit_scalar = 1.0f,
     generation_record* record = nullptr);
 
 /// Scan raster order and return the first @p n land (non-ocean) tile IDs. Used to

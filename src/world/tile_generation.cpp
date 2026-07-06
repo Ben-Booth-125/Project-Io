@@ -730,6 +730,7 @@ std::vector<entity_id> generate_body_tiles(
     int gw, int gh,
     const body_profile& profile,
     uint32_t seed,
+    float deposit_scalar,
     generation_record* record)
 {
     const int total = gw * gh;
@@ -916,6 +917,15 @@ std::vector<entity_id> generate_body_tiles(
             std::array<float, resource_count> deposits{};
             if (!is_ocean[idx])
                 generate_deposits(comp[idx], land[idx], deposits, tile_rng, rare_rng, rarity);
+
+            // BL-114: resource-abundance scalar. A pure post-multiply on the filled
+            // deposit array — it draws no RNG, so deposit_scalar == 1.0f reproduces the
+            // unscaled surface bit-for-bit. Earth-like is the ceiling (1.0); leaner
+            // worlds pass a value below 1 (GENERATION_STRATEGY.md § The resource
+            // ceiling). Applied before the reserve below so both scale consistently.
+            for (std::size_t r = 0; r < resource_count; ++r)
+                if (deposits[r] > 0.0f)
+                    deposits[r] *= deposit_scalar;
 
             // Seed the finite extraction reserve from richness. Richness stays the
             // rate multiplier; the reserve is what depletion (economy_system.cpp)

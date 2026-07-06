@@ -44,6 +44,7 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <random>
 #include <stdexcept>
 #include <string>
 #include <unordered_set>
@@ -290,7 +291,7 @@ void app::start_new_game()
         m_sim_loop.set_speed(cfg.get_or("default_speed", 1));
     }
 
-    setup_world();
+    setup_world(m_pending_world_params);
     load_economy();
 
     // Pre-game warm start ([C3] pre-game profit): seed the balance history with the
@@ -370,9 +371,10 @@ void app::step_economy()
     }
 }
 
-void app::setup_world()
+void app::setup_world(world_params params)
 {
-    m_world = make_hard_coded_world();
+    m_active_world_params = params;          // remember the descriptor the live world was built from
+    m_world = make_hard_coded_world(params);
 
     // Set the initial solar zoom so the default view covers roughly 5 AU.
     // The auto-fit scale at zoom 1 shows max_radius_au; dividing it by 5 zooms
@@ -1031,6 +1033,60 @@ void app::draw_main_menu()
         centre_text(title, IM_COL32(225, 230, 240, 255));
         centre_text(tag,   IM_COL32(120, 128, 145, 255));
         ImGui::Dummy({0.0f, 18.0f});
+
+        // --- New World setup (BL-114). Every widget edits m_pending_world_params,
+        //     which start_new_game() consumes; each carries a unique ##id so it never
+        //     collides with the centred buttons below. ---
+        world_params& wp = m_pending_world_params;
+        ImGui::SeparatorText("New World");
+
+        // Seed — hex entry + a one-shot randomise. The random_device draw feeds ONLY
+        // the seed value; no entropy ever enters world generation, which stays a pure
+        // function of this seed (same seed + knobs -> identical world).
+        ImGui::TextUnformatted("Seed");
+        ImGui::SetNextItemWidth(210.0f);
+        ImGui::InputScalar("##seed", ImGuiDataType_U32, &wp.seed, nullptr, nullptr,
+                           "%08X", ImGuiInputTextFlags_CharsHexadecimal);
+        ImGui::SameLine();
+        if (ImGui::Button("Roll##seedroll", {64.0f, 0.0f}))
+        {
+            std::random_device rd;
+            wp.seed = static_cast<uint32_t>(rd());
+        }
+        {
+            // Copyable readout of the reproducible key.
+            char seedhex[16];
+            std::snprintf(seedhex, sizeof seedhex, "%08X", wp.seed);
+            if (ImGui::Button("Copy seed##seedcopy", {280.0f, 0.0f}))
+                ImGui::SetClipboardText(seedhex);
+        }
+
+        // Resource abundance — Earth-like 'Standard' is the ceiling; the leaner tiers
+        // step down (GENERATION_STRATEGY.md § The resource ceiling).
+        ImGui::TextUnformatted("Resources");
+        int ab = static_cast<int>(wp.abundance);
+        ImGui::RadioButton("Sparse##ab",   &ab, static_cast<int>(abundance_level::sparse));
+        ImGui::SameLine();
+        ImGui::RadioButton("Lean##ab",     &ab, static_cast<int>(abundance_level::lean));
+        ImGui::SameLine();
+        ImGui::RadioButton("Standard##ab", &ab, static_cast<int>(abundance_level::standard));
+        wp.abundance = static_cast<abundance_level>(ab);
+
+        // Nations on the home body (the Voronoi merge target).
+        ImGui::SetNextItemWidth(280.0f);
+        ImGui::SliderInt("##nations", &wp.nation_count, 6, 20, "Nations: %d");
+
+        // Bodies — the count knob is phased to a later update; shown disabled so the
+        // intent reads without implying it works yet.
+        ImGui::BeginDisabled();
+        int bodies_stub = 5;
+        ImGui::SetNextItemWidth(280.0f);
+        ImGui::SliderInt("##bodies", &bodies_stub, 5, 5, "Bodies: %d (fixed)");
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+            ImGui::SetTooltip("A variable body count is coming in a later update.");
+
+        ImGui::Dummy({0.0f, 12.0f});
 
         const ImVec2 btn = {280.0f, 40.0f};
         if (ImGui::Button("New Game", btn))

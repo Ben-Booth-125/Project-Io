@@ -25,11 +25,36 @@ std::array<float, resource_count> resource_array(
     return a;
 }
 
+// Map an abundance tier to the deposit multiplier passed to generate_body_tiles.
+// Earth-like `standard` is the ceiling (1.0×); leaner tiers step down (never up).
+// See GENERATION_STRATEGY.md § The resource ceiling.
+float deposit_scalar_for(abundance_level a)
+{
+    switch (a)
+    {
+        case abundance_level::sparse:   return 0.40f;
+        case abundance_level::lean:     return 0.65f;
+        case abundance_level::standard: return 1.00f;
+    }
+    return 1.00f;
+}
+
 } // namespace
 
-world make_hard_coded_world()
+world make_hard_coded_world(world_params params)
 {
     world w;
+
+    // The resource-abundance multiplier every body's deposit pass is scaled by.
+    // At the default `standard` tier this is 1.0f, so a default-params world is
+    // bit-identical to the pre-BL-114 generation.
+    const float deposit_scalar = deposit_scalar_for(params.abundance);
+
+    // Nation knob → Voronoi params. Preserve the over-seed/merge shape (today: 18
+    // seeds merged to 14): merge to the requested count, pre-seed a few extra so the
+    // merge still has material to work with. Clamped to a sane floor.
+    const int merge_to   = params.nation_count < 2 ? 2 : params.nation_count;
+    const int pre_seed_n = merge_to + 4;
 
     w.player_entity = w.create_entity();
 
@@ -80,7 +105,7 @@ world make_hard_coded_world()
             .water_fraction = 0.0f,
             .bias           = composition_bias::standard,
         },
-        /*seed=*/0xC1D0001u);
+        /*seed=*/params.seed ^ 0xC1D0001u, deposit_scalar);
 
     // -----------------------------------------------------------------------
     // Kepler — temperate home planet (Earth analogue, ~1.0 AU)
@@ -112,21 +137,21 @@ world make_hard_coded_world()
             .water_fraction = 0.60f,
             .bias           = composition_bias::standard,
         },
-        /*seed=*/0xE471001u);
+        /*seed=*/params.seed ^ 0xE471001u, deposit_scalar);
 
     // Kepler is the only body with a political layer in the prototype: 8–12
     // nations placed over its land tiles. Selene/Cinder/Pallas stay unclaimed.
     // See docs/generation/NATION_GENERATION.md.
     // Population centres must be placed before generate_nations so that Pass 6
     // (substrate density) can reference them during nation territory assignment.
-    generate_population_centres(w, kepler, /*seed=*/0x70701001u);
+    generate_population_centres(w, kepler, /*seed=*/params.seed ^ 0x70701001u);
 
     // BL-053: over-seed (18) with tighter separation, then merge down to 14 so the
     // map reads as a varied, "grown" political layer — a few large powers, several
     // mid, many small — rather than ~10 near-uniform Voronoi cells.
     generate_nations(w, kepler, kepler_tiles, 180, 84,
-        nation_params{ .nation_count = 18, .min_seed_separation = 5, .merge_to = 14 },
-        /*seed=*/0x4A71012u);
+        nation_params{ .nation_count = pre_seed_n, .min_seed_separation = 5, .merge_to = merge_to },
+        /*seed=*/params.seed ^ 0x4A71012u);
 
     // Attach installations to the first two land tiles found in raster order.
     {
@@ -197,7 +222,7 @@ world make_hard_coded_world()
     // after the pre-authored Kepler installations are in w.buildings, so corporate
     // asset placement collision-avoids those tiles. See CORPORATION_GENERATION.md.
     generate_corporations(w, corporation_params{ .corporation_count = 8 },
-        /*seed=*/0x4A71012u);
+        /*seed=*/params.seed ^ 0x4A71012u);
 
     // Player unit stub on Kepler.
     const entity_id kepler_unit = w.create_entity();
@@ -234,7 +259,7 @@ world make_hard_coded_world()
             .water_fraction = 0.0f,
             .bias           = composition_bias::standard,
         },
-        /*seed=*/0x5E1E001u);
+        /*seed=*/params.seed ^ 0x5E1E001u, deposit_scalar);
 
     // -----------------------------------------------------------------------
     // Asteroid belt — a band beyond Kepler. The belt itself is not a body; it
@@ -281,7 +306,7 @@ world make_hard_coded_world()
                 .water_fraction = 0.0f,
                 .bias           = composition_bias::metallic,
             },
-            a.seed);
+            params.seed ^ a.seed, deposit_scalar);
     }
 
     return w;

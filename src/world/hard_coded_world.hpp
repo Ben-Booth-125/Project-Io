@@ -2,6 +2,26 @@
 
 #include "world.hpp"
 
+#include <cstdint>
+
+/// Resource-abundance tier for a generated world. Earth-like is the ceiling: no
+/// tier exceeds the baseline (GENERATION_STRATEGY.md § The resource ceiling), so
+/// `standard` (1.0×) is the richest and the leaner tiers step *down* from it.
+/// Maps to the `deposit_scalar` threaded into generate_body_tiles.
+enum class abundance_level : uint8_t { sparse, lean, standard };
+
+/// The reproducible world descriptor: a master seed plus the high-level generation
+/// knobs. Same seed + same params → an identical world on a given binary. Threaded
+/// through make_hard_coded_world and edited on the main-menu New World setup (BL-114);
+/// it lives in the app, not the `world` struct, so it stays off the serialisation seam.
+struct world_params
+{
+    uint32_t        seed         = 0;                         ///< Master seed, XOR-folded into each per-body seed. 0 reproduces the legacy world.
+    abundance_level abundance    = abundance_level::standard; ///< Deposit-density tier (standard = earth-like ceiling).
+    int             nation_count = 14;                        ///< Nations on the home body (the Voronoi merge target).
+    int             body_count   = 0;                         ///< Reserved — the body-count knob is PHASED to a follow-on (bodies are still hard-coded profiles).
+};
+
 /// Construct and return a world populated with the prototype's authored bodies.
 ///
 /// Bodies (all orbiting the star Helios):
@@ -15,5 +35,7 @@
 /// hand-authored for prototype testing. Replace this function with a
 /// data-driven loader when scripted body definitions are added.
 ///
+/// @param params The world descriptor — seed + generation knobs. Defaulted so the
+///               legacy call `make_hard_coded_world()` reproduces the original world.
 /// @return A fully populated world ready to drive the simulation.
-world make_hard_coded_world();
+world make_hard_coded_world(world_params params = {});

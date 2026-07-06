@@ -1971,6 +1971,33 @@
       "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
       "summary": "The construction deadlock shipped invisibly because no check exercised a real player action through the commit path — construction_harness uses a non-representative registry, build_walkthrough only armed placement, goldens capture chrome. 2026-07-06 added verify.build_first_valid() + verify.expect() + fresh_start_build.lua (US-002). The same gap likely hides in the other interactive flows: recipe/workforce change (US-007), sell-order placement (US-008), survey dispatch (US-011). Extend the verify commit/assert primitives to cover them so a player-goal acceptance test exists per core interaction.",
       "design": "**Status:** designed — the pattern is established by fresh_start_build.lua. For each core interaction add a verify commit primitive (mirroring build_first_valid: mutate via the SAME code path the interactive control uses) + a verify.expect assertion + a scripts/verify/<flow>.lua acceptance script: recipe/workforce (set a building's recipe/target, tick, assert output changes), sell orders (place a standing order, clear, assert honoured over auto-sell), survey (dispatch, assert credits debited + reveal advances). Wire each to its user story's testing.note. These are the durable guard against the 'green suite, unplayable game' class. Authority DEVELOPMENT_PRACTICES.md § Visual verification; consumes the US catalogue."
+    },
+    {
+      "id": "BL-114",
+      "short_name": "WORLD_DESCRIPTOR",
+      "category": "Environment",
+      "title": "Seeded world descriptor — New World setup (seed + resource abundance + nation count)",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-06",
+      "files": [
+        "src/world/hard_coded_world.hpp",
+        "src/world/hard_coded_world.cpp",
+        "src/world/tile_generation.hpp",
+        "src/world/tile_generation.cpp",
+        "src/core/app.hpp",
+        "src/core/app.cpp",
+        "tools/verify/world_determinism.cpp",
+        "docs/generation/GENERATION_STRATEGY.md"
+      ],
+      "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+      "summary": "A reproducible world descriptor — master seed + world_params (abundance tier, nation count, reserved body count) — chosen on a main-menu New World setup and threaded through make_hard_coded_world(world_params). Seed XOR-folds into each per-body seed literal (seed 0 reproduces the legacy world bit-for-bit); abundance is a pure post-multiply on deposits (sparse 0.40 / lean 0.65 / standard 1.00, the earth-like ceiling) that draws no RNG; nation count drives the Voronoi merge target. Descriptor lives in the app, off the serialisation seam. Verified headlessly by tools/verify/world_determinism.cpp (same seed→identical, different seed→different, sparse<lean<standard, default==legacy). Landed 2026-07-06 as a salvage-port onto main (originally authored off-main under the duplicated id BL-101; renumbered here — main's BL-101 is a different, closed item). body_count knob deferred to a follow-on (bodies are still hand-authored profiles).",
+      "design": "**Status:** complete (landed 2026-07-06). The world descriptor is a small `world_params` struct — `seed` (uint32_t), `abundance` (sparse/lean/standard), `nation_count` (int), and a reserved `body_count` — plus a New World main-menu block that edits `m_pending_world_params` (seed hex entry + Roll/Copy, abundance radios, nation slider, a disabled bodies slider stub). `start_new_game()` consumes it; `setup_world(world_params)` records it in `m_active_world_params` and passes it to `make_hard_coded_world(world_params = {})`. Mapping: seed is XOR-folded into each existing per-body seed literal so seed 0 reproduces the legacy world exactly; abundance maps to a `deposit_scalar` applied as a pure post-multiply in `generate_body_tiles` Pass 6 (no RNG draw, so standard=1.0 is bit-identical to the unscaled surface, honouring the resource ceiling); nation_count sets `nation_params.merge_to` with `pre_seed_n = merge_to + 4` extra pre-merge seeds. The descriptor deliberately lives in the app, not the `world` struct, so it stays off the flat-binary save seam. Determinism/ordering verified by `tools/verify/world_determinism.cpp` (auto-registered as a CTest by the tools/verify/*.cpp glob). **Provenance:** salvage-ported from an off-main session that had duplicated much of v0.0.8/0.0.9 under divergent commits; this feature was its one genuinely-unique contribution. It was authored there citing 'BL-101', which collides with main's real (closed) BL-101 — renumbered to BL-114 throughout on landing. **Deferred:** the `body_count` knob (the body set is still the hand-authored Cinder/Kepler/Selene/Pallas profiles; a real count needs procedural body synthesis). Authority docs/generation/GENERATION_STRATEGY.md § The world descriptor."
     }
   ]
 }

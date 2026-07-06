@@ -4842,6 +4842,44 @@
           "notes": "Enabling branch protection itself is an owner-only repo-settings action; this requirement covers the query + record + doc note."
         }
       ]
+    },
+    {
+      "batch": "2026-07-06-salvage",
+      "brief": "world-descriptor",
+      "title": "BL-114 Seeded world descriptor — determinism + New World setup",
+      "promoted_from": "backlog.json BL-114 (2026-07-06 salvage-port onto main; renumbered from off-main BL-101)",
+      "difficulty": 2,
+      "importance": "B",
+      "evaluated_difficulty": 2,
+      "status": "complete",
+      "resolved": "2026-07-06",
+      "resolution": "Ported onto origin/main as claude/salvage-seeded-worlds and built green (ProjectIo + world_determinism). tools/verify/world_determinism.cpp runs ALL PASS (0 failures). Determinism, seed-sensitivity, abundance ordering and default==legacy are proven headlessly (R1/R2). The New World menu compiles and links (app build green); R3 is left pending — a scripts/verify/*.lua visual capture of the menu was not authored this pass, so the menu is smoke-verified by build only.",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "make_hard_coded_world(world_params) is a pure function of its descriptor: same seed+params yields a bit-identical world across repeated builds (tile/composition/deposit/nation/corp/entity metrics equal); a different seed yields a demonstrably different world; and the default make_hard_coded_world() equals {seed 0, standard, 14 nations} (the legacy world) bit-for-bit.",
+          "verification": ["headless: tools/verify/world_determinism.cpp"],
+          "result_metric": "PASS. seed ABCDEF01: 34440 tiles / 14 nations / 8 corps, deposits=4208174.812, identical across two builds; seed 12345678 deposits=4118875.779 (differs); default==seed0/standard.",
+          "notes": "Auto-registered as a CTest by the tools/verify/*.cpp glob (main's BL-104/106 harness loop)."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "Resource abundance scales deposits monotonically without perturbing the RNG streams: at a fixed seed, summed-deposit(sparse) < (lean) < (standard), and standard is the earth-like ceiling (no tier richer than standard). The scalar is a pure post-multiply (draws no RNG), so standard == the unscaled surface.",
+          "verification": ["headless: tools/verify/world_determinism.cpp"],
+          "result_metric": "PASS. deposits sparse=1683269.954 (0.40x), lean=2735313.526 (0.65x), standard=4208174.812 (1.00x); standard >= both leaner tiers.",
+          "notes": "Ratios track the design scalars 0.40/0.65/1.00."
+        },
+        {
+          "id": "R3",
+          "status": "pending",
+          "requirement": "The main-menu New World setup exposes the descriptor — seed (hex entry + Roll/Copy), resource abundance (Sparse/Lean/Standard), nation count slider, and a disabled bodies stub — and starting a new game builds the world from the edited descriptor.",
+          "verification": ["visual: scripts/verify/new_world_setup.lua (not yet authored)", "build: ProjectIo links with the menu block"],
+          "result_metric": "App builds+links green; interactive menu not captured in a saved visual script this pass.",
+          "notes": "Follow-on: author scripts/verify/new_world_setup.lua and run verifier-visual. Load-bearing determinism guarantee is covered headlessly by R1/R2."
+        }
+      ]
     }
   ]
 }

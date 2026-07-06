@@ -5,6 +5,7 @@
 #include "scripting/lua_state.hpp"
 #include "ui/ui_state.hpp"
 #include "world/economy_system.hpp"
+#include "world/hard_coded_world.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
 
@@ -76,8 +77,9 @@ private:
     void start_new_game();
 
     /// Build the prototype world and frame the opening view. Shared by run() and
-    /// run_verify() so both start from the same deterministic state.
-    void setup_world();
+    /// run_verify() so both start from the same deterministic state. @p params is the
+    /// world descriptor (seed + knobs); defaulted so run_verify() stays deterministic-cold.
+    void setup_world(world_params params = {});
 
     /// Load the economy Lua data layer (scripts/recipes.lua + scripts/economy.lua)
     /// into m_registry, then author processing recipes onto the generated assets
@@ -141,6 +143,8 @@ private:
     sim_loop        m_sim_loop;
     lua_state       m_lua;
     world           m_world;
+    world_params    m_pending_world_params; ///< Edited by the New World menu; consumed by start_new_game (BL-114).
+    world_params    m_active_world_params;  ///< The descriptor the live world was built from; shown as the "seed used".
     ui_state        m_ui;
     recipe_registry m_registry;          ///< Recipes + economy constants, loaded from Lua at startup.
     economy_report  m_last_econ_report;  ///< Most recent economy-step report; read by the economy panel.

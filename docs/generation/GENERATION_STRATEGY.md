@@ -40,6 +40,31 @@ managing it.
 
 ---
 
+## The world descriptor — seed + generation parameters (BL-114)
+
+Generation is driven by a small **world descriptor** — a master **seed** plus a `world_params`
+struct — chosen on the main-menu **New World** setup and threaded through
+`make_hard_coded_world(world_params)`. Same descriptor → identical world on a given binary; this
+is the reproducible key the setup screen surfaces (with a dice-randomise and a copyable readout).
+The descriptor lives in the app, **not** the `world` struct, so it stays off the serialisation seam.
+
+**`world_params` fields and how each maps onto the generators:**
+
+| Field | Maps to | Cost |
+|---|---|---|
+| `seed` (`uint32_t`) | XOR-folded into each **existing per-body seed literal** (`params.seed ^ 0xC1D0001u`, …). Seed `0` yields the original literals, so the **default descriptor reproduces the legacy world bit-for-bit**. | cheap |
+| `abundance` (`sparse`/`lean`/`standard`) | A **deposit-density scalar** applied as a pure post-multiply in `generate_body_tiles` Pass 6 (`0.40` / `0.65` / `1.00`). Consumes no RNG, so `standard` (1.0) is bit-identical to the unscaled surface. | cheap, isolated |
+| `nation_count` (`int`) | The Voronoi **merge target** (`nation_params.merge_to`), with a few extra pre-merge seeds so the merge still has material (`pre_seed_n = merge_to + 4`). | moderate |
+| `body_count` (`int`) | **Reserved — phased to a follow-on.** The body set is still hand-authored prototype profiles (Cinder/Kepler/Selene/Pallas); a true count knob needs the generator to synthesise variable body profiles, which is out of BL-114's budget. The field exists so the descriptor is forward-shaped. | heaviest (deferred) |
+
+**Abundance honours the resource ceiling (above).** `standard` **is** the earth-like ceiling
+(1.0×); the other tiers step *down* (`lean` 0.65, `sparse` 0.40) — there is no tier above Earth.
+Determinism is verified headlessly by `tools/verify/world_determinism.cpp` (same seed → identical
+world; different seed → different; `sparse < lean < standard`). The descriptor is also the natural
+input to the staged-generation Tile Ledger ([[BL-100]]) as a tuning surface.
+
+---
+
 ## How the layers compose
 
 - **Tiles** establish the physical reality: terrain, hazard, habitability, and resource
