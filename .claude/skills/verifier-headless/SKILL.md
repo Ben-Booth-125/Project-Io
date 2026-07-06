@@ -33,7 +33,7 @@ in `tools/verify/README.md`.
   (forest + wetland fraction), extraction-asset placement, deposit-reserve seeding,
   the reusable `placement_rules::can_place` seam (placed assets pass it; ocean /
   zero-deposit tiles are rejected), and the **generated corp starting stockpile**
-  (BL-115: every corp opens non-empty + prototype-scoped on its home body; extraction
+  (BL-116: every corp opens non-empty + prototype-scoped on its home body; extraction
   opens richer in raws than trade; stockpiles identical across two generations).
   Links the generation TUs (`tile_generation`, `nation_generation`,
   `corporation_generation`, `population_generation`, `placement_rules`,

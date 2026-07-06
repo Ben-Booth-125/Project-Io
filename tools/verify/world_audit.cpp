@@ -220,8 +220,8 @@ int main()
     std::printf("  B4 R1 every corp holding count within its focus ceiling (>=1): %s\n",
                 holdings_bad == 0 ? "PASS" : "FAIL");
 
-    // --- BL-115 (generated corp starting stockpile): the opening stockpile is
-    // generated from industrial focus + starting capital (replaces BL-114's
+    // --- BL-116 (generated corp starting stockpile): the opening stockpile is
+    // generated from industrial focus + starting capital (replaces BL-115's
     // fixed give). make_hard_coded_world() is the cold generation state (no
     // pre-game ticks), so pools equal the generated give exactly. Checks:
     //   R1 every corp with holdings opens with a non-empty stockpile on its home
@@ -298,7 +298,7 @@ int main()
     }
     std::printf("Corp starting stockpiles: %d stocked corps, %d discrepancies\n",
                 stock_corps, stock_bad);
-    std::printf("  BL-115 R1 every corp opens non-empty, prototype-scoped, on its home body: %s\n",
+    std::printf("  BL-116 R1 every corp opens non-empty, prototype-scoped, on its home body: %s\n",
                 stock_bad == 0 ? "PASS" : "FAIL");
 
     bool focus_ok = true;
@@ -309,12 +309,12 @@ int main()
         focus_ok = ext_mean > trade_mean;
         std::printf("  raw-stock mean: extraction=%.1f (n=%d)  trade=%.1f (n=%d)\n",
                     ext_mean, ext_n, trade_mean, trade_n);
-        std::printf("  BL-115 R2 extraction opens richer in raws than trade: %s\n",
+        std::printf("  BL-116 R2 extraction opens richer in raws than trade: %s\n",
                     focus_ok ? "PASS" : "FAIL");
     }
     else
     {
-        std::printf("  BL-115 R2 focus correlation: SKIP (need >=1 extraction and >=1 trade; ext=%d trade=%d)\n",
+        std::printf("  BL-116 R2 focus correlation: SKIP (need >=1 extraction and >=1 trade; ext=%d trade=%d)\n",
                     ext_n, trade_n);
     }
 
@@ -329,7 +329,7 @@ int main()
             if (pool.quantities[r] != it2->second.quantities[r]) { ++det_bad; break; }
     }
     if (det_bad != 0) det_ok = false;
-    std::printf("  BL-115 R3 stockpiles identical across two generations (%zu pools, %d mismatched): %s\n",
+    std::printf("  BL-116 R3 stockpiles identical across two generations (%zu pools, %d mismatched): %s\n",
                 w.corp_body_pools.size(), det_bad, det_ok ? "PASS" : "FAIL");
 
     const bool stockpile_ok = (stock_bad == 0) && focus_ok && det_ok;

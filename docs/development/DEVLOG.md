@@ -9,19 +9,19 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 ## Session — Corp starting resource stockpile: fixed give → generated (2026-07-06)
 
 **Context.** "Players need to start with a stockpile of resources" (Ben) — heading into v0.1.0
-playtest. Two backlog items authored and both delivered this session: BL-114 (prototype fixed give)
-then BL-115 (focus/wealth-shaped generation that replaces it).
+playtest. Two backlog items authored and both delivered this session: BL-115 (prototype fixed give)
+then BL-116 (focus/wealth-shaped generation that replaces it).
 
 **The gap.** Corporations opened with capital but empty `corp_body_pools` (only the 12-tick pre-game
 warm-start put any materials in) — the same empty-pool condition behind the construction deadlock
 (`a712b05`). No corp had an opening inventory to build / produce / trade from.
 
-**BL-114 — fixed give (commit `77a5c4a`).** `corporation_generation.cpp` seeds each corp's
+**BL-115 — fixed give (commit `282f8d9`).** `corporation_generation.cpp` seeds each corp's
 `corp_body_pools[{corp, home_body}]` at generation with a fixed slug of the seven-resource prototype
 subset; the home body is resolved from the corp's first placed asset; holdless corps are skipped. No
 new save field, no RNG. `world_audit` extended with a stockpile audit (8/8 corps stocked).
 
-**BL-115 — generated (this session's second commit).** Replaced the flat give with
+**BL-116 — generated (commit `7ea6747`).** Replaced the flat give with
 `generate_starting_stockpile(focus, capital, base_capital, rng)`: per-focus weights (extraction
 hoards raws; processing pairs feedstock with refined output; trade carries finished goods with thin
 raws) × a capital scalar (`starting_capital / base_capital`, clamped `[0.5, 2.0]`) × a seeded jitter
@@ -35,9 +35,11 @@ untouched — re-enabling market-sourced construction is BL-095, not these items
 per-focus mix in post-WW2 industry stays the shared open item (CORPORATION_GENERATION.md § Open items).
 
 **Process.** New push policy (Ben): push only major releases; `main` is kept current locally by
-fast-forward merge (no per-commit push). Backlog IDs first collided with main's playability-audit
-BL-111/112/113 (authored off a stale worktree base) — caught before integrating and renumbered to
-BL-114/115 after fast-forwarding onto main.
+fast-forward merge (no per-commit push). Backlog IDs collided **twice**: first with main's
+playability-audit BL-111/112/113 (authored off a stale worktree base → renumbered to BL-114/115),
+then — when origin gained the fog-of-war / seeded-world work (`6f228cc`, carrying its own BL-114
+`WORLD_DESCRIPTOR`) — our branch was rebased onto origin and renumbered again to the final
+**BL-115** (fixed) / **BL-116** (generated); code, harness labels, and cross-refs shifted to match.
 
 ---
 

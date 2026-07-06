@@ -512,8 +512,8 @@ float compute_capital(float base_capital,
 /// empty pool warmed only by the pre-game ticks (CORPORATION_GENERATION.md
 /// § Pre-game operating history; addresses the construction deadlock a712b05).
 ///
-/// BL-115 — generated from industrial focus + financial profile (replaces the
-/// BL-114 fixed give). Per-focus weights over the seven-resource prototype
+/// BL-116 — generated from industrial focus + financial profile (replaces the
+/// BL-115 fixed give). Per-focus weights over the seven-resource prototype
 /// subset (RESOURCES.md) read as "who holds what at the gate": extraction
 /// hoards the raws it mines; processing pairs feedstock with refined output;
 /// trade carries finished goods and thinner raws. Magnitude scales with
@@ -807,7 +807,7 @@ std::vector<entity_id> generate_corporations(
             capital_rng);
     }
 
-    // Independent stream for the generated starting stockpile (BL-115).
+    // Independent stream for the generated starting stockpile (BL-116).
     std::mt19937 stock_rng(seed_stock);
 
     // ---------------------------------------------------------------------------
@@ -858,7 +858,7 @@ std::vector<entity_id> generate_corporations(
         corp_ids.push_back(corp_id);
         w.corporations[corp_id] = std::move(cc);
 
-        // Starting resource stockpile (BL-115): generate a focus / wealth-shaped
+        // Starting resource stockpile (BL-116): generate a focus / wealth-shaped
         // opening stockpile and seed it on the corp's home body so build /
         // production / trade have materials from turn one. Generated for every
         // corp (fixed RNG-draw order) so the stream stays deterministic even
