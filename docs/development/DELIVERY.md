@@ -242,6 +242,33 @@ Consequences:
   stay in the main session when the win is marginal (a short serial chain, co-evolving
   interfaces). State the call and its reason rather than asking permission each time.
 
+### Parallel worktree coherence (keeping N sessions consistent)
+
+Worktrees isolate the *working copy* for free; coherence is about the things they **don't** isolate
+— a shared base, shared append-only registries, and a single integration point. Three rules keep N
+concurrent sessions consistent (learned the hard way — two ID collisions in one session, 2026-07-06;
+memory `backlog-id-collision-hazard`):
+
+1. **Branch off a *current* base.** Every worktree starts from an up-to-date `main`. If the last
+   local session was ≥ 3 days ago, `git fetch origin` and integrate first (CLAUDE.md § Session
+   start) — origin can move ahead independently (other machines / cloud sessions) even though we
+   push only at releases. A stale base is the root cause of most merge pain.
+2. **Allocate shared IDs before authoring, don't mint off the local max.** The append-only
+   registries — `backlog.json`, `req/requirements.json`, `user_stories.json`, `DEVLOG.md`,
+   `REFINED.md` — are the collision hotspots because every session appends to the tail. Before
+   filing a backlog item run **`node tools/session/next_id.js [count]`**: it scans *all* branches
+   (local + remote) for the true max and returns the next safe id (or a reserved range for a
+   session that will file several). Two sessions each grabbing "next = BL-114" off their own stale
+   file is the exact failure this prevents. `backlog_lint.js` is the **backstop** — it now FAILs on
+   a duplicate id at the merge point.
+3. **Integrate in one place, in order, and verify retroactively.** Worktree agents commit on their
+   own branch and **never touch `main`**. The **integrator** (the main-tree session) merges branches
+   in dependency order, rebasing each onto current `main`; **renumbers any residual collision** —
+   keep the earlier/shared item, renumber the later one **and its cross-references, code comments,
+   and harness labels**; then runs the **integrating build + headless harnesses on the merged tree**
+   (an agent's branch passing in isolation ≠ passing after integration) before fast-forwarding
+   `main`. Push only at a release.
+
 ## Proportionality & session boundaries
 
 - **Proportionality.** The lifecycle is a guideline proportional to the work, not a fixed

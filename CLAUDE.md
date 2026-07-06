@@ -116,8 +116,10 @@ run `git fetch origin` and compare `origin/main` **before starting work**. Under
 `main` is kept current locally and pushed only at major releases — but origin can still move ahead
 independently (work from other machines or cloud sessions). Integrate any upstream commits
 (fast-forward, or rebase our branch onto `origin/main`) *before* committing new work, so a stale base
-doesn't cause the divergence + backlog-ID-renumber churn it otherwise does. See
-`.claude/projects/.../memory/push-policy-major-releases-only.md` and the backlog-ID-collision memory.
+doesn't cause the divergence + backlog-ID-renumber churn it otherwise does. And before authoring a
+new backlog item, allocate its id with **`node tools/session/next_id.js`** (scans all branches for the
+true max — don't mint off the local file). Full method: DELIVERY.md § Parallel worktree coherence;
+see also the push-policy and backlog-ID-collision memories.
 
 ### Rule 0 — size the effort to the job
 

@@ -58,6 +58,23 @@ if (!backlog || !reqs) {
   report();
 }
 
+// ---- Invariant 0: id integrity (duplicates + malformed) ----
+// Duplicate ids are the parallel-worktree collision hazard: two sessions minting the
+// same next id off a stale local max (memory backlog-id-collision-hazard). backlog.json
+// is the merge point where the dup lands, so catch it here as a hard FAIL — the Map
+// index below would otherwise silently overwrite one and hide it. The *preventive* side
+// is tools/session/next_id.js (allocate across all branches before authoring).
+{
+  const counts = new Map();
+  for (const it of backlog.items || []) counts.set(it.id, (counts.get(it.id) || 0) + 1);
+  for (const [id, n] of counts) {
+    if (n > 1) fail(`duplicate id ${id} appears ${n}× in backlog.json — a collision; keep one and renumber the rest (+ their cross-refs). See tools/session/next_id.js.`);
+  }
+  for (const it of backlog.items || []) {
+    if (!/^BL-\d+$/.test(it.id || '')) fail(`malformed id "${it.id}" (short_name ${it.short_name || '?'}) — ids must match BL-\\d+.`);
+  }
+}
+
 // ---- index the backlog items by id ----
 const items = new Map();
 for (const it of backlog.items || []) items.set(it.id, it);
