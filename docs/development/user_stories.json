@@ -131,7 +131,7 @@
       ],
       "friction": "BL-082: during placement the construction panel occluded the Selection/Tile panel (fixed in v0.0.9 — re-walk to confirm). The 'why not here' reasons (BL-071) and the material-cost / market-stock gate (BL-095, design-owed) should read as one coherent explanation, not two separate refusals.",
       "written": "2026-07-05",
-      "testing": {"mode": "mixed", "note": "Cost debit + placement legality are auto (construction-pricing, building-placement-rules); the 'why-not reads as one explanation' legibility is a manual walk."}
+      "testing": {"mode": "mixed", "note": "Fresh-start buildability is asserted end-to-end by scripts/verify/fresh_start_build.lua (verify.build_first_valid + expect 'placed') — the acceptance test that would have caught the BL-044 construction deadlock. Cost debit + placement legality are also auto (construction-pricing, building-placement-rules); the 'why-not reads as one explanation' legibility is a manual walk."}
     },
     {
       "id": "US-003",

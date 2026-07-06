@@ -30,6 +30,7 @@
 #include "ui/view_nav.hpp"
 #include "world/budget_system.hpp"
 #include "world/construction.hpp"
+#include "world/placement_rules.hpp"
 #include "world/survey_system.hpp"
 #include "world/hard_coded_world.hpp"
 #include "world/market_clearing.hpp"
@@ -45,6 +46,7 @@
 #include <fstream>
 #include <stdexcept>
 #include <string>
+#include <unordered_set>
 #include <unordered_map>
 #include <vector>
 
@@ -596,6 +598,58 @@ int app::run_verify(const std::string& script_path, bool bless)
                 else if (t == "agricultural_produce") m_ui.construction.target = resource_type::agricultural_produce;
             }
         });
+
+    // Commit a real placement (verify harness): place the currently-armed building
+    // type/target on the first valid, unoccupied tile of the active body via the
+    // SAME construct_building path the interactive click uses — so a script can prove
+    // a fresh player can actually BUILD, not merely arm placement. This is the
+    // coverage the build flow lacked (build_walkthrough armed but never committed;
+    // construction_harness uses a hand-built registry without the real material
+    // costs), which let the BL-044 construction deadlock ship invisibly. Returns the
+    // construction_result name ("placed" on success).
+    v.set_function("build_first_valid", [this]() -> std::string {
+        const building_type bt  = m_ui.construction.type;
+        const resource_type tgt = m_ui.construction.target;
+        std::unordered_set<entity_id> occupied;
+        for (const auto& [bid, bc] : m_world.buildings)
+            occupied.insert(bc.tile);
+        for (const auto& [tid, tc] : m_world.tiles)
+        {
+            if (tc.body != m_ui.active_body || occupied.count(tid))
+                continue;
+            if (!placement_rules::can_place_in_world(m_world, tid, bt, tgt))
+                continue;
+            entity_id built = null_entity;
+            const construction_result r = construct_building(
+                m_world, m_registry, m_world.player_entity, tid, bt, tgt, built);
+            const char* name =
+                r == construction_result::placed                 ? "placed" :
+                r == construction_result::invalid_tile           ? "invalid_tile" :
+                r == construction_result::insufficient_funds     ? "insufficient_funds" :
+                r == construction_result::no_corp                ? "no_corp" :
+                r == construction_result::no_tile                ? "no_tile" :
+                r == construction_result::slot_occupied          ? "slot_occupied" :
+                r == construction_result::insufficient_materials ? "insufficient_materials" : "failed";
+            if (r == construction_result::placed)
+            {
+                m_ui.selected_entity      = built;
+                m_ui.selection_hidden_for = null_entity;
+            }
+            SDL_Log("verify.build_first_valid: %s at tile (%d,%d)", name, tc.grid_x, tc.grid_y);
+            return std::string(name);
+        }
+        SDL_Log("verify.build_first_valid: no valid unoccupied tile on active body");
+        return std::string("no_valid_tile");
+    });
+
+    // Assertion primitive (verify harness): on a false condition, bump the failure
+    // count (→ non-zero exit, like a golden miss) and log; so a logic check can
+    // PASS/FAIL a script the way a golden diff does.
+    v.set_function("expect", [this](bool ok, sol::optional<std::string> msg) {
+        if (!ok) ++m_verify_failures;
+        SDL_Log("verify.expect %s: %s", ok ? "PASS" : "FAIL",
+                msg ? msg->c_str() : "");
+    });
 
     // Discrete navigation by the shared command vocabulary — the same dispatch the
     // keyboard uses (see canvas_command.hpp), so a script reads as a key sequence.

@@ -44,9 +44,8 @@ frame_tile(69, 40, 20)
 verify.hover_tile(69, 40)
 verify.capture("walk_07_placement_ghost")
 
--- Step 6 — A BUILT BUILDING. Select an existing player building to show the
--- completed on-canvas marker and its management detail (the end state).
-verify.place_mode("none")
-verify.select_building(70, 38)
-frame_tile(70, 38, 20)
+-- Step 6 — COMMIT THE BUILD. Actually place the armed building via the real
+-- construct_building path (not just disarm + select a pre-existing one) so the
+-- final capture shows a freshly placed building — a completed build, not a ghost.
+verify.build_first_valid()
 verify.capture("walk_08_built_building")

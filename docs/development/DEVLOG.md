@@ -6,6 +6,34 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — Playability: construction deadlock fix + fresh-start build assertion (2026-07-06)
+
+**Context.** "Impossible to place a single building" (Ben). Traced, fixed, and — crucially — added
+the acceptance test that would have caught it.
+
+**Root cause + fix (commit `a712b05`).** Every building required steel from the corp's own body pool
+(BL-044, `construction.cpp`), but smelter output is auto-sold as surplus each tick
+(`market_clearing.cpp` retains only processor inputs, and construction is not one), so pool steel
+stays ~0 and NO building is placeable from a fresh start — a hard bootstrapping deadlock. Reverted
+construction to credits-only (`economy.lua` `resource_costs = {}`) until BL-095 (market-sourced
+materials). Re-blessed the 8 build-cost goldens.
+
+**Why no check caught it — and the fix for that.** `construction_harness` uses a hand-built registry
+without the steel costs (its placement passes); `build_walkthrough` only ARMED placement and never
+committed; goldens capture chrome, not a real build. Added a verify build-commit path —
+`verify.build_first_valid()` (places the armed type on the first valid tile via the real
+`construct_building`) + `verify.expect(cond, msg)` (bumps the failure count) — and
+`scripts/verify/fresh_start_build.lua`, the US-002 acceptance test: a fresh player places an
+extraction site → asserts "placed" (PASS today; red if construction is ever re-gated on materials
+the empty starting pool can't meet). Fixed `build_walkthrough` to actually commit (walk_08 now shows
+a placed Extraction Site). Rebuilt clean (only third-party sol2 C5321 warnings); CTest 14/14.
+
+**Audit findings (owed).** Corp Dashboard table cramped to single-char cells (BL-081-class legibility
+bug, different panel); the player opens at a net loss (economy-viability check owed); BL-095 elevated
+— it now unblocks re-enabling the material economy.
+
+---
+
 ## Session — User-story testing pillar + local tooling + golden-staleness sweep (2026-07-05)
 
 **Context.** Continued the BL-098 user-story work into a testing pillar, installed local scripting
