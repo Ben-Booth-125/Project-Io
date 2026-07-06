@@ -109,6 +109,16 @@ The Generation Ledger (design only) — a tuning/analysis surface that explains 
 The lifecycle for acting on a backlog **item**. **Full authority lives in
 `docs/development/DELIVERY.md`**; this is the condensed reference.
 
+### Session start — check origin if the last local session is stale
+
+If the previous local session was **≥ 3 days ago** (judge by the date of the last commit on `main`),
+run `git fetch origin` and compare `origin/main` **before starting work**. Under the push policy
+`main` is kept current locally and pushed only at major releases — but origin can still move ahead
+independently (work from other machines or cloud sessions). Integrate any upstream commits
+(fast-forward, or rebase our branch onto `origin/main`) *before* committing new work, so a stale base
+doesn't cause the divergence + backlog-ID-renumber churn it otherwise does. See
+`.claude/projects/.../memory/push-policy-major-releases-only.md` and the backlog-ID-collision memory.
+
 ### Rule 0 — size the effort to the job
 
 Every non-trivial task states its **mode**:
