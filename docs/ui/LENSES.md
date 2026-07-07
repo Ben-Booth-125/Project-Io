@@ -67,7 +67,7 @@ a dependency (named in the lens section).
 | **Resource** | — | — | **✓ contiguous-deposit flat fill + key** |
 | **Market** | — | ✓ per-body price strip | ✓ per-body price wash |
 | **Population** | — | — | **✓ workforce-efficiency tint + gradient key (BL-069)** |
-| **Opportunity** | — | — | **✓ best-building net-margin tint + key** |
+| **Opportunity** | — | — | **✓ per-catchment unmet-demand tint + key (BL-112)** |
 | **Production** | — | (later) per-body output-throughput badge | **✓ production-intensity tint + key** |
 | **Scarcity** *(keyboard-cycle only)* | — | (later) per-body shortfall badge | **✓ per-market shortfall blocks + key** |
 | **Industry** *(keyboard-cycle only)* | — | — | **✓ substrate-throughput amber tint + key** |
@@ -412,33 +412,33 @@ Population lens, the Selection panel, and the hover card all surface the *same* 
 feedback the economy applies, rather than the lens showing a different quantity than the sim
 consumes.
 
-## Opportunity lens *(built 2026-06-17 — BL-017)*
+## Opportunity lens *(built 2026-06-17 — BL-017; rekeyed to unmet demand 2026-07-07 — BL-112)*
 
-**Intent.** Read the map as a *siting surface*: where could value be made? Each tile
-shows the estimated **net margin of the best valid building on its terrain** — the
-counterpart to Population's liveability read. Paired with Population on the strip
-(both replace the former Habitability main-lens).
+**Intent.** Read the map as an *opportunity surface*: where is demand going unmet, so the
+market will pay a premium to whoever supplies it? Under the BL-078 elastic economy the fillable
+gap is a first-class, legible thing — a market bidding above base price — and this lens surfaces
+it directly (superseding the earlier per-tile "best-building net-margin" siting estimate).
+Paired with Population on the strip.
 
-**Data definition (settled).** For each tile, over the building types valid on its
-terrain (`placement_rules::can_place`): **extraction** — the best single deposit's
-`base_rate × richness × price − maintenance − wage`; **processing** — the best
-recipe's `base_rate × (Σ outputs×price − Σ inputs×price) − maintenance − wage`. The
-margin is the max over candidates, evaluated **ignoring what is currently built and
-ignoring logistics** (it is potential, not actual). Prices come from the tile's
-market (`market_for_tile`); upkeep from the recipe registry. No new data.
+**Data definition (settled, BL-112).** Per body market, the opportunity intensity is the
+**biggest tradeable price/base ratio** on that market — `max over tradeable r of price[r] /
+base_price[r]` (resources with `base_price == 0` skipped). A market with a wide unmet-demand gap
+prices its scarce good far above base and reads hot; a saturated market sits near neutral. Each
+tile takes its **catchment market's** ratio via `market_for_tile`, so the surface reads as
+uniform blocks per catchment (the same idiom as the Scarcity lens). No new data — it reads the
+live `market_component` demand-discovered prices.
 
 **Rung.** Planetary only. Guarded behind `overlay_mode::opportunity`.
 
-**Colour.** A **diverging** surface normalised against the body's largest absolute
-margin: profit composites toward green (`IM_COL32(110,200,120)`), loss toward red
-(`IM_COL32(216,100,96)`), at `0.75 · |margin|/max`. Tiles with no valid building keep
-terrain.
+**Colour.** A **diverging** surface: a market bid above base (unmet demand) composites toward
+green (`IM_COL32(110,200,120)`), an oversupplied one toward red (`IM_COL32(216,100,96)`), keyed
+by `d = log(clamp(ratio, 0.25, 4)) / log(4)` at `0.75 · |d|` alpha. Tiles with no catchment
+market keep terrain.
 
-**Glyph.** An open circle with an inner "+" (`icons::opportunity`) — a potential-gain
-motif.
+**Glyph.** An open circle with an inner "+" (`icons::opportunity`) — a potential-gain motif.
 
-**Legend.** Strip glyph + tooltip ("Opportunity (net margin)") + an on-canvas
-loss→profit diverging key.
+**Legend.** Strip glyph + tooltip ("Opportunity (unmet demand)") + an on-canvas
+supplied→unmet diverging key.
 
 **Interaction notes.** Planetary-only, single-select; the script ticks the economy
 first so prices have resolved. Verified by `scripts/verify/opportunity_lens.lua`.
