@@ -2204,6 +2204,44 @@
       "authority_doc": "docs/ui/SELECTION.md",
       "summary": "Note (2026-07-06, Ben, after the BL-122 fold-out shell landed): the Selection element (bottom-left, docs/ui/SELECTION.md) needs a resize / proportion pass now that BL-122 moved its left edge to x = W (the shell column edge) and narrowed it. Ben will struggle to specify exact dimensions in prose and will provide a MOCKUP — the visual/proportion design lives with him; the coding is the follow-up. Design-owed on that mockup: target width/height/placement of the Selection element in the new shell. This is a visual-tuning follow-on to BL-122, not a structural change.",
       "design": "**Status:** design-owed on Ben's mockup — the exact proportions are a visual call Ben will make (and struggles to give precisely in prose), so this item waits on a reference image rather than settling numbers here.\n\n### Current state (post-BL-122)\n- The Selection element is drawn by `draw_selection_panel` (`src/ui/selection_panel.cpp`), called from `src/core/app.cpp` with `left_x = shell_column_width(disp.x)` (its left edge is now the shell column's right edge, `x = W`), `right_x = minimap left − margin`, `bottom_y = disp.y − margin`, `height = mm_h`.\n- **BL-093** sizes its HEIGHT from content (text-line units), clamped up to the header + content rows; it is bottom-anchored. Do not fight that — any resize must compose with the content-height sizing, not replace it with a resolution-scaled magic number (the BL-093 regression).\n- **BL-122** only moved its left edge (narrowed it); it did not retune width/height/placement for the new shell. That retune is this item.\n\n### Owed (from the mockup)\n- Target width band — does it keep running to the minimap's left edge, or sit narrower?\n- Target height — taller/shorter than the current `mm_h`-derived clamp; still content-driven?\n- Placement — stays bottom-left anchored at `x = W`, or shifts?\n- Behaviour across 1280x720 (verify harness) and 1920x1080 (Ben's runtime), per the display-robustness constraint (shares this concern with **BL-097** view-bounding audit).\n\n### Method\nBen supplies a mockup / annotated screenshot; the implementation reads the target proportions off it and tunes `draw_selection_panel`'s geometry + the `app.cpp` call. Coding-only once the mockup exists. Relationships: follows **BL-122** (shell), composes with **BL-093** (content-height sizing), aligns with **BL-097** (resolution-robust bounding). Authority `docs/ui/SELECTION.md` — do not edit ahead of the work."
+    },
+    {
+      "id": "BL-124",
+      "short_name": "CITY_NAMING",
+      "category": "Generation",
+      "title": "Procedural city names for population centres (market/city identity)",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-06",
+      "resolved": "2026-07-06",
+      "files": ["src/world/world.hpp", "src/world/population_generation.cpp"],
+      "authority_doc": "docs/generation/NATION_GENERATION.md",
+      "summary": "Population centres had no name; the market ledger's market/city selector (Ben's mockup) needs one. Adds procedural city names via make_city_name() (self-contained phoneme bank, mirrors the nation-name generator), stored in world::population_centre_name, keyed by centre id.",
+      "design": "Delivered on branch claude/market-ledger (with BL-125). make_city_name(rng) assembles onset+nucleus(+coda)(+suffix) from a small phoneme bank. Assigned by generate_population_centres from an INDEPENDENT seeded stream (seed ^ 0x9E3779B9) drawn in sorted-centre-id order AFTER generation, so it consumes nothing from the main rng and the generated world is byte-identical (determinism rule — verified: the corp/cashflow/stockpile/building CSV exports are unchanged pre/post, only market labels differ). Stored in world::population_centre_name (parallel to population_centre_tile). A market's city name resolves via its centre_tile (ui::market_city_name). NOTE (merge): minted BL-124 off a max shared with a concurrent branch — renumber on merge if it collided (backlog-ID-collision hazard). Authority propagates to a generation doc at merge."
+    },
+    {
+      "id": "BL-125",
+      "short_name": "MARKET_LEDGER_REDESIGN",
+      "category": "UI",
+      "title": "Market ledger redesign: body->city cascade + scrollable price-over-time (Ben mockup)",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 2,
+      "parked": false,
+      "requires": ["BL-124"],
+      "blocked_on": [],
+      "written": "2026-07-06",
+      "resolved": "2026-07-06",
+      "files": ["src/ui/market_ledger.cpp", "src/ui/market_ledger.hpp", "src/core/app.cpp"],
+      "authority_doc": "docs/ui/LAYOUT.md",
+      "summary": "Supersedes BL-120's 'confirm single-purpose' conclusion: Ben mocked up (Power BI) a redesigned market ledger — a double select (body -> market/city) narrowing to one market, then a scrollable list of per-good price-over-time charts. Built to the mockup in the fold-out shell column.",
+      "design": "Delivered on branch claude/market-ledger. draw_market_ledger rebuilt: Body combo -> Market combo (cascade, ui::market_city_name real city names from BL-124) -> a scrollable BeginChild stacking one price sparkline per traded good (from m_market_history), each labelled with the good + current price. Replaces the old all-markets dashboard table + per-resource detail table + single-resource trend selector. The CSV export (verify.export_data) gained market_prices.csv (per market/resource/tick series) and split markets.csv by market, using the same city name, so Ben's Power BI mock shows real curves. Golden market_ledger re-blessed @1280x720. Relationships: consumes BL-124 (names) + the m_market_history substrate; supersedes BL-120. Authority LAYOUT.md market-ledger section — update at merge (a concurrent agent is editing LAYOUT.md on main)."
     }
   ]
 }
