@@ -61,13 +61,15 @@ int main()
     check(r_ocean == construction_result::invalid_tile && built == null_entity,
           "C.R1 ocean tile rejected (invalid_tile, no build)");
 
-    // R2: valid extraction site placed; cost 100 debited (250 -> 150); asset added; target set.
+    // R2: valid extraction site placed. BL-095: placement no longer debits up-front
+    // (pay-as-you-build — run_construction charges build_cost + materials as the build
+    // progresses), so the balance is UNCHANGED at placement; asset added; target set.
     auto r_ext = construct_building(w, reg, corp, land, building_type::extraction_site,
                                     resource_type::iron_ore, built);
     check(r_ext == construction_result::placed && built != null_entity,
           "C.R2 valid extraction placed");
-    check(near(w.corporations[corp].balance, 150.0f),
-          "C.R2 build cost debited (250-100)", w.corporations[corp].balance, 150.0f);
+    check(near(w.corporations[corp].balance, 250.0f),
+          "C.R2 placement does NOT debit up-front (pay-as-you-build)", w.corporations[corp].balance, 250.0f);
     check(w.corporations[corp].assets.size() == 1 && w.corporations[corp].assets[0] == built,
           "C.R2 building appended to corp assets");
     check(w.buildings.count(built) == 1 &&
@@ -76,20 +78,23 @@ int main()
           "C.R2 building authored (target + staffed)");
     check(w.stockpiles.count(built) == 1, "C.R2 building gets a stockpile component");
 
-    // R3: processing facility seeded with the default steel recipe; cost 150 debited (150 -> 0).
+    // R3: processing facility seeded with the default steel recipe; balance still
+    // unchanged at placement (BL-095 pay-as-you-build).
     entity_id proc = null_entity;
     auto r_proc = construct_building(w, reg, corp, land, building_type::processing_facility,
                                      resource_type::iron_ore, proc);
     check(r_proc == construction_result::placed && w.buildings[proc].recipe == steel_id,
           "C.R3 processing facility seeded with default recipe");
-    check(near(w.corporations[corp].balance, 0.0f),
-          "C.R3 processing cost debited (150-150)", w.corporations[corp].balance, 0.0f);
+    check(near(w.corporations[corp].balance, 250.0f),
+          "C.R3 processing placement also un-charged at placement", w.corporations[corp].balance, 250.0f);
 
-    // R4: now broke — a further build on a VALID tile is refused for insufficient
-    // funds, with no mutation. Uses a fresh valid tile + processing_facility (Any
-    // terrain) so the refusal is genuinely the funds check, not terrain: a Port
-    // requires a coastal tile (BL-043), and this synthetic world has no adjacency,
-    // so a Port would short-circuit to invalid_tile and mask the funds path.
+    // R4: the affordability GATE is retained (BL-095) — a build a corp cannot afford
+    // the whole of is refused up front with no mutation, even though payment is now
+    // spread across construction. Drop the balance below the processing build_cost
+    // (150; no market here so material_cost is 0 -> total_cost == build_cost), then
+    // attempt a VALID processing tile (Any terrain, so the refusal is the funds check,
+    // not terrain — a Port would short-circuit to invalid_tile and mask it).
+    w.corporations[corp].balance = 100.0f; // < 150 processing build_cost
     const entity_id land2 = w.create_entity();
     { tile_component tc{}; tc.body = body; tc.composition = terrain_composition::rocky;
       tc.resource_deposit[ri(resource_type::iron_ore)] = 2.0f; w.tiles[land2] = tc; }
@@ -99,8 +104,9 @@ int main()
                                       resource_type::iron_ore, none_built);
     check(r_broke == construction_result::insufficient_funds &&
           none_built == null_entity &&
+          near(w.corporations[corp].balance, 100.0f) &&
           w.corporations[corp].assets.size() == n_before,
-          "C.R4 insufficient funds refused (no build, no spend)");
+          "C.R4 unaffordable build refused by the gate (no build, no spend)");
 
     // R5: unknown corp / tile are refused.
     entity_id x = null_entity;

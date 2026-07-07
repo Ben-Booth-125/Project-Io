@@ -183,6 +183,8 @@ add_executable(econ_bankruptcy
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/economy_system.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/market_clearing.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/budget_system.cpp"
+    # BL-079: economy_system's scoped-agency pass calls estimate_building_profit.
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/building_profit.cpp"
 )
 
 target_include_directories(econ_bankruptcy PRIVATE

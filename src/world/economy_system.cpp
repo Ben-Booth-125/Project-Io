@@ -1,10 +1,14 @@
 #include "economy_system.hpp"
 
+#include "building_profit.hpp" // estimate_building_profit (BL-079 corp agency)
+#include "market_clearing.hpp" // market_for_tile (BL-095 construction gate)
 #include "workforce.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <unordered_set>
+#include <vector>
 
 namespace {
 
@@ -210,19 +214,98 @@ building_report run_processing(world& w, const recipe_registry& reg,
     return rep;
 }
 
+// BL-095: pace each under-construction building against the local market's recent
+// supply of its materials, drawing + paying for them as it builds (pay-as-you-build).
+// Runs at the very top of the economy step, before production, so a building that
+// completes this tick is immediately eligible below. Visits buildings in ascending
+// id order (deterministic) because it mutates shared market demand (report.purchases)
+// and corp balances.
+void run_construction(world& w, const recipe_registry& reg, economy_report& report)
+{
+    const float max_stretch = reg.construction().max_stretch;
+    const float pause_below  = (max_stretch > 1.0f) ? (1.0f / max_stretch) : 0.0f;
+
+    std::vector<entity_id> ids;
+    for (const auto& [bid, b] : w.buildings)
+        if (b.ticks_remaining > 0)
+            ids.push_back(bid);
+    std::sort(ids.begin(), ids.end());
+
+    for (const entity_id bid : ids)
+    {
+        building_component& b          = w.buildings.at(bid);
+        const building_economics& econ = reg.economics(b.type);
+        const float duration           = econ.build_duration_ticks;
+        if (duration <= 0.0f) { b.ticks_remaining = 0; continue; } // instant safety
+
+        // Local market — read its RECENT supply (last tick's cleared throughput) as
+        // the derived "stock" the build competes for. No stored inventory, no new
+        // serialised field (BL-095).
+        const entity_id mid       = market_for_tile(w, b.tile);
+        const market_component* m = (mid != null_entity) ? &w.markets.at(mid) : nullptr;
+
+        // Rate = the fraction of this tick's material need the market can supply,
+        // set by the scarcest required material; below 1/max_stretch it pauses.
+        float rate = 1.0f;
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            const float need = econ.resource_build_cost[r] / duration;
+            if (need <= 0.0f)
+                continue;
+            const float avail = m ? m->supply[r] : 0.0f;
+            rate = std::min(rate, avail / need);
+        }
+        rate = std::clamp(rate, 0.0f, 1.0f);
+        if (rate < pause_below)
+            rate = 0.0f; // paused: market can't supply even the max-stretched rate
+        if (rate <= 0.0f)
+            continue;
+
+        // Draw this tick's materials as real market demand (bids price up, competes
+        // with population and other builds) via the shared auto-buy path, and charge
+        // the flat build_cost portion incrementally to the owning corp.
+        const entity_id corp = owner_corp_of(w, bid);
+        const entity_id body = building_body(w, b);
+        if (corp != null_entity && body != null_entity)
+        {
+            auto& bought = report.purchases[std::make_pair(corp, body)];
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                const float need = econ.resource_build_cost[r] / duration;
+                if (need > 0.0f)
+                    bought[r] += need * rate;
+            }
+            const auto cit = w.corporations.find(corp);
+            if (cit != w.corporations.end())
+                cit->second.balance -= (econ.build_cost / duration) * rate;
+        }
+
+        // Advance sub-tick progress; a full-rate tick consumes exactly one whole
+        // ticks_remaining unit.
+        b.construction_progress += rate;
+        while (b.construction_progress >= 1.0f && b.ticks_remaining > 0)
+        {
+            b.construction_progress -= 1.0f;
+            --b.ticks_remaining;
+        }
+        if (b.ticks_remaining <= 0)
+            b.construction_progress = 0.0f;
+    }
+}
+
 } // namespace
 
 economy_report run_economy_step(world& w, const recipe_registry& reg)
 {
     economy_report report;
 
-    // Build-time pacing (playtest patch, 2026-07-06): advance every building's
-    // construction timer one tick before anything else runs, so a building
-    // finishing this tick is already eligible for production/workforce demand
-    // below (mirrors treating "placed this tick" as "under construction this tick").
-    for (auto& [bid, b] : w.buildings)
-        if (b.ticks_remaining > 0)
-            --b.ticks_remaining;
+    // Build-time pacing (playtest 2026-07-06 → BL-095): advance every building's
+    // construction before anything else runs, so a building finishing this tick is
+    // already eligible for production/workforce demand below. BL-095 replaces the
+    // flat one-tick-per-tick decrement with a market-gated rate: each build draws +
+    // pays for its materials as real market demand and progresses only as fast as
+    // the local market can supply them (full / stretched / paused).
+    run_construction(w, reg, report);
 
     // Bodies that host a market — a processor on one auto-buys input shortfalls
     // rather than idling for want of pool stock (see run_processing).
@@ -433,11 +516,16 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
         }
     }
 
-    // BL-048B: Population growth step — accumulate growth per centre each tick;
-    // level up when the accumulator crosses the tier threshold.
-    // Growth ticks only when body habitability >= 0.5 AND food demand is >= 50% met.
+    // BL-048B / BL-078: Population growth step — accumulate growth per centre each
+    // tick; level up when the accumulator crosses the tier threshold. Growth ticks
+    // only when body habitability >= 0.5 AND the population's whole consumption
+    // basket is met at >= growth_met_threshold (BL-078 keys growth off met-supply,
+    // not food alone — minimal bounded growth, no habitability feedback loop). The
+    // met-supply is read from last tick's cleared market (this step precedes
+    // clear_markets in the tick), so it is deterministic and price-consistent.
     // Tier thresholds (ticks to grow): scale 1→2: 200, 2→3: 500, 3→4: 1500, 4→5: 5000.
     static constexpr int growth_threshold[6] = { 0, 200, 500, 1500, 5000, 0 };
+    const substrate_params& growth_sp = reg.substrate();
     for (auto& [cid, pcc] : w.population_centres)
     {
         if (pcc.scale >= 5)
@@ -456,20 +544,28 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
         if (hab < 0.5f)
             continue;
 
-        // Check food supply ratio (agricultural_produce demand vs. supply in body's market).
-        float food_ratio = 1.0f;
+        // Met-supply ratio across the whole demand basket (BL-078): a basket-weighted
+        // mean of supply/demand over the body's market, so a centre grows only when
+        // its population's consumption is broadly met and plateaus when it is not.
+        float met_ratio = 1.0f;
         for (const auto& [mid, mc] : w.markets)
         {
             if (mc.body != body)
                 continue;
-            const std::size_t ri = static_cast<std::size_t>(resource_type::agricultural_produce);
-            const float demand = mc.demand[ri];
-            const float supply = mc.supply[ri];
-            if (demand > 0.0f)
-                food_ratio = std::min(1.0f, supply / demand);
+            float met_acc = 0.0f, met_weight = 0.0f;
+            for (std::size_t r = 0; r < resource_count; ++r)
+            {
+                const float b = growth_sp.demand_basket[r];
+                if (b <= 0.0f || mc.demand[r] <= 0.0f)
+                    continue;
+                met_acc    += b * std::min(1.0f, mc.supply[r] / mc.demand[r]);
+                met_weight += b;
+            }
+            if (met_weight > 0.0f)
+                met_ratio = met_acc / met_weight;
             break;
         }
-        if (food_ratio < 0.5f)
+        if (met_ratio < growth_sp.growth_met_threshold)
             continue;
 
         ++pcc.growth_accumulator;
@@ -483,24 +579,175 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
         }
     }
 
+    // BL-079: scoped background-corp agency (SCOPED RULE EXCEPTION — narrow, local,
+    // deterministic; recorded in .claude/rules/io-standing-rules.md on landing). After
+    // production, each NON-player corp may make one small mechanical choice per
+    // building: switch a processor stuck on a floored (near-worthless) output to a
+    // recipe with a healthier one, else idle a building that has run at a loss for a
+    // sustained streak. No relocation, planning, or global optimisation. Visits corps
+    // (corp_ids, sorted above) and their assets in stored order for determinism;
+    // composes with the deposit-depletion throttle already live in run_extraction.
+    {
+        constexpr int   loss_streak_to_idle = 8;     // consecutive loss ticks before idling.
+        constexpr float floored_frac        = 0.30f; // output within ~30% of the price floor reads as "floored".
+        for (const entity_id corp : corp_ids)
+        {
+            const corporation_component& acc = w.corporations.at(corp);
+            if (acc.is_player)
+                continue; // never auto-act on the player's own corp
+
+            for (const entity_id bid : acc.assets)
+            {
+                const auto bit = w.buildings.find(bid);
+                if (bit == w.buildings.end())
+                    continue;
+                building_component& b = bit->second;
+                if (b.ticks_remaining > 0 || b.decommissioned)
+                    continue; // not operating
+
+                // (1) Recipe rescue: a processor whose current output is floored
+                // switches to the recipe with the healthiest output, if better.
+                if (b.type == building_type::processing_facility)
+                {
+                    const entity_id mid       = market_for_tile(w, b.tile);
+                    const market_component* m = (mid != null_entity) ? &w.markets.at(mid) : nullptr;
+                    auto output_ratio = [&](uint16_t recipe_id) -> float {
+                        const recipe* rc = reg.get_recipe(recipe_id);
+                        if (!rc || !m)
+                            return 1.0f;
+                        float worst = 1.0f; // lowest price/base over the recipe's outputs
+                        for (std::size_t r = 0; r < resource_count; ++r)
+                        {
+                            if (rc->outputs[r] <= 0.0f)
+                                continue;
+                            const float base = m->base_price[r];
+                            if (base <= 0.0f)
+                                continue;
+                            worst = std::min(worst, m->price[r] / base);
+                        }
+                        return worst;
+                    };
+                    if (output_ratio(b.recipe) <= floored_frac)
+                    {
+                        const int n      = reg.recipe_count(building_type::processing_facility);
+                        int   best_i     = -1;
+                        float best_ratio = output_ratio(b.recipe);
+                        for (int i = 0; i < n; ++i)
+                        {
+                            const recipe& cand = reg.recipe_at(building_type::processing_facility, i);
+                            const float ratio  = output_ratio(reg.recipe_id(cand.name));
+                            if (ratio > best_ratio)
+                            {
+                                best_ratio = ratio;
+                                best_i     = i;
+                            }
+                        }
+                        if (best_i >= 0)
+                        {
+                            const recipe& chosen  = reg.recipe_at(building_type::processing_facility, best_i);
+                            b.recipe              = reg.recipe_id(chosen.name);
+                            b.active_recipe_index = best_i;
+                            b.loss_streak         = 0; // give the new recipe a chance before idling
+                            continue;
+                        }
+                    }
+                }
+
+                // (2) Idle a persistent loser (composes with the depletion throttle:
+                // an exhausted deposit drives extraction losses that end in an idle).
+                const building_profit bp = estimate_building_profit(w, reg, report, bid);
+                if (bp.has_data && bp.net() < 0.0f)
+                {
+                    if (++b.loss_streak >= loss_streak_to_idle)
+                        b.decommissioned = true;
+                }
+                else
+                {
+                    b.loss_streak = 0;
+                }
+            }
+        }
+    }
+
     return report;
 }
 
-void inject_substrate_demand(world& w)
+void inject_substrate_demand(world& w, const recipe_registry& reg)
 {
+    const substrate_params& sp = reg.substrate();
+
     for (auto& [key, sub] : w.nation_substrates)
     {
-        const entity_id body_id = key.second;
-        for (auto& [mid, mc] : w.markets)
+        const entity_id nation_id = key.first;
+        const entity_id body_id   = key.second;
+
+        // BL-096: distribute the nation's substrate across the markets on this body
+        // that sit in its OWN territory (a market whose centre_tile the nation owns);
+        // if it owns none (it folded into a neighbour under the resource carve), fall
+        // back to the body's lowest-id market. Split equally so the per-nation totals
+        // are conserved however many markets the carve produced. Markets are gathered
+        // in ascending id order for determinism.
+        std::vector<entity_id> targets;
+        entity_id fallback = null_entity;
         {
-            if (mc.body != body_id)
-                continue;
+            std::vector<entity_id> body_markets;
+            for (const auto& [mid, mc] : w.markets)
+                if (mc.body == body_id)
+                    body_markets.push_back(mid);
+            std::sort(body_markets.begin(), body_markets.end());
+            for (const entity_id mid : body_markets)
+            {
+                if (fallback == null_entity)
+                    fallback = mid; // lowest-id market on the body
+                const entity_id ct = w.markets.at(mid).centre_tile;
+                if (ct == null_entity)
+                    continue;
+                const auto nit = w.tile_to_nation.find(ct);
+                if (nit != w.tile_to_nation.end() && nit->second == nation_id)
+                    targets.push_back(mid);
+            }
+        }
+        if (targets.empty() && fallback != null_entity)
+            targets.push_back(fallback);
+        if (targets.empty())
+            continue; // no markets on this body
+
+        const float share = 1.0f / static_cast<float>(targets.size());
+        const float pop_w = sub.population_weight * share;
+
+        for (const entity_id mid : targets)
+        {
+            market_component& mc = w.markets.at(mid);
             for (std::size_t r = 0; r < resource_count; ++r)
             {
-                mc.supply[r] += sub.background_supply[r];
-                mc.demand[r] += sub.background_demand[r];
+                // Only tradeable resources carry a substrate; untradeables have no
+                // base price to anchor the elasticity curve.
+                const float base = mc.base_price[r];
+                if (base <= 0.0f)
+                    continue;
+                const float weighted = pop_w * sp.demand_basket[r] * sp.demand_scale;
+                if (weighted <= 0.0f)
+                    continue;
+
+                // DEMAND — price-elastic: cheaper than base → consume more, dearer
+                // → less. Reads last tick's cleared price (0 before the first clear
+                // falls back to base). Deterministic; a curve, not RNG.
+                const float price   = (mc.price[r] > 0.0f) ? mc.price[r] : base;
+                const float elastic = std::clamp(std::pow(base / price, sp.demand_elasticity),
+                                                 sp.elasticity_min, sp.elasticity_max);
+                const float demand  = weighted * elastic;
+
+                // SUPPLY — abstract nation capacity that tracks demand and clears it
+                // only to `clearing_fraction`, capped by deposit-derived capacity.
+                // Ample capacity → a thin saturation margin (price just above base);
+                // a resource the nation lacks → supply pegs short, price rises (the
+                // fillable opportunity gap BL-112/BL-079 read).
+                const float capacity = sub.capacity[r] * share * sp.capacity_scale;
+                const float supply   = std::min(capacity, demand * sp.clearing_fraction);
+
+                mc.demand[r] += demand;
+                mc.supply[r] += supply;
             }
-            break; // one market per body for now
         }
     }
 }

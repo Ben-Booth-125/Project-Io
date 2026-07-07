@@ -58,35 +58,9 @@ void read_resource_map(const sol::table& src, std::array<float, resource_count>&
 
 } // namespace
 
-// --- recipe_count / recipe_at ------------------------------------------------
-
-int recipe_registry::recipe_count(building_type bt) const
-{
-    // Only processing facilities use recipes. Extraction sites and ports do not.
-    if (bt != building_type::processing_facility)
-        return 0;
-    return static_cast<int>(m_recipes.size());
-}
-
-namespace {
-// Dummy recipe returned when the building type carries no recipes.
-const recipe& empty_recipe()
-{
-    static const recipe r{};
-    return r;
-}
-} // namespace
-
-const recipe& recipe_registry::recipe_at(building_type bt, int i) const
-{
-    const int n = recipe_count(bt);
-    if (n == 0)
-        return empty_recipe();
-    const int clamped = (i < 0) ? 0 : (i >= n ? n - 1 : i);
-    return m_recipes[static_cast<std::size_t>(clamped)];
-}
-
 // --- load_from_lua -----------------------------------------------------------
+// (recipe_count / recipe_at are now inline in the header so the SDL/Lua-free world
+//  superset links without this translation unit — see recipe_registry.hpp.)
 
 void recipe_registry::load_from_lua(lua_state& lua)
 {
@@ -128,6 +102,34 @@ void recipe_registry::load_from_lua(lua_state& lua)
     {
         m_t_full = thr->get_or("t_full", 1.0f);
         m_t_idle = thr->get_or("t_idle", 0.2f);
+    }
+
+    // BL-078 elastic-substrate model (economy.substrate). Scalars fall back to the
+    // struct defaults (which mirror economy.lua) so a partial table still loads.
+    sol::optional<sol::table> substrate = (*econ)["substrate"];
+    if (substrate)
+    {
+        substrate_params sp;
+        sol::optional<sol::table> basket = (*substrate)["demand_basket"];
+        if (basket)
+            read_resource_map(*basket, sp.demand_basket, "economy.substrate.demand_basket");
+        sp.capacity_scale       = substrate->get_or("capacity_scale",       sp.capacity_scale);
+        sp.clearing_fraction    = substrate->get_or("clearing_fraction",    sp.clearing_fraction);
+        sp.demand_elasticity    = substrate->get_or("demand_elasticity",    sp.demand_elasticity);
+        sp.elasticity_min       = substrate->get_or("elasticity_min",       sp.elasticity_min);
+        sp.elasticity_max       = substrate->get_or("elasticity_max",       sp.elasticity_max);
+        sp.demand_scale         = substrate->get_or("demand_scale",         sp.demand_scale);
+        sp.growth_met_threshold = substrate->get_or("growth_met_threshold", sp.growth_met_threshold);
+        m_substrate = sp;
+    }
+
+    // BL-095 construction-gate (economy.construction).
+    sol::optional<sol::table> construction = (*econ)["construction"];
+    if (construction)
+    {
+        construction_params cp;
+        cp.max_stretch = construction->get_or("max_stretch", cp.max_stretch);
+        m_construction = cp;
     }
 
     sol::optional<sol::table> buildings = (*econ)["buildings"];

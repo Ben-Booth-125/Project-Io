@@ -226,10 +226,11 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         mc.demand.fill(0.0f);
     }
 
-    // Inject nation-substrate background supply and demand into markets before the
+    // Inject the elastic nation-substrate demand/supply into markets before the
     // order-book runs. Must come after the zero-reset above so substrate is additive
-    // to the order-book quantities, not erased by it.
-    inject_substrate_demand(w);
+    // to the order-book quantities, not erased by it. (BL-078: reads last tick's
+    // cleared price for the demand elasticity.)
+    inject_substrate_demand(w, reg);
 
     // A (corp, body, resource) the player has a standing sell order for is under
     // manual control: the auto-surplus path yields it so the player's floor-priced

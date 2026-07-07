@@ -25,6 +25,18 @@ base — the bulk of ordinary extraction, processing, and manufacture — is **o
 the Nation AI as background**. It is not the player's playing field and is not surfaced as
 manageable detail; it is the saturated substrate the contest happens *on top of*.
 
+**Refined into two faces (BL-078, 2026-07-07).** The substrate is *redefined, not removed*.
+Its **demand face** is population — a price-elastic per-capita basket (so every product has a
+real referent and price *discovers* rather than clamping) with minimal met-supply-keyed growth.
+Its **supply face** is the nation's abstract production capacity, which tracks that demand and
+clears it only *partially*, leaving a **live margin** — the saturation cushion where the nation
+has the capacity, and a wide **opportunity gap** where it lacks the deposit (price pegs high;
+the gap the player fills). The markets those faces feed are **resource-carved (BL-096)**: a
+nation's territory fractures into more markets where its tradeable-resource concentration is
+high and folds into a neighbour where it is barren, with nations as the carving actor. Together
+these keep the premise (a saturated base the player competes *on top of*) while making it a
+legible, fillable opportunity surface rather than an inert price floor.
+
 **Corporations are specialists, not full-chain industrialists.** The player and the major AI
 rivals each occupy a **focused slice** of the resource chain and are differentiated by a single
 shared trait: an **interest in expanding to space**. The strategic contest is therefore between

@@ -839,11 +839,14 @@ std::vector<entity_id> generate_nations(
         const entity_id nation_id = nation_ids[static_cast<std::size_t>(ni)];
         nation_substrate& sub = w.nation_substrates[std::make_pair(nation_id, body_id)];
 
+        // BL-078: store only generation baselines here — raw deposit-weighted
+        // capacity and the population-proximity weight. The economic scalars
+        // (capacity_scale, basket, elasticity, clearing_fraction) are applied at
+        // tick time by inject_substrate_demand, so the demand/supply model is
+        // fully retunable from economy.lua without regenerating the world.
+        sub.population_weight += best_density;
         for (std::size_t r = 0; r < resource_count; ++r)
-        {
-            sub.background_supply[r] += best_density * tc.resource_deposit[r] * 2.0f;
-            sub.background_demand[r] += best_density * 0.5f;
-        }
+            sub.capacity[r] += best_density * tc.resource_deposit[r];
     }
 
     return nation_ids;

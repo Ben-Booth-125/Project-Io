@@ -6,10 +6,14 @@
 #include "population_generation.hpp"
 #include "tile_generation.hpp"
 
+#include <algorithm>
 #include <array>
 #include <cstddef>
 #include <initializer_list>
+#include <map>
+#include <random>
 #include <utility>
+#include <vector>
 
 namespace {
 
@@ -174,11 +178,19 @@ world make_hard_coded_world(world_params params)
         w.stockpiles[kepler_processor] = stockpile_component{};
     }
 
-    // Kepler markets — one per major population centre (scale >= 3), anchored to
-    // that centre's tile so catchment routing (market_for_tile) partitions the map.
-    // Resources outside the tradeable prototype subset stay at base 0 and are
-    // never traded. Supply/demand are seeded by the substrate injection each tick;
-    // no warm-start values are set here (BL-035 handles that separately).
+    // Kepler markets — population-anchored but RESOURCE-CARVED (BL-096). Markets
+    // still anchor to population-centre tiles (catchment routing via market_for_tile
+    // partitions the map), but how finely a nation's territory is split into markets
+    // is shaped by its tradeable-resource concentration: a resource-rich nation
+    // fractures into more markets (a lower population-scale gate admits more of its
+    // centres), a barren one folds into its neighbour (a higher gate — its smaller
+    // centres get no market and their tiles route to the nearest neighbour's).
+    // Nations are the carving actor, so a resource cluster spanning two nations'
+    // territory yields two markets. One-pass at world-gen, deterministic; a small
+    // seeded jitter varies the borderline split per campaign (fresh XOR offset,
+    // uncorrelated with the nation/corp streams). Fuller co-generation is BL-132.
+    // Resources outside the tradeable prototype subset stay at base 0 and are never
+    // traded. Supply/demand are seeded by the substrate injection each tick.
     {
         const market_component kepler_market_template{
             .body       = kepler,
@@ -190,11 +202,61 @@ world make_hard_coded_world(world_params params)
                                            {resource_type::refined_fuel,          10.0f},
                                            {resource_type::food_rations,           6.0f} }),
         };
-        int markets_seeded = 0;
-        for (const auto& [cid, pcc] : w.population_centres)
+
+        // Per-nation tradeable-resource concentration = mean raw-deposit richness
+        // per owned tile over the tradeable subset. Classified against the
+        // cross-nation mean into a population-scale gate (2 = fracture, 3 = normal,
+        // 4 = fold). Tunable via rich_factor / barren_factor.
+        constexpr resource_type tradeable_raws[] = { resource_type::iron_ore,
+                                                      resource_type::petroleum,
+                                                      resource_type::water,
+                                                      resource_type::agricultural_produce };
+        constexpr float rich_factor   = 1.30f; // concentration >= mean × this → fracture (gate 2)
+        constexpr float barren_factor = 0.70f; // concentration <  mean × this → fold    (gate 4)
+
+        std::map<entity_id, float> concentration; // std::map → ascending id (deterministic)
+        for (const auto& [nid, nc] : w.nations)
         {
-            if (pcc.scale < 3)
-                continue;
+            float sum = 0.0f;
+            for (const resource_type rt : tradeable_raws)
+                sum += nc.resource_abundance[static_cast<std::size_t>(rt)];
+            const float tiles = static_cast<float>(std::max<std::size_t>(1, nc.tiles.size()));
+            concentration[nid] = sum / tiles;
+        }
+        // Seeded jitter in ascending nation-id order (deterministic; fresh offset).
+        {
+            std::mt19937 jitter_rng(params.seed ^ 0xA5310096u);
+            std::uniform_real_distribution<float> jitter(0.85f, 1.15f);
+            for (auto& [nid, c] : concentration)
+                c *= jitter(jitter_rng);
+        }
+        float mean_conc = 0.0f;
+        if (!concentration.empty())
+        {
+            for (const auto& [nid, c] : concentration)
+                mean_conc += c;
+            mean_conc /= static_cast<float>(concentration.size());
+        }
+        auto gate_for_nation = [&](entity_id nid) -> int {
+            const auto it = concentration.find(nid);
+            if (it == concentration.end() || mean_conc <= 0.0f)
+                return 3;
+            if (it->second >= mean_conc * rich_factor)   return 2; // fracture: more markets
+            if (it->second <  mean_conc * barren_factor) return 4; // fold: fewer markets
+            return 3;
+        };
+
+        // Seed markets in ascending centre-id order for deterministic market ids.
+        std::vector<entity_id> centre_ids;
+        centre_ids.reserve(w.population_centres.size());
+        for (const auto& [cid, pcc] : w.population_centres)
+            centre_ids.push_back(cid);
+        std::sort(centre_ids.begin(), centre_ids.end());
+
+        int markets_seeded = 0;
+        for (const entity_id cid : centre_ids)
+        {
+            const population_centre_component& pcc = w.population_centres.at(cid);
             const auto tile_it = w.population_centre_tile.find(cid);
             if (tile_it == w.population_centre_tile.end())
                 continue;
@@ -202,13 +264,21 @@ world make_hard_coded_world(world_params params)
             if (tc_it == w.tiles.end() || tc_it->second.body != kepler)
                 continue;
 
+            // Nation-carved population-scale gate for this centre's owning nation.
+            int gate = 3;
+            const auto nit = w.tile_to_nation.find(tile_it->second);
+            if (nit != w.tile_to_nation.end())
+                gate = gate_for_nation(nit->second);
+            if (pcc.scale < gate)
+                continue; // folds into a neighbouring market (routed by market_for_tile)
+
             market_component mc = kepler_market_template;
             mc.centre_tile = tile_it->second;
             mc.price       = mc.base_price; // start at canonical base
             w.markets[w.create_entity()] = mc;
             ++markets_seeded;
         }
-        // Fallback: if no large centres were generated, seed one unanchored market.
+        // Fallback: if no centre qualified, seed one unanchored market.
         if (markets_seeded == 0)
         {
             market_component mc = kepler_market_template;
