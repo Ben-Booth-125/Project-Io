@@ -1,5 +1,6 @@
 #include "population_generation.hpp"
 
+#include "world/city_names.hpp"     // world::generate_city_name
 #include "world/placement_rules.hpp"
 
 #include <algorithm>
@@ -14,34 +15,6 @@
 // ---------------------------------------------------------------------------
 
 namespace {
-
-/// A procedural city name: an onset + nucleus (+ optional coda), optionally suffixed
-/// with a settlement word. Self-contained phoneme bank (mirrors the nation-name
-/// generator's approach). Deterministic on @p rng — call from an independent stream.
-std::string make_city_name(std::mt19937& rng)
-{
-    static const char* onset[]  = { "B","D","F","G","H","K","L","M","N","P","R","S","T","V",
-                                    "Br","Dr","Gr","Kr","Th","St","Vel","Nor","Cal","Mar" };
-    static const char* nucleus[]= { "a","e","i","o","u","ai","ea","or","en","ar","el","yn" };
-    static const char* coda[]   = { "", "n","r","s","th","ll","rd","nd","st","x","ne","ry" };
-    static const char* suffix[] = { "", "", " City", " Port", "burg", "ton", "haven", " Cross" };
-    const auto pick = [&rng](const char* const* arr, std::size_t n) {
-        std::uniform_int_distribution<std::size_t> d(0, n - 1);
-        return arr[d(rng)];
-    };
-    std::string s = pick(onset, std::size(onset));
-    s += pick(nucleus, std::size(nucleus));
-    s += pick(coda, std::size(coda));
-    // Occasional second syllable for a longer name.
-    std::uniform_int_distribution<int> two(0, 2);
-    if (two(rng) == 0)
-    {
-        s += pick(onset, std::size(onset));
-        s += pick(nucleus, std::size(nucleus));
-    }
-    s += pick(suffix, std::size(suffix));
-    return s;
-}
 
 /// Headcount in thousands for each scale level 1–5.
 constexpr int k_population_for_scale[5] = { 10, 50, 200, 1000, 5000 };
@@ -233,6 +206,6 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed)
         std::sort(ids.begin(), ids.end());
         std::mt19937 name_rng(seed ^ 0x9E3779B9u);
         for (entity_id cid : ids)
-            w.population_centre_name[cid] = make_city_name(name_rng);
+            w.population_centre_name[cid] = generate_city_name(name_rng);
     }
 }

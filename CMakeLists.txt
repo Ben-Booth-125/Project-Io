@@ -286,6 +286,7 @@ add_executable(corp_terrain_matrix
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/tile_generation.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/nation_generation.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/population_generation.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/city_names.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/corporation_generation.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/orbital_system.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/placement_rules.cpp"
