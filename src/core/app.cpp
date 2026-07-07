@@ -841,17 +841,56 @@ int app::run_verify(const std::string& script_path, bool bless)
                           << ui::resource_name(static_cast<resource_type>(r)) << ","
                           << pool.quantities[r] << "\n";
         }
-        // markets.csv — one row per (body, tradeable resource).
+        // A per-market display label. Markets carry no name in the data model yet
+        // (the future "market_city_name" is design-owed); until then, label each by its
+        // body + the grid coords of its anchoring city tile, which is stable + distinct.
+        const auto market_label = [this, &body_name](entity_id mid) -> std::string {
+            const auto it = m_world.markets.find(mid);
+            if (it == m_world.markets.end()) return "market#" + std::to_string(mid);
+            const std::string bn = body_name(it->second.body);
+            const auto tit = m_world.tiles.find(it->second.centre_tile);
+            if (tit != m_world.tiles.end())
+                return bn + " (" + std::to_string(tit->second.grid_x) + ","
+                          + std::to_string(tit->second.grid_y) + ")";
+            return bn; // unanchored single-market fallback
+        };
+
+        // markets.csv — snapshot, one row per (market, tradeable resource). Split by
+        // market_id/market_label so multiple markets on a body are distinguishable.
         {
             std::ofstream f(path("markets.csv"));
-            f << "body_id,body_name,resource,supply,demand,price,base_price\n";
+            f << "market_id,market_label,body_id,body_name,resource,supply,demand,price,base_price\n";
             for (const auto& [mid, mc] : m_world.markets)
                 for (std::size_t r = 0; r < resource_count; ++r)
                     if (mc.base_price[r] > 0.0f)
-                        f << mc.body << ",\"" << body_name(mc.body) << "\","
+                        f << mid << ",\"" << market_label(mid) << "\"," << mc.body << ",\""
+                          << body_name(mc.body) << "\","
                           << ui::resource_name(static_cast<resource_type>(r)) << ","
                           << mc.supply[r] << "," << mc.demand[r] << "," << mc.price[r] << ","
                           << mc.base_price[r] << "\n";
+        }
+        // market_prices.csv — the price/supply/demand TIME SERIES per (market, resource,
+        // tick) from m_market_history, so the "price over time" charts have real curves.
+        // tick is the sample index (0 = oldest retained, capped at plot_history_cap).
+        {
+            std::ofstream f(path("market_prices.csv"));
+            f << "market_id,market_label,body_name,resource,tick,price,supply,demand\n";
+            for (const auto& [mid, series] : m_market_history)
+            {
+                const auto mit = m_world.markets.find(mid);
+                const std::string bn = mit != m_world.markets.end() ? body_name(mit->second.body) : "-";
+                const std::string lbl = market_label(mid);
+                for (std::size_t r = 0; r < resource_count; ++r)
+                {
+                    const ui::resource_plot_series& s = series[r];
+                    for (std::size_t t = 0; t < s.price.size(); ++t)
+                        f << mid << ",\"" << lbl << "\",\"" << bn << "\","
+                          << ui::resource_name(static_cast<resource_type>(r)) << ","
+                          << t << "," << s.price[t] << ","
+                          << (t < s.supply.size() ? s.supply[t] : 0.0f) << ","
+                          << (t < s.demand.size() ? s.demand[t] : 0.0f) << "\n";
+                }
+            }
         }
         // cashflow.csv — last tick's itemised per-corp budget (the Balance Ledger data).
         {
@@ -890,7 +929,7 @@ int app::run_verify(const std::string& script_path, bool bless)
                   << (i < m_income_history.size() ? m_income_history[i] : 0.0f) << ","
                   << (i < m_expenditure_history.size() ? m_expenditure_history[i] : 0.0f) << "\n";
         }
-        SDL_Log("export_data: wrote 7 CSVs to %s", dir.c_str());
+        SDL_Log("export_data: wrote 8 CSVs to %s", dir.c_str());
     });
 
     // Diagnostic: log every corporation building's grid position and owner so a
