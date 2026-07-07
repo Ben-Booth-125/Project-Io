@@ -1,36 +1,36 @@
 market_id,market_label,body_id,body_name,resource,supply,demand,price,base_price
-30281,"Kepler (19,19)",15124,"Kepler",Iron Ore,150380,1056.31,0.625029,2.5
-30281,"Kepler (19,19)",15124,"Kepler",Petroleum,32450.1,1056.31,0.87504,3.5
-30281,"Kepler (19,19)",15124,"Kepler",Agricultural Produce,124159,1056.31,0.750034,3
-30281,"Kepler (19,19)",15124,"Kepler",Water,162607,1056.31,0.375017,1.5
-30281,"Kepler (19,19)",15124,"Kepler",Steel,0,1056.31,31.9996,8
-30281,"Kepler (19,19)",15124,"Kepler",Refined Fuel,0,1056.31,39.9995,10
-30281,"Kepler (19,19)",15124,"Kepler",Food Rations,0,1056.31,23.9997,6
-30282,"Kepler (109,23)",15124,"Kepler",Iron Ore,0,48,9.99951,2.5
-30282,"Kepler (109,23)",15124,"Kepler",Petroleum,0,0,3.49996,3.5
-30282,"Kepler (109,23)",15124,"Kepler",Agricultural Produce,0,0,2.99997,3
-30282,"Kepler (109,23)",15124,"Kepler",Water,0,0,1.49998,1.5
-30282,"Kepler (109,23)",15124,"Kepler",Steel,24,0,2.00009,8
-30282,"Kepler (109,23)",15124,"Kepler",Refined Fuel,0,0,9.99989,10
-30282,"Kepler (109,23)",15124,"Kepler",Food Rations,0,0,5.99993,6
-30283,"Kepler (162,45)",15124,"Kepler",Iron Ore,0,16,9.99951,2.5
-30283,"Kepler (162,45)",15124,"Kepler",Petroleum,0,0,3.49996,3.5
-30283,"Kepler (162,45)",15124,"Kepler",Agricultural Produce,0,0,2.99997,3
-30283,"Kepler (162,45)",15124,"Kepler",Water,0,0,1.49998,1.5
-30283,"Kepler (162,45)",15124,"Kepler",Steel,8,0,2.00009,8
-30283,"Kepler (162,45)",15124,"Kepler",Refined Fuel,0,0,9.99989,10
-30283,"Kepler (162,45)",15124,"Kepler",Food Rations,0,0,5.99993,6
-30284,"Kepler (66,6)",15124,"Kepler",Iron Ore,149.115,0,0.625029,2.5
-30284,"Kepler (66,6)",15124,"Kepler",Petroleum,0,0,3.49996,3.5
-30284,"Kepler (66,6)",15124,"Kepler",Agricultural Produce,3086.55,0,0.750034,3
-30284,"Kepler (66,6)",15124,"Kepler",Water,0,0,1.49998,1.5
-30284,"Kepler (66,6)",15124,"Kepler",Steel,8,0,2.00009,8
-30284,"Kepler (66,6)",15124,"Kepler",Refined Fuel,0,0,9.99989,10
-30284,"Kepler (66,6)",15124,"Kepler",Food Rations,0,0,5.99993,6
-30285,"Kepler (168,71)",15124,"Kepler",Iron Ore,0,0,2.5,2.5
-30285,"Kepler (168,71)",15124,"Kepler",Petroleum,0,0,3.5,3.5
-30285,"Kepler (168,71)",15124,"Kepler",Agricultural Produce,0,0,3,3
-30285,"Kepler (168,71)",15124,"Kepler",Water,0,0,1.5,1.5
-30285,"Kepler (168,71)",15124,"Kepler",Steel,0,0,8,8
-30285,"Kepler (168,71)",15124,"Kepler",Refined Fuel,0,0,10,10
-30285,"Kepler (168,71)",15124,"Kepler",Food Rations,0,0,6,6
+30281,"NuneKrenton",15124,"Kepler",Iron Ore,150380,1056.31,0.625029,2.5
+30281,"NuneKrenton",15124,"Kepler",Petroleum,32450.1,1056.31,0.87504,3.5
+30281,"NuneKrenton",15124,"Kepler",Agricultural Produce,124159,1056.31,0.750034,3
+30281,"NuneKrenton",15124,"Kepler",Water,162607,1056.31,0.375017,1.5
+30281,"NuneKrenton",15124,"Kepler",Steel,0,1056.31,31.9996,8
+30281,"NuneKrenton",15124,"Kepler",Refined Fuel,0,1056.31,39.9995,10
+30281,"NuneKrenton",15124,"Kepler",Food Rations,0,1056.31,23.9997,6
+30282,"MordTor Cross",15124,"Kepler",Iron Ore,0,48,9.99951,2.5
+30282,"MordTor Cross",15124,"Kepler",Petroleum,0,0,3.49996,3.5
+30282,"MordTor Cross",15124,"Kepler",Agricultural Produce,0,0,2.99997,3
+30282,"MordTor Cross",15124,"Kepler",Water,0,0,1.49998,1.5
+30282,"MordTor Cross",15124,"Kepler",Steel,24,0,2.00009,8
+30282,"MordTor Cross",15124,"Kepler",Refined Fuel,0,0,9.99989,10
+30282,"MordTor Cross",15124,"Kepler",Food Rations,0,0,5.99993,6
+30283,"Kynrdton",15124,"Kepler",Iron Ore,0,16,9.99951,2.5
+30283,"Kynrdton",15124,"Kepler",Petroleum,0,0,3.49996,3.5
+30283,"Kynrdton",15124,"Kepler",Agricultural Produce,0,0,2.99997,3
+30283,"Kynrdton",15124,"Kepler",Water,0,0,1.49998,1.5
+30283,"Kynrdton",15124,"Kepler",Steel,8,0,2.00009,8
+30283,"Kynrdton",15124,"Kepler",Refined Fuel,0,0,9.99989,10
+30283,"Kynrdton",15124,"Kepler",Food Rations,0,0,5.99993,6
+30284,"Sasthaven",15124,"Kepler",Iron Ore,149.115,0,0.625029,2.5
+30284,"Sasthaven",15124,"Kepler",Petroleum,0,0,3.49996,3.5
+30284,"Sasthaven",15124,"Kepler",Agricultural Produce,3086.55,0,0.750034,3
+30284,"Sasthaven",15124,"Kepler",Water,0,0,1.49998,1.5
+30284,"Sasthaven",15124,"Kepler",Steel,8,0,2.00009,8
+30284,"Sasthaven",15124,"Kepler",Refined Fuel,0,0,9.99989,10
+30284,"Sasthaven",15124,"Kepler",Food Rations,0,0,5.99993,6
+30285,"Thear City",15124,"Kepler",Iron Ore,0,0,2.5,2.5
+30285,"Thear City",15124,"Kepler",Petroleum,0,0,3.5,3.5
+30285,"Thear City",15124,"Kepler",Agricultural Produce,0,0,3,3
+30285,"Thear City",15124,"Kepler",Water,0,0,1.5,1.5
+30285,"Thear City",15124,"Kepler",Steel,0,0,8,8
+30285,"Thear City",15124,"Kepler",Refined Fuel,0,0,10,10
+30285,"Thear City",15124,"Kepler",Food Rations,0,0,6,6

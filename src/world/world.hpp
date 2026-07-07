@@ -76,6 +76,12 @@ struct world
     /// Written alongside population_centres by generate_population_centres().
     std::unordered_map<entity_id, entity_id>                   population_centre_tile;
 
+    /// Procedural city name per population centre — the human-readable identity used
+    /// by the market ledger's market/city selector and the CSV export. Assigned by
+    /// generate_population_centres() from an INDEPENDENT seeded stream (so it does not
+    /// perturb world generation). A market's city name resolves via its centre_tile.
+    std::unordered_map<entity_id, std::string>                 population_centre_name;
+
     /// Nation entities keyed by their entity ID. Populated by generate_nations()
     /// after tile generation; empty until that call is made for a body.
     std::unordered_map<entity_id, nation_component>    nations;

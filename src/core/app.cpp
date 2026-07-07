@@ -841,18 +841,11 @@ int app::run_verify(const std::string& script_path, bool bless)
                           << ui::resource_name(static_cast<resource_type>(r)) << ","
                           << pool.quantities[r] << "\n";
         }
-        // A per-market display label. Markets carry no name in the data model yet
-        // (the future "market_city_name" is design-owed); until then, label each by its
-        // body + the grid coords of its anchoring city tile, which is stable + distinct.
-        const auto market_label = [this, &body_name](entity_id mid) -> std::string {
-            const auto it = m_world.markets.find(mid);
-            if (it == m_world.markets.end()) return "market#" + std::to_string(mid);
-            const std::string bn = body_name(it->second.body);
-            const auto tit = m_world.tiles.find(it->second.centre_tile);
-            if (tit != m_world.tiles.end())
-                return bn + " (" + std::to_string(tit->second.grid_x) + ","
-                          + std::to_string(tit->second.grid_y) + ")";
-            return bn; // unanchored single-market fallback
+        // Per-market display label = its generated city name (population centre anchoring
+        // the market's centre tile), or the body name as a fallback. Shared with the
+        // market ledger's city selector so the CSV and the game agree.
+        const auto market_label = [this](entity_id mid) {
+            return ui::market_city_name(m_world, mid);
         };
 
         // markets.csv — snapshot, one row per (market, tradeable resource). Split by

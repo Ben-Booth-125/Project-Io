@@ -32,11 +32,12 @@ BI star schema: `corporations` is the corp dimension; `cashflow`, `stockpiles`, 
 per tick) are the trend tables for line charts — `market_prices` is what feeds the market-ledger
 "price over time" small multiples.
 
-**`market_label` is a placeholder.** Markets carry no name in the data model — the second
-selector's `market_city_name` is **design-owed** (see BL-120 note / the market-ledger mock-up). Until
-a naming scheme is chosen, `market_label` is derived from the body + the grid coords of the market's
-anchoring city tile (e.g. `Kepler (19,19)`), which is stable and distinct. There are **5 markets on
-Kepler** (one per major population centre), so the body → market cascade has real options.
+**`market_label` is the generated city name.** Each market resolves to the procedural name of the
+population centre anchoring its `centre_tile` (`world::population_centre_name`, assigned by
+`generate_population_centres` from an independent seeded stream — see the city-naming feature). The
+market ledger's second selector and this column share `ui::market_city_name`. There are **5 markets on
+Kepler** (one per major population centre — e.g. Kynrdton, NuneKrenton, Thear City), so the body →
+market cascade has real, named options.
 
 ## Caveats (design inputs, not data bugs)
 
