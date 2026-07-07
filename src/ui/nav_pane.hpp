@@ -24,4 +24,14 @@ void draw_nav_pane(ui_state& state, float top_offset = 0.0f);
 /// than a worded menu (the profile aligns to its own width, not this one).
 inline constexpr float nav_pane_width = 56.0f;
 
+/// Close every fold-out ledger/panel so at most one column occupant is shown.
+/// The Selection element shares the fold-out column and is mutually exclusive with
+/// the ledgers, so a *new* entity selection calls this to take the column (app),
+/// exactly as opening a ledger from the rail does.
+void close_all_panels(ui_state& state);
+
+/// Whether any fold-out ledger/panel currently owns the column. The Selection
+/// element only draws when this is false (the ledger wins the shared slot).
+bool any_panel_open(const ui_state& state);
+
 } // namespace ui

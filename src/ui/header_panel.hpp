@@ -30,7 +30,9 @@ void draw_header_panel(const world& w,
                        float left,
                        float right);
 
-/// Height of the header strip in pixels.
-inline constexpr float header_panel_height = 52.0f;
+/// Height of the header strip in pixels. Matches the identity card
+/// (profile_panel_height, 92) so the balance bar and the identity tile read as one
+/// level top band across the window; the strip's content is vertically centred.
+inline constexpr float header_panel_height = 92.0f;
 
 } // namespace ui

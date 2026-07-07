@@ -1,6 +1,6 @@
 # Project Io — Header
 
-The **header** is a full-width strip across the top of the canvas area, sitting between the profile (top-left) and the time column (top-right). It is the player's persistent financial and material dashboard — always visible, glanceable, never opened or closed. See `LAYOUT.md` for where it sits in the shell.
+The **header** is a full-width strip across the top of the canvas area, sitting between the profile (top-left) and the time column (top-right). It top-aligns at `y=0` and stands at the profile card's full height (`profile_panel_height`), so it reads level with the identity tile as a single top band; its content row is vertically centred within that band. It is the player's persistent financial and material dashboard — always visible, glanceable, never opened or closed. See `LAYOUT.md` for where it sits in the shell.
 
 Wired to the live economy as of the Layer 3 finalisation (`src/ui/header_panel.{hpp,cpp}`). The header design pass settled it as a **summary surface**: three money figures plus a trend line, with all detail left to the ledgers.
 

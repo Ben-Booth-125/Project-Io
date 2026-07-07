@@ -51,12 +51,12 @@ void draw_header_panel(const world& w,
                        float left,
                        float right)
 {
-    constexpr float margin = 8.0f;
-    const float     width  = right - left;
+    const float width = right - left;
     if (width <= 0.0f)
         return; // window too narrow to show the strip
 
-    ImGui::SetNextWindowPos({left, margin});
+    // Top-align with the identity card (y = 0) so the two read as one level band.
+    ImGui::SetNextWindowPos({left, 0.0f});
     ImGui::SetNextWindowSize({width, header_panel_height});
 
     constexpr ImGuiWindowFlags flags =
@@ -70,6 +70,11 @@ void draw_header_panel(const world& w,
         ImGuiWindowFlags_NoSavedSettings;
 
     ImGui::Begin("##header_panel", nullptr, flags);
+
+    // Vertically centre the single content row within the tall strip. Every element
+    // on the row (text + sparkline) is drawn at one frame height, so centring the
+    // start Y centres the whole row.
+    ImGui::SetCursorPosY((header_panel_height - ImGui::GetFrameHeight()) * 0.5f);
 
     const float balance   = player_balance(w);
     const float valuation = player_stockpile_value(w);
@@ -119,7 +124,7 @@ void draw_header_panel(const world& w,
                          static_cast<int>(balance_history.size()),
                          0, nullptr,
                          FLT_MAX, FLT_MAX,
-                         {96.0f, header_panel_height - 2.0f * margin});
+                         {96.0f, ImGui::GetFrameHeight()});
     }
 
     ImGui::End();

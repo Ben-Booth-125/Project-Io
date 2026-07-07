@@ -10,7 +10,7 @@ namespace ui {
 
 /// Close every nav-pane panel so at most one is open at a time. Call before
 /// toggling a slot ON; skip when toggling OFF (the toggle handles that itself).
-static void close_all_panels(ui_state& state)
+void close_all_panels(ui_state& state)
 {
     state.show_corporation_panel = false;
     state.show_balance_ledger    = false;
@@ -18,6 +18,13 @@ static void close_all_panels(ui_state& state)
     state.show_construction_panel = false;
     state.show_tile_ledger       = false;
     state.show_economy_panel     = false;
+}
+
+bool any_panel_open(const ui_state& state)
+{
+    return state.show_corporation_panel || state.show_balance_ledger ||
+           state.show_market_ledger     || state.show_construction_panel ||
+           state.show_tile_ledger       || state.show_economy_panel;
 }
 
 void draw_nav_pane(ui_state& state, float top_offset)

@@ -8,8 +8,11 @@
 namespace ui {
 
 /// Draw the Selection info element — a pinned panel showing detail of the
-/// current selection (ui_state::selected_entity), docked in the bottom-left
-/// above the overlay-lens strip. See docs/ui/SELECTION.md.
+/// current selection (ui_state::selected_entity), docked in the **shell fold-out
+/// column** (foldout_column_rect), where it is mutually exclusive with the ledgers:
+/// a new selection closes any open ledger to take the column, and the Selection
+/// draws only when no ledger owns the column (app gates it on ui::any_panel_open).
+/// See docs/ui/SELECTION.md.
 ///
 /// The panel is **polymorphic by selection kind** (selection.hpp): it dispatches
 /// on selection_kind_of to the matching per-entity content builder
@@ -33,17 +36,12 @@ namespace ui {
 ///                 body_habitability to show a population centre's workforce cap.
 /// @param ui       UI state; read for the selection, written by 'go to' (focus),
 ///                 the close button (hide), and the build front door (enqueue).
-/// @param left_x   Left edge of the panel, screen pixels (the nav-pane inner edge).
-/// @param right_x  Right edge of the panel, screen pixels — the bar stops here
-///                 rather than running to the display edge, so it sits *beside*
-///                 the bottom-right minimap (pass the minimap's left edge less a
-///                 margin) instead of behind it.
-/// @param bottom_y Bottom edge to anchor the panel against, screen pixels.
-/// @param height   Target bar height, screen pixels — pass the minimap's box
-///                 height so the bar reads as its left-hand twin. Clamped up to
-///                 the minimum needed to show the header + content rows.
+///
+/// The panel fills the shell fold-out column (foldout_column_rect); it takes no
+/// layout parameters. NOTE: the content still uses the wide-bottom-bar
+/// action|facts split — its re-lay-out for the narrower column is BL-123
+/// SELECTION_ELEMENT_RESIZE (Ben to mock).
 void draw_selection_panel(const world& w, const recipe_registry& reg,
-                          const economy_report& report, ui_state& ui,
-                          float left_x, float right_x, float bottom_y, float height);
+                          const economy_report& report, ui_state& ui);
 
 } // namespace ui

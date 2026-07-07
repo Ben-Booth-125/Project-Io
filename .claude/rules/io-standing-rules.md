@@ -49,6 +49,12 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   § Sub-agents & worktrees).
 - **Save the tool.** When you build a check or helper, push it to a reusable skill or committed
   script (`CLAUDE.md` § Tool creation is skill creation), not a one-off.
+- **Toggle rule (UI).** Any control whose active state is visible is a **toggle**: clicking it while
+  active undoes it. A nav-rail menu icon toggles its ledger open/closed; re-clicking the
+  *currently-active* sub-view tab **closes** the ledger (it does not collapse to an overview);
+  switching between tabs is an ordinary view change. **Exempt:** cross-cutting selectors
+  (body/market/resource combos), which switch a target rather than express an active state; and the
+  Selection element, which is selection-driven with no rail slot.
 - **Git writes from native only.** `git add`, `commit`, `merge`, `push` must run from native
   Claude Code or a native terminal — never the Cowork shell. The Cowork bridge mounts the Windows
   repo into a Linux VM; git writes cause CRLF diff churn and `.git` lock-file failures. File

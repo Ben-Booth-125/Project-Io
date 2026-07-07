@@ -9,23 +9,22 @@ The prototype UI is built with Dear ImGui (see TECH_FOUNDATIONS). Everything her
 ## Screen regions
 
 ```
-┌──────────┬────────────────────────────────────┬──────────────┐
-│ Profile  │              Header                 │  Time panel  │
-├──────────┤      (budget + resource strip)      │ (date + bar, │
-│          ├────────────────────────────────────┤  speed ctl)  │
-│ Nav rail │                                     ├──────────────┤
-│ (icons)  │         Primary canvas              │              │
-│ ▢        │  (Solar / Circumplanetary / Surface)│   Explorer   │
-│ ▢        │                                     │  (pinned     │
-│ ▢  …     │     [ floating ledger windows ]     │   shortcuts) │
-│ ▦ (8)    │                                     │              │
-│ ▢  …     │                                     │              │
-│ ▢        │  [ Selection info — action surface ]┌──────────────┐│
-│ ▢        │  (owns bottom-left corner)          │   Minimap    ││
-│          │                                     │ [lens bar]   ││
-│          │                                     │   (inactive  ││
-│          │                                     │    canvas)   ││
-└──────────┴─────────────────────────────────────┴─────────────┘
+┌────────────────┬──────────────────────────────┬──────────────┐
+│ Profile        │            Header             │  Time panel  │
+│ (identity tile)│    (budget + resource strip)  │ (date + bar, │
+├──────────┬─────┤  — one top band, level tiles  │  speed ctl)  │
+│ Nav rail │     ├──────────────────────────────┼──────────────┤
+│ (icons)  │Fold-│                               │              │
+│ ▢        │out  │       Primary canvas          │   Explorer   │
+│ ▢        │col: │ (Solar / Circumplanetary /    │  (pinned     │
+│ ▢  …     │ledger                    Surface)   │   shortcuts) │
+│ ▦ (8)    │ OR  │                               │              │
+│ ▢  …     │Selec-│                    ┌─────────┬──────────────┐│
+│ ▢        │tion │                     │lens key │   Minimap    ││
+│ ▢        │side-│                     │ (drawer)│ [lens bar]   ││
+│          │bar  │                     └─────────┤   (inactive  ││
+│          │     │                               │    canvas)   ││
+└──────────┴─────┴───────────────────────────────┴──────────────┘
 ```
 
 Two layers compose the screen:
@@ -40,21 +39,25 @@ The explorer is **not yet implemented** — it is specified here ahead of the wo
 ## The shell column (BL-122)
 
 Since **BL-122** the left edge is a single **permanent shell column** of width
-`W = clamp(round(0.17 · display_width), 300, 360)` px (`ui::shell_column_width`,
+`W = clamp(round(0.272 · display_width), 480, 576)` px (`ui::shell_column_width`,
 `src/ui/foldout_column.hpp`) — runtime-computed from the display so it stays legible
-across resolutions rather than a magic constant. The column is reserved down the whole
-left edge:
+across resolutions rather than a magic constant. The column was **widened ~1.6×** from its
+original `0.17·display_width` clamped `[300, 360]` so it can host the Selection element as a
+sidebar (below) alongside the ledgers; it now resolves to ~480 px at 1720 wide, ~522 px at
+1920. The column is reserved down the whole left edge:
 
 - The **identity tile** (profile) caps it at top, taking the full width `W`.
 - The narrow **icon nav rail** (56 px) runs down its left sub-edge.
 - A **fold-out ledger** fills the rest of the column (`[nav_pane_width, W]`, below the
   identity tile to the bottom margin) when a nav slot is active — see *Ledger windows*.
-- The **balance bar** (header) and the **Selection element** both start at `x = W`
-  permanently, whether or not any fold-out is open, so they always clear the column.
+- The **Selection element** shares that same fold-out slot as a sidebar, mutually exclusive
+  with the ledgers — see *Selection info element*.
+- The **balance bar** (header) starts at `x = W` permanently, whether or not any fold-out is
+  open, so it always clears the column.
 
-The 300 px floor is deliberate: it is the constraint that forces the one-question-per-view
-panel splits (BL-117..121). The per-panel splits and the Tile Ledger's migration into the
-column are **not** part of BL-122 — the skeleton hosts each panel's current content.
+The 480 px floor forces the one-question-per-view panel splits (BL-117..121). The per-panel
+splits and the Tile Ledger's migration into the column are **not** part of BL-122 — the
+skeleton hosts each panel's current content.
 
 ---
 
@@ -75,7 +78,7 @@ This is a static identity readout in the prototype — no interaction beyond, ev
 ## Header — top
 **Spec: `HEADER.md`**
 
-A strip across the top of the canvas area, between the identity tile and the time column. Its left edge is the shell column's right edge (`x = W`, BL-122). It is the player's persistent financial dashboard, wired to the live economy as of the Layer 3 finalisation:
+A strip across the top of the canvas area, between the identity tile and the time column. Its left edge is the shell column's right edge (`x = W`, BL-122). It now stands the **full identity-tile height** (`profile_panel_height`, ~92 px) and top-aligns at `y = 0`, so the header and the identity tile read as **one level top band**; its content row is vertically centred within that taller strip. It is the player's persistent financial dashboard, wired to the live economy as of the Layer 3 finalisation:
 
 - **Balance** — the player corporation's running treasury balance (negatives flagged red).
 - **Stockpile valuation** — an estimated liquid value of everything the player holds: its `(corporation, body)` pools summed at each body's current market price. A single money figure, not a per-resource inventory.
@@ -108,7 +111,7 @@ The canvases render behind the foreground panels, so the chrome currently occlud
 ## Minimap — bottom-right inset
 **Spec: `MINIMAP.md`**
 
-A fixed inset in the bottom-right corner showing the **zoom-out neighbour** of the primary canvas at reduced scale, framed by its own chrome — a title bar (the viewed body, or the star name; the game name at the top rung) above the inset. Clicking it **ascends** one rung. It shares the primary canvases' drawing code, parameterised by region size. Since BL-093 the minimap also carries the **lens mode bar** along its bottom edge (see below); `MINIMAP.md` is the authoritative spec for the minimap chrome, the lens bar, and the ladder navigation, and `CANVASES.md` covers the shared drawing path.
+A fixed inset in the bottom-right corner showing the **zoom-out neighbour** of the primary canvas at reduced scale, framed by its own chrome — a title bar (the viewed body, or the star name; the game name at the top rung) above the inset. It was **enlarged ~1.4×** — its size is now `max(336, 0.28 · min(w, h))` px (was `max(240, 0.20 · min(w, h))`), keeping the same 4:3 ratio; the time panel scales with it, sharing the right-column width. Clicking it **ascends** one rung. It shares the primary canvases' drawing code, parameterised by region size. Since BL-093 the minimap also carries the **lens mode bar** along its bottom edge (see below); `MINIMAP.md` is the authoritative spec for the minimap chrome, the lens bar, and the ladder navigation, and `CANVASES.md` covers the shared drawing path.
 
 ---
 
@@ -125,19 +128,27 @@ all nine). Clicking a glyph toggles that lens; the active one is highlighted,
 and clicking it again clears the overlay. The lens-local resource/good picker
 (Resource, Market, Scarcity) is now a **popup button** on the bar rather than an
 inline combo — the fixed-width combo did not fit the bar's reduced footprint.
-Freeing the bottom-left strip is what lets the Selection info element (below)
-take over the whole corner.
 
-## Selection info element — bottom-left corner
+The read-only **lens legend** (the on-canvas key for the graded lenses — Resource,
+Market, Production, Opportunity, Population, Scarcity, Industry) is a separate element
+from this control bar. It now sits **flush-left of the minimap** — its right edge at the
+minimap's left edge, vertically centred on the minimap, reading as a drawer folding out
+from the minimap's left side (passed a `lens_key_anchor` from `app.cpp`). It was moved
+here from the canvas left edge, which also clears the now-widened shell column it would
+otherwise have overlapped. `LENSES.md` is the authoritative spec.
+
+## Selection info element — shell-column sidebar
 **Spec: `SELECTION.md`**
 
-The Selection info element sits in the bottom-left, anchored to the bottom margin.
-Since BL-093 it sizes its height from content; since BL-122 its **left edge is the
-shell column's right edge** (`x = W`) — so it clears the fold-out column permanently —
-and its right edge is the minimap's left edge. It shows detail about the **current
-selection**, whatever entity the player last single-clicked.
+The Selection info element now lives **in the shell fold-out column as a sidebar**,
+filling `foldout_column_rect` — the same slot the ledgers use — rather than the old
+full-width bottom bar (the earlier BL-065 corner layout is gone). It is **mutually
+exclusive with the ledgers**: making a new entity selection closes any open ledger to
+take the column; while a ledger owns the column the Selection is not drawn; the selection
+state persists behind an open ledger and reappears when that ledger closes. It shows
+detail about the **current selection**, whatever entity the player last single-clicked.
 
-It is now an **action surface**, not a stat block: a header row
+It is an **action surface**, not a stat block: a header row
 (`[kind icon] Name · type` on the left, **go-to** `>` and **close** `x` buttons
 on the right) over two columns — a dominant **ACTION** column (~58% width, the
 kind's primary affordance) beside a narrower, muted **FACTS** column. Per
@@ -150,15 +161,15 @@ and location facts, production/stockpile shown as explicit private rows. The
 old undifferentiated stat-block polymorphism and the separate lens-supplement
 section are gone — the action/facts split *is* the per-kind content now.
 
-The panel **sizes its height to its content** in text-line units (so it stays
-correct across resolutions) rather than matching a fixed neighbour's height,
-and is anchored bottom-left.
+This content still uses the old **wide action | facts split**, sized for the former
+full-width bar; its re-lay-out for the narrower fold-out column is **owed as
+BL-123 SELECTION_ELEMENT_RESIZE** (Ben to mock), not yet designed here.
 
 The **go-to** button is equivalent to a double-click on the selection (routes
 through `ui::focus_on_entity` — navigates a canvas for spatial entities, opens a
 ledger for non-spatial ones); **close** hides the panel until the next
-selection. Unlike the floating ledgers it is **not** reachable from the
-navigation rail — **selecting an entity is the only way to open it.** It carries
+selection. Unlike the fold-out ledgers it has **no nav-rail slot** — being
+selection-driven, **selecting an entity is the only way to open it.** It carries
 the click-model shared across all canvases: **single-click selects** (fills this
 panel, no view change), **double-click navigates**. See `SELECTION.md` and
 `CANVASES.md`.
@@ -236,8 +247,8 @@ exempt — it is persistent chrome, not a ledger.
 > still-floating Tile Ledger**. The five named ledgers (Construction, Economy, Market,
 > Balance, Corporations) fold out into the shell column instead (see *Ledger windows*) and
 > no longer read `ledger_window_spawn`/`size`. The **BL-082 Construction-panel height-cap
-> is dissolved** — the fold-out column sits entirely left of the Selection element, so the
-> panel can no longer occlude the build front door and needs no caller-supplied spawn.
+> is dissolved** — the fold-out ledger is confined to the shell column, so the panel can no
+> longer occlude the canvas or the build front door and needs no caller-supplied spawn.
 
 ### One-question-per-view splits (BL-117 sweep)
 

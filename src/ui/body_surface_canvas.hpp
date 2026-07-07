@@ -30,8 +30,12 @@ namespace ui {
 /// @param size          Width and height of the region, in screen pixels.
 /// @param input_enabled When true, hover and click are processed. The caller
 ///                      disables input for whichever canvas the mouse is not over.
+/// @param lens_key_anchor Screen point the active lens's on-canvas key hangs from:
+///                      its RIGHT edge sits at anchor.x and it is vertically centred on
+///                      anchor.y. Pass the minimap's left edge + vertical centre so the
+///                      key reads as a drawer folding out from the minimap.
 void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_registry& reg,
                               const economy_report& report, ImVec2 origin, ImVec2 size,
-                              bool input_enabled);
+                              bool input_enabled, ImVec2 lens_key_anchor);
 
 } // namespace ui

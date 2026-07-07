@@ -127,12 +127,12 @@ water") and follows the cursor as a **"why not here"** label under the armed pla
 the Planetary canvas. One vocabulary, three surfaces.
 
 **Placement-time coexistence with the Construction panel (BL-082).** These affordance surfaces are
-read *while a build is armed* — exactly when the Construction panel is open. The Construction panel
-therefore does **not** overlap the bottom-left Selection element: `app` anchors it top-left but
-**height-caps** it so its bottom stays clear of the Selection element's top (see `LAYOUT.md`
-§ Construction-panel exception). The fix is **reposition, not fold** — folding the reason string
-into the Construction panel would have rescued only the reason line, leaving the Thrives/Valid
-affordance readout occluded; both must stay visible at the placement moment.
+read *while a build is armed* — exactly when the Construction panel is open. Now that the Selection
+element occupies the fold-out column rather than the bottom-left corner, the two no longer share the
+corner; the Construction panel keeps its top-left anchor (see `LAYOUT.md` § Construction-panel
+exception). The fix is **reposition, not fold** — folding the reason string into the Construction
+panel would have rescued only the reason line, leaving the Thrives/Valid affordance readout
+occluded; both must stay visible at the placement moment.
 
 ### The building element's fact is a profitability readout (BL-074)
 
@@ -204,27 +204,37 @@ element stopped calling them.
 
 ## Layout & chrome
 
-- **Pinned**, not floating. It docks in the bottom-left and now **owns the whole bottom-left
-  corner** (BL-093): anchored from the nav-rail's right edge to the minimap's left edge (less a
-  margin), and from the very bottom margin upward. The **lens strip no longer sits beneath
-  it** — it relocated onto the minimap (see § Lens strip relocation below), which is what freed
-  the vertical room the action/facts split needed.
-- **Sized to content, in text-line units (BL-093 fix).** `draw_selection_panel` computes a
-  `content_rows` count per selection kind (tile 9, body 5, player building 6, rival building 3,
-  default 4) and derives the window height from `ImGui::GetTextLineHeightWithSpacing()` /
-  `GetFrameHeight()` rather than pinning to the minimap's pixel height. This is deliberately
-  **resolution-robust**: a fixed-pixel height read fine at the resolution it was tuned on but
-  ballooned with empty space or clipped content at another — see
-  [DEVELOPMENT_PRACTICES.md § Display environment](../development/DEVELOPMENT_PRACTICES.md) for
-  the general rule this follows. The window still clamps to `[min_h, screen_h]` so it never
-  overruns the display or shrinks below three content lines.
+- **Pinned**, not floating. It now lives in the **shell fold-out column as a sidebar** (BL-124):
+  it fills `foldout_column_rect` — the same right-of-canvas slot the ledgers occupy — rather than
+  the old full-width bottom bar (the BL-065 layout, now gone). It is **mutually exclusive with the
+  ledgers**: a new entity selection closes any open ledger to take the column; while a ledger owns
+  the column the Selection is **not drawn**; selection state persists behind an open ledger and the
+  element reappears when that ledger closes. Because the column widened (~1.6×) for this, it is a
+  tall narrow sidebar, not a wide corner panel.
+- **Content re-lay-out for the narrower column is owed (BL-123 `SELECTION_ELEMENT_RESIZE`).** The
+  Selection *content* still uses the old wide **action | facts** split described below, which was
+  tuned for the full-width bar; re-flowing it for the sidebar's narrower width is an owed design
+  item (Ben to mock) — not designed here.
+- **Fills the fold-out column (BL-124).** Since the move into the column, `draw_selection_panel`
+  sizes to `foldout_column_rect` (`{r.w, r.h}`) — it fills the column from below the identity tile
+  to the bottom margin, exactly as a ledger does. This **replaced** the old BL-093 content-height
+  sizing (a per-kind `content_rows` count → text-line-unit height, clamped `[min_h, screen_h]`),
+  which was tuned for the free-floating bottom bar and no longer applies. How the content should use
+  that fixed column height — top-packed with overflow scrolling, or reflowed to fill — is part of
+  the owed **BL-123** relayout. The resolution-robustness BL-093 chased now lives in the column
+  geometry itself (`shell_column_width` is display-scaled; see
+  [DEVELOPMENT_PRACTICES.md § Display environment](../development/DEVELOPMENT_PRACTICES.md)).
 - **Header row:** a small coloured **kind icon** (`draw_selection_icon` — circle for body,
   square for building, outlined square for tile, pentagon otherwise; a first pass ahead of a
   richer per-entity icon), then the title line (name · type), then a right-aligned **`[>]`**
   ('go to') button and **`[x]`** (close) button.
 - **Close hides, it does not destroy.** Closing sets the panel hidden; it
   reappears on the next selection. There is no nav-rail entry to reopen it —
-  selection is the only opener.
+  selection is the only opener. Being selection-driven with no rail slot, the
+  element is **not** governed by the universal toggle rule (any control whose
+  active state is visible is a toggle): that rule toggles the rail's ledgers, not
+  this element. An open ledger claiming the column simply hides the Selection
+  (§ Layout above); it is not a toggle of the element itself.
 - **Empty / no-selection state:** when nothing is selected (fresh session, or
   after clicking empty space) the panel is hidden. It is shown only while a
   valid selection exists and has not been closed.

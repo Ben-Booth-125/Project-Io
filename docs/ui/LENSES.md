@@ -267,8 +267,11 @@ alpha); the per-body strip in **`circumplanetary_canvas.cpp`** — the Circumpla
 `solar_system_canvas.cpp` as the Session-2 handoff's file list said (Solar has no market surface).
 The good-selector is the shared combo from the Resource lens (`overlay.cpp`, bound to
 `ui_state.lens_resource`; since BL-093 a popup opened from the minimap bar rather than an inline
-combo). On-canvas keys/strip are inset past the nav rail (`nav_pane_width`) and
-vertically centred. Verified by `scripts/verify/market_lens.lua`, which runs `verify.econ_step(12)`
+combo). On-canvas keys/strip are anchored **flush-left of the minimap** (their right edge at the
+minimap's left edge, vertically centred on the minimap — a `lens_key_anchor` passed from `app.cpp`),
+reading as a drawer folding out from the minimap's left side and clearing the widened
+Selection/ledger column (relocated 2026-07-06 from the former canvas-left-edge placement past the nav
+rail). Verified by `scripts/verify/market_lens.lua`, which runs `verify.econ_step(12)`
 to diverge prices from base before capture (and a new `verify.show_panel("economy", false)` hook to
 clear the panel `econ_step` opens), against blessed goldens.
 
@@ -361,8 +364,9 @@ rather than an inline strip combo. No new data, no tick dependency.
 Planetary pass in `body_surface_canvas.cpp`: a tile with `resource_deposit[sel] > 0` is
 composited toward `presentation_of(sel).colour` at a fixed 0.8 (uniform flat fill); other tiles
 keep terrain. The highest-value mode and the `resource_lens_single` toggle were removed (the
-lens is always single). The on-canvas key sits at the left edge, vertically centred, inset past
-the nav rail. Verified by `scripts/verify/resource_lens.lua` against blessed goldens
+lens is always single). The on-canvas key sits **flush-left of the minimap**, vertically centred on
+it (a drawer off the minimap's left side; `lens_key_anchor` from `app.cpp`) — relocated 2026-07-06
+from the former left-edge / past-the-nav-rail placement. Verified by `scripts/verify/resource_lens.lua` against blessed goldens
 (deterministic after the draw-order fix).
 
 ## Population lens *(built 2026-06-16, re-keyed 2026-06-30 — BL-069)*
@@ -392,8 +396,9 @@ diverging) — efficiency has a single good direction. No per-faction colours.
 **Glyph.** A small figure — round head over a tapered torso (`icons::population`); reads as
 "people / workforce", distinct from the other lens glyphs.
 
-**Legend.** A low→high gradient bar (`draw_population_key`), left edge, vertically centred, inset
-past the nav rail (the Resource/Market key placement), labelled "Workforce efficiency" and mapping
+**Legend.** A low→high gradient bar (`draw_population_key`), anchored **flush-left of the minimap**,
+vertically centred on it (the shared Resource/Market key placement, relocated there 2026-07-06),
+labelled "Workforce efficiency" and mapping
 the bar's ends to `0.5×`→`1.0×` workforce efficiency (not `0`→`1` habitability) — so the key reads
 the same labour multiplier the tint shows. Tooltip "Workforce efficiency".
 
@@ -555,8 +560,9 @@ direction. No per-faction colours.
 **Legend.** Strip glyph highlight + tooltip (`overlay_mode_name` → "Industry density"), plus an
 on-canvas **low→high amber gradient key** (`draw_industry_key` in
 [`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp)) — a bar running the terrain-hue
-base to full industrial amber, matching the placement convention of the other built lenses (left
-edge, inset past the nav rail, vertically centred). The key landed in the 2026-07-04 reconciliation
+base to full industrial amber, matching the placement convention of the other built lenses
+(**flush-left of the minimap**, vertically centred on it since the 2026-07-06 relocation from the
+former nav-rail-inset left edge). The key landed in the 2026-07-04 reconciliation
 (the lens's original delivery shipped the tint but not the key).
 
 **Interaction notes.** Planetary-only, single-select; the script runs `verify.econ_step(4)` so the

@@ -51,8 +51,8 @@
 #include <unordered_map>
 #include <vector>
 
-static constexpr int window_w = 1280;
-static constexpr int window_h = 720;
+static constexpr int window_w = 1720;
+static constexpr int window_h = 1080;
 
 // ---------------------------------------------------------------------------
 // Unified key-binding table (BL-062).
@@ -314,7 +314,7 @@ void app::start_new_game()
     {
         sol::table cfg = m_lua.state()["config"];
         m_sim_loop = sim_loop();
-        m_sim_loop.set_speed(cfg.get_or("default_speed", 1));
+        m_sim_loop.set_speed(cfg.get_or("default_speed", 2));
     }
 
     setup_world(m_pending_world_params);
@@ -1266,7 +1266,7 @@ void app::render()
     ImGuiIO&     io     = ImGui::GetIO();
     const ImVec2 disp   = io.DisplaySize;
     constexpr float margin = 8.0f;
-    const float  mm_w   = std::max(240.0f, 0.20f * std::min(disp.x, disp.y));
+    const float  mm_w   = std::max(336.0f, 0.28f * std::min(disp.x, disp.y)); // ~1.4x the old 240/0.20 band — legible on larger displays
     const float  mm_h   = mm_w * 0.75f; // keep the 4:3 ratio of the 240x180 default
     const ImVec2 mm_origin = {disp.x - margin - mm_w, disp.y - margin - mm_h};
 
@@ -1319,7 +1319,8 @@ void app::render()
                 break;
 
             case canvas_level::planetary:
-                ui::draw_body_surface_canvas(m_world, m_ui, m_registry, m_last_econ_report, {0.0f, 0.0f}, disp, primary_input);
+                ui::draw_body_surface_canvas(m_world, m_ui, m_registry, m_last_econ_report, {0.0f, 0.0f}, disp, primary_input,
+                                             {mm_origin.x, mm_origin.y + mm_h * 0.5f});
                 ui::draw_circumplanetary_canvas(m_world, m_ui, inset_origin, inset_size, minimap_input, true);
                 {
                     const entity_id anchor = ui::circumplanetary_anchor(m_world, m_ui.active_body);
@@ -1399,16 +1400,9 @@ void app::render()
             ImGui::TableSetColumnIndex(0);
             ImGui::Text("%d Q%d", date.year, date.quarter);
             ImGui::Text("%s %02d", ui::fmt::month_abbrev(date.month), date.day);
-            {
-                const uint64_t days_left =
-                    static_cast<uint64_t>(sim_loop::econ_tick_days)
-                    - (day % static_cast<uint64_t>(sim_loop::econ_tick_days));
-                const int next_q = (date.quarter % 4) + 1;
-                ImGui::ProgressBar(ui::fmt::quarter_progress(day), {-1.0f, 0.0f},
-                                   "");
-                ImGui::TextDisabled("Q%d in %llud", next_q,
-                                    static_cast<unsigned long long>(days_left));
-            }
+            // Quarter-progress bar (the economy resolves on the quarter boundary); the
+            // "Qx in Nd" readout was removed as noise.
+            ImGui::ProgressBar(ui::fmt::quarter_progress(day), {-1.0f, 0.0f}, "");
 
             // --- Right: the compressed speed controls.
             ImGui::TableSetColumnIndex(1);
@@ -1423,10 +1417,11 @@ void app::render()
                 ImGui::TextDisabled("(%s)", (s >= 1 && s <= sim_loop::max_speed) ? mult_labels[s] : "?");
             }
 
-            // Pause plus speed buttons. The active speed is highlighted. The pause
-            // label flips to a play symbol when paused so it reflects the toggle state.
-            // Speed tiers use Roman numerals (I–V); pause uses || to stay distinct from speed II.
-            const char* labels[] = {m_sim_loop.paused() ? ">" : "||", "I", "II", "III", "IV", "V"};
+            // Pause plus speed buttons. The active speed is highlighted. When running,
+            // the pause slot is a blank button carrying a filled square glyph (drawn
+            // below); when paused it flips to a play ">" so it reflects the toggle state.
+            // Speed tiers use Roman numerals (I–V); the square avoids "||" reading as II.
+            const char* labels[] = {m_sim_loop.paused() ? ">" : "##pause", "I", "II", "III", "IV", "V"};
             const int   speeds[] = { 0,    1,   2,   3,   4,   5 };
             const int   n        = 6;
             const float spacing  = ImGui::GetStyle().ItemSpacing.x;
@@ -1457,6 +1452,18 @@ void app::render()
                         m_prev_speed = speeds[i];
                         m_sim_loop.set_speed(speeds[i]);
                     }
+                }
+                // Pause glyph: a filled square centred on the blank "##pause" button —
+                // clearer than "||", which read as the numeral II beside the tiers.
+                if (speeds[i] == 0 && !m_sim_loop.paused())
+                {
+                    const ImVec2 mn = ImGui::GetItemRectMin();
+                    const ImVec2 mx = ImGui::GetItemRectMax();
+                    const ImVec2 c  = {(mn.x + mx.x) * 0.5f, (mn.y + mx.y) * 0.5f};
+                    const float  h  = ImGui::GetFontSize() * 0.31f;
+                    ImGui::GetWindowDrawList()->AddRectFilled(
+                        {c.x - h, c.y - h}, {c.x + h, c.y + h},
+                        ImGui::GetColorU32(ImGuiCol_Text), 1.0f);
                 }
                 if (active)
                     ImGui::PopStyleColor();
@@ -1574,25 +1581,27 @@ void app::render()
         const ui::player_plot_history phist{m_balance_history, m_income_history, m_expenditure_history};
         ui::draw_economy_panel(m_world, m_registry, m_last_econ_report, phist, m_ui, &m_ui.show_economy_panel);
     }
-    // Construction panel — now an ordinary fold-out tab in the shell column (BL-122).
-    // The BL-082 height-cap that kept the old floating window clear of the bottom-left
-    // Selection element is gone: the column sits entirely left of Selection (x < W),
-    // so there is no occlusion to avoid.
+    // Construction panel — an ordinary fold-out tab in the shell column (BL-122),
+    // one of the mutually-exclusive column occupants (ledgers + Selection).
     ui::draw_construction_panel(m_world, m_registry, m_ui, &m_ui.show_construction_panel);
     ui::draw_market_ledger(m_world, m_ui, m_market_history, m_ui.show_market_ledger);
     ui::draw_balance_ledger(m_world, m_last_econ_report, m_balance_history, m_ui.show_balance_ledger);
     ui::draw_corporation_panel(m_world, m_ui, m_ui.show_corporation_panel);
 
-    // Selection info element — pinned bottom-left, anchored at the bottom margin
-    // (BL-093 content-height sizing preserved). Since BL-122 its left edge is the shell
-    // column's right edge (x = W) rather than the narrow nav rail, so it clears the
-    // fold-out column permanently; its right edge is the minimap's left edge less a
-    // margin. Hidden until the player selects an entity. See SELECTION.md.
-    ui::draw_selection_panel(m_world, m_registry, m_last_econ_report, m_ui,
-                             ui::shell_column_width(disp.x),
-                             mm_origin.x - margin,
-                             disp.y - margin,
-                             mm_h);
+    // Selection info element — now docked in the shell fold-out column, mutually
+    // exclusive with the ledgers (SELECTION.md). A *new* entity selection closes any
+    // open ledger so the selection takes the column; while a ledger owns the column
+    // the Selection is not drawn (the ledger wins the shared slot). Selection state
+    // persists behind an open ledger, so closing the ledger reveals it again.
+    if (m_ui.selected_entity != m_prev_selection)
+    {
+        if (m_ui.selected_entity != null_entity &&
+            m_ui.selected_entity != m_ui.selection_hidden_for)
+            ui::close_all_panels(m_ui); // new selection takes the column
+        m_prev_selection = m_ui.selected_entity;
+    }
+    if (!ui::any_panel_open(m_ui))
+        ui::draw_selection_panel(m_world, m_registry, m_last_econ_report, m_ui);
 
     // Execute any construction request queued this frame by the build front door
     // (tile Selection element) or a placement-mode canvas click. Centralised here
@@ -1685,6 +1694,7 @@ void app::render()
             static const preset presets[] = {
                 {1280, 720,  "1280 x 720"},
                 {1600, 900,  "1600 x 900"},
+                {1720, 1080, "1720 x 1080"},
                 {1920, 1080, "1920 x 1080"},
                 {2560, 1440, "2560 x 1440"},
             };

@@ -6,6 +6,67 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — Ledger-mockup design + shell proportion/selection pass (2026-07-07)
+
+**Context.** A focused session to set up the **ledger-mockup work**: Ben designs each ledger surface
+in Power BI (real game data already exported to `docs/ui/mockdata/`, prior session), Claude builds to
+the images. This session did three things: seeded the per-ledger design conversation, tuned the shell
+proportions Ben needs for the mockups, and folded it all into docs + backlog.
+
+**Ledger Q&A docs.** New `docs/ui/ledgers/` — a 5-axis design Q&A per surface (Corporation, Balance,
+Market, Construction, Economy, Selection, Tile Ledger): top question · sub-levels + default · lens on
+open · data gaps · toggle/close semantics · open-questions-for-Ben. Drafted by a fan-out (one reader
+per ledger) → cross-doc consistency critic → revise. The critic earned its keep: it caught that the
+**aggregate-only Economy** substantially duplicates Balance (Cashflow) and Corporation (Standing) —
+so the live question is whether Economy keeps its own rail slot or folds into Corporation — and that
+the Economy→**Industry** lens pairing was wrong (Industry paints the AI nation substrate, not the
+player's sector mix). Strawman for Ben to revise; per-menu backlog items wait on that revision.
+
+**Settled decisions (Q&A).** (1) **Menu taxonomy** — Economy is aggregate-only; Corporation and
+Market are the drill-downs; no two surfaces answer the same question. (2) **Universal toggle rule** —
+any control whose active state is visible is a toggle: the rail icon toggles its ledger; re-clicking
+the active sub-view tab *closes the ledger* (not collapse-to-overview); cross-cutting selectors are
+exempt. Recorded in `.claude/rules/io-standing-rules.md`. (3) **Selection** moves into the fold-out
+column, mutually exclusive with the ledgers.
+
+**Shell changes (all landed, verified by-eye).** Bundled as **BL-125** (proportion/clock pass) and
+**BL-124** (Selection sidebar): default window 1280×720 → **1720×1080**; balance bar 52→**92px**
+(level with the identity card, content centred); fold-out column widened **~1.6×**
+(`0.272·disp_x`, clamp[480,576]); minimap enlarged **~1.4×** (`max(336, 0.28·min(w,h))`); the
+on-canvas **lens legend re-anchored flush-left of the minimap** (a `lens_key_anchor` into
+`draw_body_surface_canvas`) so it reads as a drawer — this also cleared the far-left position the
+widened column would have overlapped; time panel **dropped the "Qx in Nd"** readout; default campaign
+speed → **tier II**; pause glyph → **filled square** (the "||" read as the numeral II).
+
+**Selection → column sidebar (BL-124).** `draw_selection_panel` re-hosted from the BL-065 bottom bar
+into `foldout_column_rect`; mutual exclusion via `close_all_panels` + new `any_panel_open`
+(nav_pane) — a *new* selection evicts any open ledger to take the column; while a ledger owns the
+column the Selection isn't drawn (state persists, reappears on close). The bottom bar is gone. The
+Selection **content** still uses the wide action|facts split — its re-lay-out for the ~480px column
+is **BL-123** (narrowed to content-only; Ben to mock).
+
+**New/owed backlog.** **BL-124** (Selection sidebar) + **BL-125** (proportion/clock pass) complete;
+**BL-126** the toggle-rule sub-view half — `nav_button` re-click on the active tab must close the
+ledger, currently a no-op — designed, owed. **BL-123** narrowed to the Selection content relayout.
+
+**Found (out of scope).** A full-target build (`cmake --build build`) fails one verify harness —
+`pregame_balance_harness` `#include`s `scripting/lua_state.hpp` (needs sol2/Lua) but the generic
+harness batch in CMakeLists builds every `tools/verify/*.cpp` sol2-free. Pre-existing since `e53dcb6`;
+the game target builds green regardless. Spawned as a background task (not fixed here).
+
+**Verified.** Game builds + links green at 1720×1080; smoke-captured `header`, `foldout_shell`,
+`selection_redesign`, `market_lens` and eyeballed the PNGs (balance bar level, wider column, Selection
+in-column, bigger minimap, lens drawer flush-left). `--verify` forces the sim paused, so the pause
+**square** and default-speed **II** show only live, not headless. Backlog lint clean (0 fail).
+
+**Files.** `options.cfg`, `scripts/init.lua`, `src/core/app.{cpp,hpp}`,
+`src/ui/header_panel.{cpp,hpp}`, `src/ui/foldout_column.cpp`, `src/ui/body_surface_canvas.{cpp,hpp}`,
+`src/ui/selection_panel.{cpp,hpp}`, `src/ui/nav_pane.{cpp,hpp}`; docs `docs/ui/ledgers/*` (new),
+`LAYOUT.md`, `SELECTION.md`, `MINIMAP.md`, `LENSES.md`, `HEADER.md`,
+`.claude/rules/io-standing-rules.md`, `backlog.json` (BL-124..126, BL-123).
+
+---
+
 ## Session — One-question-per-view sweep + corp-dashboard legibility (2026-07-06)
 
 **Context.** Directly after the BL-122 shell skeleton, whose narrow fold-out column was the

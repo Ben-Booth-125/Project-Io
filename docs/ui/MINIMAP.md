@@ -153,6 +153,17 @@ navigation lives in the body / minimap clicks described above, **not** in
 these controls.) See [SELECTION.md](SELECTION.md) for the paired change to the
 Selection element that shipped alongside this relocation in BL-093.
 
+### Lens legend (folds out from the minimap's left edge)
+
+The on-canvas **lens key** — the swatch legend for the field lenses (Resource,
+Market, Production, Opportunity, Population, Scarcity, Industry) — no longer sits
+against the canvas *left* edge. It now anchors **flush-left of the minimap**: its
+right edge meets the minimap's left edge and it is vertically centred on the
+minimap, so it reads as a drawer folding out from the minimap's left side. `app.cpp`
+passes the render pass a `lens_key_anchor` derived from the minimap rect. This also
+clears the widened Selection / ledger fold-out column the legend would otherwise
+have overlapped.
+
 ---
 
 ## Star as an entity
@@ -182,7 +193,7 @@ done in this doc.
 
 Unchanged from `CANVASES.md` (authoritative there), with the chrome accounted for:
 
-- `mm_w = max(240, 0.20 × min(window width, height))`; `mm_h = mm_w × 0.75` (4:3)
+- `mm_w = max(336, 0.28 × min(window width, height))`; `mm_h = mm_w × 0.75` (4:3)
   governs the minimap box; the title bar and lens mode bar each take a
   fixed-height strip (top and bottom respectively) and the inset canvas fills
   the remaining height between them.

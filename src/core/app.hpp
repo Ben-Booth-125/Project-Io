@@ -117,8 +117,8 @@ private:
     /// whenever a setting changes in the F10 Options window.
     struct display_settings
     {
-        int  window_w   = 1280;
-        int  window_h   = 720;
+        int  window_w   = 1720;
+        int  window_h   = 1080;
         bool fullscreen = false;  ///< Borderless-desktop fullscreen.
         bool vsync      = true;
     };
@@ -153,6 +153,7 @@ private:
     std::vector<float> m_income_history;      ///< Recent player income per econ tick (market sales); feeds economy panel graph.
     std::vector<float> m_expenditure_history; ///< Recent player expenditure per econ tick (auto-buys + wages + maintenance); feeds economy panel graph.
     ui::market_plot_history m_market_history; ///< Price / supply / demand history per market, per resource; feeds market ledger graphs.
+    entity_id   m_prev_selection = null_entity; ///< selected_entity last frame; a change to a new selection closes any open ledger so the Selection element takes the shared fold-out column.
 
     bool        m_show_help        = false;   ///< Toggle for the F1 key-binding cheat-sheet overlay.
     bool        m_show_options     = false;   ///< Toggle for the F10 display/options window.

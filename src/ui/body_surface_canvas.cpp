@@ -106,11 +106,13 @@ ImU32 diverging_colour(float ratio);
 /// clear of the Selection panel, the header/Explorer, and the lens control strip.
 /// Returns the inner top-left and the inner content width via @p out_x/@p out_y/
 /// @p out_w. Pure ImDrawList — no ImGui widget state.
-void begin_lens_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size, float box_w,
+void begin_lens_key(ImDrawList* dl, ImVec2 anchor, float box_w,
                     float body_h, float pad, float& out_x, float& out_y, float& out_w)
 {
-    const ImVec2 p0 = { area_origin.x + nav_pane_width + pad,
-                        area_origin.y + std::max(pad, (area_size.y - body_h) * 0.5f) };
+    // Anchored so the box's RIGHT edge sits at anchor.x (the minimap's left edge) and
+    // the box is vertically centred on anchor.y — it reads as a drawer folding out from
+    // the left side of the minimap. anchor is passed in from app.cpp (lens_key_anchor).
+    const ImVec2 p0 = { anchor.x - box_w, anchor.y - body_h * 0.5f };
     const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
     dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
     dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
@@ -122,14 +124,14 @@ void begin_lens_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size, float 
 /// On-canvas legend for the Resource lens (BL-019): the selected resource's name
 /// and identity swatch, plus a note that the fill marks the contiguous deposit.
 /// Flat, not a gradient — the lens shows deposit *shape*, not magnitude.
-void draw_resource_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size,
+void draw_resource_key(ImDrawList* dl, ImVec2 anchor,
                        const ui_state& state)
 {
     const float pad    = 8.0f;
     const float line_h = ImGui::GetTextLineHeight();
     const float body_h = pad + line_h + 4.0f + line_h + 4.0f + line_h + pad;
     float x, y, bar_w;
-    begin_lens_key(dl, area_origin, area_size, 168.0f, body_h, pad, x, y, bar_w);
+    begin_lens_key(dl, anchor, 168.0f, body_h, pad, x, y, bar_w);
 
     dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Resource deposit");
     y += line_h + 4.0f;
@@ -143,14 +145,14 @@ void draw_resource_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size,
 
 /// On-canvas legend for the Opportunity lens (BL-017): a diverging loss→profit
 /// gradient bar over the best-building net-margin surface.
-void draw_opportunity_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size)
+void draw_opportunity_key(ImDrawList* dl, ImVec2 anchor)
 {
     const float pad    = 8.0f;
     const float line_h = ImGui::GetTextLineHeight();
     const float bar_h  = 10.0f;
     const float body_h = pad + line_h + 4.0f + bar_h + 2.0f + line_h + pad;
     float x, y, bar_w;
-    begin_lens_key(dl, area_origin, area_size, 168.0f, body_h, pad, x, y, bar_w);
+    begin_lens_key(dl, anchor, 168.0f, body_h, pad, x, y, bar_w);
 
     dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Opportunity (margin)");
     y += line_h + 4.0f;
@@ -173,14 +175,14 @@ void draw_opportunity_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size)
 
 /// On-canvas legend for the Production lens (BL-009): a diverging cool→warm bar
 /// (below/above the body's mean output value) over the production-intensity surface.
-void draw_production_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size)
+void draw_production_key(ImDrawList* dl, ImVec2 anchor)
 {
     const float pad    = 8.0f;
     const float line_h = ImGui::GetTextLineHeight();
     const float bar_h  = 10.0f;
     const float body_h = pad + line_h + 4.0f + bar_h + 2.0f + line_h + pad;
     float x, y, bar_w;
-    begin_lens_key(dl, area_origin, area_size, 168.0f, body_h, pad, x, y, bar_w);
+    begin_lens_key(dl, anchor, 168.0f, body_h, pad, x, y, bar_w);
 
     dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Production intensity");
     y += line_h + 4.0f;
@@ -217,7 +219,7 @@ ImU32 diverging_colour(float ratio)
 /// the body's market has no entry for it). Same left-edge placement as the Resource key.
 // BL-015: market lens is now a catchment-boundary tint (one colour per market).
 // The key shows a colour swatch per market with an ordinal label.
-void draw_market_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size,
+void draw_market_key(ImDrawList* dl, ImVec2 anchor,
                      const ui_state& /*state*/,
                      const std::unordered_map<entity_id, ImU32>& catchment_colours)
 {
@@ -230,8 +232,7 @@ void draw_market_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size,
                        + static_cast<float>(std::max(n, 1)) * (swatch + 2.0f)
                        + pad;
 
-    const ImVec2 p0 = { area_origin.x + nav_pane_width + pad,
-                        area_origin.y + std::max(pad, (area_size.y - body_h) * 0.5f) };
+    const ImVec2 p0 = { anchor.x - box_w, anchor.y - body_h * 0.5f };
     const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
     dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
     dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
@@ -262,7 +263,7 @@ void draw_market_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size,
 
 /// On-canvas legend for the Population lens: a low→high habitability gradient bar
 /// (dark substrate → liveable green). Same left-edge placement as the other keys.
-void draw_population_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size)
+void draw_population_key(ImDrawList* dl, ImVec2 anchor)
 {
     const float pad    = 8.0f;
     const float box_w  = 156.0f;
@@ -270,8 +271,7 @@ void draw_population_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size)
     const float bar_h  = 10.0f;
 
     const float body_h = pad + line_h + 4.0f + bar_h + 2.0f + line_h + pad;
-    const ImVec2 p0 = { area_origin.x + nav_pane_width + pad,
-                        area_origin.y + std::max(pad, (area_size.y - body_h) * 0.5f) };
+    const ImVec2 p0 = { anchor.x - box_w, anchor.y - body_h * 0.5f };
     const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
     dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
     dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
@@ -304,7 +304,7 @@ void draw_population_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size)
 /// On-canvas legend for the Industry lens (BL-084): a low→high amber gradient bar
 /// mapping the substrate-throughput tint (terrain hue → industrial amber), so the
 /// field reads as "where the existing industry is densest". Same placement as the others.
-void draw_industry_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size)
+void draw_industry_key(ImDrawList* dl, ImVec2 anchor)
 {
     const float pad    = 8.0f;
     const float box_w  = 156.0f;
@@ -312,8 +312,7 @@ void draw_industry_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size)
     const float bar_h  = 10.0f;
 
     const float body_h = pad + line_h + 4.0f + bar_h + 2.0f + line_h + pad;
-    const ImVec2 p0 = { area_origin.x + nav_pane_width + pad,
-                        area_origin.y + std::max(pad, (area_size.y - body_h) * 0.5f) };
+    const ImVec2 p0 = { anchor.x - box_w, anchor.y - body_h * 0.5f };
     const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
     dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
     dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
@@ -344,7 +343,7 @@ void draw_industry_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size)
 
 /// On-canvas legend for the Scarcity lens: an abundant→scarce gradient bar (no tint
 /// → hot) plus the selected resource's name and swatch. Same placement as the others.
-void draw_scarcity_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size,
+void draw_scarcity_key(ImDrawList* dl, ImVec2 anchor,
                        const ui_state& state)
 {
     const float pad    = 8.0f;
@@ -353,8 +352,7 @@ void draw_scarcity_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size,
     const float bar_h  = 10.0f;
 
     const float body_h = pad + line_h + 4.0f + bar_h + 2.0f + line_h + 4.0f + line_h + pad;
-    const ImVec2 p0 = { area_origin.x + nav_pane_width + pad,
-                        area_origin.y + std::max(pad, (area_size.y - body_h) * 0.5f) };
+    const ImVec2 p0 = { anchor.x - box_w, anchor.y - body_h * 0.5f };
     const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
     dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
     dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
@@ -393,7 +391,7 @@ void draw_scarcity_key(ImDrawList* dl, ImVec2 area_origin, ImVec2 area_size,
 
 void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_registry& reg,
                               const economy_report& report, ImVec2 origin, ImVec2 size,
-                              bool input_enabled)
+                              bool input_enabled, ImVec2 lens_key_anchor)
 {
     ImDrawList* dl = ImGui::GetBackgroundDrawList();
 
@@ -1460,23 +1458,23 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
     dl->PopClipRect();
 
-    // On-canvas lens key (drawn unclipped, top-right of the grid area, before the
-    // input early-out so it shows in headless captures too). Resource is the first
-    // lens to carry a colour key; Market's diverging key is added alongside.
+    // On-canvas lens key (drawn unclipped, flush-left of the minimap so it reads as a
+    // drawer folding out from it — anchor passed in as lens_key_anchor; before the
+    // input early-out so it shows in headless captures too).
     if (state.overlay == overlay_mode::resource)
-        draw_resource_key(dl, grid_area_origin, grid_area_size, state);
+        draw_resource_key(dl, lens_key_anchor, state);
     else if (state.overlay == overlay_mode::market)
-        draw_market_key(dl, grid_area_origin, grid_area_size, state, market_catchment_colour);
+        draw_market_key(dl, lens_key_anchor, state, market_catchment_colour);
     else if (state.overlay == overlay_mode::population)
-        draw_population_key(dl, grid_area_origin, grid_area_size);
+        draw_population_key(dl, lens_key_anchor);
     else if (state.overlay == overlay_mode::opportunity)
-        draw_opportunity_key(dl, grid_area_origin, grid_area_size);
+        draw_opportunity_key(dl, lens_key_anchor);
     else if (state.overlay == overlay_mode::production)
-        draw_production_key(dl, grid_area_origin, grid_area_size);
+        draw_production_key(dl, lens_key_anchor);
     else if (state.overlay == overlay_mode::scarcity)
-        draw_scarcity_key(dl, grid_area_origin, grid_area_size, state);
+        draw_scarcity_key(dl, lens_key_anchor, state);
     else if (state.overlay == overlay_mode::industry)
-        draw_industry_key(dl, grid_area_origin, grid_area_size);
+        draw_industry_key(dl, lens_key_anchor);
 
     if (!input_enabled)
         return;

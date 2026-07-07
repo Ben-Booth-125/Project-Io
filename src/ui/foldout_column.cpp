@@ -9,9 +9,12 @@ namespace ui {
 
 float shell_column_width(float disp_x)
 {
-    float w = 0.17f * disp_x;
-    if (w < 300.0f) w = 300.0f;
-    if (w > 360.0f) w = 360.0f;
+    // ~1.6x the original 0.17/[300,360] band (widened for the ledger + Selection
+    // content that now shares this column); still resolution-scaled. ~480 @1720,
+    // ~522 @1920.
+    float w = 0.272f * disp_x;
+    if (w < 480.0f) w = 480.0f;
+    if (w > 576.0f) w = 576.0f;
     // Round to a whole pixel so the column edge (and everything anchored to it) lands
     // on a pixel boundary rather than blurring across two.
     return static_cast<float>(static_cast<int>(w + 0.5f));

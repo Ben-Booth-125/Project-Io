@@ -1,6 +1,7 @@
 #include "selection_panel.hpp"
 
 #include "entity_summary.hpp"
+#include "foldout_column.hpp" // shell fold-out column host (shared with the ledgers)
 #include "icons.hpp"
 #include "presentation.hpp"
 #include "selection.hpp"
@@ -590,8 +591,7 @@ void draw_selection_facts(const world& w, const recipe_registry& reg,
 } // namespace
 
 void draw_selection_panel(const world& w, const recipe_registry& reg,
-                          const economy_report& report, ui_state& ui,
-                          float left_x, float right_x, float bottom_y, float height)
+                          const economy_report& report, ui_state& ui)
 {
     const selection_kind kind = selection_kind_of(w, ui.selected_entity);
 
@@ -602,37 +602,19 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
     if (ui.selected_entity == ui.selection_hidden_for)
         return;
 
-    // --- Layout (BL-093: action surface) ---
-    // Owns the whole bottom-left corner — anchored bottom-left at (left_x, bottom_y),
-    // spanning to right_x (the minimap's left edge less a margin). The lens strip
-    // moved onto the minimap, so this drops to the bottom margin and stands tall.
-    const float bar_w   = std::max(0.0f, right_x - left_x);
-    const float line_h  = ImGui::GetTextLineHeightWithSpacing();
-    const float frame_h = ImGui::GetFrameHeight();
-    const ImGuiStyle& style = ImGui::GetStyle();
-    (void)height; // sizing is content-based, not the minimap's height
+    // --- Layout ---
+    // The Selection element now fills the shell fold-out column (foldout_column_rect),
+    // the same slot the ledgers use, and is mutually exclusive with them (app closes
+    // any open ledger on a new selection and gates this draw on !any_panel_open).
+    // NOTE: the content below still uses the wide-bottom-bar action|facts split;
+    // its re-lay-out for this narrower, taller column is BL-123 (Ben to mock).
+    const foldout_rect r       = foldout_column_rect();
+    const float        bar_w   = r.w;
+    const float        frame_h = ImGui::GetFrameHeight();
+    const ImGuiStyle&  style   = ImGui::GetStyle();
 
-    // Content-fit height per selection kind (BL-093), expressed in text-line units so
-    // it is identical and fully visible at ANY resolution — the earlier pinning to the
-    // resolution-scaled minimap height (mm_h) is what made it balloon with empty space
-    // / clip. Anchored by its bottom-left corner so it grows upward from the bottom.
-    int content_rows = 4;
-    switch (kind)
-    {
-        case selection_kind::tile:     content_rows = 9; break;                                   // build door + affordances
-        case selection_kind::body:     content_rows = 5; break;                                   // survey / go-to + activity
-        case selection_kind::building: content_rows = is_player_owned(w, ui.selected_entity) ? 6 : 3; break;
-        default:                       content_rows = 4; break;
-    }
-    const float header_h = frame_h + style.ItemSpacing.y + 1.0f + style.ItemSpacing.y;
-    const float pad_h    = style.WindowPadding.y * 2.0f;
-    const float min_h    = pad_h + header_h + line_h * 3.0f;
-    const float want_h   = pad_h + header_h + line_h * static_cast<float>(content_rows);
-    const float screen_h = std::max(min_h, bottom_y - 16.0f);
-    const float bar_h    = std::min(std::max(want_h, min_h), screen_h);
-
-    ImGui::SetNextWindowPos({left_x, bottom_y}, ImGuiCond_Always, {0.0f, 1.0f});
-    ImGui::SetNextWindowSize({bar_w, bar_h}, ImGuiCond_Always);
+    ImGui::SetNextWindowPos({r.x, r.y}, ImGuiCond_Always);
+    ImGui::SetNextWindowSize({r.w, r.h}, ImGuiCond_Always);
     ImGui::SetNextWindowBgAlpha(0.90f);
     constexpr ImGuiWindowFlags flags =
         ImGuiWindowFlags_NoTitleBar            |

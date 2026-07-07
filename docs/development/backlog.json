@@ -2203,7 +2203,84 @@
       "files": ["src/ui/selection_panel.cpp", "src/core/app.cpp"],
       "authority_doc": "docs/ui/SELECTION.md",
       "summary": "Note (2026-07-06, Ben, after the BL-122 fold-out shell landed): the Selection element (bottom-left, docs/ui/SELECTION.md) needs a resize / proportion pass now that BL-122 moved its left edge to x = W (the shell column edge) and narrowed it. Ben will struggle to specify exact dimensions in prose and will provide a MOCKUP — the visual/proportion design lives with him; the coding is the follow-up. Design-owed on that mockup: target width/height/placement of the Selection element in the new shell. This is a visual-tuning follow-on to BL-122, not a structural change.",
-      "design": "**Status:** design-owed on Ben's mockup — the exact proportions are a visual call Ben will make (and struggles to give precisely in prose), so this item waits on a reference image rather than settling numbers here.\n\n### Current state (post-BL-122)\n- The Selection element is drawn by `draw_selection_panel` (`src/ui/selection_panel.cpp`), called from `src/core/app.cpp` with `left_x = shell_column_width(disp.x)` (its left edge is now the shell column's right edge, `x = W`), `right_x = minimap left − margin`, `bottom_y = disp.y − margin`, `height = mm_h`.\n- **BL-093** sizes its HEIGHT from content (text-line units), clamped up to the header + content rows; it is bottom-anchored. Do not fight that — any resize must compose with the content-height sizing, not replace it with a resolution-scaled magic number (the BL-093 regression).\n- **BL-122** only moved its left edge (narrowed it); it did not retune width/height/placement for the new shell. That retune is this item.\n\n### Owed (from the mockup)\n- Target width band — does it keep running to the minimap's left edge, or sit narrower?\n- Target height — taller/shorter than the current `mm_h`-derived clamp; still content-driven?\n- Placement — stays bottom-left anchored at `x = W`, or shifts?\n- Behaviour across 1280x720 (verify harness) and 1920x1080 (Ben's runtime), per the display-robustness constraint (shares this concern with **BL-097** view-bounding audit).\n\n### Method\nBen supplies a mockup / annotated screenshot; the implementation reads the target proportions off it and tunes `draw_selection_panel`'s geometry + the `app.cpp` call. Coding-only once the mockup exists. Relationships: follows **BL-122** (shell), composes with **BL-093** (content-height sizing), aligns with **BL-097** (resolution-robust bounding). Authority `docs/ui/SELECTION.md` — do not edit ahead of the work."
+      "design": "**Status:** design-owed on Ben's mockup — the exact proportions are a visual call Ben will make (and struggles to give precisely in prose), so this item waits on a reference image rather than settling numbers here.\n\n### Current state (post-BL-122)\n- The Selection element is drawn by `draw_selection_panel` (`src/ui/selection_panel.cpp`), called from `src/core/app.cpp` with `left_x = shell_column_width(disp.x)` (its left edge is now the shell column's right edge, `x = W`), `right_x = minimap left − margin`, `bottom_y = disp.y − margin`, `height = mm_h`.\n- **BL-093** sizes its HEIGHT from content (text-line units), clamped up to the header + content rows; it is bottom-anchored. Do not fight that — any resize must compose with the content-height sizing, not replace it with a resolution-scaled magic number (the BL-093 regression).\n- **BL-122** only moved its left edge (narrowed it); it did not retune width/height/placement for the new shell. That retune is this item.\n\n### Owed (from the mockup)\n- Target width band — does it keep running to the minimap's left edge, or sit narrower?\n- Target height — taller/shorter than the current `mm_h`-derived clamp; still content-driven?\n- Placement — stays bottom-left anchored at `x = W`, or shifts?\n- Behaviour across 1280x720 (verify harness) and 1920x1080 (Ben's runtime), per the display-robustness constraint (shares this concern with **BL-097** view-bounding audit).\n\n### Method\nBen supplies a mockup / annotated screenshot; the implementation reads the target proportions off it and tunes `draw_selection_panel`'s geometry + the `app.cpp` call. Coding-only once the mockup exists. Relationships: follows **BL-122** (shell), composes with **BL-093** (content-height sizing), aligns with **BL-097** (resolution-robust bounding). Authority `docs/ui/SELECTION.md` — do not edit ahead of the work.\n\n### Superseding note (2026-07-07)\nThe hosting move landed in **BL-124** (Ben\u2019s live direction): the Selection element now sits in the fold-out column (foldout_column_rect), mutually exclusive with the ledgers \u2014 so the bottom-bar geometry described above (left_x / right_x / bottom_y / height, the mm_h-derived clamp) no longer applies. What remains owed for THIS item is narrower: the **content re-lay-out** of the Selection inside the ~480px column (the action|facts split was built for the wide bottom bar and is cramped at column width). Still awaiting Ben\u2019s mockup; still coding-only once it exists."
+    },
+    {
+      "id": "BL-124",
+      "short_name": "SELECTION_COLUMN_SIDEBAR",
+      "category": "UI",
+      "title": "Selection element → fold-out column sidebar, mutually exclusive with the ledgers",
+      "status": "complete",
+      "glyph": "+",
+      "priority": "A",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-07",
+      "resolved": "2026-07-07",
+      "resolution": "Shipped (main session, 2026-07-07, Ben's live direction). draw_selection_panel re-hosted from the full-width bottom bar (the BL-065 layout) into foldout_column_rect — it now fills the shell fold-out column, the same slot the ledgers use. Mutual exclusion wired through the nav pane: exposed close_all_panels + added any_panel_open (nav_pane.{hpp,cpp}); app::render tracks m_prev_selection and, on a NEW valid selection, calls close_all_panels so the Selection takes the column, and gates the Selection draw on !any_panel_open so an open ledger wins the shared slot (selection state persists behind it, reappears on close). The signature dropped its four bottom-bar layout params. The bottom bar is gone; the bottom-left corner is now free. Build green; verified by-eye via scripts/verify/selection_redesign.lua captures. The Selection CONTENT still uses the old wide action|facts split — its re-lay-out for the narrower ~480px column is owed as BL-123 (Ben to mock). Authority propagated to docs/ui/SELECTION.md + docs/ui/LAYOUT.md.",
+      "files": [
+        "src/ui/selection_panel.cpp",
+        "src/ui/selection_panel.hpp",
+        "src/ui/nav_pane.cpp",
+        "src/ui/nav_pane.hpp",
+        "src/core/app.cpp",
+        "src/core/app.hpp"
+      ],
+      "authority_doc": "docs/ui/SELECTION.md",
+      "summary": "Ben (2026-07-07, live shell tuning): move the Selection element out of the bottom bar into the fold-out ledger column as an always-a-sidebar surface, mutually exclusive with the other ledgers (the toggle-rule idea: if you can see what you clicked to reach a view, clicking it again closes it). The plumbing (re-host + mutual exclusion) is the coding; the content proportions for the narrower column are Ben’s mockup (BL-123).",
+      "design": "Delivered per the resolution. Model: the fold-out column shows exactly one occupant — an open ledger (rail-driven) OR the Selection (selection-driven). A new selection evicts any open ledger; opening a ledger hides the Selection (state persists, reappears on close). No nav-rail slot for Selection. Follows BL-122 (shell) and replaces the BL-065 bottom bar; the content relayout is BL-123."
+    },
+    {
+      "id": "BL-125",
+      "short_name": "SHELL_PROPORTION_CLOCK_PASS",
+      "category": "UI",
+      "title": "Shell proportion & clock pass: 1720×1080 default, balance bar = identity height, 1.6× ledger column, 1.4× minimap, lens-legend drawer, clock declutter",
+      "status": "complete",
+      "glyph": "+",
+      "priority": "B",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-07",
+      "resolved": "2026-07-07",
+      "resolution": "Shipped (main session, 2026-07-07, Ben's live direction, several passes). (1) Default window 1280×720 → 1720×1080 (options.cfg + app.{hpp,cpp} defaults + a 1720×1080 Options-window preset). (2) Balance bar / header strip height 52 → 92 px to match the identity card (profile_panel_height), top-aligned at y=0 as one level top band, content row vertically centred. (3) Shell fold-out column widened ~1.6×: shell_column_width now 0.272*disp_x clamp[480,576] (was 0.17/[300,360]); the 480 floor forces the one-question splits. (4) Minimap enlarged ~1.4×: max(336, 0.28*min(w,h)) (was max(240, 0.20*...)); the time panel scales with it. (5) On-canvas lens legend re-anchored flush-left of the minimap (right edge at the minimap's left edge, vertically centred) so it reads as a drawer folding out from the minimap — draw_body_surface_canvas gained a lens_key_anchor param; also clears the widened column it would otherwise overlap. (6) Time panel: removed the 'Qx in Nd' quarter-countdown (kept the progress bar). (7) Default campaign speed → tier II (init.lua default_speed=2; --verify stays paused for determinism). (8) Pause glyph → filled square drawn over a blank button (was '||', which read as the numeral II beside the I–V tiers); play stays '>'. Build green; verified by-eye via header / foldout_shell / market_lens captures. Authority propagated to docs/ui/LAYOUT.md, HEADER.md, MINIMAP.md, LENSES.md.",
+      "files": [
+        "options.cfg",
+        "scripts/init.lua",
+        "src/core/app.cpp",
+        "src/core/app.hpp",
+        "src/ui/header_panel.cpp",
+        "src/ui/header_panel.hpp",
+        "src/ui/foldout_column.cpp",
+        "src/ui/body_surface_canvas.cpp",
+        "src/ui/body_surface_canvas.hpp"
+      ],
+      "authority_doc": "docs/ui/LAYOUT.md",
+      "summary": "Ben (2026-07-07, live shell tuning across several passes): a proportion + legibility pass on the shell for the ledger-mockup work — bigger default window, balance bar levelled to the identity card, wider ledger column, bigger minimap with the lens legend folding out from its left, and a decluttered clock (no quarter countdown, default speed II, square pause).",
+      "design": "Delivered per the resolution — a bundle of Ben-directed proportion/legibility tweaks, each individually small, landed live and verified by-eye. Grouped as one item for commit traceability. No open design."
+    },
+    {
+      "id": "BL-126",
+      "short_name": "LEDGER_SUBVIEW_TOGGLE_CLOSE",
+      "category": "UI",
+      "title": "Toggle rule: re-clicking the active sub-view tab closes the ledger (nav_button)",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 1,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-07",
+      "files": [
+        "src/ui/foldout_column.cpp"
+      ],
+      "authority_doc": "docs/ui/LAYOUT.md",
+      "summary": "Ben (2026-07-07): extend the universal toggle rule to in-ledger sub-view tabs. The rule (now recorded in .claude/rules/io-standing-rules.md): any control whose active state is visible is a toggle. The nav-rail icon already toggles its ledger; this item is the sub-view half.",
+      "design": "**Settled (2026-07-07 Q&A):** re-clicking the CURRENTLY-ACTIVE sub-view tab CLOSES the ledger (chosen over collapse-to-an-overview — it matches the menu icon exactly and avoids needing an overview state most ledgers lack). Switching between tabs stays an ordinary view change; cross-cutting selectors (body/market/resource combos) are exempt.\n\n**Current state:** ui::nav_button (src/ui/foldout_column.cpp) only sets view=id; re-clicking the active tab is a no-op. **Owed:** when the clicked id == the active view, close the hosting ledger (clear its show_* flag) instead of re-setting the view. nav_button does not currently know its ledger’s show_* flag, so either pass it a close target (bool& / callback) or handle the active-re-click at each call site. Small (~1 file + its call sites). Authority docs/ui/LAYOUT.md; the rule text already lives in the standing rules."
     }
   ]
 }
