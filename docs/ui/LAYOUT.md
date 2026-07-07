@@ -261,6 +261,13 @@ floating) **Tile** ledgers were audited and found to be single-question already 
 principle is *one question per view, a menu to move between views* — not a mandate to split every
 panel.
 
+**Toggle rule on the strip (BL-126).** Consistent with the universal toggle rule
+(`.claude/rules/io-standing-rules.md`): re-clicking the **currently-active** sub-view tab **closes
+the hosting ledger** (clears its `show_*` flag) — matching the nav-rail icon exactly — rather than
+being a no-op. Switching to a *different* tab is an ordinary view change. `ui::nav_button` takes the
+ledger's open-flag as an optional `close` target; a strip with no flag passed stays a plain,
+non-closing selector.
+
 ### Economy-panel table legibility (BL-081, BL-111, BL-117)
 
 The Corporations dashboard (`corporation_panel.cpp`) and the economy tables were retuned for the

@@ -57,13 +57,21 @@ void foldout_end()
     ImGui::End();
 }
 
-void nav_button(const char* label, int id, int& view)
+void nav_button(const char* label, int id, int& view, bool* close)
 {
     const bool active = (view == id);
     if (active)
         ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
     if (ImGui::Button(label))
-        view = id;
+    {
+        // BL-126 toggle rule: re-clicking the active tab closes the hosting ledger (clears
+        // its show_* flag); clicking a different tab is an ordinary view change. When no
+        // close target is supplied, the active re-click stays a no-op.
+        if (active && close)
+            *close = false;
+        else
+            view = id;
+    }
     if (active)
         ImGui::PopStyleColor();
 }

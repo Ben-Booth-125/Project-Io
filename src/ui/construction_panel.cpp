@@ -393,11 +393,11 @@ void draw_construction_panel(world& w,
     ui::foldout_begin("Construction");
 
     int& view = state.construction.panel_view;
-    ui::nav_button("Build", 0, view);
+    ui::nav_button("Build", 0, view, p_open);
     ImGui::SameLine();
-    ui::nav_button("Manage", 1, view);
+    ui::nav_button("Manage", 1, view, p_open);
     ImGui::SameLine();
-    ui::nav_button("Sell Orders", 2, view);
+    ui::nav_button("Sell Orders", 2, view, p_open);
     ImGui::Separator();
     ImGui::Spacing();
 

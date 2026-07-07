@@ -40,6 +40,11 @@ void foldout_end();
 /// Build/Manage/Sell strip). Highlights when `view == id`; sets `view = id` on click.
 /// Callers place buttons with `ImGui::SameLine()` between them and a `Separator` below.
 /// Used because `ImGui::BeginTabBar`'s header does not render in this build.
-void nav_button(const char* label, int id, int& view);
+///
+/// Toggle rule (BL-126, io-standing-rules): re-clicking the *already-active* tab closes
+/// the hosting ledger via `close` (its `show_*` flag) rather than being a no-op; switching
+/// to a different tab is an ordinary view change. Pass the ledger's open-flag as `close`;
+/// `nullptr` (the default) keeps the strip non-closable (a plain view selector).
+void nav_button(const char* label, int id, int& view, bool* close = nullptr);
 
 } // namespace ui

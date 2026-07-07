@@ -2267,7 +2267,7 @@
       "short_name": "LEDGER_SUBVIEW_TOGGLE_CLOSE",
       "category": "UI",
       "title": "Toggle rule: re-clicking the active sub-view tab closes the ledger (nav_button)",
-      "status": "designed",
+      "status": "complete",
       "glyph": "✓",
       "priority": "B",
       "difficulty": 1,
@@ -2279,6 +2279,7 @@
         "src/ui/foldout_column.cpp"
       ],
       "authority_doc": "docs/ui/LAYOUT.md",
+      "resolution": "Delivered 2026-07-07 (batch with BL-113). ui::nav_button gained an optional bool* close target: re-clicking the already-active tab clears the hosting ledger's show_* flag (closes it) instead of the former no-op; switching tabs stays an ordinary view change. Call sites wired — economy_panel (&ui.show_economy_panel) and construction_panel (p_open). Build green (game target links). Logic correct-by-inspection (diff-1 interaction). Authority propagated to docs/ui/LAYOUT.md § One-question-per-view splits.",
       "summary": "Ben (2026-07-07): extend the universal toggle rule to in-ledger sub-view tabs. The rule (now recorded in .claude/rules/io-standing-rules.md): any control whose active state is visible is a toggle. The nav-rail icon already toggles its ledger; this item is the sub-view half.",
       "design": "**Settled (2026-07-07 Q&A):** re-clicking the CURRENTLY-ACTIVE sub-view tab CLOSES the ledger (chosen over collapse-to-an-overview — it matches the menu icon exactly and avoids needing an overview state most ledgers lack). Switching between tabs stays an ordinary view change; cross-cutting selectors (body/market/resource combos) are exempt.\n\n**Current state:** ui::nav_button (src/ui/foldout_column.cpp) only sets view=id; re-clicking the active tab is a no-op. **Owed:** when the clicked id == the active view, close the hosting ledger (clear its show_* flag) instead of re-setting the view. nav_button does not currently know its ledger’s show_* flag, so either pass it a close target (bool& / callback) or handle the active-re-click at each call site. Small (~1 file + its call sites). Authority docs/ui/LAYOUT.md; the rule text already lives in the standing rules."
     },
