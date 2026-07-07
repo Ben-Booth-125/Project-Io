@@ -16,7 +16,8 @@
 
 #include <imgui.h>
 
-#include <algorithm> // std::max (bar-width clamp)
+#include <algorithm> // std::max (bar-width clamp), std::min/std::clamp (build rate, BL-095)
+#include <cmath>     // std::ceil (construction ETA, BL-095)
 #include <cstring>   // std::strcmp (header title/kind de-dup)
 #include <string>    // affordance-row labels (BL-071)
 #include <utility>   // std::move
@@ -118,6 +119,85 @@ const char* scale_label(int scale)
     }
 }
 
+// --- Analog construction status (BL-095 task E) ------------------------------
+// Construction is now durative *and* material-gated: each economy tick a building
+// under construction advances by a RATE in [0,1] set by how much of its per-tick
+// material need the local market can supply (economy_system.cpp § run_construction).
+// The front door used to read this as a binary yes/no; these helpers surface it as
+// an analog rate / ETA / paused status instead.
+
+// Recompute a build's current material rate exactly as run_construction does — the
+// fraction of this tick's per-material need the local market can supply, set by the
+// scarcest required material and forced to 0 (paused) below 1/max_stretch. Shared by
+// the prospective front door (a candidate tile + type) and the in-progress building
+// card. A local mirror of the world-side formula, not a call into it, because the UI
+// is const and only needs the read.
+float construction_rate(const world& w, const recipe_registry& reg,
+                        building_type type, entity_id tile)
+{
+    const building_economics& econ = reg.economics(type);
+    const float duration = econ.build_duration_ticks;
+    if (duration <= 0.0f)
+        return 1.0f; // instant build — never material-gated
+
+    const market_component* m = nullptr;
+    const entity_id mid = market_for_tile(w, tile);
+    if (mid != null_entity)
+    {
+        const auto mit = w.markets.find(mid);
+        if (mit != w.markets.end())
+            m = &mit->second;
+    }
+
+    float rate = 1.0f;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        const float need = econ.resource_build_cost[r] / duration;
+        if (need <= 0.0f)
+            continue;
+        const float avail = m ? m->supply[r] : 0.0f;
+        rate = std::min(rate, avail / need);
+    }
+    rate = std::clamp(rate, 0.0f, 1.0f);
+
+    const float max_stretch = reg.construction().max_stretch;
+    const float pause_below  = (max_stretch > 1.0f) ? (1.0f / max_stretch) : 0.0f;
+    if (rate < pause_below)
+        rate = 0.0f; // paused: even the max-stretched rate can't be supplied
+    return rate;
+}
+
+// A compact tick-count label. A Tick is ~3 months, so 4 ticks make a year (BL-095);
+// years surface once the span reads better than a raw count.
+std::string ticks_label(int ticks)
+{
+    std::string s = std::to_string(ticks) + (ticks == 1 ? " tick" : " ticks");
+    if (ticks >= 4)
+        s += " (~" + std::to_string(ticks / 4) + " yr)";
+    return s;
+}
+
+// The human status for a build rate + the whole ticks of work left: paused when the
+// market can't feed even the max-stretched rate; otherwise "Building..." with an ETA
+// a sub-1 rate stretches (and flags as scarce).
+std::string construction_status(float rate, int ticks_left)
+{
+    if (rate <= 0.0f)
+        return "Paused - market can't supply materials";
+    if (rate >= 1.0f)
+        return "Building... ~" + ticks_label(ticks_left);
+    const int eta = static_cast<int>(std::ceil(static_cast<float>(ticks_left) / rate));
+    return "Building... ~" + ticks_label(eta) + " (materials scarce)";
+}
+
+// Colour for an analog build status: red paused, amber scarce, green on-schedule.
+ImVec4 construction_status_colour(float rate)
+{
+    return (rate <= 0.0f) ? ImVec4{0.90f, 0.55f, 0.55f, 1.0f}   // paused
+         : (rate < 1.0f)  ? ImVec4{0.85f, 0.75f, 0.45f, 1.0f}   // materials scarce
+                          : ImVec4{0.55f, 0.80f, 0.55f, 1.0f};  // on schedule
+}
+
 // --- Build front door (tile Selection element) -------------------------------
 // Compact cost + material annotation for a build button (BL-044/BL-095-lite
 // legibility): the credit cost plus every required material, priced at the
@@ -156,6 +236,33 @@ build_afford build_cost_annotation(const world& w, const recipe_registry& reg,
     }
     const float total = e.build_cost + material_cost;
     return { s, balance >= total };
+}
+
+// BL-095 task E: the prospective build's *starting* material status, rendered under a
+// front-door build button. Recomputes the same rate run_construction will apply on
+// the first tick — the per-tick material need vs the candidate tile's local market
+// supply — so the player reads "materials scarce here" (or "paused") before
+// committing, in place of the old binary yes/no. A build with no material cost has
+// nothing to gate, so its status line is omitted. On schedule stays muted (the cost
+// annotation already carries the detail); scarce/paused speak up.
+void draw_prospective_build_status(const world& w, const recipe_registry& reg,
+                                   building_type type, entity_id tile)
+{
+    const building_economics& econ = reg.economics(type);
+    bool needs_material = false;
+    for (std::size_t r = 0; r < resource_count; ++r)
+        if (econ.resource_build_cost[r] > 0.0f) { needs_material = true; break; }
+    if (!needs_material)
+        return;
+
+    const float rate = construction_rate(w, reg, type, tile);
+    // Match construct_building's ticks_remaining seeding (truncated build_duration).
+    const int   base = static_cast<int>(econ.build_duration_ticks);
+    const std::string msg = construction_status(rate, base);
+    if (rate >= 1.0f)
+        ImGui::TextDisabled("%s", msg.c_str());
+    else
+        ImGui::TextColored(construction_status_colour(rate), "%s", msg.c_str());
 }
 
 // The per-tile entry to construction (docs/ui/SELECTION.md): offers the buildable
@@ -235,6 +342,7 @@ void draw_build_front_door(const world& w, const recipe_registry& reg,
         ImGui::EndDisabled();
         ImGui::SameLine();
         ImGui::TextDisabled("%s", ext.label.c_str());
+        draw_prospective_build_status(w, reg, building_type::extraction_site, tile);
     }
     else
     {
@@ -250,6 +358,7 @@ void draw_build_front_door(const world& w, const recipe_registry& reg,
     ImGui::EndDisabled();
     ImGui::SameLine();
     ImGui::TextDisabled("%s", proc.label.c_str());
+    draw_prospective_build_status(w, reg, building_type::processing_facility, tile);
 
     const build_afford prt =
         build_cost_annotation(w, reg, building_type::port, tile, balance);
@@ -259,6 +368,7 @@ void draw_build_front_door(const world& w, const recipe_registry& reg,
     ImGui::EndDisabled();
     ImGui::SameLine();
     ImGui::TextDisabled("%s", prt.label.c_str());
+    draw_prospective_build_status(w, reg, building_type::port, tile);
 
     // Outcome of the most recent attempt, if any.
     if (!ui.construction.last_message.empty())
@@ -533,6 +643,17 @@ void draw_selection_action(const world& w, const recipe_registry& reg,
         case selection_kind::building:
             if (is_player_owned(w, sel))
             {
+                // Under construction (BL-095 task E): lead with the live analog build
+                // status — rate / ETA / paused — so a freshly-placed building reads as
+                // "still building" rather than an empty card, before the Manage control.
+                if (const auto bit = w.buildings.find(sel);
+                    bit != w.buildings.end() && bit->second.ticks_remaining > 0)
+                {
+                    const building_component& b = bit->second;
+                    const float rate = construction_rate(w, reg, b.type, b.tile);
+                    ImGui::TextColored(construction_status_colour(rate), "%s",
+                        construction_status(rate, b.ticks_remaining).c_str());
+                }
                 // Manage — routes to the building-management panel (construction_panel),
                 // which owns the workforce / recipe / decommission controls.
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Manage");
