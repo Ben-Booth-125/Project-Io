@@ -6,6 +6,45 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — Tooling + batch: ID-reservation ledger, BL-126, BL-113 (2026-07-07)
+
+**Context.** Quick backlog pass that turned into a small tooling fix + a two-item Batch Delivery.
+Duration-stamped end to end (Ben cares about duration — now a recorded REFINED practice).
+
+**Tooling — ID reservation ledger.** BL-id collisions kept recurring because `next_id.js` reads the
+max at allocation time, so two concurrent worktrees mint the same id off a stale max. Added an
+append-only `docs/development/id_reservations.jsonl` folded into the cross-ref max scan, plus a
+`--claim <SHORT_NAME>` write mode that persists the allocation *before* backlog.json is touched.
+Scan mode verified (found 3 live in-flight collisions on other branches); `--claim` write path
+correct-by-inspection. Committed `d440588`.
+
+**Duration-stamp practice.** REFINED.md now codifies wall-clock start→end stamping on promoted groups
+and batch blocks (objective clock, not a felt estimate) — descriptive telemetry to sharpen the 1–5
+difficulty scale.
+
+**Batch (08:04:31 → 08:17:27, 12m 56s).** Only two of the six `designed` items were truly
+promote-ready — the other four are each blocked (BL-107 serialiser-blocked, BL-099 held on a
+determinism/save-seam premise, BL-094 parked v0.2.0, BL-077 a diff-5 A* feature). Delivered:
+- **BL-126** (`4e8c3fd`) — toggle rule for sub-view tabs: `ui::nav_button` gained an optional
+  `bool* close`; re-clicking the active tab clears the ledger's `show_*` flag instead of a no-op.
+  Wired at economy_panel + construction_panel. Build green; diff-1, correct-by-inspection.
+- **BL-113** (`be92911`) — acceptance coverage for three interactive flows (recipe/workforce, sell
+  order, survey), each driven through the **real UI commit path**. Sub-agent authored in a worktree;
+  main session patch-applied app.cpp, copied the three scripts, built, and ran all three to PASS.
+  Fixed the survey script (staged funds via the existing `set_balance` — the starting balance can't
+  afford an off-home survey, a BL-112 concern). **Known-weak:** sell_order's floor-precedence assert
+  is vacuous with a 0 home iron_ore pool (proves placement reaches clearing; full precedence stays
+  the econ-harness invariant) — recorded in the requirement.
+
+**Verified.** Incremental MSVC builds green throughout; three BL-113 acceptance scripts PASS;
+backlog + requirements JSON parse-clean; `backlog_lint` 0 fail. Authority propagated: LAYOUT.md
+(BL-126), DEVELOPMENT_PRACTICES.md § Acceptance flows (BL-113).
+
+**Open/caveats.** `next_id.js --claim` write path unverified (no manual run yet). sell_order
+acceptance is deliberately weak. Nothing pushed (major-releases-only policy).
+
+---
+
 ## Session — Ledger-mockup design + shell proportion/selection pass (2026-07-07)
 
 **Context.** A focused session to set up the **ledger-mockup work**: Ben designs each ledger surface

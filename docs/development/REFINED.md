@@ -123,69 +123,18 @@ session boundary is drawn *between* them.
 
 ---
 
-## 2026-07-05 Health-sweep batch — audit quick-wins (BL-101–BL-110) — **COMPLETE**
+## 2026-07-07 Batch — BL-126 + BL-113 (08:04:31 → 08:17:27, 12m 56s) — **COMPLETE**
 
-Ten quick-wins from the 2026-07-05 engineering health sweep, delivered in one main-session batch (no
-fan-out — difficulty-1 edits, shared hotspots). **9 complete, 1 designed-blocked:** BL-101 warnings
-(`-Wall -Wextra` / `/W4`, advisory), BL-104 CTest `foreach` + `check.bat` (ctest -N = 14), BL-106
-determinism harness (23/23 PASS), BL-110 sol2 `main()` guard, BL-102 doc case-rename
-(concept/systems → CONCEPT/SYSTEMS), BL-103 12-pointer sweep, BL-108 CLAUDE.md req-path, BL-109
-testing-doc rewrite (Catch2 → harness reality), BL-105 merge-gate note (branch protection = 403,
-unavailable on private/free). **BL-107** shipped its doc-truthfulness half only (TECH_FOUNDATIONS
-save wording → future tense); the magic+version header stays `designed` + blocked on the serialiser.
-Verified via a vcvars2022 full build (green) + `ctest`. Requirements: the five group slugs in
-`req/requirements.json`, all complete. Permanent record: DEVLOG 2026-07-05. Summary retained one cycle.
+Two-item batch. **BL-126** (toggle rule — `nav_button` re-click on the active tab closes the ledger
+via an optional `bool* close`; wired at economy_panel + construction_panel; diff-1, build-green,
+correct-by-inspection). **BL-113** (interactive-flow acceptance — recipe/workforce, sell, survey verify
+primitives + three acceptance scripts driving the real commit path; sub-agent authored in a worktree,
+main session integrated + built + ran all three to PASS; survey funds staged via `set_balance`;
+sell_order floor-precedence assert known-weak with a 0 pool). Requirements `interactive-flow-acceptance`
+R1–R3 complete. Commits `4e8c3fd`, `be92911`. Permanent record: DEVLOG 2026-07-07, LAYOUT.md,
+DEVELOPMENT_PRACTICES.md § Acceptance flows. Summary retained one cycle.
 
 ---
-
-## BL-122 Paradox-style fold-out shell — skeleton (promoted from backlog.json § BL-122) — **COMPLETE**
-
-Delivered 2026-07-06 in one main session (no fan-out — one shared helper + the app.cpp layout
-hotspot). All five tasks complete: **A** `src/ui/foldout_column.{hpp,cpp}` (the shell column —
-`shell_column_width`, `foldout_column_rect`, `foldout_begin`/`foldout_end`); **B** identity tile
-widened to `W` (profile_panel; `profile_panel_width` retargeted to the floating-ledger spawn anchor
-only); **C** the five named ledgers re-hosted via `foldout_begin`/`end`, Construction shed its
-BL-082 spawn params; **D** app.cpp `header_left`/selection `left_x` → `shell_column_width(disp.x)`,
-BL-082 anchor block deleted; **E** `scripts/verify/foldout_shell.lua`, 3 goldens blessed @1280×720.
-Build green. Requirements `foldout-shell-skeleton` R1–R4 all complete. **Deferred as designed:** the
-per-panel one-question splits (BL-117..121 — economy tables cramped in the narrow column, the
-intended forcing function) and the Tile Ledger migration (still floats). Permanent record: DEVLOG
-2026-07-06, `docs/ui/LAYOUT.md`. Summary retained one cycle.
-
----
-
-## One-question-per-view sweep + corp legibility (promoted from backlog.json § BL-117/111/118/119/120/121) — **COMPLETE**
-
-Delivered 2026-07-06 in one main-session batch right after BL-122, no fan-out (shared `ui_state.hpp`
-+ `foldout_column` hotspots; the visual-verify loop is serial). **Real code changes (2):** BL-117 —
-economy panel split into Corps / Holdings / Markets via a new shared `ui::nav_button` (Construction
-refactored onto it), `ui.economy_view` persists the view; BL-111 — Corporations table dropped
-`SizingStretchProp` for a 3-col stretch-name + tight fixed Focus/Balance (also tightened the economy
-Corps view's balances columns for the narrow column). **Assessed, no split (4)** — matching Ben's own
-framing: BL-118 (Balance Ledger is one financial read), BL-119 (Tile Ledger floats, not
-width-pressured — deferred to column migration), BL-120 (Market Ledger single-purpose), BL-121
-(Corporation panel single-question after BL-111). Build green; goldens re-blessed (economy_panel,
-corp_dashboard, foldout_shell). Requirements `one-question-per-view-sweep` R1–R5 complete. Permanent
-record: DEVLOG 2026-07-06, `docs/ui/LAYOUT.md`. Summary retained one cycle.
-
----
-
-## Practice: duration-stamp refined items
-
-Ben cares about **duration** — how long work actually took, not just that it landed. So every
-promoted group (and each Batch Delivery block) is **stamped with a wall-clock span**, not only a
-date:
-
-- **Take the clock at promotion** (`date +"%Y-%m-%d %H:%M:%S"`) and again **at close**; record both
-  and the elapsed span in the group's completion line, e.g. *"Delivered 2026-07-07, 07:47:40 →
-  08:31:05 (43m 25s)."*
-- **Stamp the objective clock span** (start → end), not a felt estimate. If the session was paused,
-  note the paused interval so the figure stays honest.
-- The stamp is **descriptive telemetry**, not a target — it feeds Ben's sense of what each
-  difficulty tier really costs, sharpening the 1–5 difficulty scale over time.
-
-Origin: 2026-07-07 — first applied to this session's tooling block (`next_id.js` reservation ledger),
-07:47:40 → 07:50:08 (2m 28s, clock span from first stamp).
 
 ## Dividing work across agents & authoring tasks
 
