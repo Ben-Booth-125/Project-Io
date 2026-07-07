@@ -123,6 +123,33 @@ session boundary is drawn *between* them.
 
 ---
 
+## 2026-07-07 Batch — Economy dynamism (BL-078, BL-095, BL-096, BL-079, BL-112) — **COMPLETE**
+
+Five interlocking economy items delivered 2026-07-07. **BL-078** redefined the nation substrate into a
+tick-time elastic per-capita basket demand + abstract nation-capacity supply (price discovers via
+`base×√(D/S)`, `[0.25×,4×]` band kept). **BL-095** made construction market-gated + pay-as-you-build
+(3-regime rate, derived stock = prior-tick market supply, analog front-door). **BL-096** resource-carved
+the market map (nation-gated by tradeable-resource concentration, fresh RNG offset `0xA5310096u`) +
+distributed substrate across a body's markets. **BL-079** added narrow deterministic background-corp
+agency (idle a loss-maker / switch a floored recipe; player exempt), reconciled the stale depletion docs,
+and wrote the scoped standing-rule exception. **BL-112** upgraded `pregame_balance_harness` into the
+economy gate (differentiated/elastic/live-margin/fillable/determinism — all PASS) and rekeyed the
+Opportunity lens to unmet demand.
+
+Verified: full app build + **19/19 headless tests green** (incl. new `construction_gate_harness`,
+`corp_agency_harness`, and `world_audit` BL-096 assertions), `verifier-review` GO COMPILE, determinism
+preserved (`world_determinism`/`econ_stability` green). The two UI slices (095 front-door, 112 lens) were
+fanned to sub-agents; the determinism-critical tick core stayed main-session-serial. **Design decision
+(Ben, 2026-07-07): the emergent milder opening — the player opens ~break-even/profitable rather than at
+the intended net loss — is ACCEPTED**; the fillable-gap dynamism is the win. Requirements
+`requirements.json` § {product-market-inert, market-stockpile-build-gate, market-resource-generation,
+extraction-boombust-feedback, starting-economy-viability} all complete. Deferred follow-ons: BL-130
+(real market inventory vs derived), BL-131 (player market destruction), BL-132 (full market
+co-generation). Permanent record: DEVLOG 2026-07-07, PRODUCTION.md, GENERATION_STRATEGY.md, LENSES.md,
+io-standing-rules.md. Summary retained one cycle.
+
+---
+
 ## 2026-07-07 Batch — BL-126 + BL-113 (08:04:31 → 08:17:27, 12m 56s) — **COMPLETE**
 
 Two-item batch. **BL-126** (toggle rule — `nav_button` re-click on the active tab closes the ledger
