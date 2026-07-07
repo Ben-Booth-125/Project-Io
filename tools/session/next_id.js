@@ -21,6 +21,12 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const BACKLOG = 'docs/development/backlog.json';
+// Append-only reservation ledger: the *preventive persistence* that survives between
+// sessions and across worktrees BEFORE any backlog.json edit or commit exists. A session
+// that allocates an id records the claim here (via --claim <SHORT_NAME>); the next scan
+// folds these ids into the max, so two concurrent sessions can't mint the same id off a
+// stale backlog max. One JSON object per line: {id, name, ts, branch}.
+const LEDGER = 'docs/development/id_reservations.jsonl';
 const sh = (cmd) => execSync(cmd, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
 const isId = (id) => /^BL-\d+$/.test(id);
 const num = (id) => parseInt(id.slice(3), 10);
@@ -56,9 +62,28 @@ const record = (source, items) => {
   }
 };
 
+// Reservation ledger (working tree + every ref that has it) — folded in as ordinary
+// sources so a reserved-but-uncommitted id still lifts the max.
+function ledgerItems(txt) {
+  const out = [];
+  for (const line of txt.split('\n')) {
+    const s = line.trim();
+    if (!s) continue;
+    try { const o = JSON.parse(s); if (isId(o.id)) out.push({ id: o.id, name: o.name || '(reserved)' }); } catch { /* skip */ }
+  }
+  return out;
+}
+function ledgerFromWorking() {
+  try { return ledgerItems(fs.readFileSync(path.join(ROOT, LEDGER), 'utf8')); } catch { return []; }
+}
+function ledgerFromRef(ref) {
+  try { return ledgerItems(sh(`git show ${ref}:${LEDGER}`)); } catch { return []; }
+}
+
 const allRefs = refs();
-for (const r of allRefs) record(r, itemsFromRef(r));
+for (const r of allRefs) { record(r, itemsFromRef(r)); record(r + ' (ledger)', ledgerFromRef(r)); }
 record('(working tree)', itemsFromWorking());
+record('(ledger)', ledgerFromWorking());
 
 let max = 0, maxWhere = [];
 for (const [id, names] of byId) {
@@ -66,7 +91,14 @@ for (const [id, names] of byId) {
   if (n > max) { max = n; maxWhere = [...new Set([].concat(...[...names.values()].map((s) => [...s])))]; }
 }
 
-const count = Math.max(1, parseInt(process.argv[2] || '1', 10));
+// --claim <SHORT_NAME> writes the allocated id(s) into the ledger immediately, so the
+// reservation persists before backlog.json is even edited. Parse it out of argv.
+let claimName = null;
+const argv = process.argv.slice(2);
+const ci = argv.indexOf('--claim');
+if (ci !== -1) { claimName = argv[ci + 1] || '(reserved)'; argv.splice(ci, 2); }
+
+const count = Math.max(1, parseInt(argv[0] || '1', 10));
 const first = max + 1;
 
 console.log(`Scanned ${byId.size} distinct BL-ids across ${allRefs.length} ref(s) + working tree.`);
@@ -83,4 +115,18 @@ if (collisions.length) {
     for (const [name, srcs] of names) console.log(`  ${id} = ${name}   [${[...srcs].join(', ')}]`);
   }
   console.log('  Resolve by keeping the earliest/shared item and renumbering the rest (+ their cross-refs).');
+}
+
+// Persist the claim(s) so the next scan (this session or a concurrent worktree) can't
+// re-mint them off a stale backlog max.
+if (claimName) {
+  let branch = '?';
+  try { branch = sh('git rev-parse --abbrev-ref HEAD'); } catch { /* detached / no git */ }
+  const ts = new Date().toISOString();
+  const lines = [];
+  for (let n = first; n < first + count; n++) {
+    lines.push(JSON.stringify({ id: pad(n), name: claimName, ts, branch }));
+  }
+  fs.appendFileSync(path.join(ROOT, LEDGER), lines.join('\n') + '\n');
+  console.log(`\nClaimed ${count === 1 ? pad(first) : pad(first) + '..' + pad(max + count)} for "${claimName}" -> ${LEDGER} (commit it, or drop the line if you abandon the id).`);
 }

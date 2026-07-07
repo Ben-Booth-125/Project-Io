@@ -170,6 +170,23 @@ record: DEVLOG 2026-07-06, `docs/ui/LAYOUT.md`. Summary retained one cycle.
 
 ---
 
+## Practice: duration-stamp refined items
+
+Ben cares about **duration** — how long work actually took, not just that it landed. So every
+promoted group (and each Batch Delivery block) is **stamped with a wall-clock span**, not only a
+date:
+
+- **Take the clock at promotion** (`date +"%Y-%m-%d %H:%M:%S"`) and again **at close**; record both
+  and the elapsed span in the group's completion line, e.g. *"Delivered 2026-07-07, 07:47:40 →
+  08:31:05 (43m 25s)."*
+- **Stamp the objective clock span** (start → end), not a felt estimate. If the session was paused,
+  note the paused interval so the figure stays honest.
+- The stamp is **descriptive telemetry**, not a target — it feeds Ben's sense of what each
+  difficulty tier really costs, sharpening the 1–5 difficulty scale over time.
+
+Origin: 2026-07-07 — first applied to this session's tooling block (`next_id.js` reservation ledger),
+07:47:40 → 07:50:08 (2m 28s, clock span from first stamp).
+
 ## Dividing work across agents & authoring tasks
 
 This is the method used to promote an item and (optionally) fan it out to
