@@ -315,6 +315,30 @@ enable_testing()
 file(GLOB IO_WORLD_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/world/*.cpp")
 list(FILTER IO_WORLD_SOURCES EXCLUDE REGEX "recipe_registry\\.cpp$")
 
+# pregame_balance_harness is the one harness that genuinely needs a live Lua
+# state: it constructs a `lua_state`, loads scripts/economy.lua + recipes.lua,
+# and calls recipe_registry::load_from_lua (defined in recipe_registry.cpp, the
+# sol2/Lua TU the world superset above deliberately excludes). So the generic
+# batch below cannot build it — declare it explicitly here, mirroring the
+# ProjectIo target's sol2 setup: add back recipe_registry.cpp + scripting/
+# lua_state.cpp, the sol2 include dir, and link lua54 (which propagates the Lua
+# headers sol2 needs). Being a TARGET already, the `if(NOT TARGET ...)` guard in
+# the foreach skips redeclaring it, while the unconditional add_test still
+# registers it as a CTest test.
+add_executable(pregame_balance_harness
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/pregame_balance_harness.cpp"
+    ${IO_WORLD_SOURCES}
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
+)
+target_include_directories(pregame_balance_harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(pregame_balance_harness PRIVATE lua54)
+target_compile_features(pregame_balance_harness PRIVATE cxx_std_20)
+target_compile_options(pregame_balance_harness PRIVATE ${IO_WARNING_FLAGS})
+
 file(GLOB IO_VERIFY_HARNESSES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/*.cpp")
 foreach(harness_src ${IO_VERIFY_HARNESSES})
     get_filename_component(harness_name "${harness_src}" NAME_WE)

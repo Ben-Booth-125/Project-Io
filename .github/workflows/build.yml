@@ -84,6 +84,16 @@ jobs:
           fail=0
           for h in tools/verify/*.cpp; do
             name=$(basename "$h" .cpp)
+            # pregame_balance_harness is the lone harness that needs a live Lua
+            # state (sol2 + lua54 + recipe_registry.cpp + scripting/lua_state.cpp),
+            # so it is NOT part of this pure world/* headless tier. It is still
+            # compiled on both OSes by the full `cmake --build` step above (via its
+            # CTest target); running it here would add nothing — it is a diagnostic
+            # print harness that always exits 0.
+            if [ "$name" = "pregame_balance_harness" ]; then
+              echo "=== skipping $name (needs Lua; built via CMake/CTest target) ==="
+              continue
+            fi
             echo "=== building $name ==="
             "${CXX:-g++}" -std=c++20 -O2 -I src "$h" $WORLD -o "/tmp/$name"
             echo "=== running $name ==="
