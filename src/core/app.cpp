@@ -679,6 +679,182 @@ int app::run_verify(const std::string& script_path, bool bless)
                 msg ? msg->c_str() : "");
     });
 
+    // === BL-113 interactive-flow acceptance primitives ======================
+    // Three more real-commit-path mutators mirroring build_first_valid: each drives
+    // the SAME state a UI control writes, so an acceptance script proves the player
+    // action reaches the sim, then asserts the effect after ticking. See the
+    // scripts/verify/{recipe_workforce,sell_order,survey_dispatch}.lua scripts.
+
+    // --- US-007: recipe / workforce change ----------------------------------
+    // Locate the player's first processing_facility (the only type with a recipe
+    // choice) and report {found, recipes} so a script can decide what to set. Returns
+    // recipes = the number of selectable recipes for that building's type.
+    v.set_function("first_processing_building", [this]() {
+        sol::state& s = m_lua.state();
+        sol::table  out = s.create_table();
+        const auto cit = m_world.corporations.find(m_world.player_entity);
+        if (cit != m_world.corporations.end())
+        {
+            for (const entity_id bld_id : cit->second.assets)
+            {
+                const auto bit = m_world.buildings.find(bld_id);
+                if (bit == m_world.buildings.end()) continue;
+                if (bit->second.type != building_type::processing_facility) continue;
+                out["found"]   = true;
+                out["tile"]    = static_cast<unsigned>(bit->second.tile);
+                out["recipes"] = m_registry.recipe_count(building_type::processing_facility);
+                out["index"]   = bit->second.active_recipe_index;
+                out["workforce"] = bit->second.workforce_target;
+                return out;
+            }
+        }
+        out["found"] = false;
+        return out;
+    });
+
+    // Set a building's active recipe by index via the SAME writes the construction
+    // panel's recipe combo performs (b.active_recipe_index + b.recipe = registry id
+    // of the chosen recipe). Keys on tile like the panel does (buildings key on their
+    // own id; the panel scans for tile == selection). Returns the recipe name applied,
+    // or "" if the tile has no building. Non-economic — the next econ_step honours it.
+    v.set_function("set_building_recipe", [this](unsigned tile_u, int index) -> std::string {
+        const entity_id tile = static_cast<entity_id>(tile_u);
+        for (auto& [bid, b] : m_world.buildings)
+        {
+            if (b.tile != tile) continue;
+            const int n = m_registry.recipe_count(b.type);
+            if (n <= 0) return std::string("");
+            const int i = std::clamp(index, 0, n - 1);
+            const recipe& r = m_registry.recipe_at(b.type, i);
+            b.active_recipe_index = i;
+            b.recipe              = m_registry.recipe_id(r.name);
+            SDL_Log("verify.set_building_recipe: tile=%u index=%d recipe=%s",
+                    tile_u, i, r.name.c_str());
+            return r.name;
+        }
+        return std::string("");
+    });
+
+    // Set a building's workforce target (0–200 %) via the SAME clamp+write the
+    // construction panel's workforce slider performs. Returns the applied value.
+    v.set_function("set_building_workforce", [this](unsigned tile_u, int pct) -> int {
+        const entity_id tile = static_cast<entity_id>(tile_u);
+        for (auto& [bid, b] : m_world.buildings)
+        {
+            if (b.tile != tile) continue;
+            b.workforce_target = std::clamp(pct, 0, 200);
+            SDL_Log("verify.set_building_workforce: tile=%u target=%d",
+                    tile_u, b.workforce_target);
+            return b.workforce_target;
+        }
+        return -1;
+    });
+
+    // Read the last econ report's output for the building on `tile` — the units it
+    // credited to the pool this tick. Lets a recipe/workforce script assert the
+    // change took effect after econ_step. Returns -1 if no report row for that tile.
+    v.set_function("building_output", [this](unsigned tile_u) -> double {
+        const entity_id tile = static_cast<entity_id>(tile_u);
+        for (const building_report& br : m_last_econ_report.buildings)
+        {
+            const auto bit = m_world.buildings.find(br.building);
+            if (bit != m_world.buildings.end() && bit->second.tile == tile)
+                return static_cast<double>(br.output_quantity);
+        }
+        return -1.0;
+    });
+
+    // --- US-008: standing sell-order placement ------------------------------
+    // Place a standing sell order through the SAME path the construction panel's
+    // "Add sell order" button uses: push a sell_order onto m_ui.sell_orders, the
+    // vector step_economy() feeds to clear_markets. Body resolves to the player's
+    // home body. Returns the resulting sell_orders count so a script can assert the
+    // order registered. Realises the placement half of US-008.
+    v.set_function("place_sell_order",
+        [this](const std::string& res, double qty, double floor) -> int {
+            sell_order o;
+            o.corp        = m_world.player_entity;
+            o.body        = m_world.home_body;
+            o.resource    = resource_from_name(res);
+            o.quantity    = static_cast<float>(qty);
+            o.floor_price = static_cast<float>(floor);
+            m_ui.sell_orders.push_back(o);
+            SDL_Log("verify.place_sell_order: %s x%.0f >= %.1f (n=%zu)",
+                    res.c_str(), qty, floor, m_ui.sell_orders.size());
+            return static_cast<int>(m_ui.sell_orders.size());
+        });
+
+    // Read the resolved market price of `res` on the player's home body — lets a
+    // sell-order script assert the floor was honoured (a placed floor above the
+    // clearing price prevents a below-floor dump; the pool retains stock rather than
+    // selling under the floor). Returns -1 if the home body has no market.
+    v.set_function("home_market_price", [this](const std::string& res) -> double {
+        const resource_type rt = resource_from_name(res);
+        for (const auto& [mid, mc] : m_world.markets)
+            if (mc.body == m_world.home_body)
+                return static_cast<double>(mc.price[static_cast<std::size_t>(rt)]);
+        return -1.0;
+    });
+
+    // Read the player's home-body pool quantity of `res` — the stock a sell order
+    // draws from. A floored order that cannot clear leaves stock in the pool; a
+    // script asserts the floor was honoured by comparing pool before/after a tick.
+    v.set_function("home_pool", [this](const std::string& res) -> double {
+        const resource_type rt = resource_from_name(res);
+        const auto it = m_world.corp_body_pools.find(
+            std::make_pair(m_world.player_entity, m_world.home_body));
+        if (it == m_world.corp_body_pools.end()) return 0.0;
+        return static_cast<double>(it->second.quantities[static_cast<std::size_t>(rt)]);
+    });
+
+    // --- US-011: survey dispatch --------------------------------------------
+    // Dispatch a survey of a named body through the SAME dispatch_survey path
+    // app::render runs when it consumes ui.pending_survey_dispatch (the Selection
+    // panel's Survey button only enqueues; the real debit + schedule live in
+    // dispatch_survey). Returns the survey_dispatch_result name ("success" debits
+    // the cost upfront and arms the schedule). Realises the dispatch half of US-011.
+    v.set_function("dispatch_survey_of", [this](const std::string& name) -> std::string {
+        const entity_id body = find_body(m_world, name);
+        if (body == null_entity) return std::string("invalid");
+        const survey_dispatch_result r = dispatch_survey(m_world, body);
+        const char* rn =
+            r == survey_dispatch_result::success             ? "success" :
+            r == survey_dispatch_result::insufficient_funds  ? "insufficient_funds" :
+            r == survey_dispatch_result::already_surveyed     ? "already_surveyed" :
+            r == survey_dispatch_result::in_progress          ? "in_progress" : "invalid";
+        SDL_Log("verify.dispatch_survey_of: %s -> %s", name.c_str(), rn);
+        return std::string(rn);
+    });
+
+    // Advance every in-progress survey by `days` via the real advance_surveys path
+    // (the same call app runs on day boundaries). Lets a script tick the survey clock
+    // deterministically and then assert the reveal advanced.
+    v.set_function("advance_survey_days", [this](int days) {
+        advance_surveys(m_world, days);
+    });
+
+    // Survey read accessors: the up-front cost preview, the player balance, and the
+    // count of regions revealed so far on a named body — so a survey script can assert
+    // BOTH that credits were debited (balance drop == cost) AND that reveal advanced
+    // (regions_done climbs after ticking). Returns -1 on a missing body/market.
+    v.set_function("survey_cost_of", [this](const std::string& name) -> double {
+        const entity_id body = find_body(m_world, name);
+        if (body == null_entity) return -1.0;
+        return static_cast<double>(survey_cost(m_world, body));
+    });
+    v.set_function("player_balance", [this]() -> double {
+        const auto it = m_world.corporations.find(m_world.player_entity);
+        return it == m_world.corporations.end() ? 0.0
+                                                 : static_cast<double>(it->second.balance);
+    });
+    v.set_function("survey_regions_done", [this](const std::string& name) -> int {
+        const entity_id body = find_body(m_world, name);
+        if (body == null_entity) return -1;
+        const auto bit = m_world.bodies.find(body);
+        if (bit == m_world.bodies.end()) return -1;
+        return bit->second.survey.regions_done;
+    });
+
     // Discrete navigation by the shared command vocabulary — the same dispatch the
     // keyboard uses (see canvas_command.hpp), so a script reads as a key sequence.
     // Unknown command names are ignored.

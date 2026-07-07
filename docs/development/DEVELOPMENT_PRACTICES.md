@@ -63,6 +63,26 @@ ProjectIo --verify scripts/verify/<name>.lua
   deliberately with `ProjectIo --verify <script> --bless` (overwrites it — a reviewable diff in
   version control). The tolerance model below is the **shipped** behaviour.
 
+#### Acceptance flows — driving a real player action through the commit path (BL-113)
+
+Golden capture proves *chrome renders*; it does **not** prove a player *action* has its effect —
+the construction deadlock shipped green because no check exercised a build through the real commit
+path. The fix is a second use of the same `--verify` harness: **acceptance scripts** that mutate
+game state through the *same code path the interactive control uses*, then assert the outcome with
+`verify.expect(cond, msg)` (logs `PASS`/`FAIL`, non-zero exit on any fail).
+
+- **The rule:** a verify commit primitive must call the **same function the UI control calls**, never
+  a reimplementation or a bypass registry. `verify.set_building_recipe`/`set_building_workforce`
+  perform the exact writes the construction panel's combo/slider do; `verify.place_sell_order` pushes
+  onto the same `m_ui.sell_orders` the panel appends to; `verify.dispatch_survey_of` calls the real
+  `dispatch_survey`. That fidelity is what makes the test catch a broken commit path.
+- **Shipped acceptance scripts:** `fresh_start_build.lua` (US-002 build), `recipe_workforce.lua`
+  (US-007), `sell_order.lua` (US-008), `survey_dispatch.lua` (US-011). Each traces to its user
+  story's `testing.note`.
+- **Capture-only is fine here** — these scripts assert via `verify.expect`, so they need no golden;
+  the `capture()` at the end is incidental. Stage preconditions with existing primitives
+  (e.g. `verify.set_balance` to afford an action) rather than entangling a separate concern.
+
 #### Golden-image diffing — tolerance model (designed 2026-06-15, [F3]; build deferred)
 
 When automatic pass/fail is built, it diffs each freshly-captured `screenshots/<name>.png` against
