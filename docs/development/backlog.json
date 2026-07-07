@@ -2319,6 +2319,29 @@
       "authority_doc": "docs/ui/LAYOUT.md",
       "summary": "Supersedes BL-120's 'confirm single-purpose' conclusion: Ben mocked up (Power BI) a redesigned market ledger — a double select (body -> market/city) narrowing to one market, then a scrollable list of per-good price-over-time charts. Built to the mockup in the fold-out shell column.",
       "design": "Delivered on branch claude/market-ledger, merged to main 2026-07-07. draw_market_ledger rebuilt: Body combo -> Market combo (cascade, ui::market_city_name real city names from BL-127) -> a scrollable BeginChild stacking one price sparkline per traded good (from m_market_history), each labelled with the good + current price. Replaces the old all-markets dashboard table + per-resource detail table + single-resource trend selector. The CSV export (verify.export_data) gained market_prices.csv (per market/resource/tick series) and split markets.csv by market, using the same city name, so Ben's Power BI mock shows real curves. Golden market_ledger re-blessed @1280x720. Relationships: consumes BL-127 (names) + the m_market_history substrate; supersedes BL-120. RENUMBERED from BL-125 → BL-128 on merge (collided with main's concurrently-minted BL-125 SHELL_PROPORTION_CLOCK_PASS)."
+    },
+    {
+      "id": "BL-129",
+      "short_name": "CENTRAL_DOC_PROSE_PASS",
+      "category": "Development",
+      "title": "Prose-analysis pass on the central documentation",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "SSS",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-07",
+      "files": [
+        "CLAUDE.md",
+        ".claude/rules/io-standing-rules.md",
+        "docs/development/DEVELOPMENT_PRACTICES.md",
+        "docs/development/DELIVERY.md"
+      ],
+      "authority_doc": "CLAUDE.md",
+      "summary": "Idea (2026-07-07, Ben, end of the ledger-mockup session): a prose-analysis pass on the CENTRAL documentation — CLAUDE.md, .claude/rules/io-standing-rules.md, DEVELOPMENT_PRACTICES.md, DELIVERY.md. Prompted by the observation that these docs specify the discipline of development entirely in the negative (what to avoid, 'favour X over Y', 'no ceremony') and never name the reward — the craft / enjoyment of the work. The prose is Ben's to write; this item just captures the analysis + candidate framings for when he is in the mood. Not urgent (Ben: 'won't change it soon') but rated SSS: the central docs are the project's operating system, so their prose quality is strategically load-bearing.",
+      "design": "**Seed observation.** The central docs name the *constraints* of good development well but never the *satisfactions* — they say what to avoid, rarely what to reach for or savour. A prose pass could name the reward without tipping into motivational-poster register.\n\n**Candidate framings (from the 2026-07-07 discussion — Ben picks; the prose is his):**\n- *Legibility as a pleasure, not just a constraint* — 'favour legible over clever' is defensive; name the payoff instead: a good solution reads as obvious in hindsight and is a pleasure to explain.\n- *The proportionate as its own reward (Rule 0)* — a clean one-liner is a genuine pleasure; don't rob a small win of it with ceremony. Rule 0 frames Light as the cheap option; it is often the satisfying one.\n- *Flow* — the docs are all gates and barriers; nothing blesses momentum. Something like 'when the path is clear, keep moving; save the ceremony for the seam.'\n- *The click / the quietly-wrong* — name the satisfaction of finding the thing that is secretly wrong (the fix that also dissolves a latent problem; e.g. the lens-key reposition that pre-empted a future overlap).\n- *Taste as a valid input* — when something reads wrong, fixing it is work, not vanity (the '||' → square pause glyph).\n- *The loop mirrors the game* (the strongest, Io-specific one) — Project Io prizes legible, composable systems that justify themselves by feeding Trade or Conflict; describe the development process in the same words: each change feeds something, composes cleanly, reads legibly. A game about elegant systems, built by an elegant system.\n- *The word 'fun' itself* may land light in that register; heavier synonyms carry the same energy — craft, satisfaction, momentum, or (for a game) play.\n\n**Scope.** Analysis + rewording of the Tone / Rule-0 / working-method sections primarily. Doc-only, no code. Authority: the docs themselves."
     }
   ]
 }
