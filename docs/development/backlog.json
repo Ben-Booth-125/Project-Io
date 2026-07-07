@@ -2281,6 +2281,44 @@
       "authority_doc": "docs/ui/LAYOUT.md",
       "summary": "Ben (2026-07-07): extend the universal toggle rule to in-ledger sub-view tabs. The rule (now recorded in .claude/rules/io-standing-rules.md): any control whose active state is visible is a toggle. The nav-rail icon already toggles its ledger; this item is the sub-view half.",
       "design": "**Settled (2026-07-07 Q&A):** re-clicking the CURRENTLY-ACTIVE sub-view tab CLOSES the ledger (chosen over collapse-to-an-overview — it matches the menu icon exactly and avoids needing an overview state most ledgers lack). Switching between tabs stays an ordinary view change; cross-cutting selectors (body/market/resource combos) are exempt.\n\n**Current state:** ui::nav_button (src/ui/foldout_column.cpp) only sets view=id; re-clicking the active tab is a no-op. **Owed:** when the clicked id == the active view, close the hosting ledger (clear its show_* flag) instead of re-setting the view. nav_button does not currently know its ledger’s show_* flag, so either pass it a close target (bool& / callback) or handle the active-re-click at each call site. Small (~1 file + its call sites). Authority docs/ui/LAYOUT.md; the rule text already lives in the standing rules."
+    },
+    {
+      "id": "BL-127",
+      "short_name": "CITY_NAMING",
+      "category": "Generation",
+      "title": "Procedural city names for population centres (market/city identity)",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-06",
+      "resolved": "2026-07-06",
+      "files": ["src/world/city_names.hpp", "src/world/city_names.cpp", "src/world/world.hpp", "src/world/population_generation.cpp", "CMakeLists.txt"],
+      "authority_doc": "docs/generation/NATION_GENERATION.md",
+      "summary": "Population centres had no name; the market ledger's market/city selector (Ben's mockup) needs one. Adds a small dedicated procedural city-name generator (generate_city_name in src/world/city_names.cpp), assigned in the population-generation pass and stored in world::population_centre_name, keyed by centre id.",
+      "design": "Delivered on branch claude/market-ledger (with BL-128), merged to main 2026-07-07. generate_city_name(rng) (src/world/city_names.{hpp,cpp}, global-scope free fn — 'world' is a struct, not a namespace) builds root (onset+vowel, ~1/3 a second syllable) + medial + an English-ish place suffix (-ton/-ford/-haven/-moor/-march/-holm/…), with a ~1/6 directional prefix (New/North/High/…) — e.g. Kidford, Boundmarch, Kumere, Theindburg. Assigned by generate_population_centres from an INDEPENDENT seeded stream (seed ^ 0x9E3779B9) drawn in sorted-centre-id order AFTER generation, so it consumes nothing from the main rng and the generated world is byte-identical (determinism rule — verified: the corp/cashflow/stockpile/building CSV exports are unchanged pre/post, only market labels differ). Stored in world::population_centre_name (parallel to population_centre_tile); a market's city name resolves via its centre_tile (ui::market_city_name). city_names.cpp added to the corp_terrain_matrix harness source list (globbed into ProjectIo automatically). RENUMBERED from BL-124 → BL-127 on merge (collided with main's concurrently-minted BL-124 SELECTION_COLUMN_SIDEBAR)."
+    },
+    {
+      "id": "BL-128",
+      "short_name": "MARKET_LEDGER_REDESIGN",
+      "category": "UI",
+      "title": "Market ledger redesign: body->city cascade + scrollable price-over-time (Ben mockup)",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 2,
+      "parked": false,
+      "requires": ["BL-127"],
+      "blocked_on": [],
+      "written": "2026-07-06",
+      "resolved": "2026-07-06",
+      "files": ["src/ui/market_ledger.cpp", "src/ui/market_ledger.hpp", "src/core/app.cpp"],
+      "authority_doc": "docs/ui/LAYOUT.md",
+      "summary": "Supersedes BL-120's 'confirm single-purpose' conclusion: Ben mocked up (Power BI) a redesigned market ledger — a double select (body -> market/city) narrowing to one market, then a scrollable list of per-good price-over-time charts. Built to the mockup in the fold-out shell column.",
+      "design": "Delivered on branch claude/market-ledger, merged to main 2026-07-07. draw_market_ledger rebuilt: Body combo -> Market combo (cascade, ui::market_city_name real city names from BL-127) -> a scrollable BeginChild stacking one price sparkline per traded good (from m_market_history), each labelled with the good + current price. Replaces the old all-markets dashboard table + per-resource detail table + single-resource trend selector. The CSV export (verify.export_data) gained market_prices.csv (per market/resource/tick series) and split markets.csv by market, using the same city name, so Ben's Power BI mock shows real curves. Golden market_ledger re-blessed @1280x720. Relationships: consumes BL-127 (names) + the m_market_history substrate; supersedes BL-120. RENUMBERED from BL-125 → BL-128 on merge (collided with main's concurrently-minted BL-125 SHELL_PROPORTION_CLOCK_PASS)."
     }
   ]
 }

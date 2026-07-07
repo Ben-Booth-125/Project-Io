@@ -18,16 +18,26 @@ that script for a longer horizon). The export binding is `verify.export_data(dir
 |---|---|---|
 | `corporations.csv` | one row per corporation | `corp_id, name, focus, home_nation, balance, starting_capital, since_start, buildings` |
 | `cashflow.csv` | one row per corp (last tick) | `corp_id, corp_name, income, expenditure, maintenance, wages, interest, net` |
-| `markets.csv` | one row per (body, resource) | `body_id, body_name, resource, supply, demand, price, base_price` |
+| `markets.csv` | one row per (market, resource) — snapshot | `market_id, market_label, body_id, body_name, resource, supply, demand, price, base_price` |
+| `market_prices.csv` | one row per (market, resource, tick) — **time series** | `market_id, market_label, body_name, resource, tick, price, supply, demand` |
 | `stockpiles.csv` | one row per (corp, body, resource) held | `corp_id, corp_name, body_id, body_name, resource, quantity` |
 | `workforce.csv` | one row per (corp, body) | `corp_id, corp_name, body_id, body_name, staffing_pct` |
 | `buildings.csv` | one row per building (last tick) | `building_id, corp_id, corp_name, body_name, type, output, active, exhausted` |
 | `player_timeseries.csv` | one row per econ tick | `tick, balance, income, expenditure` |
 
-`corp_id` / `body_id` / `building_id` are stable join keys across the tables (a Power BI star
-schema: `corporations` is the corp dimension; `cashflow`, `stockpiles`, `workforce`, `buildings`
-are facts keyed by `corp_id`; `markets` is keyed by `body_id`). `player_timeseries` is the trend
-table for line charts.
+`corp_id` / `body_id` / `building_id` / `market_id` are stable join keys across the tables (a Power
+BI star schema: `corporations` is the corp dimension; `cashflow`, `stockpiles`, `workforce`,
+`buildings` are facts keyed by `corp_id`; `markets` / `market_prices` are keyed by `market_id`).
+`player_timeseries` (player balance) and `market_prices` (per-market, per-resource price/supply/demand
+per tick) are the trend tables for line charts — `market_prices` is what feeds the market-ledger
+"price over time" small multiples.
+
+**`market_label` is the generated city name.** Each market resolves to the procedural name of the
+population centre anchoring its `centre_tile` (`world::population_centre_name`, assigned by
+`generate_population_centres` from an independent seeded stream — see the city-naming feature). The
+market ledger's second selector and this column share `ui::market_city_name`. There are **5 markets on
+Kepler** (one per major population centre — e.g. Kynrdton, NuneKrenton, Thear City), so the body →
+market cascade has real, named options.
 
 ## Caveats (design inputs, not data bugs)
 

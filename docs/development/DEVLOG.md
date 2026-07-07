@@ -67,6 +67,53 @@ in-column, bigger minimap, lens drawer flush-left). `--verify` forces the sim pa
 
 ---
 
+## Session — Market ledger redesign + city naming (worktree, 2026-07-06/07)
+
+**Context.** Ben sent a Power BI mock-up of the market ledger — a double select (body → market/city)
+narrowing to one market, then a scrollable per-good price-over-time stack — and asked to work in a
+**worktree** (a concurrent agent was on `main`). Created `claude/market-ledger` **from local HEAD**
+(not the `fresh` origin/main default, which would have dropped this day's unpushed commits). Merged to
+`main` 2026-07-07.
+
+**Data read first.** The price-over-time substrate already existed (`m_market_history` — price/supply/
+demand per market/resource/tick). Bodies have names and there are 5 markets per body (one per major
+population centre). The one gap: **markets/cities have no name** — the mock-up's second selector had
+no data behind it. Ben chose *generated city names*.
+
+**City naming (BL-127).** A dedicated small generator `generate_city_name()` in a new
+`src/world/city_names.{hpp,cpp}` (root + medial + English-ish place suffix -ton/-ford/-haven/-march/…,
+occasional New/North/High prefix — Kidford, Boundmarch, Kumere, Theindburg), assigned in the
+population-generation pass to `world::population_centre_name`. Drawn from an **independent** seeded
+stream (`seed ^ 0x9E3779B9`) in sorted-id order *after* generation, so the main `rng` — and the
+generated world — stays byte-identical. Verified: the corp/cashflow/stockpile/building CSV exports are
+unchanged pre/post; only market labels differ. (`world` is a struct, not a namespace — the generator is
+a global-scope free fn like the other generation entry points.)
+
+**Market ledger redesign (BL-128, supersedes BL-120).** `draw_market_ledger` rebuilt to the mock-up:
+Body combo → Market/city combo (cascade, `ui::market_city_name` resolving centre_tile → population
+centre) → a scrollable stack of per-good price sparklines from `m_market_history`. Replaced the old
+dashboard + detail tables + single-resource trend selector. Verified visually (`market_ledger.lua`
+golden re-blessed): Kepler → Kumere → Iron Ore/Petroleum/Steel/… each with a real price curve.
+
+**Export.** `verify.export_data` gained `market_prices.csv` (per market/resource/tick series) and split
+`markets.csv` by market, both using the city name, so Ben's Power BI mock draws real curves (it had
+shown single dots — a one-tick snapshot). 16-tick seed data regenerated.
+
+**Merge (2026-07-07).** Merged into `main` after the concurrent shell/selection pass landed there.
+`app.cpp` auto-merged clean (the two agents touched different regions). Conflicts in `backlog.json` and
+`DEVLOG.md` resolved by taking main's items/entries and appending mine; **BL-124/125 renumbered to
+BL-127/128** (they collided with main's concurrently-minted BL-124 SELECTION_COLUMN_SIDEBAR / BL-125
+SHELL_PROPORTION_CLOCK_PASS / BL-126 LEDGER_SUBVIEW_TOGGLE_CLOSE). Post-merge full build verified green.
+No `requirements.json` group — the two blessed goldens + the determinism diff stand as verification.
+LAYOUT.md's market-ledger section + a generation-doc city-naming note remain owed (authority
+time-slicing).
+
+**Files.** `src/world/{city_names.{hpp,cpp},world.hpp,population_generation.cpp}`, `CMakeLists.txt`,
+`src/ui/market_ledger.{cpp,hpp}`, `src/core/app.cpp`, `scripts/verify/market_ledger.lua` (+ golden),
+`docs/ui/mockdata/*`.
+
+---
+
 ## Session — One-question-per-view sweep + corp-dashboard legibility (2026-07-06)
 
 **Context.** Directly after the BL-122 shell skeleton, whose narrow fold-out column was the

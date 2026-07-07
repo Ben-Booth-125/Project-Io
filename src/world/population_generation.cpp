@@ -1,10 +1,12 @@
 #include "population_generation.hpp"
 
+#include "world/city_names.hpp"     // world::generate_city_name
 #include "world/placement_rules.hpp"
 
 #include <algorithm>
 #include <cstdint>
 #include <random>
+#include <string>
 #include <unordered_set>
 #include <vector>
 
@@ -188,5 +190,22 @@ void generate_population_centres(world& w, entity_id body_id, unsigned seed)
             const int nidx = nit->second.grid_y * gw + nit->second.grid_x;
             adjacent_indices.insert(nidx);
         }
+    }
+
+    // Name each population centre on this body. Drawn from an INDEPENDENT seeded stream
+    // in sorted-id order — after generation — so assigning names does not consume from
+    // the main `rng` and the generated world stays byte-identical (determinism rule).
+    {
+        std::vector<entity_id> ids;
+        for (const auto& [cid, tid] : w.population_centre_tile)
+        {
+            const auto tit = w.tiles.find(tid);
+            if (tit != w.tiles.end() && tit->second.body == body_id)
+                ids.push_back(cid);
+        }
+        std::sort(ids.begin(), ids.end());
+        std::mt19937 name_rng(seed ^ 0x9E3779B9u);
+        for (entity_id cid : ids)
+            w.population_centre_name[cid] = generate_city_name(name_rng);
     }
 }
