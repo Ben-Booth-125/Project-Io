@@ -6,6 +6,56 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — Economy-cluster design: demand model, market stock, market gen (2026-07-07)
+
+**Context.** A design-only session (audit -> Q&A -> writeback; no code). Audited the open backlog
+(22 open, 18 design-owed) and settled the **economy/market cluster** — the A-priority root the
+30-year headless sweeps exposed: demand is exogenous and flat, so the market has no elasticity, no
+price discovery, no scarcity tension. Five interlocking items settled, three new ones filed.
+
+**The keystone — demand model (BL-078).** The nation substrate is *redefined, not removed*, with two
+precise faces. **Demand = population**: a tiered per-capita basket (food primary; lighter fuel +
+construction-goods draws), **elastic** (down-sloping curve, so price discovers), with **minimal
+bounded growth** (grows when consumption is met; no full POPULATION.md habitability loop). **Supply =
+abstract nation capacity**: replaces the deposit-flood (`density x deposit x 2.0`), tracks demand and
+clears it *to some extent*, leaving a live margin — cushion + opportunity in one mechanism. Price form
+unchanged, band [0.25x, 4x] kept. Ben's framing: population IS the substrate, defined precisely — not
+a contradiction of GENERATION_STRATEGY's saturated premise.
+
+**Materials + construction (BL-095).** Market stock is **derived-from-supply** (not a persistent
+inventory), chosen for calculation simplicity — so *no* new serialized field on the flat-binary seam
+(correcting the item's original prose). Construction (already durative) gains a **material-availability
+rate modulation**: full speed / stretched to ~10x / paused; **pay-as-you-build**; and construction is
+a **real market buyer** — it competes with population and other builds, bids up local price, and a
+paused build stops spending. Front door goes binary -> analog (rate/ETA + paused reason).
+
+**Market generation (BL-096).** **One-pass at world-gen** (no runtime split/merge); population-anchored,
+resource-concentration shapes count/extent, **nations carve** the splits (they exist before markets, so
+no gen reorder). The fuller co-generation ideal (population-near-resources + trade-route-centred markets
++ corp carving) assessed as a larger rewrite and deferred.
+
+**Feedback + viability (BL-079, BL-112).** The demand model restores **market-side feedback** for free.
+Ben additionally chose **limited corp-side agency** (idle a loss-making building / switch a floored
+recipe / depletion-throttle) — a **scoped exception to the AI-stub standing rule**, recorded as
+narrow/local/deterministic only. Depletion stays emergent (no telegraph). The net-loss start is
+**intended pressure, made legible**: generation guarantees a fillable path + the Opportunity lens
+surfaces the gap (verified by a headless fillability check, not a feature-vs-bug decision).
+
+**Filed.** BL-130 (real-inventory revisit, post-optimization), BL-131 (player-driven market destruction
+— the only runtime market change), BL-132 (full market/population co-generation rewrite).
+
+**Method.** Backlog writeback done programmatically after a round-trip fidelity check showed the file
+mixes inline/multi-line arrays (a full re-serialize would churn hundreds of unrelated lines) — so the
+script edits only each item's status/glyph/summary/design bytes and appends the three new items.
+Surgical diff (88 ins / 20 del), JSON re-parses, CRLF preserved.
+
+**Design-state discipline.** No authority-doc or `src/` edits — design time-slices into
+SYSTEMS/PRODUCTION/GENERATION_STRATEGY (and the BL-079 rule exception into io-standing-rules) only when
+the work lands. All five items are now `designed`/promote-ready (BL-096 after BL-095). Ben will promote
+and build in a coming coding session.
+
+---
+
 ## Session — Tooling + batch: ID-reservation ledger, BL-126, BL-113 (2026-07-07)
 
 **Context.** Quick backlog pass that turned into a small tooling fix + a two-item Batch Delivery.
