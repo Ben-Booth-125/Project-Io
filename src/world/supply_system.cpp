@@ -69,6 +69,14 @@ void credit_arrived_convoys(world& w, int tick)
                 rit->last_tick = tick;
                 ++rit->convoy_count;
             }
+
+            // Proximity-glimpse peek (BL-099): a player convoy completing this inter-body
+            // lane faintly lights any frontier body it passed near — the "route past a
+            // frontier to reveal it" mechanic. Player-only (a glimpse is the player's own
+            // commercial reach expanding their sight); sampled here at the discrete
+            // completion tick from live orbital positions, then stored (never reconstructed).
+            if (convoy.corp == w.player_entity)
+                record_proximity_glimpses(w, src_body, dest_body, tick);
         }
     }
 

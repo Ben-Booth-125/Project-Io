@@ -148,6 +148,13 @@ Rendered in `src/ui/solar_system_canvas.cpp` (see [`SOLAR.md`](SOLAR.md) for the
   no badge (home carries its BL-085 halo).
 - **Corridors** — the player's persistent routes drawn as lit lanes between endpoint bodies (fresh
   routes glow, stale routes fade to grey), so commercial reach is felt on the map.
+- **Proximity glimpse** (BL-099) — a body a completed player lane merely *passes near* — not an
+  endpoint, and with no route of its own — is marked `known_stale`: a faint, decaying "peek", the
+  third illumination geometry that completes the endpoint / corridor / proximity trio. Sampled once
+  at the convoy's discrete completion tick (`record_proximity_glimpses`, from live orbital
+  positions), never a per-frame test, so it cannot flicker with orbital drift; it feeds the same
+  lower-left activity badge at the stale tier, so no renderer change was needed. A glimpse never
+  rises above `known_stale` (a peek, not a data feed) and a body's own route always outranks it.
 - **Selection panel** — a body gains a "Commercial activity" section keyed on the tier (unknown →
   "outside your trade network"; known/visible → the market pulse; stale → a greyed note).
 
@@ -156,25 +163,30 @@ Rendered in `src/ui/solar_system_canvas.cpp` (see [`SOLAR.md`](SOLAR.md) for the
 ## Determinism, serialisation, scope
 
 - Everything here is **deterministic**: survey reveal is a pure function of grid dimensions; the
-  activity tier is a pure function of routes + convoys + ownership + tick. No RNG, no Lua, no per-tile
-  data exposed to Lua.
+  activity tier is a pure function of routes + convoys + ownership + tick + the proximity-glimpse
+  stamps (each written once at a discrete completion tick — no per-frame geometry, no reconstruction
+  of past positions). No RNG, no Lua, no per-tile data exposed to Lua.
 - **Serialisation:** `world.trade_routes` joins the flat-binary read+write paths symmetrically when a
-  save path exists (none is wired in `world/*` today). Survey state rides on `body_component`. The
-  activity tier and the market pulse are derived, so they need no persistence.
+  save path exists (none is wired in `world/*` today); the proximity-glimpse stamps
+  (`world.body_last_glimpse_tick`) join the same seam. Both are held in `world` maps, off
+  `body_component` (the `corp_body_pools` rationale), to keep the body's future flat-binary layout
+  untouched. Survey state rides on `body_component`. The activity tier and the market pulse are
+  derived, so they need no persistence.
 - **Verification:** headless — `tools/verify/survey_harness.cpp`, `visibility_harness.cpp`,
-  `trade_routes_harness.cpp`, `commercial_fog_harness.cpp`; visual — the `survey`, `visibility`,
-  `commercial_fog` golden scripts under `scripts/verify/`.
+  `trade_routes_harness.cpp`, `commercial_fog_harness.cpp` (the last covering the BL-099 glimpse
+  geometry, tier, decay + determinism); visual — the `survey`, `visibility`, `commercial_fog`, and
+  `proximity_glimpse` golden scripts under `scripts/verify/`.
 
 ## Deferred extensions
 
-- The deterministic **proximity glimpse** — sampling body positions at a convoy's completion tick to
-  mark a near-by frontier body `known_stale` (a faint "peek" from routing past it). Chosen as a
-  discrete tick sample rather than a per-frame proximity test (which would flicker with orbital
-  drift); left for a follow-up with its calibration constants (`R`, freshness window). **Still
-  deferred after the v0.0.9 pass:** a faithful implementation needs either a serialised
-  `last_glimpse_tick` on `body_component` (a save-seam change) or orbital back-computation from the
-  *mutated* `orbital_angle_rad` (position is not a pure function of tick today) — disproportionate
-  determinism/serialisation risk for a polish minor. Re-assess at the v0.1.0 boundary.
+- ~~The deterministic **proximity glimpse**~~ — **landed (BL-099, 2026-07-08).** See the Activity-fog
+  rendering list above. The v0.0.9 deferral worried that position is not a pure function of tick
+  (`orbital_angle_rad` is mutated), so a glimpse could not be reconstructed at a later read. Resolved
+  by **sample-and-store**: the closest-approach set is sampled once at the discrete completion tick —
+  when orbits have already advanced for that frame, so the live positions *are* the completion-tick
+  positions — and the glimpse tick is stored (`world.body_last_glimpse_tick`); the fog reads the
+  stamp and never recomputes geometry. Calibration constants: `glimpse_radius_au_default` (0.25 AU)
+  and `glimpse_fresh_ticks_default` (90 ticks).
 - ~~The **hover** body-activity line~~ — **landed v0.0.9** (2026-07-05). The Solar-canvas body hover
   tooltip now carries a short activity read keyed on `body_activity_visibility` (unknown → outside
   network; known → market pulse; stale → gone cold; visible → live lane / presence), wording aligned

@@ -293,3 +293,23 @@ interaction/hover-gated surfaces (BL-070 popup interior, BL-089 tooltip) code-ve
 disproportionate to a polish minor — re-assess at the v0.1.0 boundary). Permanent record: DEVLOG
 2026-07-05, `req/requirements.json`, backlog resolutions, `docs/ui/{MENU,LAYOUT,SELECTION,ICONS,
 DISCOVERY}.md`. Summary retained one cycle (from 2026-07-05).
+
+---
+
+## BL-099 — Commercial-fog proximity-glimpse peek (delivered 2026-07-08) — **COMPLETE**
+
+BL-089 deferral 2 of 2, landed as its own item. **Sample-and-store** dissolved the determinism
+objection that caused the deferral: body positions are mutated `orbital_angle_rad` (not pure in tick),
+so `record_proximity_glimpses` samples the closest-approach set ONCE at a player convoy's discrete
+completion tick (in `credit_arrived_convoys`, after orbits advanced for that frame) and stores the tick
+in `world.body_last_glimpse_tick` (off `body_component`); `body_activity_visibility` returns
+`known_stale` for a glimpsed-but-unrouted body within `glimpse_fresh_ticks_default` (90), never
+`known`/`visible`, and a body's own route outranks a glimpse. R = `glimpse_radius_au_default` (0.25 AU).
+The renderer was untouched (BL-089's blessed `known_stale` badge path). Built main-session-serial.
+
+Verified: `commercial_fog_harness` 19/19 (10 new BL-099 assertions — geometry, tier, endpoint-exclusion,
+decay, route-precedence, determinism) + full CTest **19/19** (determinism intact); on-canvas by-eye via
+`scripts/verify/proximity_glimpse.lua` before/after. Requirements `requirements.json § proximity-glimpse`
+R1+R2 complete. Authority propagated to `docs/ui/DISCOVERY.md`. Golden bless owed on the Linux box
+(new `proximity_glimpse` goldens + `commercial_fog_solar` re-bless — its `known_stale` set widened).
+Summary retained one cycle (from 2026-07-08).

@@ -5303,6 +5303,36 @@
           "notes": ""
         }
       ]
+    },
+    {
+      "brief": "proximity-glimpse",
+      "title": "BL-099 Commercial-fog proximity-glimpse peek (BL-089 deferral 2 of 2)",
+      "promoted_from": "backlog.json BL-099 (standalone item lifted from BL-089's deferrals; requires BL-089)",
+      "difficulty": 2,
+      "importance": "B",
+      "evaluated_difficulty": 2,
+      "status": "complete",
+      "resolved": "2026-07-08",
+      "resolution": "Delivered BL-089's second documented deferral via sample-and-store, which dissolves the determinism obstacle (body positions are mutated orbital_angle_rad, not pure in tick): record_proximity_glimpses samples live positions at a player convoy's discrete completion tick (credit_arrived_convoys, when orbits have already advanced for the frame) and stamps body_last_glimpse_tick[body] on any non-endpoint body within glimpse_radius_au_default (0.25 AU) of the endpoint->endpoint segment; body_activity_visibility returns known_stale for a glimpsed-but-unrouted body within glimpse_fresh_ticks_default (90), never known/visible. Stored off body_component in a world map to keep the flat-binary layout untouched; all reads (solar badge, hover, Selection) widen with zero renderer change. Verified: commercial_fog_harness 19/19 (10 new assertions) + full CTest 19/19 (incl. determinism); on-canvas by-eye (proximity_glimpse before/after). Golden bless owed on the Linux box.",
+      "batch": null,
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "Item-spanning (visual): after a player convoy completes a space lane that passes near a frontier body (neither endpoint, no player route of its own), that body enters the activity fog at the faint known_stale tier on the Solar canvas -- the same badge the endpoint/corridor fog already renders -- while a body far from every completed lane stays unknown.",
+          "verification": ["visual: scripts/verify/proximity_glimpse.lua golden"],
+          "result_metric": "By-eye confirmed (proximity_glimpse before/after, software renderer): the completed player Kepler->Pallas lit corridor runs directly past route-free Cinder; endpoint bodies (Kepler/Pallas) show activity badges via the same render path that draws the known_stale glimpse. Cinder's known_stale tier + the within-R/beyond-R/decay geometry are proven exhaustively in commercial_fog_harness (R2).",
+          "notes": "The known_stale badge render is unchanged from BL-089 (blessed); BL-099 only widens which bodies reach that tier (a data change, proven headless). Cinder's own badge is occluded in-capture by the lit corridor drawn over it (Cinder is ~collinear with the lane -- the strongest glimpse case). Golden bless owed on Linux (Windows window opens 1720x1080 vs the 1280x720 golden; goldens are Linux-blessed per the cross-platform policy). Also owed on Linux: re-bless commercial_fog_solar, whose known_stale set legitimately widens (Selene now glimpses on the Kepler->Cinder completion)."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "Deterministic by sample-and-store: at a player convoy's discrete completion tick, record_proximity_glimpses samples live body positions and stamps body_last_glimpse_tick[body]=tick for every non-endpoint body whose closest approach to the endpoint->endpoint segment is <= glimpse_radius_au_default. body_activity_visibility returns known_stale (never known/visible) for a body glimpsed within glimpse_fresh_ticks, unknown once it decays or lies beyond R; a body with its own route keeps its route tier. Same inputs -> same glimpse set (no orbital-drift, no RNG, no reconstruction of past positions).",
+          "verification": ["headless: tools/verify/commercial_fog_harness.cpp (extended)"],
+          "result_metric": "PASS: commercial_fog_harness 19/19 (10 new BL-099 assertions) -- closest-approach geometry (near=0.1AU, far>R, endpoint sentinel), within-R -> known_stale, beyond-R -> unknown, endpoint not self-glimpsed, glimpse never exceeds known_stale, own fresh route outranks glimpse, decay past the window -> unknown, idempotent re-sample (deterministic set). Full CTest suite 19/19 incl. determinism_harness + world_determinism.",
+          "notes": "Sample-and-store resolves the BL-089/v0.0.9 deferral: positions are mutated state (orbital_angle_rad), not a pure function of tick, so the glimpse is frozen at the completion tick (orbits already advanced for that frame in step_economy) rather than reconstructed at a later read. Stored off body_component in a world map (body_last_glimpse_tick) to keep the future flat-binary layout untouched. The sample call lives in supply_system.cpp credit_arrived_convoys (the actual completion hook), correcting BL-099's files list which omitted it."
+        }
+      ]
     }
   ]
 }
