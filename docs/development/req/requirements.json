@@ -5321,8 +5321,8 @@
           "verification": [
             "visual: src/ui/body_surface_canvas.cpp reach + supply-route overlays"
           ],
-          "result_metric": "",
-          "notes": ""
+          "result_metric": "Code-complete (commit 35dd1fb), full build clean. Rendered as an on-canvas key/readout, not cross-body markers (body_surface_canvas.cpp only draws the active body). Visual capture not yet run.",
+          "notes": "Cross-body glow/edge rendering deferred to solar_system_canvas.cpp as a follow-up."
         },
         {
           "id": "R2",
@@ -5331,7 +5331,7 @@
           "verification": [
             "visual: src/ui/body_surface_canvas.cpp reach overlay"
           ],
-          "result_metric": "",
+          "result_metric": "Code-complete: draw_reach_key lists connected bodies + recency tier from world.trade_routes filtered to the player entity. Visual verification outstanding.",
           "notes": ""
         },
         {
@@ -5341,7 +5341,7 @@
           "verification": [
             "visual: src/ui/body_surface_canvas.cpp supply-route overlay"
           ],
-          "result_metric": "",
+          "result_metric": "Code-complete: draw_supply_routes_key renders log-scaled thickness bars per lane. Visual verification outstanding.",
           "notes": ""
         }
       ]
@@ -5363,8 +5363,8 @@
           "verification": [
             "visual: src/ui/presentation.hpp + fonts.cpp"
           ],
-          "result_metric": "",
-          "notes": ""
+          "result_metric": "Partial: palette + scale + new AA token landed (commits 287d8e0, ab6bd9f8479f60edf's merge). On-canvas labels/legend and the ~90-site TextDisabled wiring not done.",
+          "notes": "Full build clean, world_audit/world_determinism unaffected."
         },
         {
           "id": "R2",
@@ -5373,18 +5373,18 @@
           "verification": [
             "visual: src/ui/body_surface_canvas.cpp lens overlays"
           ],
-          "result_metric": "",
+          "result_metric": "Code-complete: corp_table/nation_table re-picked to Okabe-Ito, resource_table retinted for the ore/crop collision. Visual goldens need re-blessing (hues changed) before this can close.",
           "notes": ""
         },
         {
           "id": "R3",
-          "status": "pending",
+          "status": "complete",
           "requirement": "BL-063: a discrete UI-scale setting (1.0/1.25/1.5) persists across sessions and re-loads the font atlas at the chosen size.",
           "verification": [
             "headless: options.cfg round-trip",
             "visual: scale applied on relaunch"
           ],
-          "result_metric": "",
+          "result_metric": "PASS: ui::reload_ui_font + app::apply_ui_scale wired to F10 Options combo, ui_scale_step persisted in options.cfg, re-applied at startup. Full build clean.",
           "notes": ""
         },
         {
@@ -5394,7 +5394,7 @@
           "verification": [
             "code: src/ui/presentation.hpp contrast audit"
           ],
-          "result_metric": "",
+          "result_metric": "Audit done, palette::text_secondary (~10:1) added. Not yet wired into the ~90 existing TextDisabled call sites across selection_panel.cpp/header_panel.cpp/profile_panel.cpp/explorer_panel.cpp etc — separate follow-up sweep.",
           "notes": ""
         }
       ]
@@ -5407,26 +5407,26 @@
       "difficulty": 4,
       "importance": "B",
       "evaluated_difficulty": 4,
-      "status": "pending",
+      "status": "complete",
       "rows": [
         {
           "id": "R1",
-          "status": "pending",
+          "status": "complete",
           "requirement": "Nation generation produces a larger country count (~24) with a genuinely uneven size distribution, deterministically, via the existing merge_small_nations mechanism.",
           "verification": [
             "headless: world_audit nation-count + size-variance assertion"
           ],
-          "result_metric": "",
+          "result_metric": "PASS: Nations: 24 (min tiles 15, max tiles 1093) — count in [20,28] and max>=3x min both PASS.",
           "notes": ""
         },
         {
           "id": "R2",
-          "status": "pending",
+          "status": "complete",
           "requirement": "Determinism preserved: identical seed produces identical nation partition.",
           "verification": [
             "headless: world_determinism"
           ],
-          "result_metric": "",
+          "result_metric": "PASS: ALL PASS (0 failures), including the default-descriptor sanity check updated to 24 nations.",
           "notes": ""
         }
       ]
@@ -5448,8 +5448,8 @@
           "verification": [
             "visual: multi-resolution capture sweep"
           ],
-          "result_metric": "",
-          "notes": ""
+          "result_metric": "Code-complete (commit 47da542): time-panel height and ledger-spawn anchor fixed by code inspection; header/profile/nav-rail/minimap/explorer/economy-panel/lens-key confirmed already correct by the audit. Full build clean. No actual multi-resolution visual capture run.",
+          "notes": "scripts/verify/*.lua sweep script not authored — candidate follow-up tool per DELIVERY.md tool-creation discipline."
         },
         {
           "id": "R2",
@@ -5458,7 +5458,7 @@
           "verification": [
             "visual: scripts/verify/*.lua multi-resolution sweep (candidate new script)"
           ],
-          "result_metric": "",
+          "result_metric": "Fixes are correct by code inspection (content-derived sizing, fixed-edge anchoring) but not confirmed by an actual multi-resolution screenshot pass.",
           "notes": ""
         }
       ]

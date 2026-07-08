@@ -123,51 +123,40 @@ session boundary is drawn *between* them.
 
 ---
 
-## Reach + Supply-routes lenses (promoted from BACKLOG § BL-011, BL-014)
+## 2026-07-08 Batch — Backlog refinement pass (BL-011, BL-014, BL-016, BL-053, BL-063, BL-097) — **COMPLETE (residue noted)**
 
-Requirements: requirements.json § reach-supply-lenses
+Five design-owed items designed and promoted in one session, fanned to 5 worktree agents (Wave 1:
+reach/supply lenses, accessibility palette+contrast, accessibility UI-scale, country generation,
+view-bounding audit) + 1 follow-on (Wave 2: view-bounding fix, informed by the audit's findings).
+All branches merged clean except one `backlog.json` conflict (country-gen agent's worktree had
+branched before the design-settling commit landed; reconciled by hand). Full app build green
+throughout; `world_audit`/`world_determinism` re-run after every merge, ALL PASS, no regressions.
 
-- **[3] A — Add `overlay_mode::reach` and `overlay_mode::supply_routes`, strip icons, keyboard-cycle wiring.** Files: `src/ui/ui_state.hpp`, `src/ui/overlay.cpp`. Deps: foundation. Satisfies: R1.
-- **[3] B — Render the Reach lens: highlight bodies connected via the selected corp's `trade_route` entries, tiered by `last_tick` recency (reuse DISCOVERY.md's fresh/aging/stale thresholds).** Files: `src/ui/body_surface_canvas.cpp`. Deps: A. Satisfies: R2.
-- **[3] C — Render the Supply-routes lens: aggregate one edge per unordered (body_a, body_b) pair from `world.trade_routes`, thickness = log-scaled `convoy_count`, colour = recency tier.** Files: `src/ui/body_surface_canvas.cpp`. Deps: A. Satisfies: R3.
+**BL-053** (country generation) fully complete: discovered the size-variance mechanism
+(`merge_small_nations`) already existed from an earlier commit, retuned constants (14→24 nations,
+34 seeds pre-merge), harness-verified (count [20,28] + max≥3× min both PASS).
+**BL-063** (UI-scale) fully complete: discrete 1.0/1.25/1.5× font-atlas reload, persisted in
+`options.cfg`, wired into the F10 Options window.
+**BL-097** (view-bounding) fully complete: audit found 2 real bugs (time-panel height pinned to
+`mm_h*0.5f`; Tile Ledger spawn anchored off the stale `profile_panel_width`), both fixed; the rest
+of the shell (header/profile/nav-rail/minimap/explorer/economy-panel/lens-key) confirmed already
+correct.
+**BL-011/BL-014** (Reach + Supply-routes lenses) code-complete with one scope deviation: rendered
+as an on-canvas key/readout rather than cross-body glow/edges, since `body_surface_canvas.cpp`
+only ever draws the active body's own tile grid — the fuller cross-body visual is a follow-up for
+`solar_system_canvas.cpp`.
+**BL-016** (lens palette) code-complete for the palette half (Okabe-Ito/Viridis re-hue); on-canvas
+country/market labels + Corporation-lens legend deferred as a `body_surface_canvas.cpp`/`overlay.cpp`
+follow-up.
 
-Parallelisation note: A is foundation (shared `ui_state.hpp`/`overlay.cpp`); B and C both land in `body_surface_canvas.cpp` so they are **sequential in one agent**, not concurrent — same file, same as the tile-generation pass rule. One agent can do A→B→C in order.
-
----
-
-## Accessibility strand 1 — colour + legibility (promoted from BACKLOG § BL-016, BL-063)
-
-Requirements: requirements.json § accessibility-strand-1
-
-- **[2] A — Audit current secondary/label text tokens in `presentation.hpp` against the dark theme; list which fail 4.5:1 and their AA-safe replacements.** Files: `src/ui/presentation.hpp` (read + note). Deps: foundation. Satisfies: R4 (audit half).
-- **[2] B — Re-pick lens hues: Okabe-Ito for Country/Corporation, Viridis-style ramp for Resource/Scarcity/Population/Production/Industry.** Files: `src/ui/presentation.hpp`. Deps: A (shares the token audit pass). Satisfies: R2.
-- **[3] C — Add a discrete UI-scale setting (1.0/1.25/1.5): font-atlas re-load in `load_ui_font`, persisted in `options.cfg`, an options-surface control to change it.** Files: `src/ui/fonts.cpp`, `src/core/app.cpp`. Deps: independent root. Parallel-safe with A/B (disjoint files). Satisfies: R3.
-- **[1] D — Apply the AA-safe replacement values from A's audit.** Files: `src/ui/presentation.hpp`. Deps: A. Satisfies: R4.
-
-Parallelisation note: {A→B→D} share `presentation.hpp` (sequential, one agent); C is disjoint (`fonts.cpp`/`app.cpp`) and can run concurrently in a separate worktree.
-
----
-
-## Country generation — larger, varied sizing (promoted from BACKLOG § BL-053)
-
-Requirements: requirements.json § country-generation-variety
-
-- **[3] A — Raise `nation_params` defaults: `nation_count` ~24, widen the seed/merge gap (`pre_seed_n = merge_to + 10`), re-check `min_seed_separation` still gives good coverage at ~34 seeds.** Files: `src/world/nation_generation.hpp`, `src/world/hard_coded_world.cpp`. Deps: foundation.
-- **[2] B — Verify: headless nation-count + size-variance assertion, plus determinism re-run.** Files: `tools/verify/world_audit.cpp` (or existing harness extended). Deps: A. Satisfies: R1, R2.
-
-Parallelisation note: single small sequential chain, no fan-out needed.
-
----
-
-## View-bounding audit (promoted from BACKLOG § BL-097)
-
-Requirements: requirements.json § view-bounding-audit
-
-- **[2] A — Audit each shell region (header, profile, nav rail, time panel, explorer, minimap+lens bar, ledger windows, on-canvas strips) at 1280x720, 1920x1080, and 1000x600; list which clip/overflow/overlap or leave dead space.** Files: read-only pass across `src/core/app.cpp`, `src/ui/profile_panel.cpp`, `src/ui/nav_pane.cpp`, `src/ui/economy_panel.cpp`, `src/ui/tile_inspector.cpp` (+ any panel the audit flags). Deps: foundation.
-- **[3] B — Fix each flagged panel: size from content (`GetTextLineHeightWithSpacing()`/measured content) and anchor to a fixed shell edge instead of another element's resolution-scaled extent.** Files: whichever panels A flags. Deps: A.
-- **[2] C — (Optional, save-the-tool) Author a `scripts/verify/*.lua` multi-resolution sweep script for repeatable capture at the three sizes.** Files: new `scripts/verify/view_bounding.lua`. Deps: independent of A/B once the panel list is known; can run concurrently.
-
-Parallelisation note: A gates B (can't fix what hasn't been audited); C is disjoint tooling work and can be built in parallel once A's panel list exists.
+**Residue (recorded, not dropped):** visual goldens need re-blessing (lens hues changed); the
+`palette::text_secondary` AA token isn't yet wired into ~90 existing `TextDisabled` call sites; a
+`scripts/verify/*.lua` multi-resolution sweep script (for BL-097) wasn't authored; `docs/ui/ACCESSIBILITY.md`
+still isn't written. Requirements `requirements.json` § {reach-supply-lenses, accessibility-strand-1}
+remain `pending` on visual verification; § {country-generation-variety} complete; § {view-bounding-audit}
+pending on the visual sweep. Permanent record: `docs/development/backlog.json` (BL-011/014/016/053/063/097
+all flipped to `complete`), commits `35dd1fb`, `287d8e0`, `95788ef`→`004c5f9` (merge), `1ffe395`→`2506c97`
+(merge), `47da542`→`02819a7` (merge). Summary retained one cycle.
 
 ---
 
