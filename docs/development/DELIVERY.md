@@ -98,12 +98,19 @@ same subject differently:
   contradicts them.
 - **Resolve at delivery** — reconcile conflicts among the set being delivered, not continuously.
 
-## Priority & difficulty
+## Priority, difficulty & version goal
 
 - **Priority** (importance, ascending): `F · C · B · A · S · SSS`. `F` = deferred/parked
   (`parked:true`); `SSS` = do immediately. Re-rate against the **current goal**.
 - **Difficulty** (1–5, non-linear ~3–4× per step): 1 ≈ 5 min, 2 ≈ 20 min, 3 ≈ 1 h, 4 ≈ 3 h,
   5 ≈ 12 h+ (**break a 5 down** rather than take it whole).
+- **Version goal** (added 2026-07-08) — every new item names a `version_goal`: the minor it's
+  aimed at (`"v0.0.9"`), the next one (`"v0.1.0"`), or `"post-v0.1.0"` for anything beyond the
+  prototype's remaining arc. Read `ROADMAP.md` for the live version sequence and each minor's
+  theme before naming one — an item's `version_goal` should match a theme it actually serves, not
+  just the nearest open minor. It is a goal, not a promise: re-rate it at re-sequencing the same
+  way priority gets re-rated, rather than treating the first guess as fixed. Legacy items authored
+  before this policy are not backfilled.
 
 ## Depth verbs — how far to take an item
 

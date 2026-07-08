@@ -34,7 +34,14 @@
     "  - ON PROMOTION into REFINED.md: delete any remaining BACKLOG.md body (if not yet migrated).",
     "  - BACKLOG.md therefore only drains, never grows, and is deleted once empty.",
     "  - For designs with rich tables use markdown in the `design` string (tables render fine).",
-    "  - `design: \"@<doc>\"` is also valid as a pointer to an authority doc when prose lives there."
+    "  - `design: \"@<doc>\"` is also valid as a pointer to an authority doc when prose lives there.",
+    "",
+    "VERSION GOAL (policy added 2026-07-08): every NEW item names which version it is FOR via the",
+    "`version_goal` field — the minor it targets (\"v0.0.9\"), the next one (\"v0.1.0\"), or",
+    "\"post-v0.1.0\" for anything beyond the prototype's remaining arc (see ROADMAP.md for the",
+    "live version sequence and themes). This is a goal, not a promise — it may slip a version at",
+    "re-sequencing, same as priority. Legacy items predating this policy are not backfilled; treat",
+    "a missing `version_goal` as \"unset (legacy)\", not as \"post-v0.1.0\"."
   ],
   "items": [
     {
