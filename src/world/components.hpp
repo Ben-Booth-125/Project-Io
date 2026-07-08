@@ -131,6 +131,11 @@ struct tile_component
     float      hazard_level;     ///< 0.0 (safe) – 1.0 (extreme hazard).
     float      habitability;     ///< 0.0 (uninhabitable) – 1.0 (hospitable).
     float      substrate_density = 0.0f; ///< Background nation industrial occupation [0, 1].
+
+    /// Road tier on this tile (BL-077). 0 = no road; higher tiers lower the intra-body A*
+    /// traversal cost of the tile (road_traversal_multiplier). Populated by BL-146 road
+    /// generation and BL-147 player placement; 0 everywhere in the economic core.
+    std::uint8_t road_level = 0;
 };
 
 /// Background nation-owned economy baseline for one (nation, body) pair. Carries
@@ -317,7 +322,7 @@ struct buy_order
 /// See docs/economy/POPULATION.md § Land-use trade-offs.
 struct land_use_component
 {
-    enum class type { residential, industrial, agricultural, wilderness };
+    enum class type { residential, industrial, agricultural, wilderness, infrastructure };
     type use = type::wilderness;
 };
 

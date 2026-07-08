@@ -2,9 +2,12 @@
 
 #include "components.hpp"
 
+#include <cstdint>
 #include <map>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 /// The system's single asteroid belt — a band between two orbital radii. The
 /// belt is not a body (it owns no entity); it is rendered as a thick, translucent
@@ -19,6 +22,17 @@ struct asteroid_belt
     /// Whether the system has a belt to draw.
     /// @return True when the band has positive width.
     bool present() const { return outer_radius_au > inner_radius_au && outer_radius_au > 0.0f; }
+};
+
+/// Result of an intra-body pathfind (BL-077): the terrain-weighted path cost, whether the
+/// cheapest path crosses ocean (=> sea mode, else land), and whether the endpoints connect.
+/// Symmetric in its endpoints (edge cost is the average of the two tiles), so it caches under
+/// a canonicalised (body, lo_tile, hi_tile) key.
+struct logistics_path
+{
+    float cost          = 0.0f;
+    bool  crosses_ocean = false;
+    bool  reachable     = false;
 };
 
 /// ECS registry. Entities are plain integer IDs; components are stored in
@@ -128,6 +142,18 @@ struct world
     /// geometry. Held off `body_component` (the `corp_body_pools` rationale) to keep the
     /// body's future flat-binary layout untouched. std::map for deterministic iteration.
     std::map<entity_id, int> body_last_glimpse_tick;
+
+    /// Lazily-built per-body raster index (grid_y*grid_width + grid_x -> tile entity, or
+    /// null_entity for an absent cell), for O(1) neighbour lookup in intra-body pathfinding
+    /// (BL-077). A derived cache, not authored state: built on first use by body_tile_grid(),
+    /// a pure function of the body's tiles (independent of tiles-map iteration order).
+    std::unordered_map<entity_id, std::vector<entity_id>> body_tile_index;
+
+    /// Route-cost cache for intra-body A* (BL-077), keyed by (body, lo_tile, hi_tile) with the
+    /// tile pair canonicalised (the weighted path is symmetric). A derived cache; invalidated
+    /// when road_level changes (road placement, BL-147). Keeps per-Tick per-lane A* off the
+    /// dispatch hot path.
+    std::map<std::tuple<entity_id, entity_id, entity_id>, logistics_path> astar_cost_cache;
 
     /// Stockpile pool for a (corporation, body) pair, inserting an empty pool on
     /// first access. The single point through which the economy systems read and

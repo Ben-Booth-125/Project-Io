@@ -313,3 +313,19 @@ decay, route-precedence, determinism) + full CTest **19/19** (determinism intact
 R1+R2 complete. Authority propagated to `docs/ui/DISCOVERY.md`. Golden bless owed on the Linux box
 (new `proximity_glimpse` goldens + `commercial_fog_solar` re-bless — its `known_stale` set widened).
 Summary retained one cycle (from 2026-07-08).
+
+---
+
+## BL-077 — Planetary logistics: economic core (promoted 2026-07-08) — **ACTIVE**
+
+Requirements: requirements.json § planetary-logistics-core (R1 A* distance, R2 data model, R3 dispatch)
+
+Rescoped core of the logistics epic. Built **main-session-serial** — determinism-critical tick code over shared `world/*` files. Grid topology reuses `nation_generation.cpp`'s 4-cardinal + column-wrap `raster_idx`/`cardinal_neighbours` and the `expand_territory` priority-queue Dijkstra shape.
+
+- **[2] A — Data model.** `land_use_component::type` += `infrastructure`; `tile_component` += `road_level` (default 0); `world` gains a per-body grid->tile index cache + an A* route cache. Files: `src/world/components.hpp`, `src/world/world.hpp`. Deps: foundation. Satisfies: R2.
+- **[3] B — A* pathfinder.** New `src/world/logistics.{hpp,cpp}`: canonical `landform_logistics_cost` (TILES.md table), per-body grid-index build, terrain-weighted A* over the grid (4-cardinal, column wrap, road discount, ocean = sea-leg cost), symmetric edge cost, route cache. Files: `src/world/logistics.hpp`, `src/world/logistics.cpp`, `src/world/world.cpp`. Deps: A. Satisfies: R1, R2.
+- **[3] C — Intra-body dispatch.** Enable same-body market pairs in `dispatch_convoys`; distance via B's A*; mode land/sea by ocean-crossing; deterministic source selection; space path unchanged. Files: `src/world/supply_system.cpp`. Deps: A, B (+ economy-model read). Satisfies: R1, R3.
+- **[3] D — Headless harness.** `tools/verify/logistics_harness.cpp`: A* weighted<naive, road discount, wrap-shorter-way, cache idempotence, intra-body dispatch creates a land/sea convoy with A* cost. Files: `tools/verify/logistics_harness.cpp`. Deps: A, B, C. Satisfies: R1, R2, R3.
+
+Parallelisation note: A -> B -> C -> D, strictly serial (shared `world.{hpp,cpp}` / `supply_system.cpp`, determinism core). No fan-out.
+
