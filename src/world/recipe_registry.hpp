@@ -40,6 +40,32 @@ struct building_economics
     float build_duration_ticks = 0.0f;
 };
 
+/// BL-078 elastic nation-substrate model tunables, authored in scripts/economy.lua
+/// under `economy.substrate`. Applied at tick time by inject_substrate_demand so
+/// the whole demand/supply model is retunable without regenerating the world.
+/// See docs/economy/PRODUCTION.md (on landing) and economy.lua for the full model.
+struct substrate_params
+{
+    /// Per-capita aggregate demand weight per resource (population + background
+    /// industry pull). Indexed by static_cast<std::size_t>(resource_type).
+    std::array<float, resource_count> demand_basket = {};
+    float capacity_scale       = 2.0f;  ///< deposit-derived capacity → supply ceiling scale.
+    float clearing_fraction    = 0.90f; ///< abstract supply clears this fraction of demand (leaves the margin).
+    float demand_elasticity    = 0.80f; ///< exponent on (base_price / price).
+    float elasticity_min       = 0.30f; ///< clamp lo on the elasticity factor.
+    float elasticity_max       = 2.50f; ///< clamp hi on the elasticity factor.
+    float demand_scale         = 1.00f; ///< global population → demand scale.
+    float growth_met_threshold = 0.50f; ///< basket met-supply ratio a centre needs to grow.
+};
+
+/// BL-095 construction-gate tunables, authored in scripts/economy.lua under
+/// `economy.construction`. Read by run_economy_step's construction step, which
+/// paces each build against the local market's recent supply of its materials.
+struct construction_params
+{
+    float max_stretch = 10.0f; ///< longest a material-starved build stretches to (×base duration); below 1/max_stretch it pauses.
+};
+
 /// Startup-loaded registry of processing recipes and economy constants. Pure
 /// data once built; constructed either from Lua (load_from_lua) in the real
 /// build or by hand in a headless test harness.
@@ -83,6 +109,12 @@ public:
     float t_full() const { return m_t_full; }
     float t_idle() const { return m_t_idle; }
 
+    /// BL-078 elastic-substrate model tunables (economy.substrate in Lua).
+    const substrate_params& substrate() const { return m_substrate; }
+
+    /// BL-095 construction-gate tunables (economy.construction in Lua).
+    const construction_params& construction() const { return m_construction; }
+
     /// Base logistics cost per unit distance per unit cargo for the given convoy mode.
     float logistics_cost(convoy_mode m) const
     {
@@ -92,16 +124,33 @@ public:
     std::size_t recipe_count() const { return m_recipes.size(); }
 
     /// Returns the number of available recipes for the given building type.
-    /// Only processing_facility has recipes; all other types return 0.
-    int recipe_count(building_type bt) const;
+    /// Only processing_facility has recipes; all other types return 0. Inline (pure
+    /// data, no Lua) so the SDL/Lua-free world superset — and the headless harnesses
+    /// that exclude recipe_registry.cpp — link without it (BL-079 uses this).
+    int recipe_count(building_type bt) const
+    {
+        if (bt != building_type::processing_facility)
+            return 0;
+        return static_cast<int>(m_recipes.size());
+    }
 
-    /// Returns the recipe at index @p i for building type @p bt.
-    /// The index is clamped to [0, recipe_count(bt) - 1]; returns a dummy empty
-    /// recipe if the type has no recipes.
-    const recipe& recipe_at(building_type bt, int i) const;
+    /// Returns the recipe at index @p i for building type @p bt. The index is
+    /// clamped to [0, recipe_count(bt) - 1]; returns a dummy empty recipe if the
+    /// type has no recipes. Inline for the same headless-link reason as above.
+    const recipe& recipe_at(building_type bt, int i) const
+    {
+        static const recipe empty{};
+        const int n = recipe_count(bt);
+        if (n == 0)
+            return empty;
+        const int clamped = (i < 0) ? 0 : (i >= n ? n - 1 : i);
+        return m_recipes[static_cast<std::size_t>(clamped)];
+    }
 
     // --- direct construction for tests (headless harness builds these by hand) ---
     void set_thresholds(float t_full, float t_idle) { m_t_full = t_full; m_t_idle = t_idle; }
+    void set_substrate(const substrate_params& s) { m_substrate = s; }
+    void set_construction(const construction_params& c) { m_construction = c; }
     void set_economics(building_type type, const building_economics& e)
     {
         m_building_econ[static_cast<std::size_t>(type)] = e;
@@ -124,6 +173,14 @@ private:
 
     float m_t_full = 1.0f;
     float m_t_idle = 0.2f;
+
+    /// BL-078 elastic-substrate model tunables (economy.substrate). Defaults match
+    /// economy.lua so a hand-built harness registry behaves sensibly without Lua.
+    substrate_params m_substrate = {};
+
+    /// BL-095 construction-gate tunables (economy.construction). Defaults match
+    /// economy.lua so a hand-built harness registry paces builds sensibly.
+    construction_params m_construction = {};
 
     /// Logistics base cost per unit distance per unit cargo, indexed by convoy_mode
     /// (land=0, sea=1, air=2, space=3). Defaults match economy.lua values.

@@ -1,12 +1,15 @@
 #include "construction_panel.hpp"
 
 #include <algorithm>
+#include <cmath>   // std::ceil (construction ETA, BL-095)
+#include <string>  // status strings (BL-095)
 
 #include "foldout_column.hpp" // shell fold-out column host (BL-122)
 #include "presentation.hpp"
 #include "ui_state.hpp"
 
 #include "world/components.hpp"
+#include "world/market_clearing.hpp" // market_for_tile (build-rate read, BL-095)
 #include "world/placement_rules.hpp"
 #include "world/recipe_registry.hpp"
 
@@ -15,6 +18,76 @@
 namespace ui {
 
 namespace {
+
+// --- Analog construction status (BL-095 task E) ------------------------------
+// Construction is durative *and* material-gated: each economy tick a building under
+// construction advances by a RATE in [0,1] set by how much of its per-tick material
+// need the local market can supply (economy_system.cpp § run_construction). These
+// mirror that formula (const-read only) so the management view can show the same
+// analog rate / ETA / paused status the Selection front door does. (Kept a local copy
+// rather than shared — the UI has no common header seam to hang it on.)
+float construction_rate(const world& w, const recipe_registry& reg,
+                        building_type type, entity_id tile)
+{
+    const building_economics& econ = reg.economics(type);
+    const float duration = econ.build_duration_ticks;
+    if (duration <= 0.0f)
+        return 1.0f; // instant build — never material-gated
+
+    const market_component* m = nullptr;
+    const entity_id mid = market_for_tile(w, tile);
+    if (mid != null_entity)
+    {
+        const auto mit = w.markets.find(mid);
+        if (mit != w.markets.end())
+            m = &mit->second;
+    }
+
+    float rate = 1.0f;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        const float need = econ.resource_build_cost[r] / duration;
+        if (need <= 0.0f)
+            continue;
+        const float avail = m ? m->supply[r] : 0.0f;
+        rate = std::min(rate, avail / need);
+    }
+    rate = std::clamp(rate, 0.0f, 1.0f);
+
+    const float max_stretch = reg.construction().max_stretch;
+    const float pause_below  = (max_stretch > 1.0f) ? (1.0f / max_stretch) : 0.0f;
+    if (rate < pause_below)
+        rate = 0.0f; // paused: even the max-stretched rate can't be supplied
+    return rate;
+}
+
+// Compact tick-count label; a Tick is ~3 months, so 4 ticks make a year (BL-095).
+std::string ticks_label(int ticks)
+{
+    std::string s = std::to_string(ticks) + (ticks == 1 ? " tick" : " ticks");
+    if (ticks >= 4)
+        s += " (~" + std::to_string(ticks / 4) + " yr)";
+    return s;
+}
+
+// Human status for a build rate + the whole ticks of work left.
+std::string construction_status(float rate, int ticks_left)
+{
+    if (rate <= 0.0f)
+        return "Paused - market can't supply materials";
+    if (rate >= 1.0f)
+        return "Building... ~" + ticks_label(ticks_left);
+    const int eta = static_cast<int>(std::ceil(static_cast<float>(ticks_left) / rate));
+    return "Building... ~" + ticks_label(eta) + " (materials scarce)";
+}
+
+// Colour for an analog build status: red paused, amber scarce, green on-schedule.
+ImVec4 construction_status_colour(float rate)
+{
+    return (rate <= 0.0f) ? ImVec4{0.90f, 0.55f, 0.55f, 1.0f}   // paused
+         : (rate < 1.0f)  ? ImVec4{0.85f, 0.75f, 0.45f, 1.0f}   // materials scarce
+                          : ImVec4{0.55f, 0.80f, 0.55f, 1.0f};  // on schedule
+}
 
 // --- Queue overview table ----------------------------------------------------
 // All active construction items across all bodies. Progress cell is
@@ -212,6 +285,19 @@ void draw_selected_section(world& w, const recipe_registry& reg, const ui_state&
 
     ImGui::Text("Build cost: %.1f", eco.build_cost);
     ImGui::Text("Maintenance: %.1f / tick", eco.maintenance);
+
+    // BL-095 task E: while under construction, the analog build status — rate / ETA /
+    // paused — recomputed the same way economy_system.cpp § run_construction paces it
+    // (per-tick material need vs the local market's recent supply). Replaces the old
+    // "instant or nothing" read now that construction is durative + material-gated.
+    if (b.ticks_remaining > 0)
+    {
+        const float rate = construction_rate(w, reg, b.type, b.tile);
+        ImGui::Spacing();
+        ImGui::SeparatorText("Under construction");
+        ImGui::TextColored(construction_status_colour(rate), "%s",
+                           construction_status(rate, b.ticks_remaining).c_str());
+    }
 
     ImGui::Spacing();
     ImGui::SeparatorText("Management");

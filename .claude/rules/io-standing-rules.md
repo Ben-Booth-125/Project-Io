@@ -21,7 +21,14 @@ rule has a fuller authority, it is cited — this file does not redefine it.
 - Do **not** expose individual tile data to Lua.
 - Do **not** use unprotected sol2 calls where errors can occur.
 - Do **not** add SQLite — flat binary serialisation is correct for the prototype.
-- Do **not** build AI faction behaviour beyond the data-model minimum stub.
+- Do **not** build AI faction behaviour beyond the data-model minimum stub. **Scoped
+  exception (BL-079, landed 2026-07-07):** background (non-player) corporations may take
+  *narrow, local, deterministic* per-building actions from mechanical triggers — idle a
+  persistently loss-making building, switch a floored recipe, throttle extraction as a
+  deposit depletes. This is **not** a licence for strategic planning, relocation, or
+  global optimisation; the player's own corp is never auto-acted on. Anything broader
+  stays deferred (backlog.json § BL-054). See `src/world/economy_system.cpp`
+  (run_economy_step § agency).
 - Do **not** introduce a retained-mode UI framework in place of ImGui for the prototype.
 
 ## Terms & docs

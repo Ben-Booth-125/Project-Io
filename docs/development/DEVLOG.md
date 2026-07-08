@@ -6,6 +6,108 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — Economy dynamism batch delivered: BL-078/095/096/079/112 (2026-07-07)
+
+**Context.** Delivered the five interlocking economy items designed in the prior session (below) as one
+Batch Delivery — turning the inert, flat-demand market into a price-discovering economy with a legible
+fillable opportunity gap. Full app + **19/19 headless tests green**; `verifier-review` GO COMPILE;
+determinism preserved.
+
+**What shipped.**
+- **BL-078** — the nation substrate became two tick-time faces: price-elastic per-capita basket demand
+  (`pop_weight × basket[r] × (base/price)^elasticity`) and abstract nation-capacity supply
+  (`min(capacity×scale, demand×clearing_fraction)`), leaving a live margin. Price form `base×√(D/S)` +
+  `[0.25,4]` band unchanged. Generation stores only raw capacity + population weight; the economic scalars
+  are tunable in `economy.lua § substrate`. Growth keyed off the met-supply basket.
+- **BL-095** — construction is durative, market-gated, pay-as-you-build: `run_construction` paces each
+  build by the local market's recent material supply (full / stretched ≤10× / paused), drawing materials
+  as real market demand and charging incrementally. Placement no longer debits up-front (affordability
+  gate retained). New `building_component.construction_progress`; analog front-door status.
+- **BL-096** — one-pass resource carve: a nation's population-scale market gate depends on its
+  tradeable-resource concentration (rich fractures, barren folds), nations as carving actor, fresh RNG
+  offset `0xA5310096u`. `inject_substrate_demand` distributes substrate across a body's markets.
+- **BL-079** — a narrow deterministic background-corp pass (idle a persistent loss-maker / switch a
+  floored recipe; player exempt, sorted-id order). The depletion throttle was already live; stale docs
+  (PRODUCTION.md, components.hpp) reconciled; the scoped standing-rule exception written into
+  io-standing-rules.md on landing. New `building_component.loss_streak`.
+- **BL-112** — `pregame_balance_harness` upgraded into the economy gate (differentiated + elastic demand,
+  a live/lucrative fillable margin, determinism — all PASS). Opportunity lens rekeyed to the
+  per-catchment unmet-demand margin. No generation guard needed (fillability is emergent).
+
+**Design-direction Q&A (the non-trivial call).** The combined batch reversed the warm-start trajectory:
+after BL-078 alone the player declined (−165/tick operating loss); with BL-079's agency thinning
+background supply, prices firm and the player now opens at a *mild profit* (+20/tick after the stockpile
+burn). This contradicts BL-112's settled "opens at a net loss" premise. **Ben's call: ACCEPT the milder
+opening** — the fillable-gap dynamism is the intended win; no `economy.lua` retune. Recorded so a future
+currency audit doesn't read the profitable opening as a regression.
+
+**Verification.** Full app build clean; `ctest` 19/19 (incl. new `construction_gate_harness`,
+`corp_agency_harness`, `world_audit` BL-096 assertions, the upgraded `pregame_balance_harness`);
+`verifier-review` GO COMPILE; `world_determinism`/`econ_stability` green. Two build fallouts fixed:
+`economy_system` → `building_profit` link coupling (inlined `recipe_count`/`recipe_at`; added
+`building_profit.cpp` to `econ_bankruptcy`'s CMake sources), and the old `construction_harness`
+up-front-charge assertions updated to pay-as-you-build.
+
+**Orchestration.** Code-seam mapping fanned to 4 Explore agents; the two UI slices fanned to sub-agents on
+disjoint file-sets; the determinism-critical tick core stayed main-session-serial. Requirements groups all
+complete; REFINED drained. **Open/deferred:** BL-130 (real market inventory vs the derived figure), BL-131
+(player market destruction), BL-132 (full market co-generation); a few requirement rows are code-complete
+with visual/growth assertions deferred (noted in the rows).
+
+**Status: Complete — 5 items delivered, requirement groups all complete, 19/19 headless tests green.**
+
+---
+
+## Session — Economy-cluster design: demand model, market stock, market gen (2026-07-07)
+
+**Context.** A design-only session (audit -> Q&A -> writeback; no code). Audited the open backlog
+(22 open, 18 design-owed) and settled the **economy/market cluster** — the A-priority root the
+30-year headless sweeps exposed: demand is exogenous and flat, so the market has no elasticity, no
+price discovery, no scarcity tension. Five interlocking items settled, three new ones filed.
+
+**The keystone — demand model (BL-078).** The nation substrate is *redefined, not removed*, with two
+precise faces. **Demand = population**: a tiered per-capita basket (food primary; lighter fuel +
+construction-goods draws), **elastic** (down-sloping curve, so price discovers), with **minimal
+bounded growth** (grows when consumption is met; no full POPULATION.md habitability loop). **Supply =
+abstract nation capacity**: replaces the deposit-flood (`density x deposit x 2.0`), tracks demand and
+clears it *to some extent*, leaving a live margin — cushion + opportunity in one mechanism. Price form
+unchanged, band [0.25x, 4x] kept. Ben's framing: population IS the substrate, defined precisely — not
+a contradiction of GENERATION_STRATEGY's saturated premise.
+
+**Materials + construction (BL-095).** Market stock is **derived-from-supply** (not a persistent
+inventory), chosen for calculation simplicity — so *no* new serialized field on the flat-binary seam
+(correcting the item's original prose). Construction (already durative) gains a **material-availability
+rate modulation**: full speed / stretched to ~10x / paused; **pay-as-you-build**; and construction is
+a **real market buyer** — it competes with population and other builds, bids up local price, and a
+paused build stops spending. Front door goes binary -> analog (rate/ETA + paused reason).
+
+**Market generation (BL-096).** **One-pass at world-gen** (no runtime split/merge); population-anchored,
+resource-concentration shapes count/extent, **nations carve** the splits (they exist before markets, so
+no gen reorder). The fuller co-generation ideal (population-near-resources + trade-route-centred markets
++ corp carving) assessed as a larger rewrite and deferred.
+
+**Feedback + viability (BL-079, BL-112).** The demand model restores **market-side feedback** for free.
+Ben additionally chose **limited corp-side agency** (idle a loss-making building / switch a floored
+recipe / depletion-throttle) — a **scoped exception to the AI-stub standing rule**, recorded as
+narrow/local/deterministic only. Depletion stays emergent (no telegraph). The net-loss start is
+**intended pressure, made legible**: generation guarantees a fillable path + the Opportunity lens
+surfaces the gap (verified by a headless fillability check, not a feature-vs-bug decision).
+
+**Filed.** BL-130 (real-inventory revisit, post-optimization), BL-131 (player-driven market destruction
+— the only runtime market change), BL-132 (full market/population co-generation rewrite).
+
+**Method.** Backlog writeback done programmatically after a round-trip fidelity check showed the file
+mixes inline/multi-line arrays (a full re-serialize would churn hundreds of unrelated lines) — so the
+script edits only each item's status/glyph/summary/design bytes and appends the three new items.
+Surgical diff (88 ins / 20 del), JSON re-parses, CRLF preserved.
+
+**Design-state discipline.** No authority-doc or `src/` edits — design time-slices into
+SYSTEMS/PRODUCTION/GENERATION_STRATEGY (and the BL-079 rule exception into io-standing-rules) only when
+the work lands. All five items are now `designed`/promote-ready (BL-096 after BL-095). Ben will promote
+and build in a coming coding session.
+
+---
+
 ## Session — Tooling + batch: ID-reservation ledger, BL-126, BL-113 (2026-07-07)
 
 **Context.** Quick backlog pass that turned into a small tooling fix + a two-item Batch Delivery.

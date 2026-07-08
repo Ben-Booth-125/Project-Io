@@ -121,10 +121,11 @@ struct tile_component
     terrain_landform    landform;    ///< Physical shape (elevation/slope).
     std::array<float, resource_count> resource_deposit; ///< Fixed deposit **richness** per resource type (the extraction rate multiplier).
 
-    /// Reserved depletion reserve per resource type. **Unused in Layer 3** — the
-    /// prototype economy never draws this down (richness sets the rate; deposits
-    /// do not deplete). Carried so the deferred depletion model (backlog.json § Environment)
-    /// lands without a data-model retrofit. Indexed by resource_type, as above.
+    /// Finite depletion reserve per resource type. **Live** — extraction draws this
+    /// down each tick (run_extraction, economy_system.cpp): richness sets the rate,
+    /// this reserve is consumed and tapers the output as it nears empty, at which
+    /// point the building reports the deposit exhausted. Seeded at generation to
+    /// richness × a reserve factor. Indexed by resource_type, as above.
     std::array<float, resource_count> resource_remaining = {};
 
     float      hazard_level;     ///< 0.0 (safe) – 1.0 (extreme hazard).
@@ -132,12 +133,21 @@ struct tile_component
     float      substrate_density = 0.0f; ///< Background nation industrial occupation [0, 1].
 };
 
-/// Background nation-owned industrial aggregate for one (nation, body) pair.
-/// Injected into the body's markets each economy tick to give them liquidity.
+/// Background nation-owned economy baseline for one (nation, body) pair. Carries
+/// only *generation* coefficients; the live demand/supply is derived at tick time
+/// by inject_substrate_demand from these plus the economy.substrate tunables
+/// (BL-078). Injected into the body's markets each economy tick to give them
+/// liquidity and a price-discovering demand/supply model.
 struct nation_substrate
 {
-    std::array<float, resource_count> background_supply = {};
-    std::array<float, resource_count> background_demand = {};
+    /// Abstract production capacity per resource on this body, derived from
+    /// owned-tile deposits weighted by population proximity (Σ density·deposit).
+    /// Scaled by economy.substrate.capacity_scale at tick time to cap supply, so a
+    /// resource the nation lacks the deposit for leaves a live, fillable gap.
+    std::array<float, resource_count> capacity = {};
+    /// Catchment population/economic weight (Σ of the density ripple over owned
+    /// tiles) that drives the per-capita basket demand at tick time.
+    float population_weight = 0.0f;
 };
 
 /// Survey lifecycle of a body (BL-067, docs/ui/SOLAR.md § Survey badge).
@@ -224,9 +234,24 @@ struct building_component
     /// the player could place a dozen-plus buildings in a single instant burst
     /// with zero ticks elapsed, since construction had no time cost at all; this
     /// is the pacing gate). Set from `building_economics::build_duration_ticks`
-    /// at placement; decremented once per economy tick (economy_system.cpp) until
-    /// it reaches 0, at which point the building is built and operational.
+    /// at placement; decremented (BL-095: by whole units as sub-tick progress
+    /// accumulates) each economy tick until it reaches 0, at which point the
+    /// building is built and operational.
     int  ticks_remaining = 0;
+
+    /// BL-095: sub-tick construction progress accumulator in [0, 1). Each tick the
+    /// build advances by a rate in [0, 1] set by how much of its per-tick material
+    /// need the local market can supply (full/stretched/paused); when the
+    /// accumulator crosses 1.0 one whole `ticks_remaining` unit is consumed. This
+    /// keeps `ticks_remaining` an integer gate while allowing a material-starved
+    /// build to stretch over many ticks. Not meaningful once ticks_remaining == 0.
+    float construction_progress = 0.0f;
+
+    /// BL-079: consecutive economy ticks this building has been estimated
+    /// loss-making. Read only by the scoped background-corp agency (a non-player corp
+    /// idles a building whose streak passes a threshold); reset to 0 on any
+    /// profitable tick. Never advanced for the player's own buildings.
+    int  loss_streak = 0;
 };
 
 /// Pooled resource quantities held by an entity.

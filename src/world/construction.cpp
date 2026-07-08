@@ -34,14 +34,17 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     corporation_component& cc = corp_it->second;
     const building_economics& econ = reg.economics(type);
 
-    // Material cost (BL-044/BL-095-lite): a building's resource_build_cost is
-    // displayed as materials but bought from the local market at its prevailing
-    // price, folded into the credit cost — "everything costs money", the
-    // resource line is what that money buys. This sidesteps the bootstrapping
-    // deadlock a corp-pool-only gate produced (a fresh corp's own pool starts
-    // empty and its refined surplus auto-sells each tick, so no building was
-    // ever placeable) without yet modelling a depletable market stockpile
-    // (that gate/charge distinction is the open question left to BL-095).
+    // Material cost (BL-044 → BL-095): a building's resource_build_cost is bought
+    // from the local market — but under BL-095 it is no longer a single up-front
+    // debit. Placement gates on affordability (you must be able to afford the whole
+    // build to commit to it), then construction is *paid as it is built*: each
+    // economy tick the build draws 1/build_duration_ticks of its materials as real
+    // market demand and pays the resolved price, and the flat build_cost accrues at
+    // the same pace (economy_system.cpp § run_construction). The rate is gated on
+    // the market's recent supply of those materials, so a starved build stretches
+    // or pauses rather than completing instantly. The affordability figure below is
+    // priced at the *current* market price for the commitment check; the actual
+    // spend happens tick by tick at the price prevailing then.
     const market_component* mkt = nullptr;
     {
         const entity_id mid = market_for_tile(w, tile);
@@ -61,6 +64,9 @@ construction_result construct_building(world& w, const recipe_registry& reg,
         material_cost += econ.resource_build_cost[r] * p;
     }
 
+    // Affordability is a commitment gate only (BL-095): the corp must be able to
+    // afford the whole build to start it, but is not debited here — payment is
+    // spread across construction by run_construction (pay-as-you-build).
     const float total_cost = econ.build_cost + material_cost;
     if (cc.balance < total_cost)
         return construction_result::insufficient_funds;
@@ -92,7 +98,8 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     w.stockpiles[bld_id] = stockpile_component{};
 
     cc.assets.push_back(bld_id);
-    cc.balance -= total_cost;
+    // BL-095: no up-front debit — run_construction charges build_cost + materials
+    // incrementally as the build progresses (pay-as-you-build).
 
     out_building = bld_id;
     return construction_result::placed;

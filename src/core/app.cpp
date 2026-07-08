@@ -1825,7 +1825,11 @@ void app::render()
         switch (r)
         {
             case construction_result::placed:
-                m_ui.construction.last_message    = "Built.";
+                // BL-095: placement now only *starts* a durative, material-gated build
+                // (ticks_remaining > 0), so the toast reflects that rather than claiming
+                // it is done — the Selection card carries the live rate / ETA / paused
+                // status from here on.
+                m_ui.construction.last_message    = "Construction started.";
                 m_ui.selected_entity              = built;        // inspect the new building
                 m_ui.selection_hidden_for         = null_entity;  // re-show the panel
                 break;

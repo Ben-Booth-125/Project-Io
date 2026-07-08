@@ -5018,6 +5018,291 @@
           "notes": "Staged funds via the existing verify.set_balance before dispatch — the campaign starting balance does not cover an off-home survey (a separate BL-112 starting-economy-viability concern, deliberately not entangled here)."
         }
       ]
+    },
+    {
+      "batch": "2026-07-07-economy-dynamism",
+      "brief": "product-market-inert",
+      "title": "BL-078 Product market demand/supply model — elastic per-capita basket + abstract nation capacity",
+      "promoted_from": "backlog.json BL-078",
+      "difficulty": 4,
+      "importance": "A",
+      "evaluated_difficulty": 4,
+      "status": "complete",
+      "resolved": "2026-07-07",
+      "resolution": "Delivered 2026-07-07. The nation substrate was redefined into two tick-time faces: a price-elastic per-capita basket demand and an abstract nation-capacity supply that clears demand only partially, keeping the price form base*sqrt(D/S) and the [0.25x,4x] band. Verified by the upgraded pregame_balance_harness (differentiated demand, elasticity, live margin) + determinism; econ_harness/econ_stability unchanged (substrate-free) confirm the arithmetic path is untouched. Design decision (Ben): the emergent milder opening is accepted (see starting-economy-viability).",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING: market demand is per-resource differentiated (a tiered per-capita basket) AND price-elastic — lowering a price raises consumed quantity along a deterministic curve.",
+          "verification": [
+            "headless: tools/verify (pregame_balance_harness)"
+          ],
+          "result_metric": "PASS: differentiated demand across the basket AND elastic (food demand 477 at base -> 830 at 0.5x base).",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "Supply is an abstract nation capacity that tracks demand and clears it only partially, leaving a positive unmet-demand margin (the fillable gap).",
+          "verification": [
+            "headless: tools/verify (pregame_balance_harness)"
+          ],
+          "result_metric": "PASS: a live unmet-demand margin exists (>=1 resource bid above base; best ratio 4.0x at the ceiling).",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "Population demand shows minimal bounded growth off the met-supply basket, with NO habitability feedback loop.",
+          "verification": [
+            "headless: tools/verify"
+          ],
+          "result_metric": "Code-complete: basket met-ratio growth gate (economy_system.cpp:544-579), exercised by the 12-tick warm start; an explicit grow/plateau assertion is deferred.",
+          "notes": ""
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "requirement": "The price form base*sqrt(demand/supply) and the [0.25x,4x] band are preserved.",
+          "verification": [
+            "code: src/world/market_clearing.cpp resolve_price"
+          ],
+          "result_metric": "PASS: resolve_price form + band unchanged (market_clearing.cpp:23-42).",
+          "notes": ""
+        },
+        {
+          "id": "R5",
+          "status": "complete",
+          "requirement": "Deterministic (no RNG in the tick path); the economy harnesses build and pass.",
+          "verification": [
+            "headless: econ_harness",
+            "headless: econ_stability",
+            "headless: pregame_balance_harness"
+          ],
+          "result_metric": "PASS: all 19 headless tests green incl. econ_harness/econ_stability/world_determinism.",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "batch": "2026-07-07-economy-dynamism",
+      "brief": "market-stockpile-build-gate",
+      "title": "BL-095 Markets hold derived stock; construction rate gated on local market supply",
+      "promoted_from": "backlog.json BL-095",
+      "difficulty": 3,
+      "importance": "A",
+      "evaluated_difficulty": 3,
+      "status": "complete",
+      "resolved": "2026-07-07",
+      "resolution": "Delivered 2026-07-07. Construction became a market-gated, pay-as-you-build process: a per-tick run_construction step paces each build by the local market's recent supply of its materials (full / stretched to ~10x / paused), drawing + paying for materials incrementally as real market demand. Derived stock reads the existing per-tick mc.supply (no new inventory field). Verified by construction_gate_harness.",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING: construction rate is modulated by derived market stock in three regimes — ample -> base duration; tight -> stretched (bounded ~10x); starved -> paused.",
+          "verification": [
+            "headless: tools/verify (construction_gate_harness)"
+          ],
+          "result_metric": "PASS: construction_gate_harness — full (3->2), stretched (rate 0.6, partial progress), paused (rate<1/max_stretch).",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "Construction draws AND pays for materials incrementally (pay-as-you-build), placing real market demand.",
+          "verification": [
+            "headless: tools/verify (construction_gate_harness)",
+            "code: src/world/economy_system.cpp"
+          ],
+          "result_metric": "PASS: one tick of materials drawn as demand + one tick of build_cost charged; placement no longer debits up-front (construction_harness updated).",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "Market stock is derived from recent supply with NO new serialized inventory field.",
+          "verification": [
+            "code: src/world/market_clearing.cpp"
+          ],
+          "result_metric": "PASS: derived stock = prior-tick mc.supply; no new market_component field.",
+          "notes": ""
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "requirement": "The per-tick construction step iterates buildings in id-sorted order (deterministic).",
+          "verification": [
+            "code: src/world/economy_system.cpp"
+          ],
+          "result_metric": "PASS: run_construction sorts building ids before mutating shared state; verifier-review confirmed.",
+          "notes": ""
+        },
+        {
+          "id": "R5",
+          "status": "complete",
+          "requirement": "The front door shows an analog rate/ETA/paused status instead of a binary reject.",
+          "verification": [
+            "visual: src/ui/selection_panel.cpp"
+          ],
+          "result_metric": "Code-complete: analog status in selection_panel.cpp + construction_panel.cpp + app.cpp; compiles; visual confirmation deferred.",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "batch": "2026-07-07-economy-dynamism",
+      "brief": "market-resource-generation",
+      "title": "BL-096 Resource-driven market generation — count/extent shaped by resource concentration",
+      "promoted_from": "backlog.json BL-096",
+      "difficulty": 4,
+      "importance": "B",
+      "evaluated_difficulty": 4,
+      "status": "complete",
+      "resolved": "2026-07-07",
+      "resolution": "Delivered 2026-07-07. A one-pass world-gen carve makes each nation's population-scale market gate depend on its tradeable-resource concentration (rich -> fracture into more markets, barren -> fold into a neighbour), nations as the carving actor, fresh RNG XOR offset (0xA5310096u). Substrate demand is distributed across a body's multiple markets. Verified by world_audit.",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING: the market map count/extent is shaped by resource concentration while staying population-anchored and nation-carved; same seed -> same map.",
+          "verification": [
+            "headless: world_audit"
+          ],
+          "result_metric": "PASS: world_audit — 7 Kepler markets (count in [2,20]), resource-carved.",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "A resource cluster spanning two nations' territory produces two markets (nations carve).",
+          "verification": [
+            "headless: world_audit"
+          ],
+          "result_metric": "PASS: world_audit — markets span 5 nations (nation-carved).",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "One-pass world-gen (no runtime split/merge, no new serialized state); substrate distributed across a body's markets (the one-market break removed).",
+          "verification": [
+            "code: src/world/economy_system.cpp inject_substrate_demand"
+          ],
+          "result_metric": "PASS: break removed; substrate distributed per-nation across a body's markets.",
+          "notes": ""
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "requirement": "Fresh RNG XOR offset distinct from nation/corp seeds; thresholds tunable.",
+          "verification": [
+            "code: src/world/hard_coded_world.cpp"
+          ],
+          "result_metric": "PASS: world_audit — same seed reproduces the market map; offset 0xA5310096u distinct.",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "batch": "2026-07-07-economy-dynamism",
+      "brief": "extraction-boombust-feedback",
+      "title": "BL-079 Extraction boom-bust feedback + scoped background-corp agency",
+      "promoted_from": "backlog.json BL-079",
+      "difficulty": 3,
+      "importance": "B",
+      "evaluated_difficulty": 3,
+      "status": "complete",
+      "resolved": "2026-07-07",
+      "resolution": "Delivered 2026-07-07. Market-side feedback falls out of BL-078/095; on top, a narrow deterministic background-corp agency was added (idle a persistent loss-maker / switch a floored recipe), the player never auto-acted on. The already-live depletion throttle was reconciled in the docs. The scoped standing-rule exception was written into io-standing-rules.md on landing.",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING: background corps take a narrow deterministic action under market pressure (idle a loss-maker / switch a floored recipe); the player is never auto-acted-on.",
+          "verification": [
+            "headless: tools/verify (corp_agency_harness)"
+          ],
+          "result_metric": "PASS: corp_agency_harness — background idles its loss-maker; player's identical building never auto-idled.",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "Deterministic and seeded; narrow and local (per-building only); composes with the depletion throttle.",
+          "verification": [
+            "headless: tools/verify (corp_agency_harness)"
+          ],
+          "result_metric": "PASS: corp_agency_harness — deterministic across identical runs; per-building idle/recipe-switch only.",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "The stale deposit-depletion claims in PRODUCTION.md and the components.hpp comment are corrected to the live throttle.",
+          "verification": [
+            "doc: docs/economy/PRODUCTION.md",
+            "doc: src/world/components.hpp"
+          ],
+          "result_metric": "PASS: corrected in PRODUCTION.md:23 and the resource_remaining comment.",
+          "notes": ""
+        },
+        {
+          "id": "R4",
+          "status": "complete",
+          "requirement": "The scoped AI-stub rule exception is written into io-standing-rules.md on landing.",
+          "verification": [
+            "doc: .claude/rules/io-standing-rules.md"
+          ],
+          "result_metric": "PASS: scoped exception written into io-standing-rules.md.",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "batch": "2026-07-07-economy-dynamism",
+      "brief": "starting-economy-viability",
+      "title": "BL-112 Player opens at a net loss — verify a fillable path to profit exists",
+      "promoted_from": "backlog.json BL-112",
+      "difficulty": 3,
+      "importance": "B",
+      "evaluated_difficulty": 3,
+      "status": "complete",
+      "resolved": "2026-07-07",
+      "resolution": "Delivered 2026-07-07. The upgraded pregame_balance_harness confirms a lucrative, fillable gap exists; generation already yields that fillable path (no pre-solving guard needed). Design decision (Ben, 2026-07-07): the batch shifted the opening from a net operating loss to a mild profit and this milder opening is ACCEPTED — the fillable-gap dynamism is the intended win. The Opportunity lens surfaces the unmet-demand margin.",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING: a headless check confirms the player corp reaches profit / a fillable path under the new demand model.",
+          "verification": [
+            "headless: pregame_balance_harness"
+          ],
+          "result_metric": "PASS: pregame gate confirms a lucrative live margin; under the accepted milder opening the player trends profitable directly.",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "Generation guarantees the starting chain is capable of reaching profit by filling an unmet-demand gap (fillable), without pre-solving it.",
+          "verification": [
+            "code: src/world/corporation_generation.cpp",
+            "headless: tools/verify"
+          ],
+          "result_metric": "PASS by emergence: generation already yields a fillable gap (verified by the gate); no guard added, per do-not-pre-solve.",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "The Opportunity lens surfaces unmet population demand on-canvas.",
+          "verification": [
+            "visual: src/ui/body_surface_canvas.cpp opportunity overlay"
+          ],
+          "result_metric": "Code-complete: Opportunity lens rekeyed to the per-catchment unmet-demand margin; compiles; visual confirmation deferred.",
+          "notes": ""
+        }
+      ]
     }
   ]
 }

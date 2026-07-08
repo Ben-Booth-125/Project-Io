@@ -1148,8 +1148,8 @@
       "short_name": "PRODUCT_MARKET_INERT",
       "category": "Trade",
       "title": "Product market is inert — capped prices, flat exogenous demand, raw gluts to zero",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "complete",
+      "glyph": "✓",
       "priority": "A",
       "difficulty": 4,
       "parked": false,
@@ -1158,16 +1158,16 @@
       "written": "2026-07-01",
       "files": [],
       "authority_doc": "docs/SYSTEMS.md",
-      "summary": "Playtest finding (2026-07-01, 30-year headless econ sweep): the market clears trivially. Product prices climb to a fixed cap by ~yr15 and never move again (Steel 32.00, Refined Fuel 40.00, Food Rations 24.00) while product supply never grows (Steel stuck at 32u, Fuel/Rations at 0). Meanwhile raw extraction floods a flat exogenous demand (~1056/good regardless of world state), pinning ~9 raw prices at 0.00 (Coal, Silica, Copper, Rare Earth, Stone, Timber, Sand, Clay, Peat). Demand responds to nothing, so there is no price discovery and no scarcity tension — the 'too easy to work' gap in the loop the prototype is meant to validate. Design-owed: what demand should be a function of.",
-      "design": "**Status:** design-owed — filed from the 2026-07-01 playtest (harness `econ_step` sweep over the seeded cold-start world).\n\n### Observed\n- Product prices reach a hard cap and freeze: Steel 30.5→32.0, Fuel 38.1→40.0, Rations 22.9→24.0 by ~yr15, then flat through yr30.\n- Product supply is inert: Steel 32u throughout; Refined Fuel and Food Rations produced at 0 (the refining tier barely runs, recipe_count=3).\n- Raw supply grows without bound against a **flat** demand of ~1056/good, flooring ~9 raw prices at 0.00.\n\n### The gap\nDemand is exogenous and constant (the saturated-substrate injection, v0.0.6), so the market has no elasticity: nothing consumes more when cheap, nothing bids up when scarce. Prices are a clamp, not a discovery. This is what makes the economy 'too easy' — a corp never has to respond to a market signal.\n\n### Open questions\n1. What drives demand — population centres (POPULATION.md), downstream recipe consumption, era/tech, or export sinks? Most likely a composition.\n2. Should product prices be uncapped once a real consumption sink exists, or is the cap a deliberate ceiling?\n3. Is the flat substrate demand the right *floor*, or is it masking the absence of a real demand model?\n4. Determinism constraint: any demand model must stay seeded/deterministic (standing rule).\n\nRelated: BL-079 (the supply-side inertia of the same loop), BL-075 (reachable-market check). Authority time-slices into SYSTEMS.md / a market-model doc when the work lands."
+      "summary": "Playtest finding (2026-07-01, 30-year headless econ sweep): the market clears trivially. Product prices climb to a fixed cap by ~yr15 and never move again (Steel 32.00, Refined Fuel 40.00, Food Rations 24.00) while product supply never grows (Steel stuck at 32u, Fuel/Rations at 0). Meanwhile raw extraction floods a flat exogenous demand (~1056/good regardless of world state), pinning ~9 raw prices at 0.00 (Coal, Silica, Copper, Rare Earth, Stone, Timber, Sand, Clay, Peat). Demand responds to nothing, so there is no price discovery and no scarcity tension — the 'too easy to work' gap in the loop the prototype is meant to validate. Design-owed: what demand should be a function of. [DESIGNED 2026-07-07: population as the demand substrate (tiered elastic basket + bounded growth), abstract nation capacity as supply, price band kept.]",
+      "design": "**Status: DESIGNED 2026-07-07** (design session, Ben). The nation substrate is *redefined, not removed* — given two precise faces.\n\n### Demand face — population\n- Demand = a **tiered per-capita basket**: food/rations primary, lighter draws on fuel and construction goods, so every product has a real referent (replacing the old flat `density × 0.5`, identical across resources).\n- **Elastic**: a down-sloping demand curve — cheaper → consumed more, dearer → less — so price *discovers* instead of clamping. Deterministic (a curve, not RNG).\n- **Minimal bounded growth**: population demand grows when its consumption is met, plateaus when not — an endogenous expansion driver keyed off met-supply, WITHOUT the full POPULATION.md habitability loop (that stays a later item).\n- Demand lands in each population centre's catchment market (existing routing).\n\n### Supply face — abstract nation capacity\n- Replaces the deposit-flood (`density × deposit × 2.0`). The nation retains an **abstract production capacity that tracks population demand and clears it *to some extent***, leaving a **live margin** — the saturation cushion AND the opportunity gap in one mechanism. Unmet demand pegs price high = the visible market gap the player fills (the intended BL-079/BL-112 tension, by design).\n\n### Price\n- Unchanged form (`base × √(demand/supply)`), **band [0.25×, 4×] KEPT**; retune the multiplier once real ranges are visible.\n\n### Not a contradiction of the saturated-substrate premise\n- Population IS the substrate, defined more precisely (Ben, 2026-07-07): demand face = population, supply face = abstract nation capacity. GENERATION_STRATEGY's premise stands.\n\nDeterminism: all faces seeded/deterministic; no RNG. Authority → SYSTEMS.md (+ POPULATION.md for basket/growth) on landing. Related: BL-095 (materials as a demand sink), BL-079/BL-112 (downstream consequences), BL-096 (market gen)."
     },
     {
       "id": "BL-079",
       "short_name": "EXTRACTION_BOOMBUST_NO_FEEDBACK",
       "category": "Trade",
       "title": "Extraction boom-bust vs steady processing — corp fate fixed at generation, no competitive feedback",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "complete",
+      "glyph": "✓",
       "priority": "B",
       "difficulty": 3,
       "parked": false,
@@ -1176,8 +1176,8 @@
       "written": "2026-07-01",
       "files": [],
       "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
-      "summary": "Playtest finding (2026-07-01, 30-year sweep): finite deposit depletion (v0.0.4, by design) makes extraction corps boom then plateau/decline (Corix 65k→162k@yr20→161k@yr30; FararAthar peaks yr20 then falls; Exoar plateaus), while processing corps grind up linearly forever (player 'Genom', steel, +~880/yr steady). A corp on a zero-priced output just bleeds (Faros-Yelen −320/decade). Net: a corp's whole trajectory is essentially fixed at generation by which tile/resource it spawned on — no price feedback, competition, or adaptation erodes a leader or rescues a laggard. The live form of the BL-075 'reachable market / profitable chain' concern.",
-      "design": "**Status:** design-owed — filed from the 2026-07-01 playtest.\n\n### Observed (balance, k credits)\n| corp (output) | yr10 | yr20 | yr30 | shape |\n|---|---|---|---|---|\n| Corix (rich raw) | 147 | 162 | 161 | boom → plateau |\n| FararAthar (raw) | 137 | 147 | 140 | boom → decline |\n| Exoar (raw) | 127 | 135 | 134 | boom → plateau |\n| Genom *(player, steel)* | 149 | 157 | 166 | steady linear |\n| Faros-Yelen (0-priced) | 92.4 | 92.0 | 91.7 | slow bleed |\n\nDepletion is working as designed; the gap is that **nothing closes the loop**. The steady processors overtake the former extraction leaders purely by attrition, and a badly-placed corp can neither adapt nor fail interestingly.\n\n### Open questions\n1. What supplies the missing feedback — does fixing the demand model (BL-079↔BL-078) alone create it, or is corp-side behaviour (re-invest / switch recipe / relocate) needed? Note the standing rule caps AI at a data-model stub, so favour *price/market* feedback over AI agency.\n2. Should depletion be **telegraphed** so boom-bust reads as a legible dynamic rather than an unexplained plateau?\n3. Is a corp landing on a zero-priced resource a generation bug (BL-075 tier-1 FAIL) or an intended hard-mode start?\n\nRelated: BL-078, BL-075."
+      "summary": "Playtest finding (2026-07-01, 30-year sweep): finite deposit depletion (v0.0.4, by design) makes extraction corps boom then plateau/decline (Corix 65k→162k@yr20→161k@yr30; FararAthar peaks yr20 then falls; Exoar plateaus), while processing corps grind up linearly forever (player 'Genom', steel, +~880/yr steady). A corp on a zero-priced output just bleeds (Faros-Yelen −320/decade). Net: a corp's whole trajectory is essentially fixed at generation by which tile/resource it spawned on — no price feedback, competition, or adaptation erodes a leader or rescues a laggard. The live form of the BL-075 'reachable market / profitable chain' concern. [DESIGNED 2026-07-07: market-side feedback + LIMITED deterministic corp agency (scoped AI-stub exception, propagates to standing rules on landing); depletion stays emergent.]",
+      "design": "**Status: DESIGNED 2026-07-07** (design session, Ben).\n\n### The feedback the demand model restores\n- Elastic population demand + unmet-demand-pegs-price + population growth + construction-as-competitor (BL-078/BL-095) create **market-side feedback** that did not exist: a corp on a valuable, scarce output is bid up; a glutted output falls; a laggard is rescued by the *player/market filling a visible gap*. This is the primary loop.\n\n### Limited corp-side agency (Ben's call — SCOPED RULE EXCEPTION)\n- Ben chose to add **limited corp-side agency** beyond pure market feedback: background corps may make a real (if small) deterministic choice — e.g. **idle a loss-making building** or **switch a floored recipe** — alongside extraction that **throttles as a deposit depletes**.\n- ⚠️ **This bends the standing rule** \"do not build AI faction behaviour beyond the data-model minimum stub.\" Recorded here as a **scoped exception**: the agency is *narrow, local, and deterministic* (per-building idle / recipe-switch / depletion-throttle from mechanical triggers — NOT strategic planning, relocation, or global optimisation). Must stay seeded/deterministic.\n- **Propagation:** the scoped exception is written into `.claude/rules/io-standing-rules.md` (and DEVELOPMENT_PRACTICES if needed) ONLY WHEN this item lands — design time-slicing; do not edit the standing rules ahead of the work.\n\n### Depletion telegraph — NO\n- Boom-bust stays **emergent** (no dedicated depletion-remaining UI); the player infers decline from falling output. Note: the Scarcity lens already gives indirect signal.\n\n### Bad-start framing\n- A corp on a low-demand resource = **intended pressure, made legible** (see BL-112) — a fillable, visible gap, not a generation bug.\n\nDeterminism-sensitive (the agency must be deterministic). Authority → CORPORATION_GENERATION.md / SYSTEMS.md on landing. Related: BL-078, BL-112, BL-054 (deferred nation/AI behaviour — where broader agency lives)."
     },
     {
       "id": "BL-080",
@@ -1549,8 +1549,8 @@
       "short_name": "MARKET_STOCKPILE_BUILD_GATE",
       "category": "Trade",
       "title": "Markets hold a resource stockpile; construction draws from / is gated on the local market stock",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "complete",
+      "glyph": "✓",
       "priority": "A",
       "difficulty": 3,
       "parked": false,
@@ -1564,16 +1564,16 @@
         "src/ui/selection_panel.cpp"
       ],
       "authority_doc": "docs/economy/PRODUCTION.md",
-      "summary": "Idea (2026-07-04, Ben): building materials must be a real, visible constraint sourced from the MARKET, not the corp's private pool. Today construction checks the corp's `corp_body_pools` on the body (construct_building → insufficient_materials) and markets carry only supply/demand/price — no physical resource stockpile. Give markets a resource stockpile and gate/charge construction against the LOCAL market's stock, so 'you can only build where the market can supply the materials'. Prerequisite framing for BL-096 (resource-driven market generation). Material cost is already surfaced in the build front door (BL-044 clarity, 2026-07-04); this changes WHERE the materials come from.",
-      "design": "**Status:** design-owed — captured 2026-07-04 (Ben); model owed before promotion. Structural prerequisite for BL-096 (markets as resource territories).\n\n### The idea\nBuilding should require **materials the local market can actually supply**, making 'where can I build' a function of local resource availability rather than the corp's private stash. Concretely: markets gain a **resource stockpile**, and `construct_building` checks/charges that stockpile (the market in the tile's catchment) instead of — or in addition to — the corp pool.\n\n### What exists today\n- `construct_building` (src/world/construction.cpp) checks `w.corp_body_pools[{corp, body}].quantities[r]` against `resource_build_cost[r]` and deducts on success (BL-044). The build front door now shows this cost (`100 cr · 20 Steel`) and gates on it (2026-07-04).\n- `market_component` holds `supply`/`demand`/`price` per resource but **no physical stockpile** that persists between ticks. `market_for_tile` / `market_clearing.hpp` resolve a tile's catchment market.\n\n### Open design (owed)\n- **Stockpile model.** Does the market hold a real per-resource inventory that accumulates from production and drains on purchase/build, or is 'stock' derived from recent supply? A real inventory is the cleaner substrate for BL-096's split/merge but adds a serialised field (flat-binary seam) and tick logic.\n- **Gate vs charge.** Does building *consume* market stock (deducting it, competing with other buyers) or just *require* a threshold be present? Consuming is the 'greedy actors compete for resources' feel Ben wants.\n- **Corp pool vs market stock.** Replace the corp-pool check entirely, or layer market-availability on top (buy-from-market-into-pool-then-build)? Interacts with the existing auto-buy/convoy supply path (BL-035/039).\n- **Front-door reason.** Extend the BL-071 reason-coded rejection with an 'insufficient market stock' reason so the gate is legible.\n- **Determinism / serialisation.** A stored market inventory joins the flat-binary seam symmetrically (as flagged for survey_state / trade_routes); no RNG.\n\n### Requirement (at promotion)\nHeadless: a build succeeds only when the catchment market holds the materials and correctly draws them down; a build is rejected with the new reason when stock is short. Visual: the front door shows the market-sourced requirement + reason.\n\n### Relationships\nPrerequisite for **BL-096** (resource-driven market generation). Touches the economy/construction/save seam → Full mode, determinism-sensitive. Do not edit PRODUCTION.md/SYSTEMS.md ahead of the work (authority time-slicing)."
+      "summary": "Idea (2026-07-04, Ben): building materials must be a real, visible constraint sourced from the MARKET, not the corp's private pool. Today construction checks the corp's `corp_body_pools` on the body (construct_building → insufficient_materials) and markets carry only supply/demand/price — no physical resource stockpile. Give markets a resource stockpile and gate/charge construction against the LOCAL market's stock, so 'you can only build where the market can supply the materials'. Prerequisite framing for BL-096 (resource-driven market generation). Material cost is already surfaced in the build front door (BL-044 clarity, 2026-07-04); this changes WHERE the materials come from. [DESIGNED 2026-07-07: derived-from-supply stock; construction rate modulated by material availability (full/stretched/paused), pay-as-you-build, construction competes as a real market buyer. Real-inventory revisit -> BL-130.]",
+      "design": "**Status: DESIGNED 2026-07-07** (design session, Ben).\n\n### Market stock model — DERIVED (not a persistent inventory)\n- Market 'stock' is **derived from recent supply** (a rolling/smoothed throughput figure), NOT a stored per-resource inventory. Chosen for calculation simplicity.\n- **Correction to the earlier open design:** with derived stock there is **no new serialized inventory field on the flat-binary seam** and nothing extra to tick — the serialisation concern the original prose raised does not apply.\n- Revisit real inventory vs derived after an optimization/efficiency pass → **BL-130**.\n\n### Materials come from the market (already shipped — BL-095-lite)\n- A building's `resource_build_cost` is bought from the local market at prevailing price and folded into the credit cost (construction.cpp) — sidesteps the empty-fresh-corp-pool deadlock. Retained.\n\n### Construction rate modulated by material availability (the new mechanic)\n- Construction is already **durative** (`ticks_remaining = build_duration_ticks`). Now **material availability modulates the drain rate**, in three regimes:\n  - surplus ample → full speed (base duration)\n  - surplus tight → **stretched**, up to a max (~10×; e.g. a 6-month build → 5 years max)\n  - surplus below even the max-stretch rate → **paused** until it recovers\n- **Pay-as-you-build**: materials are drawn and paid *incrementally* as construction progresses (entailed by the rate model — a build can only be slow-because-starved if materials arrive over time).\n- Construction is a **real market buyer**: its draw adds genuine demand, competes with population and other builds, and bids up local price; a paused build stops spending. Concurrent builds genuinely contend for the derived stock.\n\n### Front door\n- The BL-071 reason-coded rejection is **upgraded from binary to analog**: show a rate/ETA (\"~4yr — materials scarce\") or \"paused — market can't supply\" instead of a hard reject.\n\nTouches economy/construction/market seam → Full mode, determinism-sensitive. Prerequisite for BL-096. Authority → PRODUCTION.md on landing. Related: BL-078 (same substrate, supply side), BL-130 (inventory revisit)."
     },
     {
       "id": "BL-096",
       "short_name": "MARKET_RESOURCE_GENERATION",
       "category": "Trade",
       "title": "Resource-driven market generation — markets split/dissolve by resource concentration, not land area",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "complete",
+      "glyph": "✓",
       "priority": "B",
       "difficulty": 4,
       "parked": false,
@@ -1588,8 +1588,8 @@
         "src/world/components.hpp"
       ],
       "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
-      "summary": "Idea (2026-07-04, Ben): reframe market generation — markets are 'less to do with equal amounts of land, and more to do with splitting resources from greedy actors'. Generate markets from RESOURCE concentration: a region with too few resources has no market (one dissolves); a resource-rich region splits into multiple markets. Market count and boundaries reflect resource wealth, not land partition. Requires BL-095 (markets holding resource stockpiles) as the substrate. Ben's steer: 'generation can come afterwards' — settle BL-095 first.",
-      "design": "**Status:** design-owed — captured 2026-07-04 (Ben); model owed. `requires` BL-095 (market resource stockpiles). Reframes BL-036's market seeding.\n\n### The reframe\nToday markets are seeded from **capitals / population** (BL-036) — roughly a land/population partition. Ben wants them driven by **resource concentration**: markets form where resources are, contested by 'greedy actors'. The generation produces a market map that mirrors **resource wealth**, so a barren region supports no market and a rich one fractures into several.\n\n### The mechanic (Ben's words, to formalise)\n- **Too few resources → a market disappears** (a thin region cannot sustain its own market; it folds into a neighbour or vanishes).\n- **Too many resources → a market splits** (a resource-rich area carries more than one market — competition carves it up).\n- Net: market count/boundaries are a function of the deposit field (and BL-095 stockpile flow), not equal land shares.\n\n### Open design (owed — the load-bearing questions)\n- **Generation-time vs runtime.** Ben implied *generation time* ('markets are generated such that...'). Is split/merge a one-pass generation step over the deposit field (deterministic, clean), or an ongoing runtime dynamic (markets split/merge as stockpiles shift during play)? Generation-time is the far cheaper, determinism-safe first cut; runtime is a bigger, later system.\n- **Thresholds.** What resource total (per region / catchment) triggers a split, and what floor triggers a dissolve? Seeded + tunable in a headless harness, consistent with the seeded-rarity model (BL-040).\n- **Catchment recomputation.** `market_for_tile` currently resolves catchment by proximity/body; a resource-driven model changes how catchments are assigned when a market splits or dissolves.\n- **'Greedy actors'.** Is the split literally driven by competing corporations/nations claiming resource clusters (ties to CORPORATION_GENERATION placement), or purely by the deposit field? The former is richer and feeds Conflict; the latter is simpler.\n- **Reconciliation with the saturated-substrate premise** (GENERATION_STRATEGY): the nation-owned background economy (BL-050) already consumes/produces across the map — market count must stay coherent with that substrate.\n\n### Requirement (at promotion)\nHeadless: over a generated world, market count correlates with the deposit field — a barren body has fewer/no markets, a rich body has more; the split/dissolve thresholds behave as specified; deterministic (same seed → same market map).\n\n### Relationships\n`requires` **BL-095**. Reframes **BL-036** (market seeding). Touches generation + market + save seam → Full mode, determinism-sensitive. Post-BL-095. Do not edit GENERATION_STRATEGY.md/PRODUCTION.md ahead of the work."
+      "summary": "Idea (2026-07-04, Ben): reframe market generation — markets are 'less to do with equal amounts of land, and more to do with splitting resources from greedy actors'. Generate markets from RESOURCE concentration: a region with too few resources has no market (one dissolves); a resource-rich region splits into multiple markets. Market count and boundaries reflect resource wealth, not land partition. Requires BL-095 (markets holding resource stockpiles) as the substrate. Ben's steer: 'generation can come afterwards' — settle BL-095 first. [DESIGNED 2026-07-07: one-pass gen; population-anchored + resource-concentration shaped; nations carve splits. Fuller co-gen -> BL-132; player market destruction -> BL-131.]",
+      "design": "**Status: DESIGNED 2026-07-07** (design session, Ben) — first cut scoped; fuller vision deferred to BL-132.\n\n### First cut (this item)\n- **One-pass at world-gen** — NO runtime split/merge. The generated market map is fixed for the campaign; the ONLY runtime market change is player-driven destruction → **BL-131**.\n- Markets stay **population-anchored** (from the BL-078 demand model); **resource concentration shapes count/extent** — a resource-rich region fractures into more markets, a barren one folds into its neighbour.\n- **Carving actors = nations** at generation time: nations exist before markets in the gen order and already tile the map (Voronoi territory + substrate density), so a resource cluster spanning two nations' territory becomes two markets. No generation reorder required.\n- Deterministic (same seed → same market map). Split/dissolve thresholds seeded + tunable in a headless harness, consistent with the seeded-rarity model (BL-040).\n\n### Deferred (out of this item)\n- **BL-132** — full co-generation: population spawns near rich resources + markets centred on rich trade-route proxies + **corp-level** carving (needs corps placed before markets = a gen reorder). Ben's ideal, but a larger rewrite.\n- **BL-131** — player-driven market destruction (mechanism TBD).\n\n`requires` BL-095. Reframes BL-036 (market seeding). Touches generation + market + save seam → Full mode, determinism-sensitive. Authority → GENERATION_STRATEGY.md on landing."
     },
     {
       "id": "BL-097",
@@ -1937,8 +1937,8 @@
       "short_name": "STARTING_ECONOMY_VIABILITY",
       "category": "Trade",
       "title": "Player opens at a net loss — verify build→produce→profit is reachable (or intended)",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "complete",
+      "glyph": "✓",
       "priority": "B",
       "difficulty": 3,
       "parked": false,
@@ -1950,8 +1950,8 @@
         "scripts/economy.lua"
       ],
       "authority_doc": "docs/economy/PRODUCTION.md",
-      "summary": "Found 2026-07-06 in the playability audit: a fresh player opens running a NET LOSS (balance ledger showed inputs bought ~158/tick vs sales ~16/tick, net ~-166/qtr). Runway is long (~200yr) so it is not a hard blocker, but 'starts unprofitable with no obvious path to profit' is a viability question. Determine whether the starting corp can reach profit by building out its chain (and whether the player can tell how), or whether generation/pricing needs tuning.",
-      "design": "**Status:** design-owed — needs investigation before a fix. Open questions: (1) does the starting asset mix (focus_asset_pattern) form a chain that can be profitable once staffed/reconfigured, or is it structurally loss-making? (2) is the loss intended early-game pressure or a generation/pricing bug? (3) is the path to profit legible (US-003/US-012)? Instrument with a headless run of the player corp over N ticks (extend econ_harness / world_audit) to see whether balance trends up after a sensible build-out. Couples to BL-078/BL-079 (economy dynamism) and BL-095 (materials). Authority docs/economy/PRODUCTION.md."
+      "summary": "Found 2026-07-06 in the playability audit: a fresh player opens running a NET LOSS (balance ledger showed inputs bought ~158/tick vs sales ~16/tick, net ~-166/qtr). Runway is long (~200yr) so it is not a hard blocker, but 'starts unprofitable with no obvious path to profit' is a viability question. Determine whether the starting corp can reach profit by building out its chain (and whether the player can tell how), or whether generation/pricing needs tuning. [DESIGNED 2026-07-07: intended pressure made legible — generation guarantees a fillable path, Opportunity lens surfaces unmet demand; headless fillability check.]",
+      "design": "**Status: DESIGNED 2026-07-07** (design session, Ben).\n\n### Verdict: intended pressure, made legible (NOT a bug)\n- Opening at a net loss is the intended early-game tension, PROVIDED the path to profit is fillable and visible.\n\n### Two requirements at promotion\n1. **Generation guarantees the path EXISTS** — the player's starting chain must be *capable* of reaching profit by filling an unmet demand gap (fillable), without pre-solving it.\n2. **The Opportunity lens surfaces unmet population demand** — the gap the player should fill is legible on-canvas (ties US-003 / US-012).\n\n### Verification\n- Headless: instrument the player corp over N ticks (extend econ_harness / world_audit) under the new BL-078 demand model to confirm balance trends to profit after a sensible build-out — a *fillability check*, not a feature-vs-bug decision (settled: feature).\n\nCouples to BL-078/BL-079 (economy dynamism) and BL-095 (materials). Authority → PRODUCTION.md on landing."
     },
     {
       "id": "BL-113",
@@ -2346,6 +2346,74 @@
       "authority_doc": "CLAUDE.md",
       "summary": "Idea (2026-07-07, Ben, end of the ledger-mockup session): a prose-analysis pass on the CENTRAL documentation — CLAUDE.md, .claude/rules/io-standing-rules.md, DEVELOPMENT_PRACTICES.md, DELIVERY.md. Prompted by the observation that these docs specify the discipline of development entirely in the negative (what to avoid, 'favour X over Y', 'no ceremony') and never name the reward — the craft / enjoyment of the work. The prose is Ben's to write; this item just captures the analysis + candidate framings for when he is in the mood. Not urgent (Ben: 'won't change it soon') but rated SSS: the central docs are the project's operating system, so their prose quality is strategically load-bearing.",
       "design": "**Seed observation.** The central docs name the *constraints* of good development well but never the *satisfactions* — they say what to avoid, rarely what to reach for or savour. A prose pass could name the reward without tipping into motivational-poster register.\n\n**Candidate framings (from the 2026-07-07 discussion — Ben picks; the prose is his):**\n- *Legibility as a pleasure, not just a constraint* — 'favour legible over clever' is defensive; name the payoff instead: a good solution reads as obvious in hindsight and is a pleasure to explain.\n- *The proportionate as its own reward (Rule 0)* — a clean one-liner is a genuine pleasure; don't rob a small win of it with ceremony. Rule 0 frames Light as the cheap option; it is often the satisfying one.\n- *Flow* — the docs are all gates and barriers; nothing blesses momentum. Something like 'when the path is clear, keep moving; save the ceremony for the seam.'\n- *The click / the quietly-wrong* — name the satisfaction of finding the thing that is secretly wrong (the fix that also dissolves a latent problem; e.g. the lens-key reposition that pre-empted a future overlap).\n- *Taste as a valid input* — when something reads wrong, fixing it is work, not vanity (the '||' → square pause glyph).\n- *The loop mirrors the game* (the strongest, Io-specific one) — Project Io prizes legible, composable systems that justify themselves by feeding Trade or Conflict; describe the development process in the same words: each change feeds something, composes cleanly, reads legibly. A game about elegant systems, built by an elegant system.\n- *The word 'fun' itself* may land light in that register; heavier synonyms carry the same energy — craft, satisfaction, momentum, or (for a game) play.\n\n**Scope.** Analysis + rewording of the Tone / Rule-0 / working-method sections primarily. Doc-only, no code. Authority: the docs themselves."
+    },
+    {
+      "id": "BL-130",
+      "short_name": "REAL_MARKET_INVENTORY",
+      "category": "Trade",
+      "title": "Revisit real market inventory vs derived-from-supply stock (post-optimization)",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "C",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [
+        "BL-095"
+      ],
+      "blocked_on": [],
+      "written": "2026-07-07",
+      "files": [
+        "src/world/components.hpp",
+        "src/world/market_clearing.cpp",
+        "src/world/economy_system.cpp"
+      ],
+      "authority_doc": "docs/economy/PRODUCTION.md",
+      "summary": "Filed 2026-07-07 from the economy design session. BL-095 settled on DERIVED-from-supply market stock (a rolling throughput figure) for calculation simplicity, deferring a real persistent per-resource inventory. Ben: revisit once we have had a moment to work on optimisation and efficiency of the program. A real inventory is the cleaner substrate for competition and for a future RUNTIME market split/merge, at the cost of a serialized field on the flat-binary seam + tick accounting.",
+      "design": "Post-optimization revisit of the BL-095 stock model. Decide whether markets should hold a **real persistent per-resource inventory** (fills from production + nation capacity, drains to consumption + construction) rather than a derived-from-recent-supply figure. Trade-off: a real inventory is the cleanest substrate for \"greedy actors compete for stock\" and for runtime market split/merge (BL-132), but adds a serialized array to the flat-binary seam and deterministic tick accounting. Gate: only worth doing after a general optimization/efficiency pass. `requires` BL-095. Authority → PRODUCTION.md on landing."
+    },
+    {
+      "id": "BL-131",
+      "short_name": "PLAYER_MARKET_DESTRUCTION",
+      "category": "Trade",
+      "title": "Player-driven market destruction (the only runtime market change)",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "C",
+      "difficulty": 4,
+      "parked": false,
+      "requires": [
+        "BL-096"
+      ],
+      "blocked_on": [],
+      "written": "2026-07-07",
+      "files": [],
+      "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+      "summary": "Filed 2026-07-07 from the economy design session. BL-096 makes market generation a fixed one-pass step (no runtime split/merge). Ben: in the game, players will be the only ones who can destroy markets — but it is not yet clear how that would happen. This item holds the mechanism design for the single sanctioned runtime market change.",
+      "design": "Design the mechanism by which a **player** can destroy/collapse a market at runtime — the only sanctioned runtime change to the otherwise fixed, generation-time market map (BL-096). Open: what player action causes it (economic starvation of a market? military/Conflict action? deliberate withdrawal?), what happens to the market's catchment tiles and population demand when it dissolves (fold into a neighbour, or go marketless), and how it reads on-canvas. Deterministic given player inputs. `requires` BL-096. Authority → GENERATION_STRATEGY.md / SYSTEMS.md on landing."
+    },
+    {
+      "id": "BL-132",
+      "short_name": "MARKET_COGENERATION",
+      "category": "Trade",
+      "title": "Full market/population co-generation — population near resources, markets on trade routes, corp carving",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "C",
+      "difficulty": 5,
+      "parked": false,
+      "requires": [
+        "BL-096"
+      ],
+      "blocked_on": [],
+      "written": "2026-07-07",
+      "files": [
+        "src/world/hard_coded_world.cpp",
+        "src/world/nation_generation.cpp",
+        "src/world/market_clearing.cpp"
+      ],
+      "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
+      "summary": "Filed 2026-07-07 from the economy design session. BL-096's first cut keeps population placement as-is and carves markets by nation territory. Ben's fuller ideal: population spawns near rich resources, and markets are centred on rich trade routes, with corps (not just nations) carving resource clusters. Assessed as a LARGER REWRITE (population placement + generation ordering + a trade-flow proxy), so deferred per Ben's conditional steer.",
+      "design": "The fuller co-generation vision deferred from BL-096. Three coupled changes: (1) **population spawns near rich resources** — make generate_population_centres resource-aware; (2) **markets centred on rich trade-route proxies** — since live routes do not exist at gen-time, derive a static resource↔population trade-flow proxy and centre markets on it; (3) **corp-level carving** — place corps before markets (a generation reorder) so competing corporations, not just nations, carve resource clusters. Larger rewrite touching hard_coded_world / nation_generation / market seeding; determinism-sensitive. `requires` BL-096. Authority → GENERATION_STRATEGY.md on landing."
     }
   ]
 }

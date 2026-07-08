@@ -74,6 +74,53 @@ economy = {
             resource_costs = { steel = 50.0, refined_fuel = 20.0 },
         },
     },
+
+    -- BL-078: the elastic nation-substrate model. The saturated background
+    -- economy (GENERATION_STRATEGY.md) is given two precise faces at tick time.
+    --   DEMAND  = population_weight × demand_basket[r] × elasticity(price)
+    --     a tiered per-capita basket (food primary, industry inputs lighter) that
+    --     is price-elastic — a lower price raises consumed quantity along a
+    --     down-sloping curve, so price *discovers* instead of clamping.
+    --   SUPPLY  = min(capacity[r] × capacity_scale, demand × clearing_fraction)
+    --     an abstract nation production capacity (deposit-derived at generation)
+    --     that tracks demand and clears it only to `clearing_fraction`, leaving a
+    --     live margin — the saturation cushion where capacity is ample, a wide
+    --     opportunity gap where the nation lacks the deposit (supply pegs short,
+    --     price rises: the gap the player fills).
+    -- All faces are deterministic (a curve, not RNG). Magnitudes are legible
+    -- defaults, retuned by playtest once real price ranges are visible.
+    substrate = {
+        -- Per-capita aggregate demand weight per resource (population + background
+        -- industry pull). Unlisted resources get 0 (no substrate demand).
+        demand_basket = {
+            food_rations         = 0.70,  -- population primary
+            agricultural_produce = 0.55,  -- food processing + direct
+            steel                = 0.45,  -- construction / industry
+            water                = 0.40,  -- life support + industry
+            refined_fuel         = 0.40,  -- energy
+            iron_ore             = 0.35,  -- background smelting input
+            petroleum            = 0.30,  -- background refining input
+        },
+        capacity_scale     = 2.0,  -- deposit-derived capacity → supply ceiling scale
+        clearing_fraction  = 0.90, -- abstract supply clears this fraction of demand (leaves the cushion/margin)
+        demand_elasticity  = 0.80, -- exponent on (base_price / price); higher = more price-responsive
+        elasticity_min     = 0.30, -- clamp on the elasticity factor (dear goods still consumed a little)
+        elasticity_max     = 2.50, -- clamp on the elasticity factor (cheap goods consumption saturates)
+        demand_scale       = 1.00, -- global population → demand scale
+        growth_met_threshold = 0.50, -- basket met-supply ratio a centre needs to grow (BL-078 growth)
+    },
+
+    -- BL-095: construction is gated on local market supply. Each tick a build
+    -- draws 1/build_duration_ticks of its materials as real market DEMAND (bids
+    -- the price up, competes with population and other builds) and progresses at a
+    -- rate set by how much of that need the market can supply:
+    --   market supplies the full need   -> full speed (base build_duration_ticks)
+    --   market supplies part            -> stretched, proportionally slower
+    --   supplies less than 1/max_stretch -> paused until supply recovers
+    -- so a starved build takes up to max_stretch × its base duration, then stalls.
+    construction = {
+        max_stretch = 10.0, -- longest a starved build stretches to (×base duration); below 1/max_stretch it pauses.
+    },
 }
 
 -- Logistics cost constants (BL-045 / BL-039 supply layer).

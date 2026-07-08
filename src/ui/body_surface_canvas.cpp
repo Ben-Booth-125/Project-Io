@@ -143,8 +143,9 @@ void draw_resource_key(ImDrawList* dl, ImVec2 anchor,
     dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "filled = deposit present");
 }
 
-/// On-canvas legend for the Opportunity lens (BL-017): a diverging loss→profit
-/// gradient bar over the best-building net-margin surface.
+/// On-canvas legend for the Opportunity lens (BL-112): a diverging supplied→unmet
+/// gradient bar over the per-catchment unmet-demand surface (biggest tradeable
+/// price/base ratio — a market bidding above its floor is the gap to fill).
 void draw_opportunity_key(ImDrawList* dl, ImVec2 anchor)
 {
     const float pad    = 8.0f;
@@ -152,9 +153,10 @@ void draw_opportunity_key(ImDrawList* dl, ImVec2 anchor)
     const float bar_h  = 10.0f;
     const float body_h = pad + line_h + 4.0f + bar_h + 2.0f + line_h + pad;
     float x, y, bar_w;
-    begin_lens_key(dl, anchor, 168.0f, body_h, pad, x, y, bar_w);
+    // A touch wider than the other keys so the "(unmet demand)" qualifier fits.
+    begin_lens_key(dl, anchor, 190.0f, body_h, pad, x, y, bar_w);
 
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Opportunity (margin)");
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Opportunity (unmet demand)");
     y += line_h + 4.0f;
     constexpr ImU32 loss   = IM_COL32(216, 100,  96, 255);
     constexpr ImU32 profit = IM_COL32(110, 200, 120, 255);
@@ -168,9 +170,9 @@ void draw_opportunity_key(ImDrawList* dl, ImVec2 anchor)
                           { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
     }
     y += bar_h + 2.0f;
-    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "loss");
-    const ImVec2 ts = ImGui::CalcTextSize("profit");
-    dl->AddText({x + bar_w - ts.x, y}, IM_COL32(170, 175, 185, 255), "profit");
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "supplied");
+    const ImVec2 ts = ImGui::CalcTextSize("unmet");
+    dl->AddText({x + bar_w - ts.x, y}, IM_COL32(170, 175, 185, 255), "unmet");
 }
 
 /// On-canvas legend for the Production lens (BL-009): a diverging cool→warm bar
@@ -668,68 +670,31 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     }
     const float prod_mean = prod_count > 0 ? std::exp(prod_log_sum / static_cast<float>(prod_count)) : 0.0f;
 
-    // Opportunity lens pre-pass (BL-017): per tile, the estimated net margin of the
-    // best valid building on that terrain — output value minus input value and
-    // upkeep — evaluated *without* regard to what is currently built or to
-    // logistics. A siting signal: where could value be made? Diverging red(loss)→
-    // green(profit), normalised against the body's largest absolute margin.
-    std::unordered_map<entity_id, float> opp_margin; // tile id → best net margin
-    float opp_max_abs = 0.0f;
+    // Opportunity lens pre-pass (BL-112): a market-level unmet-demand field, keyed
+    // off the live price-discovering market (BL-078). The opportunity is the gap a
+    // scarce, high-priced market opens up — for each market on the body, the largest
+    // tradeable price/base ratio: a good bid above its floor is demand outrunning
+    // supply, exactly the margin the player can fill. Untradeable goods (base_price
+    // 0 — the space-era resources) carry no floor and are skipped. Every tile in a
+    // market's catchment reads that market's gap (market_for_tile); diverging
+    // oversupplied(red)→opportunity(green) about the neutral floor, on the same
+    // symmetric price band as diverging_colour.
+    std::unordered_map<entity_id, float> opp_ratio; // market id → biggest tradeable price/base ratio
     if (state.overlay == overlay_mode::opportunity)
     {
-        const building_economics& ext_e  = reg.economics(building_type::extraction_site);
-        const building_economics& proc_e = reg.economics(building_type::processing_facility);
-        for (const auto& [id, tile] : w.tiles)
+        for (const auto& [mid, mk] : w.markets)
         {
-            if (tile.body != state.active_body)
+            if (mk.body != state.active_body)
                 continue;
-            const auto mk_it = w.markets.find(market_for_tile(w, id));
-            if (mk_it == w.markets.end())
-                continue;
-            const auto& price = mk_it->second.price;
-
             float best = 0.0f;
-            bool  have = false;
-
-            // Extraction: best single deposit on the tile (valid terrain only).
             for (std::size_t r = 0; r < resource_count; ++r)
             {
-                if (tile.resource_deposit[r] <= 0.0f)
+                if (mk.base_price[r] <= 0.0f) // untradeable good — no floor to bid over
                     continue;
-                const resource_type rt = static_cast<resource_type>(r);
-                if (!placement_rules::can_place(tile, building_type::extraction_site, rt))
-                    continue;
-                const float gross = ext_e.base_rate * tile.resource_deposit[r] * price[r];
-                const float net   = gross - ext_e.maintenance - ext_e.base_wage;
-                best = have ? std::max(best, net) : net;
-                have = true;
+                best = std::max(best, mk.price[r] / mk.base_price[r]);
             }
-
-            // Processing: best recipe (valid on any non-ocean terrain).
-            if (placement_rules::can_place(tile, building_type::processing_facility, resource_type::iron_ore))
-            {
-                for (std::size_t i = 0; i < reg.recipe_count(); ++i)
-                {
-                    const recipe* rec = reg.get_recipe(static_cast<uint16_t>(i));
-                    if (!rec)
-                        continue;
-                    float gross = 0.0f, cost = 0.0f;
-                    for (std::size_t r = 0; r < resource_count; ++r)
-                    {
-                        gross += rec->outputs[r] * price[r];
-                        cost  += rec->inputs[r]  * price[r];
-                    }
-                    const float net = proc_e.base_rate * (gross - cost) - proc_e.maintenance - proc_e.base_wage;
-                    best = have ? std::max(best, net) : net;
-                    have = true;
-                }
-            }
-
-            if (have)
-            {
-                opp_margin[id] = best;
-                opp_max_abs    = std::max(opp_max_abs, std::abs(best));
-            }
+            if (best > 0.0f)
+                opp_ratio[mid] = best;
         }
     }
 
@@ -898,16 +863,19 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 fill = lerp_colour(fill, live, 0.15f + 0.7f * eff);
             }
         }
-        // Opportunity lens (BL-017): tint a tile by the net margin of the best valid
-        // building on its terrain — a diverging red(loss)→green(profit) surface
-        // normalised against the body's largest absolute margin. A siting signal:
-        // where could value be made? Tiles with no valid building keep terrain hue.
+        // Opportunity lens (BL-112): tint a tile by the unmet-demand margin of its
+        // catchment market — the biggest tradeable price/base ratio (pre-pass above).
+        // A good bid above its floor is demand the player can supply; the whole
+        // catchment reads that market's gap. Diverging oversupplied(red)→
+        // opportunity(green) about the neutral floor (ratio 1.0), on the symmetric
+        // [0.25×, 4×] price band diverging_colour uses. Tiles with no market keep hue.
         else if (state.overlay == overlay_mode::opportunity)
         {
-            const auto it = opp_margin.find(id);
-            if (it != opp_margin.end() && opp_max_abs > 0.0f)
+            const auto it = opp_ratio.find(market_for_tile(w, id));
+            if (it != opp_ratio.end())
             {
-                const float d = std::clamp(it->second / opp_max_abs, -1.0f, 1.0f);
+                const float ratio = std::clamp(it->second, 0.25f, 4.0f);
+                const float d     = std::log(ratio) / std::log(4.0f); // [-1, 1]
                 constexpr ImU32 loss   = IM_COL32(216, 100,  96, 255);
                 constexpr ImU32 profit = IM_COL32(110, 200, 120, 255);
                 fill = d < 0.0f ? lerp_colour(fill, loss, -d * 0.75f)

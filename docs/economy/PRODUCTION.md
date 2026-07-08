@@ -20,7 +20,7 @@ Output rate is the product of three factors:
 
 i.e. `output = base_rate × richness × workforce × (1 − hazard)`, where `base_rate` is a Lua-authored economic constant.
 
-Deposits do not deplete in the prototype: `resource_deposit[r]` is the fixed **richness** (the rate multiplier above), and a reserved **`remaining`** reserve per deposit is carried unused so the post-prototype depletion model can draw it down without a data-model retrofit. Richness sets the rate; the reserve will deplete.
+Deposits **deplete** (BL-079): `resource_deposit[r]` is the fixed **richness** (the rate multiplier above), while `resource_remaining[r]` is a finite reserve — seeded at generation to richness × a reserve factor — that extraction draws down each tick. As the reserve nears empty the output **tapers**, then the building reports the deposit **exhausted** and stops. Richness sets the rate; the reserve sets how long the tile pays out — the boom-bust arc a resource-dependent corporation rides (see `docs/development/backlog.json` § BL-079).
 
 ### Extraction buildings
 
@@ -186,9 +186,30 @@ Extraction and processing outputs accrue into a shared stockpile pool held per `
 
 1. **Supply** is the goods each corporation lists for sale — its surplus above what its own processors will consume that tick.
 2. **Demand** is the total input shortfall auto-bought by processing buildings (inputs not covered by the corporation's own pool), plus any standing convoy cargo orders (from Layer 5 onward).
-3. **Transactions clear at base price.** Sales credit, and purchases debit, the corporation's balance at `market_component.base_price`. Price resolution from the supply/demand ratio is deferred to a discrete open item (BACKLOG.md § Trade); until then `market_component.price` stays at `base_price`.
+3. **Transactions clear at the resolved market price (BL-078).** Sales credit, and purchases debit, the corporation's balance at `market_component.price`, resolved each Tick from the supply/demand ratio as `base × √(demand/supply)`, clamped to the `[0.25×, 4×]` band and EMA-smoothed. Demand and supply are no longer flat/deposit-flooded: the nation substrate is redefined into a **price-elastic per-capita basket demand** and an **abstract nation-capacity supply** that clears demand only partially, leaving a live margin (the fillable opportunity gap). See `docs/economy/RESOURCES.md` and `scripts/economy.lua` § `substrate` for the model and its tunables.
 
 ---
+
+## Construction pacing (BL-095)
+
+Construction is a **market-gated, pay-as-you-build** process, not an instant purchase.
+Placing a building gates only on affordability (the corp must be able to afford the whole
+build to commit to it) and does **not** debit up front. Each economy tick a building under
+construction:
+
+- draws `resource_build_cost / build_duration_ticks` of its materials as **real market
+  demand** (competing with population and other builds, bidding the local price up) and pays
+  the resolved price for them, plus the same fraction of the flat `build_cost`;
+- progresses at a **rate set by how much of that per-tick material need the local market can
+  supply** — read from the market's recent throughput (`market_component.supply`, a *derived*
+  figure, not a stored inventory): market supplies the full need → full speed; supplies part →
+  **stretched** (up to `max_stretch ≈ 10×` the base duration); supplies less than
+  `1/max_stretch` → **paused** until supply recovers.
+
+So a build in a thin market slows or stalls rather than completing instantly, and its cost is
+spread across the build. The front door shows the analog rate/ETA/paused status rather than a
+binary reject. Tunables live in `scripts/economy.lua` § `construction`. A depletable real
+market inventory (vs. the derived figure) is revisited in `backlog.json` § BL-130.
 
 ## Layer 3 prototype scope
 

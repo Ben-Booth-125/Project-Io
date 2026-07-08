@@ -10,9 +10,12 @@
 #include "world/placement_rules.hpp"
 #include "world/world.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <map>
+#include <set>
 #include <utility>
+#include <vector>
 
 static std::size_t ri(resource_type r) { return static_cast<std::size_t>(r); }
 
@@ -386,8 +389,50 @@ int main()
     std::printf("  BL-053 R2 strong size variance (max >= 3x min): %s\n",
                 variance_ok ? "PASS" : "FAIL");
 
+    // --- BL-096: resource-carved market generation ---
+    // Markets are population-anchored but resource-carved: a nation's territory is
+    // split into more or fewer markets by its tradeable-resource concentration, with
+    // nations as the carving actor. Assert the carve produced a plural, cross-nation
+    // market map and that it is deterministic (same seed -> same map).
+    int kepler_markets = 0;
+    std::vector<entity_id> centre_tiles;
+    std::set<entity_id>    market_nations;
+    for (const auto& [mid, mc] : w.markets)
+    {
+        if (mc.body != kepler)
+            continue;
+        ++kepler_markets;
+        centre_tiles.push_back(mc.centre_tile);
+        if (mc.centre_tile != null_entity)
+        {
+            const auto nit = w.tile_to_nation.find(mc.centre_tile);
+            if (nit != w.tile_to_nation.end())
+                market_nations.insert(nit->second);
+        }
+    }
+    std::sort(centre_tiles.begin(), centre_tiles.end());
+    const bool market_count_ok = kepler_markets >= 2 && kepler_markets <= 20;
+    const bool cross_nation_ok = market_nations.size() >= 2;
+    std::printf("Kepler markets: %d (anchored across %zu nations)\n",
+                kepler_markets, market_nations.size());
+    std::printf("  BL-096 R1 resource-carved market count in [2,20]: %s\n",
+                market_count_ok ? "PASS" : "FAIL");
+    std::printf("  BL-096 R2 markets span >= 2 nations (nation-carved): %s\n",
+                cross_nation_ok ? "PASS" : "FAIL");
+
+    world wm2 = make_hard_coded_world();
+    std::vector<entity_id> centre_tiles2;
+    for (const auto& [mid, mc] : wm2.markets)
+        if (mc.body == wm2.home_body)
+            centre_tiles2.push_back(mc.centre_tile);
+    std::sort(centre_tiles2.begin(), centre_tiles2.end());
+    const bool market_determinism_ok = (centre_tiles == centre_tiles2);
+    std::printf("  BL-096 R4 same seed reproduces the market map: %s\n",
+                market_determinism_ok ? "PASS" : "FAIL");
+
     return (fw_frac >= 3.0f && bad == 0 && seed_bad == 0 && seam_bad == 0
             && unclaimed_land == 0 && holdings_bad == 0 && stockpile_ok
             && absent == 0 && ordering_ok
-            && count_ok && variance_ok) ? 0 : 1;
+            && count_ok && variance_ok
+            && market_count_ok && cross_nation_ok && market_determinism_ok) ? 0 : 1;
 }
