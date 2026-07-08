@@ -6,6 +6,7 @@
 #include "hover_card.hpp"
 #include "hover_content.hpp"
 #include "icons.hpp"
+#include "market_ledger.hpp" // market_city_name (Market lens catchment key, BL-015)
 #include "nav_pane.hpp"
 #include "presentation.hpp"
 #include "world/market_clearing.hpp" // market_for_tile (Scarcity catchment, prices)
@@ -220,8 +221,9 @@ ImU32 diverging_colour(float ratio)
 /// the selected good's name and its current price ratio (or an "untraded" note when
 /// the body's market has no entry for it). Same left-edge placement as the Resource key.
 // BL-015: market lens is now a catchment-boundary tint (one colour per market).
-// The key shows a colour swatch per market with an ordinal label.
-void draw_market_key(ImDrawList* dl, ImVec2 anchor,
+// The key shows a colour swatch per market labelled with its city name (matching the
+// ledger / selection / CSV — never a bare ordinal, which the player never sees elsewhere).
+void draw_market_key(ImDrawList* dl, ImVec2 anchor, const world& w,
                      const ui_state& /*state*/,
                      const std::unordered_map<entity_id, ImU32>& catchment_colours)
 {
@@ -229,7 +231,21 @@ void draw_market_key(ImDrawList* dl, ImVec2 anchor,
     const float line_h = ImGui::GetTextLineHeight();
     const float swatch = line_h;
     const int   n      = static_cast<int>(catchment_colours.size());
-    const float box_w  = 140.0f;
+
+    // Stable legend order — the source map iterates arbitrarily; sort by market id so the
+    // swatch list does not reshuffle frame to frame (colours stay keyed to their market).
+    std::vector<std::pair<entity_id, ImU32>> entries(catchment_colours.begin(),
+                                                     catchment_colours.end());
+    std::sort(entries.begin(), entries.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
+
+    // Size the box to the widest label so long city names are not clipped.
+    float label_w = ImGui::CalcTextSize("Market catchments").x;
+    for (const auto& [mid, col] : entries)
+        label_w = std::max(label_w,
+            swatch + 4.0f + ImGui::CalcTextSize(market_city_name(w, mid).c_str()).x);
+    const float box_w = std::max(140.0f, label_w + 2.0f * pad);
+
     const float body_h = pad + line_h + 4.0f
                        + static_cast<float>(std::max(n, 1)) * (swatch + 2.0f)
                        + pad;
@@ -245,21 +261,18 @@ void draw_market_key(ImDrawList* dl, ImVec2 anchor,
     dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Market catchments");
     y += line_h + 4.0f;
 
-    if (catchment_colours.empty())
+    if (entries.empty())
     {
         dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "No markets");
         return;
     }
 
-    int idx = 1;
-    for (const auto& [mid, col] : catchment_colours)
+    for (const auto& [mid, col] : entries)
     {
         dl->AddRectFilled({x, y}, {x + swatch, y + swatch}, col);
-        char label[32];
-        std::snprintf(label, sizeof(label), " Market %d", idx);
-        dl->AddText({x + swatch + 4.0f, y}, IM_COL32(220, 220, 220, 255), label);
+        const std::string label = market_city_name(w, mid);
+        dl->AddText({x + swatch + 4.0f, y}, IM_COL32(220, 220, 220, 255), label.c_str());
         y += swatch + 2.0f;
-        ++idx;
     }
 }
 
@@ -1579,7 +1592,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     if (state.overlay == overlay_mode::resource)
         draw_resource_key(dl, lens_key_anchor, state);
     else if (state.overlay == overlay_mode::market)
-        draw_market_key(dl, lens_key_anchor, state, market_catchment_colour);
+        draw_market_key(dl, lens_key_anchor, w, state, market_catchment_colour);
     else if (state.overlay == overlay_mode::population)
         draw_population_key(dl, lens_key_anchor);
     else if (state.overlay == overlay_mode::opportunity)
