@@ -25,6 +25,19 @@ nodes; **scope: all post-prototype** (no lean gate-tech item minted for v0.1.0).
 **Left open:** Era-event mechanics (timing/foreseeability, boundary effects, gate-quest rename) —
 the item's remaining owed set. Branch: `claude/mobile-design-opportunities-4bxp67`.
 
+**Follow-up (same day): mock tech tree in a build.** Ben asked for a quick mock to work with while
+the design is fresh. Landed as `scripts/tech_tree.lua` (the worked Propellant Loop ~25 techs +
+Era 0/1 stub quests + standing lines, 53 techs total, resolutions applied),
+`world/tech_tree.{hpp,cpp}` (string-field registry, sol2 loader mirroring recipe_registry), and a
+**read-only F9 viewer** (`ui/tech_tree_panel.{hpp,cpp}`, new `canvas_command::tech_tree_toggle`) —
+capstone rows tinted gold, economically-gated rows blue, unlock text on hover. **Display only** —
+no research state, no sim coupling, so BL-087 resolution 6 (system is post-prototype) stands.
+`tech_tree.cpp` joins `recipe_registry.cpp` in the headless-superset exclusion (CMakeLists +
+build.yml). *Caveat:* the cloud container's network policy blocks the FetchContent dependency
+downloads, so the full app build could not be run here — the headless harness loop compiles green
+with the new exclusion, the new header syntax-checks, and the panel/loader mirror existing
+patterns, but the first desktop build is the real verification.
+
 ## Session — Economy dynamism batch delivered: BL-078/095/096/079/112 (2026-07-07)
 
 **Context.** Delivered the five interlocking economy items designed in the prior session (below) as one
