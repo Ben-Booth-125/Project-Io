@@ -71,6 +71,20 @@ inline constexpr ImU32 selection = IM_COL32(255, 255, 255, 255); ///< The select
 inline constexpr ImU32 hover     = IM_COL32(120, 190, 255, 255); ///< The entity under the cursor.
 inline constexpr ImU32 pinned    = IM_COL32(255, 200,  90, 255); ///< An Explorer-pinned entity.
 
+// --- text legibility (BL-063 contrast audit, 2026-07-08) ---
+// ImGui's default ImGuiCol_TextDisabled (mid grey 128,128,128) measures ~4.8:1
+// against the dark theme's window background (StyleColorsDark, app.cpp) — it
+// grazes WCAG AA's 4.5:1 floor with no margin, and several dim/secondary labels
+// (header BALANCE/STOCKPILE/NET captions, the Selection element's Parent/Focus/
+// Territory lines, the EXPLORER placeholder) read at or under that line once
+// window transparency and font hinting are accounted for. text_secondary is the
+// AA-safe replacement for those tokens (~10:1 against the dark theme) — apply it
+// via ImGui::PushStyleColor(ImGuiCol_Text, text_secondary) in place of
+// TextDisabled at a call site, rather than lightening TextDisabled itself, since
+// TextDisabled is also used for genuinely inactive/greyed-out controls where the
+// dimmer default is the correct affordance.
+inline constexpr ImU32 text_secondary = IM_COL32(190, 194, 202, 255); ///< AA-safe dim/label text.
+
 // --- civic (settlements; BL-083) ---
 // Population-centre markers are civic-neutral: settlements are not corp-owned, so a
 // corp tint would misread as ownership, and tier is carried by the glyph size, not

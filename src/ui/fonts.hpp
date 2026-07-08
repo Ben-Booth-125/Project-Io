@@ -26,4 +26,14 @@ namespace ui {
 /// @return        The loaded font (also set as ImGui's default font).
 ImFont* load_ui_font(float size_px = 16.0f);
 
+/// Re-load the UI font atlas at a new @p size_px (BL-063 discrete UI-scale
+/// steps — 1.0 / 1.25 / 1.5 — re-render crisper than ImGui's FontGlobalScale).
+/// Clears the existing atlas and calls load_ui_font(size_px); the caller is
+/// responsible for destroying the renderer backend's fonts texture afterwards
+/// so it is rebuilt from the new atlas on the next frame.
+///
+/// @param size_px Font size in pixels.
+/// @return        The loaded font.
+ImFont* reload_ui_font(float size_px);
+
 } // namespace ui

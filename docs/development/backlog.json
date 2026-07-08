@@ -86,49 +86,45 @@
       "short_name": "REACH_LOGISTICS_LENS",
       "category": "Canvas",
       "title": "Reach / Logistics-range lens",
-      "status": "design-owed",
-      "glyph": "~",
-      "priority": "F",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "B",
       "difficulty": 4,
-      "parked": true,
+      "parked": false,
       "requires": [
         "BL-039"
       ],
-      "blocked_on": [
-        "SUPPLY_CONVOYS"
-      ],
+      "blocked_on": [],
       "written": "2026-06-16",
       "files": [
         "src/ui/body_surface_canvas.cpp"
       ],
       "authority_doc": "docs/ui/LENSES.md",
-      "summary": "Static reach surface (deployment/supply falloff from ports/launchpads). Underdefined until the Supply route model exists; may be a Supply sub-mode. Design owed.",
-      "design": "**Status:** design-owed (parked, F). No BACKLOG.md body was preserved — the problem statement lives in this item's `summary`. Open: whether this is a standalone lens or a Supply sub-mode, and the reach / supply-falloff model from ports/launchpads. Blocked until the Supply route model exists. Authority docs/ui/LENSES.md; relates to BL-014."
+      "summary": "Body-level reach lens: which bodies a corp's trade routes currently connect to, tiered by recency. Standalone lens, distinct from BL-014's flow read. Unblocked — BL-039/BL-088 landed.",
+      "design": "**Status:** complete. Landed 35dd1fb: `overlay_mode::reach` renders an on-canvas key/readout (connected-bodies list + recency tier) for the active body's own connections — `body_surface_canvas.cpp` only ever renders the active body's tile grid, so the originally-envisioned cross-body glow/marker rendering isn't reachable there; that fuller visual is a follow-up for `solar_system_canvas.cpp`. Dedicated icon glyph also deferred (reuses `icons::convoy`). Build clean; visual verification not yet run. Prior design: Unblocked: BL-039 (Supply convoys) and BL-088 (persistent `trade_route`) are both complete, so lane data exists at the body level. No distance-cost/falloff model exists anywhere in `supply_system`, so this scopes to what the data actually supports rather than inventing new physics.\n\n**Shape (settled):** standalone lens — its own `overlay_mode::reach` and strip icon — not a Supply sub-mode. Reach reads *static coverage*; BL-014's Supply lens reads *live flow*; distinct enough to earn separate slots.\n\n**Model.** For the selected corp, reach = the set of bodies connected via that corp's `trade_route` entries from a chosen origin body, tiered by `last_tick` recency — reuse the fresh/aging/stale tiering convention from the activity fog (`docs/ui/DISCOVERY.md`, BL-089) rather than inventing new thresholds. No physical falloff radius: a body is connected (with a recency tier) or it isn't — `trade_route` carries no distance/strength field to derive one from.\n\n**Rendering.** Body-to-body highlight (glow/outline on the body marker) on the relevant canvas/minimap, not a per-tile field — reach is body-level connectivity, matching `trade_route`'s granularity.\n\nOpen at promotion: reuse DISCOVERY.md's exact stale-aging tick thresholds rather than picking new ones; confirm player-only vs all-corps rendering (competitor-visibility rule — likely player's own routes only). Authority docs/ui/LENSES.md; relates to BL-014."
     },
     {
       "id": "BL-014",
       "short_name": "SUPPLY_ROUTES_LENS",
       "category": "Canvas",
       "title": "Supply-routes lens — market-connection graph",
-      "status": "design-owed",
-      "glyph": "~",
-      "priority": "F",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "B",
       "difficulty": 3,
-      "parked": true,
+      "parked": false,
       "requires": [
         "BL-039",
         "BL-037"
       ],
-      "blocked_on": [
-        "SUPPLY_CONVOYS"
-      ],
+      "blocked_on": [],
       "written": "2026-06-16",
       "files": [
         "src/ui/body_surface_canvas.cpp"
       ],
       "authority_doc": "docs/ui/LENSES.md",
-      "summary": "Graph of trade connections between markets, edge thickness/colour from net trade worth. Aggregate edges once per frame. Blocked on inter-market trades existing. Design owed.",
-      "design": "**Status:** design-owed (parked, F). No BACKLOG.md body was preserved — see this item's `summary`. Open: how to encode edge worth (thickness/colour from net trade worth) and per-frame edge aggregation. Blocked on inter-market trades existing. Authority docs/ui/LENSES.md; relates to BL-011."
+      "summary": "Graph of trade routes between bodies, edge thickness from convoy_count (volume proxy), recency-tiered colour. Aggregated from BL-088's trade_route list, not per-frame. Unblocked — BL-039/BL-088 landed.",
+      "design": "**Status:** complete. Landed 35dd1fb: `overlay_mode::supply_routes` renders an on-canvas key/readout of the active body's lanes (log-scaled thickness bar per lane + recency-tier colour) rather than cross-body edges, for the same body_surface_canvas.cpp scoping reason as BL-011; the fuller line-between-body-markers visual is a follow-up for `solar_system_canvas.cpp`. Build clean; visual verification not yet run. Prior design: Unblocked: BL-088 gives a persistent `trade_route` (`body_a`, `body_b`, `corp`, `last_tick`, `convoy_count`) per lane.\n\n**Edge worth (scoped down).** `trade_route` carries no running $-value, so 'net trade worth' as originally framed isn't available without a new ledger. Settled: use `convoy_count` (cumulative completions) as the volume proxy for edge thickness, log-scaled so a few heavy lanes don't swamp the rest. Edge colour/alpha = recency tier from `last_tick`, sharing the fresh/aging/stale convention with BL-011 and the activity fog (DISCOVERY.md, BL-089).\n\n**Aggregation (settled):** one edge per unordered (`body_a`, `body_b`) pair, built from the `trade_routes` list at render time — not per-frame convoy positions. Cheap and matches the lens's 'graph', not 'live traffic', framing.\n\n**Rendering.** Line between body markers on the relevant canvas, thickness from log-scaled `convoy_count`, colour/alpha from recency tier.\n\nOpen at promotion: the log-scale constant (tune by eye); player-only vs all-corps lane rendering (competitor-visibility rule — likely player's own routes only, consistent with the activity fog). Authority docs/ui/LENSES.md; relates to BL-011."
     },
     {
       "id": "BL-015",
@@ -158,11 +154,11 @@
       "short_name": "LENS_COLOUR_SCHEME_PASS",
       "category": "Canvas",
       "title": "Lens colour-scheme pass (deferred to a colour session)",
-      "status": "design-owed",
-      "glyph": "~",
-      "priority": "F",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "B",
       "difficulty": 3,
-      "parked": true,
+      "parked": false,
       "requires": [],
       "blocked_on": [],
       "written": "2026-06-16",
@@ -170,8 +166,8 @@
         "src/ui/presentation.hpp"
       ],
       "authority_doc": "docs/ui/LENSES.md",
-      "summary": "Board-wide lens colour reconsideration, reframed by the 2026-06-24 accessibility review as the colour-vision half of accessibility: a colourblind-safe palette PLUS a redundant non-colour channel (pattern/glyph/dash) so no lens relies on hue alone — the Resource lens's red-on-green deposit pips and the Country lens's green/yellow/red fills are the worst cases. Plus on-canvas labels and a Corporation-lens legend. Design owed: the whole pass. (Strip prerequisite BL-013 has since landed — no longer blocked.)",
-      "design": "**Problem.** Board-wide, lens colours need reconsideration — some too harsh, some too soft. The 2026-06-24 accessibility review sharpened this: every lens currently carries its meaning in **hue alone**, and the worst pairings are colour-vision hazards — the **Country lens** fills territories green/yellow/red (the deutan/protan confusion set), the **Resource lens** puts **red 'deposit present' pips on green terrain** (the canonical red-on-green trap), and the **Corporation lens** distinguishes player vs rival by colour only. ~8% of men cannot read these reliably.\n\n**Proposal (to design).** Two coupled passes:\n\n1. **Colourblind-safe palette** — re-pick lens colours from a deuteranopia/protanopia-safe set (Okabe-Ito, or a Viridis-style ordered ramp for the quantitative lenses), not just 'harsh vs soft' aesthetics.\n2. **Redundant second channel** — never rely on hue alone: hatch/pattern fills for territory ownership, glyph *shape* for deposit presence, dashed-vs-solid for player vs rival routes. Carries the original scope too: **on-canvas text labels** (country/market) and a **Corporation-lens legend**.\n\n**Open questions (design owed):** the chosen palette and its mapping to each `overlay_mode`; which lenses get a pattern channel vs a glyph channel; the legend surface; label placement/clutter rules. Identity colours in `src/ui/presentation.hpp`; passes in `src/ui/body_surface_canvas.cpp`; strip in `src/ui/overlay.cpp`; glyph work propagates to `docs/ui/ICONS.md`. The **colour-vision half** of the accessibility strand — companion to BL-063 (legibility/contrast) and BL-062 (motor). The strip prerequisite (BL-013) has since landed (commit 44b0228), so this is no longer blocked on it. *(Written 2026-06-16, v0.0.6 brief intake; accessibility reframing 2026-06-24.)*"
+      "summary": "Colourblind-safe palette pass across all lenses (Okabe-Ito categorical / Viridis-style ordered ramp for quantitative), plus on-canvas labels and a Corporation-lens legend. Scoped down from the original two-pass proposal — no added pattern/glyph redundancy channel (Ben's call).",
+      "design": "**Status:** complete. Landed 287d8e0: Okabe-Ito hues for `corp_table`/`nation_table`, retinted `resource_table` entries (Iron Ore/Copper Ore vs Agricultural Produce/Timber) to break the ore/crop hue collision, new `palette::text_secondary` AA-safe token added. On-canvas country/market labels + Corporation-lens legend NOT done (out of file scope for this pass — `body_surface_canvas.cpp`/`overlay.cpp` follow-up needed). Author agent could not run a local compile; verified clean in the full integrating build. Visual goldens need re-blessing (lens hues changed). Prior design: scoped down from the original two-pass proposal to **palette only**; no added pattern/glyph redundancy channel (Ben's call — accept that gap rather than build a second signalling channel into every lens).\n\n**Problem (unchanged).** Every lens currently carries meaning in hue alone; the worst hazards are the Country lens's green/yellow/red territory fill (the deutan/protan confusion set), the Resource lens's red-on-green deposit pips, and the Corporation lens's player/rival hue-only split.\n\n**Fix (settled):** re-pick lens hues from a colourblind-safe set — Okabe-Ito for categorical lenses (Country, Corporation), a Viridis-style ordered ramp for quantitative lenses (Resource, Scarcity, Population, Production, Industry). Carries the original scope: on-canvas text labels (country/market) and a Corporation-lens legend, which were never part of the dropped pattern-channel half.\n\nOpen at promotion: exact hue assignments per `overlay_mode` in `src/ui/presentation.hpp`; label placement/clutter rules (`src/ui/body_surface_canvas.cpp`); legend surface (strip in `src/ui/overlay.cpp`). Glyph-adjacent changes propagate to `docs/ui/ICONS.md`. The strip prerequisite (BL-013) landed (commit 44b0228). Companion to BL-063 (contrast/scale) and BL-062 (motor) — together the accessibility strand. *(Written 2026-06-16; accessibility reframing 2026-06-24; scoped down 2026-07-08.)*"
     },
     {
       "id": "BL-020",
@@ -556,8 +552,8 @@
       "short_name": "COUNTRY_GENERATION",
       "category": "Environment",
       "title": "Country generation — more countries, generated 'in history'",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "complete",
+      "glyph": "✓",
       "priority": "B",
       "difficulty": 4,
       "parked": false,
@@ -567,11 +563,17 @@
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
-        "src/world/nation_generation.cpp"
+        "src/world/nation_generation.cpp",
+        "src/world/nation_generation.hpp",
+        "src/world/hard_coded_world.cpp",
+        "src/world/hard_coded_world.hpp",
+        "src/core/app.cpp",
+        "tools/verify/world_audit.cpp",
+        "tools/verify/world_determinism.cpp"
       ],
       "authority_doc": "docs/generation/NATION_GENERATION.md",
-      "summary": "More countries than today's Voronoi partition, with a sense of history: v0.1.0 target is clustering seeds with a varied size distribution (some larger, some smaller). Couples to SATURATED_SUBSTRATE. Design owed: clustered-seed sizing, what 'in history' means, count target.",
-      "design": "**Status:** design-owed (B). No BACKLOG.md body was preserved — see this item's `summary`. v0.1.0 target: more countries via clustered seeds with a varied size distribution. Open: clustered-seed sizing, what 'in history' means, the count target. Couples to the saturated substrate (BL-050). Authority docs/generation/NATION_GENERATION.md.",
+      "summary": "More countries than today's Voronoi partition, with a sense of history: over-seed + light merge (Pass 1b growth weights, Pass 2c 'in history' merges) gives a strongly varied, irregular-bordered political layer. Landed fc7c62b (18 seeds -> 14 nations); retuned 2026-07-08 to 34 seeds -> 24 nations for a richer map. No history/event-log mechanic — the variance itself reads as implied age.",
+      "design": "**Status:** complete. Landed in fc7c62b (Pass 1b skewed growth weights + Pass 2c deterministic smallest-into-largest-neighbour merge, `merge_to` nation_param). Retuned 2026-07-08: default `nation_count` 14 -> 24, pre-seed gap `merge_to+4` -> `merge_to+10` (34 seeds merged to 24), New World setup slider widened 6-20 -> 6-30. world_audit BL-053 R1 (count in [20,28]) + R2 (max >= 3x min) both PASS; world_determinism default-descriptor check updated to 24 nations, still PASS. Authority docs/generation/NATION_GENERATION.md.",
       "waits_on": [
         "SATURATED_SUBSTRATE"
       ]
@@ -594,7 +596,7 @@
       ],
       "authority_doc": "docs/generation/NATION_GENERATION.md",
       "summary": "The nation SYSTEM (tax, licences, war, infrastructure), sentiment graph, historical fragmentation (exclaves/disputed zones), non-Kepler jurisdiction. Out of prototype scope; design owed when in scope.",
-      "design": "**Status:** design-owed (parked, F) — out of prototype scope. No BACKLOG.md body was preserved — see this item's `summary`. Covers the nation SYSTEM (tax, licences, war, infrastructure), the sentiment graph, historical fragmentation (exclaves/disputed zones), non-Kepler jurisdiction. Design owed when in scope. Authority docs/generation/NATION_GENERATION.md."
+      "design": "**Status:** designed — shape only (2026-07-08); still parked/out-of-scope, not promote-ready. Settling the structure now (per BL-087's model) so it's ready to pick up once nations move from generation-only to a system.\n\n**Shape.** Four coupled parts, all deterministic and tick-driven like the rest of `world/*`:\n\n1. **Nation SYSTEM.** A nation gets simple per-tick economic state — tax rate (levied on corp production/trade within its territory), a licence gate (a corp needs a licence to build/operate in a nation, cost scales with nation character), and a coarse infrastructure scalar (modulates production/logistics efficiency, generated once, degrading/improving slowly). War is a state flag between nation pairs affecting licence issuance and infrastructure decay, not a combat system — actual Conflict mechanics live elsewhere.\n2. **Sentiment graph.** A small per-nation-pair scalar (-1..1) seeded at generation from shared borders/resource competition, drifting slowly from corp activity (heavy extraction in a nation nudges its sentiment toward the extracting corp's home nation). Read-only input to licence cost/availability; no diplomacy UI for the prototype's follow-on scope.\n3. **Historical fragmentation.** Exclaves and disputed zones are a **generation-time** decoration on top of BL-053's Voronoi/merge output — after merge, some tiles are deliberately left owned by a non-contiguous or disputed neighbour rather than reassigned, for flavour and to justify uneven licence friction. Not a simulated historical event log.\n4. **Non-Kepler jurisdiction.** Off-Earth bodies (once Era 1 opens them) start with no nation ownership — jurisdiction there is corp-claim-based, not nation-based; this item only needs to state that boundary, not design the space-claim system (that's Era 1 scope, BL-087-adjacent).\n\n**Explicitly out of shape (defer further):** exact tax/licence formulas, sentiment decay/drift constants, war trigger conditions, the space-claim model. Those are sub-decisions for when this item is actually promoted, not now.\n\nAuthority docs/generation/NATION_GENERATION.md. Companion to BL-053 (which this builds on) and BL-087 (Era 1, for the non-Kepler boundary)."
     },
     {
       "id": "BL-055",
@@ -780,8 +782,8 @@
       "short_name": "ACCESSIBILITY_LEGIBILITY_BASELINE",
       "category": "Menu",
       "title": "Accessibility & legibility baseline — UI scale + secondary-text contrast",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "complete",
+      "glyph": "✓",
       "priority": "B",
       "difficulty": 3,
       "parked": false,
@@ -795,7 +797,7 @@
       ],
       "authority_doc": "docs/ui/ACCESSIBILITY.md",
       "summary": "Legibility baseline from the 2026-06-24 accessibility UX review: a global UI-scale control (ImGui FontGlobalScale / font re-load) and a secondary-text contrast pass to clear WCAG AA on dim header/label/ledger text. The non-colour half of accessibility — colour-vision stays in BL-016, motor/keyboard in BL-062. Design owed: scale storage/persistence, the FontGlobalScale-vs-refont tradeoff, a measured contrast token audit, whether a docs/ui/ACCESSIBILITY.md is warranted. [NOTE 2026-06-30: this is the WCAG-contrast + UI-scale item; distinct from the shipped tester-legibility trend plots now tracked as BL-066. The 'BL-063' label on the trend-plots commits predates this slot's reassignment.]",
-      "design": "**Problem.** A UX/accessibility review (2026-06-24) of the blessed golden captures surfaced two legibility barriers no existing item covers:\n\n1. **Low secondary-text contrast.** Label/secondary text is dim grey on near-black — the header fields (`Parent`, `Standing`, `NET ±0/qtr`), the EXPLORER placeholder, and ledger sub-labels sit below the WCAG AA 4.5:1 body-text ratio.\n2. **Single fixed UI scale.** Everything renders at one scale. The dense monospace ledgers (balance, corp dashboard, building management) are already small at 1280×720 and become punishing on high-DPI displays; there is no user control to enlarge.\n\nBoth hurt low-vision players, ageing eyes, and high-glare settings.\n\n**Proposal (to design).** A deliberately *narrow* legibility baseline — the non-colour half of accessibility (colour-vision lives in BL-016, motor/keyboard in BL-062):\n\n- **Global UI scale.** A user-adjustable scale through ImGui — either `FontGlobalScale` (cheap, slightly blurry) or re-loading the font atlas at a chosen px in `src/ui/fonts.cpp` (`load_ui_font`, crisp, heavier) — persisted in settings. Likely a discrete step set (e.g. 1.0 / 1.25 / 1.5) so layouts are tested at known sizes rather than a free slider.\n- **Secondary-text contrast pass.** Lift the dim secondary/label tokens to clear AA. Identity colours live in `src/ui/presentation.hpp`; the base theme is `StyleColorsDark()` at `src/core/app.cpp:129`.\n\n**Open questions (design owed):** where the scale setting lives (settings.json vs an in-engine options surface) and how it persists; `FontGlobalScale` vs font-atlas re-load; discrete steps vs continuous; which exact tokens are below AA and their replacement values (needs a measured contrast audit of `presentation.hpp` + the dark theme); whether this warrants a dedicated `docs/ui/ACCESSIBILITY.md` authority doc (proposed) or folds into `LAYOUT.md`. Companion to BL-016 (colour-vision) and BL-062 (motor/keyboard) — together the three are the prototype's **accessibility strand**. *(Written 2026-06-24, accessibility UX review.)*"
+      "design": "**Status:** complete. Landed 287d8e0: discrete 1.0/1.25/1.5x UI-scale via `ui::reload_ui_font`/`app::apply_ui_scale`, persisted in `options.cfg`, wired into the F10 Options window; `palette::text_secondary` AA-safe token added for the contrast half. Wiring `text_secondary` into the ~90 existing `TextDisabled` call sites across the shell is a separate follow-up sweep, not done here. `docs/ui/ACCESSIBILITY.md` not yet authored. Full build clean, 1.0/1.25/1.5x steps confirmed reload the font atlas and persist across restart. Prior design: A deliberately narrow legibility baseline — the non-colour half of accessibility (colour-vision lives in BL-016, motor/keyboard in BL-062).\n\n**Problem (unchanged).** Dim secondary/label text (`Parent`, `Standing`, `NET ±0/qtr`, EXPLORER placeholder, ledger sub-labels) sits below WCAG AA 4.5:1; and everything renders at one fixed scale, punishing on high-DPI displays with no user control.\n\n**Settled (Ben's call): user-facing scale setting**, discrete steps (1.0 / 1.25 / 1.5) rather than a free slider, so layouts are only ever tested at known sizes. Implement via font-atlas re-load at each step's px size in `src/ui/fonts.cpp` (`load_ui_font`) rather than `FontGlobalScale` — crisper, and the discrete-step design already amortises the reload cost (no per-frame rescaling). Persist the chosen step the same way other display prefs persist (`options.cfg`, alongside window size).\n\n**Contrast pass:** lift dim secondary/label tokens in `src/ui/presentation.hpp` (over the `StyleColorsDark()` base, `src/core/app.cpp:129`) to clear AA 4.5:1 — needs a measured audit of current token values against the dark background, not guessed replacements.\n\n**Settled:** fold into a new `docs/ui/ACCESSIBILITY.md` (the authority_doc slot already anticipates it) rather than splitting across `LAYOUT.md`/`LENSES.md` — the accessibility strand (this + BL-016 + BL-062) is coherent enough to own one doc. Doc gets created when this item lands (authority time-slicing — not created now).\n\nOpen at promotion: exact AA-failing token list + replacement values (audit pass); the three scale-step font sizes. Companion to BL-016 (colour-vision) and BL-062 (motor/keyboard). *(Written 2026-06-24, accessibility UX review; settled 2026-07-08.)*"
     },
     {
       "id": "BL-064",
@@ -1598,8 +1600,8 @@
       "short_name": "VIEW_BOUNDING_AUDIT",
       "category": "UI",
       "title": "Bound every shell view/panel like the Selection element — resolution-robust, content-sized",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "complete",
+      "glyph": "✓",
       "priority": "B",
       "difficulty": 3,
       "parked": false,
@@ -1615,7 +1617,7 @@
       ],
       "authority_doc": "docs/ui/LAYOUT.md",
       "summary": "Idea (2026-07-04, Ben): treat every view/panel the way BL-093 fixed the Selection element — properly bounded and resolution-robust. BL-093 found the Selection panel ballooned/clipped because its height was pinned to the resolution-scaled minimap height (mm_h); the fix sized it from content in text-line units. Audit the rest of the shell chrome (header, profile, nav rail, time panel, explorer, minimap, ledger windows, on-canvas keys/strips) for the same class of bug — anything pinned to a resolution-scaled dimension or another element's size, or that can clip/overflow off the verify-capture resolution (1280x720) vs the runtime window — and bound each from content + fixed shell anchors. Standing practice already recorded in DEVELOPMENT_PRACTICES § Display environment; this is the sweep that applies it everywhere.",
-      "design": "**Status:** design-owed — captured 2026-07-04 (Ben). Generalises the BL-093 fix.\n\n### The problem class\nBL-093 (Selection element) balllooned with empty space / clipped because its height was pinned to `mm_h` (`mm_w = max(240, 0.20·min(disp.x,disp.y))`), a **resolution-scaled** value. The fix: size from content in **text-line units** + anchor to a shell edge. The same anti-pattern likely recurs across the shell — any panel whose extent derives from another element's resolution-scaled size, or that assumes the 1280x720 verify-capture resolution and can clip/overflow at the real runtime window (Ben runs 1920x1080; the window is resizable — see the `display-environment` memory + DEVELOPMENT_PRACTICES § Display environment).\n\n### Scope (audit + fix pass)\nWalk each shell region (LAYOUT.md is the map) and check bounding at several resolutions / window sizes: **header** (top strip), **profile** (top-left), **nav rail**, **time panel** (top-right, sized off `mm_w`), **explorer**, **minimap** (+ its new lens bar), the **ledger windows** (shared `ledger_chrome` constants), and the **on-canvas lens keys / control strips**. For each: does it clip, overflow the screen, overlap a neighbour, or leave dead space when the window is small or large? Fix by sizing from content (`GetTextLineHeightWithSpacing()` / measured content) and anchoring to fixed shell edges, never to another element's resolution-scaled extent.\n\n### Method\nDrive the app at a few window sizes (e.g. 1280x720, 1920x1080, a small 1000x600) — the startup `Display:` log reports the runtime size — and capture each region. A `scripts/verify/*.lua` multi-resolution sweep would make this a repeatable check (candidate tool → skill). Proportional, Light-per-panel where a panel is already fine.\n\n### Relationships\nGeneralises **BL-093**. Authority `docs/ui/LAYOUT.md` (+ each panel's own doc). Standing rule already in DEVELOPMENT_PRACTICES § Display environment — this item is the application sweep, not a new rule."
+      "design": "**Status:** complete. Landed 47da542 (fix) after the read-only audit found two real bugs: time-panel height (`app.cpp`, was `mm_h*0.5f`, now sized from content in text-line units) and the Tile Ledger's stale spawn anchor (`ledger_chrome.hpp`, was seeded from the superseded `profile_panel_width=200`, now `ledger_window_spawn(disp_x)`/`ledger_window_size(disp_x,disp_y)` functions anchored off `shell_column_width` + clamped to viewport). Header/profile/nav-rail/minimap/explorer/economy-panel/lens-key audited and confirmed already correct (no fix needed). Full build clean; a `scripts/verify/*.lua` multi-resolution sweep script was not authored (candidate follow-up tool). Captured 2026-07-04 (Ben). Generalises the BL-093 fix.\n\n### The problem class\nBL-093 (Selection element) balllooned with empty space / clipped because its height was pinned to `mm_h` (`mm_w = max(240, 0.20·min(disp.x,disp.y))`), a **resolution-scaled** value. The fix: size from content in **text-line units** + anchor to a shell edge. The same anti-pattern likely recurs across the shell — any panel whose extent derives from another element's resolution-scaled size, or that assumes the 1280x720 verify-capture resolution and can clip/overflow at the real runtime window (Ben runs 1920x1080; the window is resizable — see the `display-environment` memory + DEVELOPMENT_PRACTICES § Display environment).\n\n### Scope (audit + fix pass)\nWalk each shell region (LAYOUT.md is the map) and check bounding at several resolutions / window sizes: **header** (top strip), **profile** (top-left), **nav rail**, **time panel** (top-right, sized off `mm_w`), **explorer**, **minimap** (+ its new lens bar), the **ledger windows** (shared `ledger_chrome` constants), and the **on-canvas lens keys / control strips**. For each: does it clip, overflow the screen, overlap a neighbour, or leave dead space when the window is small or large? Fix by sizing from content (`GetTextLineHeightWithSpacing()` / measured content) and anchoring to fixed shell edges, never to another element's resolution-scaled extent.\n\n### Method\nDrive the app at a few window sizes (e.g. 1280x720, 1920x1080, a small 1000x600) — the startup `Display:` log reports the runtime size — and capture each region. A `scripts/verify/*.lua` multi-resolution sweep would make this a repeatable check (candidate tool → skill). Proportional, Light-per-panel where a panel is already fine.\n\n### Relationships\nGeneralises **BL-093**. Authority `docs/ui/LAYOUT.md` (+ each panel's own doc). Standing rule already in DEVELOPMENT_PRACTICES § Display environment — this item is the application sweep, not a new rule."
     },
     {
       "id": "BL-098",

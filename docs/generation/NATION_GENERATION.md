@@ -115,8 +115,9 @@ phoneme table. No human-authored list of specific names is required.
 In the prototype, Kepler is the only body with nation generation. Selene, Cinder, and Pallas
 are unclaimed territory.
 
-Nation count for Kepler: **~14** (BL-053: 18 seeds merged down to 14), with strongly varied
-sizes; tunable via campaign parameters (`nation_count`, `min_seed_separation`, `merge_to`).
+Nation count for Kepler: **~24** (BL-053 retune: 34 seeds merged down to 24), with strongly
+varied sizes; tunable via campaign parameters (`nation_count`, `min_seed_separation`, `merge_to`),
+including the New World setup slider (6–30).
 
 Nation system behaviour — taxes, laws, diplomatic actions, military response, territorial
 ambition — is **not implemented in the prototype**. Nations are generated and exist as data

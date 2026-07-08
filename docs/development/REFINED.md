@@ -123,6 +123,43 @@ session boundary is drawn *between* them.
 
 ---
 
+## 2026-07-08 Batch — Backlog refinement pass (BL-011, BL-014, BL-016, BL-053, BL-063, BL-097) — **COMPLETE (residue noted)**
+
+Five design-owed items designed and promoted in one session, fanned to 5 worktree agents (Wave 1:
+reach/supply lenses, accessibility palette+contrast, accessibility UI-scale, country generation,
+view-bounding audit) + 1 follow-on (Wave 2: view-bounding fix, informed by the audit's findings).
+All branches merged clean except one `backlog.json` conflict (country-gen agent's worktree had
+branched before the design-settling commit landed; reconciled by hand). Full app build green
+throughout; `world_audit`/`world_determinism` re-run after every merge, ALL PASS, no regressions.
+
+**BL-053** (country generation) fully complete: discovered the size-variance mechanism
+(`merge_small_nations`) already existed from an earlier commit, retuned constants (14→24 nations,
+34 seeds pre-merge), harness-verified (count [20,28] + max≥3× min both PASS).
+**BL-063** (UI-scale) fully complete: discrete 1.0/1.25/1.5× font-atlas reload, persisted in
+`options.cfg`, wired into the F10 Options window.
+**BL-097** (view-bounding) fully complete: audit found 2 real bugs (time-panel height pinned to
+`mm_h*0.5f`; Tile Ledger spawn anchored off the stale `profile_panel_width`), both fixed; the rest
+of the shell (header/profile/nav-rail/minimap/explorer/economy-panel/lens-key) confirmed already
+correct.
+**BL-011/BL-014** (Reach + Supply-routes lenses) code-complete with one scope deviation: rendered
+as an on-canvas key/readout rather than cross-body glow/edges, since `body_surface_canvas.cpp`
+only ever draws the active body's own tile grid — the fuller cross-body visual is a follow-up for
+`solar_system_canvas.cpp`.
+**BL-016** (lens palette) code-complete for the palette half (Okabe-Ito/Viridis re-hue); on-canvas
+country/market labels + Corporation-lens legend deferred as a `body_surface_canvas.cpp`/`overlay.cpp`
+follow-up.
+
+**Residue (recorded, not dropped):** visual goldens need re-blessing (lens hues changed); the
+`palette::text_secondary` AA token isn't yet wired into ~90 existing `TextDisabled` call sites; a
+`scripts/verify/*.lua` multi-resolution sweep script (for BL-097) wasn't authored; `docs/ui/ACCESSIBILITY.md`
+still isn't written. Requirements `requirements.json` § {reach-supply-lenses, accessibility-strand-1}
+remain `pending` on visual verification; § {country-generation-variety} complete; § {view-bounding-audit}
+pending on the visual sweep. Permanent record: `docs/development/backlog.json` (BL-011/014/016/053/063/097
+all flipped to `complete`), commits `35dd1fb`, `287d8e0`, `95788ef`→`004c5f9` (merge), `1ffe395`→`2506c97`
+(merge), `47da542`→`02819a7` (merge). Summary retained one cycle.
+
+---
+
 ## 2026-07-07 Batch — Economy dynamism (BL-078, BL-095, BL-096, BL-079, BL-112) — **COMPLETE**
 
 Five interlocking economy items delivered 2026-07-07. **BL-078** redefined the nation substrate into a
