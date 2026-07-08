@@ -26,8 +26,9 @@ void draw_tile_inspector(const world& w, const ui_state& s, bool* p_open)
 
     // Shared ledger-window chrome: one size + one spawn anchor for the whole
     // ledger family (docs/ui/LAYOUT.md § Uniform ledger-window chrome).
-    ImGui::SetNextWindowPos(ledger_window_spawn, ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ledger_window_size, ImGuiCond_Once);
+    const ImVec2 disp = ImGui::GetIO().DisplaySize;
+    ImGui::SetNextWindowPos(ledger_window_spawn(disp.x), ImGuiCond_Once);
+    ImGui::SetNextWindowSize(ledger_window_size(disp.x, disp.y), ImGuiCond_Once);
     // Passing p_open gives the window a close button that clears the flag.
     ImGui::Begin("Tile Ledger", p_open);
 

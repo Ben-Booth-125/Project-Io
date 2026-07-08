@@ -1577,7 +1577,16 @@ void app::render()
     // date/quarter block (left, 25%) and the speed controls (right, 75%). The
     // panel takes input (the speed buttons), so it is not flagged NoInputs.
     const float tick_w = mm_w;
-    const float time_h = mm_h * 0.5f;
+    // Height is content-derived (BL-097), not a fraction of the minimap's
+    // resolution-scaled mm_h (the BL-093 anti-pattern). Left column: 2 date-line
+    // rows plus the quarter-progress bar; right column: the tick readout plus the
+    // speed-button row. Whichever column is taller sets the content height.
+    const float time_line_h    = ImGui::GetTextLineHeightWithSpacing();
+    const float time_frame_h   = ImGui::GetFrameHeight();
+    const float date_col_h     = time_line_h * 2.0f + time_frame_h;
+    const float ctrl_col_h     = time_line_h + time_frame_h;
+    const float time_content_h = std::max(date_col_h, ctrl_col_h);
+    const float time_h         = time_content_h + ImGui::GetStyle().WindowPadding.y * 2.0f;
     {
         ImGui::SetNextWindowPos({disp.x - margin - tick_w, margin});
         ImGui::SetNextWindowSize({tick_w, time_h});
