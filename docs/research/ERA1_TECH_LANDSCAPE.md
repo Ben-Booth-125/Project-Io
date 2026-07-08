@@ -491,3 +491,23 @@ Even the lean gate-tech implementation waits until after v0.1.0; the prototype k
 hard-coded Era arrangement. (Supersedes the sketch's lean that the lean gate-tech was
 prototype-relevant.) ROADMAP already excludes Research from v0.1.0, so nothing needs reconciling
 now; ERAS ↔ ROADMAP reconcile only when post-prototype work lands.
+
+## Resolutions — Era-event mechanics (2026-07-08, v0.2.0-scope)
+
+> Resolves questions A–C spawned by the Era reframe above. Brief — this is v0.2.0-horizon design,
+> not near-term.
+
+**A — timing:** a **seeded date** per campaign (deterministic), with a **visible in-UI countdown**
+once conditions near it — the Terra Invicta external-clock lesson made literal: the player sees
+the rupture coming and can race it, rather than being blindsided.
+
+**B — boundary effects:** an Era event is not purely additive. It (1) **shocks demand/markets** —
+shortages and price spikes ripple through the nation substrate; (2) **selectively destroys** —
+some buildings/infrastructure are damaged (a satellite cascade wrecks orbital assets; a war damages
+surface facilities), giving the moment real stakes and a recovery arc; and (3) **unlocks the new
+Era's quest trees**. All three fire together — the event is a shock the player manages, not just a
+door that opens.
+
+**C — terminology:** rename **gate quest → keystone quest**, matching the "keystone" language
+already used for the Propellant Loop. Apply on the next pass through the itemisation schema
+(quest-record `type` field); not renamed retroactively in this doc's earlier sections.

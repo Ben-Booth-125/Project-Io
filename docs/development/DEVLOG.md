@@ -38,6 +38,14 @@ downloads, so the full app build could not be run here — the headless harness 
 with the new exclusion, the new header syntax-checks, and the panel/loader mirror existing
 patterns, but the first desktop build is the real verification.
 
+**Follow-up (same day, brief): Era-event mechanics A–C, v0.2.0-horizon.** Quick resolution of the
+questions the reframe spawned. **A (timing):** a seeded date per campaign with a visible in-UI
+countdown once conditions near it. **B (boundary effects, all three together):** market/demand
+shock + selective infrastructure destruction (satellite cascade → orbital, war → surface) + the new
+Era's quest trees unlock. **C (terminology):** 'gate quest' → **keystone quest**, applied on the
+next itemisation pass. Recorded in `ERA1_TECH_LANDSCAPE.md` § 'Resolutions — Era-event mechanics'
++ BL-087's design field. No sketch-depth questions remain open; itemisation is deferred to v0.2.0.
+
 ## Session — Economy dynamism batch delivered: BL-078/095/096/079/112 (2026-07-07)
 
 **Context.** Delivered the five interlocking economy items designed in the prior session (below) as one
