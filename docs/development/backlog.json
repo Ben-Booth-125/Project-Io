@@ -2416,6 +2416,281 @@
       "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
       "summary": "Filed 2026-07-07 from the economy design session. BL-096's first cut keeps population placement as-is and carves markets by nation territory. Ben's fuller ideal: population spawns near rich resources, and markets are centred on rich trade routes, with corps (not just nations) carving resource clusters. Assessed as a LARGER REWRITE (population placement + generation ordering + a trade-flow proxy), so deferred per Ben's conditional steer.",
       "design": "The fuller co-generation vision deferred from BL-096. Three coupled changes: (1) **population spawns near rich resources** — make generate_population_centres resource-aware; (2) **markets centred on rich trade-route proxies** — since live routes do not exist at gen-time, derive a static resource↔population trade-flow proxy and centre markets on it; (3) **corp-level carving** — place corps before markets (a generation reorder) so competing corporations, not just nations, carve resource clusters. Larger rewrite touching hard_coded_world / nation_generation / market seeding; determinism-sensitive. `requires` BL-096. Authority → GENERATION_STRATEGY.md on landing."
+    },
+    {
+      "id": "BL-133",
+      "short_name": "COUNTRY_LENS_LEGEND",
+      "category": "Canvas",
+      "title": "Country lens has no legend — colours with no names",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "files": [
+        "src/ui/body_surface_canvas.cpp"
+      ],
+      "authority_doc": "docs/ui/LENSES.md",
+      "summary": "Found 2026-07-08 in the lens-legibility review (Ben). The Country lens tints owned tiles with each nation's identity colour (body_surface_canvas.cpp) but is the ONE lens with no on-canvas key — every other lens has a draw_*_key. So nation colours appear with nothing mapping them to names; countries read as 'unnamed / invisible'. Add a country legend (swatch + nation name) by analogy to the market catchment key. History-ledger country names are a separate, lower-priority follow-on (Ben: not urgent).",
+      "design": "Add `draw_country_key` modelled on `draw_market_key` (BL-015): one swatch + nation name per nation present on the active body, sorted by nation id for a stable order, box auto-sized to the widest name. Colour source = `palette::nation_colour` (the same source the tile tint uses at body_surface_canvas.cpp ~831). Wire it into the lens-key dispatch in draw_body_surface_canvas (add a `overlay_mode::country` branch alongside the other draw_*_key calls ~line 1446). Secondary (lower priority — Ben: not urgent): surface the country name in the history/selection ledger too. Authority → LENSES.md (+ ICONS.md if a glyph is added) on landing. Part of the 2026-07-08 lens-legibility batch [COUNTRY_LENS_LEGEND, LENS_SELECTOR_IN_LEGEND, VALUE_LENS_TILE_MARKS, OPPORTUNITY_DEMAND_SIGNAL, PRODUCTION_LENS_RED_GREEN]."
+    },
+    {
+      "id": "BL-134",
+      "short_name": "LENS_SELECTOR_IN_LEGEND",
+      "category": "Canvas",
+      "title": "Move the lens good-selector into the legend as a scrollable dropdown",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "B",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "files": [
+        "src/ui/overlay.cpp",
+        "src/ui/body_surface_canvas.cpp"
+      ],
+      "authority_doc": "docs/ui/LENSES.md",
+      "summary": "Found 2026-07-08 in the lens-legibility review (Ben). The Resource/Market/Scarcity 'which good' selector (draw_lens_selector, overlay.cpp:42) is a popup-button docked in the lens icon strip on the minimap bar, separate from the legend. Ben wants selection-driven lenses to carry their selector INSIDE the legend as a scrollable dropdown, not in a space near the minimap. Layout change — needs a mockup (Ben owns UI proportions).",
+      "design": "**design-owed — needs a Ben mockup** (layout/proportions are Ben's). Relocate the shared good-selector (overlay.cpp draw_lens_selector, currently a SmallButton+popup) so it lives in the lens legend for the selection-driven lenses (Resource, Market, Scarcity — all share `lens_resource`). The legends are painted with raw ImDrawList (non-interactive), so embedding a real scrollable dropdown (ImGui::BeginCombo) means either (a) repositioning the existing ImGui selector widget to sit over the legend's rect, or (b) converting the legend into an interactive ImGui child. Open (for the mockup): where in the legend the dropdown sits, its width, and whether the whole legend becomes a widget. Authority → LENSES.md on landing. Part of the 2026-07-08 lens-legibility batch."
+    },
+    {
+      "id": "BL-135",
+      "short_name": "VALUE_LENS_TILE_MARKS",
+      "category": "Canvas",
+      "title": "Value lenses (Workforce, Opportunity) as per-tile red→green marks, not full-tile tint",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "A",
+      "difficulty": 4,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "files": [
+        "src/ui/body_surface_canvas.cpp",
+        "src/ui/icons.cpp",
+        "src/ui/icons.hpp"
+      ],
+      "authority_doc": "docs/ui/LENSES.md",
+      "summary": "Found 2026-07-08 in the lens-legibility review (Ben). Workforce-efficiency (Population lens) and Opportunity both tint the WHOLE tile fill (body_surface_canvas.cpp ~869/~885), which Ben finds 'basically impossible to read'. Ben's fix: draw a per-tile red→green MARK on each tile (replacing the building glyph while the lens is active) instead of a full-screen tint. Shared treatment for both value lenses. Layout/glyph choice — needs a mockup.",
+      "design": "**design-owed — needs a Ben mockup** (glyph + mark density are layout calls). Replace the full-tile tint for the two value lenses with a per-tile mark on a red→green scale (red = low, green = high): Workforce = workforce_efficiency(habitability); Opportunity = the catchment's unmet-demand signal (see OPPORTUNITY_DEMAND_SIGNAL). The mark REPLACES the building glyph on tiles that carry one (suppress icons::building at ~line 1094 under these lenses). Open (for the mockup): the mark shape/size (a filled dot?), whether EVERY tile gets one or only populated/producing tiles (all-tiles may be noisy), and the exact red/green endpoints. Keep the on-canvas key but re-legend it red→green. Couples to OPPORTUNITY_DEMAND_SIGNAL (the opportunity metric the mark reads). Authority → LENSES.md (+ ICONS.md for the mark glyph) on landing. Part of the 2026-07-08 lens-legibility batch."
+    },
+    {
+      "id": "BL-136",
+      "short_name": "OPPORTUNITY_DEMAND_SIGNAL",
+      "category": "Canvas",
+      "title": "Opportunity lens reads uniformly green — differentiate unmet demand + drop the qualifier",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "A",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "files": [
+        "src/ui/body_surface_canvas.cpp",
+        "src/ui/overlay.cpp"
+      ],
+      "authority_doc": "docs/ui/LENSES.md",
+      "summary": "Found 2026-07-08 in the lens-legibility review (Ben). The Opportunity lens shows all-green — it is not differentiating actual unmet demand. Root cause: the metric is each market's biggest ABSOLUTE price/base_price ratio (body_surface_canvas.cpp ~698); in a saturated economy where every market bids above its floor, every catchment reads as opportunity, so it is uniform. Also drop the '(unmet demand)' qualifier from the lens name/legend (overlay.cpp:75, body_surface_canvas.cpp:160) — Ben: it just confuses. The label drop is trivial; the metric differentiation is the substance.",
+      "design": "Two parts. (1) **Label (trivial, settled):** drop '(unmet demand)' — overlay_mode_name returns 'Opportunity' (overlay.cpp:75) and the legend title becomes 'Opportunity' (body_surface_canvas.cpp:160); shrink the widened key box (~190px) back to the standard width. (2) **Metric (design-owed):** the lens must DIFFERENTIATE opportunities, not paint every catchment green. Current metric = max absolute price/base ratio per market → saturates when all markets bid over floor. Proposed: normalize relative to the body's markets (as the Scarcity lens does across the body) so the strongest gaps stand out and met markets read neutral/red. Open: the exact normalization (relative rank vs body-max), and whether to weight by demand volume so a large gap outranks a tiny high-ratio one. Pairs with VALUE_LENS_TILE_MARKS for the red→green mark styling. Authority → LENSES.md on landing. Part of the 2026-07-08 lens-legibility batch."
+    },
+    {
+      "id": "BL-137",
+      "short_name": "PRODUCTION_LENS_RED_GREEN",
+      "category": "Canvas",
+      "title": "Production intensity lens: recolour blue↔orange to red→green",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 1,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "files": [
+        "src/ui/body_surface_canvas.cpp"
+      ],
+      "authority_doc": "docs/ui/LENSES.md",
+      "summary": "Found 2026-07-08 in the lens-legibility review (Ben). The Production lens uses diverging_colour (blue=below-mean, orange=above-mean; body_surface_canvas.cpp ~210). Ben: 'it is not clear that orange means intense' — recolour to a red→green scale so high intensity reads as green. Recolour only (Ben did not ask for per-tile marks here, unlike the value lenses). Trivial.",
+      "design": "Recolour the Production-intensity tint from the blue↔orange diverging scale to red→green (red = low/below-mean, green = high/above-mean), matching the value-lens direction. Scope: the production branch of the tile tint (body_surface_canvas.cpp ~905, currently `diverging_colour(value/mean)`) and its legend gradient in draw_production_key (~181). **Gotcha:** `diverging_colour` is SHARED with the Market price key — do NOT repurpose it; add a dedicated red→green ramp for production (or a param) so the market scale is untouched. Stays a full-tile tint (no marks — Ben only flagged the colour here). Authority → LENSES.md on landing. Part of the 2026-07-08 lens-legibility batch."
+    },
+    {
+      "id": "BL-138",
+      "short_name": "TIME_CONTROL_COMPACT_REDESIGN",
+      "category": "Canvas",
+      "title": "Compact time-control panel redesign (mockup supplied)",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "files": [
+        "src/core/app.cpp",
+        "src/ui/format.cpp",
+        "src/ui/format.hpp"
+      ],
+      "authority_doc": "docs/ui/TIME_CONTROLS.md",
+      "summary": "Filed 2026-07-08 (Ben, with a mockup). Iterates on BL-125's clock pass toward a more compact time control. Current panel (app.cpp ~1576) is a 25/75 two-column block: date rows (YYYY Qn / Mon DD / progress bar) left, 'Sim NNNN' + speed buttons right. Ben's mockup compresses it: year alone on top, 'Jan 1st (Q1)' on one line, speed row to the right, progress bar under the date, and the 'Sim NNNN' counter dropped.",
+      "design": "**Designed — mockup supplied by Ben 2026-07-08 (in the issues thread).** Compact layout replacing the current app.cpp time panel (~1576–1685):\n\n- **Year alone on top**, prominent/centred (e.g. '2000').\n- **Date line 'Jan 1st (Q1)'** on one line, left — month abbrev + ORDINAL day ('1st', not the current zero-padded '01') + quarter in parens. Needs an ordinal-day formatter in fmt (format.cpp): 1→'1st', 2→'2nd', 3→'3rd', 21→'21st', etc.\n- **Speed controls '> I II III IV V' on the right**, compact — the play/pause toggle (filled square when running, '>' when paused) + speeds I–V; the existing button logic (app.cpp ~1632, Roman numerals BL-064) is preserved.\n- **Progress bar directly BELOW the date line** — 'keep the progress bar below month date' (Ben). The quarter_progress bar sits under 'Jan 1st (Q1)'.\n- **Drop the 'Sim NNNN' tick counter and the '(paused)/(I..V)' text readout** — redundant with the highlighted speed button; the mockup omits them.\n- Overall a shorter panel than the current mm_h*0.5 block.\n\nAuthority → TIME_CONTROLS.md on landing. Predecessor: BL-125 SHELL_PROPORTION_CLOCK_PASS. Part of the 2026-07-08 UX review."
+    },
+    {
+      "id": "BL-139",
+      "short_name": "SELECTION_TILE_LEDGER_BUILDING",
+      "category": "Canvas",
+      "title": "Tile selection opens a tile-detail ledger that includes its building (one tile = one building)",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "A",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "files": [
+        "src/ui/selection_panel.cpp"
+      ],
+      "authority_doc": "docs/ui/SELECTION.md",
+      "summary": "Filed 2026-07-08 (Ben). Selecting a tile should open a ledger/view that LEADS with tile detail (what the tile is — terrain, deposits, owner) and also surfaces the ONE building on it, with a way to navigate (double-click) into that building's own detail. Confirms the existing one-building-per-tile invariant (placement_reason::occupied already blocks a second building per tile). Currently tile and building are separate selection_kinds (selection_panel.cpp) — tile selection shows tile detail + a build front-door, building selection shows building detail — so the two are not unified as tile-primary-with-building.",
+      "design": "**design-owed** (interaction + layout; likely a Ben mockup for the layout). Make a TILE the primary selection subject: selecting a tile opens the tile ledger whose main content answers 'what is this tile' (terrain composition/landform, deposits, territory owner, habitability), and which ALSO shows the single building occupying it (if any) as a sub-element. From there the player navigates — double-click (the existing single-click-selects / double-click-navigates model, SELECTION.md) — into the building's full detail (the current building selection content).\n\n**Invariant (confirmed by Ben, already enforced):** each tile carries at most ONE building — placement_rules rejects an occupied tile (placement_reason::occupied). So 'the building on this tile' is always 0 or 1, which is what makes the tile-primary framing clean.\n\n**Future (noted, NOT this item):** a building may gain multiple LEVELS, or change its resource / production path over its life 'depending on plausibility' — the tile-ledger layout should leave room for that without designing it now.\n\nOpen (for the design/mockup): the exact split between tile detail and the building sub-element, whether the build front-door (current tile-selection content for empty tiles) folds into this, and how 'navigate to building' reads. Relates to BL-119 (Tile Ledger audit), BL-123 (selection resize), BL-124 (selection fold-out column). Authority → SELECTION.md on landing. Part of the 2026-07-08 UX review."
+    },
+    {
+      "id": "BL-140",
+      "short_name": "UI_TEXT_IMAGE_CONTAINMENT",
+      "category": "Canvas",
+      "title": "Containerise every text/image — wrap or fit, never truncate in narrow views",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "A",
+      "difficulty": 4,
+      "parked": false,
+      "requires": [
+        "BL-141"
+      ],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "files": [
+        "src/ui/header_panel.cpp",
+        "src/ui/selection_panel.cpp",
+        "src/ui/body_surface_canvas.cpp",
+        "src/core/app.cpp"
+      ],
+      "authority_doc": "docs/ui/LAYOUT.md",
+      "summary": "Filed 2026-07-08 (Ben). Text is being truncated/clipped in narrow views. Ben: every image or line of text must be containerised so it either WRAPS or is guaranteed to FIT its defined space — never silently truncated. Scope (measured 2026-07-08): ~255 ImGui text calls across 17 UI files with ZERO use of TextWrapped/PushTextWrapPos (nothing wraps today), plus 37 draw-list AddText labels across 5 canvas files (painted legends/labels that overflow their boxes — cf. the market-legend key auto-size fix). Requires the container spec (BL-141) first.",
+      "design": "**design-owed — requires BL-141** (the container vocabulary). Systemic pass: every on-screen text/image lives in a permitted container (BL-141) and either wraps to the container width (PushTextWrapPos / TextWrapped for ImGui text) or is measured-and-fitted so it always fits (the pattern the market-legend key now uses — CalcTextSize → size the box). No silent truncation at the app's supported widths (down to the 1280×720 verify window and the narrower fold-out columns). Images (icons/markers) likewise clamped to their container (max-fit).\n\n**Current state (measured 2026-07-08):** ~255 ImGui text calls across 17 files, none wrapping; 37 draw-list AddText across 5 canvas files.\n\n**Broad but mostly mechanical; decomposes per-surface at promotion** — header/balance strip, time panel, on-canvas legends, selection element, ledgers, hover card, ImGui tables. Each surface: take its container's policy from BL-141, apply wrap-or-fit, verify at the narrow width. Relates to BL-063 (accessibility/legibility baseline). Authority → LAYOUT.md on landing. Part of the 2026-07-08 UX review."
+    },
+    {
+      "id": "BL-141",
+      "short_name": "UI_CONTAINER_VOCABULARY",
+      "category": "Canvas",
+      "title": "Define each permitted UI container (the container vocabulary)",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "A",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "files": [
+        "docs/ui/LAYOUT.md"
+      ],
+      "authority_doc": "docs/ui/LAYOUT.md",
+      "summary": "Filed 2026-07-08 (Ben). Foundation for BL-140: before we can containerise every text/image, we must enumerate the ALLOWED containers — the fixed set of layout boxes the UI is built from (fold-out ledger column, on-canvas legend box, selection element, header/balance strip, time panel, hover card, minimap lens bar, nav rail, ImGui tables) — each with its sizing rule (fixed / stretch / fit-to-content) and its text policy (wrap vs fit). Every piece of on-screen text/image must then live inside one of these. Lands in LAYOUT.md as the container spec.",
+      "design": "**design-owed** (a design deliverable, with Ben — layout/proportions are his). Produce the *container vocabulary*: the closed set of permitted UI containers, each specified by (a) how it sizes — fixed px, stretch-to-region, or fit-to-content; (b) its min/max constraints; (c) its text policy — wrap (PushTextWrapPos/TextWrapped) or guaranteed-fit (measured + sized, as the market-legend key now does); (d) its overflow behaviour if content still exceeds. Inventory the current surfaces to seed the list: fold-out ledger column (foldout_column), on-canvas lens legends (draw-list boxes, body_surface_canvas), selection element, header/balance strip (header_panel), time panel (app.cpp), hover card, minimap lens bar, nav rail, ImGui tables. Output: a LAYOUT.md section (the authority) enumerating each container + its rules, which BL-140 then applies everywhere. Gates BL-140. Part of the 2026-07-08 UX review."
+    },
+    {
+      "id": "BL-142",
+      "short_name": "BUDGET_VIEW_PLAYER_ONLY",
+      "category": "Canvas",
+      "title": "Budget view = player only, with a Policies / Budget-laws TODO skeleton",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "files": [
+        "src/ui/balance_ledger.cpp"
+      ],
+      "authority_doc": "docs/ui/ledgers/balance.md",
+      "summary": "Filed 2026-07-08 (Ben). The Balance Ledger (the budget view) currently has a Corporation combo (balance_ledger.cpp:70) that lets the player inspect ANY corporation's full budget — Treasury, Cashflow breakdown, Runway, Assets. Ben: the budget must be viewed as ONLY the player's budget. This also closes a competitor-visibility leak (BL-068: rival internals are private — a rival's per-tick cashflow should not be inspectable). Secondly, keep a non-functional TODO skeleton for future 'Policies' and 'Budget laws' — represented in-game as a placeholder, NOT implemented.",
+      "design": "**Designed** — two facets, both non-speculative. (1) **Player-only budget:** remove the corporation selector from the Balance Ledger (balance_ledger.cpp ~55–82) and pin the view to w.player_entity; drop the per-corp fallback branches (the 'any other corp' runway path ~168). Aligns with BL-068 (competitor internals private) — a rival's cashflow/treasury must not be inspectable. Open (minor): whether to also rename 'Balance Ledger' → 'Budget' (Ben's term); an optional dev-only corp inspector could hide behind a debug flag. (2) **Policies / Budget-laws skeleton (TODO only):** add two placeholder sections to the budget view — 'Policies' and 'Budget laws' — rendered as disabled TODO stubs (e.g. TextDisabled '(not implemented)'), signposting future direction WITHOUT any behaviour. This respects the standing scope rule (no out-of-scope implementation): a signpost, not a system. The real Policies/Budget-Laws feature, when designed, couples to the deferred nation/tax/sovereignty items (CORPORATION_GENERATION open items, BL-054) and would be its own item then. Authority → docs/ui/ledgers/balance.md on landing. Part of the 2026-07-08 UX review."
+    },
+    {
+      "id": "BL-143",
+      "short_name": "BUILDING_LEDGER_REDESIGN",
+      "category": "Canvas",
+      "title": "Rename Construction → 'Building' with Construction/Buildings tabs; drop the build front-door and sell orders",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "A",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "files": [
+        "src/ui/construction_panel.cpp",
+        "src/ui/nav_pane.cpp"
+      ],
+      "authority_doc": "docs/ui/ledgers/construction.md",
+      "summary": "Filed 2026-07-08 (Ben). The construction panel (draw_construction_panel) currently has three tabs — Build (what-can-be-built front-door + queue), Manage, Sell Orders. Ben's redesign: rename the ledger 'Construction' → 'Building' with TWO tabs: (1) 'Construction' = progress of in-progress builds + an estimated cost PER QUARTER; (2) 'Buildings' = a quick list of ALL player buildings with aggregates (workforce, profit, potentially group policies). Building is ONLY via tile selection (that front-door already exists in selection_panel.cpp), so drop the panel's build front-door. Drop 'Sell Orders' — that is a market function.",
+      "design": "**design-owed** (direction clear; Buildings-tab spec + sell-order relocation to settle). Rework draw_construction_panel (construction_panel.cpp):\n\n- **Rename** the fold-out 'Construction' → 'Building'; nav-rail tooltip likewise (nav_pane.cpp case 6, currently 'Construction').\n- **Tab 1 'Construction'** = the in-progress queue + per-build progress (draw_queue_section / under-construction), PLUS an **estimated cost per quarter** (sum building_opex maintenance+wages over a quarter; building_opex already exists in budget_system).\n- **Tab 2 'Buildings'** = a quick list of ALL player buildings with **aggregates**: workforce, profit (building_profit.hpp), and a **group-policies** placeholder (TODO stub only — same treatment as BL-142's policy skeleton). Open: the exact columns / aggregate rows.\n- **Remove the 'Build' front-door** (draw_build_section / 'Place a building') — building is only via tile selection, which ALREADY works (selection_panel.cpp prospective-build front-door). Confirms Ben's 'build only via selection on a tile'.\n- **Remove the 'Sell Orders' tab** (draw_sell_orders_section) — a MARKET function. ⚠️ Sell orders currently live ONLY here, so removal is a functional regression unless relocated to the market surface (Market Ledger / market selection). Treat the relocation as a REQUIRED companion — likely its own item.\n\nCouples to BL-139 (tile selection → build). Authority → docs/ui/ledgers/construction.md on landing. Part of the 2026-07-08 UX review."
+    },
+    {
+      "id": "BL-144",
+      "short_name": "TILE_LEDGER_FOLDOUT_STANDARD",
+      "category": "Canvas",
+      "title": "History/Tile ledger opens as a separate window — re-host into the fold-out column standard",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "files": [
+        "src/ui/tile_inspector.cpp"
+      ],
+      "authority_doc": "docs/ui/ledgers/tile_ledger.md",
+      "summary": "Filed 2026-07-08 (Ben). draw_tile_inspector (the 'Tile Ledger', reached via the nav rail's History slot — nav_pane case 9) still opens as a standalone floating window (ImGui::Begin('Tile Ledger', ...) with ledger_window_spawn/size), unlike every other ledger which BL-122 re-hosted into the shell fold-out column (foldout_begin/foldout_end). Ben: even though History is not implemented yet, whatever opens there must follow the standard. Re-host it into the fold-out column.",
+      "design": "**Designed** — mechanical, mirrors BL-122. In tile_inspector.cpp draw_tile_inspector: replace the standalone ImGui::Begin('Tile Ledger', p_open) + ledger_window_spawn/ledger_window_size chrome with ui::foldout_begin('Tile Ledger') / ui::foldout_end(), matching market_ledger / balance_ledger / construction_panel. Drop the SetNextWindowPos/Size spawn-anchor lines and the p_open close button (the fold-out column is closed via the nav rail, like the other ledgers). Verify it becomes one of the mutually-exclusive column occupants (ledgers + Selection). Note: the nav slot is labelled 'History' but currently hosts the Tile Ledger content — that naming, and whether History becomes its own future view, is out of scope here (see BL-139 for the tile-ledger content). Authority → docs/ui/ledgers/tile_ledger.md on landing. Part of the 2026-07-08 UX review."
+    },
+    {
+      "id": "BL-145",
+      "short_name": "CORP_FOCUS_INVISIBLE",
+      "category": "Canvas",
+      "title": "Corporation focuses should be invisible (hide industrial_focus from the UI)",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "files": [
+        "src/ui/economy_panel.cpp",
+        "src/ui/corporation_panel.cpp",
+        "src/ui/entity_summary.cpp",
+        "src/ui/profile_panel.cpp"
+      ],
+      "authority_doc": "docs/ui/DISCOVERY.md",
+      "summary": "Filed 2026-07-08 (Ben). A corporation's industrial focus (Extraction/Processing/Trade) is currently shown in at least four surfaces: economy_panel.cpp (Focus column ~89), corporation_panel.cpp (Focus column ~65/91), entity_summary.cpp (corp 'Focus:' ~399), profile_panel.cpp (corp 'Focus:' ~120). Ben: corporation focuses should be INVISIBLE. Hide the focus display across these surfaces. Aligns with competitor-info privacy (BL-068 — a rival's strategic focus is internal).",
+      "design": "**Designed** — hide the corporation industrial_focus display wherever it is shown: economy_panel.cpp (the 'Focus' table column — setup ~73 + cell ~89–92), corporation_panel.cpp (the 'Focus' column ~65/91), entity_summary.cpp (corp 'Focus: %s' ~399), profile_panel.cpp (corp 'Focus:' line ~120). Leave the industrial_focus DATA intact (generation + economy still use it); only the UI readout is removed. Open (minor): (a) whether to also hide it for the PLAYER'S own corp or only rivals — Ben said blanket 'invisible', so hide everywhere unless he wants the player's kept; (b) the NATION 'Economic focus' (entity_summary.cpp ~301) is a separate attribute, left visible unless Ben says otherwise. Authority → docs/ui/DISCOVERY.md (competitor visibility) on landing. Part of the 2026-07-08 UX review."
     }
   ]
 }
