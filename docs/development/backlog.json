@@ -552,7 +552,7 @@
       "short_name": "COUNTRY_GENERATION",
       "category": "Environment",
       "title": "Country generation — more countries, generated 'in history'",
-      "status": "designed",
+      "status": "complete",
       "glyph": "✓",
       "priority": "B",
       "difficulty": 4,
@@ -563,11 +563,17 @@
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
-        "src/world/nation_generation.cpp"
+        "src/world/nation_generation.cpp",
+        "src/world/nation_generation.hpp",
+        "src/world/hard_coded_world.cpp",
+        "src/world/hard_coded_world.hpp",
+        "src/core/app.cpp",
+        "tools/verify/world_audit.cpp",
+        "tools/verify/world_determinism.cpp"
       ],
       "authority_doc": "docs/generation/NATION_GENERATION.md",
-      "summary": "More countries than today's Voronoi partition, with a sense of history: v0.1.0 target is clustering seeds with a varied size distribution (some larger, some smaller). Couples to SATURATED_SUBSTRATE. Design owed: clustered-seed sizing, what 'in history' means, count target.",
-      "design": "**Status:** designed (2026-07-08). Settled: larger count, more varied size distribution — not a modest bump.\n\n**Mechanism already exists.** `nation_generation.cpp`'s `merge_small_nations` already amplifies size variance deterministically (repeatedly absorbs the smallest nation into its largest neighbour until `target_count` remains) — today's default (`nation_params::nation_count = 10`, `hard_coded_world.cpp` seeds `pre_seed_n = merge_to + 4`, i.e. 14 seeds merged to 10) barely exercises it. No new algorithm needed, just re-tuned constants.\n\n**Settled sizing:** raise `nation_count` target to ~24 (more than 2x today's 10) and widen the seed/merge gap (e.g. `pre_seed_n = merge_to + 10`, i.e. seed ~34 down to ~24) so more absorption happens and the size spread is real, not incidental. A handful of seeds survive un-merged (large, old-feeling) while most get absorbed at least once (smaller, younger-feeling) — this *is* what 'in history' means: **no simulated history/founding-date model**, just an uneven, plausible-looking size distribution read as implied history, consistent with the no-AI-strategic-planning standing rule.\n\nOpen at promotion: exact `nation_count`/`pre_seed_n` constants (tune by eye against a few seeded worlds); confirm `min_seed_separation` (currently 5) still gives good coverage at 34 seeds before merge. Couples to the saturated substrate (BL-050). Authority docs/generation/NATION_GENERATION.md.",
+      "summary": "More countries than today's Voronoi partition, with a sense of history: over-seed + light merge (Pass 1b growth weights, Pass 2c 'in history' merges) gives a strongly varied, irregular-bordered political layer. Landed fc7c62b (18 seeds -> 14 nations); retuned 2026-07-08 to 34 seeds -> 24 nations for a richer map. No history/event-log mechanic — the variance itself reads as implied age.",
+      "design": "**Status:** complete. Landed in fc7c62b (Pass 1b skewed growth weights + Pass 2c deterministic smallest-into-largest-neighbour merge, `merge_to` nation_param). Retuned 2026-07-08: default `nation_count` 14 -> 24, pre-seed gap `merge_to+4` -> `merge_to+10` (34 seeds merged to 24), New World setup slider widened 6-20 -> 6-30. world_audit BL-053 R1 (count in [20,28]) + R2 (max >= 3x min) both PASS; world_determinism default-descriptor check updated to 24 nations, still PASS. Authority docs/generation/NATION_GENERATION.md.",
       "waits_on": [
         "SATURATED_SUBSTRATE"
       ]
