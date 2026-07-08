@@ -71,7 +71,7 @@ struct key_binding
     const char*        key_name; ///< Human-readable key string (F1 overlay)
 };
 
-static const std::array<key_binding, 21> s_bindings = {{
+static const std::array<key_binding, 22> s_bindings = {{
     // Canvas navigation
     {SDL_SCANCODE_RETURN,       false, ui::canvas_command::descend,      "Descend rung",      "Enter"},
     {SDL_SCANCODE_BACKSPACE,    false, ui::canvas_command::ascend,       "Ascend rung",       "Backspace"},
