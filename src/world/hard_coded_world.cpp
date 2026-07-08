@@ -54,11 +54,12 @@ world make_hard_coded_world(world_params params)
     // bit-identical to the pre-BL-114 generation.
     const float deposit_scalar = deposit_scalar_for(params.abundance);
 
-    // Nation knob → Voronoi params. Preserve the over-seed/merge shape (today: 18
-    // seeds merged to 14): merge to the requested count, pre-seed a few extra so the
-    // merge still has material to work with. Clamped to a sane floor.
+    // Nation knob → Voronoi params. Preserve the over-seed/merge shape (BL-053 retune:
+    // 34 seeds merged to 24): merge to the requested count, pre-seed extra so the merge
+    // pass has real material to absorb (a wider gap gives stronger size variance).
+    // Clamped to a sane floor.
     const int merge_to   = params.nation_count < 2 ? 2 : params.nation_count;
-    const int pre_seed_n = merge_to + 4;
+    const int pre_seed_n = merge_to + 10;
 
     w.player_entity = w.create_entity();
 
@@ -150,9 +151,9 @@ world make_hard_coded_world(world_params params)
     // (substrate density) can reference them during nation territory assignment.
     generate_population_centres(w, kepler, /*seed=*/params.seed ^ 0x70701001u);
 
-    // BL-053: over-seed (18) with tighter separation, then merge down to 14 so the
+    // BL-053: over-seed (34) with tighter separation, then merge down to 24 so the
     // map reads as a varied, "grown" political layer — a few large powers, several
-    // mid, many small — rather than ~10 near-uniform Voronoi cells.
+    // mid, many small — rather than near-uniform Voronoi cells.
     generate_nations(w, kepler, kepler_tiles, 180, 84,
         nation_params{ .nation_count = pre_seed_n, .min_seed_separation = 5, .merge_to = merge_to },
         /*seed=*/params.seed ^ 0x4A71012u);

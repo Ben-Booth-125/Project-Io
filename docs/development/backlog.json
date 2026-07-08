@@ -556,8 +556,8 @@
       "short_name": "COUNTRY_GENERATION",
       "category": "Environment",
       "title": "Country generation — more countries, generated 'in history'",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "complete",
+      "glyph": "✓",
       "priority": "B",
       "difficulty": 4,
       "parked": false,
@@ -567,11 +567,17 @@
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
-        "src/world/nation_generation.cpp"
+        "src/world/nation_generation.cpp",
+        "src/world/nation_generation.hpp",
+        "src/world/hard_coded_world.cpp",
+        "src/world/hard_coded_world.hpp",
+        "src/core/app.cpp",
+        "tools/verify/world_audit.cpp",
+        "tools/verify/world_determinism.cpp"
       ],
       "authority_doc": "docs/generation/NATION_GENERATION.md",
-      "summary": "More countries than today's Voronoi partition, with a sense of history: v0.1.0 target is clustering seeds with a varied size distribution (some larger, some smaller). Couples to SATURATED_SUBSTRATE. Design owed: clustered-seed sizing, what 'in history' means, count target.",
-      "design": "**Status:** design-owed (B). No BACKLOG.md body was preserved — see this item's `summary`. v0.1.0 target: more countries via clustered seeds with a varied size distribution. Open: clustered-seed sizing, what 'in history' means, the count target. Couples to the saturated substrate (BL-050). Authority docs/generation/NATION_GENERATION.md.",
+      "summary": "More countries than today's Voronoi partition, with a sense of history: over-seed + light merge (Pass 1b growth weights, Pass 2c 'in history' merges) gives a strongly varied, irregular-bordered political layer. Landed fc7c62b (18 seeds -> 14 nations); retuned 2026-07-08 to 34 seeds -> 24 nations for a richer map. No history/event-log mechanic — the variance itself reads as implied age.",
+      "design": "**Status:** complete. Landed in fc7c62b (Pass 1b skewed growth weights + Pass 2c deterministic smallest-into-largest-neighbour merge, `merge_to` nation_param). Retuned 2026-07-08: default `nation_count` 14 -> 24, pre-seed gap `merge_to+4` -> `merge_to+10` (34 seeds merged to 24), New World setup slider widened 6-20 -> 6-30. world_audit BL-053 R1 (count in [20,28]) + R2 (max >= 3x min) both PASS; world_determinism default-descriptor check updated to 24 nations, still PASS. Authority docs/generation/NATION_GENERATION.md.",
       "waits_on": [
         "SATURATED_SUBSTRATE"
       ]

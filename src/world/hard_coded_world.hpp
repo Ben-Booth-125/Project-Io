@@ -18,7 +18,7 @@ struct world_params
 {
     uint32_t        seed         = 0;                         ///< Master seed, XOR-folded into each per-body seed. 0 reproduces the legacy world.
     abundance_level abundance    = abundance_level::standard; ///< Deposit-density tier (standard = earth-like ceiling).
-    int             nation_count = 14;                        ///< Nations on the home body (the Voronoi merge target).
+    int             nation_count = 24;                        ///< Nations on the home body (the Voronoi merge target).
     int             body_count   = 0;                         ///< Reserved — the body-count knob is PHASED to a follow-on (bodies are still hard-coded profiles).
 };
 

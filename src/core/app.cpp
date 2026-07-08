@@ -1411,7 +1411,7 @@ void app::draw_main_menu()
 
         // Nations on the home body (the Voronoi merge target).
         ImGui::SetNextItemWidth(280.0f);
-        ImGui::SliderInt("##nations", &wp.nation_count, 6, 20, "Nations: %d");
+        ImGui::SliderInt("##nations", &wp.nation_count, 6, 30, "Nations: %d");
 
         // Bodies — the count knob is phased to a later update; shown disabled so the
         // intent reads without implying it works yet.

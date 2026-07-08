@@ -113,8 +113,8 @@ int main()
     // --- Sanity: the default descriptor equals seed 0 / standard (legacy world) ---
     const world_metrics dflt   = measure(make_hard_coded_world());
     const world_metrics zero_s = measure(make_hard_coded_world(
-        world_params{ .seed = 0, .abundance = abundance_level::standard, .nation_count = 14 }));
-    check(dflt == zero_s, "default make_hard_coded_world() == {seed 0, standard, 14 nations} (legacy world)");
+        world_params{ .seed = 0, .abundance = abundance_level::standard, .nation_count = 24 }));
+    check(dflt == zero_s, "default make_hard_coded_world() == {seed 0, standard, 24 nations} (legacy world)");
 
     std::printf("\n%s (%d failure%s)\n", failures == 0 ? "ALL PASS" : "FAILURES", failures,
                 failures == 1 ? "" : "s");
