@@ -9,15 +9,23 @@ namespace {
 // Indexed by static_cast<std::size_t>(resource_type); order matches the enum in
 // components.hpp. Identity colours are chosen to read distinctly against the
 // dark canvas and from one another.
+//
+// Re-picked 2026-07-08 (BL-016) against the Okabe-Ito colourblind-
+// safe set. The prior Iron Ore / Copper Ore rust-browns sat too close in hue to
+// Agricultural Produce / Timber's crop-greens under deuteranopia/protanopia
+// simulation (the same red-on-green confusion the Resource lens's deposit fill
+// inherits from this table) — the ore hues are shifted toward Okabe-Ito
+// vermillion/orange and the crop/foliage hues toward its bluish-green, so the two
+// families separate on hue, not just on the raw values a trichromat would read.
 constexpr resource_presentation resource_table[resource_count] = {
     // --- Tier 1: raw materials (Earth-sourced) ---
-    { "Iron Ore",          "Fe",  IM_COL32(176, 120,  92, 255) }, // rust
+    { "Iron Ore",          "Fe",  IM_COL32(196, 110,  60, 255) }, // vermillion rust
     { "Coal",              "Coal",IM_COL32( 70,  72,  78, 255) }, // near-black grey
     { "Petroleum",         "Oil", IM_COL32( 96,  82, 110, 255) }, // dark violet-brown
     { "Silica",            "Si",  IM_COL32(196, 188, 150, 255) }, // pale sand
-    { "Copper Ore",        "Cu",  IM_COL32(196, 118,  78, 255) }, // copper
+    { "Copper Ore",        "Cu",  IM_COL32(214, 140,  60, 255) }, // Okabe-Ito orange
     { "Rare Earth Ore",    "REE", IM_COL32(200, 170, 240, 255) }, // violet
-    { "Agricultural Produce","Agr",IM_COL32(150, 196,  92, 255) }, // crop green
+    { "Agricultural Produce","Agr",IM_COL32(110, 190, 130, 255) }, // bluish-green crop
     // --- Tier 1: raw materials (space-sourced) ---
     { "Water",             "H2O", IM_COL32(120, 180, 230, 255) }, // water blue
     { "Iron-Nickel Ore",   "FeNi",IM_COL32(150, 140, 130, 255) }, // dull steel
@@ -25,7 +33,7 @@ constexpr resource_presentation resource_table[resource_count] = {
     { "Regolith",          "Reg", IM_COL32(140, 132, 120, 255) }, // grey-tan dust
     // --- Tier 1: ambient ---
     { "Stone",             "Stn", IM_COL32(150, 150, 150, 255) }, // neutral grey
-    { "Timber",            "Tmb", IM_COL32(120, 160,  90, 255) }, // foliage green
+    { "Timber",            "Tmb", IM_COL32( 90, 170, 120, 255) }, // bluish-green foliage
     { "Sand",              "Snd", IM_COL32(214, 196, 140, 255) }, // light sand
     { "Clay",              "Cly", IM_COL32(178, 130, 100, 255) }, // earthy clay
     { "Peat",              "Pt",  IM_COL32(110,  86,  64, 255) }, // dark peat brown
@@ -36,14 +44,17 @@ constexpr resource_presentation resource_table[resource_count] = {
 };
 
 // Reserved corporation identity colours. Slot 0 is the player's corporation; the
-// rest are placeholders for the rival corporations the data model already permits.
+// rest are rival slots. Re-picked 2026-07-08 (BL-016) from the Okabe-Ito
+// colourblind-safe palette so player/rival and rival/rival pairs stay
+// distinguishable under deuteranopia/protanopia — the prior red/green pair
+// (slots 1/2) was exactly the confusion set the accessibility review flagged.
 constexpr ImU32 corp_table[palette::corp_slot_count] = {
-    IM_COL32( 80, 150, 230, 255), // player — corporate blue
-    IM_COL32(220, 110,  90, 255), // red
-    IM_COL32(110, 200, 130, 255), // green
-    IM_COL32(210, 180,  80, 255), // amber
-    IM_COL32(170, 120, 210, 255), // violet
-    IM_COL32( 90, 200, 205, 255), // teal
+    IM_COL32(  0, 114, 178, 255), // player — Okabe-Ito blue
+    IM_COL32(213,  94,   0, 255), // vermillion
+    IM_COL32(  0, 158, 115, 255), // bluish green
+    IM_COL32(240, 228,  66, 255), // yellow
+    IM_COL32(204, 121, 167, 255), // reddish purple
+    IM_COL32( 86, 180, 233, 255), // sky blue
 };
 
 } // namespace
@@ -144,21 +155,26 @@ ImU32 corp_identity_colour(entity_id corp, entity_id player)
 
 ImU32 nation_colour(entity_id id)
 {
-    // Twelve hues stepped ~30 deg around the wheel at moderate saturation/value,
-    // legible on the dark canvas and distinct from the corporation palette.
+    // Re-picked 2026-07-08 (BL-016): the prior 12-hue even wheel stepped straight
+    // through the deutan/protan confusion band (red -> orange -> yellow -> lime
+    // -> green reads as one indistinguishable smear under either deficiency —
+    // the Country lens's worst-cited hazard). Twelve slots now extend the eight
+    // Okabe-Ito colourblind-safe hues with four lightness-shifted variants of the
+    // same safe hues (rather than new hues), since varying lightness within a
+    // safe hue family is the standard way to extend a small CVD-safe palette.
     static constexpr ImU32 nation_table[nation_slot_count] = {
-        IM_COL32(204, 102, 102, 255), // red
-        IM_COL32(204, 153, 102, 255), // orange
-        IM_COL32(204, 204, 102, 255), // yellow
-        IM_COL32(153, 204, 102, 255), // lime
-        IM_COL32(102, 204, 102, 255), // green
-        IM_COL32(102, 204, 153, 255), // spring
-        IM_COL32(102, 204, 204, 255), // cyan
-        IM_COL32(102, 153, 204, 255), // azure
-        IM_COL32(102, 102, 204, 255), // blue
-        IM_COL32(153, 102, 204, 255), // violet
-        IM_COL32(204, 102, 204, 255), // magenta
-        IM_COL32(204, 102, 153, 255), // rose
+        IM_COL32(213,  94,   0, 255), // vermillion
+        IM_COL32(230, 159,   0, 255), // orange
+        IM_COL32(240, 228,  66, 255), // yellow
+        IM_COL32(  0, 158, 115, 255), // bluish green
+        IM_COL32( 86, 180, 233, 255), // sky blue
+        IM_COL32(  0, 114, 178, 255), // blue
+        IM_COL32(204, 121, 167, 255), // reddish purple
+        IM_COL32(150, 150, 150, 255), // neutral grey (stands in for Okabe-Ito black — pure black would vanish on the dark canvas)
+        IM_COL32(140,  60,   0, 255), // vermillion, shaded
+        IM_COL32(150, 210, 180, 255), // bluish green, tinted
+        IM_COL32(150, 180, 220, 255), // blue, tinted
+        IM_COL32(150,  80, 110, 255), // reddish purple, shaded
     };
     // Knuth multiplicative hash so consecutive nation ids (the common case) land
     // on well-separated palette slots rather than adjacent hues.
