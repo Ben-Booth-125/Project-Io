@@ -316,16 +316,18 @@ Summary retained one cycle (from 2026-07-08).
 
 ---
 
-## BL-077 — Planetary logistics: economic core (promoted 2026-07-08) — **ACTIVE**
+## BL-077 — Planetary logistics: economic core (delivered 2026-07-08) — **COMPLETE**
 
-Requirements: requirements.json § planetary-logistics-core (R1 A* distance, R2 data model, R3 dispatch)
+Rescoped core of the logistics epic, built main-session-serial. **Data model** (A): tile_component.road_level
+(default 0), land_use infrastructure value, per-body grid->tile index + A* route cache on world. **A* pathfinder**
+(B, new world/logistics.{hpp,cpp}): canonical landform cost table (TILES.md), terrain-weighted A* over the tile grid
+(4-cardinal, column wrap, road discount, ocean sea-leg + land/sea mode selection), symmetric edge cost, cached;
+reuses nation_generation's Dijkstra shape, expansion_cost untouched (world-gen determinism). **Intra-body dispatch**
+(C, supply_system.cpp): same-body market shortfalls source the corp's on-body pool, hauling from its representative
+tile to the short market's centre_tile via A*, mode land/sea by ocean-crossing, cost reg.logistics_cost(mode)*dist*qty;
+inter-body space path unchanged. **Harness** (D, tools/verify/logistics_harness.cpp).
 
-Rescoped core of the logistics epic. Built **main-session-serial** — determinism-critical tick code over shared `world/*` files. Grid topology reuses `nation_generation.cpp`'s 4-cardinal + column-wrap `raster_idx`/`cardinal_neighbours` and the `expand_territory` priority-queue Dijkstra shape.
-
-- **[2] A — Data model.** `land_use_component::type` += `infrastructure`; `tile_component` += `road_level` (default 0); `world` gains a per-body grid->tile index cache + an A* route cache. Files: `src/world/components.hpp`, `src/world/world.hpp`. Deps: foundation. Satisfies: R2.
-- **[3] B — A* pathfinder.** New `src/world/logistics.{hpp,cpp}`: canonical `landform_logistics_cost` (TILES.md table), per-body grid-index build, terrain-weighted A* over the grid (4-cardinal, column wrap, road discount, ocean = sea-leg cost), symmetric edge cost, route cache. Files: `src/world/logistics.hpp`, `src/world/logistics.cpp`, `src/world/world.cpp`. Deps: A. Satisfies: R1, R2.
-- **[3] C — Intra-body dispatch.** Enable same-body market pairs in `dispatch_convoys`; distance via B's A*; mode land/sea by ocean-crossing; deterministic source selection; space path unchanged. Files: `src/world/supply_system.cpp`. Deps: A, B (+ economy-model read). Satisfies: R1, R3.
-- **[3] D — Headless harness.** `tools/verify/logistics_harness.cpp`: A* weighted<naive, road discount, wrap-shorter-way, cache idempotence, intra-body dispatch creates a land/sea convoy with A* cost. Files: `tools/verify/logistics_harness.cpp`. Deps: A, B, C. Satisfies: R1, R2, R3.
-
-Parallelisation note: A -> B -> C -> D, strictly serial (shared `world.{hpp,cpp}` / `supply_system.cpp`, determinism core). No fan-out.
+Verified: logistics_harness 19/19 + full CTest **20/20** (econ_stability + pregame_balance stable on the real world,
+determinism intact, supply_advance + trade_routes unaffected). Commits a202dc8 (facility) + this (dispatch).
+Requirements planetary-logistics-core R1-R3 complete. Authority: SUPPLY.md. Summary retained one cycle (from 2026-07-08).
 

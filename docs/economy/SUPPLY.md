@@ -40,9 +40,11 @@ logistical_cost = base_logistics_cost × distance × cargo_qty
 land < sea < air < space
 ```
 
-For **space convoys**, `distance` is the Euclidean distance between the parent bodies' centres (no path routing — straight-line in the prototype). For **intra-body convoys** (land / sea / air), distance is the route length across the tile grid.
+For **space convoys**, `distance` is the Euclidean distance between the parent bodies' centres (no path routing — straight-line in the prototype). For **intra-body convoys** (land / sea), `distance` is the **terrain-weighted A* path** over the body's tile grid (BL-077, `src/world/logistics.{hpp,cpp}`): each tile weighted by its landform cost (TILES.md — plains 1.0 … mountain 2.0) and discounted by `road_level`, respecting the east–west cylinder wrap; the edge cost is the average of the two tiles (so the path is symmetric) and results cache per fixed endpoint pair. Ocean tiles carry a higher sea-leg cost, so the cheapest path prefers land and a water crossing selects **sea** mode.
 
 The cost is charged at dispatch (or amortised per Tick — the exact timing is a build decision). It is the term that makes distant arbitrage marginal: a profitable inter-body trade requires `source_price + logistical_cost_per_unit < destination_price`.
+
+> **Implemented (BL-077 economic core, 2026-07-08).** The intra-body A* distance above and same-body dispatch are live. `dispatch_convoys` now fills a same-body market shortfall from the corp's on-body pool, hauling from the corp's representative tile (its lowest-id building on the body) to the short market's `centre_tile` at the A* cost + mode above — previously same-body pairs were skipped ("resolved by production"). The inter-body space path is unchanged. Road-network generation + player placement (which populate `road_level`), cities-as-hubs, and the Inland Logistics Hub follow as BL-146–BL-149.
 
 ---
 
@@ -69,7 +71,7 @@ Each convoy mode is gated on endpoint infrastructure. Mode is selected by the so
 | **Air** | **Airfield** building at both endpoints | Designed; building not in the prototype set — deferred |
 | **Space** | **Launchpad** at the origin + **Orbital Port** at the destination; **Era 1 required** | Era gate already enforced by `docs/economy/ERAS.md` |
 
-Roads are an optional land cost-reducer — a `road_level` tile attribute that multiplies the per-unit-distance land cost downward when a route crosses it. Roads are a deferred tuning follow-on; the prototype land mode works without them.
+Roads are a land cost-reducer: `road_level` is now a real `tile_component` field (BL-077 core, default 0) that discounts the A* traversal cost of the tiles a route crosses (`road_traversal_multiplier`). The **generated road network** that populates it and **player road placement** are the follow-ons BL-146 / BL-147; the land mode works with `road_level` 0 everywhere until then.
 
 Per-node throughput capacity (a larger Port or Orbital Port carrying more cargo per Tick) is the natural infrastructure tuning lever but is out of prototype scope.
 

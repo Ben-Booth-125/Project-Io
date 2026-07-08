@@ -5340,27 +5340,29 @@
       "promoted_from": "backlog.json BL-077 (rescoped core; decomposed 2026-07-08)",
       "difficulty": 4,
       "importance": "B",
-      "evaluated_difficulty": null,
-      "status": "active",
+      "evaluated_difficulty": 4,
+      "status": "complete",
+      "resolved": "2026-07-08",
+      "resolution": "Delivered the BL-077 economic core. Data model: tile_component.road_level (default 0), land_use infrastructure value, per-body grid->tile index + A* route cache on world. Pathfinder (world/logistics.{hpp,cpp}): canonical landform cost table (TILES.md), terrain-weighted A* (4-cardinal, column wrap, road discount, ocean sea-leg + mode selection), symmetric edge cost, cached. Intra-body dispatch (supply_system.cpp): same-body market shortfalls now source the corp's on-body pool, hauling from its representative tile to the short market's centre_tile via A*, mode land/sea by ocean-crossing, cost reg.logistics_cost(mode)*dist*qty; the inter-body space path is unchanged. Verified: logistics_harness 19/19 (geometry, weighting, wrap, road discount, cache, mode selection, intra-body dispatch cost) + full CTest 20/20 -- econ_stability + pregame_balance_harness stable on the real world, determinism_harness + world_determinism intact, supply_advance + trade_routes unaffected. nation_generation expansion_cost left untouched (world-gen determinism). Follow-ons BL-146..149 spun off.",
       "batch": null,
       "rows": [
         {
           "id": "R1",
-          "status": "pending",
+          "status": "complete",
           "requirement": "Item-spanning (headless): intra-body convoy distance is a terrain-weighted A* over the tile grid -- a path across cheap terrain costs less than one forced over mountains, road_level discounts a tile, the east-west cylinder wrap is respected (a route wrapping the shorter way is cheaper), and the route cache returns an identical cost on re-query. An intra-body (same-body) market shortfall dispatches a land/sea convoy whose cost uses that A* distance, not the space path.",
           "verification": ["headless: tools/verify/logistics_harness.cpp"],
           "notes": ""
         },
         {
           "id": "R2",
-          "status": "pending",
+          "status": "complete",
           "requirement": "Data-model foundation: tile_component gains road_level (default 0); land_use_component::type gains infrastructure; a per-body grid->tile-entity index gives O(1) neighbour lookup (no linear scan of the tiles map); a canonical landform logistics-cost table matches TILES.md (plains 1.0 .. mountain 2.0). World generation determinism is preserved (nation_generation expansion_cost untouched).",
           "verification": ["headless: tools/verify/logistics_harness.cpp", "headless: tools/verify/determinism_harness.cpp"],
           "notes": ""
         },
         {
           "id": "R3",
-          "status": "pending",
+          "status": "complete",
           "requirement": "dispatch_convoys creates same-body convoys for intra-body shortfalls (today skipped) with mode land (default) or sea (path crosses ocean) and A*-based cost; the inter-body space path is unchanged. Deterministic source selection.",
           "verification": ["headless: tools/verify/logistics_harness.cpp"],
           "notes": ""

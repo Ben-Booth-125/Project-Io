@@ -247,6 +247,7 @@ add_executable(trade_routes_harness
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/trade_routes_harness.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/supply_system.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/logistics.cpp"
 )
 
 target_include_directories(trade_routes_harness PRIVATE

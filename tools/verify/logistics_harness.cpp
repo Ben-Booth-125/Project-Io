@@ -8,6 +8,8 @@
 
 #include "world/components.hpp"
 #include "world/logistics.hpp"
+#include "world/recipe_registry.hpp"
+#include "world/supply_system.hpp"
 #include "world/world.hpp"
 
 #include <cmath>
@@ -126,6 +128,55 @@ int main()
         check(tc.road_level == 0, "tile_component.road_level defaults to 0");
         const land_use_component::type infra = land_use_component::type::infrastructure;
         check(infra == land_use_component::type::infrastructure, "land_use has an infrastructure value");
+    }
+
+    // T7 — intra-body dispatch: a short market is served from the corp's on-body pool via a
+    // land convoy whose cost uses the A* tile distance (not the space lane).
+    {
+        world w;
+        const entity_id corp = w.create_entity();
+        corporation_component cc{};
+        cc.is_player = true;
+        cc.balance   = 1000.0f;
+
+        const entity_id body = make_grid(w, 1, 3, terrain_landform::plains); // 3-tall plains column
+        const entity_id anchor = tile_at(w, body, 0, 0); // corp production anchor
+        const entity_id bld = w.create_entity();
+        building_component bc{};
+        bc.tile = anchor;
+        w.buildings[bld] = bc;
+        cc.assets.push_back(bld);
+        w.corporations[corp] = cc;
+        w.player_entity = corp;
+
+        constexpr std::size_t ri = 0;
+        w.pool_for(corp, body).quantities[ri] = 100.0f; // on-body stockpile surplus
+
+        const entity_id short_market = w.create_entity();
+        market_component mm{};
+        mm.body        = body;
+        mm.centre_tile = tile_at(w, body, 0, 2); // far end of the column
+        mm.demand[ri]  = 10.0f;
+        mm.supply[ri]  = 0.0f;
+        w.markets[short_market] = mm;
+
+        recipe_registry reg; // default per-mode logistics costs {land .02, sea .05, air .15, space 1}
+        const std::size_t convoys_before = w.convoys.size();
+        const float bal_before = w.corporations[corp].balance;
+        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
+                         reg.logistics_cost(convoy_mode::space));
+
+        check(w.convoys.size() == convoys_before + 1, "intra-body shortfall dispatches one convoy");
+        if (w.convoys.size() == convoys_before + 1)
+        {
+            const convoy_component& cv = w.convoys.back();
+            check(cv.mode == convoy_mode::land, "intra-body plains route uses land mode, not space");
+            check(cv.corp == corp, "convoy attributed to the dispatching corp");
+        }
+        const float spent = bal_before - w.corporations[corp].balance;
+        check(spent > 0.0f, "intra-body logistics cost is debited from the corp balance");
+        // A* (0,0)->(0,2) = 2 plains edges = 2.0; qty = min(100,10) = 10; land unit cost 0.02.
+        check(approx(spent, 0.02f * 2.0f * 10.0f), "intra-body cost = land(0.02) * A*(2.0) * qty(10) = 0.4");
     }
 
     std::printf("\n%s  (%d failure%s)\n",
