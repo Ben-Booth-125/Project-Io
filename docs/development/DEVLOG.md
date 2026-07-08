@@ -6,6 +6,25 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — BL-087 tech/quest design resolutions (mobile, 2026-07-08)
+
+**Context.** Mobile design session (cloud, doc-only) working the BL-087 owed set — the six open
+questions from the 2026-07-01 tech-tree sketch, resolved with Ben via structured Q&A.
+
+**Decisions.** Two answers reframed the sketch: **Eras are catastrophic events** (war, satellite
+cascade) arriving on the world clock — tech can outpace the Era clock but never opens an Era; and
+**capstones open quest trees, not Eras** (the ERAS.md Rocketry+Launchpad+propellant set re-read as
+a quest-tree gate). Per-question: quests are mostly binary trees with dead-end leaves; standing
+lines never gate Eras but can gate quest lines; research capacity comes from dedicated buildings
+or scales with industry (mix = playtest), payoffs mostly tangible with sparing passive buffs;
+cross-quest prereqs allowed sparingly + marked; economic gates reserved for capstones + marquee
+nodes; **scope: all post-prototype** (no lean gate-tech item minted for v0.1.0).
+
+**Recorded in** `docs/research/ERA1_TECH_LANDSCAPE.md` § 'Resolutions — design session
+(2026-07-08)' + BL-087's design field. `ERAS.md` deliberately untouched (authority time-slices).
+**Left open:** Era-event mechanics (timing/foreseeability, boundary effects, gate-quest rename) —
+the item's remaining owed set. Branch: `claude/mobile-design-opportunities-4bxp67`.
+
 ## Session — Economy dynamism batch delivered: BL-078/095/096/079/112 (2026-07-07)
 
 **Context.** Delivered the five interlocking economy items designed in the prior session (below) as one
