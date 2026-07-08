@@ -389,6 +389,107 @@ void draw_scarcity_key(ImDrawList* dl, ImVec2 anchor,
                 presentation_of(state.lens_resource).name);
 }
 
+/// Recency-tier colour shared by the Reach and Supply-routes keys, mirroring the
+/// activity-fog convention (DISCOVERY.md, BL-089): fresh reads green, gone-cold
+/// reads greyed. (No `visible` case here — a trade_route-only reach has no live
+/// convoy/ownership signal to promote it past `known`.)
+ImU32 reach_tier_colour(activity_vis tier)
+{
+    return (tier == activity_vis::known) ? palette::activity_known : palette::activity_stale;
+}
+
+/// A body this canvas's active body is connected to via a player `trade_route`,
+/// tiered by recency. Shared shape for the Reach lens's pre-pass and key.
+struct reach_link { entity_id other_body; activity_vis tier; };
+
+/// One aggregated player trade lane touching the active body. Shared shape for
+/// the Supply-routes lens's pre-pass and key.
+struct supply_edge { entity_id other_body; int convoy_count; activity_vis tier; };
+
+/// On-canvas legend for the Reach lens (BL-011): this canvas only ever shows the
+/// active body's tile grid (never other bodies), so the "highlight the connected
+/// bodies" the design calls for reads here as a list of the active body's own
+/// connections (name + recency tier) — the body-marker glow the design describes
+/// belongs on the Solar canvas, out of this lens work's file scope.
+void draw_reach_key(ImDrawList* dl, ImVec2 anchor, const world& w,
+                    const std::vector<reach_link>& links)
+{
+    const float pad     = 8.0f;
+    const float box_w   = 176.0f;
+    const float line_h  = ImGui::GetTextLineHeight();
+    const int   n       = static_cast<int>(links.size());
+    const float body_h  = pad + line_h + 4.0f + std::max(1, n) * (line_h + 2.0f) + pad;
+    const ImVec2 p0 = { anchor.x - box_w, anchor.y - body_h * 0.5f };
+    const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
+    dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
+    dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
+
+    const float x = p0.x + pad;
+    float       y = p0.y + pad * 0.5f;
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Reach (your trade network)");
+    y += line_h + 4.0f;
+
+    if (links.empty())
+    {
+        dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "no routes from this body");
+        return;
+    }
+    for (const reach_link& link : links)
+    {
+        const auto  it   = w.bodies.find(link.other_body);
+        const char* name = (it != w.bodies.end()) ? it->second.name.c_str() : "unknown body";
+        const ImU32 c    = reach_tier_colour(link.tier);
+        dl->AddCircleFilled({x + 4.0f, y + line_h * 0.5f}, 3.5f, c);
+        dl->AddText({x + 12.0f, y}, c, name);
+        y += line_h + 2.0f;
+    }
+}
+
+/// On-canvas legend for the Supply-routes lens (BL-014): one row per aggregated
+/// lane touching the active body — a thickness bar log-scaled from convoy_count
+/// stands in for the edge-thickness encoding the design specifies for the
+/// (out-of-scope-here) Solar-canvas graph rendering, and colour is the shared
+/// recency tier.
+void draw_supply_routes_key(ImDrawList* dl, ImVec2 anchor, const world& w,
+                            const std::vector<supply_edge>& edges)
+{
+    const float pad     = 8.0f;
+    const float box_w   = 176.0f;
+    const float line_h  = ImGui::GetTextLineHeight();
+    const float bar_max = 40.0f;
+    const int   n       = static_cast<int>(edges.size());
+    const float body_h  = pad + line_h + 4.0f + std::max(1, n) * (line_h + 2.0f) + pad;
+    const ImVec2 p0 = { anchor.x - box_w, anchor.y - body_h * 0.5f };
+    const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
+    dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
+    dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
+
+    const float x = p0.x + pad;
+    float       y = p0.y + pad * 0.5f;
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Supply routes");
+    y += line_h + 4.0f;
+
+    if (edges.empty())
+    {
+        dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "no lanes from this body");
+        return;
+    }
+    for (const supply_edge& edge : edges)
+    {
+        const auto  it   = w.bodies.find(edge.other_body);
+        const char* name = (it != w.bodies.end()) ? it->second.name.c_str() : "unknown body";
+        const ImU32 c    = reach_tier_colour(edge.tier);
+        // Log-scaled thickness (BL-014, settled): a bare completion reads as a
+        // thin sliver; heavy repeat traffic saturates toward bar_max rather than
+        // dominating the row linearly.
+        const float thickness = std::clamp(3.0f + 6.0f * std::log(1.0f + static_cast<float>(edge.convoy_count)),
+                                            3.0f, bar_max);
+        dl->AddRectFilled({x, y + line_h * 0.5f - 2.0f}, {x + thickness, y + line_h * 0.5f + 2.0f}, c);
+        dl->AddText({x + bar_max + 6.0f, y}, c, name);
+        y += line_h + 2.0f;
+    }
+}
+
 } // namespace
 
 void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_registry& reg,
@@ -752,6 +853,52 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             const float thr = tile.substrate_density * (0.35f + 0.65f * dep_norm);
             industry_field[tid] = thr;
             industry_max = std::max(industry_max, thr);
+        }
+    }
+
+    // Reach lens pre-pass (BL-011): `trade_route` is body-level, not per-tile, and
+    // this canvas only ever shows the *active* body's tile grid (never other
+    // bodies), so the "body-to-body highlight" the design calls for reads here as
+    // a per-body connectivity readout for the active body — every other endpoint
+    // it is connected to, tiered by recency. Player's own routes only, per the
+    // competitor-visibility rule (rival lanes stay private). No falloff/distance
+    // model: trade_route carries none to derive one from.
+    std::vector<reach_link> reach_links;
+    if (state.overlay == overlay_mode::reach)
+    {
+        for (const trade_route& route : w.trade_routes)
+        {
+            if (route.corp != w.player_entity)
+                continue;
+            entity_id other = null_entity;
+            if (route.body_a == state.active_body)      other = route.body_b;
+            else if (route.body_b == state.active_body) other = route.body_a;
+            else                                        continue;
+            const bool fresh = (w.current_day_tick - route.last_tick) <= route_fresh_ticks_default;
+            reach_links.push_back({other, fresh ? activity_vis::known : activity_vis::known_stale});
+        }
+    }
+
+    // Supply-routes lens pre-pass (BL-014): one aggregated edge per unordered
+    // (body_a, body_b) pair touching the active body, built from `w.trade_routes`
+    // at render time (not per-frame convoy positions). `trade_route` is already
+    // upserted per (pair, corp), so filtering to the player's corp yields at most
+    // one entry per pair directly — no further aggregation needed. Thickness is
+    // log-scaled convoy_count; colour/alpha is the same recency tier as Reach.
+    std::vector<supply_edge> supply_edges;
+    if (state.overlay == overlay_mode::supply_routes)
+    {
+        for (const trade_route& route : w.trade_routes)
+        {
+            if (route.corp != w.player_entity)
+                continue;
+            entity_id other = null_entity;
+            if (route.body_a == state.active_body)      other = route.body_b;
+            else if (route.body_b == state.active_body) other = route.body_a;
+            else                                        continue;
+            const bool fresh = (w.current_day_tick - route.last_tick) <= route_fresh_ticks_default;
+            supply_edges.push_back({other, route.convoy_count,
+                                    fresh ? activity_vis::known : activity_vis::known_stale});
         }
     }
 
@@ -1443,6 +1590,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         draw_scarcity_key(dl, lens_key_anchor, state);
     else if (state.overlay == overlay_mode::industry)
         draw_industry_key(dl, lens_key_anchor);
+    else if (state.overlay == overlay_mode::reach)
+        draw_reach_key(dl, lens_key_anchor, w, reach_links);
+    else if (state.overlay == overlay_mode::supply_routes)
+        draw_supply_routes_key(dl, lens_key_anchor, w, supply_edges);
 
     if (!input_enabled)
         return;

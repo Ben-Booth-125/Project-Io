@@ -29,6 +29,12 @@ void draw_lens_icon(ImDrawList* dl, overlay_mode m, ImVec2 rect_min, ImVec2 rect
         case overlay_mode::production:  icons::production (dl, centre, r, colour); break;
         case overlay_mode::scarcity:    icons::scarcity   (dl, centre, r, colour); break;
         case overlay_mode::industry:    icons::industry   (dl, centre, r, colour); break;
+        // Reach/Supply-routes (BL-011/BL-014) reuse the existing convoy/supply
+        // glyphs rather than adding new ones — dedicated glyphs are an open TODO
+        // in ui::icons (src/ui/icons.{hpp,cpp}, out of this lens work's file
+        // scope) for whenever these lenses join the on-screen strip.
+        case overlay_mode::reach:         icons::convoy(dl, centre, r, colour); break;
+        case overlay_mode::supply_routes: icons::supply(dl, centre, r, colour); break;
         default: break;
     }
 }
@@ -76,6 +82,8 @@ const char* overlay_mode_name(overlay_mode m)
         case overlay_mode::production:  return "Production intensity";
         case overlay_mode::scarcity:    return "Market scarcity";
         case overlay_mode::industry:    return "Industry density";
+        case overlay_mode::reach:         return "Reach (commercial connectivity)";
+        case overlay_mode::supply_routes: return "Supply-routes graph";
         default:                        return "None";
     }
 }
@@ -94,6 +102,8 @@ const char* overlay_mode_short_name(overlay_mode m)
         case overlay_mode::production:  return "Production";
         case overlay_mode::scarcity:    return "Scarcity";
         case overlay_mode::industry:    return "Industry";
+        case overlay_mode::reach:         return "Reach";
+        case overlay_mode::supply_routes: return "Supply routes";
         default:                        return "None";
     }
 }
@@ -107,7 +117,8 @@ void draw_overlay_controls(ui_state& ui, float x, float top_y, float w)
 {
     // The seven on-screen lenses, in settled order (BL-013, trimmed BL-093):
     // Corp → Country → Resource → Market → Population → Opportunity → Production.
-    // Scarcity and Industry are keyboard-cycle only (like Supply) — they do not fit
+    // Scarcity and Industry are keyboard-cycle only (like Supply); Reach and
+    // Supply-routes (BL-011/BL-014) join them off-strip too — they do not fit
     // the 240 px minimap bar this row now lives on. Single-select with a null state:
     // clicking the active lens clears to overlay_mode::none (toggle_overlay).
     constexpr overlay_mode modes[7] = {
