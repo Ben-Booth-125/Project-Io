@@ -5303,6 +5303,165 @@
           "notes": ""
         }
       ]
+    },
+    {
+      "batch": "2026-07-08-backlog-refinement",
+      "brief": "reach-supply-lenses",
+      "title": "BL-011 + BL-014 — Reach and Supply-routes lenses",
+      "promoted_from": "backlog.json BL-011, BL-014",
+      "difficulty": 4,
+      "importance": "B",
+      "evaluated_difficulty": 4,
+      "status": "pending",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "pending",
+          "requirement": "ITEM-SPANNING: both lenses render correctly from the existing trade_route list, with no new data model added.",
+          "verification": [
+            "visual: src/ui/body_surface_canvas.cpp reach + supply-route overlays"
+          ],
+          "result_metric": "",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "pending",
+          "requirement": "BL-011: Reach lens highlights bodies connected via the selected corp's trade_route entries, tiered by last_tick recency.",
+          "verification": [
+            "visual: src/ui/body_surface_canvas.cpp reach overlay"
+          ],
+          "result_metric": "",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "status": "pending",
+          "requirement": "BL-014: Supply-routes lens draws one aggregated edge per unordered (body_a, body_b) pair, thickness log-scaled from convoy_count, colour from recency tier.",
+          "verification": [
+            "visual: src/ui/body_surface_canvas.cpp supply-route overlay"
+          ],
+          "result_metric": "",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "batch": "2026-07-08-backlog-refinement",
+      "brief": "accessibility-strand-1",
+      "title": "BL-016 + BL-063 — colourblind-safe palette + legibility baseline",
+      "promoted_from": "backlog.json BL-016, BL-063",
+      "difficulty": 3,
+      "importance": "B",
+      "evaluated_difficulty": 3,
+      "status": "pending",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "pending",
+          "requirement": "ITEM-SPANNING: lens colours are colourblind-safe and secondary text clears WCAG AA, with a working UI-scale setting.",
+          "verification": [
+            "visual: src/ui/presentation.hpp + fonts.cpp"
+          ],
+          "result_metric": "",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "pending",
+          "requirement": "BL-016: Country/Corporation lenses use Okabe-Ito hues; Resource/Scarcity/Population/Production/Industry use a Viridis-style ordered ramp.",
+          "verification": [
+            "visual: src/ui/body_surface_canvas.cpp lens overlays"
+          ],
+          "result_metric": "",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "status": "pending",
+          "requirement": "BL-063: a discrete UI-scale setting (1.0/1.25/1.5) persists across sessions and re-loads the font atlas at the chosen size.",
+          "verification": [
+            "headless: options.cfg round-trip",
+            "visual: scale applied on relaunch"
+          ],
+          "result_metric": "",
+          "notes": ""
+        },
+        {
+          "id": "R4",
+          "status": "pending",
+          "requirement": "BL-063: audited secondary/label text tokens in presentation.hpp meet 4.5:1 contrast against the dark theme.",
+          "verification": [
+            "code: src/ui/presentation.hpp contrast audit"
+          ],
+          "result_metric": "",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "batch": "2026-07-08-backlog-refinement",
+      "brief": "country-generation-variety",
+      "title": "BL-053 — larger, size-varied country generation",
+      "promoted_from": "backlog.json BL-053",
+      "difficulty": 4,
+      "importance": "B",
+      "evaluated_difficulty": 4,
+      "status": "pending",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "pending",
+          "requirement": "Nation generation produces a larger country count (~24) with a genuinely uneven size distribution, deterministically, via the existing merge_small_nations mechanism.",
+          "verification": [
+            "headless: world_audit nation-count + size-variance assertion"
+          ],
+          "result_metric": "",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "pending",
+          "requirement": "Determinism preserved: identical seed produces identical nation partition.",
+          "verification": [
+            "headless: world_determinism"
+          ],
+          "result_metric": "",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "batch": "2026-07-08-backlog-refinement",
+      "brief": "view-bounding-audit",
+      "title": "BL-097 — bound shell panels from content, not resolution-scaled dimensions",
+      "promoted_from": "backlog.json BL-097",
+      "difficulty": 3,
+      "importance": "B",
+      "evaluated_difficulty": 3,
+      "status": "pending",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "pending",
+          "requirement": "ITEM-SPANNING: every audited shell panel is sized from content (text-line units) and anchored to a fixed shell edge, at both 1280x720 and 1920x1080.",
+          "verification": [
+            "visual: multi-resolution capture sweep"
+          ],
+          "result_metric": "",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "pending",
+          "requirement": "No audited panel clips, overflows, or overlaps a neighbour at a small (1000x600) or large (1920x1080) window size.",
+          "verification": [
+            "visual: scripts/verify/*.lua multi-resolution sweep (candidate new script)"
+          ],
+          "result_metric": "",
+          "notes": ""
+        }
+      ]
     }
   ]
 }

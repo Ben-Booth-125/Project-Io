@@ -123,6 +123,54 @@ session boundary is drawn *between* them.
 
 ---
 
+## Reach + Supply-routes lenses (promoted from BACKLOG § BL-011, BL-014)
+
+Requirements: requirements.json § reach-supply-lenses
+
+- **[3] A — Add `overlay_mode::reach` and `overlay_mode::supply_routes`, strip icons, keyboard-cycle wiring.** Files: `src/ui/ui_state.hpp`, `src/ui/overlay.cpp`. Deps: foundation. Satisfies: R1.
+- **[3] B — Render the Reach lens: highlight bodies connected via the selected corp's `trade_route` entries, tiered by `last_tick` recency (reuse DISCOVERY.md's fresh/aging/stale thresholds).** Files: `src/ui/body_surface_canvas.cpp`. Deps: A. Satisfies: R2.
+- **[3] C — Render the Supply-routes lens: aggregate one edge per unordered (body_a, body_b) pair from `world.trade_routes`, thickness = log-scaled `convoy_count`, colour = recency tier.** Files: `src/ui/body_surface_canvas.cpp`. Deps: A. Satisfies: R3.
+
+Parallelisation note: A is foundation (shared `ui_state.hpp`/`overlay.cpp`); B and C both land in `body_surface_canvas.cpp` so they are **sequential in one agent**, not concurrent — same file, same as the tile-generation pass rule. One agent can do A→B→C in order.
+
+---
+
+## Accessibility strand 1 — colour + legibility (promoted from BACKLOG § BL-016, BL-063)
+
+Requirements: requirements.json § accessibility-strand-1
+
+- **[2] A — Audit current secondary/label text tokens in `presentation.hpp` against the dark theme; list which fail 4.5:1 and their AA-safe replacements.** Files: `src/ui/presentation.hpp` (read + note). Deps: foundation. Satisfies: R4 (audit half).
+- **[2] B — Re-pick lens hues: Okabe-Ito for Country/Corporation, Viridis-style ramp for Resource/Scarcity/Population/Production/Industry.** Files: `src/ui/presentation.hpp`. Deps: A (shares the token audit pass). Satisfies: R2.
+- **[3] C — Add a discrete UI-scale setting (1.0/1.25/1.5): font-atlas re-load in `load_ui_font`, persisted in `options.cfg`, an options-surface control to change it.** Files: `src/ui/fonts.cpp`, `src/core/app.cpp`. Deps: independent root. Parallel-safe with A/B (disjoint files). Satisfies: R3.
+- **[1] D — Apply the AA-safe replacement values from A's audit.** Files: `src/ui/presentation.hpp`. Deps: A. Satisfies: R4.
+
+Parallelisation note: {A→B→D} share `presentation.hpp` (sequential, one agent); C is disjoint (`fonts.cpp`/`app.cpp`) and can run concurrently in a separate worktree.
+
+---
+
+## Country generation — larger, varied sizing (promoted from BACKLOG § BL-053)
+
+Requirements: requirements.json § country-generation-variety
+
+- **[3] A — Raise `nation_params` defaults: `nation_count` ~24, widen the seed/merge gap (`pre_seed_n = merge_to + 10`), re-check `min_seed_separation` still gives good coverage at ~34 seeds.** Files: `src/world/nation_generation.hpp`, `src/world/hard_coded_world.cpp`. Deps: foundation.
+- **[2] B — Verify: headless nation-count + size-variance assertion, plus determinism re-run.** Files: `tools/verify/world_audit.cpp` (or existing harness extended). Deps: A. Satisfies: R1, R2.
+
+Parallelisation note: single small sequential chain, no fan-out needed.
+
+---
+
+## View-bounding audit (promoted from BACKLOG § BL-097)
+
+Requirements: requirements.json § view-bounding-audit
+
+- **[2] A — Audit each shell region (header, profile, nav rail, time panel, explorer, minimap+lens bar, ledger windows, on-canvas strips) at 1280x720, 1920x1080, and 1000x600; list which clip/overflow/overlap or leave dead space.** Files: read-only pass across `src/core/app.cpp`, `src/ui/profile_panel.cpp`, `src/ui/nav_pane.cpp`, `src/ui/economy_panel.cpp`, `src/ui/tile_inspector.cpp` (+ any panel the audit flags). Deps: foundation.
+- **[3] B — Fix each flagged panel: size from content (`GetTextLineHeightWithSpacing()`/measured content) and anchor to a fixed shell edge instead of another element's resolution-scaled extent.** Files: whichever panels A flags. Deps: A.
+- **[2] C — (Optional, save-the-tool) Author a `scripts/verify/*.lua` multi-resolution sweep script for repeatable capture at the three sizes.** Files: new `scripts/verify/view_bounding.lua`. Deps: independent of A/B once the panel list is known; can run concurrently.
+
+Parallelisation note: A gates B (can't fix what hasn't been audited); C is disjoint tooling work and can be built in parallel once A's panel list exists.
+
+---
+
 ## 2026-07-07 Batch — Economy dynamism (BL-078, BL-095, BL-096, BL-079, BL-112) — **COMPLETE**
 
 Five interlocking economy items delivered 2026-07-07. **BL-078** redefined the nation substrate into a
