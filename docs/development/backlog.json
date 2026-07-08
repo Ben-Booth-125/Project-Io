@@ -2795,6 +2795,28 @@
       "authority_doc": "docs/economy/SUPPLY.md",
       "summary": "Follow-on from BL-077 (core). A land-mode counterpart to the Port: a routing waypoint that consolidates convoys so a cluster of buildings ships through the hub rather than each dispatching independently — the missing land-network piece. Occupies land_use = infrastructure.",
       "design": "Follow-on from BL-077 (core). Adds a new building_type value (inland_logistics_hub) that acts as an intra-body convoy consolidation waypoint: buildings within its catchment route through the hub, so the network ships hub-to-hub rather than each building point-to-point.\n\n**Touch points (the new-building-type footprint the core investigation catalogued):** building_type enum (components.hpp); a placement rule (placement_rules.cpp — land, non-ocean, likely inland); scripts/economy.lua building econ entry; recipe_registry.cpp named_type list + the m_building_econ array bump (5 -> 6, indexed by building_type); a construction_panel.cpp build button. **Authority:** SUPPLY.md + PRODUCTION.md."
+    },
+    {
+      "id": "BL-150",
+      "short_name": "ACTIVITY_FOG_DIM_SHADOW",
+      "category": "Canvas",
+      "title": "Render the commercial-activity fog as a dim shadow (make the unlit map read as fogged)",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "files": [
+        "src/ui/solar_system_canvas.cpp",
+        "src/ui/presentation.hpp",
+        "src/ui/presentation.cpp"
+      ],
+      "authority_doc": "docs/ui/DISCOVERY.md",
+      "summary": "Filed 2026-07-08 (Ben) after observing the commercial-activity fog reads as 'no fog'. Today (BL-089) the activity fog is ABSENCE-by-default: an unknown body draws nothing (a plain astronomy dot); only known/known_stale/visible non-home bodies get a small ~4-6px lower-left pulse badge. So with no player commerce the whole Solar map looks identical to no-fog, and even when lit the badges are subtle next to the survey '?' + labels. This item inverts the treatment: render the fog as a DIM SHADOW over bodies outside the player's commercial network, so the unlit map READS as fogged and brightens as commerce reaches it.",
+      "design": "**Problem.** The commercial-activity fog (BL-089, `body_activity_visibility` -> Solar badges in `solar_system_canvas.cpp:249`) is a presence-badge on LIT bodies, not an overlay on the dark. Unknown bodies draw nothing, so the fog is invisible until the player runs commerce, and the small lower-left pulse dots are easily lost. Prompted by Ben 2026-07-08 ('I'm not seeing any fog').\n\n**Change.** Render the activity fog as a **dim shadow**: bodies the player's commercial network does NOT reach are drawn dimmed/shadowed on the Solar canvas (a translucent dark wash and/or reduced body+label brightness), so the un-networked map legibly reads as *fogged*; as a route/convoy reaches a body it **brightens** to full (known -> visible a rising brightness ramp). The existing lower-left pulse badge can stay as the fine-grained tier tell for the lit tiers; the shadow is the new coarse read for the unlit. Keep it visually distinct from the geographic **survey** fog (BL-067, the '?' badges) — the two fogs must still read apart (DISCOVERY.md's two-independent-fogs rule).\n\n**Scope.** Solar canvas only (the activity fog is body-level). Home stays full-bright (its BL-085 halo). Derived read only — no new sim state (reads `body_activity_visibility`). `presentation.hpp/.cpp` for the shadow colour/alpha + brightness ramp; `solar_system_canvas.cpp` for the per-body dim.\n\n**Open (Ben's visual call — mockup welcome):** per-body dimming (a shadow on each un-networked body + label) vs a broader regional wash; the exact alpha/brightness ramp across unknown -> known_stale -> known -> visible; whether known_stale reads as partially-lit or still-shadowed. Visual design lives with Ben; this captures the intent + the seam. **Authority:** docs/ui/DISCOVERY.md (activity-fog rendering)."
     }
   ]
 }
