@@ -1340,11 +1340,11 @@
       "id": "BL-077",
       "short_name": "PLANETARY_LOGISTICS_NETWORK",
       "category": "Infrastructure",
-      "title": "Planetary logistics network — terrain-weighted routing, roads & hubs",
+      "title": "Planetary logistics: economic core — terrain-weighted A* distance + intra-body dispatch + data model",
       "status": "designed",
       "glyph": "✓",
       "priority": "B",
-      "difficulty": 5,
+      "difficulty": 4,
       "parked": false,
       "requires": [
         "BL-039"
@@ -1352,16 +1352,18 @@
       "blocked_on": [],
       "written": "2026-07-01",
       "files": [
+        "src/world/supply_system.hpp",
         "src/world/supply_system.cpp",
-        "src/world/tile_generation.cpp",
         "src/world/components.hpp",
+        "src/world/world.hpp",
+        "src/world/world.cpp",
+        "src/world/tile_generation.cpp",
         "src/world/placement_rules.hpp",
-        "src/ui/body_surface_canvas.cpp",
         "scripts/economy.lua"
       ],
       "authority_doc": "docs/economy/SUPPLY.md",
-      "summary": "Intra-body logistics refinement of the built convoy system: distance = terrain-weighted A* on the tile grid (landform-weighted, cylinder-wrapped); roads generated as a realistic pre-existing nation network + player-placeable, rendered from campaign start, lowering A* traversal cost; cities act as free logistics hubs (agglomeration discount); new Inland Logistics Hub building consolidates land convoys. Pipeline & tiered-port throughput dropped this milestone. Planetary-scoped.",
-      "design": "Follow-on refinement of the completed Layer 5 convoy system (BL-039 / BL-045). Scoped **intra-body (planetary)** for this milestone; the space / inter-body side keeps the settled Euclidean-between-body-centres rule and is out of focus. Decisions settled 2026-07-01 via design Q&A.\n\n**1. Distance = terrain-weighted A\\*.** Intra-body land/sea/air `distance` becomes the shortest path over the tile grid, each tile weighted by its landform build-cost modifier (plains ×1 → mountain ×2, TILES.md), respecting the east–west cylinder wrap (PLANETARY.md). Replaces the current \"route length across the tile grid\" placeholder in SUPPLY.md § Logistical cost. Roads (below) lower a tile's traversal weight, so A\\* prefers roaded corridors.\n\n**2. Roads — generated network + player-placeable.** The world **ships pre-roaded**: a new deterministic generation pass lays a realistic road network over existing nation territory (runs after nation + population generation — it needs cities to connect). The player **extends** it with placeable road/rail occupying `land_use = infrastructure`. A road lowers the A\\* traversal cost of the tiles it crosses. Roads **render from campaign start** (the world generates with a visible network), which retires the old \"invisible tile-attribute\" concern. Supersedes BL-045's \"road = optional, deferred tile-attribute cost-reducer\".\n\n**Road-generation pass (algorithm, settled 2026-07-01).** Deterministic from the campaign seed; runs after nation + population generation. Per nation:\n1. **Nodes** = the nation's population centres.\n2. **Weighted graph** = terrain-weighted A\\* path cost between each centre-pair (one-off at generation, small node count — not per-Tick, so cost is fine).\n3. **Backbone = MST + redundancy** — take the minimum spanning tree over that graph, then add a few short extra edges (relative-neighbour rule: keep an edge unless a third centre is closer to both endpoints) to introduce realistic loops. Deterministic tie-break: sort candidate edges by (cost, lower-node-id, higher-node-id).\n4. **Hierarchy = two-tier** — edges among major centres (City / Metropolis) become **trunk** roads (higher `road_level`, larger traversal-cost cut); spurs linking smaller settlements to their nearest backbone node become **local** roads.\n5. **Rasterise** each edge as its terrain-weighted A\\* path and stamp `road_level` onto the crossed tiles; on overlap take the max. Paths respect the cylinder wrap.\n6. **Border links** — after the per-nation networks exist, add one link between the nearest city-pair across each adjacent-nation boundary, so the continent-wide lattice is connected.\n\n**3. Cities as free logistics hubs.** Population centres discount convoy cost for routes into/through them, reusing the agglomeration bonus already committed in POPULATION.md (\"better logistics, shared infrastructure\"). The city *is* infrastructure — no new building; higher tier → larger discount.\n\n**4. New building — Inland Logistics Hub.** A land-mode counterpart to the Port: a routing waypoint that consolidates convoys so a cluster ships through the hub rather than each building dispatching independently — the missing land-network piece. Occupies `land_use = infrastructure`.\n\n**Design rationale — the nation lattice.** Nations own the saturated broad economy (GENERATION_STRATEGY.md), so they come pre-roaded: cities linked by roads. Combined with cities-as-hubs, the generated world already contains a low-cost logistics lattice the player *plugs into*. Player road-building is then about reaching out from that lattice to remote extraction sites — the specialist-corporation fantasy.\n\n**Explicitly dropped / deferred this milestone:** Pipeline mode (fluids) and tiered-port throughput — both noted sensible but out of scope; keep the milestone planetary.\n\n**Open (settle at promotion):**\n- Cities-as-hub discount formula and radius, and trunk/local `road_level` cost-cut values (all tuning).\n- A\\* performance / determinism — per-convoy, per-Tick routing on a 180×84 grid likely needs route caching between fixed endpoints. The one watch-point."
+      "summary": "Economic core of the planetary-logistics epic — decomposed from the original d5 on 2026-07-08 (Ben's call: decompose + build core). Investigation found the epic is bigger than a d5 AND that intra-body convoys do not dispatch at all today (dispatch_convoys skips same-body pairs, hardcodes convoy_mode::space) with no data-model support. Core scope: data-model foundation (land_use.infrastructure, road_level on tile, a per-body grid->tile index, landform build-cost table) + terrain-weighted A* intra-body distance with a route cache + enabling intra-body land/sea dispatch (market-to-market per SUPPLY.md). Road-network generation (BL-146), road rendering + player placement (BL-147), cities-as-hubs (BL-148), and the Inland Logistics Hub building (BL-149) are the spun-off follow-ons.",
+      "design": "**Economic core of the planetary-logistics epic** — the foundation the road / hub / cities follow-ons (BL-146..BL-149) build on. Decomposed from the original d5 on 2026-07-08 (Ben) after investigation found (a) the epic is far bigger than a d5, and (b) intra-body convoys do NOT dispatch at all today — `dispatch_convoys` skips same-body pairs (`if (src_body == dest_body) continue;`), hardcodes `convoy_mode::space`, and land-mode is `// deferred`; and there is no data-model support. So the original 'A* replaces the placeholder distance' framing was against a system that was never built. Distance-model settled 2026-07-01; decomposition 2026-07-08.\n\n**In scope (build now):**\n\n1. **Data-model foundation** — add the fields the whole epic needs, positioned once so the flat-binary layout settles: the `infrastructure` value on `land_use_component::type`; a `road_level` attribute on `tile_component` (default 0; populated by BL-146); a per-body **grid->tile-entity index** so A* neighbour lookups are O(1) rather than the current linear scan of the `tiles` unordered_map; and the **landform build-cost table** from TILES.md (plains 1.0 ... mountain 2.0) encoded in code (today it is prose only — and `nation_generation.cpp` has a *different* private `expansion_cost` table; author a canonical shared one).\n\n2. **Terrain-weighted A\\* distance** — intra-body land/sea `distance` becomes the shortest path over the tile grid, each tile weighted by its landform cost and discounted by `road_level`, respecting the east-west cylinder wrap (PLANETARY.md). Reuse `nation_generation.cpp`'s `expand_territory` shape (priority_queue Dijkstra over the grid, `raster_idx`/`cardinal_neighbours` column-wrap). Replaces the 'route length across the tile grid' placeholder named in SUPPLY.md § Logistical cost (prose only — never built). **Route cache** keyed by (body, src_tile, dst_tile): per-Tick per-lane A* over a ~15,120-tile (180x84) hex grid is a perf cliff, so cache path cost and invalidate on road_level change. This caching is the design's flagged watch-point.\n\n3. **Intra-body dispatch** — enable same-body market pairs in `dispatch_convoys`, per SUPPLY.md's **market-to-market** coupling: a dest-market shortfall on body X may be filled from a same-body source, mode **land** (default) or **sea** (path crosses ocean), cost = `logistics_cost_{land,sea} × A*-distance × qty` between the two markets' tiles (market centre_tile). Reconcile with the body-level `corp_body_pools` model during implementation (source selection stays deterministic).\n\n**Out of scope (spun-off follow-ons):** road-network generation + road_level population + A* cost wiring (**BL-146**); road rendering + player-placeable roads (**BL-147**); cities as free logistics hubs / agglomeration discount (**BL-148**); Inland Logistics Hub building (**BL-149**). Pipeline mode (fluids) and tiered-port throughput stay dropped (out of the epic's prototype scope).\n\n**Verification:** headless — extend the supply harness (or a new one) for A* distance correctness (weighted path < naive, road discount, wrap), route-cache determinism, and intra-body dispatch (same-body land/sea convoy created with A* cost). Determinism guard: `road_level` + any new world state added to determinism_harness. **Authority:** docs/economy/SUPPLY.md (§ Logistical cost) on landing."
     },
     {
       "id": "BL-088",
@@ -2691,6 +2693,107 @@
       "authority_doc": "docs/ui/DISCOVERY.md",
       "summary": "Filed 2026-07-08 (Ben). A corporation's industrial focus (Extraction/Processing/Trade) is currently shown in at least four surfaces: economy_panel.cpp (Focus column ~89), corporation_panel.cpp (Focus column ~65/91), entity_summary.cpp (corp 'Focus:' ~399), profile_panel.cpp (corp 'Focus:' ~120). Ben: corporation focuses should be INVISIBLE. Hide the focus display across these surfaces. Aligns with competitor-info privacy (BL-068 — a rival's strategic focus is internal).",
       "design": "**Designed** — hide the corporation industrial_focus display wherever it is shown: economy_panel.cpp (the 'Focus' table column — setup ~73 + cell ~89–92), corporation_panel.cpp (the 'Focus' column ~65/91), entity_summary.cpp (corp 'Focus: %s' ~399), profile_panel.cpp (corp 'Focus:' line ~120). Leave the industrial_focus DATA intact (generation + economy still use it); only the UI readout is removed. Open (minor): (a) whether to also hide it for the PLAYER'S own corp or only rivals — Ben said blanket 'invisible', so hide everywhere unless he wants the player's kept; (b) the NATION 'Economic focus' (entity_summary.cpp ~301) is a separate attribute, left visible unless Ben says otherwise. Authority → docs/ui/DISCOVERY.md (competitor visibility) on landing. Part of the 2026-07-08 UX review."
+    },
+    {
+      "id": "BL-146",
+      "short_name": "ROAD_NETWORK_GENERATION",
+      "category": "Infrastructure",
+      "title": "Generated road network + A* cost integration",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 4,
+      "parked": false,
+      "requires": [
+        "BL-077"
+      ],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "files": [
+        "src/world/road_generation.cpp",
+        "src/world/road_generation.hpp",
+        "src/world/hard_coded_world.cpp",
+        "src/world/components.hpp",
+        "scripts/economy.lua"
+      ],
+      "authority_doc": "docs/economy/SUPPLY.md",
+      "summary": "Follow-on from BL-077 (core), split out 2026-07-08. The world ships pre-roaded: a deterministic per-nation generation pass lays a realistic road lattice over nation territory (stamping road_level onto tiles), and road_level lowers A* traversal cost so routing prefers roads. The nation lattice + cities-as-hubs (BL-148) give the player a low-cost network to plug into; player road-building (BL-147) then reaches out to remote extraction sites.",
+      "design": "Follow-on from BL-077 (core). Requires the core's road_level field, per-body grid index, and terrain-weighted A* pathfinder. Runs AFTER nation + population generation (it needs cities to connect) — slots into hard_coded_world.cpp after generate_nations (~line 158).\n\n**Road-generation pass (deterministic from the campaign seed).** Per nation:\n1. **Nodes** = the nation's population centres.\n2. **Weighted graph** = terrain-weighted A* path cost between each centre-pair (one-off at generation; small node count, not per-Tick).\n3. **Backbone = MST + redundancy** — minimum spanning tree over that graph, then a few short extra edges (relative-neighbour rule: keep an edge unless a third centre is closer to both endpoints) for realistic loops. Deterministic tie-break: sort candidate edges by (cost, lower-node-id, higher-node-id).\n4. **Two-tier hierarchy** — edges among major centres (City/Metropolis) become **trunk** roads (higher road_level, larger cost cut); spurs linking smaller settlements to their nearest backbone node become **local** roads.\n5. **Rasterise** each edge as its terrain-weighted A* path; stamp road_level on the crossed tiles (max on overlap); paths respect the east-west cylinder wrap.\n6. **Border links** — after the per-nation networks exist, add one link between the nearest city-pair across each adjacent-nation boundary, so the continent-wide lattice is connected.\n\nCities enumerable via world.population_centres + population_centre_tile. New TU road_generation.{hpp,cpp} keeps the pass off the tile_generation hotspot; wired in hard_coded_world.cpp (main-session integration). Determinism guard: add road_level to the determinism_harness field checks.\n\n**Tuning (settle at promotion):** trunk/local road_level values and their A* cost-cut. **Authority:** SUPPLY.md (road cost-reducer) + TILE_GENERATION.md (the generation pass)."
+    },
+    {
+      "id": "BL-147",
+      "short_name": "ROAD_RENDER_PLACEMENT",
+      "category": "Infrastructure",
+      "title": "Road rendering on the planetary canvas + player-placeable roads",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [
+        "BL-146"
+      ],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "files": [
+        "src/ui/body_surface_canvas.cpp",
+        "src/world/construction.cpp",
+        "src/world/placement_rules.hpp",
+        "src/world/placement_rules.cpp",
+        "src/ui/construction_panel.cpp"
+      ],
+      "authority_doc": "docs/ui/PLANETARY.md",
+      "summary": "Follow-on from BL-146. Render the generated road_level network on the Planetary canvas (from campaign start) and let the player extend it by placing infrastructure road/rail (land_use = infrastructure), lowering the crossed tiles' A* cost. Retires the old 'invisible tile-attribute' concern — the world generates with a visible lattice the player plugs into.",
+      "design": "Follow-on from BL-146 (roads must exist to render/extend). Requires the core's land_use.infrastructure value + road_level.\n\n**Rendering.** Draw road segments as edges between adjacent road tiles — reuse the Country-lens edge-draw pattern in body_surface_canvas.cpp (hex edges shared with a differently-attributed neighbour), inside the wrap-copy loop; trunk vs local by road_level (thicker/brighter for trunk). Add a road legend chip (copy a draw_*_key helper). Rendered always-on (like the player-tile ownership wash) rather than behind a lens, since roads are terrain, not an overlay mode — confirm at promotion.\n\n**Player placement.** A placement path that occupies land_use = infrastructure on a land tile, raising road_level on it (and lowering its A* cost). Goes through construction.cpp / placement_rules (a new placement_reason + branch) and a construction_panel affordance. Player roads extend the nation lattice out to remote extraction sites (the specialist-corporation fantasy).\n\n**Authority:** PLANETARY.md / LENSES.md (rendering) + SUPPLY.md (placement effect). Note: this touches body_surface_canvas.cpp (the lens-legend files another workstream edits) — sequence after those land."
+    },
+    {
+      "id": "BL-148",
+      "short_name": "CITIES_AS_LOGISTICS_HUBS",
+      "category": "Infrastructure",
+      "title": "Cities as free logistics hubs (agglomeration discount)",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [
+        "BL-077"
+      ],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "files": [
+        "src/world/supply_system.cpp",
+        "scripts/economy.lua"
+      ],
+      "authority_doc": "docs/economy/SUPPLY.md",
+      "summary": "Follow-on from BL-077 (core). Population centres discount convoy cost for routes into/through them — the agglomeration bonus already committed in POPULATION.md ('better logistics, shared infrastructure'). The city IS infrastructure (no new building); higher tier -> larger discount. Combined with the generated road lattice (BL-146), the world already contains a low-cost logistics network the player plugs into.",
+      "design": "Follow-on from BL-077 (core). Applies a cost discount in the intra-body A*/dispatch cost path (supply_system.cpp): a route into or through a population centre's tiles is discounted, scaling with centre tier. Reuses the agglomeration concept from POPULATION.md. A tunable multiplier + radius in economy.lua.\n\n**Tuning (settle at promotion):** the discount formula and radius. **Authority:** SUPPLY.md + POPULATION.md."
+    },
+    {
+      "id": "BL-149",
+      "short_name": "INLAND_LOGISTICS_HUB",
+      "category": "Infrastructure",
+      "title": "Inland Logistics Hub building (land-mode convoy consolidator)",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [
+        "BL-077"
+      ],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "files": [
+        "src/world/components.hpp",
+        "src/world/placement_rules.cpp",
+        "src/world/recipe_registry.cpp",
+        "scripts/economy.lua",
+        "src/ui/construction_panel.cpp"
+      ],
+      "authority_doc": "docs/economy/SUPPLY.md",
+      "summary": "Follow-on from BL-077 (core). A land-mode counterpart to the Port: a routing waypoint that consolidates convoys so a cluster of buildings ships through the hub rather than each dispatching independently — the missing land-network piece. Occupies land_use = infrastructure.",
+      "design": "Follow-on from BL-077 (core). Adds a new building_type value (inland_logistics_hub) that acts as an intra-body convoy consolidation waypoint: buildings within its catchment route through the hub, so the network ships hub-to-hub rather than each building point-to-point.\n\n**Touch points (the new-building-type footprint the core investigation catalogued):** building_type enum (components.hpp); a placement rule (placement_rules.cpp — land, non-ocean, likely inland); scripts/economy.lua building econ entry; recipe_registry.cpp named_type list + the m_building_econ array bump (5 -> 6, indexed by building_type); a construction_panel.cpp build button. **Authority:** SUPPLY.md + PRODUCTION.md."
     }
   ]
 }
