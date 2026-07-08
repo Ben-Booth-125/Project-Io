@@ -121,6 +121,7 @@ private:
         int  window_h   = 1080;
         bool fullscreen = false;  ///< Borderless-desktop fullscreen.
         bool vsync      = true;
+        int  ui_scale_step = 0;   ///< BL-063 discrete UI scale: 0=1.0, 1=1.25, 2=1.5.
     };
 
     /// Read options.cfg into m_settings; a missing/partial file leaves defaults.
@@ -129,6 +130,8 @@ private:
     void save_settings() const;
     /// Apply m_settings to the live SDL window + renderer (size, fullscreen, vsync).
     void apply_display_settings();
+    /// Re-load the UI font atlas at the size for m_settings.ui_scale_step (BL-063).
+    void apply_ui_scale();
 
     /// Which top-level screen is active. run() opens on the menu; run_verify()
     /// jumps straight to in_game (the harness renders the live world, not the menu,

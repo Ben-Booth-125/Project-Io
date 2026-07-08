@@ -54,4 +54,11 @@ ImFont* load_ui_font(float size_px)
     return io.Fonts->AddFontDefault(&cfg);
 }
 
+ImFont* reload_ui_font(float size_px)
+{
+    ImGuiIO& io = ImGui::GetIO();
+    io.Fonts->Clear();
+    return load_ui_font(size_px);
+}
+
 } // namespace ui

@@ -38,6 +38,7 @@
 #include "world/supply_system.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cmath>
 #include <cstdio>
@@ -229,6 +230,17 @@ app::app()
     ui::load_ui_font();
 }
 
+namespace {
+constexpr std::array<float, 3> k_ui_scale_px = {16.0f, 20.0f, 24.0f}; ///< BL-063 steps: 1.0 / 1.25 / 1.5 of the 16px base.
+} // namespace
+
+void app::apply_ui_scale()
+{
+    const int step = std::clamp(m_settings.ui_scale_step, 0, static_cast<int>(k_ui_scale_px.size()) - 1);
+    ui::reload_ui_font(k_ui_scale_px[static_cast<std::size_t>(step)]);
+    ImGui_ImplSDLRenderer3_DestroyFontsTexture();
+}
+
 app::~app()
 {
     ImGui_ImplSDLRenderer3_Shutdown();
@@ -246,6 +258,7 @@ int app::run()
     // never touches settings, keeping golden captures at the fixed default size.
     load_settings();
     apply_display_settings();
+    apply_ui_scale();
 
     m_lua.load("scripts/init.lua");
 
@@ -1945,6 +1958,22 @@ void app::render()
                 save_settings();
             }
 
+            ImGui::SeparatorText("Accessibility");
+            static const char* ui_scale_labels[] = {"1.0x", "1.25x", "1.5x"};
+            if (ImGui::BeginCombo("UI Scale", ui_scale_labels[m_settings.ui_scale_step]))
+            {
+                for (int i = 0; i < IM_ARRAYSIZE(ui_scale_labels); ++i)
+                {
+                    if (ImGui::Selectable(ui_scale_labels[i], i == m_settings.ui_scale_step))
+                    {
+                        m_settings.ui_scale_step = i;
+                        apply_ui_scale();
+                        save_settings();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+
             // Live window size (also reflects a free drag-resize of the frame).
             int win_w = 0, win_h = 0;
             SDL_GetWindowSize(m_window, &win_w, &win_h);
@@ -1996,6 +2025,7 @@ void app::load_settings()
             else if (key == "window_h")   m_settings.window_h   = std::stoi(val);
             else if (key == "fullscreen") m_settings.fullscreen = (std::stoi(val) != 0);
             else if (key == "vsync")      m_settings.vsync      = (std::stoi(val) != 0);
+            else if (key == "ui_scale_step") m_settings.ui_scale_step = std::stoi(val);
         }
         catch (const std::exception&) { /* skip malformed value */ }
     }
@@ -2003,6 +2033,7 @@ void app::load_settings()
     // Clamp to a sane floor so a corrupt file can't produce an unusable window.
     m_settings.window_w = std::max(640, m_settings.window_w);
     m_settings.window_h = std::max(480, m_settings.window_h);
+    m_settings.ui_scale_step = std::clamp(m_settings.ui_scale_step, 0, 2);
 }
 
 void app::save_settings() const
@@ -2016,7 +2047,8 @@ void app::save_settings() const
     out << "window_w="   << m_settings.window_w        << '\n'
         << "window_h="   << m_settings.window_h        << '\n'
         << "fullscreen=" << (m_settings.fullscreen ? 1 : 0) << '\n'
-        << "vsync="      << (m_settings.vsync ? 1 : 0)      << '\n';
+        << "vsync="      << (m_settings.vsync ? 1 : 0)      << '\n'
+        << "ui_scale_step=" << m_settings.ui_scale_step     << '\n';
 }
 
 void app::apply_display_settings()
