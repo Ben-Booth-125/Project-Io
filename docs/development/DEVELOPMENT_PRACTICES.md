@@ -1,6 +1,6 @@
 # Project Io — Development Practices
 
-This document defines the coding standards, documentation conventions, and testing approach for Project Io. Apply these consistently across all code written or reviewed. Where code deviates from these standards, note it and suggest a correction — but do not refuse to proceed or treat it as a blocker.
+This document defines the coding standards, documentation conventions, and testing approach for Project Io. Apply these consistently across all code written or reviewed. Where code deviates from these standards, note it and suggest a correction — but do not refuse to proceed or treat it as a blocker. The note rides along with the work.
 
 ---
 
@@ -8,7 +8,7 @@ This document defines the coding standards, documentation conventions, and testi
 
 Tests are **headless C++ harnesses**, not a unit-test framework. Each `tools/verify/<name>.cpp` is a standalone program that exercises a slice of the SDL/Lua/ImGui-free `world/*` logic and prints `PASS`/`FAIL` lines through its own small `check()`-style assertions, exiting non-zero on any failure. They are built and run by CMake/CTest (`ctest --test-dir build --output-on-failure`, or `check.bat`) and by the CI headless loop (`.github/workflows/build.yml`), which globs every `tools/verify/*.cpp` so a new harness is picked up automatically. *(Catch2 was evaluated as the unit-test framework but **not adopted** — the printf-assert harness pattern needs no dependency and mirrors how the code is actually structured. The `verifier-headless` skill runs a harness on demand.)*
 
-Tests are written alongside the layer they cover, not deferred to the end. Each milestone in `ROADMAP.md` should have a harness for its core logic before the next begins.
+Tests are written alongside the layer they cover, not deferred to the end — alongside, the check catches the quietly-wrong while the layer is still fresh in the head. Each milestone in `ROADMAP.md` should have a harness for its core logic before the next begins.
 
 ### What to test
 
@@ -230,7 +230,7 @@ resulting doc change **does not carry a `⟳` note**. Write the settled design d
 
 ### Inline comments
 
-Use inline comments to explain **why**, not what. If the code requires a comment to explain what it is doing, rewrite the code first.
+Use inline comments to explain **why**, not what. If the code requires a comment to explain what it is doing, rewrite the code first. Code that states its own *what* frees the comment budget for the part worth reading — the non-obvious decision.
 
 ```cpp
 // Correct — explains a non-obvious decision
@@ -247,8 +247,9 @@ ImGui panel code is an exception — brief section comments are encouraged there
 
 ### ImGui panels — one per milestone, as it is built
 
-Wire an ImGui panel alongside each milestone as it is built, not at the end. Each panel needs
-only to make that milestone's state observable — a tile inspector, a market price readout, a
+Wire an ImGui panel alongside each milestone as it is built, not at the end — the panel is the
+first time the milestone shows itself working. Each panel needs only to make that milestone's
+state observable — a tile inspector, a market price readout, a
 convoy list, a budget line. These panels are debugging tools *and* the functional
 specification for the production UI. Write ImGui code clearly, not cleverly — it is reference
 material as much as working code.
@@ -296,7 +297,9 @@ resolution-scaled value.
 ## Tone and approach
 
 - Every system should justify its existence by feeding into **Trade** or **Conflict**. Favour
-  solutions that are legible and composable over solutions that are locally clever but opaque.
+  solutions that are legible and composable over solutions that are locally clever but opaque —
+  the legible solution reads as obvious in hindsight and is a pleasure to explain; the locally
+  clever one is a debt.
 - When the right approach is uncertain, state the uncertainty and present options with
   trade-offs rather than picking one silently. Stay the advisor — the developer makes the calls.
 

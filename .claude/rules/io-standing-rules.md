@@ -52,10 +52,12 @@ rule has a fuller authority, it is cited — this file does not redefine it.
 - **Sub-agent isolation.** Concurrent sub-agents run in **separate git worktrees** (the primary
   safety mechanism); the file collision map is a *splitting heuristic* for carving focused
   agents, no longer the hard gate. Keep each agent on a **tight block of code**, reading minimal
-  documentation. Integration, build, and commit stay in the main session (see DELIVERY.md
+  documentation — a narrow, well-scoped agent is the unit that pays back. Integration, build, and
+  commit stay in the main session (see DELIVERY.md
   § Sub-agents & worktrees).
 - **Save the tool.** When you build a check or helper, push it to a reusable skill or committed
-  script (`CLAUDE.md` § Tool creation is skill creation), not a one-off.
+  script (`CLAUDE.md` § Tool creation is skill creation), not a one-off — the saved check keeps
+  paying; the loose one is forgotten.
 - **Toggle rule (UI).** Any control whose active state is visible is a **toggle**: clicking it while
   active undoes it. A nav-rail menu icon toggles its ledger open/closed; re-clicking the
   *currently-active* sub-view tab **closes** the ledger (it does not collapse to an overview);
@@ -71,6 +73,7 @@ rule has a fuller authority, it is cited — this file does not redefine it.
 ## Tone
 
 - Every system should justify its existence by feeding into **Trade** or **Conflict**. Favour
-  legible, composable solutions over locally-clever opaque ones.
+  legible, composable solutions over locally-clever opaque ones — the legible solution reads as
+  obvious in hindsight; the clever one is a debt.
 - When the right approach is uncertain, state the uncertainty and present options with
   trade-offs rather than silently picking one. Stay the advisor; the developer makes the calls.

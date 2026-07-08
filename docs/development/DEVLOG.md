@@ -6,6 +6,44 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — BL-129: prose pass on the central documentation (2026-07-08)
+
+**Context.** Ben green-lit BL-129 CENTRAL_DOC_PROSE_PASS ("burn some Fable 5 on it — rewrite the
+docs"), explicitly delegating the prose the item had reserved for him. Doc-only; Light-plus mode
+(no REFINED promotion, no requirement group — doc-only exempt), run at full multi-agent depth for
+quality.
+
+**What shipped.** 18 clause-level edits across CLAUDE.md, io-standing-rules.md,
+DEVELOPMENT_PRACTICES.md, and DELIVERY.md: the central docs now name the reward of the discipline —
+craft, satisfaction, momentum — around the rules, with no rule text changed. The anchor passage
+lands in DELIVERY.md § The one idea ("the method answers to the game's own standard: each change
+feeds something, composes cleanly, reads legibly") with a one-sentence echo in CLAUDE.md's pipeline
+intro. The Light family carries "the small win stays whole" (CLAUDE.md) / "a clean one-liner is a
+pleasure" (DELIVERY); the Tone pair gains a compression gradient ("the clever one is a debt" terse
+in standing-rules, "+ is a pleasure to explain" full in DEVELOPMENT_PRACTICES); "the quietly-wrong"
+names the enemy at both verification seams (tests-alongside, retroactive merge verify); "a stop is
+a finish, not an abandonment" (depth verbs); "left clean, it resumes without archaeology" (both
+pausing homes); taste scoped under Rule 0a ("taste qualifies… it gets the same two options").
+
+**Method.** Two Workflow fan-outs. (1) Survey (4 per-doc + 1 voice-anchor agents) → three competing
+full drafts (minimal-weave / one-named-home / full-coverage) → a three-lens judge panel (register
+skeptic / operating-system critic / craft judge); final synthesis in the main session. (2) A
+post-apply adversarial verify (rule-preservation / register / echo-integrity skeptics) over the
+real diff: 11 findings, 8 corrections accepted, the rest rejected as re-litigating the item's
+premise (recorded in the item's design field).
+
+**In-session decisions (for Ben's review).**
+- Ben's sketch "when the path is clear, keep moving; save the ceremony for the seam" was adjusted
+  to "the ceremony is for the work that earns it": two independent passes found "the seam"
+  mis-narrows Full's three triggers, and "keep moving" both preaches and introduces a
+  path-clarity mode signal Rule 0 doesn't have.
+- "A game about elegant systems, built by an elegant system" (the item's own summary line) was
+  deliberately not used — closest to poster register of all the candidates. One-line add if wanted.
+- The taste sentence was moved out of the Light bullet into § Ad-hoc ideas: in the mode definition
+  it read as license to act on unscoped noticings without Rule 0a's two-option offer.
+- The register verifier argued for deleting the pleasure/kernel sentences outright; rejected — they
+  are the item's payload. If they still read wrong on the fortieth session, each is a one-line revert.
+
 ## Session — Economy dynamism batch delivered: BL-078/095/096/079/112 (2026-07-07)
 
 **Context.** Delivered the five interlocking economy items designed in the prior session (below) as one

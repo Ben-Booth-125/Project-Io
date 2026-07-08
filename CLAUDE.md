@@ -107,7 +107,8 @@ The Generation Ledger (design only) — a tuning/analysis surface that explains 
 ## Delivery pipeline
 
 The lifecycle for acting on a backlog **item**. **Full authority lives in
-`docs/development/DELIVERY.md`**; this is the condensed reference.
+`docs/development/DELIVERY.md`**; this is the condensed reference. The method answers to the
+game's own standard: each change feeds something, composes cleanly, reads legibly.
 
 ### Session start — check origin if the last local session is stale
 
@@ -126,7 +127,7 @@ see also the push-policy and backlog-ID-collision memories.
 Every non-trivial task states its **mode**:
 
 - **Light (default).** A one-line fix, an obvious cleanup, a doc tweak — make it, check it, say
-  what you did. No tasks, no requirements, no ceremony.
+  what you did. No tasks, no requirements, no ceremony. The small win stays whole.
 - **Full (earned).** Work whose coordination cost it repays — touches the economy / save-format /
   integration seam, spans more than ~2 files of real logic, or carries determinism risk. Run the
   Delivery lifecycle below.
@@ -178,7 +179,7 @@ refactor). Full detail in `DELIVERY.md`.
 
 **Proportionality & pausing.** The lifecycle is proportional to the work (Rule 0); a Light change
 skips steps 1–2. Pausing a group is a legitimate outcome — leave it clean and resumable rather
-than forcing completion or cancelling.
+than forcing completion or cancelling. Left clean, it resumes without archaeology.
 
 ### Sub-agents & worktrees (the parallelism model)
 
@@ -223,7 +224,7 @@ These skills exist and should be used proactively rather than reinventing their 
 
 When a check or automation does not yet have a tool, **author the tool, then push it to a
 skill** — a skill is a permanent, reusable, discoverable asset; a loose tool or bespoke
-procedure is forgotten. **Creating or modifying a skill requires user permission**, so the
+procedure is forgotten. The check committed today catches next month's regression. **Creating or modifying a skill requires user permission**, so the
 workflow is:
 
 1. **Attempt to author the tool** (a `tools/verify/*.cpp` harness, a `scripts/verify/*.lua`
