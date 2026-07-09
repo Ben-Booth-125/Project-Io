@@ -411,22 +411,23 @@ void draw_population_key(ImDrawList* dl, ImVec2 anchor)
     dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Workforce efficiency");
     y += line_h + 4.0f;
 
-    // Gradient maps the workforce-efficiency range the lens tints by (0.5×→1.0×),
-    // so the bar reads as the labour multiplier rather than raw habitability.
-    constexpr ImU32 live = IM_COL32(80, 200, 110, 255);
+    // Red→green rank bar (BL-135): mirrors the per-tile value-mark dot the lens
+    // now draws instead of a full-tile tint — low efficiency reads red, full
+    // labour reads green.
+    constexpr ImU32 low  = IM_COL32(216, 100,  96, 255);
+    constexpr ImU32 high = IM_COL32(110, 200, 120, 255);
     constexpr int segs = 24;
     for (int i = 0; i < segs; ++i)
     {
-        const float t0  = static_cast<float>(i) / segs;
-        const float eff = 0.5f + 0.5f * t0; // 0.5× at the low end → 1.0× at full labour
-        const ImU32 c   = lerp_colour(IM_COL32(40, 40, 48, 255), live, 0.15f + 0.7f * eff);
+        const float t0 = static_cast<float>(i) / segs;
+        const ImU32 c  = lerp_colour(low, high, t0);
         dl->AddRectFilled({ x + bar_w * t0, y },
                           { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
     }
     y += bar_h + 2.0f;
-    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "0.5x");
-    const ImVec2 hts = ImGui::CalcTextSize("1.0x");
-    dl->AddText({x + bar_w - hts.x, y}, IM_COL32(170, 175, 185, 255), "1.0x");
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "low");
+    const ImVec2 hts = ImGui::CalcTextSize("high");
+    dl->AddText({x + bar_w - hts.x, y}, IM_COL32(170, 175, 185, 255), "high");
 }
 
 /// On-canvas legend for the Industry lens (BL-084): a low→high amber gradient bar
@@ -977,37 +978,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (col_it != market_catchment_colour.end())
                 fill = lerp_colour(fill, col_it->second, 0.55f);
         }
-        // Population lens (re-keyed, BL-069): tint a tile by the *workforce
-        // efficiency* its habitability yields (workforce.hpp), not raw habitability.
-        // Tiles at/above habitability 0.6 read at full labour (flat brightest green);
-        // below 0.6 they grade down sharply — so the lens shows the 0.6 efficiency
-        // cliff, the siting signal "build where habitability ≥ 0.6 for full workforce".
-        // Zero-habitability tiles (ocean, barren) stay untinted so terrain still reads.
-        else if (state.overlay == overlay_mode::population)
-        {
-            const float h = std::clamp(tile.habitability, 0.0f, 1.0f);
-            if (h > 0.0f)
-            {
-                const float eff = workforce_efficiency(h);
-                constexpr ImU32 live = IM_COL32(80, 200, 110, 255);
-                fill = lerp_colour(fill, live, 0.15f + 0.7f * eff);
-            }
-        }
-        // Opportunity lens (BL-136): tint a tile by its catchment market's
-        // body-relative demand-gap rank (pre-pass above) — low/red (met demand,
-        // or a tiny market's gap) → high/green (the body's strongest, largest
-        // unmet-demand opportunity). Tiles with no market keep terrain hue.
-        else if (state.overlay == overlay_mode::opportunity)
-        {
-            const auto it = opp_score.find(market_for_tile(w, id));
-            if (it != opp_score.end() && opp_max_score > 0.0f)
-            {
-                const float t = std::clamp(it->second / opp_max_score, 0.0f, 1.0f);
-                constexpr ImU32 low  = IM_COL32(216, 100,  96, 255);
-                constexpr ImU32 high = IM_COL32(110, 200, 120, 255);
-                fill = lerp_colour(fill, lerp_colour(low, high, t), 0.75f);
-            }
-        }
+        // Population (Workforce) and Opportunity lenses (BL-135): no longer a
+        // full-tile tint — each reads as a per-tile red→green dot mark, drawn
+        // below alongside the building glyph (workforce_efficiency / the
+        // body-relative demand-gap rank respectively). Tiles keep terrain hue here.
         // Production lens (BL-009): tint a producing tile by output sell value this
         // tick, log-scaled relative to the body's producing-tile mean (above mean
         // warm, below cool). Idle / exhausted / unbuilt tiles read cold (no tint).
@@ -1204,7 +1178,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 if (corp_it != tile_to_corp.end())
                     marker_col = corp_identity(corp_it->second);
 
-                icons::building(dl, {cx, cy}, mr, built_type, marker_col);
+                // The Workforce (Population lens) and Opportunity lenses replace the
+                // building silhouette with the per-tile value mark drawn below
+                // (BL-135) — the mark reads the tile's rank, not its installation.
+                if (state.overlay != overlay_mode::population &&
+                    state.overlay != overlay_mode::opportunity)
+                    icons::building(dl, {cx, cy}, mr, built_type, marker_col);
 
                 // Owner-identity tag (BL-090): a small corp emblem tucked at the
                 // building glyph's lower-right, for BOTH player and rival buildings —
@@ -1238,6 +1217,35 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                         state.marker_hit_zones.push_back(hz);
                     }
                 }
+            }
+
+            // Value-lens tile marks (BL-135): Workforce (Population lens) and
+            // Opportunity replace their old full-tile tint with a per-tile red→green
+            // dot on every BUILDABLE tile (valid terrain for activity — ocean
+            // excluded), not just occupied ones. Workforce reads
+            // workforce_efficiency(habitability); Opportunity reads the same
+            // body-relative demand-gap rank as its (now-removed) tile tint (BL-136).
+            // Drawn instead of, not blended with, the building glyph on occupied
+            // tiles (suppressed above).
+            if ((state.overlay == overlay_mode::population ||
+                 state.overlay == overlay_mode::opportunity) &&
+                !placement_rules::is_ocean_tile(tile.composition))
+            {
+                float t = 0.0f; // body-relative rank, [0, 1], red(low) -> green(high)
+                if (state.overlay == overlay_mode::population)
+                {
+                    t = workforce_efficiency(std::clamp(tile.habitability, 0.0f, 1.0f));
+                }
+                else // opportunity
+                {
+                    const auto it = opp_score.find(market_for_tile(w, id));
+                    if (it != opp_score.end() && opp_max_score > 0.0f)
+                        t = std::clamp(it->second / opp_max_score, 0.0f, 1.0f);
+                }
+                constexpr ImU32 low  = IM_COL32(216, 100,  96, 255);
+                constexpr ImU32 high = IM_COL32(110, 200, 120, 255);
+                const float mr = std::max(2.0f, draw_r * 0.22f);
+                icons::value_mark(dl, {cx, cy}, mr, lerp_colour(low, high, t));
             }
 
             // Supply lens: draw a convoy glyph on every tile when the active body

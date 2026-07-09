@@ -374,4 +374,13 @@ void survey_badge(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     dl->AddLine(h0, h1, colour, 2.0f);
 }
 
+void value_mark(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // A simple filled dot with a thin dark outline for contrast on any terrain —
+    // deliberately plain so the red→green colour itself carries the reading,
+    // rather than a shape (BL-135, Workforce + Opportunity lenses).
+    dl->AddCircleFilled(centre, r, colour, 16);
+    dl->AddCircle(centre, r, IM_COL32(20, 20, 24, 200), 16, 1.2f);
+}
+
 } // namespace ui::icons
