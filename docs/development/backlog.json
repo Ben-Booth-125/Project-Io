@@ -2818,6 +2818,7 @@
       "requires": [],
       "blocked_on": [],
       "written": "2026-07-08",
+      "version_goal": "v0.1.1",
       "files": [
         "src/ui/solar_system_canvas.cpp",
         "src/ui/presentation.hpp",
@@ -2840,7 +2841,7 @@
       "requires": [],
       "blocked_on": [],
       "written": "2026-07-09",
-      "version_goal": "v0.0.9",
+      "version_goal": "v0.1.1",
       "files": [
         "src/ui/body_surface_canvas.cpp",
         "scripts/verify/intrabody_fog.lua"
@@ -2862,7 +2863,7 @@
       "requires": [],
       "blocked_on": [],
       "written": "2026-07-09",
-      "version_goal": "v0.0.9",
+      "version_goal": "v0.1.1",
       "files": [
         "src/world/world.hpp",
         "src/world/logistics.cpp",
@@ -2911,7 +2912,7 @@
       "requires": [],
       "blocked_on": [],
       "written": "2026-07-09",
-      "version_goal": "v0.0.9",
+      "version_goal": "v0.1.1",
       "files": [
         "src/ui/ui_state.hpp",
         "src/ui/body_surface_canvas.cpp",

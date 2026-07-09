@@ -59,6 +59,11 @@ Filed design-owed, post-v0.1.0 — needs a design pass, not bundled with the vis
 Ben-tunable one-liners. The path-reconstruction probe was run ad hoc, not saved as a `tools/verify/*.cpp`
 harness — candidate follow-up. Authority propagated to DISCOVERY.md ("Illumination (Planetary canvas)").
 
+**Sequencing (Ben, end of session).** The fog/vision work looks good but depends on systems that still
+need stress-testing (the convoy/economy/dispatch loop the beams and corridors read) before it can be
+called done. Retargeted BL-150/151/152/154 `version_goal` → **v0.1.1** (from v0.0.9). The code stays on
+`main`; it is complete-as-implemented but not counted as shipped until the dependent systems are proven.
+
 ## Session — BL-129: prose pass on the central documentation (2026-07-08)
 
 **Context.** Ben green-lit BL-129 CENTRAL_DOC_PROSE_PASS ("burn some Fable 5 on it — rewrite the
