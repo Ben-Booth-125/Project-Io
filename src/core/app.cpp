@@ -26,6 +26,7 @@
 #include "ui/profile_panel.hpp"
 #include "ui/selection_panel.hpp"
 #include "ui/solar_system_canvas.hpp"
+#include "ui/tech_tree_panel.hpp"
 #include "ui/tile_inspector.hpp"
 #include "ui/view_nav.hpp"
 #include "world/budget_system.hpp"
@@ -70,7 +71,7 @@ struct key_binding
     const char*        key_name; ///< Human-readable key string (F1 overlay)
 };
 
-static const std::array<key_binding, 21> s_bindings = {{
+static const std::array<key_binding, 22> s_bindings = {{
     // Canvas navigation
     {SDL_SCANCODE_RETURN,       false, ui::canvas_command::descend,      "Descend rung",      "Enter"},
     {SDL_SCANCODE_BACKSPACE,    false, ui::canvas_command::ascend,       "Ascend rung",       "Backspace"},
@@ -95,6 +96,7 @@ static const std::array<key_binding, 21> s_bindings = {{
     {SDL_SCANCODE_5,            false, ui::canvas_command::speed_5,      "Speed V  (16×)",    "5"},
     // UI
     {SDL_SCANCODE_F1,           false, ui::canvas_command::help_toggle,  "Key bindings",      "F1"},
+    {SDL_SCANCODE_F9,           false, ui::canvas_command::tech_tree_toggle, "Tech tree (mock)", "F9"},
     {SDL_SCANCODE_F10,          false, ui::canvas_command::options_toggle, "Options",         "F10"},
 }};
 
@@ -346,6 +348,11 @@ void app::load_economy()
     m_lua.load("scripts/recipes.lua");
     m_lua.load("scripts/economy.lua");
     m_registry.load_from_lua(m_lua);
+
+    // BL-087 mock tech/quest tree — display data for the F9 viewer only; no
+    // simulation system reads it (the tech system is post-prototype).
+    m_lua.load("scripts/tech_tree.lua");
+    m_tech_tree.load_from_lua(m_lua);
 
     // Author processing recipes onto generated assets. The recipe id is a registry
     // index, unknown at generation time, so it is assigned here once the registry
@@ -1335,6 +1342,9 @@ void app::dispatch_action(ui::canvas_command cmd)
         case ui::canvas_command::options_toggle:
             m_show_options = !m_show_options;
             return;
+        case ui::canvas_command::tech_tree_toggle:
+            m_show_tech_tree = !m_show_tech_tree;
+            return;
 
         // Everything else is a canvas navigation command.
         default:
@@ -1956,6 +1966,10 @@ void app::render()
         }
         ImGui::End();
     }
+
+    // F9 mock tech-tree viewer (BL-087). Read-only design aid over
+    // scripts/tech_tree.lua; no simulation coupling.
+    ui::draw_tech_tree_panel(m_tech_tree, m_show_tech_tree);
 
     ImGui::Render();
     SDL_SetRenderDrawColor(m_renderer, 15, 15, 20, 255);

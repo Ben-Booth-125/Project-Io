@@ -7,6 +7,7 @@
 #include "world/economy_system.hpp"
 #include "world/hard_coded_world.hpp"
 #include "world/recipe_registry.hpp"
+#include "world/tech_tree.hpp"
 #include "world/world.hpp"
 
 #include "ui/canvas_command.hpp"
@@ -147,6 +148,7 @@ private:
     world_params    m_active_world_params;  ///< The descriptor the live world was built from; shown as the "seed used".
     ui_state        m_ui;
     recipe_registry m_registry;          ///< Recipes + economy constants, loaded from Lua at startup.
+    tech_tree_registry m_tech_tree;      ///< BL-087 mock tech/quest tree, loaded from Lua at startup; F9 viewer only.
     economy_report  m_last_econ_report;  ///< Most recent economy-step report; read by the economy panel.
     uint64_t        m_last_econ_tick = 0; ///< econ_tick() at the previous step; drives the boundary detection in run().
     std::vector<float> m_balance_history;      ///< Recent player balances (one per econ tick, capped); feeds the header net + sparkline.
@@ -157,6 +159,7 @@ private:
 
     bool        m_show_help        = false;   ///< Toggle for the F1 key-binding cheat-sheet overlay.
     bool        m_show_options     = false;   ///< Toggle for the F10 display/options window.
+    bool        m_show_tech_tree   = false;   ///< Toggle for the F9 mock tech-tree viewer (BL-087).
     display_settings m_settings;              ///< Persisted display settings (options.cfg).
     bool        m_capture_requested = false;  ///< Set by F12 / capture_frame, consumed in render().
     std::string m_capture_name;              ///< Base name for the next capture; empty = timestamped (F12).

@@ -74,13 +74,13 @@ jobs:
         shell: bash
         run: |
           # Link each tools/verify/*.cpp against every world/*.cpp except
-          # recipe_registry.cpp (the one TU that pulls sol2/Lua). This is a
+          # recipe_registry.cpp and tech_tree.cpp (the TUs that pull sol2/Lua). This is a
           # superset of each harness's hand-listed sources, so it stays correct
           # as those lists evolve. See tools/verify/README.md for the per-harness
           # MSVC recipes. Use the matrix compiler ($CXX) so both legs exercise
           # the headless tier too.
           set -euo pipefail
-          WORLD=$(ls src/world/*.cpp | grep -v 'recipe_registry.cpp')
+          WORLD=$(ls src/world/*.cpp | grep -v -e 'recipe_registry.cpp' -e 'tech_tree.cpp')
           fail=0
           for h in tools/verify/*.cpp; do
             name=$(basename "$h" .cpp)

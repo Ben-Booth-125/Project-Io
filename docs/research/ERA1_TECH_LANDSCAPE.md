@@ -415,3 +415,99 @@ Three facts from the web pass that update the threads above:
 6. **Scope reconciliation.** The *lean gate-tech* (Rocketry/ISRU/Orbital) is prototype-relevant; the
    *full quest tree* is post-prototype. ROADMAP currently excludes Research from v0.1.0 — reconcile
    ERAS ↔ ROADMAP **only when the work lands** (authority time-slicing), not from this sketch.
+
+# Resolutions — design session (2026-07-08)
+
+> Resolves the six open questions above (mobile design session with Ben). Newest-dated wins: where
+> this section contradicts the first sketch, this section supersedes it. Two answers go beyond the
+> question asked and **reframe the sketch** — the Era model and what capstones open — recorded
+> first because the per-question answers read differently in their light.
+
+## The Era reframe — *Eras are catastrophic events; capstones open quest trees*
+
+- **Eras are based on time, not tech.** An Era transition is a **catastrophic world event** — e.g.
+  a war, a satellite/Kessler cascade — arriving on the world clock. This *is* the external clock
+  from the Terra Invicta comparable: the world moves on whether or not the player is ready. Tech
+  can move *faster* than the Era clock, but tech never opens an Era.
+- **Capstones open quest trees.** The `ERAS.md` Era 0→1 condition set (Rocketry researched +
+  Launchpad staffed + propellant stockpile) should be re-read as gating a new **quest tree**, not
+  the Era itself ("these should have been recorded as gating new quest trees" — Ben). Generalised:
+  a gate-quest capstone opens the next quest tree(s). The threading insight survives intact —
+  gate, quest, and tech remain one condition-set object — only *what the largest gates open*
+  changes: further quests, not Eras.
+- **Determinism.** Catastrophic Era events must be deterministic — a seeded schedule or a seeded
+  world-state trigger — per the standing determinism rule. No random ruptures.
+- **Authority untouched.** `ERAS.md` is *not* edited from this reframe — authority time-slices;
+  the reframe lives here (and in BL-087's design field) until implementing work lands.
+
+**New open questions spawned (the next owed set):**
+
+- **A.** Are Era-event timings fixed seeded dates, or influenced by world state? And is the event
+  *foreseeable* — the TI visible-countdown lesson argues the player should see it coming?
+- **B.** What mechanically changes at an Era boundary — demand shifts, destruction, market
+  disruption, which quest trees become era-appropriate?
+- **C.** Terminology: a "gate quest" now opens quest trees, not Eras — rename (keystone quest?)
+  when itemisation resumes, and revisit the `gates` field of the quest record.
+
+## Q1 — quest shape: mostly a binary tree, some dead-end leaves
+
+Branching factor ≤ 2 out of any node; no re-converging mesh. Dead-end leaves — tier chains and
+optional techs that lead nowhere further — carry the depth without onward requirement. Sits
+between the strictly-linear and mesh options: route choice exists, but the TI "inaccessible mess"
+failure mode stays excluded.
+
+## Q2 — standing lines: never gate Eras; **can gate quest lines**
+
+(Corrected in-session: an initial "can gate Eras" selection was a mis-pick; the intent was quest
+*lines*.) A quest tree's availability condition may include standing-line depth (e.g. Logistics ≥
+tier N) — adding a line-depth primitive to the condition vocabulary alongside `era`. Under the Era
+reframe, *nothing* tech-gates an Era, so the original worry (ambiguity about what opens the next
+Era) dissolves: Eras arrive; quests are what gets opened.
+
+## Q3 — the build coupling lives on research *generation*; payoffs are mostly tangible
+
+- **Input side:** research capacity is improved by **dedicated buildings** (the R&D Lab) or
+  **scales with industry** — the exact mix is deliberately unresolved, a playtest-tuning item.
+- **Output side:** a completed tech's payoff should be **mostly tangible effects** — a new
+  building, a more efficient production method (a recipe), a new gathering technique — and only
+  sometimes a permanent passive buff. This rebalances the sketch's healthy-quest audit (which had
+  ~13/25 pure `efficiency` nodes): prefer expressing an improvement as a new *method* the player
+  adopts over a bare percentage buff.
+
+## Q4 — cross-quest prerequisites: allowed, sparingly, visually marked
+
+A handful of deliberate cross-links per Era (the Depot→Orbital Port and Rig→Automation cases
+already tabled), visually marked in the tree UI. As recommended in the sketch.
+
+## Q5 — economic gates: capstones + a few marquee nodes
+
+Every gate-quest capstone gates economically (as the Propellant Loop's does), plus 1–2 marquee
+mid-quest nodes per Era. Not liberal — over-use stalls a player who is behind economically (the
+asteroid-mining capital/runway lesson, correction #3 above).
+
+## Q6 — scope: **all post-prototype**
+
+Even the lean gate-tech implementation waits until after v0.1.0; the prototype keeps today's
+hard-coded Era arrangement. (Supersedes the sketch's lean that the lean gate-tech was
+prototype-relevant.) ROADMAP already excludes Research from v0.1.0, so nothing needs reconciling
+now; ERAS ↔ ROADMAP reconcile only when post-prototype work lands.
+
+## Resolutions — Era-event mechanics (2026-07-08, v0.2.0-scope)
+
+> Resolves questions A–C spawned by the Era reframe above. Brief — this is v0.2.0-horizon design,
+> not near-term.
+
+**A — timing:** a **seeded date** per campaign (deterministic), with a **visible in-UI countdown**
+once conditions near it — the Terra Invicta external-clock lesson made literal: the player sees
+the rupture coming and can race it, rather than being blindsided.
+
+**B — boundary effects:** an Era event is not purely additive. It (1) **shocks demand/markets** —
+shortages and price spikes ripple through the nation substrate; (2) **selectively destroys** —
+some buildings/infrastructure are damaged (a satellite cascade wrecks orbital assets; a war damages
+surface facilities), giving the moment real stakes and a recovery arc; and (3) **unlocks the new
+Era's quest trees**. All three fire together — the event is a shock the player manages, not just a
+door that opens.
+
+**C — terminology:** rename **gate quest → keystone quest**, matching the "keystone" language
+already used for the Propellant Loop. Apply on the next pass through the itemisation schema
+(quest-record `type` field); not renamed retroactively in this doc's earlier sections.

@@ -43,8 +43,9 @@ enum class canvas_command
     speed_5,      ///< Set speed to tier V (16×, fast-forward).
 
     // UI toggles.
-    help_toggle,    ///< Toggle the key-binding cheat-sheet overlay (F1).
-    options_toggle, ///< Toggle the display/options window (F10).
+    help_toggle,      ///< Toggle the key-binding cheat-sheet overlay (F1).
+    options_toggle,   ///< Toggle the display/options window (F10).
+    tech_tree_toggle, ///< Toggle the read-only mock tech-tree viewer (F9, BL-087 design aid).
 };
 
 /// Apply a canvas command to the shared UI state. Pure state mutation — no
