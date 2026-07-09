@@ -124,6 +124,7 @@ void apply_canvas_command(const world& w, ui_state& ui, canvas_command cmd)
         case canvas_command::speed_5:
         case canvas_command::help_toggle:
         case canvas_command::options_toggle:
+        case canvas_command::tech_tree_toggle:
             break;
     }
 }
@@ -131,7 +132,7 @@ void apply_canvas_command(const world& w, ui_state& ui, canvas_command cmd)
 std::optional<canvas_command> canvas_command_from_name(std::string_view name)
 {
     // Pairs the command vocabulary (verify scripts + keybinding table) to the enum.
-    static const std::array<std::pair<std::string_view, canvas_command>, 21> table = {{
+    static const std::array<std::pair<std::string_view, canvas_command>, 22> table = {{
         {"descend",       canvas_command::descend},
         {"ascend",        canvas_command::ascend},
         {"body_next",     canvas_command::body_next},
@@ -153,6 +154,7 @@ std::optional<canvas_command> canvas_command_from_name(std::string_view name)
         {"speed_5",       canvas_command::speed_5},
         {"help_toggle",   canvas_command::help_toggle},
         {"options_toggle", canvas_command::options_toggle},
+        {"tech_tree_toggle", canvas_command::tech_tree_toggle},
     }};
 
     for (const auto& [n, cmd] : table)
