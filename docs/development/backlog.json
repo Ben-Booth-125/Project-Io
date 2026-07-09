@@ -2875,6 +2875,59 @@
       "authority_doc": "docs/ui/DISCOVERY.md",
       "summary": "Filed + landed 2026-07-09 (Ben, the 'things are moving' half of BL-151). A live player convoy emits a radius-2 beam of vision along the tiles it moves through; that vision lags and dims over one econ tick (90 days). The moving-presence complement to BL-151's static-presence pocket.",
       "design": "**Spec (Ben).** 'Convoys should send a radius 2 beam of vision which lags and dims over 1 econ tick.'\n\n**Path exposure.** `logistics_path` (world.hpp) gained a `tiles` sequence; `intra_body_path` (logistics.cpp) reconstructs it via a came_from parent-walk, stored in canonical lo->hi endpoint order (the route cache is keyed on the unordered pair). Deterministic; wrap-aware (the grid is a horizontal cylinder). Verified by a throwaway headless probe (contiguity, canonical order, single-tile src==dst).\n\n**Vision buffer.** `ui_state.convoy_vision` maps tile -> the sim time (elapsed days) a beam last lit it; `ui_state.sim_now_days` is the continuous fade clock (set every frame in app.cpp). Derived VIEW state only — never serialised, no feedback into world/*, so world determinism is preserved (a `world/*` standing rule).\n\n**Refresh (per econ step).** `ui::update_convoy_vision` (body_surface_canvas) runs in app::step_economy after advance_convoys (before arrived convoys are retired). For each live player intra-body convoy it maps progress -> a path-index segment (where it was one tick ago .. now), floods radius-2 (odd-r neighbours) around that segment, and stamps now_days. Prunes entries older than one econ tick.\n\n**Render.** The Planetary fog (BL-151) now blends a beam vision term: vision = 1 in the static pocket, else max with the beam's fading contribution (1 - age/90); fog wash = 0.5*(1 - vision). So a convoy's beam trails and dims behind it over one econ tick. Uses continuous sim time, so it fades smoothly between quarter boundaries rather than snapping.\n\n**Scope note.** Intra-body convoys only (inter-body activity reads on the Solar fog, BL-089/150). econ_tick_days (90) mirrored as a local constant in the canvas to avoid a ui->core include. **Authority:** docs/ui/DISCOVERY.md."
+    },
+    {
+      "id": "BL-155",
+      "short_name": "AUTO_EXCHANGE_POLICY",
+      "category": "Economy",
+      "title": "Automatic exchange policy — per-resource auto-buy/sell bands (blacklist-default) + relocate sell orders to the market surface",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 4,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-09",
+      "version_goal": "v0.2",
+      "files": [
+        "src/world/market_clearing.cpp",
+        "src/world/market_clearing.hpp",
+        "src/world/components.hpp",
+        "src/world/world.hpp",
+        "src/core/app.cpp",
+        "src/ui/market_ledger.cpp",
+        "src/ui/ui_state.hpp",
+        "src/ui/construction_panel.cpp"
+      ],
+      "authority_doc": "docs/SYSTEMS.md",
+      "summary": "Filed 2026-07-09 (Ben, market-exchanges design session; all forks settled by Q&A). The player governor over the already-automatic order book: standing per-(corp,body,resource) inventory-band policies that shape what the auto path does with the player's own stock, blacklist-default, surfaced as a new Market Ledger 'Policy' view. Retires the construction-panel Sell Orders tab into it (BL-143 companion). Axis A of automatic exchanges; Axis B (counterparty) is fast-follow BL-156. v0.2, after the prototype cut.",
+      "design": "**Settled 2026-07-09 (Ben, market-exchanges design session; five forks resolved via Q&A).** The order book already auto-derives BOTH sides each tick (clear_markets: pool surplus above production auto-sells; processor input shortfalls auto-buy). This item adds the PLAYER GOVERNOR on top — standing policies that bound what the automatic path may do with the player's own stock — and retires the manual sell-order tab into it.\n\n**Axis A — per (player-corp, body, resource) inventory-band policy (the FULL band, Ben's call):** `sell_enabled` + `reserve` (hold >= this; auto-sell only the surplus above reserve + next-run production need) + `floor_price`; `buy_enabled` + `target` (auto-buy UP TO this stock level — speculative stockpiling for a construction draw / a planned convoy, MAY exceed production need) + `ceiling_price`. Between reserve and target: hold. Today's manual sell order is the degenerate one-tick case (enabled, reserve 0, floor).\n\n**Default polarity — BLACKLIST-DEFAULT (Ben's call).** Unconfigured resources auto-trade exactly as today; every player action is subtractive/bounding (blacklist = sell_enabled false -> hold; band = set reserve/target/limits). No dead market on ship day — the current substrate IS the default.\n\n**Mechanism.** A new `derive_exchange_orders(w, policies)` runs each econ tick BEFORE clear_markets, reading policy + current pool + production need and emitting the `player_orders`/`player_buy_orders` overlay that clear_markets ALREADY accepts — no order-book core change. Fully deterministic (world/* standing rule).\n\n**Hard constraint — local-body only, never auto-launches.** SUPPLY.md: space launches are ALWAYS player-directed. Auto-buy-to-target may be satisfied only from the SAME body's market; a policy can never trigger an inter-body convoy. Cross-body acquisition stays a manual convoy decision. (Same-body terrestrial auto-dispatch already exists in the substrate, so this is consistent, not new.)\n\n**Serialisation seam.** Policies are player-authored world state -> a new serialised policy table (flat binary, no SQLite). This makes the item Full-mode, determinism- + save-format-touching; needs a verifier-headless check on derive_exchange_orders and a save round-trip.\n\n**Surface — new Market Ledger 'Policy' view (Ben's call)** beside Prices/Markets/Trends: one inline-editable row per resource (Resource | Sell | Reserve | Floor | Buy | Target | Ceiling) for the selected body's player pool. This is BL-143's 'relocate sell orders to the market surface' home, so REMOVING the construction panel's Sell Orders tab (draw_sell_orders_section) is a REQUIRED companion here — couples to BL-143 (which independently wants that tab gone).\n\n**Scope / sequence.** v0.2 — Ben pushed the whole automatic-exchange feature PAST the prototype cut; v0.1.0 stays audit-only and playtest ships on the current auto-derived substrate without the policy layer. Axis B (counterparty allow/deny — the embargo/Trade->Conflict lever) is the cross-linked fast-follow BL-156.\n\n**Authority** -> docs/SYSTEMS.md § Trade (mechanic) + docs/ui/ledgers/market.md (surface) on landing."
+    },
+    {
+      "id": "BL-156",
+      "short_name": "COUNTERPARTY_ALLOW_DENY",
+      "category": "Economy",
+      "title": "Counterparty allow/deny — embargo & exclusive-trade lever (automatic exchanges, Axis B)",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 2,
+      "parked": false,
+      "requires": ["BL-155"],
+      "blocked_on": [],
+      "written": "2026-07-09",
+      "version_goal": "v0.2",
+      "files": [
+        "src/world/market_clearing.cpp",
+        "src/world/components.hpp",
+        "src/world/world.hpp",
+        "src/ui/ui_state.hpp",
+        "src/ui/selection_panel.cpp"
+      ],
+      "authority_doc": "docs/SYSTEMS.md",
+      "summary": "Filed 2026-07-09 (Ben, market-exchanges design session). Axis B of automatic exchanges — the counterparty control, and the half that turns Trade into a Conflict lever. Per-(player-corp) allow/deny list of rival corps, applied as a match filter; deny-list = embargo, allow-list = exclusive trade. Fast-follow to BL-155; realises the counterparty-preference open Brief in SYSTEMS.md § Trade. v0.2.",
+      "design": "**Settled 2026-07-09 (Ben, market-exchanges design session).** Axis B of automatic exchanges — the counterparty control, and the half that makes Trade a Conflict lever. Fast-follow to BL-155 (Axis A resource bands); realises the 'counterparty preference' open Brief in SYSTEMS.md § Trade.\n\n**Model.** A per (player-corp) allow/deny list of rival corps, applied as a filter inside clear_markets' matching loop (skip disallowed (buyer, seller) pairs). Two modes: DENY-LIST (the common case — refuse to match a named rival: an embargo) and ALLOW-LIST (the extreme — trade ONLY with named corps: an exclusive supply relationship). Complements the existing soft `preferred_seller` +10% tie-hint with a HARD include/exclude.\n\n**Surface.** The action lives on the RIVAL's Selection panel ('Embargo / Trade-only') — where the player is already looking at that competitor (BL-093 made Selection action-first). The BL-155 Policy view reflects the resulting state.\n\n**Serialisation.** The counterparty list is player-authored world state -> serialised alongside the BL-155 policy table (flat binary).\n\n**Scope / sequence.** v0.2, after BL-155 — requires its derive/overlay plumbing.\n\n**Authority** -> docs/SYSTEMS.md § Trade on landing."
     }
   ]
 }
