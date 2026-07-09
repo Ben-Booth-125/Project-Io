@@ -101,6 +101,12 @@ ImU32 lerp_colour(ImU32 a, ImU32 b, float t)
 /// declared so the Production key (above its definition) can sample the same band.
 ImU32 diverging_colour(float ratio);
 
+/// Diverging red→green colour for a ratio relative to 1.0 (defined below); forward
+/// declared so the Production key (above its definition) can sample the same band.
+/// Distinct ramp from diverging_colour (BL-137) — dedicated so the Market lens's
+/// cool/warm scale is untouched.
+ImU32 production_colour(float ratio);
+
 /// Shared chrome for an on-canvas lens key: a rounded dark panel of @p box_w ×
 /// @p body_h at the left edge (inset past the nav rail), vertically centred —
 /// clear of the Selection panel, the header/Explorer, and the lens control strip.
@@ -192,7 +198,7 @@ void draw_production_key(ImDrawList* dl, ImVec2 anchor)
     for (int i = 0; i < segs; ++i)
     {
         const float t = static_cast<float>(i) / (segs - 1);
-        const ImU32 c = diverging_colour(std::pow(4.0f, t * 2.0f - 1.0f));
+        const ImU32 c = production_colour(std::pow(4.0f, t * 2.0f - 1.0f));
         dl->AddRectFilled({ x + bar_w * static_cast<float>(i) / segs, y },
                           { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
     }
@@ -214,6 +220,20 @@ ImU32 diverging_colour(float ratio)
     constexpr ImU32 cool    = IM_COL32( 70, 140, 225, 255);
     constexpr ImU32 warm    = IM_COL32(232, 120,  60, 255);
     return d < 0.0f ? lerp_colour(neutral, cool, -d) : lerp_colour(neutral, warm, d);
+}
+
+/// Diverging red→green colour for a ratio relative to 1.0 (BL-137, Production lens):
+/// `ratio = value / mean`; 1.0 is the neutral mid-tone, < 1 (below mean) trends red,
+/// > 1 (above mean) trends green. Same log-of-ratio centring as diverging_colour, but
+/// a dedicated ramp — diverging_colour stays untouched for the Market lens.
+ImU32 production_colour(float ratio)
+{
+    ratio = std::clamp(ratio, 0.25f, 4.0f);
+    const float d = std::log(ratio) / std::log(4.0f); // [-1, 1]
+    constexpr ImU32 neutral = IM_COL32(205, 205, 210, 255);
+    constexpr ImU32 low     = IM_COL32(216, 100,  96, 255);
+    constexpr ImU32 high    = IM_COL32(110, 200, 120, 255);
+    return d < 0.0f ? lerp_colour(neutral, low, -d) : lerp_colour(neutral, high, d);
 }
 
 /// On-canvas legend for the Market lens: a diverging cheap↔dear gradient bar plus
@@ -889,7 +909,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         {
             const auto it = prod_value.find(id);
             if (it != prod_value.end() && prod_mean > 0.0f)
-                fill = lerp_colour(fill, diverging_colour(it->second / prod_mean), 0.6f);
+                fill = lerp_colour(fill, production_colour(it->second / prod_mean), 0.6f);
         }
         // Scarcity lens (BL-018): a market-level shortfall field. Every tile in a
         // market's catchment reads as one chunky block tinted by that market's
