@@ -123,6 +123,10 @@ struct ui_state
     // panel's construction.panel_view for the template.
     int  economy_view = 0; ///< Economy panel: 0=Corps, 1=Holdings, 2=Markets (BL-117).
 
+    /// Market Ledger: 0=Prices, 1=Sell Orders (BL-159 — sell-order management
+    /// relocated here from the Construction/Building panel).
+    int  market_ledger_view = 0;
+
     // --- application / system menu (BL-070) ---
     // The corner gear popup for session control (Pause/Resume, Exit Game). Opened
     // by the gear button and toggled by Esc; confirm_exit_pending arms the inline

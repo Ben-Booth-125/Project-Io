@@ -55,7 +55,93 @@ std::string market_city_name(const world& w, entity_id mid)
     return body_label(w, mc.body); // unanchored / unnamed fallback
 }
 
-void draw_market_ledger(const world& w, const ui_state& /*s*/,
+namespace {
+
+// --- Sell orders (player) ----------------------------------------------------
+// Relocated from the Construction/Building panel (BL-159 — "how do I sell what
+// I make?" is a market question, so it now lives on the market surface rather
+// than the building surface). Columns/actions carried over faithfully from the
+// old draw_sell_orders_section (construction_panel.cpp, pre-BL-159).
+void draw_sell_orders_tab(const world& w, ui_state& state, entity_id body,
+                          const market_component* market)
+{
+    const entity_id corp = w.player_entity;
+
+    bool any = false;
+    for (std::size_t i = 0; i < state.sell_orders.size(); ++i)
+    {
+        const sell_order& o = state.sell_orders[i];
+        if (o.corp != corp || o.body != body)
+            continue;
+        any = true;
+        ImGui::PushID(static_cast<int>(i));
+        ImGui::Text("%s  x%.0f  >= %.1f",
+            resource_name(o.resource), o.quantity, o.floor_price);
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Remove"))
+        {
+            state.sell_orders.erase(state.sell_orders.begin() + static_cast<long>(i));
+            ImGui::PopID();
+            break;
+        }
+        ImGui::PopID();
+    }
+    if (!any)
+        ImGui::TextDisabled("No sell orders on this body.");
+
+    if (market == nullptr)
+    {
+        ImGui::TextDisabled("This body has no market.");
+        return;
+    }
+
+    ImGui::Separator();
+    static int   add_resource = -1;
+    static float add_quantity = 10.0f;
+    static float add_floor    = 0.0f;
+
+    if (add_resource < 0 || market->base_price[static_cast<std::size_t>(add_resource)] <= 0.0f)
+    {
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (market->base_price[r] > 0.0f) { add_resource = static_cast<int>(r); break; }
+    }
+
+    const char* preview = (add_resource >= 0)
+        ? resource_name(static_cast<resource_type>(add_resource)) : "-";
+    if (ImGui::BeginCombo("Resource", preview))
+    {
+        for (std::size_t r = 0; r < resource_count; ++r)
+        {
+            if (market->base_price[r] <= 0.0f)
+                continue;
+            const bool sel = (add_resource == static_cast<int>(r));
+            if (ImGui::Selectable(resource_name(static_cast<resource_type>(r)), sel))
+                add_resource = static_cast<int>(r);
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::InputFloat("Quantity / tick", &add_quantity, 1.0f, 10.0f, "%.0f");
+    ImGui::InputFloat("Floor price",     &add_floor,    0.1f, 1.0f,  "%.1f");
+    if (add_quantity < 0.0f) add_quantity = 0.0f;
+    if (add_floor    < 0.0f) add_floor    = 0.0f;
+
+    ImGui::BeginDisabled(add_resource < 0 || add_quantity <= 0.0f);
+    if (ImGui::Button("Add sell order"))
+    {
+        sell_order o;
+        o.corp        = corp;
+        o.body        = body;
+        o.resource    = static_cast<resource_type>(add_resource);
+        o.quantity    = add_quantity;
+        o.floor_price = add_floor;
+        state.sell_orders.push_back(o);
+    }
+    ImGui::EndDisabled();
+}
+
+} // namespace
+
+void draw_market_ledger(const world& w, ui_state& s,
                         const market_plot_history& history, bool& open)
 {
     if (!open)
@@ -85,7 +171,26 @@ void draw_market_ledger(const world& w, const ui_state& /*s*/,
     }
     std::sort(bodies.begin(), bodies.end());
 
-    static entity_id selected_body = null_entity;
+    static entity_id selected_body        = null_entity;
+    static entity_id last_seen_selection  = null_entity;
+
+    // Selecting a market elsewhere (canvas click / Selection element) routes
+    // here (BL-159): when the player's current selection is a market that
+    // differs from the one we last picked up, jump the body/market selectors
+    // to it. `last_seen_selection` guards this so the player can still browse
+    // away with the combos afterward without being yanked back every frame.
+    entity_id pending_focus_market = null_entity;
+    if (s.selected_entity != last_seen_selection)
+    {
+        last_seen_selection = s.selected_entity;
+        const auto fit = w.markets.find(s.selected_entity);
+        if (fit != w.markets.end())
+        {
+            selected_body        = fit->second.body;
+            pending_focus_market = s.selected_entity;
+        }
+    }
+
     if (selected_body == null_entity || w.bodies.find(selected_body) == w.bodies.end())
         selected_body = (w.home_body != null_entity && w.bodies.count(w.home_body))
                         ? w.home_body : bodies.front();
@@ -116,6 +221,12 @@ void draw_market_ledger(const world& w, const ui_state& /*s*/,
 
     // --- Market / city selector (cascades from the body) ---
     static entity_id selected_market = null_entity;
+    if (pending_focus_market != null_entity &&
+        std::find(body_markets.begin(), body_markets.end(), pending_focus_market) != body_markets.end())
+    {
+        selected_market = pending_focus_market;
+    }
+    pending_focus_market = null_entity;
     if (selected_market == null_entity ||
         std::find(body_markets.begin(), body_markets.end(), selected_market) == body_markets.end())
         selected_market = body_markets.front();
@@ -142,6 +253,22 @@ void draw_market_ledger(const world& w, const ui_state& /*s*/,
         return;
     }
     const market_component& mc = w.markets.at(selected_market);
+
+    // --- View tabs (BL-159): Prices (the original view) / Sell Orders (relocated
+    // from the Construction/Building panel — a market question belongs on the
+    // market surface). Same button-strip idiom as the other split ledgers.
+    ui::nav_button("Prices",      0, s.market_ledger_view, &open);
+    ImGui::SameLine();
+    ui::nav_button("Sell Orders", 1, s.market_ledger_view, &open);
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    if (s.market_ledger_view == 1)
+    {
+        draw_sell_orders_tab(w, s, selected_body, &mc);
+        ui::foldout_end();
+        return;
+    }
 
     // --- Price over time: one small chart per traded good at this market, scrollable ---
     // The whole question this view answers is "how has each good's price moved here?",
