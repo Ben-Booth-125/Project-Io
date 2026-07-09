@@ -124,21 +124,25 @@ Final verification pass against the done-definition below, then the Cut.
 *Theme: ponder and stub what the expanded prototype will need — design-forward, data-model-first,
 no committed systems yet.* Past the cut, the v0.1.x band is where the game's next dimensions get
 their first shape: enough design and stubbing that the v0.2.0 refocus and the v0.3.0 political
-layer land on positioned ground rather than a greenfield. Only v0.1.1 is a concrete build minor;
-the rest of the band is deliberately design-forward and will firm into named minors as it settles.
+layer land on positioned ground rather than a greenfield. v0.1.1 is a concrete build minor; the
+rest of the band (v0.1.2–v0.1.5) is deliberately design-forward — each now has a placeholder
+`design-owed` item that firms into real design as it is reached.
 
 - **v0.1.1 — Roads & planetary logistics.** BL-146–149: a generated per-nation road lattice with
   A\* cost integration, planetary road rendering + player-placeable infrastructure, cities as free
   logistics hubs (agglomeration discount), and the inland logistics-hub building. The one concrete
-  expanded-prototype minor; it also retires the "roads are an invisible tile attribute" concern.
-- **Laws.** First pass at the law / policy surface — what a law *is* as a data object and how it
-  gates or modifies economic (and later political) behaviour. Design + stub.
-- **Techs.** Early design toward the tech / quest system (BL-087) — the condition-set gate model
-  (gate = quest = tech) that the v0.3.0 filter system formalises. Design only at this stage.
-- **Military systems.** The Conflict dimension's first data-model footing — units, forces, and the
-  seams they need in the world model. Stub, not mechanics (Conflict proper stays post-cut scope).
-- **Politics (stub).** A data-model stub only — enough political layer for the v0.2.0 nation actor
-  to have something to own, deferring the working system to v0.3.0.
+  build minor; it also retires the "roads are an invisible tile attribute" concern.
+- **v0.1.2 — Laws** (**BL-155**). First pass at the law / policy surface — what a law *is* as a
+  data object and how it gates or modifies economic (and later political) behaviour. Design + stub.
+- **v0.1.3 — Techs** (**BL-156**). Early design toward the tech / quest system — the condition-set
+  gate model (gate = quest = tech) that BL-087 reframed and the v0.3.0 filter system formalises.
+  Design only; precursor to BL-087.
+- **v0.1.4 — Military systems** (**BL-157**). The Conflict dimension's first data-model footing —
+  units, forces, and the seams they need in the world model. Stub, not mechanics (Conflict proper
+  stays post-cut scope).
+- **v0.1.5 — Politics (stub)** (**BL-158**). A data-model stub only — enough political layer for
+  the v0.2.0 nation actor to have something to own, deferring the working system to v0.3.0. The
+  band's last minor before the refocus.
 
 ### v0.2.0 — The refocus (nation as the strategic actor)
 

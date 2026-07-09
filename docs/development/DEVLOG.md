@@ -37,8 +37,12 @@ prototype cut*. `backlog.json` metadata: BL-146–149 → v0.1.1, BL-094 → v0.
 - **Naming watch — Filter vs Lens.** "Filter" (Era rename, v0.3.0) sits near the map-lens
   vocabulary in `LENSES.md`; flagged in the roadmap to confirm the two read as distinct before the
   rename lands.
-- **No v0.1.x backlog items yet** for laws / military / politics-stub — offered to Ben as a
-  follow-up; roadmap themes precede items deliberately.
+- **v0.1.x band itemised** (follow-up, same session): Ben asked for one placeholder item per minor
+  until the v0.2.0 refocus. Created **BL-155** (v0.1.2 Laws), **BL-156** (v0.1.3 Techs, precursor to
+  BL-087), **BL-157** (v0.1.4 Military stub), **BL-158** (v0.1.5 Politics stub) — all `design-owed`,
+  authority docs/SYSTEMS.md, framed as design + data-model stub within post-cut scope. IDs allocated
+  off the cross-branch max via `next_id.js` (BL-155 was next safe). ROADMAP v0.1.x bullets now name
+  the minors + item IDs.
 - **Era→Filter is authority-time-sliced** — `ERAS.md` / `GLOSSARY.md` / era enums stay as-is until
   the v0.3.0 work lands.
 

@@ -2846,6 +2846,90 @@
       "authority_doc": "docs/ui/DISCOVERY.md",
       "summary": "Filed 2026-07-08 (Ben) after observing the commercial-activity fog reads as 'no fog'. Today (BL-089) the activity fog is ABSENCE-by-default: an unknown body draws nothing (a plain astronomy dot); only known/known_stale/visible non-home bodies get a small ~4-6px lower-left pulse badge. So with no player commerce the whole Solar map looks identical to no-fog, and even when lit the badges are subtle next to the survey '?' + labels. This item inverts the treatment: render the fog as a DIM SHADOW over bodies outside the player's commercial network, so the unlit map READS as fogged and brightens as commerce reaches it.",
       "design": "**Problem.** The commercial-activity fog (BL-089, `body_activity_visibility` -> Solar badges in `solar_system_canvas.cpp:249`) is a presence-badge on LIT bodies, not an overlay on the dark. Unknown bodies draw nothing, so the fog is invisible until the player runs commerce, and the small lower-left pulse dots are easily lost. Prompted by Ben 2026-07-08 ('I'm not seeing any fog').\n\n**Change.** Render the activity fog as a **dim shadow**: bodies the player's commercial network does NOT reach are drawn dimmed/shadowed on the Solar canvas (a translucent dark wash and/or reduced body+label brightness), so the un-networked map legibly reads as *fogged*; as a route/convoy reaches a body it **brightens** to full (known -> visible a rising brightness ramp). The existing lower-left pulse badge can stay as the fine-grained tier tell for the lit tiers; the shadow is the new coarse read for the unlit. Keep it visually distinct from the geographic **survey** fog (BL-067, the '?' badges) — the two fogs must still read apart (DISCOVERY.md's two-independent-fogs rule).\n\n**Scope.** Solar canvas only (the activity fog is body-level). Home stays full-bright (its BL-085 halo). Derived read only — no new sim state (reads `body_activity_visibility`). `presentation.hpp/.cpp` for the shadow colour/alpha + brightness ramp; `solar_system_canvas.cpp` for the per-body dim.\n\n**Open (Ben's visual call — mockup welcome):** per-body dimming (a shadow on each un-networked body + label) vs a broader regional wash; the exact alpha/brightness ramp across unknown -> known_stale -> known -> visible; whether known_stale reads as partially-lit or still-shadowed. Visual design lives with Ben; this captures the intent + the seam. **Authority:** docs/ui/DISCOVERY.md (activity-fog rendering)."
+    },
+    {
+      "id": "BL-155",
+      "version_goal": "v0.1.2",
+      "short_name": "LAW_POLICY_SURFACE_DESIGN",
+      "category": "Policy",
+      "title": "Laws & policy surface — design + data-model stub (v0.1.2 expanded-prototype groundwork)",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "B",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-09",
+      "files": [
+        "docs/SYSTEMS.md"
+      ],
+      "authority_doc": "docs/SYSTEMS.md",
+      "summary": "Roadmap v0.1.2 expanded-prototype groundwork (Ben, 2026-07-09 refocus). First pass at the law / policy surface: what a law IS as a data object and how it gates or modifies economic (and later political) behaviour. Design-forward + data-model stub only — no committed mechanics — so the v0.2.0 nation actor and the v0.3.0 political layer land on prepared ground. Design-owed: the law-object schema, the prototype lever set, and the enforcement seam are all open.",
+      "design": "**Theme (roadmap v0.1.2).** Define the **law / policy** surface as a first-class data object: a law is a named, serialisable record that gates or modifies behaviour (initially economic — tax, tariff, subsidy, extraction cap — later political). This item settles the *shape*, not the mechanics.\n\n**Scope.** Design + a data-model stub only. Enumerate the law-object schema (id, subject, condition, effect), sketch a small prototype lever set, and name the enforcement seam in the economy step where a law would read. No UI, no active law effects committed — the point is to position the model.\n\n**Open questions.** Law-object schema; which levers are prototype-worthy vs deferred; where enforcement hooks into `economy_system` without breaking determinism; how laws relate to the future filter system (BL-087) and the nation actor (BL-094) that will own them.\n\n**Standing-rule note.** Policy proper is post-prototype scope (TECH_FOUNDATIONS); this is the design + stub that precedes it, not the system. **Authority:** docs/SYSTEMS.md once landed."
+    },
+    {
+      "id": "BL-156",
+      "version_goal": "v0.1.3",
+      "short_name": "TECH_SYSTEM_EARLY_DESIGN",
+      "category": "Research",
+      "title": "Tech system — early design toward the quest/gate model (v0.1.3 expanded-prototype groundwork)",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "B",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-09",
+      "files": [
+        "docs/SYSTEMS.md"
+      ],
+      "authority_doc": "docs/SYSTEMS.md",
+      "summary": "Roadmap v0.1.3 expanded-prototype groundwork (Ben, 2026-07-09 refocus). Early design toward the tech / quest system — the condition-set gate model (gate = quest = tech, one object) that BL-087 reframed and that the v0.3.0 filter system will formalise. Design only at this stage: settle the tech-object and gate-condition shape so later work has a spine. Precursor to BL-087 (filter system, v0.3.0).",
+      "design": "**Theme (roadmap v0.1.3).** The early-design pass for the **tech system**, feeding the unified gate model BL-087 settled: a **gate = quest = tech** is one condition-set object, so a tech can gate on economic OR world state. This item does the groundwork design; BL-087 formalises it as the filter system in v0.3.0.\n\n**Scope.** Design only — no implementation. Settle the tech / gate-condition object shape, the capstone-vs-ordinary distinction, and how a tech unlock threads into content availability (buildings, recipes, quest trees). Position it so v0.3.0's Era→Filter rename inherits a coherent model.\n\n**Open questions.** Tech-object schema and its overlap with the law object (BL-155); which conditions are expressible in the prototype; how quest trees hang off capstones; the boundary between this precursor and BL-087's full design.\n\n**Relates:** BL-087 (filter system, v0.3.0 — this is its early-design precursor), BL-155 (shared condition-set shape). **Authority:** docs/SYSTEMS.md once landed."
+    },
+    {
+      "id": "BL-157",
+      "version_goal": "v0.1.4",
+      "short_name": "MILITARY_DATAMODEL_STUB",
+      "category": "Military",
+      "title": "Military systems — data-model footing stub (v0.1.4 expanded-prototype groundwork)",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "C",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-09",
+      "files": [
+        "docs/SYSTEMS.md"
+      ],
+      "authority_doc": "docs/SYSTEMS.md",
+      "summary": "Roadmap v0.1.4 expanded-prototype groundwork (Ben, 2026-07-09 refocus). The Conflict dimension's first data-model footing: units, forces, and the seams they need in the world model. Stub, NOT mechanics — Conflict proper stays post-cut scope (TECH_FOUNDATIONS). Positions the model so the v0.2.0 nation actor (which owns military) has something concrete to hold. Design-owed: unit/force schema and the world-model seams are open.",
+      "design": "**Theme (roadmap v0.1.4).** Lay the **data-model footing** for the military / Conflict dimension: what a unit and a force are as records, where they sit in the world model, and which seams (movement, ownership, position) they touch. This is scaffolding for the v0.2.0 nation-as-strategic-actor pivot, which gives military to the nation.\n\n**Scope.** Data-model stub only — no combat, no movement mechanics, no AI. Conflict proper is post-prototype scope (TECH_FOUNDATIONS § exclusions); this item only positions the entities so later conflict work is not greenfield.\n\n**Open questions.** Unit / force schema; how forces relate to the nation actor (BL-094) and to territory; the serialisation seam; the minimum stub that earns its place without inviting scope creep.\n\n**Standing-rule note.** No AI faction behaviour beyond the data-model minimum (io-standing-rules § Determinism). **Authority:** docs/SYSTEMS.md once landed."
+    },
+    {
+      "id": "BL-158",
+      "version_goal": "v0.1.5",
+      "short_name": "POLITICS_DATAMODEL_STUB",
+      "category": "Politics",
+      "title": "Politics — data-model stub for the v0.2.0 nation actor (v0.1.5 expanded-prototype groundwork)",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "C",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-09",
+      "files": [
+        "docs/SYSTEMS.md"
+      ],
+      "authority_doc": "docs/SYSTEMS.md",
+      "summary": "Roadmap v0.1.5 expanded-prototype groundwork (Ben, 2026-07-09 refocus). A data-model stub only — enough political layer for the v0.2.0 nation actor to have something to own — deferring the working political system to v0.3.0. Positions nation political character, relationships, and lever slots as records without committing mechanics. Design-owed: the political-state schema is open. Last v0.1.x band item before the v0.2.0 refocus.",
+      "design": "**Theme (roadmap v0.1.5).** The thinnest useful **political stub**: the data slots the v0.2.0 nation actor needs to own — political character, inter-nation relationships, and placeholder lever slots — as serialisable records, with no working system behind them yet. The real political layer is promoted in v0.3.0 (politics + the filter system).\n\n**Scope.** Data-model stub only. No political mechanics, no AI decision-making, no diplomacy beyond the existing data-model stub (TECH_FOUNDATIONS). This closes the v0.1.x groundwork band: after it, the model is positioned for the v0.2.0 refocus.\n\n**Open questions.** Political-state schema; overlap with the existing nation generation (BL-054 territory + political-character assignment); which relationship data is worth stubbing now vs at v0.3.0; the boundary between this stub and the v0.3.0 working layer.\n\n**Relates:** BL-094 (the nation actor that owns this, v0.2.0), v0.3.0 politics (the working system this stubs toward), BL-054 (existing nation political character). **Authority:** docs/SYSTEMS.md once landed."
     }
   ]
 }
