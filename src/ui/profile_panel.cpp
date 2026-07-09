@@ -40,18 +40,6 @@ void text_ellipsized(const char* text, float max_w, bool disabled)
         ImGui::SetItemTooltip("%s", text);
 }
 
-/// Human-readable label for a corporation's industrial focus.
-const char* focus_label(industrial_focus f)
-{
-    switch (f)
-    {
-        case industrial_focus::extraction: return "Extraction";
-        case industrial_focus::processing: return "Processing";
-        case industrial_focus::trade:      return "Trade";
-    }
-    return "—";
-}
-
 } // namespace
 
 void draw_profile_panel(const world& w)
@@ -80,7 +68,6 @@ void draw_profile_panel(const world& w)
     // fails (e.g. a world with no player corp).
     const char* corp_name   = "Unnamed Corp";
     const char* parent_name = "—";
-    const char* focus_name  = "—";
     // Emblem: the player's identity colour (corp slot 0) and a shape chosen
     // deterministically from the corp id so it is stable and corp-distinct. Both
     // route through the shared palette source of truth so the card, the Selection
@@ -93,7 +80,6 @@ void draw_profile_panel(const world& w)
         const corporation_component& corp = corp_it->second;
         if (!corp.name.empty())
             corp_name = corp.name.c_str();
-        focus_name = focus_label(corp.focus);
         const auto nat_it = w.nations.find(corp.home_nation);
         if (nat_it != w.nations.end() && !nat_it->second.name.empty())
             parent_name = nat_it->second.name.c_str();
@@ -117,7 +103,8 @@ void draw_profile_panel(const world& w)
     const float avail = ImGui::GetContentRegionAvail().x;
     text_ellipsized(corp_name, avail, false);
     text_ellipsized((std::string("Parent: ") + parent_name).c_str(), avail, true);
-    text_ellipsized((std::string("Focus: ") + focus_name).c_str(), avail, true);
+    // BL-145: focus readout hidden blanket (industrial_focus stays a data-model
+    // field for world-gen/economy, just not surfaced in UI).
     ImGui::EndGroup();
 
     ImGui::End();
