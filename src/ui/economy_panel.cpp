@@ -63,14 +63,15 @@ void draw_balances(const world& w)
     std::sort(corps.begin(), corps.end());
 
     // BL-081: the name column stretches so the corp identity is never clipped;
-    // Focus/Balance get comfortable fixed widths so the full numeric value shows.
-    if (ImGui::BeginTable("##balances", 3,
+    // Balance gets a comfortable fixed width so the full numeric value shows.
+    // BL-145: the Focus column is hidden blanket (industrial_focus stays a
+    // data-model field for world-gen/economy, just not surfaced in UI).
+    if (ImGui::BeginTable("##balances", 2,
             ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
     {
         // Tightened from BL-081's 90/90 (tuned for the old wide floating window) so the
         // stretched name keeps usable room in the narrow shell column (BL-117).
         ImGui::TableSetupColumn("Corporation", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableSetupColumn("Focus", ImGuiTableColumnFlags_WidthFixed, 72.0f);
         ImGui::TableSetupColumn("Balance", ImGuiTableColumnFlags_WidthFixed, 64.0f);
         ImGui::TableHeadersRow();
 
@@ -86,12 +87,6 @@ void draw_balances(const world& w)
                 ImGui::TextUnformatted(cc.name.c_str());
 
             ImGui::TableSetColumnIndex(1);
-            const char* focus =
-                cc.focus == industrial_focus::extraction ? "Extraction" :
-                cc.focus == industrial_focus::processing ? "Processing" : "Trade";
-            ImGui::TextDisabled("%s", focus);
-
-            ImGui::TableSetColumnIndex(2);
             // Negative balances are flagged red (palette::negative).
             const ImU32 col = (cc.balance < 0.0f) ? palette::negative : palette::positive;
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(col), "%.1f", cc.balance);

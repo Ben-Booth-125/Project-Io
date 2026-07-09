@@ -90,21 +90,6 @@ const char* economic_focus_name(::economic_focus v)
     return "Unknown";
 }
 
-/// Display name for a corporation's primary industrial focus.
-///
-/// @param v Industrial focus to name.
-/// @return  Null-terminated display name.
-const char* industrial_focus_name(::industrial_focus v)
-{
-    switch (v)
-    {
-    case ::industrial_focus::extraction: return "Extraction";
-    case ::industrial_focus::processing: return "Processing";
-    case ::industrial_focus::trade:      return "Trade";
-    }
-    return "Unknown";
-}
-
 } // namespace
 
 void draw_body_summary(const world& w, entity_id id)
@@ -396,7 +381,8 @@ void draw_corporation_summary(const world& w, entity_id id)
     if (nation_it != w.nations.end())
         ImGui::Text("Nation: %s", nation_it->second.name.c_str());
 
-    ImGui::Text("Focus: %s", industrial_focus_name(c.focus));
+    // BL-145: focus readout hidden blanket (industrial_focus stays a data-model
+    // field for world-gen/economy, just not surfaced in UI).
     ImGui::Text("Capital: %s", ui::fmt::credits(c.starting_capital).c_str());
     ImGui::Text("Assets: %zu", c.assets.size());
 }
