@@ -39,33 +39,6 @@ void draw_lens_icon(ImDrawList* dl, overlay_mode m, ImVec2 rect_min, ImVec2 rect
     }
 }
 
-/// Draw the lens-local resource/good selector for the Resource, Market, and
-/// Scarcity lenses. All three pick "which resource" from the same `lens_resource`
-/// field (LENSES.md says the selectors share a form), so one popup serves them.
-/// A compact button (the current good's name) opens a Selectable list popup — the
-/// former 140 px inline combo does not fit the minimap bar (BL-093). The caller
-/// positions the cursor; this draws no SameLine of its own.
-void draw_lens_selector(ui_state& ui)
-{
-    if (ui.overlay != overlay_mode::resource && ui.overlay != overlay_mode::market &&
-        ui.overlay != overlay_mode::scarcity)
-        return;
-
-    const char* current = presentation_of(ui.lens_resource).name;
-    if (ImGui::SmallButton(current))
-        ImGui::OpenPopup("##lens_resource_popup");
-    if (ImGui::BeginPopup("##lens_resource_popup"))
-    {
-        for (std::size_t i = 0; i < resource_count; ++i)
-        {
-            const resource_type r = static_cast<resource_type>(i);
-            if (ImGui::Selectable(presentation_of(r).name, r == ui.lens_resource))
-                ui.lens_resource = r;
-        }
-        ImGui::EndPopup();
-    }
-}
-
 } // namespace
 
 const char* overlay_mode_name(overlay_mode m)
@@ -78,7 +51,7 @@ const char* overlay_mode_name(overlay_mode m)
         case overlay_mode::corporation: return "Corporation ownership";
         case overlay_mode::resource:    return "Resource deposits";
         case overlay_mode::population:  return "Workforce efficiency";
-        case overlay_mode::opportunity: return "Opportunity (unmet demand)";
+        case overlay_mode::opportunity: return "Opportunity";
         case overlay_mode::production:  return "Production intensity";
         case overlay_mode::scarcity:    return "Market scarcity";
         case overlay_mode::industry:    return "Industry density";
@@ -179,10 +152,8 @@ void draw_overlay_controls(ui_state& ui, float x, float top_y, float w)
         cursor_x += icon_size + spacing;
     }
 
-    // Resource/good selector popup (Resource / Market / Scarcity), placed after the
-    // glyph row when one of those lenses is active.
-    ImGui::SetCursorScreenPos({cursor_x + spacing, cursor_y + 2.0f});
-    draw_lens_selector(ui);
+    // The resource/good selector (Resource / Market / Scarcity share `lens_resource`)
+    // moved into the on-canvas lens legend (BL-134) — it no longer docks here.
 
     ImGui::End();
     ImGui::PopStyleVar();

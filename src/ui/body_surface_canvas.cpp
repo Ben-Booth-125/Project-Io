@@ -104,6 +104,12 @@ ImU32 lerp_colour(ImU32 a, ImU32 b, float t)
 /// declared so the Production key (above its definition) can sample the same band.
 ImU32 diverging_colour(float ratio);
 
+/// Diverging red→green colour for a ratio relative to 1.0 (defined below); forward
+/// declared so the Production key (above its definition) can sample the same band.
+/// Distinct ramp from diverging_colour (BL-137) — dedicated so the Market lens's
+/// cool/warm scale is untouched.
+ImU32 production_colour(float ratio);
+
 /// Shared chrome for an on-canvas lens key: a rounded dark panel of @p box_w ×
 /// @p body_h at the left edge (inset past the nav rail), vertically centred —
 /// clear of the Selection panel, the header/Explorer, and the lens control strip.
@@ -124,17 +130,55 @@ void begin_lens_key(ImDrawList* dl, ImVec2 anchor, float box_w,
     out_w = box_w - 2.0f * pad;
 }
 
+/// The lens-local resource/good selector for the Resource, Market, and Scarcity
+/// lenses (BL-134): all three pick "which resource" from the same `lens_resource`
+/// field (LENSES.md says the selectors share a form), so one combo serves them.
+/// Now lives at the top of the on-canvas legend (moved off the minimap strip,
+/// which the former popup button docked in) — a real scrollable ImGui::BeginCombo,
+/// hosted in a small borderless window since the legend itself paints on the
+/// background draw list rather than a live ImGui window.
+constexpr float kLensComboH = 22.0f;
+
+void draw_lens_resource_combo(ui_state& state, ImVec2 pos, float w)
+{
+    ImGui::SetNextWindowPos(pos, ImGuiCond_Always);
+    ImGui::SetNextWindowSize({w, kLensComboH}, ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.0f);
+    constexpr ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoTitleBar  | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoCollapse  | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoNav |
+        ImGuiWindowFlags_NoSavedSettings;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0.0f, 0.0f});
+    ImGui::Begin("##lens_key_resource_combo", nullptr, flags);
+    ImGui::SetNextItemWidth(w);
+    if (ImGui::BeginCombo("##lens_key_resource", presentation_of(state.lens_resource).name))
+    {
+        for (std::size_t i = 0; i < resource_count; ++i)
+        {
+            const resource_type r = static_cast<resource_type>(i);
+            if (ImGui::Selectable(presentation_of(r).name, r == state.lens_resource))
+                state.lens_resource = r;
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::End();
+    ImGui::PopStyleVar();
+}
+
 /// On-canvas legend for the Resource lens (BL-019): the selected resource's name
 /// and identity swatch, plus a note that the fill marks the contiguous deposit.
 /// Flat, not a gradient — the lens shows deposit *shape*, not magnitude.
 void draw_resource_key(ImDrawList* dl, ImVec2 anchor,
-                       const ui_state& state)
+                       ui_state& state)
 {
     const float pad    = 8.0f;
     const float line_h = ImGui::GetTextLineHeight();
-    const float body_h = pad + line_h + 4.0f + line_h + 4.0f + line_h + pad;
+    const float body_h = pad + kLensComboH + 4.0f + line_h + 4.0f + line_h + 4.0f + line_h + pad;
     float x, y, bar_w;
     begin_lens_key(dl, anchor, 168.0f, body_h, pad, x, y, bar_w);
+
+    draw_lens_resource_combo(state, {x, y}, bar_w);
+    y += kLensComboH + 4.0f;
 
     dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Resource deposit");
     y += line_h + 4.0f;
@@ -146,9 +190,11 @@ void draw_resource_key(ImDrawList* dl, ImVec2 anchor,
     dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "filled = deposit present");
 }
 
-/// On-canvas legend for the Opportunity lens (BL-112): a diverging supplied→unmet
-/// gradient bar over the per-catchment unmet-demand surface (biggest tradeable
-/// price/base ratio — a market bidding above its floor is the gap to fill).
+/// On-canvas legend for the Opportunity lens (BL-136): a body-relative red→green
+/// rank bar over the volume-weighted unmet-demand-gap field — each market's
+/// demand-gap × demand-volume score, ranked against the body max (mirrors the
+/// Scarcity lens's per-market normalisation). Standard key width — the former
+/// "(unmet demand)" qualifier that widened this box is gone (BL-136).
 void draw_opportunity_key(ImDrawList* dl, ImVec2 anchor)
 {
     const float pad    = 8.0f;
@@ -156,26 +202,24 @@ void draw_opportunity_key(ImDrawList* dl, ImVec2 anchor)
     const float bar_h  = 10.0f;
     const float body_h = pad + line_h + 4.0f + bar_h + 2.0f + line_h + pad;
     float x, y, bar_w;
-    // A touch wider than the other keys so the "(unmet demand)" qualifier fits.
-    begin_lens_key(dl, anchor, 190.0f, body_h, pad, x, y, bar_w);
+    begin_lens_key(dl, anchor, 168.0f, body_h, pad, x, y, bar_w);
 
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Opportunity (unmet demand)");
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Opportunity");
     y += line_h + 4.0f;
-    constexpr ImU32 loss   = IM_COL32(216, 100,  96, 255);
-    constexpr ImU32 profit = IM_COL32(110, 200, 120, 255);
+    constexpr ImU32 low  = IM_COL32(216, 100,  96, 255);
+    constexpr ImU32 high = IM_COL32(110, 200, 120, 255);
     constexpr int segs = 24;
     for (int i = 0; i < segs; ++i)
     {
         const float t = static_cast<float>(i) / (segs - 1);
-        const ImU32 c = t < 0.5f ? lerp_colour(loss, IM_COL32(40, 40, 48, 255), t * 2.0f)
-                                 : lerp_colour(IM_COL32(40, 40, 48, 255), profit, (t - 0.5f) * 2.0f);
+        const ImU32 c = lerp_colour(low, high, t);
         dl->AddRectFilled({ x + bar_w * static_cast<float>(i) / segs, y },
                           { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
     }
     y += bar_h + 2.0f;
-    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "supplied");
-    const ImVec2 ts = ImGui::CalcTextSize("unmet");
-    dl->AddText({x + bar_w - ts.x, y}, IM_COL32(170, 175, 185, 255), "unmet");
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "low");
+    const ImVec2 ts = ImGui::CalcTextSize("high");
+    dl->AddText({x + bar_w - ts.x, y}, IM_COL32(170, 175, 185, 255), "high");
 }
 
 /// On-canvas legend for the Production lens (BL-009): a diverging cool→warm bar
@@ -195,7 +239,7 @@ void draw_production_key(ImDrawList* dl, ImVec2 anchor)
     for (int i = 0; i < segs; ++i)
     {
         const float t = static_cast<float>(i) / (segs - 1);
-        const ImU32 c = diverging_colour(std::pow(4.0f, t * 2.0f - 1.0f));
+        const ImU32 c = production_colour(std::pow(4.0f, t * 2.0f - 1.0f));
         dl->AddRectFilled({ x + bar_w * static_cast<float>(i) / segs, y },
                           { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
     }
@@ -219,6 +263,20 @@ ImU32 diverging_colour(float ratio)
     return d < 0.0f ? lerp_colour(neutral, cool, -d) : lerp_colour(neutral, warm, d);
 }
 
+/// Diverging red→green colour for a ratio relative to 1.0 (BL-137, Production lens):
+/// `ratio = value / mean`; 1.0 is the neutral mid-tone, < 1 (below mean) trends red,
+/// > 1 (above mean) trends green. Same log-of-ratio centring as diverging_colour, but
+/// a dedicated ramp — diverging_colour stays untouched for the Market lens.
+ImU32 production_colour(float ratio)
+{
+    ratio = std::clamp(ratio, 0.25f, 4.0f);
+    const float d = std::log(ratio) / std::log(4.0f); // [-1, 1]
+    constexpr ImU32 neutral = IM_COL32(205, 205, 210, 255);
+    constexpr ImU32 low     = IM_COL32(216, 100,  96, 255);
+    constexpr ImU32 high    = IM_COL32(110, 200, 120, 255);
+    return d < 0.0f ? lerp_colour(neutral, low, -d) : lerp_colour(neutral, high, d);
+}
+
 /// On-canvas legend for the Market lens: a diverging cheap↔dear gradient bar plus
 /// the selected good's name and its current price ratio (or an "untraded" note when
 /// the body's market has no entry for it). Same left-edge placement as the Resource key.
@@ -226,14 +284,13 @@ ImU32 diverging_colour(float ratio)
 // The key shows a colour swatch per market labelled with its city name (matching the
 // ledger / selection / CSV — never a bare ordinal, which the player never sees elsewhere).
 void draw_market_key(ImDrawList* dl, ImVec2 anchor, const world& w,
-                     const ui_state& /*state*/,
+                     ui_state& state,
                      const std::unordered_map<entity_id, ImU32>& catchment_colours)
 {
     const float pad    = 8.0f;
     const float line_h = ImGui::GetTextLineHeight();
     const float swatch = line_h;
     const int   n      = static_cast<int>(catchment_colours.size());
-
     // Stable legend order — the source map iterates arbitrarily; sort by market id so the
     // swatch list does not reshuffle frame to frame (colours stay keyed to their market).
     std::vector<std::pair<entity_id, ImU32>> entries(catchment_colours.begin(),
@@ -248,7 +305,7 @@ void draw_market_key(ImDrawList* dl, ImVec2 anchor, const world& w,
             swatch + 4.0f + ImGui::CalcTextSize(market_city_name(w, mid).c_str()).x);
     const float box_w = std::max(140.0f, label_w + 2.0f * pad);
 
-    const float body_h = pad + line_h + 4.0f
+    const float body_h = pad + kLensComboH + 4.0f + line_h + 4.0f
                        + static_cast<float>(std::max(n, 1)) * (swatch + 2.0f)
                        + pad;
 
@@ -259,6 +316,9 @@ void draw_market_key(ImDrawList* dl, ImVec2 anchor, const world& w,
 
     float x = p0.x + pad;
     float y = p0.y + pad * 0.5f;
+
+    draw_lens_resource_combo(state, {x, y}, box_w - 2.0f * pad);
+    y += kLensComboH + 4.0f;
 
     dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Market catchments");
     y += line_h + 4.0f;
@@ -274,6 +334,71 @@ void draw_market_key(ImDrawList* dl, ImVec2 anchor, const world& w,
         dl->AddRectFilled({x, y}, {x + swatch, y + swatch}, col);
         const std::string label = market_city_name(w, mid);
         dl->AddText({x + swatch + 4.0f, y}, IM_COL32(220, 220, 220, 255), label.c_str());
+        y += swatch + 2.0f;
+    }
+}
+
+/// On-canvas legend for the Country lens (BL-133): one colour swatch + nation name
+/// per nation present on the active body, sorted by nation id for a stable order.
+/// Modelled on draw_market_key; the box auto-sizes to the widest name so every
+/// label guaranteed-fits (CalcTextSize pattern draw_market_key already uses).
+/// Colour source is palette::nation_colour — the same source the tile tint itself
+/// uses (the country lens's tile-tint pass, above).
+void draw_country_key(ImDrawList* dl, ImVec2 anchor, const world& w, const ui_state& state)
+{
+    std::vector<entity_id> present;
+    for (const auto& [tid, nid] : w.tile_to_nation)
+    {
+        const auto tile_it = w.tiles.find(tid);
+        if (tile_it == w.tiles.end() || tile_it->second.body != state.active_body)
+            continue;
+        if (std::find(present.begin(), present.end(), nid) == present.end())
+            present.push_back(nid);
+    }
+    std::sort(present.begin(), present.end());
+
+    const float pad    = 8.0f;
+    const float line_h = ImGui::GetTextLineHeight();
+    const float swatch = line_h;
+
+    float name_w = ImGui::CalcTextSize("Countries").x;
+    for (const entity_id nid : present)
+    {
+        const auto nat_it = w.nations.find(nid);
+        if (nat_it == w.nations.end())
+            continue;
+        name_w = std::max(name_w, ImGui::CalcTextSize(nat_it->second.name.c_str()).x);
+    }
+    const float box_w  = pad * 2.0f + swatch + 4.0f + name_w;
+    const int   n      = static_cast<int>(present.size());
+    const float body_h = pad + line_h + 4.0f
+                       + static_cast<float>(std::max(n, 1)) * (swatch + 2.0f)
+                       + pad;
+
+    const ImVec2 p0 = { anchor.x - box_w, anchor.y - body_h * 0.5f };
+    const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
+    dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
+    dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
+
+    float x = p0.x + pad;
+    float y = p0.y + pad * 0.5f;
+
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Countries");
+    y += line_h + 4.0f;
+
+    if (present.empty())
+    {
+        dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "No nations");
+        return;
+    }
+
+    for (const entity_id nid : present)
+    {
+        const auto nat_it = w.nations.find(nid);
+        if (nat_it == w.nations.end())
+            continue;
+        dl->AddRectFilled({x, y}, {x + swatch, y + swatch}, palette::nation_colour(nid));
+        dl->AddText({x + swatch + 4.0f, y}, IM_COL32(220, 220, 220, 255), nat_it->second.name.c_str());
         y += swatch + 2.0f;
     }
 }
@@ -300,22 +425,23 @@ void draw_population_key(ImDrawList* dl, ImVec2 anchor)
     dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Workforce efficiency");
     y += line_h + 4.0f;
 
-    // Gradient maps the workforce-efficiency range the lens tints by (0.5×→1.0×),
-    // so the bar reads as the labour multiplier rather than raw habitability.
-    constexpr ImU32 live = IM_COL32(80, 200, 110, 255);
+    // Red→green rank bar (BL-135): mirrors the per-tile value-mark dot the lens
+    // now draws instead of a full-tile tint — low efficiency reads red, full
+    // labour reads green.
+    constexpr ImU32 low  = IM_COL32(216, 100,  96, 255);
+    constexpr ImU32 high = IM_COL32(110, 200, 120, 255);
     constexpr int segs = 24;
     for (int i = 0; i < segs; ++i)
     {
-        const float t0  = static_cast<float>(i) / segs;
-        const float eff = 0.5f + 0.5f * t0; // 0.5× at the low end → 1.0× at full labour
-        const ImU32 c   = lerp_colour(IM_COL32(40, 40, 48, 255), live, 0.15f + 0.7f * eff);
+        const float t0 = static_cast<float>(i) / segs;
+        const ImU32 c  = lerp_colour(low, high, t0);
         dl->AddRectFilled({ x + bar_w * t0, y },
                           { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
     }
     y += bar_h + 2.0f;
-    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "0.5x");
-    const ImVec2 hts = ImGui::CalcTextSize("1.0x");
-    dl->AddText({x + bar_w - hts.x, y}, IM_COL32(170, 175, 185, 255), "1.0x");
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "low");
+    const ImVec2 hts = ImGui::CalcTextSize("high");
+    dl->AddText({x + bar_w - hts.x, y}, IM_COL32(170, 175, 185, 255), "high");
 }
 
 /// On-canvas legend for the Industry lens (BL-084): a low→high amber gradient bar
@@ -361,14 +487,15 @@ void draw_industry_key(ImDrawList* dl, ImVec2 anchor)
 /// On-canvas legend for the Scarcity lens: an abundant→scarce gradient bar (no tint
 /// → hot) plus the selected resource's name and swatch. Same placement as the others.
 void draw_scarcity_key(ImDrawList* dl, ImVec2 anchor,
-                       const ui_state& state)
+                       ui_state& state)
 {
     const float pad    = 8.0f;
     const float box_w  = 156.0f;
     const float line_h = ImGui::GetTextLineHeight();
     const float bar_h  = 10.0f;
 
-    const float body_h = pad + line_h + 4.0f + bar_h + 2.0f + line_h + 4.0f + line_h + pad;
+    const float body_h = pad + kLensComboH + 4.0f
+                       + line_h + 4.0f + bar_h + 2.0f + line_h + 4.0f + line_h + pad;
     const ImVec2 p0 = { anchor.x - box_w, anchor.y - body_h * 0.5f };
     const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
     dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
@@ -377,6 +504,9 @@ void draw_scarcity_key(ImDrawList* dl, ImVec2 anchor,
     const float x     = p0.x + pad;
     const float bar_w = box_w - 2.0f * pad;
     float       y     = p0.y + pad * 0.5f;
+
+    draw_lens_resource_combo(state, {x, y}, bar_w);
+    y += kLensComboH + 4.0f;
 
     dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Market scarcity");
     y += line_h + 4.0f;
@@ -908,31 +1038,31 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     }
     const float prod_mean = prod_count > 0 ? std::exp(prod_log_sum / static_cast<float>(prod_count)) : 0.0f;
 
-    // Opportunity lens pre-pass (BL-112): a market-level unmet-demand field, keyed
-    // off the live price-discovering market (BL-078). The opportunity is the gap a
-    // scarce, high-priced market opens up — for each market on the body, the largest
-    // tradeable price/base ratio: a good bid above its floor is demand outrunning
-    // supply, exactly the margin the player can fill. Untradeable goods (base_price
-    // 0 — the space-era resources) carry no floor and are skipped. Every tile in a
-    // market's catchment reads that market's gap (market_for_tile); diverging
-    // oversupplied(red)→opportunity(green) about the neutral floor, on the same
-    // symmetric price band as diverging_colour.
-    std::unordered_map<entity_id, float> opp_ratio; // market id → biggest tradeable price/base ratio
+    // Opportunity lens pre-pass (BL-136): a body-relative, volume-weighted rank of
+    // the unmet-demand gap, replacing the old max-absolute price/base ratio (which
+    // saturated green in the saturated economy — every market bids over its floor).
+    // For each market: sum the per-good demand gap (demand outrunning supply, like
+    // the Scarcity pre-pass) and weight it by the market's total demand volume, so
+    // a large market's real gap outranks a tiny market's high-ratio blip. Scores are
+    // then ranked against the body max (mirrors the Scarcity lens's normalisation) —
+    // strongest gaps read green, met markets read low/red.
+    std::unordered_map<entity_id, float> opp_score; // market id → volume-weighted demand-gap score
+    float opp_max_score = 0.0f;
     if (state.overlay == overlay_mode::opportunity)
     {
         for (const auto& [mid, mk] : w.markets)
         {
             if (mk.body != state.active_body)
                 continue;
-            float best = 0.0f;
+            float gap = 0.0f, volume = 0.0f;
             for (std::size_t r = 0; r < resource_count; ++r)
             {
-                if (mk.base_price[r] <= 0.0f) // untradeable good — no floor to bid over
-                    continue;
-                best = std::max(best, mk.price[r] / mk.base_price[r]);
+                gap    += std::max(0.0f, mk.demand[r] - mk.supply[r]);
+                volume += mk.demand[r];
             }
-            if (best > 0.0f)
-                opp_ratio[mid] = best;
+            const float score = gap * volume;
+            opp_score[mid] = score;
+            opp_max_score  = std::max(opp_max_score, score);
         }
     }
 
@@ -1203,41 +1333,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (col_it != market_catchment_colour.end())
                 fill = lerp_colour(fill, col_it->second, 0.55f);
         }
-        // Population lens (re-keyed, BL-069): tint a tile by the *workforce
-        // efficiency* its habitability yields (workforce.hpp), not raw habitability.
-        // Tiles at/above habitability 0.6 read at full labour (flat brightest green);
-        // below 0.6 they grade down sharply — so the lens shows the 0.6 efficiency
-        // cliff, the siting signal "build where habitability ≥ 0.6 for full workforce".
-        // Zero-habitability tiles (ocean, barren) stay untinted so terrain still reads.
-        else if (state.overlay == overlay_mode::population)
-        {
-            const float h = std::clamp(tile.habitability, 0.0f, 1.0f);
-            if (h > 0.0f)
-            {
-                const float eff = workforce_efficiency(h);
-                constexpr ImU32 live = IM_COL32(80, 200, 110, 255);
-                fill = lerp_colour(fill, live, 0.15f + 0.7f * eff);
-            }
-        }
-        // Opportunity lens (BL-112): tint a tile by the unmet-demand margin of its
-        // catchment market — the biggest tradeable price/base ratio (pre-pass above).
-        // A good bid above its floor is demand the player can supply; the whole
-        // catchment reads that market's gap. Diverging oversupplied(red)→
-        // opportunity(green) about the neutral floor (ratio 1.0), on the symmetric
-        // [0.25×, 4×] price band diverging_colour uses. Tiles with no market keep hue.
-        else if (state.overlay == overlay_mode::opportunity)
-        {
-            const auto it = opp_ratio.find(market_for_tile(w, id));
-            if (it != opp_ratio.end())
-            {
-                const float ratio = std::clamp(it->second, 0.25f, 4.0f);
-                const float d     = std::log(ratio) / std::log(4.0f); // [-1, 1]
-                constexpr ImU32 loss   = IM_COL32(216, 100,  96, 255);
-                constexpr ImU32 profit = IM_COL32(110, 200, 120, 255);
-                fill = d < 0.0f ? lerp_colour(fill, loss, -d * 0.75f)
-                                : lerp_colour(fill, profit, d * 0.75f);
-            }
-        }
+        // Population (Workforce) and Opportunity lenses (BL-135): no longer a
+        // full-tile tint — each reads as a per-tile red→green dot mark, drawn
+        // below alongside the building glyph (workforce_efficiency / the
+        // body-relative demand-gap rank respectively). Tiles keep terrain hue here.
         // Production lens (BL-009): tint a producing tile by output sell value this
         // tick, log-scaled relative to the body's producing-tile mean (above mean
         // warm, below cool). Idle / exhausted / unbuilt tiles read cold (no tint).
@@ -1245,7 +1344,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         {
             const auto it = prod_value.find(id);
             if (it != prod_value.end() && prod_mean > 0.0f)
-                fill = lerp_colour(fill, diverging_colour(it->second / prod_mean), 0.6f);
+                fill = lerp_colour(fill, production_colour(it->second / prod_mean), 0.6f);
         }
         // Scarcity lens (BL-018): a market-level shortfall field. Every tile in a
         // market's catchment reads as one chunky block tinted by that market's
@@ -1455,7 +1554,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 if (corp_it != tile_to_corp.end())
                     marker_col = corp_identity(corp_it->second);
 
-                icons::building(dl, {cx, cy}, mr, built_type, marker_col);
+                // The Workforce (Population lens) and Opportunity lenses replace the
+                // building silhouette with the per-tile value mark drawn below
+                // (BL-135) — the mark reads the tile's rank, not its installation.
+                if (state.overlay != overlay_mode::population &&
+                    state.overlay != overlay_mode::opportunity)
+                    icons::building(dl, {cx, cy}, mr, built_type, marker_col);
 
                 // Owner-identity tag (BL-090): a small corp emblem tucked at the
                 // building glyph's lower-right, for BOTH player and rival buildings —
@@ -1489,6 +1593,35 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                         state.marker_hit_zones.push_back(hz);
                     }
                 }
+            }
+
+            // Value-lens tile marks (BL-135): Workforce (Population lens) and
+            // Opportunity replace their old full-tile tint with a per-tile red→green
+            // dot on every BUILDABLE tile (valid terrain for activity — ocean
+            // excluded), not just occupied ones. Workforce reads
+            // workforce_efficiency(habitability); Opportunity reads the same
+            // body-relative demand-gap rank as its (now-removed) tile tint (BL-136).
+            // Drawn instead of, not blended with, the building glyph on occupied
+            // tiles (suppressed above).
+            if ((state.overlay == overlay_mode::population ||
+                 state.overlay == overlay_mode::opportunity) &&
+                !placement_rules::is_ocean_tile(tile.composition))
+            {
+                float t = 0.0f; // body-relative rank, [0, 1], red(low) -> green(high)
+                if (state.overlay == overlay_mode::population)
+                {
+                    t = workforce_efficiency(std::clamp(tile.habitability, 0.0f, 1.0f));
+                }
+                else // opportunity
+                {
+                    const auto it = opp_score.find(market_for_tile(w, id));
+                    if (it != opp_score.end() && opp_max_score > 0.0f)
+                        t = std::clamp(it->second / opp_max_score, 0.0f, 1.0f);
+                }
+                constexpr ImU32 low  = IM_COL32(216, 100,  96, 255);
+                constexpr ImU32 high = IM_COL32(110, 200, 120, 255);
+                const float mr = std::max(2.0f, draw_r * 0.22f);
+                icons::value_mark(dl, {cx, cy}, mr, lerp_colour(low, high, t));
             }
 
             // Supply lens: draw a convoy glyph on every tile when the active body
@@ -1806,7 +1939,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // On-canvas lens key (drawn unclipped, flush-left of the minimap so it reads as a
     // drawer folding out from it — anchor passed in as lens_key_anchor; before the
     // input early-out so it shows in headless captures too).
-    if (state.overlay == overlay_mode::resource)
+    if (state.overlay == overlay_mode::country)
+        draw_country_key(dl, lens_key_anchor, w, state);
+    else if (state.overlay == overlay_mode::resource)
         draw_resource_key(dl, lens_key_anchor, state);
     else if (state.overlay == overlay_mode::market)
         draw_market_key(dl, lens_key_anchor, w, state, market_catchment_colour);

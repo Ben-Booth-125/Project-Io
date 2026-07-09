@@ -248,4 +248,16 @@ void activity(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Stroke colour.
 void survey_badge(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw a value-lens tile mark — a single filled dot in @p colour — for the
+/// Workforce and Opportunity lenses (BL-135). These lenses read a per-tile
+/// magnitude on a red→green scale (caller resolves the colour); the mark
+/// replaces both the terrain-tint wash and, on occupied tiles, the building
+/// glyph while either lens is active.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Mark centre, screen pixels.
+/// @param r      Radius of the dot, screen pixels.
+/// @param colour Fill colour (caller's red→green ramp sample).
+void value_mark(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 } // namespace ui::icons
