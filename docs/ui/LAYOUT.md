@@ -309,6 +309,42 @@ need not rediscover them:
 
 ---
 
+## Container vocabulary (BL-141)
+
+A closed set of **nine** container kinds recur across the shell and canvases. Each
+combines a sizing rule with exactly one text policy — **wrap** (`PushTextWrapPos` +
+`TextWrapped`, reflowing to the box) or **guaranteed-fit** (`CalcTextSize` measured first,
+the box sized to the text — the pattern the market-legend key established) — plus an
+overflow rule for when content still exceeds the box. New UI work should land in one of
+these nine rather than inventing a tenth.
+
+| # | Container | Sizing | Text policy | Overflow |
+|---|---|---|---|---|
+| 1 | **Fold-out ledger column** (`foldout_column`) | Fixed-width (`[nav_pane_width, W]`), stretches to the column's full height | Wrap to inner width | Vertical scroll |
+| 2 | **On-canvas lens legend box** (draw-list, `body_surface_canvas.cpp`) | Fit-to-content — box sized from its own entries | Guaranteed-fit | None — box grows to fit |
+| 3 | **Selection info element** (`selection_panel.cpp`) | Fixed-width panel (shares the fold-out column slot) | Wrap | Vertical scroll |
+| 4 | **Header / balance strip** (`header_panel.cpp`) | Stretch-to-width, fixed height | Guaranteed-fit — segments measured, never wraps | Elide-with-tooltip, only as a last resort; never silent truncation |
+| 5 | **Time panel** (`app.cpp`) | Fixed size | Guaranteed-fit — authored to fit | None |
+| 6 | **Hover card** | Fit-to-content, capped at a max width | Wrap at the max width | Grows vertically |
+| 7 | **Minimap lens bar** | Fixed strip | Icon-only / guaranteed-fit labels | None |
+| 8 | **Nav rail** | Fixed (56 px) | Icon-only; tooltips wrap | None (tooltip wrap absorbs it) |
+| 9 | **ImGui table** (ledgers) | Stretch columns with per-column min widths | Per-cell guaranteed-fit (clip + tooltip) for numeric/identity columns, wrap for description columns | Horizontal scroll on the table; never silent truncation of a load-bearing value |
+
+A few cross-cutting notes:
+
+- **Wrap vs guaranteed-fit is a binary choice per container, not per instance.** A
+  container that measures text to size itself (2, 4, 5, 7, 9-numeric) never also wraps
+  that same text; a container that wraps (1, 3, 6, 8-tooltip, 9-description) never
+  pre-measures to a fixed box.
+- **Silent truncation is never acceptable** for a load-bearing figure (balance, price,
+  quantity). The only sanctioned degradations are elide-with-tooltip (4) and clip-with-tooltip
+  (9) — both keep the value one hover away.
+- These are prototype-tuned concrete behaviours (BL-122's `foldout_column`, the market
+  legend's measure-then-size pattern), not a general layout engine — see
+  `docs/tech/TECH_FOUNDATIONS.md` for why a retained-mode framework is out of scope.
+
+---
+
 ## UI popup elements
 
 Beyond the persistent chrome and the floating ledgers, the production UI will use **transient popup elements** — context menus, confirmation dialogs, hover cards, and action prompts that appear in response to a click or hover and dismiss on action or click-away. Examples: right-clicking a unit for an order menu, a "confirm purchase" dialog, a richer hover card than the canvas tooltip.
