@@ -22,6 +22,7 @@
 #include <iterator>
 #include <limits>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace ui {
@@ -915,6 +916,71 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
     }
 
+    // Intra-body commercial-reach fog (BL-151): the player's local visibility on this
+    // body. Vision is a TIGHT pocket around the player's actual presence, not a whole
+    // market catchment — the map should read mostly *unknown*, lit only where the
+    // player has activity, so the surface conveys unknowns (and, as lanes come and go,
+    // movement). Reveal sources are the player's own building tiles plus the endpoint
+    // tiles of any live player convoy on this body (an active lane lights both ends);
+    // a breadth-first flood out to `fog_reveal_radius` tiles from every source marks
+    // the visible pocket. Everything else is drawn fogged (a dark wash on the tile fill
+    // in the loop below). Derived live — no stored state. The geographic survey fog
+    // (BL-067) still owns unrevealed tiles; this dims on top of revealed ones only.
+    constexpr int fog_reveal_radius = 3; // tile hops of vision from a presence source
+    std::unordered_set<entity_id> revealed_by_activity;
+    {
+        // Odd-r offset neighbours (col, row deltas), matching the Country-lens border
+        // pass; the grid is a horizontal cylinder so columns wrap, rows clamp.
+        static const int even_off[6][2] =
+            {{+1, 0}, {0, -1}, {-1, -1}, {-1, 0}, {-1, +1}, {0, +1}};
+        static const int odd_off[6][2] =
+            {{+1, 0}, {+1, -1}, {0, -1}, {-1, 0}, {0, +1}, {+1, +1}};
+
+        std::vector<entity_id> frontier; // BFS seed set: player presence tiles
+        auto seed = [&](entity_id tid) {
+            if (tid == null_entity) return;
+            const auto it = w.tiles.find(tid);
+            if (it != w.tiles.end() && it->second.body == state.active_body &&
+                revealed_by_activity.insert(tid).second)
+                frontier.push_back(tid);
+        };
+        for (const auto& [tid, corp] : tile_to_corp)
+            if (corp == w.player_entity)
+                seed(tid);
+        for (const auto& cv : w.convoys)
+        {
+            if (cv.corp != w.player_entity) continue;
+            const auto sm = w.markets.find(cv.source_market);
+            if (sm != w.markets.end()) seed(sm->second.centre_tile);
+            const auto dm = w.markets.find(cv.dest_market);
+            if (dm != w.markets.end()) seed(dm->second.centre_tile);
+        }
+        // Flood out radius hops. frontier holds the current ring; grow ring by ring.
+        for (int step = 0; step < fog_reveal_radius && !frontier.empty(); ++step)
+        {
+            std::vector<entity_id> next;
+            for (const entity_id tid : frontier)
+            {
+                const auto tit = w.tiles.find(tid);
+                if (tit == w.tiles.end()) continue;
+                const tile_component& t = tit->second;
+                const int (*off)[2] = (t.grid_y & 1) ? odd_off : even_off;
+                for (int n = 0; n < 6; ++n)
+                {
+                    const int nrow = t.grid_y + off[n][1];
+                    if (nrow < 0 || nrow >= gh) continue;
+                    int ncol = (t.grid_x + off[n][0]) % gw;
+                    if (ncol < 0) ncol += gw;
+                    const auto nb = tile_at.find(static_cast<long long>(nrow) * gw + ncol);
+                    if (nb == tile_at.end()) continue;
+                    if (revealed_by_activity.insert(nb->second).second)
+                        next.push_back(nb->second);
+                }
+            }
+            frontier.swap(next);
+        }
+    }
+
     const ImVec2 mouse = state.mouse.active
                          ? ImVec2{state.mouse.x, state.mouse.y}
                          : ImVec2{-1.0f, -1.0f}; // off-screen sentinel suppresses hover
@@ -1125,6 +1191,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         const bool revealed = survey_tile_visible(body.survey, gw, gh, tile.grid_x, tile.grid_y);
         if (!revealed)
             fill = IM_COL32(12, 14, 20, 255);
+
+        // Intra-body commercial-reach fog (BL-151): dim any *revealed* tile outside the
+        // player's local vision pocket (the BFS reveal set above), so the surface reads
+        // as mostly unknown, lit only around the player's presence. Applied over the
+        // lens fill — a fogged region is less certain, so its analytic read dims with
+        // it. The survey mask already owns unrevealed tiles, so this skips them.
+        if (revealed && revealed_by_activity.find(id) == revealed_by_activity.end())
+            fill = lerp_colour(fill, IM_COL32(8, 10, 16, 255), 0.5f);
 
         // Range of wrap copies that land inside the canvas horizontally.
         const int k_min = (period_px > 0.0f)

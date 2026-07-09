@@ -2810,7 +2810,7 @@
       "short_name": "ACTIVITY_FOG_DIM_SHADOW",
       "category": "Canvas",
       "title": "Render the commercial-activity fog as a dim shadow (make the unlit map read as fogged)",
-      "status": "designed",
+      "status": "complete",
       "glyph": "✓",
       "priority": "A",
       "difficulty": 2,
@@ -2825,7 +2825,29 @@
       ],
       "authority_doc": "docs/ui/DISCOVERY.md",
       "summary": "Filed 2026-07-08 (Ben) after observing the commercial-activity fog reads as 'no fog'. Today (BL-089) the activity fog is ABSENCE-by-default: an unknown body draws nothing (a plain astronomy dot); only known/known_stale/visible non-home bodies get a small ~4-6px lower-left pulse badge. So with no player commerce the whole Solar map looks identical to no-fog, and even when lit the badges are subtle next to the survey '?' + labels. This item inverts the treatment: render the fog as a DIM SHADOW over bodies outside the player's commercial network, so the unlit map READS as fogged and brightens as commerce reaches it.",
-      "design": "**Problem.** The commercial-activity fog (BL-089, `body_activity_visibility` -> Solar badges in `solar_system_canvas.cpp:249`) is a presence-badge on LIT bodies, not an overlay on the dark. Unknown bodies draw nothing, so the fog is invisible until the player runs commerce, and the small lower-left pulse dots are easily lost. Prompted by Ben 2026-07-08 ('I'm not seeing any fog').\n\n**Change.** Render the activity fog as a **dim shadow**: bodies the player's commercial network does NOT reach are drawn dimmed/shadowed on the Solar canvas (a translucent dark wash and/or reduced body+label brightness), so the un-networked map legibly reads as *fogged*; as a route/convoy reaches a body it **brightens** to full (known -> visible a rising brightness ramp). The existing lower-left pulse badge can stay as the fine-grained tier tell for the lit tiers; the shadow is the new coarse read for the unlit. Keep it visually distinct from the geographic **survey** fog (BL-067, the '?' badges) — the two fogs must still read apart (DISCOVERY.md's two-independent-fogs rule).\n\n**Scope.** Solar canvas only (the activity fog is body-level). Home stays full-bright (its BL-085 halo). Derived read only — no new sim state (reads `body_activity_visibility`). `presentation.hpp/.cpp` for the shadow colour/alpha + brightness ramp; `solar_system_canvas.cpp` for the per-body dim.\n\n**Open (Ben's visual call — mockup welcome):** per-body dimming (a shadow on each un-networked body + label) vs a broader regional wash; the exact alpha/brightness ramp across unknown -> known_stale -> known -> visible; whether known_stale reads as partially-lit or still-shadowed. Visual design lives with Ben; this captures the intent + the seam. **Authority:** docs/ui/DISCOVERY.md (activity-fog rendering)."
+      "design": "**Problem.** The commercial-activity fog (BL-089, `body_activity_visibility` -> Solar badges in `solar_system_canvas.cpp:249`) is a presence-badge on LIT bodies, not an overlay on the dark. Unknown bodies draw nothing, so the fog is invisible until the player runs commerce, and the small lower-left pulse dots are easily lost. Prompted by Ben 2026-07-08 ('I'm not seeing any fog').\n\n**Change.** Render the activity fog as a **dim shadow**: bodies the player's commercial network does NOT reach are drawn dimmed/shadowed on the Solar canvas (a translucent dark wash and/or reduced body+label brightness), so the un-networked map legibly reads as *fogged*; as a route/convoy reaches a body it **brightens** to full (known -> visible a rising brightness ramp). The existing lower-left pulse badge can stay as the fine-grained tier tell for the lit tiers; the shadow is the new coarse read for the unlit. Keep it visually distinct from the geographic **survey** fog (BL-067, the '?' badges) — the two fogs must still read apart (DISCOVERY.md's two-independent-fogs rule).\n\n**Scope.** Solar canvas only (the activity fog is body-level). Home stays full-bright (its BL-085 halo). Derived read only — no new sim state (reads `body_activity_visibility`). `presentation.hpp/.cpp` for the shadow colour/alpha + brightness ramp; `solar_system_canvas.cpp` for the per-body dim.\n\n**Landed 2026-07-09.** Per-body dimming (chosen over regional wash); brightness ramp unknown/stale/known/visible = 0.36/0.60/0.84/1.0 with shadow-wash alpha 105/50/0/0; known_stale reads partially-lit. `dim_rgb` helper + `activity_fog_*` ramps in presentation.hpp; per-body dim in solar_system_canvas.cpp. **Authority:** docs/ui/DISCOVERY.md (activity-fog rendering)."
+    },
+    {
+      "id": "BL-151",
+      "short_name": "INTRABODY_ACTIVITY_FOG",
+      "category": "Canvas",
+      "title": "Intra-body commercial-reach fog on the Planetary canvas (surface reads as mostly unknown)",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-09",
+      "version_goal": "v0.0.9",
+      "files": [
+        "src/ui/body_surface_canvas.cpp",
+        "scripts/verify/intrabody_fog.lua"
+      ],
+      "authority_doc": "docs/ui/DISCOVERY.md",
+      "summary": "Filed + landed 2026-07-09 (Ben, follow-on from BL-150). The commercial-activity fog (BL-089) is body-level only, rendered on the Solar canvas; the Planetary canvas had no activity fog, so the home surface read as fully known. Ben expected fog of war on the home planet over intra-body trade. This adds a THIRD visibility treatment: a per-tile intra-body fog on the Planetary canvas so the surface reads as mostly unknown, lit only around the player's own presence.",
+      "design": "**Semantics (Ben's call).** Commercial reach, not unknown-terrain: the home planet is the player's own territory, so 'fog' means *where your logistics actually operate*. **Substrate (Ben's call).** Live-derived, no stored state / no save-format change; intra-body traffic records nothing persistent.\n\n**Model.** Vision is a TIGHT pocket around the player's actual presence, not a whole market catchment (a first cut lit the entire catchment — Ben: 'too wide'; the point is a sense of movement + unknowns). Reveal sources: the player's own building tiles + the endpoint (`centre_tile`) of any live player convoy on the active body. A breadth-first flood out to `fog_reveal_radius` (=3) tile-hops from every source marks the visible pocket (odd-r offset neighbours, column wrap); every other revealed tile takes a dark wash (`lerp 0.5` toward IM_COL32(8,10,16)). Applied over the lens fill (a fogged region's analytic read dims with it). The geographic survey fog (BL-067) still owns unrevealed tiles — this dims revealed ones only. Always-on, all overlays. Convoys confirmed live (dispatch/advance/credit run every econ step, app.cpp:381).\n\n**Verify.** `scripts/verify/intrabody_fog.lua` (goto_surface home + zoom-out capture). Probe at landing: home body 7 markets, player reaches 1 -> 6 catchments fogged; tightened to radius pockets so the HQ region reads lit and the rest of the globe fogged at both play and wide zoom.\n\n**Follow-up -> BL-152:** a live convoy should emit a radius-2 vision BEAM that travels its route and lags/dims over ~1 econ tick (needs `logistics_path` to return its tile sequence — currently cost-only). That is the 'things are moving' half; this item is the static-presence half."
     }
   ]
 }
