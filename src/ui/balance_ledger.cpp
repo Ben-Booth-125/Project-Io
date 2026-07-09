@@ -6,20 +6,11 @@
 #include <imgui.h>
 
 #include <algorithm>
-#include <string>
 #include <vector>
 
 namespace ui {
 
 namespace {
-
-std::string corp_label(const world& w, entity_id corp)
-{
-    const auto it = w.corporations.find(corp);
-    if (it != w.corporations.end() && !it->second.name.empty())
-        return it->second.name;
-    return "Corp #" + std::to_string(corp);
-}
 
 /// Smoothed per-tick net: mean of the last `window` balance deltas (BL-072). A
 /// single tick's net is noisy, so the projected runway reads off this trailing
@@ -51,37 +42,10 @@ void draw_balance_ledger(const world& w, const economy_report& report,
         return;
     }
 
-    // Build a stable, sorted list of corporation ids for the combo.
-    static entity_id selected_corp = null_entity;
-
-    std::vector<entity_id> corp_ids;
-    corp_ids.reserve(w.corporations.size());
-    for (const auto& [id, _] : w.corporations)
-        corp_ids.push_back(id);
-    std::sort(corp_ids.begin(), corp_ids.end());
-
-    // Default selection to the player's corporation on first open or when the
-    // previously-selected id has been removed (empty world edge case).
-    if (selected_corp == null_entity || w.corporations.find(selected_corp) == w.corporations.end())
-        selected_corp = w.player_entity;
-
-    // Corporation selector combo.
-    const std::string preview = corp_label(w, selected_corp);
-    if (ImGui::BeginCombo("Corporation", preview.c_str()))
-    {
-        for (entity_id id : corp_ids)
-        {
-            const bool is_sel = (id == selected_corp);
-            const std::string label = corp_label(w, id);
-            if (ImGui::Selectable(label.c_str(), is_sel))
-                selected_corp = id;
-            if (is_sel)
-                ImGui::SetItemDefaultFocus();
-        }
-        ImGui::EndCombo();
-    }
-
-    ImGui::Separator();
+    // Player-only budget (BL-142): pinned permanently to the player's own corp.
+    // Rival treasuries/cashflow stay private per the competitor-visibility rule
+    // (BL-068) — no selector to inspect another corp's internals.
+    const entity_id selected_corp = w.player_entity;
 
     const auto cit = w.corporations.find(selected_corp);
     if (cit == w.corporations.end())
@@ -163,12 +127,10 @@ void draw_balance_ledger(const world& w, const economy_report& report,
         }
 
         // --- Projected runway (BL-072) ---
-        // The player corp uses the smoothed trailing net (less noisy); any other
-        // corp falls back to this tick's net. Runway = balance / burn, in quarters.
-        const bool   player = (selected_corp == w.player_entity);
-        const float  burn   = (player && balance_history.size() >= 2)
-                                  ? smoothed_net(balance_history)
-                                  : bud.net();
+        // Player-only view (BL-142): always uses the smoothed trailing net
+        // (less noisy than a single tick's delta). Runway = balance / burn, in quarters.
+        const bool  have_history = balance_history.size() >= 2;
+        const float burn = have_history ? smoothed_net(balance_history) : bud.net();
         ImGui::Spacing();
         if (cc.balance < 0.0f)
         {
@@ -187,7 +149,7 @@ void draw_balance_ledger(const world& w, const economy_report& report,
                                "Runway: ~%.0f quarters (%.1f yr) at current burn",
                                quarters, quarters / 4.0f);
         }
-        if (player && balance_history.size() >= 2 && cc.balance >= 0.0f)
+        if (have_history && cc.balance >= 0.0f)
         {
             // The smoothed-burn note only applies to the burn-based runway, not the
             // flat "in debt" read.
@@ -211,6 +173,13 @@ void draw_balance_ledger(const world& w, const economy_report& report,
     // --- Asset count ---
     ImGui::SeparatorText("Assets");
     ImGui::Text("Buildings owned: %d", static_cast<int>(cc.assets.size()));
+
+    // --- Policies / Budget laws (BL-142): signpost stubs, no behaviour yet. ---
+    ImGui::SeparatorText("Policies");
+    ImGui::TextDisabled("(not implemented)");
+
+    ImGui::SeparatorText("Budget laws");
+    ImGui::TextDisabled("(not implemented)");
 
     ui::foldout_end();
 }
