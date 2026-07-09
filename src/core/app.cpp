@@ -1665,7 +1665,11 @@ void app::render()
             ImGui::TableSetColumnIndex(0);
             ImGui::Text("%s %s (Q%d)", ui::fmt::month_abbrev(date.month),
                         ui::fmt::ordinal_day(date.day).c_str(), date.quarter);
-            ImGui::ProgressBar(ui::fmt::quarter_progress(day), {-1.0f, 0.0f}, "");
+            // Progress bar sits narrower than the date column and centred within it,
+            // rather than stretched flush to the column's left edge.
+            const float bar_w = ImGui::GetContentRegionAvail().x * 0.7f;
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (ImGui::GetContentRegionAvail().x - bar_w) * 0.5f);
+            ImGui::ProgressBar(ui::fmt::quarter_progress(day), {bar_w, 0.0f}, "");
 
             // --- Right: the compressed speed controls. No "Sim NNNN" tick
             // counter or "(paused)/(I..V)" text readout — the highlighted
