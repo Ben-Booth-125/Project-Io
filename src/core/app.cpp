@@ -1801,7 +1801,7 @@ void app::render()
     }
     // Construction panel — an ordinary fold-out tab in the shell column (BL-122),
     // one of the mutually-exclusive column occupants (ledgers + Selection).
-    ui::draw_construction_panel(m_world, m_registry, m_ui, &m_ui.show_construction_panel);
+    ui::draw_construction_panel(m_world, m_registry, m_last_econ_report, m_ui, &m_ui.show_construction_panel);
     ui::draw_market_ledger(m_world, m_ui, m_market_history, m_ui.show_market_ledger);
     ui::draw_balance_ledger(m_world, m_last_econ_report, m_balance_history, m_ui.show_balance_ledger);
     ui::draw_corporation_panel(m_world, m_ui, m_ui.show_corporation_panel);

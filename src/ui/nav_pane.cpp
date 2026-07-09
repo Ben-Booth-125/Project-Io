@@ -103,13 +103,13 @@ void draw_nav_pane(ui_state& state, float top_offset)
             }
             ImGui::SetItemTooltip("Market Ledger");
             break;
-        case 6: // Construction / Buildings (BL-029)
+        case 6: // Building (BL-029, renamed BL-143)
             if (ImGui::Selectable(id, state.show_construction_panel, 0, {slot_size, slot_size})) {
                 const bool was_open = state.show_construction_panel;
                 close_all_panels(state);
                 state.show_construction_panel = !was_open;
             }
-            ImGui::SetItemTooltip("Construction");
+            ImGui::SetItemTooltip("Building");
             break;
         case 7: // Corp. Strategy — placeholder
             ImGui::BeginDisabled();
