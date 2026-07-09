@@ -93,49 +93,45 @@
       "short_name": "REACH_LOGISTICS_LENS",
       "category": "Canvas",
       "title": "Reach / Logistics-range lens",
-      "status": "design-owed",
-      "glyph": "~",
-      "priority": "F",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "B",
       "difficulty": 4,
-      "parked": true,
+      "parked": false,
       "requires": [
         "BL-039"
       ],
-      "blocked_on": [
-        "SUPPLY_CONVOYS"
-      ],
+      "blocked_on": [],
       "written": "2026-06-16",
       "files": [
         "src/ui/body_surface_canvas.cpp"
       ],
       "authority_doc": "docs/ui/LENSES.md",
-      "summary": "Static reach surface (deployment/supply falloff from ports/launchpads). Underdefined until the Supply route model exists; may be a Supply sub-mode. Design owed.",
-      "design": "**Status:** design-owed (parked, F). No BACKLOG.md body was preserved — the problem statement lives in this item's `summary`. Open: whether this is a standalone lens or a Supply sub-mode, and the reach / supply-falloff model from ports/launchpads. Blocked until the Supply route model exists. Authority docs/ui/LENSES.md; relates to BL-014."
+      "summary": "Body-level reach lens: which bodies a corp's trade routes currently connect to, tiered by recency. Standalone lens, distinct from BL-014's flow read. Unblocked — BL-039/BL-088 landed.",
+      "design": "**Status:** complete. Landed 35dd1fb: `overlay_mode::reach` renders an on-canvas key/readout (connected-bodies list + recency tier) for the active body's own connections — `body_surface_canvas.cpp` only ever renders the active body's tile grid, so the originally-envisioned cross-body glow/marker rendering isn't reachable there; that fuller visual is a follow-up for `solar_system_canvas.cpp`. Dedicated icon glyph also deferred (reuses `icons::convoy`). Build clean; visual verification not yet run. Prior design: Unblocked: BL-039 (Supply convoys) and BL-088 (persistent `trade_route`) are both complete, so lane data exists at the body level. No distance-cost/falloff model exists anywhere in `supply_system`, so this scopes to what the data actually supports rather than inventing new physics.\n\n**Shape (settled):** standalone lens — its own `overlay_mode::reach` and strip icon — not a Supply sub-mode. Reach reads *static coverage*; BL-014's Supply lens reads *live flow*; distinct enough to earn separate slots.\n\n**Model.** For the selected corp, reach = the set of bodies connected via that corp's `trade_route` entries from a chosen origin body, tiered by `last_tick` recency — reuse the fresh/aging/stale tiering convention from the activity fog (`docs/ui/DISCOVERY.md`, BL-089) rather than inventing new thresholds. No physical falloff radius: a body is connected (with a recency tier) or it isn't — `trade_route` carries no distance/strength field to derive one from.\n\n**Rendering.** Body-to-body highlight (glow/outline on the body marker) on the relevant canvas/minimap, not a per-tile field — reach is body-level connectivity, matching `trade_route`'s granularity.\n\nOpen at promotion: reuse DISCOVERY.md's exact stale-aging tick thresholds rather than picking new ones; confirm player-only vs all-corps rendering (competitor-visibility rule — likely player's own routes only). Authority docs/ui/LENSES.md; relates to BL-014."
     },
     {
       "id": "BL-014",
       "short_name": "SUPPLY_ROUTES_LENS",
       "category": "Canvas",
       "title": "Supply-routes lens — market-connection graph",
-      "status": "design-owed",
-      "glyph": "~",
-      "priority": "F",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "B",
       "difficulty": 3,
-      "parked": true,
+      "parked": false,
       "requires": [
         "BL-039",
         "BL-037"
       ],
-      "blocked_on": [
-        "SUPPLY_CONVOYS"
-      ],
+      "blocked_on": [],
       "written": "2026-06-16",
       "files": [
         "src/ui/body_surface_canvas.cpp"
       ],
       "authority_doc": "docs/ui/LENSES.md",
-      "summary": "Graph of trade connections between markets, edge thickness/colour from net trade worth. Aggregate edges once per frame. Blocked on inter-market trades existing. Design owed.",
-      "design": "**Status:** design-owed (parked, F). No BACKLOG.md body was preserved — see this item's `summary`. Open: how to encode edge worth (thickness/colour from net trade worth) and per-frame edge aggregation. Blocked on inter-market trades existing. Authority docs/ui/LENSES.md; relates to BL-011."
+      "summary": "Graph of trade routes between bodies, edge thickness from convoy_count (volume proxy), recency-tiered colour. Aggregated from BL-088's trade_route list, not per-frame. Unblocked — BL-039/BL-088 landed.",
+      "design": "**Status:** complete. Landed 35dd1fb: `overlay_mode::supply_routes` renders an on-canvas key/readout of the active body's lanes (log-scaled thickness bar per lane + recency-tier colour) rather than cross-body edges, for the same body_surface_canvas.cpp scoping reason as BL-011; the fuller line-between-body-markers visual is a follow-up for `solar_system_canvas.cpp`. Build clean; visual verification not yet run. Prior design: Unblocked: BL-088 gives a persistent `trade_route` (`body_a`, `body_b`, `corp`, `last_tick`, `convoy_count`) per lane.\n\n**Edge worth (scoped down).** `trade_route` carries no running $-value, so 'net trade worth' as originally framed isn't available without a new ledger. Settled: use `convoy_count` (cumulative completions) as the volume proxy for edge thickness, log-scaled so a few heavy lanes don't swamp the rest. Edge colour/alpha = recency tier from `last_tick`, sharing the fresh/aging/stale convention with BL-011 and the activity fog (DISCOVERY.md, BL-089).\n\n**Aggregation (settled):** one edge per unordered (`body_a`, `body_b`) pair, built from the `trade_routes` list at render time — not per-frame convoy positions. Cheap and matches the lens's 'graph', not 'live traffic', framing.\n\n**Rendering.** Line between body markers on the relevant canvas, thickness from log-scaled `convoy_count`, colour/alpha from recency tier.\n\nOpen at promotion: the log-scale constant (tune by eye); player-only vs all-corps lane rendering (competitor-visibility rule — likely player's own routes only, consistent with the activity fog). Authority docs/ui/LENSES.md; relates to BL-011."
     },
     {
       "id": "BL-015",
@@ -165,11 +161,11 @@
       "short_name": "LENS_COLOUR_SCHEME_PASS",
       "category": "Canvas",
       "title": "Lens colour-scheme pass (deferred to a colour session)",
-      "status": "design-owed",
-      "glyph": "~",
-      "priority": "F",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "B",
       "difficulty": 3,
-      "parked": true,
+      "parked": false,
       "requires": [],
       "blocked_on": [],
       "written": "2026-06-16",
@@ -177,8 +173,8 @@
         "src/ui/presentation.hpp"
       ],
       "authority_doc": "docs/ui/LENSES.md",
-      "summary": "Board-wide lens colour reconsideration, reframed by the 2026-06-24 accessibility review as the colour-vision half of accessibility: a colourblind-safe palette PLUS a redundant non-colour channel (pattern/glyph/dash) so no lens relies on hue alone — the Resource lens's red-on-green deposit pips and the Country lens's green/yellow/red fills are the worst cases. Plus on-canvas labels and a Corporation-lens legend. Design owed: the whole pass. (Strip prerequisite BL-013 has since landed — no longer blocked.)",
-      "design": "**Problem.** Board-wide, lens colours need reconsideration — some too harsh, some too soft. The 2026-06-24 accessibility review sharpened this: every lens currently carries its meaning in **hue alone**, and the worst pairings are colour-vision hazards — the **Country lens** fills territories green/yellow/red (the deutan/protan confusion set), the **Resource lens** puts **red 'deposit present' pips on green terrain** (the canonical red-on-green trap), and the **Corporation lens** distinguishes player vs rival by colour only. ~8% of men cannot read these reliably.\n\n**Proposal (to design).** Two coupled passes:\n\n1. **Colourblind-safe palette** — re-pick lens colours from a deuteranopia/protanopia-safe set (Okabe-Ito, or a Viridis-style ordered ramp for the quantitative lenses), not just 'harsh vs soft' aesthetics.\n2. **Redundant second channel** — never rely on hue alone: hatch/pattern fills for territory ownership, glyph *shape* for deposit presence, dashed-vs-solid for player vs rival routes. Carries the original scope too: **on-canvas text labels** (country/market) and a **Corporation-lens legend**.\n\n**Open questions (design owed):** the chosen palette and its mapping to each `overlay_mode`; which lenses get a pattern channel vs a glyph channel; the legend surface; label placement/clutter rules. Identity colours in `src/ui/presentation.hpp`; passes in `src/ui/body_surface_canvas.cpp`; strip in `src/ui/overlay.cpp`; glyph work propagates to `docs/ui/ICONS.md`. The **colour-vision half** of the accessibility strand — companion to BL-063 (legibility/contrast) and BL-062 (motor). The strip prerequisite (BL-013) has since landed (commit 44b0228), so this is no longer blocked on it. *(Written 2026-06-16, v0.0.6 brief intake; accessibility reframing 2026-06-24.)*"
+      "summary": "Colourblind-safe palette pass across all lenses (Okabe-Ito categorical / Viridis-style ordered ramp for quantitative), plus on-canvas labels and a Corporation-lens legend. Scoped down from the original two-pass proposal — no added pattern/glyph redundancy channel (Ben's call).",
+      "design": "**Status:** complete. Landed 287d8e0: Okabe-Ito hues for `corp_table`/`nation_table`, retinted `resource_table` entries (Iron Ore/Copper Ore vs Agricultural Produce/Timber) to break the ore/crop hue collision, new `palette::text_secondary` AA-safe token added. On-canvas country/market labels + Corporation-lens legend NOT done (out of file scope for this pass — `body_surface_canvas.cpp`/`overlay.cpp` follow-up needed). Author agent could not run a local compile; verified clean in the full integrating build. Visual goldens need re-blessing (lens hues changed). Prior design: scoped down from the original two-pass proposal to **palette only**; no added pattern/glyph redundancy channel (Ben's call — accept that gap rather than build a second signalling channel into every lens).\n\n**Problem (unchanged).** Every lens currently carries meaning in hue alone; the worst hazards are the Country lens's green/yellow/red territory fill (the deutan/protan confusion set), the Resource lens's red-on-green deposit pips, and the Corporation lens's player/rival hue-only split.\n\n**Fix (settled):** re-pick lens hues from a colourblind-safe set — Okabe-Ito for categorical lenses (Country, Corporation), a Viridis-style ordered ramp for quantitative lenses (Resource, Scarcity, Population, Production, Industry). Carries the original scope: on-canvas text labels (country/market) and a Corporation-lens legend, which were never part of the dropped pattern-channel half.\n\nOpen at promotion: exact hue assignments per `overlay_mode` in `src/ui/presentation.hpp`; label placement/clutter rules (`src/ui/body_surface_canvas.cpp`); legend surface (strip in `src/ui/overlay.cpp`). Glyph-adjacent changes propagate to `docs/ui/ICONS.md`. The strip prerequisite (BL-013) landed (commit 44b0228). Companion to BL-063 (contrast/scale) and BL-062 (motor) — together the accessibility strand. *(Written 2026-06-16; accessibility reframing 2026-06-24; scoped down 2026-07-08.)*"
     },
     {
       "id": "BL-020",
@@ -563,8 +559,8 @@
       "short_name": "COUNTRY_GENERATION",
       "category": "Environment",
       "title": "Country generation — more countries, generated 'in history'",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "complete",
+      "glyph": "✓",
       "priority": "B",
       "difficulty": 4,
       "parked": false,
@@ -574,11 +570,17 @@
       "blocked_on": [],
       "written": "2026-06-16",
       "files": [
-        "src/world/nation_generation.cpp"
+        "src/world/nation_generation.cpp",
+        "src/world/nation_generation.hpp",
+        "src/world/hard_coded_world.cpp",
+        "src/world/hard_coded_world.hpp",
+        "src/core/app.cpp",
+        "tools/verify/world_audit.cpp",
+        "tools/verify/world_determinism.cpp"
       ],
       "authority_doc": "docs/generation/NATION_GENERATION.md",
-      "summary": "More countries than today's Voronoi partition, with a sense of history: v0.1.0 target is clustering seeds with a varied size distribution (some larger, some smaller). Couples to SATURATED_SUBSTRATE. Design owed: clustered-seed sizing, what 'in history' means, count target.",
-      "design": "**Status:** design-owed (B). No BACKLOG.md body was preserved — see this item's `summary`. v0.1.0 target: more countries via clustered seeds with a varied size distribution. Open: clustered-seed sizing, what 'in history' means, the count target. Couples to the saturated substrate (BL-050). Authority docs/generation/NATION_GENERATION.md.",
+      "summary": "More countries than today's Voronoi partition, with a sense of history: over-seed + light merge (Pass 1b growth weights, Pass 2c 'in history' merges) gives a strongly varied, irregular-bordered political layer. Landed fc7c62b (18 seeds -> 14 nations); retuned 2026-07-08 to 34 seeds -> 24 nations for a richer map. No history/event-log mechanic — the variance itself reads as implied age.",
+      "design": "**Status:** complete. Landed in fc7c62b (Pass 1b skewed growth weights + Pass 2c deterministic smallest-into-largest-neighbour merge, `merge_to` nation_param). Retuned 2026-07-08: default `nation_count` 14 -> 24, pre-seed gap `merge_to+4` -> `merge_to+10` (34 seeds merged to 24), New World setup slider widened 6-20 -> 6-30. world_audit BL-053 R1 (count in [20,28]) + R2 (max >= 3x min) both PASS; world_determinism default-descriptor check updated to 24 nations, still PASS. Authority docs/generation/NATION_GENERATION.md.",
       "waits_on": [
         "SATURATED_SUBSTRATE"
       ]
@@ -601,7 +603,7 @@
       ],
       "authority_doc": "docs/generation/NATION_GENERATION.md",
       "summary": "The nation SYSTEM (tax, licences, war, infrastructure), sentiment graph, historical fragmentation (exclaves/disputed zones), non-Kepler jurisdiction. Out of prototype scope; design owed when in scope.",
-      "design": "**Status:** design-owed (parked, F) — out of prototype scope. No BACKLOG.md body was preserved — see this item's `summary`. Covers the nation SYSTEM (tax, licences, war, infrastructure), the sentiment graph, historical fragmentation (exclaves/disputed zones), non-Kepler jurisdiction. Design owed when in scope. Authority docs/generation/NATION_GENERATION.md."
+      "design": "**Status:** designed — shape only (2026-07-08); still parked/out-of-scope, not promote-ready. Settling the structure now (per BL-087's model) so it's ready to pick up once nations move from generation-only to a system.\n\n**Shape.** Four coupled parts, all deterministic and tick-driven like the rest of `world/*`:\n\n1. **Nation SYSTEM.** A nation gets simple per-tick economic state — tax rate (levied on corp production/trade within its territory), a licence gate (a corp needs a licence to build/operate in a nation, cost scales with nation character), and a coarse infrastructure scalar (modulates production/logistics efficiency, generated once, degrading/improving slowly). War is a state flag between nation pairs affecting licence issuance and infrastructure decay, not a combat system — actual Conflict mechanics live elsewhere.\n2. **Sentiment graph.** A small per-nation-pair scalar (-1..1) seeded at generation from shared borders/resource competition, drifting slowly from corp activity (heavy extraction in a nation nudges its sentiment toward the extracting corp's home nation). Read-only input to licence cost/availability; no diplomacy UI for the prototype's follow-on scope.\n3. **Historical fragmentation.** Exclaves and disputed zones are a **generation-time** decoration on top of BL-053's Voronoi/merge output — after merge, some tiles are deliberately left owned by a non-contiguous or disputed neighbour rather than reassigned, for flavour and to justify uneven licence friction. Not a simulated historical event log.\n4. **Non-Kepler jurisdiction.** Off-Earth bodies (once Era 1 opens them) start with no nation ownership — jurisdiction there is corp-claim-based, not nation-based; this item only needs to state that boundary, not design the space-claim system (that's Era 1 scope, BL-087-adjacent).\n\n**Explicitly out of shape (defer further):** exact tax/licence formulas, sentiment decay/drift constants, war trigger conditions, the space-claim model. Those are sub-decisions for when this item is actually promoted, not now.\n\nAuthority docs/generation/NATION_GENERATION.md. Companion to BL-053 (which this builds on) and BL-087 (Era 1, for the non-Kepler boundary)."
     },
     {
       "id": "BL-055",
@@ -787,8 +789,8 @@
       "short_name": "ACCESSIBILITY_LEGIBILITY_BASELINE",
       "category": "Menu",
       "title": "Accessibility & legibility baseline — UI scale + secondary-text contrast",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "complete",
+      "glyph": "✓",
       "priority": "B",
       "difficulty": 3,
       "parked": false,
@@ -802,7 +804,7 @@
       ],
       "authority_doc": "docs/ui/ACCESSIBILITY.md",
       "summary": "Legibility baseline from the 2026-06-24 accessibility UX review: a global UI-scale control (ImGui FontGlobalScale / font re-load) and a secondary-text contrast pass to clear WCAG AA on dim header/label/ledger text. The non-colour half of accessibility — colour-vision stays in BL-016, motor/keyboard in BL-062. Design owed: scale storage/persistence, the FontGlobalScale-vs-refont tradeoff, a measured contrast token audit, whether a docs/ui/ACCESSIBILITY.md is warranted. [NOTE 2026-06-30: this is the WCAG-contrast + UI-scale item; distinct from the shipped tester-legibility trend plots now tracked as BL-066. The 'BL-063' label on the trend-plots commits predates this slot's reassignment.]",
-      "design": "**Problem.** A UX/accessibility review (2026-06-24) of the blessed golden captures surfaced two legibility barriers no existing item covers:\n\n1. **Low secondary-text contrast.** Label/secondary text is dim grey on near-black — the header fields (`Parent`, `Standing`, `NET ±0/qtr`), the EXPLORER placeholder, and ledger sub-labels sit below the WCAG AA 4.5:1 body-text ratio.\n2. **Single fixed UI scale.** Everything renders at one scale. The dense monospace ledgers (balance, corp dashboard, building management) are already small at 1280×720 and become punishing on high-DPI displays; there is no user control to enlarge.\n\nBoth hurt low-vision players, ageing eyes, and high-glare settings.\n\n**Proposal (to design).** A deliberately *narrow* legibility baseline — the non-colour half of accessibility (colour-vision lives in BL-016, motor/keyboard in BL-062):\n\n- **Global UI scale.** A user-adjustable scale through ImGui — either `FontGlobalScale` (cheap, slightly blurry) or re-loading the font atlas at a chosen px in `src/ui/fonts.cpp` (`load_ui_font`, crisp, heavier) — persisted in settings. Likely a discrete step set (e.g. 1.0 / 1.25 / 1.5) so layouts are tested at known sizes rather than a free slider.\n- **Secondary-text contrast pass.** Lift the dim secondary/label tokens to clear AA. Identity colours live in `src/ui/presentation.hpp`; the base theme is `StyleColorsDark()` at `src/core/app.cpp:129`.\n\n**Open questions (design owed):** where the scale setting lives (settings.json vs an in-engine options surface) and how it persists; `FontGlobalScale` vs font-atlas re-load; discrete steps vs continuous; which exact tokens are below AA and their replacement values (needs a measured contrast audit of `presentation.hpp` + the dark theme); whether this warrants a dedicated `docs/ui/ACCESSIBILITY.md` authority doc (proposed) or folds into `LAYOUT.md`. Companion to BL-016 (colour-vision) and BL-062 (motor/keyboard) — together the three are the prototype's **accessibility strand**. *(Written 2026-06-24, accessibility UX review.)*"
+      "design": "**Status:** complete. Landed 287d8e0: discrete 1.0/1.25/1.5x UI-scale via `ui::reload_ui_font`/`app::apply_ui_scale`, persisted in `options.cfg`, wired into the F10 Options window; `palette::text_secondary` AA-safe token added for the contrast half. Wiring `text_secondary` into the ~90 existing `TextDisabled` call sites across the shell is a separate follow-up sweep, not done here. `docs/ui/ACCESSIBILITY.md` not yet authored. Full build clean, 1.0/1.25/1.5x steps confirmed reload the font atlas and persist across restart. Prior design: A deliberately narrow legibility baseline — the non-colour half of accessibility (colour-vision lives in BL-016, motor/keyboard in BL-062).\n\n**Problem (unchanged).** Dim secondary/label text (`Parent`, `Standing`, `NET ±0/qtr`, EXPLORER placeholder, ledger sub-labels) sits below WCAG AA 4.5:1; and everything renders at one fixed scale, punishing on high-DPI displays with no user control.\n\n**Settled (Ben's call): user-facing scale setting**, discrete steps (1.0 / 1.25 / 1.5) rather than a free slider, so layouts are only ever tested at known sizes. Implement via font-atlas re-load at each step's px size in `src/ui/fonts.cpp` (`load_ui_font`) rather than `FontGlobalScale` — crisper, and the discrete-step design already amortises the reload cost (no per-frame rescaling). Persist the chosen step the same way other display prefs persist (`options.cfg`, alongside window size).\n\n**Contrast pass:** lift dim secondary/label tokens in `src/ui/presentation.hpp` (over the `StyleColorsDark()` base, `src/core/app.cpp:129`) to clear AA 4.5:1 — needs a measured audit of current token values against the dark background, not guessed replacements.\n\n**Settled:** fold into a new `docs/ui/ACCESSIBILITY.md` (the authority_doc slot already anticipates it) rather than splitting across `LAYOUT.md`/`LENSES.md` — the accessibility strand (this + BL-016 + BL-062) is coherent enough to own one doc. Doc gets created when this item lands (authority time-slicing — not created now).\n\nOpen at promotion: exact AA-failing token list + replacement values (audit pass); the three scale-step font sizes. Companion to BL-016 (colour-vision) and BL-062 (motor/keyboard). *(Written 2026-06-24, accessibility UX review; settled 2026-07-08.)*"
     },
     {
       "id": "BL-064",
@@ -1347,11 +1349,11 @@
       "id": "BL-077",
       "short_name": "PLANETARY_LOGISTICS_NETWORK",
       "category": "Infrastructure",
-      "title": "Planetary logistics network — terrain-weighted routing, roads & hubs",
-      "status": "designed",
+      "title": "Planetary logistics: economic core — terrain-weighted A* distance + intra-body dispatch + data model",
+      "status": "complete",
       "glyph": "✓",
       "priority": "B",
-      "difficulty": 5,
+      "difficulty": 4,
       "parked": false,
       "requires": [
         "BL-039"
@@ -1359,16 +1361,18 @@
       "blocked_on": [],
       "written": "2026-07-01",
       "files": [
+        "src/world/supply_system.hpp",
         "src/world/supply_system.cpp",
-        "src/world/tile_generation.cpp",
         "src/world/components.hpp",
+        "src/world/world.hpp",
+        "src/world/world.cpp",
+        "src/world/tile_generation.cpp",
         "src/world/placement_rules.hpp",
-        "src/ui/body_surface_canvas.cpp",
         "scripts/economy.lua"
       ],
       "authority_doc": "docs/economy/SUPPLY.md",
-      "summary": "Intra-body logistics refinement of the built convoy system: distance = terrain-weighted A* on the tile grid (landform-weighted, cylinder-wrapped); roads generated as a realistic pre-existing nation network + player-placeable, rendered from campaign start, lowering A* traversal cost; cities act as free logistics hubs (agglomeration discount); new Inland Logistics Hub building consolidates land convoys. Pipeline & tiered-port throughput dropped this milestone. Planetary-scoped.",
-      "design": "Follow-on refinement of the completed Layer 5 convoy system (BL-039 / BL-045). Scoped **intra-body (planetary)** for this milestone; the space / inter-body side keeps the settled Euclidean-between-body-centres rule and is out of focus. Decisions settled 2026-07-01 via design Q&A.\n\n**1. Distance = terrain-weighted A\\*.** Intra-body land/sea/air `distance` becomes the shortest path over the tile grid, each tile weighted by its landform build-cost modifier (plains ×1 → mountain ×2, TILES.md), respecting the east–west cylinder wrap (PLANETARY.md). Replaces the current \"route length across the tile grid\" placeholder in SUPPLY.md § Logistical cost. Roads (below) lower a tile's traversal weight, so A\\* prefers roaded corridors.\n\n**2. Roads — generated network + player-placeable.** The world **ships pre-roaded**: a new deterministic generation pass lays a realistic road network over existing nation territory (runs after nation + population generation — it needs cities to connect). The player **extends** it with placeable road/rail occupying `land_use = infrastructure`. A road lowers the A\\* traversal cost of the tiles it crosses. Roads **render from campaign start** (the world generates with a visible network), which retires the old \"invisible tile-attribute\" concern. Supersedes BL-045's \"road = optional, deferred tile-attribute cost-reducer\".\n\n**Road-generation pass (algorithm, settled 2026-07-01).** Deterministic from the campaign seed; runs after nation + population generation. Per nation:\n1. **Nodes** = the nation's population centres.\n2. **Weighted graph** = terrain-weighted A\\* path cost between each centre-pair (one-off at generation, small node count — not per-Tick, so cost is fine).\n3. **Backbone = MST + redundancy** — take the minimum spanning tree over that graph, then add a few short extra edges (relative-neighbour rule: keep an edge unless a third centre is closer to both endpoints) to introduce realistic loops. Deterministic tie-break: sort candidate edges by (cost, lower-node-id, higher-node-id).\n4. **Hierarchy = two-tier** — edges among major centres (City / Metropolis) become **trunk** roads (higher `road_level`, larger traversal-cost cut); spurs linking smaller settlements to their nearest backbone node become **local** roads.\n5. **Rasterise** each edge as its terrain-weighted A\\* path and stamp `road_level` onto the crossed tiles; on overlap take the max. Paths respect the cylinder wrap.\n6. **Border links** — after the per-nation networks exist, add one link between the nearest city-pair across each adjacent-nation boundary, so the continent-wide lattice is connected.\n\n**3. Cities as free logistics hubs.** Population centres discount convoy cost for routes into/through them, reusing the agglomeration bonus already committed in POPULATION.md (\"better logistics, shared infrastructure\"). The city *is* infrastructure — no new building; higher tier → larger discount.\n\n**4. New building — Inland Logistics Hub.** A land-mode counterpart to the Port: a routing waypoint that consolidates convoys so a cluster ships through the hub rather than each building dispatching independently — the missing land-network piece. Occupies `land_use = infrastructure`.\n\n**Design rationale — the nation lattice.** Nations own the saturated broad economy (GENERATION_STRATEGY.md), so they come pre-roaded: cities linked by roads. Combined with cities-as-hubs, the generated world already contains a low-cost logistics lattice the player *plugs into*. Player road-building is then about reaching out from that lattice to remote extraction sites — the specialist-corporation fantasy.\n\n**Explicitly dropped / deferred this milestone:** Pipeline mode (fluids) and tiered-port throughput — both noted sensible but out of scope; keep the milestone planetary.\n\n**Open (settle at promotion):**\n- Cities-as-hub discount formula and radius, and trunk/local `road_level` cost-cut values (all tuning).\n- A\\* performance / determinism — per-convoy, per-Tick routing on a 180×84 grid likely needs route caching between fixed endpoints. The one watch-point."
+      "summary": "Economic core of the planetary-logistics epic — decomposed from the original d5 on 2026-07-08 (Ben's call: decompose + build core). Investigation found the epic is bigger than a d5 AND that intra-body convoys do not dispatch at all today (dispatch_convoys skips same-body pairs, hardcodes convoy_mode::space) with no data-model support. Core scope: data-model foundation (land_use.infrastructure, road_level on tile, a per-body grid->tile index, landform build-cost table) + terrain-weighted A* intra-body distance with a route cache + enabling intra-body land/sea dispatch (market-to-market per SUPPLY.md). Road-network generation (BL-146), road rendering + player placement (BL-147), cities-as-hubs (BL-148), and the Inland Logistics Hub building (BL-149) are the spun-off follow-ons. [COMPLETE 2026-07-08: economic core delivered. Data model (road_level, land_use.infrastructure, per-body grid index + A* route cache), terrain-weighted A* pathfinder (world/logistics.*, TILES.md cost table, column wrap, road discount, ocean sea-leg + mode selection, cached), and intra-body market-to-market dispatch (supply_system.cpp: same-body shortfalls source the corp on-body pool, A* haul representative-tile -> market centre, mode land/sea, cost reg.logistics_cost(mode)*dist*qty; space path unchanged). Ben chose the full market-to-market model. Verified logistics_harness 19/19 + CTest 20/20 (stability + determinism intact). expansion_cost untouched. Follow-ons BL-146..149. Commits a202dc8 + dispatch. Authority: SUPPLY.md.]",
+      "design": "**Economic core of the planetary-logistics epic** — the foundation the road / hub / cities follow-ons (BL-146..BL-149) build on. Decomposed from the original d5 on 2026-07-08 (Ben) after investigation found (a) the epic is far bigger than a d5, and (b) intra-body convoys do NOT dispatch at all today — `dispatch_convoys` skips same-body pairs (`if (src_body == dest_body) continue;`), hardcodes `convoy_mode::space`, and land-mode is `// deferred`; and there is no data-model support. So the original 'A* replaces the placeholder distance' framing was against a system that was never built. Distance-model settled 2026-07-01; decomposition 2026-07-08.\n\n**In scope (build now):**\n\n1. **Data-model foundation** — add the fields the whole epic needs, positioned once so the flat-binary layout settles: the `infrastructure` value on `land_use_component::type`; a `road_level` attribute on `tile_component` (default 0; populated by BL-146); a per-body **grid->tile-entity index** so A* neighbour lookups are O(1) rather than the current linear scan of the `tiles` unordered_map; and the **landform build-cost table** from TILES.md (plains 1.0 ... mountain 2.0) encoded in code (today it is prose only — and `nation_generation.cpp` has a *different* private `expansion_cost` table; author a canonical shared one).\n\n2. **Terrain-weighted A\\* distance** — intra-body land/sea `distance` becomes the shortest path over the tile grid, each tile weighted by its landform cost and discounted by `road_level`, respecting the east-west cylinder wrap (PLANETARY.md). Reuse `nation_generation.cpp`'s `expand_territory` shape (priority_queue Dijkstra over the grid, `raster_idx`/`cardinal_neighbours` column-wrap). Replaces the 'route length across the tile grid' placeholder named in SUPPLY.md § Logistical cost (prose only — never built). **Route cache** keyed by (body, src_tile, dst_tile): per-Tick per-lane A* over a ~15,120-tile (180x84) hex grid is a perf cliff, so cache path cost and invalidate on road_level change. This caching is the design's flagged watch-point.\n\n3. **Intra-body dispatch** — enable same-body market pairs in `dispatch_convoys`, per SUPPLY.md's **market-to-market** coupling: a dest-market shortfall on body X may be filled from a same-body source, mode **land** (default) or **sea** (path crosses ocean), cost = `logistics_cost_{land,sea} × A*-distance × qty` between the two markets' tiles (market centre_tile). Reconcile with the body-level `corp_body_pools` model during implementation (source selection stays deterministic).\n\n**Out of scope (spun-off follow-ons):** road-network generation + road_level population + A* cost wiring (**BL-146**); road rendering + player-placeable roads (**BL-147**); cities as free logistics hubs / agglomeration discount (**BL-148**); Inland Logistics Hub building (**BL-149**). Pipeline mode (fluids) and tiered-port throughput stay dropped (out of the epic's prototype scope).\n\n**Verification:** headless — extend the supply harness (or a new one) for A* distance correctness (weighted path < naive, road discount, wrap), route-cache determinism, and intra-body dispatch (same-body land/sea convoy created with A* cost). Determinism guard: `road_level` + any new world state added to determinism_harness. **Authority:** docs/economy/SUPPLY.md (§ Logistical cost) on landing."
     },
     {
       "id": "BL-088",
@@ -1603,8 +1607,8 @@
       "short_name": "VIEW_BOUNDING_AUDIT",
       "category": "UI",
       "title": "Bound every shell view/panel like the Selection element — resolution-robust, content-sized",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "complete",
+      "glyph": "✓",
       "priority": "B",
       "difficulty": 3,
       "parked": false,
@@ -1620,7 +1624,7 @@
       ],
       "authority_doc": "docs/ui/LAYOUT.md",
       "summary": "Idea (2026-07-04, Ben): treat every view/panel the way BL-093 fixed the Selection element — properly bounded and resolution-robust. BL-093 found the Selection panel ballooned/clipped because its height was pinned to the resolution-scaled minimap height (mm_h); the fix sized it from content in text-line units. Audit the rest of the shell chrome (header, profile, nav rail, time panel, explorer, minimap, ledger windows, on-canvas keys/strips) for the same class of bug — anything pinned to a resolution-scaled dimension or another element's size, or that can clip/overflow off the verify-capture resolution (1280x720) vs the runtime window — and bound each from content + fixed shell anchors. Standing practice already recorded in DEVELOPMENT_PRACTICES § Display environment; this is the sweep that applies it everywhere.",
-      "design": "**Status:** design-owed — captured 2026-07-04 (Ben). Generalises the BL-093 fix.\n\n### The problem class\nBL-093 (Selection element) balllooned with empty space / clipped because its height was pinned to `mm_h` (`mm_w = max(240, 0.20·min(disp.x,disp.y))`), a **resolution-scaled** value. The fix: size from content in **text-line units** + anchor to a shell edge. The same anti-pattern likely recurs across the shell — any panel whose extent derives from another element's resolution-scaled size, or that assumes the 1280x720 verify-capture resolution and can clip/overflow at the real runtime window (Ben runs 1920x1080; the window is resizable — see the `display-environment` memory + DEVELOPMENT_PRACTICES § Display environment).\n\n### Scope (audit + fix pass)\nWalk each shell region (LAYOUT.md is the map) and check bounding at several resolutions / window sizes: **header** (top strip), **profile** (top-left), **nav rail**, **time panel** (top-right, sized off `mm_w`), **explorer**, **minimap** (+ its new lens bar), the **ledger windows** (shared `ledger_chrome` constants), and the **on-canvas lens keys / control strips**. For each: does it clip, overflow the screen, overlap a neighbour, or leave dead space when the window is small or large? Fix by sizing from content (`GetTextLineHeightWithSpacing()` / measured content) and anchoring to fixed shell edges, never to another element's resolution-scaled extent.\n\n### Method\nDrive the app at a few window sizes (e.g. 1280x720, 1920x1080, a small 1000x600) — the startup `Display:` log reports the runtime size — and capture each region. A `scripts/verify/*.lua` multi-resolution sweep would make this a repeatable check (candidate tool → skill). Proportional, Light-per-panel where a panel is already fine.\n\n### Relationships\nGeneralises **BL-093**. Authority `docs/ui/LAYOUT.md` (+ each panel's own doc). Standing rule already in DEVELOPMENT_PRACTICES § Display environment — this item is the application sweep, not a new rule."
+      "design": "**Status:** complete. Landed 47da542 (fix) after the read-only audit found two real bugs: time-panel height (`app.cpp`, was `mm_h*0.5f`, now sized from content in text-line units) and the Tile Ledger's stale spawn anchor (`ledger_chrome.hpp`, was seeded from the superseded `profile_panel_width=200`, now `ledger_window_spawn(disp_x)`/`ledger_window_size(disp_x,disp_y)` functions anchored off `shell_column_width` + clamped to viewport). Header/profile/nav-rail/minimap/explorer/economy-panel/lens-key audited and confirmed already correct (no fix needed). Full build clean; a `scripts/verify/*.lua` multi-resolution sweep script was not authored (candidate follow-up tool). Captured 2026-07-04 (Ben). Generalises the BL-093 fix.\n\n### The problem class\nBL-093 (Selection element) balllooned with empty space / clipped because its height was pinned to `mm_h` (`mm_w = max(240, 0.20·min(disp.x,disp.y))`), a **resolution-scaled** value. The fix: size from content in **text-line units** + anchor to a shell edge. The same anti-pattern likely recurs across the shell — any panel whose extent derives from another element's resolution-scaled size, or that assumes the 1280x720 verify-capture resolution and can clip/overflow at the real runtime window (Ben runs 1920x1080; the window is resizable — see the `display-environment` memory + DEVELOPMENT_PRACTICES § Display environment).\n\n### Scope (audit + fix pass)\nWalk each shell region (LAYOUT.md is the map) and check bounding at several resolutions / window sizes: **header** (top strip), **profile** (top-left), **nav rail**, **time panel** (top-right, sized off `mm_w`), **explorer**, **minimap** (+ its new lens bar), the **ledger windows** (shared `ledger_chrome` constants), and the **on-canvas lens keys / control strips**. For each: does it clip, overflow the screen, overlap a neighbour, or leave dead space when the window is small or large? Fix by sizing from content (`GetTextLineHeightWithSpacing()` / measured content) and anchoring to fixed shell edges, never to another element's resolution-scaled extent.\n\n### Method\nDrive the app at a few window sizes (e.g. 1280x720, 1920x1080, a small 1000x600) — the startup `Display:` log reports the runtime size — and capture each region. A `scripts/verify/*.lua` multi-resolution sweep would make this a repeatable check (candidate tool → skill). Proportional, Light-per-panel where a panel is already fine.\n\n### Relationships\nGeneralises **BL-093**. Authority `docs/ui/LAYOUT.md` (+ each panel's own doc). Standing rule already in DEVELOPMENT_PRACTICES § Display environment — this item is the application sweep, not a new rule."
     },
     {
       "id": "BL-098",
@@ -1645,7 +1649,7 @@
       "short_name": "PROXIMITY_GLIMPSE_PEEK",
       "category": "Discovery",
       "title": "Commercial-fog proximity-glimpse peek — routing past a frontier body reveals it (deterministic)",
-      "status": "designed",
+      "status": "complete",
       "glyph": "✓",
       "priority": "B",
       "difficulty": 2,
@@ -1658,10 +1662,12 @@
       "files": [
         "src/world/world.cpp",
         "src/world/world.hpp",
-        "src/ui/solar_system_canvas.cpp"
+        "src/world/supply_system.cpp",
+        "tools/verify/commercial_fog_harness.cpp",
+        "scripts/verify/proximity_glimpse.lua"
       ],
       "authority_doc": "docs/ui/DISCOVERY.md",
-      "summary": "Deferred at BL-089's landing (recorded in its resolution): the deterministic proximity-glimpse 'peek'. When a player convoy completes a lane, sample body positions at that completion tick and mark any body within radius R of the lane segment as known_stale — a faint, decaying glimpse. Makes 'route past a frontier body to reveal it' discrete and deterministic (one sample at a discrete tick; positions are a pure function of tick — no per-frame test, no flicker, no RNG). R + freshness are headless-tuned calibration constants. BL-089 shipped the core fog (endpoint badge + corridor + Selection activity section) but this third illumination geometry was cut to land the item; captured here as its own promote-ready item. (Renumbered from BL-095 on merge to main 2026-07-05 — a cross-branch collision with main's BL-095 market-stockpile item.) DEFERRAL DECISION (v0.0.9 batch, 2026-07-05): assessed and HELD BACK. A faithful implementation needs either a serialised last_glimpse_tick on body_component (a save-seam change) or orbital back-computation from the mutated orbital_angle_rad — body position is NOT a pure function of tick today, contrary to the mechanic's premise, so 'sample body positions at the completion tick' cannot be reconstructed at a later render without stored state. Disproportionate determinism/serialisation risk for a polish minor; re-assess at the v0.1.0 boundary. Stays designed/promote-ready.",
+      "summary": "Deferred at BL-089's landing (recorded in its resolution): the deterministic proximity-glimpse 'peek'. When a player convoy completes a lane, sample body positions at that completion tick and mark any body within radius R of the lane segment as known_stale — a faint, decaying glimpse. Makes 'route past a frontier body to reveal it' discrete and deterministic (one sample at a discrete tick; positions are a pure function of tick — no per-frame test, no flicker, no RNG). R + freshness are headless-tuned calibration constants. BL-089 shipped the core fog (endpoint badge + corridor + Selection activity section) but this third illumination geometry was cut to land the item; captured here as its own promote-ready item. (Renumbered from BL-095 on merge to main 2026-07-05 — a cross-branch collision with main's BL-095 market-stockpile item.) DEFERRAL DECISION (v0.0.9 batch, 2026-07-05): assessed and HELD BACK. A faithful implementation needs either a serialised last_glimpse_tick on body_component (a save-seam change) or orbital back-computation from the mutated orbital_angle_rad — body position is NOT a pure function of tick today, contrary to the mechanic's premise, so 'sample body positions at the completion tick' cannot be reconstructed at a later render without stored state. Disproportionate determinism/serialisation risk for a polish minor; re-assess at the v0.1.0 boundary. Stays designed/promote-ready. [COMPLETE 2026-07-08 (BL-099 delivery): shipped via SAMPLE-AND-STORE, which dissolves the deferral objection. Positions ARE mutated (orbital_angle_rad, not pure in tick) as the deferral said -- so instead of reconstructing a past position, record_proximity_glimpses samples the closest-approach set ONCE at the discrete completion tick (credit_arrived_convoys, after orbits advanced for that frame, so live positions ARE the completion-tick positions) and stores the glimpse tick in world.body_last_glimpse_tick (off body_component, keeping the flat-binary layout untouched). body_activity_visibility returns known_stale for a glimpsed-but-unrouted body within glimpse_fresh_ticks_default (90), never known/visible; a body's own route outranks a glimpse; R=glimpse_radius_au_default (0.25 AU). The sample lives in supply_system.cpp (the actual completion hook -- the original files list omitted it); the renderer was NOT touched (the known_stale badge path is BL-089's, already blessed -- BL-099 only widens which bodies reach that tier). Verified: commercial_fog_harness 19/19 (10 new assertions -- geometry, tier, endpoint-exclusion, decay, route-precedence, determinism) + full CTest 19/19 (determinism intact); on-canvas by-eye via scripts/verify/proximity_glimpse.lua before/after. Authority propagated to DISCOVERY.md. Golden bless owed on the Linux box.]",
       "design": "**Status:** designed — the design is settled inside BL-089's own note (§ 'Proximity glow (the peek)'); this item lifts that deferred slice out as a standalone, promote-ready unit. Requires BL-089 (shipped v0.0.8, commit af07ad0).\n\n### What it adds (over the shipped fog)\nBL-089 lit **endpoints** (bodies your routes actually reach) and **corridors** (the lit lane between them). This adds the **third illumination geometry**: a body you merely *pass near* on a completed lane gets a faint, decaying glimpse — the 'route past a frontier to reveal it' mechanic that makes commercial reach feel like expanding sight.\n\n### Mechanic (deterministic — exactly as speced in BL-089)\n- **Trigger:** when a player convoy **completes** a lane (a discrete tick), not per-frame.\n- **Sample:** at that completion tick, compute body positions (a pure function of tick) and measure each body's closest approach to the endpoint→endpoint segment.\n- **Mark:** any body whose closest approach ≤ radius `R` is set to **known_stale** — it enters the fog at the faint/greyed tier, never at `known`/`visible`. A glimpse, not a data feed.\n- **Determinism:** one sample at a discrete tick, positions pure in tick ⇒ no per-frame proximity test, no orbital-drift flicker, no RNG. This is why BL-089 chose the discrete form over a live per-frame test.\n- **State:** recomputable from routes + convoys + tick; if persisted it rides a `last_glimpse_tick` int on `body_component` (joins the save seam) — otherwise recomputed each read. No Lua, no per-tile exposure.\n\n### Calibration\n`R` (peek corridor half-width) and the freshness/decay window are **calibration constants**, headless-tuned. Start from the values BL-089's corridor rendering already uses; tune so a frontier body one 'hop' off a major lane glimpses while distant bodies do not.\n\n### Files & seams\n- `world.{hpp,cpp}` — the closest-approach sample at convoy completion; the `last_glimpse_tick` field if persisted. Reconcile with the existing `body_activity_visibility` derivation — the glimpse simply feeds the `known_stale` tier it already renders.\n- `solar_system_canvas.cpp` — render the glimpsed body at the faint known_stale tier. The badge already exists from BL-089; this only widens which bodies reach it (plus, optionally, a soft mark along the corridor at the sample point).\n\n### Requirement (Full mode)\n- **`headless`** — extend `tools/verify/commercial_fog_*.cpp`: a frontier body within `R` of a completed player lane's segment returns `known_stale`; a body beyond `R` stays `unknown`; the glimpse set is a pure function of tick (same inputs → same set, no drift across recomputes).\n- **`visual`** — extend `scripts/verify/commercial_fog.lua`: after a convoy completes a lane past a frontier body, that body shows the faint proximity glimpse. Golden-blessed.\n\n### Authority\nLands into `docs/ui/DISCOVERY.md` (the activity-fog illumination geometry) — the peek completes the endpoint / corridor / proximity trio already described there."
     },
     {
@@ -2336,14 +2342,15 @@
       "short_name": "CENTRAL_DOC_PROSE_PASS",
       "category": "Development",
       "title": "Prose-analysis pass on the central documentation",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "complete",
+      "glyph": "✓",
       "priority": "SSS",
       "difficulty": 2,
       "parked": false,
       "requires": [],
       "blocked_on": [],
       "written": "2026-07-07",
+      "resolved": "2026-07-08",
       "files": [
         "CLAUDE.md",
         ".claude/rules/io-standing-rules.md",
@@ -2351,8 +2358,8 @@
         "docs/development/DELIVERY.md"
       ],
       "authority_doc": "CLAUDE.md",
-      "summary": "Idea (2026-07-07, Ben, end of the ledger-mockup session): a prose-analysis pass on the CENTRAL documentation — CLAUDE.md, .claude/rules/io-standing-rules.md, DEVELOPMENT_PRACTICES.md, DELIVERY.md. Prompted by the observation that these docs specify the discipline of development entirely in the negative (what to avoid, 'favour X over Y', 'no ceremony') and never name the reward — the craft / enjoyment of the work. The prose is Ben's to write; this item just captures the analysis + candidate framings for when he is in the mood. Not urgent (Ben: 'won't change it soon') but rated SSS: the central docs are the project's operating system, so their prose quality is strategically load-bearing.",
-      "design": "**Seed observation.** The central docs name the *constraints* of good development well but never the *satisfactions* — they say what to avoid, rarely what to reach for or savour. A prose pass could name the reward without tipping into motivational-poster register.\n\n**Candidate framings (from the 2026-07-07 discussion — Ben picks; the prose is his):**\n- *Legibility as a pleasure, not just a constraint* — 'favour legible over clever' is defensive; name the payoff instead: a good solution reads as obvious in hindsight and is a pleasure to explain.\n- *The proportionate as its own reward (Rule 0)* — a clean one-liner is a genuine pleasure; don't rob a small win of it with ceremony. Rule 0 frames Light as the cheap option; it is often the satisfying one.\n- *Flow* — the docs are all gates and barriers; nothing blesses momentum. Something like 'when the path is clear, keep moving; save the ceremony for the seam.'\n- *The click / the quietly-wrong* — name the satisfaction of finding the thing that is secretly wrong (the fix that also dissolves a latent problem; e.g. the lens-key reposition that pre-empted a future overlap).\n- *Taste as a valid input* — when something reads wrong, fixing it is work, not vanity (the '||' → square pause glyph).\n- *The loop mirrors the game* (the strongest, Io-specific one) — Project Io prizes legible, composable systems that justify themselves by feeding Trade or Conflict; describe the development process in the same words: each change feeds something, composes cleanly, reads legibly. A game about elegant systems, built by an elegant system.\n- *The word 'fun' itself* may land light in that register; heavier synonyms carry the same energy — craft, satisfaction, momentum, or (for a game) play.\n\n**Scope.** Analysis + rewording of the Tone / Rule-0 / working-method sections primarily. Doc-only, no code. Authority: the docs themselves."
+      "summary": "Idea (2026-07-07, Ben, end of the ledger-mockup session): a prose-analysis pass on the CENTRAL documentation — CLAUDE.md, .claude/rules/io-standing-rules.md, DEVELOPMENT_PRACTICES.md, DELIVERY.md. Prompted by the observation that these docs specify the discipline of development entirely in the negative (what to avoid, 'favour X over Y', 'no ceremony') and never name the reward — the craft / enjoyment of the work. The prose is Ben's to write; this item just captures the analysis + candidate framings for when he is in the mood. Not urgent (Ben: 'won't change it soon') but rated SSS: the central docs are the project's operating system, so their prose quality is strategically load-bearing. [COMPLETE 2026-07-08: Ben explicitly delegated the prose ('rewrite the docs'); 18 clause-level edits landed across the four docs — reward named around every rule, no rule text changed.]",
+      "design": "**Seed observation.** The central docs name the *constraints* of good development well but never the *satisfactions* — they say what to avoid, rarely what to reach for or savour. A prose pass could name the reward without tipping into motivational-poster register.\n\n**Candidate framings (from the 2026-07-07 discussion — Ben picks; the prose is his):**\n- *Legibility as a pleasure, not just a constraint* — 'favour legible over clever' is defensive; name the payoff instead: a good solution reads as obvious in hindsight and is a pleasure to explain.\n- *The proportionate as its own reward (Rule 0)* — a clean one-liner is a genuine pleasure; don't rob a small win of it with ceremony. Rule 0 frames Light as the cheap option; it is often the satisfying one.\n- *Flow* — the docs are all gates and barriers; nothing blesses momentum. Something like 'when the path is clear, keep moving; save the ceremony for the seam.'\n- *The click / the quietly-wrong* — name the satisfaction of finding the thing that is secretly wrong (the fix that also dissolves a latent problem; e.g. the lens-key reposition that pre-empted a future overlap).\n- *Taste as a valid input* — when something reads wrong, fixing it is work, not vanity (the '||' → square pause glyph).\n- *The loop mirrors the game* (the strongest, Io-specific one) — Project Io prizes legible, composable systems that justify themselves by feeding Trade or Conflict; describe the development process in the same words: each change feeds something, composes cleanly, reads legibly. A game about elegant systems, built by an elegant system.\n- *The word 'fun' itself* may land light in that register; heavier synonyms carry the same energy — craft, satisfaction, momentum, or (for a game) play.\n\n**Scope.** Analysis + rewording of the Tone / Rule-0 / working-method sections primarily. Doc-only, no code. Authority: the docs themselves.\n\n**Delivered 2026-07-08.** Ben's 'rewrite the docs' overrode the prose-is-Ben's reservation. Method: survey (4 per-doc + 1 voice-anchor agents) → three competing full drafts (minimal-weave / one-named-home / full-coverage) → three-lens judge panel (register skeptic / operating-system critic / craft judge) → main-session synthesis → three-skeptic adversarial verify over the applied diff. Landings: framing 6 anchored as a three-sentence passage in DELIVERY.md § The one idea with a one-sentence echo in CLAUDE.md's pipeline intro (two appearances, no more); framing 2 as the 'small win stays whole' kernel in CLAUDE.md's Light bullet, full form ('a clean one-liner is a pleasure') in DELIVERY; framing 5 one home (DELIVERY § Ad-hoc ideas, scoped to Rule 0a's two-option offer); framing 4 at the two verification seams ('the quietly-wrong'); framing 1 as the Tone-pair gradient (standing-rules terse 'the clever one is a debt', DEVELOPMENT_PRACTICES fuller 'a pleasure to explain'); framing 3 in the thesis ('the ceremony is for the work that earns it') + pausing ('resumes without archaeology'). Deliberately omitted: 'a game about elegant systems, built by an elegant system' (poster-register risk — Ben may add); the standing-rules preamble and Development-constraints intro left untouched (panel consensus: highest standing cost / factually-wrong rationale). A post-apply adversarial verify (rule-preservation / register / echo-integrity skeptics; 11 findings) drove 8 corrections — notably rescoping the taste sentence under Rule 0a (as placed in the Light bullet it licensed unscoped drive-by fixes), broadening 'the ceremony is for the seam' to 'the work that earns it' (it mis-narrowed Full's three triggers), keeping the standing rules ornament-free, and disambiguating DP's preamble addition to 'the note rides along' (the original silently upgraded 'suggest' to 'apply inline'). Accepted-as-is over verifier objection: the pleasure/kernel sentences (they ARE the item's payload), the shared 'quietly-wrong' coinage, generic 'debt' (canonical term 'explanation debt' unused)."
     },
     {
       "id": "BL-130",
@@ -2421,6 +2428,667 @@
       "authority_doc": "docs/generation/GENERATION_STRATEGY.md",
       "summary": "Filed 2026-07-07 from the economy design session. BL-096's first cut keeps population placement as-is and carves markets by nation territory. Ben's fuller ideal: population spawns near rich resources, and markets are centred on rich trade routes, with corps (not just nations) carving resource clusters. Assessed as a LARGER REWRITE (population placement + generation ordering + a trade-flow proxy), so deferred per Ben's conditional steer.",
       "design": "The fuller co-generation vision deferred from BL-096. Three coupled changes: (1) **population spawns near rich resources** — make generate_population_centres resource-aware; (2) **markets centred on rich trade-route proxies** — since live routes do not exist at gen-time, derive a static resource↔population trade-flow proxy and centre markets on it; (3) **corp-level carving** — place corps before markets (a generation reorder) so competing corporations, not just nations, carve resource clusters. Larger rewrite touching hard_coded_world / nation_generation / market seeding; determinism-sensitive. `requires` BL-096. Authority → GENERATION_STRATEGY.md on landing."
+    },
+    {
+      "id": "BL-133",
+      "short_name": "COUNTRY_LENS_LEGEND",
+      "category": "Canvas",
+      "title": "Country lens has no legend — colours with no names",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "files": [
+        "src/ui/body_surface_canvas.cpp"
+      ],
+      "authority_doc": "docs/ui/LENSES.md",
+      "summary": "Found 2026-07-08 in the lens-legibility review (Ben). The Country lens tints owned tiles with each nation's identity colour (body_surface_canvas.cpp) but is the ONE lens with no on-canvas key — every other lens has a draw_*_key. So nation colours appear with nothing mapping them to names; countries read as 'unnamed / invisible'. Add a country legend (swatch + nation name) by analogy to the market catchment key. History-ledger country names are a separate, lower-priority follow-on (Ben: not urgent).",
+      "design": "Add `draw_country_key` modelled on `draw_market_key` (BL-015): one swatch + nation name per nation present on the active body, sorted by nation id for a stable order, box auto-sized to the widest name. Colour source = `palette::nation_colour` (the same source the tile tint uses at body_surface_canvas.cpp ~831). Wire it into the lens-key dispatch in draw_body_surface_canvas (add a `overlay_mode::country` branch alongside the other draw_*_key calls ~line 1446). Secondary (lower priority — Ben: not urgent): surface the country name in the history/selection ledger too. Authority → LENSES.md (+ ICONS.md if a glyph is added) on landing. Part of the 2026-07-08 lens-legibility batch [COUNTRY_LENS_LEGEND, LENS_SELECTOR_IN_LEGEND, VALUE_LENS_TILE_MARKS, OPPORTUNITY_DEMAND_SIGNAL, PRODUCTION_LENS_RED_GREEN]."
+    },
+    {
+      "id": "BL-134",
+      "short_name": "LENS_SELECTOR_IN_LEGEND",
+      "category": "Canvas",
+      "title": "Move the lens good-selector into the legend as a scrollable dropdown",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "version_goal": "v0.0.9",
+      "files": [
+        "src/ui/overlay.cpp",
+        "src/ui/body_surface_canvas.cpp"
+      ],
+      "authority_doc": "docs/ui/LENSES.md",
+      "summary": "Found 2026-07-08 in the lens-legibility review (Ben). The Resource/Market/Scarcity 'which good' selector (draw_lens_selector, overlay.cpp:42) is a popup-button docked in the lens icon strip on the minimap bar, separate from the legend. Ben wants selection-driven lenses to carry their selector INSIDE the legend as a scrollable dropdown, not in a space near the minimap. Layout change — needs a mockup (Ben owns UI proportions).",
+      "design": "**Settled (interaction); dropdown proportions are a Ben mockup input at promotion.** The shared good-selector (draw_lens_selector, overlay.cpp) moves out of the minimap lens strip and into the lens legend, for the three selection-driven lenses (Resource, Market, Scarcity — all share `lens_resource`). Approach: convert the legend from a raw-ImDrawList paint into an interactive ImGui child so it can host a real `ImGui::BeginCombo` scrollable dropdown of the good list, sited at the legend's top; and remove draw_lens_selector's docking in the minimap strip. The interaction — a legend-hosted scrollable combo replacing the strip popup-button — is settled; only the dropdown's exact width and vertical placement within the legend remain for Ben's mockup at promotion. Authority → LENSES.md on landing. 2026-07-08 lens-legibility batch."
+    },
+    {
+      "id": "BL-135",
+      "short_name": "VALUE_LENS_TILE_MARKS",
+      "category": "Canvas",
+      "title": "Value lenses (Workforce, Opportunity) as per-tile red→green marks, not full-tile tint",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 4,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "version_goal": "v0.0.9",
+      "files": [
+        "src/ui/body_surface_canvas.cpp",
+        "src/ui/icons.cpp",
+        "src/ui/icons.hpp"
+      ],
+      "authority_doc": "docs/ui/LENSES.md",
+      "summary": "Found 2026-07-08 in the lens-legibility review (Ben). Workforce-efficiency (Population lens) and Opportunity both tint the WHOLE tile fill (body_surface_canvas.cpp ~869/~885), which Ben finds 'basically impossible to read'. Ben's fix: draw a per-tile red→green MARK on each tile (replacing the building glyph while the lens is active) instead of a full-screen tint. Shared treatment for both value lenses. Layout/glyph choice — needs a mockup.",
+      "design": "**Settled: mark scope + colour scale; mark-glyph size is a Ben mockup input.** Replace the full-tile tint of the two value lenses (Workforce via the Population lens, Opportunity) with a per-tile mark on a red→green scale (red = low value, green = high). **Scope (Ben, settled): every BUILDABLE tile** carries a mark — tiles of valid terrain for activity (skip ocean/void) — not every tile (too noisy) and not only occupied tiles (that would hide unbuilt potential). Metric per mark: Workforce = workforce_efficiency(habitability); Opportunity = the volume-weighted, body-relative unmet-demand rank from OPPORTUNITY_DEMAND_SIGNAL (BL-136). The mark **replaces the building glyph** on occupied tiles while the lens is active (suppress icons::building under these two lenses, body_surface_canvas ~1094). Mark form: a filled, centred dot coloured on the red→green ramp; its exact radius is a Ben mockup input at promotion. Re-legend the on-canvas key as a red→green ramp, and add the dot as a new glyph in `ui::icons` (ICONS.md). Couples to BL-136. Authority → LENSES.md (+ ICONS.md) on landing. 2026-07-08 lens-legibility batch."
+    },
+    {
+      "id": "BL-136",
+      "short_name": "OPPORTUNITY_DEMAND_SIGNAL",
+      "category": "Canvas",
+      "title": "Opportunity lens reads uniformly green — differentiate unmet demand + drop the qualifier",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "version_goal": "v0.0.9",
+      "files": [
+        "src/ui/body_surface_canvas.cpp",
+        "src/ui/overlay.cpp"
+      ],
+      "authority_doc": "docs/ui/LENSES.md",
+      "summary": "Found 2026-07-08 in the lens-legibility review (Ben). The Opportunity lens shows all-green — it is not differentiating actual unmet demand. Root cause: the metric is each market's biggest ABSOLUTE price/base_price ratio (body_surface_canvas.cpp ~698); in a saturated economy where every market bids above its floor, every catchment reads as opportunity, so it is uniform. Also drop the '(unmet demand)' qualifier from the lens name/legend (overlay.cpp:75, body_surface_canvas.cpp:160) — Ben: it just confuses. The label drop is trivial; the metric differentiation is the substance.",
+      "design": "Two parts, both now settled. (1) **Label (trivial):** drop the '(unmet demand)' qualifier — overlay_mode_name returns 'Opportunity' (overlay.cpp:75), the legend title becomes 'Opportunity' (body_surface_canvas ~160), and the widened (~190px) key box shrinks back to the standard width. (2) **Metric (settled — Ben):** replace the current max-absolute price/base ratio per market (which saturates green because every market in the saturated economy bids over its floor) with a **body-relative, volume-weighted rank of the unmet-demand gap**. For each catchment/market on the body: compute its demand gap, weight it by demand volume (so a large market's gap outranks a tiny market's high-ratio blip), then rank/normalize across the body's markets so the strongest gaps read green and met markets read neutral→red. Mirrors the Scarcity lens's body-relative treatment. Feeds the red→green mark of VALUE_LENS_TILE_MARKS (BL-135). Authority → LENSES.md on landing. 2026-07-08 lens-legibility batch."
+    },
+    {
+      "id": "BL-137",
+      "short_name": "PRODUCTION_LENS_RED_GREEN",
+      "category": "Canvas",
+      "title": "Production intensity lens: recolour blue↔orange to red→green",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 1,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "files": [
+        "src/ui/body_surface_canvas.cpp"
+      ],
+      "authority_doc": "docs/ui/LENSES.md",
+      "summary": "Found 2026-07-08 in the lens-legibility review (Ben). The Production lens uses diverging_colour (blue=below-mean, orange=above-mean; body_surface_canvas.cpp ~210). Ben: 'it is not clear that orange means intense' — recolour to a red→green scale so high intensity reads as green. Recolour only (Ben did not ask for per-tile marks here, unlike the value lenses). Trivial.",
+      "design": "Recolour the Production-intensity tint from the blue↔orange diverging scale to red→green (red = low/below-mean, green = high/above-mean), matching the value-lens direction. Scope: the production branch of the tile tint (body_surface_canvas.cpp ~905, currently `diverging_colour(value/mean)`) and its legend gradient in draw_production_key (~181). **Gotcha:** `diverging_colour` is SHARED with the Market price key — do NOT repurpose it; add a dedicated red→green ramp for production (or a param) so the market scale is untouched. Stays a full-tile tint (no marks — Ben only flagged the colour here). Authority → LENSES.md on landing. Part of the 2026-07-08 lens-legibility batch."
+    },
+    {
+      "id": "BL-138",
+      "short_name": "TIME_CONTROL_COMPACT_REDESIGN",
+      "category": "Canvas",
+      "title": "Compact time-control panel redesign (mockup supplied)",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "files": [
+        "src/core/app.cpp",
+        "src/ui/format.cpp",
+        "src/ui/format.hpp"
+      ],
+      "authority_doc": "docs/ui/TIME_CONTROLS.md",
+      "summary": "Filed 2026-07-08 (Ben, with a mockup). Iterates on BL-125's clock pass toward a more compact time control. Current panel (app.cpp ~1576) is a 25/75 two-column block: date rows (YYYY Qn / Mon DD / progress bar) left, 'Sim NNNN' + speed buttons right. Ben's mockup compresses it: year alone on top, 'Jan 1st (Q1)' on one line, speed row to the right, progress bar under the date, and the 'Sim NNNN' counter dropped.",
+      "design": "**Designed — mockup supplied by Ben 2026-07-08 (in the issues thread).** Compact layout replacing the current app.cpp time panel (~1576–1685):\n\n- **Year alone on top**, prominent/centred (e.g. '2000').\n- **Date line 'Jan 1st (Q1)'** on one line, left — month abbrev + ORDINAL day ('1st', not the current zero-padded '01') + quarter in parens. Needs an ordinal-day formatter in fmt (format.cpp): 1→'1st', 2→'2nd', 3→'3rd', 21→'21st', etc.\n- **Speed controls '> I II III IV V' on the right**, compact — the play/pause toggle (filled square when running, '>' when paused) + speeds I–V; the existing button logic (app.cpp ~1632, Roman numerals BL-064) is preserved.\n- **Progress bar directly BELOW the date line** — 'keep the progress bar below month date' (Ben). The quarter_progress bar sits under 'Jan 1st (Q1)'.\n- **Drop the 'Sim NNNN' tick counter and the '(paused)/(I..V)' text readout** — redundant with the highlighted speed button; the mockup omits them.\n- Overall a shorter panel than the current mm_h*0.5 block.\n\nAuthority → TIME_CONTROLS.md on landing. Predecessor: BL-125 SHELL_PROPORTION_CLOCK_PASS. Part of the 2026-07-08 UX review."
+    },
+    {
+      "id": "BL-139",
+      "short_name": "SELECTION_TILE_LEDGER_BUILDING",
+      "category": "Canvas",
+      "title": "Tile selection opens a tile-detail ledger that includes its building (one tile = one building)",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "version_goal": "v0.0.9",
+      "files": [
+        "src/ui/selection_panel.cpp"
+      ],
+      "authority_doc": "docs/ui/SELECTION.md",
+      "summary": "Filed 2026-07-08 (Ben). Selecting a tile should open a ledger/view that LEADS with tile detail (what the tile is — terrain, deposits, owner) and also surfaces the ONE building on it, with a way to navigate (double-click) into that building's own detail. Confirms the existing one-building-per-tile invariant (placement_reason::occupied already blocks a second building per tile). Currently tile and building are separate selection_kinds (selection_panel.cpp) — tile selection shows tile detail + a build front-door, building selection shows building detail — so the two are not unified as tile-primary-with-building.",
+      "design": "**Settled (interaction; layout split is a Ben mockup input).** Make the TILE the primary selection subject. Selecting a tile opens the tile ledger whose lead content answers 'what is this tile' — terrain composition/landform, deposits, territory owner, habitability. If a building occupies the tile it appears as a sub-element; double-click navigates into the building's full detail (the existing single-click-selects / double-click-navigates model, SELECTION.md).\n\n**Build front-door (Ben, settled):** the empty-tile 'place a building' affordance is NOT folded inline and is NOT a separate ledger state — instead the tile ledger carries, **near its top, a navigation affordance to a specialised build ledger**. Building is reached by navigating from the tile, keeping the tile ledger tile-primary and the build flow its own specialised surface. Couples to BL-143, which removes the Building ledger's build front-door so that building is only ever reached via a tile.\n\n**Invariant (confirmed, already enforced):** each tile carries at most ONE building (placement_reason::occupied rejects a second), so 'the building on this tile' is always 0 or 1 — which is what makes the tile-primary framing clean.\n\n**Future (noted, NOT this item):** a building may gain LEVELS or change its resource/production path over its life; the tile-ledger layout should leave room without designing it now.\n\nOpen for the mockup (proportions only): the exact split between tile detail and the building sub-element, and the visual of the 'navigate to build ledger' affordance. Relates to BL-119, BL-123, BL-124. Authority → SELECTION.md on landing. 2026-07-08 UX review."
+    },
+    {
+      "id": "BL-140",
+      "short_name": "UI_TEXT_IMAGE_CONTAINMENT",
+      "category": "Canvas",
+      "title": "Containerise every text/image — wrap or fit, never truncate in narrow views",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 4,
+      "parked": false,
+      "requires": [
+        "BL-141"
+      ],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "version_goal": "v0.0.9",
+      "files": [
+        "src/ui/header_panel.cpp",
+        "src/ui/selection_panel.cpp",
+        "src/ui/body_surface_canvas.cpp",
+        "src/core/app.cpp"
+      ],
+      "authority_doc": "docs/ui/LAYOUT.md",
+      "summary": "Filed 2026-07-08 (Ben). Text is being truncated/clipped in narrow views. Ben: every image or line of text must be containerised so it either WRAPS or is guaranteed to FIT its defined space — never silently truncated. Scope (measured 2026-07-08): ~255 ImGui text calls across 17 UI files with ZERO use of TextWrapped/PushTextWrapPos (nothing wraps today), plus 37 draw-list AddText labels across 5 canvas files (painted legends/labels that overflow their boxes — cf. the market-legend key auto-size fix). Requires the container spec (BL-141) first.",
+      "design": "**Settled — mechanical application of the BL-141 container vocabulary; requires BL-141.** Systemic pass: every on-screen text/image is placed in a BL-141 container and takes that container's text policy — **wrap** (PushTextWrapPos/TextWrapped) or **guaranteed-fit** (CalcTextSize → size, the market-legend key pattern). No silent truncation at supported widths (down to the 1280×720 verify window and the narrower fold-out columns). Images/markers clamped to container (max-fit).\n\nCurrent state (measured 2026-07-08): ~255 ImGui text calls across 17 files, none wrapping; 37 draw-list AddText across 5 canvas files. **Decomposes per-surface at promotion** — header/balance strip, time panel, on-canvas legends, selection element, ledgers, hover card, ImGui tables. Each surface takes its container's policy from BL-141, applies wrap-or-fit, and is verified at the narrow width. Broad but mechanical. Relates to BL-063. Authority → LAYOUT.md on landing. 2026-07-08 UX review."
+    },
+    {
+      "id": "BL-141",
+      "short_name": "UI_CONTAINER_VOCABULARY",
+      "category": "Canvas",
+      "title": "Define each permitted UI container (the container vocabulary)",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "version_goal": "v0.0.9",
+      "files": [
+        "docs/ui/LAYOUT.md"
+      ],
+      "authority_doc": "docs/ui/LAYOUT.md",
+      "summary": "Filed 2026-07-08 (Ben). Foundation for BL-140: before we can containerise every text/image, we must enumerate the ALLOWED containers — the fixed set of layout boxes the UI is built from (fold-out ledger column, on-canvas legend box, selection element, header/balance strip, time panel, hover card, minimap lens bar, nav rail, ImGui tables) — each with its sizing rule (fixed / stretch / fit-to-content) and its text policy (wrap vs fit). Every piece of on-screen text/image must then live inside one of these. Lands in LAYOUT.md as the container spec.",
+      "design": "**Settled — the closed container vocabulary (draft below for Ben's blessing; exact px are his at landing).** The UI is built from a fixed set of containers; every on-screen text/image must live in exactly one. Each is specified by sizing, min/max, text policy, and overflow. Two text policies only: **wrap** (PushTextWrapPos/TextWrapped) or **guaranteed-fit** (measure with CalcTextSize → size the box, the pattern the market-legend key now uses). Images/markers clamp to their container (max-fit).\n\n1. **Fold-out ledger column** (foldout_column) — fixed-width, stretch-to-height, docked to the canvas edge; text **wrap** to inner width; overflow → vertical scroll.\n2. **On-canvas lens legend box** (draw-list, body_surface_canvas) — **fit-to-content** (measure → size); text **guaranteed-fit**; no overflow (box grows to fit).\n3. **Selection element** (selection_panel) — fixed-width panel (resize pass = BL-123); text **wrap**; overflow → vertical scroll.\n4. **Header / balance strip** (header_panel) — stretch-to-width, fixed height; text **guaranteed-fit** (measured segments, never wraps to a second line); overflow → elide-with-tooltip only as a last resort, never silent truncation.\n5. **Time panel** (app.cpp) — fixed; text **guaranteed-fit** (authored to fit); no overflow.\n6. **Hover card** — fit-to-content with a max width; text **wrap** at max width; overflow → grow vertically.\n7. **Minimap lens bar** — fixed strip; icon-only / guaranteed-fit labels; no overflow.\n8. **Nav rail** — fixed; icon-only, tooltips wrap.\n9. **ImGui table** (ledgers) — stretch columns with min widths; per-cell **guaranteed-fit** (clip + tooltip) or **wrap** for description columns; overflow → horizontal scroll on the table, never silent truncation of load-bearing values.\n\nThis lands as a LAYOUT.md section (the authority) and **gates BL-140**, which applies it everywhere. Open (Ben, at landing): confirm the list is complete and set the exact min/max px per container. 2026-07-08 UX review."
+    },
+    {
+      "id": "BL-142",
+      "short_name": "BUDGET_VIEW_PLAYER_ONLY",
+      "category": "Canvas",
+      "title": "Budget view = player only, with a Policies / Budget-laws TODO skeleton",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "files": [
+        "src/ui/balance_ledger.cpp"
+      ],
+      "authority_doc": "docs/ui/ledgers/balance.md",
+      "summary": "Filed 2026-07-08 (Ben). The Balance Ledger (the budget view) currently has a Corporation combo (balance_ledger.cpp:70) that lets the player inspect ANY corporation's full budget — Treasury, Cashflow breakdown, Runway, Assets. Ben: the budget must be viewed as ONLY the player's budget. This also closes a competitor-visibility leak (BL-068: rival internals are private — a rival's per-tick cashflow should not be inspectable). Secondly, keep a non-functional TODO skeleton for future 'Policies' and 'Budget laws' — represented in-game as a placeholder, NOT implemented.",
+      "design": "**Designed** — two facets, both non-speculative. (1) **Player-only budget:** remove the corporation selector from the Balance Ledger (balance_ledger.cpp ~55–82) and pin the view to w.player_entity; drop the per-corp fallback branches (the 'any other corp' runway path ~168). Aligns with BL-068 (competitor internals private) — a rival's cashflow/treasury must not be inspectable. Open (minor): whether to also rename 'Balance Ledger' → 'Budget' (Ben's term); an optional dev-only corp inspector could hide behind a debug flag. (2) **Policies / Budget-laws skeleton (TODO only):** add two placeholder sections to the budget view — 'Policies' and 'Budget laws' — rendered as disabled TODO stubs (e.g. TextDisabled '(not implemented)'), signposting future direction WITHOUT any behaviour. This respects the standing scope rule (no out-of-scope implementation): a signpost, not a system. The real Policies/Budget-Laws feature, when designed, couples to the deferred nation/tax/sovereignty items (CORPORATION_GENERATION open items, BL-054) and would be its own item then. Authority → docs/ui/ledgers/balance.md on landing. Part of the 2026-07-08 UX review."
+    },
+    {
+      "id": "BL-143",
+      "short_name": "BUILDING_LEDGER_REDESIGN",
+      "category": "Canvas",
+      "title": "Rename Construction → 'Building' with Construction/Buildings tabs; drop the build front-door and sell orders",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 3,
+      "parked": false,
+      "requires": ["BL-159"],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "version_goal": "v0.0.9",
+      "files": [
+        "src/ui/construction_panel.cpp",
+        "src/ui/nav_pane.cpp"
+      ],
+      "authority_doc": "docs/ui/ledgers/construction.md",
+      "summary": "Filed 2026-07-08 (Ben). The construction panel (draw_construction_panel) currently has three tabs — Build (what-can-be-built front-door + queue), Manage, Sell Orders. Ben's redesign: rename the ledger 'Construction' → 'Building' with TWO tabs: (1) 'Construction' = progress of in-progress builds + an estimated cost PER QUARTER; (2) 'Buildings' = a quick list of ALL player buildings with aggregates (workforce, profit, potentially group policies). Building is ONLY via tile selection (that front-door already exists in selection_panel.cpp), so drop the panel's build front-door. Drop 'Sell Orders' — that is a market function.",
+      "design": "**Settled — including sell-order relocation (→ BL-159).** Rework draw_construction_panel (construction_panel.cpp):\n\n- **Rename** the fold-out 'Construction' → 'Building'; nav-rail tooltip likewise (nav_pane.cpp case 6).\n- **Tab 1 'Construction'** = the in-progress queue + per-build progress (draw_queue_section), PLUS an **estimated cost per quarter** (sum building_opex maintenance+wages over a quarter; building_opex already exists in budget_system).\n- **Tab 2 'Buildings'** = a quick list of ALL player buildings with **aggregates** — workforce, profit (building_profit.hpp), and a **group-policies placeholder** (TODO stub only, same treatment as BL-142's policy skeleton). Columns (proposed, tunable at promotion): building name/type · body/tile · workforce · per-quarter profit · status (active/idle); a row selects that building.\n- **Remove the 'Build' front-door** (draw_build_section) — building is only via tile selection (the specialised build ledger reached from BL-139's tile ledger).\n- **Remove the 'Sell Orders' tab** (draw_sell_orders_section). Sell orders currently live ONLY here, so removal is a functional regression unless relocated. **Settled (Ben):** relocate to the **market surface** (Market Ledger / market selection), carved out as the required companion **BL-159**, which must land with or before this removal so no function is lost (hence BL-143 requires BL-159).\n\nCouples to BL-139. Authority → docs/ui/ledgers/construction.md on landing. 2026-07-08 UX review."
+    },
+    {
+      "id": "BL-144",
+      "short_name": "TILE_LEDGER_FOLDOUT_STANDARD",
+      "category": "Canvas",
+      "title": "History/Tile ledger opens as a separate window — re-host into the fold-out column standard",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "files": [
+        "src/ui/tile_inspector.cpp"
+      ],
+      "authority_doc": "docs/ui/ledgers/tile_ledger.md",
+      "summary": "Filed 2026-07-08 (Ben). draw_tile_inspector (the 'Tile Ledger', reached via the nav rail's History slot — nav_pane case 9) still opens as a standalone floating window (ImGui::Begin('Tile Ledger', ...) with ledger_window_spawn/size), unlike every other ledger which BL-122 re-hosted into the shell fold-out column (foldout_begin/foldout_end). Ben: even though History is not implemented yet, whatever opens there must follow the standard. Re-host it into the fold-out column.",
+      "design": "**Designed** — mechanical, mirrors BL-122. In tile_inspector.cpp draw_tile_inspector: replace the standalone ImGui::Begin('Tile Ledger', p_open) + ledger_window_spawn/ledger_window_size chrome with ui::foldout_begin('Tile Ledger') / ui::foldout_end(), matching market_ledger / balance_ledger / construction_panel. Drop the SetNextWindowPos/Size spawn-anchor lines and the p_open close button (the fold-out column is closed via the nav rail, like the other ledgers). Verify it becomes one of the mutually-exclusive column occupants (ledgers + Selection). Note: the nav slot is labelled 'History' but currently hosts the Tile Ledger content — that naming, and whether History becomes its own future view, is out of scope here (see BL-139 for the tile-ledger content). Authority → docs/ui/ledgers/tile_ledger.md on landing. Part of the 2026-07-08 UX review."
+    },
+    {
+      "id": "BL-145",
+      "short_name": "CORP_FOCUS_INVISIBLE",
+      "category": "Canvas",
+      "title": "Corporation focuses should be invisible (hide industrial_focus from the UI)",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "files": [
+        "src/ui/economy_panel.cpp",
+        "src/ui/corporation_panel.cpp",
+        "src/ui/entity_summary.cpp",
+        "src/ui/profile_panel.cpp"
+      ],
+      "authority_doc": "docs/ui/DISCOVERY.md",
+      "summary": "Filed 2026-07-08 (Ben). A corporation's industrial focus (Extraction/Processing/Trade) is currently shown in at least four surfaces: economy_panel.cpp (Focus column ~89), corporation_panel.cpp (Focus column ~65/91), entity_summary.cpp (corp 'Focus:' ~399), profile_panel.cpp (corp 'Focus:' ~120). Ben: corporation focuses should be INVISIBLE. Hide the focus display across these surfaces. Aligns with competitor-info privacy (BL-068 — a rival's strategic focus is internal).",
+      "design": "**Designed** — hide the corporation industrial_focus display wherever it is shown: economy_panel.cpp (the 'Focus' table column — setup ~73 + cell ~89–92), corporation_panel.cpp (the 'Focus' column ~65/91), entity_summary.cpp (corp 'Focus: %s' ~399), profile_panel.cpp (corp 'Focus:' line ~120). Leave the industrial_focus DATA intact (generation + economy still use it); only the UI readout is removed. Open (minor): (a) whether to also hide it for the PLAYER'S own corp or only rivals — Ben said blanket 'invisible', so hide everywhere unless he wants the player's kept; (b) the NATION 'Economic focus' (entity_summary.cpp ~301) is a separate attribute, left visible unless Ben says otherwise. Authority → docs/ui/DISCOVERY.md (competitor visibility) on landing. Part of the 2026-07-08 UX review."
+    },
+    {
+      "id": "BL-146",
+      "short_name": "ROAD_NETWORK_GENERATION",
+      "category": "Infrastructure",
+      "title": "Generated road network + A* cost integration",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 4,
+      "parked": false,
+      "requires": [
+        "BL-077"
+      ],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "files": [
+        "src/world/road_generation.cpp",
+        "src/world/road_generation.hpp",
+        "src/world/hard_coded_world.cpp",
+        "src/world/components.hpp",
+        "scripts/economy.lua"
+      ],
+      "authority_doc": "docs/economy/SUPPLY.md",
+      "summary": "Follow-on from BL-077 (core), split out 2026-07-08. The world ships pre-roaded: a deterministic per-nation generation pass lays a realistic road lattice over nation territory (stamping road_level onto tiles), and road_level lowers A* traversal cost so routing prefers roads. The nation lattice + cities-as-hubs (BL-148) give the player a low-cost network to plug into; player road-building (BL-147) then reaches out to remote extraction sites.",
+      "design": "Follow-on from BL-077 (core). Requires the core's road_level field, per-body grid index, and terrain-weighted A* pathfinder. Runs AFTER nation + population generation (it needs cities to connect) — slots into hard_coded_world.cpp after generate_nations (~line 158).\n\n**Road-generation pass (deterministic from the campaign seed).** Per nation:\n1. **Nodes** = the nation's population centres.\n2. **Weighted graph** = terrain-weighted A* path cost between each centre-pair (one-off at generation; small node count, not per-Tick).\n3. **Backbone = MST + redundancy** — minimum spanning tree over that graph, then a few short extra edges (relative-neighbour rule: keep an edge unless a third centre is closer to both endpoints) for realistic loops. Deterministic tie-break: sort candidate edges by (cost, lower-node-id, higher-node-id).\n4. **Two-tier hierarchy** — edges among major centres (City/Metropolis) become **trunk** roads (higher road_level, larger cost cut); spurs linking smaller settlements to their nearest backbone node become **local** roads.\n5. **Rasterise** each edge as its terrain-weighted A* path; stamp road_level on the crossed tiles (max on overlap); paths respect the east-west cylinder wrap.\n6. **Border links** — after the per-nation networks exist, add one link between the nearest city-pair across each adjacent-nation boundary, so the continent-wide lattice is connected.\n\nCities enumerable via world.population_centres + population_centre_tile. New TU road_generation.{hpp,cpp} keeps the pass off the tile_generation hotspot; wired in hard_coded_world.cpp (main-session integration). Determinism guard: add road_level to the determinism_harness field checks.\n\n**Tuning (settle at promotion):** trunk/local road_level values and their A* cost-cut. **Authority:** SUPPLY.md (road cost-reducer) + TILE_GENERATION.md (the generation pass)."
+    },
+    {
+      "id": "BL-147",
+      "short_name": "ROAD_RENDER_PLACEMENT",
+      "category": "Infrastructure",
+      "title": "Road rendering on the planetary canvas + player-placeable roads",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [
+        "BL-146"
+      ],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "files": [
+        "src/ui/body_surface_canvas.cpp",
+        "src/world/construction.cpp",
+        "src/world/placement_rules.hpp",
+        "src/world/placement_rules.cpp",
+        "src/ui/construction_panel.cpp"
+      ],
+      "authority_doc": "docs/ui/PLANETARY.md",
+      "summary": "Follow-on from BL-146. Render the generated road_level network on the Planetary canvas (from campaign start) and let the player extend it by placing infrastructure road/rail (land_use = infrastructure), lowering the crossed tiles' A* cost. Retires the old 'invisible tile-attribute' concern — the world generates with a visible lattice the player plugs into.",
+      "design": "Follow-on from BL-146 (roads must exist to render/extend). Requires the core's land_use.infrastructure value + road_level.\n\n**Rendering.** Draw road segments as edges between adjacent road tiles — reuse the Country-lens edge-draw pattern in body_surface_canvas.cpp (hex edges shared with a differently-attributed neighbour), inside the wrap-copy loop; trunk vs local by road_level (thicker/brighter for trunk). Add a road legend chip (copy a draw_*_key helper). Rendered always-on (like the player-tile ownership wash) rather than behind a lens, since roads are terrain, not an overlay mode — confirm at promotion.\n\n**Player placement.** A placement path that occupies land_use = infrastructure on a land tile, raising road_level on it (and lowering its A* cost). Goes through construction.cpp / placement_rules (a new placement_reason + branch) and a construction_panel affordance. Player roads extend the nation lattice out to remote extraction sites (the specialist-corporation fantasy).\n\n**Authority:** PLANETARY.md / LENSES.md (rendering) + SUPPLY.md (placement effect). Note: this touches body_surface_canvas.cpp (the lens-legend files another workstream edits) — sequence after those land."
+    },
+    {
+      "id": "BL-148",
+      "short_name": "CITIES_AS_LOGISTICS_HUBS",
+      "category": "Infrastructure",
+      "title": "Cities as free logistics hubs (agglomeration discount)",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [
+        "BL-077"
+      ],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "files": [
+        "src/world/supply_system.cpp",
+        "scripts/economy.lua"
+      ],
+      "authority_doc": "docs/economy/SUPPLY.md",
+      "summary": "Follow-on from BL-077 (core). Population centres discount convoy cost for routes into/through them — the agglomeration bonus already committed in POPULATION.md ('better logistics, shared infrastructure'). The city IS infrastructure (no new building); higher tier -> larger discount. Combined with the generated road lattice (BL-146), the world already contains a low-cost logistics network the player plugs into.",
+      "design": "Follow-on from BL-077 (core). Applies a cost discount in the intra-body A*/dispatch cost path (supply_system.cpp): a route into or through a population centre's tiles is discounted, scaling with centre tier. Reuses the agglomeration concept from POPULATION.md. A tunable multiplier + radius in economy.lua.\n\n**Tuning (settle at promotion):** the discount formula and radius. **Authority:** SUPPLY.md + POPULATION.md."
+    },
+    {
+      "id": "BL-149",
+      "short_name": "INLAND_LOGISTICS_HUB",
+      "category": "Infrastructure",
+      "title": "Inland Logistics Hub building (land-mode convoy consolidator)",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [
+        "BL-077"
+      ],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "files": [
+        "src/world/components.hpp",
+        "src/world/placement_rules.cpp",
+        "src/world/recipe_registry.cpp",
+        "scripts/economy.lua",
+        "src/ui/construction_panel.cpp"
+      ],
+      "authority_doc": "docs/economy/SUPPLY.md",
+      "summary": "Follow-on from BL-077 (core). A land-mode counterpart to the Port: a routing waypoint that consolidates convoys so a cluster of buildings ships through the hub rather than each dispatching independently — the missing land-network piece. Occupies land_use = infrastructure.",
+      "design": "Follow-on from BL-077 (core). Adds a new building_type value (inland_logistics_hub) that acts as an intra-body convoy consolidation waypoint: buildings within its catchment route through the hub, so the network ships hub-to-hub rather than each building point-to-point.\n\n**Touch points (the new-building-type footprint the core investigation catalogued):** building_type enum (components.hpp); a placement rule (placement_rules.cpp — land, non-ocean, likely inland); scripts/economy.lua building econ entry; recipe_registry.cpp named_type list + the m_building_econ array bump (5 -> 6, indexed by building_type); a construction_panel.cpp build button. **Authority:** SUPPLY.md + PRODUCTION.md."
+    },
+    {
+      "id": "BL-150",
+      "short_name": "ACTIVITY_FOG_DIM_SHADOW",
+      "category": "Canvas",
+      "title": "Render the commercial-activity fog as a dim shadow (make the unlit map read as fogged)",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-08",
+      "version_goal": "v0.1.1",
+      "files": [
+        "src/ui/solar_system_canvas.cpp",
+        "src/ui/presentation.hpp",
+        "src/ui/presentation.cpp"
+      ],
+      "authority_doc": "docs/ui/DISCOVERY.md",
+      "summary": "Filed 2026-07-08 (Ben) after observing the commercial-activity fog reads as 'no fog'. Today (BL-089) the activity fog is ABSENCE-by-default: an unknown body draws nothing (a plain astronomy dot); only known/known_stale/visible non-home bodies get a small ~4-6px lower-left pulse badge. So with no player commerce the whole Solar map looks identical to no-fog, and even when lit the badges are subtle next to the survey '?' + labels. This item inverts the treatment: render the fog as a DIM SHADOW over bodies outside the player's commercial network, so the unlit map READS as fogged and brightens as commerce reaches it.",
+      "design": "**Problem.** The commercial-activity fog (BL-089, `body_activity_visibility` -> Solar badges in `solar_system_canvas.cpp:249`) is a presence-badge on LIT bodies, not an overlay on the dark. Unknown bodies draw nothing, so the fog is invisible until the player runs commerce, and the small lower-left pulse dots are easily lost. Prompted by Ben 2026-07-08 ('I'm not seeing any fog').\n\n**Change.** Render the activity fog as a **dim shadow**: bodies the player's commercial network does NOT reach are drawn dimmed/shadowed on the Solar canvas (a translucent dark wash and/or reduced body+label brightness), so the un-networked map legibly reads as *fogged*; as a route/convoy reaches a body it **brightens** to full (known -> visible a rising brightness ramp). The existing lower-left pulse badge can stay as the fine-grained tier tell for the lit tiers; the shadow is the new coarse read for the unlit. Keep it visually distinct from the geographic **survey** fog (BL-067, the '?' badges) — the two fogs must still read apart (DISCOVERY.md's two-independent-fogs rule).\n\n**Scope.** Solar canvas only (the activity fog is body-level). Home stays full-bright (its BL-085 halo). Derived read only — no new sim state (reads `body_activity_visibility`). `presentation.hpp/.cpp` for the shadow colour/alpha + brightness ramp; `solar_system_canvas.cpp` for the per-body dim.\n\n**Landed 2026-07-09.** Per-body dimming (chosen over regional wash); brightness ramp unknown/stale/known/visible = 0.36/0.60/0.84/1.0 with shadow-wash alpha 105/50/0/0; known_stale reads partially-lit. `dim_rgb` helper + `activity_fog_*` ramps in presentation.hpp; per-body dim in solar_system_canvas.cpp. **Authority:** docs/ui/DISCOVERY.md (activity-fog rendering)."
+    },
+    {
+      "id": "BL-151",
+      "short_name": "INTRABODY_ACTIVITY_FOG",
+      "category": "Canvas",
+      "title": "Intra-body commercial-reach fog on the Planetary canvas (surface reads as mostly unknown)",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-09",
+      "version_goal": "v0.1.1",
+      "files": [
+        "src/ui/body_surface_canvas.cpp",
+        "scripts/verify/intrabody_fog.lua"
+      ],
+      "authority_doc": "docs/ui/DISCOVERY.md",
+      "summary": "Filed + landed 2026-07-09 (Ben, follow-on from BL-150). The commercial-activity fog (BL-089) is body-level only, rendered on the Solar canvas; the Planetary canvas had no activity fog, so the home surface read as fully known. Ben expected fog of war on the home planet over intra-body trade. This adds a THIRD visibility treatment: a per-tile intra-body fog on the Planetary canvas so the surface reads as mostly unknown, lit only around the player's own presence.",
+      "design": "**Semantics (Ben's call).** Commercial reach, not unknown-terrain: the home planet is the player's own territory, so 'fog' means *where your logistics actually operate*. **Substrate (Ben's call).** Live-derived, no stored state / no save-format change; intra-body traffic records nothing persistent.\n\n**Model.** Vision is a TIGHT pocket around the player's actual presence, not a whole market catchment (a first cut lit the entire catchment — Ben: 'too wide'; the point is a sense of movement + unknowns). Reveal sources: the player's own building tiles + the endpoint (`centre_tile`) of any live player convoy on the active body. A breadth-first flood out to `fog_reveal_radius` (=3) tile-hops from every source marks the visible pocket (odd-r offset neighbours, column wrap); every other revealed tile takes a dark wash (`lerp 0.5` toward IM_COL32(8,10,16)). Applied over the lens fill (a fogged region's analytic read dims with it). The geographic survey fog (BL-067) still owns unrevealed tiles — this dims revealed ones only. Always-on, all overlays. Convoys confirmed live (dispatch/advance/credit run every econ step, app.cpp:381).\n\n**Verify.** `scripts/verify/intrabody_fog.lua` (goto_surface home + zoom-out capture). Probe at landing: home body 7 markets, player reaches 1 -> 6 catchments fogged; tightened to radius pockets so the HQ region reads lit and the rest of the globe fogged at both play and wide zoom.\n\n**Follow-up -> BL-152:** a live convoy should emit a radius-2 vision BEAM that travels its route and lags/dims over ~1 econ tick (needs `logistics_path` to return its tile sequence — currently cost-only). That is the 'things are moving' half; this item is the static-presence half."
+    },
+    {
+      "id": "BL-152",
+      "short_name": "CONVOY_VISION_BEAM",
+      "category": "Canvas",
+      "title": "Convoy vision beam — a live convoy lights a radius-2 beam that lags and dims over one econ tick",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-09",
+      "version_goal": "v0.1.1",
+      "files": [
+        "src/world/world.hpp",
+        "src/world/logistics.cpp",
+        "src/ui/ui_state.hpp",
+        "src/ui/body_surface_canvas.cpp",
+        "src/ui/body_surface_canvas.hpp",
+        "src/core/app.cpp",
+        "scripts/verify/intrabody_fog.lua"
+      ],
+      "authority_doc": "docs/ui/DISCOVERY.md",
+      "summary": "Filed + landed 2026-07-09 (Ben, the 'things are moving' half of BL-151). A live player convoy emits a radius-2 beam of vision along the tiles it moves through; that vision lags and dims over one econ tick (90 days). The moving-presence complement to BL-151's static-presence pocket.",
+      "design": "**Spec (Ben).** 'Convoys should send a radius 2 beam of vision which lags and dims over 1 econ tick.'\n\n**Path exposure.** `logistics_path` (world.hpp) gained a `tiles` sequence; `intra_body_path` (logistics.cpp) reconstructs it via a came_from parent-walk, stored in canonical lo->hi endpoint order (the route cache is keyed on the unordered pair). Deterministic; wrap-aware (the grid is a horizontal cylinder). Verified by a throwaway headless probe (contiguity, canonical order, single-tile src==dst).\n\n**Vision buffer.** `ui_state.convoy_vision` maps tile -> the sim time (elapsed days) a beam last lit it; `ui_state.sim_now_days` is the continuous fade clock (set every frame in app.cpp). Derived VIEW state only — never serialised, no feedback into world/*, so world determinism is preserved (a `world/*` standing rule).\n\n**Refresh (per econ step).** `ui::update_convoy_vision` (body_surface_canvas) runs in app::step_economy after advance_convoys (before arrived convoys are retired). For each live player intra-body convoy it maps progress -> a path-index segment (where it was one tick ago .. now), floods radius-2 (odd-r neighbours) around that segment, and stamps now_days. Prunes entries older than one econ tick.\n\n**Render.** The Planetary fog (BL-151) now blends a beam vision term: vision = 1 in the static pocket, else max with the beam's fading contribution (1 - age/90); fog wash = 0.5*(1 - vision). So a convoy's beam trails and dims behind it over one econ tick. Uses continuous sim time, so it fades smoothly between quarter boundaries rather than snapping.\n\n**Scope note.** Intra-body convoys only (inter-body activity reads on the Solar fog, BL-089/150). econ_tick_days (90) mirrored as a local constant in the canvas to avoid a ui->core include. **Authority:** docs/ui/DISCOVERY.md.\n\n**Superseded 2026-07-09 by BL-154:** the per-econ-step segment-flood + timestamp-fade was replaced by a render-time moving head/tail beam (interpolated by econ-tick fraction) + permanent corp-centre->market corridors. The path-exposure work here stands; the buffer/refresh mechanism was reworked."
+    },
+    {
+      "id": "BL-153",
+      "short_name": "CONVOY_PAY_BY_DISTANCE",
+      "category": "Economy",
+      "title": "Convoy payout weighted by haul distance, not just destination price",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "B",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-09",
+      "version_goal": "post-v0.1.0",
+      "files": [
+        "src/world/supply_system.cpp",
+        "src/world/market_clearing.cpp"
+      ],
+      "authority_doc": "docs/economy/PRODUCTION.md",
+      "summary": "Filed 2026-07-09 (Ben, alongside the convoy vision work). Ben: players should 'get money based on distance rather than just time'. Today a convoy has NO time- or distance-based payout: its cargo is delivered into the destination market and sold at the live clearing price (the price differential IS the profit); logistics COST already scales with path distance (logistics_cost x A* path cost). So distance shows up as a cost, not a revenue term. This item asks whether long hauls should also PAY more — a distance-scaled delivery margin on top of the price differential.",
+      "design": "**Current model.** `credit_arrived_convoys` (supply_system.cpp) delivers cargo to the destination pool + injects it into market supply; `clear_markets` prices it. Profit = buy-low/sell-high across the price gap. Distance enters only as logistics cost (`intra_body_path` cost x per-mode `logistics_cost`), reducing net on long hauls — the opposite of a distance reward.\n\n**The question (design-owed, Ben's call).** Should distance be a REVENUE lever, not just a cost? Options to weigh: (a) a distance-scaled delivery margin/bonus credited on arrival (longer haul -> higher per-unit payout), (b) leave revenue alone and instead make distance-cost more legible (surface it), (c) a hauling contract/tariff mechanic. This touches the economy seam (determinism, balance) and the corp agency model — needs a design pass before code, and must justify itself against Trade/Conflict (standing rules). Deferred from the 2026-07-09 vision-beam session; not implemented. **Authority:** docs/economy/PRODUCTION.md (once landed)."
+    },
+    {
+      "id": "BL-154",
+      "short_name": "CONVOY_BEAM_MOVING_CORRIDORS",
+      "category": "Canvas",
+      "title": "Moving head/tail convoy beam + permanent corp-centre-to-market corridors",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-09",
+      "version_goal": "v0.1.1",
+      "files": [
+        "src/ui/ui_state.hpp",
+        "src/ui/body_surface_canvas.cpp",
+        "src/ui/body_surface_canvas.hpp",
+        "src/core/app.cpp"
+      ],
+      "authority_doc": "docs/ui/DISCOVERY.md",
+      "summary": "Filed + landed 2026-07-09 (Ben, refining BL-151/152). Two changes to the intra-body vision model: (1) the convoy beam should MOVE with a head and tail that update (not a uniformly-fading segment); (2) permanent vision as a 3-wide beam from the corp centre of operation to the market centre. Reworks the vision buffers accordingly.",
+      "design": "**Change 1 — moving head/tail beam.** The BL-152 buffer (per-econ-step segment flood, uniform timestamp fade) read as a chunky blob that stepped once per quarter. Replaced with a RENDER-TIME moving beam: `ui_state.convoy_beams` stores each live player intra-body convoy's tile path + progress + speed (rebuilt each frame in `update_body_vision`); the canvas interpolates a HEAD along the path by the fraction through the current econ tick (`fmod(sim_now_days,90)/90`), so it glides smoothly between quarterly steps, and trails a TAIL one econ tick's travel behind, ramping intensity 1->0 head->tail, radius-2 around each path tile. So the beam has a bright moving head and a dimming tail.\n\n**Change 2 — permanent corp-centre->market corridors (Ben: 'from the corp centre of operation to the market centre, as a 3 wide beam').** `ui_state.permanent_vision` (non-fading) = radius-2 pockets around the player's own building tiles + 3-wide corridors (path flooded radius 1) from the corp centre of operation (lowest-id player building tile on the body, mirroring market_clearing's file-local representative_tile) to each market centre the player operates in (the catchment markets of its buildings). Always visible.\n\n**Plumbing.** `update_body_vision` (renamed from update_convoy_vision) rebuilds both buffers per frame for the active body; moved from app::step_economy to render() (planetary branch) so the --verify capture path gets it too, and so a body switch is tracked immediately. Pathfinder is route-cache-backed (steady-state = lookups). Derived VIEW state only — no serialisation, no world/* feedback; determinism preserved.\n\n**Render.** Fog vision = 1 in permanent_vision, else the moving beam's intensity; wash = 0.5*(1 - vision). Verified: full build clean; wide + default captures show permanent pockets/corridors lit and the globe fogged (the moving beam's motion only manifests with a live inter-market intra-body convoy, not the same-market verify seed). **Authority:** docs/ui/DISCOVERY.md."
+    },
+    {
+      "id": "BL-155",
+      "version_goal": "v0.1.2",
+      "short_name": "LAW_POLICY_SURFACE_DESIGN",
+      "category": "Policy",
+      "title": "Laws & policy surface — design + data-model stub (v0.1.2 expanded-prototype groundwork)",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "B",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-09",
+      "files": [
+        "docs/SYSTEMS.md"
+      ],
+      "authority_doc": "docs/SYSTEMS.md",
+      "summary": "Roadmap v0.1.2 expanded-prototype groundwork (Ben, 2026-07-09 refocus). First pass at the law / policy surface: what a law IS as a data object and how it gates or modifies economic (and later political) behaviour. Design-forward + data-model stub only — no committed mechanics — so the v0.2.0 nation actor and the v0.3.0 political layer land on prepared ground. Design-owed: the law-object schema, the prototype lever set, and the enforcement seam are all open.",
+      "design": "**Theme (roadmap v0.1.2).** Define the **law / policy** surface as a first-class data object: a law is a named, serialisable record that gates or modifies behaviour (initially economic — tax, tariff, subsidy, extraction cap — later political). This item settles the *shape*, not the mechanics.\n\n**Scope.** Design + a data-model stub only. Enumerate the law-object schema (id, subject, condition, effect), sketch a small prototype lever set, and name the enforcement seam in the economy step where a law would read. No UI, no active law effects committed — the point is to position the model.\n\n**Open questions.** Law-object schema; which levers are prototype-worthy vs deferred; where enforcement hooks into `economy_system` without breaking determinism; how laws relate to the future filter system (BL-087) and the nation actor (BL-094) that will own them.\n\n**Standing-rule note.** Policy proper is post-prototype scope (TECH_FOUNDATIONS); this is the design + stub that precedes it, not the system. **Authority:** docs/SYSTEMS.md once landed."
+    },
+    {
+      "id": "BL-156",
+      "version_goal": "v0.1.3",
+      "short_name": "TECH_SYSTEM_EARLY_DESIGN",
+      "category": "Research",
+      "title": "Tech system — early design toward the quest/gate model (v0.1.3 expanded-prototype groundwork)",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "B",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-09",
+      "files": [
+        "docs/SYSTEMS.md"
+      ],
+      "authority_doc": "docs/SYSTEMS.md",
+      "summary": "Roadmap v0.1.3 expanded-prototype groundwork (Ben, 2026-07-09 refocus). Early design toward the tech / quest system — the condition-set gate model (gate = quest = tech, one object) that BL-087 reframed and that the v0.3.0 filter system will formalise. Design only at this stage: settle the tech-object and gate-condition shape so later work has a spine. Precursor to BL-087 (filter system, v0.3.0).",
+      "design": "**Theme (roadmap v0.1.3).** The early-design pass for the **tech system**, feeding the unified gate model BL-087 settled: a **gate = quest = tech** is one condition-set object, so a tech can gate on economic OR world state. This item does the groundwork design; BL-087 formalises it as the filter system in v0.3.0.\n\n**Scope.** Design only — no implementation. Settle the tech / gate-condition object shape, the capstone-vs-ordinary distinction, and how a tech unlock threads into content availability (buildings, recipes, quest trees). Position it so v0.3.0's Era→Filter rename inherits a coherent model.\n\n**Open questions.** Tech-object schema and its overlap with the law object (BL-155); which conditions are expressible in the prototype; how quest trees hang off capstones; the boundary between this precursor and BL-087's full design.\n\n**Relates:** BL-087 (filter system, v0.3.0 — this is its early-design precursor), BL-155 (shared condition-set shape). **Authority:** docs/SYSTEMS.md once landed."
+    },
+    {
+      "id": "BL-157",
+      "version_goal": "v0.1.4",
+      "short_name": "MILITARY_DATAMODEL_STUB",
+      "category": "Military",
+      "title": "Military systems — data-model footing stub (v0.1.4 expanded-prototype groundwork)",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "C",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-09",
+      "files": [
+        "docs/SYSTEMS.md"
+      ],
+      "authority_doc": "docs/SYSTEMS.md",
+      "summary": "Roadmap v0.1.4 expanded-prototype groundwork (Ben, 2026-07-09 refocus). The Conflict dimension's first data-model footing: units, forces, and the seams they need in the world model. Stub, NOT mechanics — Conflict proper stays post-cut scope (TECH_FOUNDATIONS). Positions the model so the v0.2.0 nation actor (which owns military) has something concrete to hold. Design-owed: unit/force schema and the world-model seams are open.",
+      "design": "**Theme (roadmap v0.1.4).** Lay the **data-model footing** for the military / Conflict dimension: what a unit and a force are as records, where they sit in the world model, and which seams (movement, ownership, position) they touch. This is scaffolding for the v0.2.0 nation-as-strategic-actor pivot, which gives military to the nation.\n\n**Scope.** Data-model stub only — no combat, no movement mechanics, no AI. Conflict proper is post-prototype scope (TECH_FOUNDATIONS § exclusions); this item only positions the entities so later conflict work is not greenfield.\n\n**Open questions.** Unit / force schema; how forces relate to the nation actor (BL-094) and to territory; the serialisation seam; the minimum stub that earns its place without inviting scope creep.\n\n**Standing-rule note.** No AI faction behaviour beyond the data-model minimum (io-standing-rules § Determinism). **Authority:** docs/SYSTEMS.md once landed."
+    },
+    {
+      "id": "BL-158",
+      "version_goal": "v0.1.5",
+      "short_name": "POLITICS_DATAMODEL_STUB",
+      "category": "Politics",
+      "title": "Politics — data-model stub for the v0.2.0 nation actor (v0.1.5 expanded-prototype groundwork)",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "C",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-09",
+      "files": [
+        "docs/SYSTEMS.md"
+      ],
+      "authority_doc": "docs/SYSTEMS.md",
+      "summary": "Roadmap v0.1.5 expanded-prototype groundwork (Ben, 2026-07-09 refocus). A data-model stub only — enough political layer for the v0.2.0 nation actor to have something to own — deferring the working political system to v0.3.0. Positions nation political character, relationships, and lever slots as records without committing mechanics. Design-owed: the political-state schema is open. Last v0.1.x band item before the v0.2.0 refocus.",
+      "design": "**Theme (roadmap v0.1.5).** The thinnest useful **political stub**: the data slots the v0.2.0 nation actor needs to own — political character, inter-nation relationships, and placeholder lever slots — as serialisable records, with no working system behind them yet. The real political layer is promoted in v0.3.0 (politics + the filter system).\n\n**Scope.** Data-model stub only. No political mechanics, no AI decision-making, no diplomacy beyond the existing data-model stub (TECH_FOUNDATIONS). This closes the v0.1.x groundwork band: after it, the model is positioned for the v0.2.0 refocus.\n\n**Open questions.** Political-state schema; overlap with the existing nation generation (BL-054 territory + political-character assignment); which relationship data is worth stubbing now vs at v0.3.0; the boundary between this stub and the v0.3.0 working layer.\n\n**Relates:** BL-094 (the nation actor that owns this, v0.2.0), v0.3.0 politics (the working system this stubs toward), BL-054 (existing nation political character). **Authority:** docs/SYSTEMS.md once landed."
+    },
+    {
+      "id": "BL-159",
+      "short_name": "SELL_ORDERS_ON_MARKET",
+      "category": "Trade",
+      "title": "Relocate sell-order management from the Building ledger to the market surface",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-09",
+      "version_goal": "v0.0.9",
+      "files": [
+        "src/ui/construction_panel.cpp",
+        "src/ui/market_ledger.cpp",
+        "src/ui/market_ledger.hpp"
+      ],
+      "authority_doc": "docs/ui/ledgers/market.md",
+      "summary": "Filed 2026-07-09 as the required companion to BL-143 (Building-ledger redesign), which removes the 'Sell Orders' tab from the construction/Building ledger. Sell orders currently live ONLY in draw_sell_orders_section (construction_panel.cpp:361), so removing that tab is a functional regression unless relocated. Ben (2026-07-08 UX review): sell orders are a MARKET function and belong on the market surface. This item moves sell-order management to the Market Ledger / market selection so no function is lost when BL-143 lands.",
+      "design": "**Settled (Ben).** Relocate sell-order management out of the Building ledger (draw_sell_orders_section, construction_panel.cpp:361 — its only current home) onto the **market surface**, as a **tab on the Market Ledger** (market_ledger.cpp). The tab is reachable **both** by its ledger tab **button** and by **market selection** (selecting a market targets/opens the Market Ledger on that market), and is paired with a **lens** — the existing Market lens (LENSES.md) surfaces sell-order activity on-canvas and links into the tab. Must land **with or before** BL-143's removal of the Building ledger's Sell Orders tab, so there is never a window without a sell-order UI (BL-143 requires BL-159). Carry over the columns/actions from draw_sell_orders_section; the market is chosen by selection (or the tab's own market target) rather than a free-standing picker. Open (proportions only, at promotion): the tab's column layout and how the on-canvas lens affordance reads. Authority → docs/ui/ledgers/market.md (+ LENSES.md for the lens link) on landing. 2026-07-08 UX review."
+    },
+    {
+      "id": "BL-160",
+      "short_name": "AUTO_EXCHANGE_POLICY",
+      "category": "Economy",
+      "title": "Automatic exchange policy — per-resource auto-buy/sell bands (blacklist-default) + relocate sell orders to the market surface",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 4,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-09",
+      "version_goal": "v0.2",
+      "files": [
+        "src/world/market_clearing.cpp",
+        "src/world/market_clearing.hpp",
+        "src/world/components.hpp",
+        "src/world/world.hpp",
+        "src/core/app.cpp",
+        "src/ui/market_ledger.cpp",
+        "src/ui/ui_state.hpp",
+        "src/ui/construction_panel.cpp"
+      ],
+      "authority_doc": "docs/SYSTEMS.md",
+      "summary": "Filed 2026-07-09 (Ben, market-exchanges design session; all forks settled by Q&A). The player governor over the already-automatic order book: standing per-(corp,body,resource) inventory-band policies that shape what the auto path does with the player's own stock, blacklist-default, surfaced as a new Market Ledger 'Policy' view. Retires the construction-panel Sell Orders tab into it (BL-143 companion). Axis A of automatic exchanges; Axis B (counterparty) is fast-follow BL-161. v0.2, after the prototype cut.",
+      "design": "**Settled 2026-07-09 (Ben, market-exchanges design session; five forks resolved via Q&A).** The order book already auto-derives BOTH sides each tick (clear_markets: pool surplus above production auto-sells; processor input shortfalls auto-buy). This item adds the PLAYER GOVERNOR on top — standing policies that bound what the automatic path may do with the player's own stock — and retires the manual sell-order tab into it.\n\n**Axis A — per (player-corp, body, resource) inventory-band policy (the FULL band, Ben's call):** `sell_enabled` + `reserve` (hold >= this; auto-sell only the surplus above reserve + next-run production need) + `floor_price`; `buy_enabled` + `target` (auto-buy UP TO this stock level — speculative stockpiling for a construction draw / a planned convoy, MAY exceed production need) + `ceiling_price`. Between reserve and target: hold. Today's manual sell order is the degenerate one-tick case (enabled, reserve 0, floor).\n\n**Default polarity — BLACKLIST-DEFAULT (Ben's call).** Unconfigured resources auto-trade exactly as today; every player action is subtractive/bounding (blacklist = sell_enabled false -> hold; band = set reserve/target/limits). No dead market on ship day — the current substrate IS the default.\n\n**Mechanism.** A new `derive_exchange_orders(w, policies)` runs each econ tick BEFORE clear_markets, reading policy + current pool + production need and emitting the `player_orders`/`player_buy_orders` overlay that clear_markets ALREADY accepts — no order-book core change. Fully deterministic (world/* standing rule).\n\n**Hard constraint — local-body only, never auto-launches.** SUPPLY.md: space launches are ALWAYS player-directed. Auto-buy-to-target may be satisfied only from the SAME body's market; a policy can never trigger an inter-body convoy. Cross-body acquisition stays a manual convoy decision. (Same-body terrestrial auto-dispatch already exists in the substrate, so this is consistent, not new.)\n\n**Serialisation seam.** Policies are player-authored world state -> a new serialised policy table (flat binary, no SQLite). This makes the item Full-mode, determinism- + save-format-touching; needs a verifier-headless check on derive_exchange_orders and a save round-trip.\n\n**Surface — new Market Ledger 'Policy' view (Ben's call)** beside Prices/Markets/Trends: one inline-editable row per resource (Resource | Sell | Reserve | Floor | Buy | Target | Ceiling) for the selected body's player pool. This is BL-143's 'relocate sell orders to the market surface' home, so REMOVING the construction panel's Sell Orders tab (draw_sell_orders_section) is a REQUIRED companion here — couples to BL-143 (which independently wants that tab gone).\n\n**Scope / sequence.** v0.2 — Ben pushed the whole automatic-exchange feature PAST the prototype cut; v0.1.0 stays audit-only and playtest ships on the current auto-derived substrate without the policy layer. Axis B (counterparty allow/deny — the embargo/Trade->Conflict lever) is the cross-linked fast-follow BL-161.\n\n**Authority** -> docs/SYSTEMS.md § Trade (mechanic) + docs/ui/ledgers/market.md (surface) on landing."
+    },
+    {
+      "id": "BL-161",
+      "short_name": "COUNTERPARTY_ALLOW_DENY",
+      "category": "Economy",
+      "title": "Counterparty allow/deny — embargo & exclusive-trade lever (automatic exchanges, Axis B)",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 2,
+      "parked": false,
+      "requires": ["BL-160"],
+      "blocked_on": [],
+      "written": "2026-07-09",
+      "version_goal": "v0.2",
+      "files": [
+        "src/world/market_clearing.cpp",
+        "src/world/components.hpp",
+        "src/world/world.hpp",
+        "src/ui/ui_state.hpp",
+        "src/ui/selection_panel.cpp"
+      ],
+      "authority_doc": "docs/SYSTEMS.md",
+      "summary": "Filed 2026-07-09 (Ben, market-exchanges design session). Axis B of automatic exchanges — the counterparty control, and the half that turns Trade into a Conflict lever. Per-(player-corp) allow/deny list of rival corps, applied as a match filter; deny-list = embargo, allow-list = exclusive trade. fast-follow to BL-160; realises the counterparty-preference open Brief in SYSTEMS.md § Trade. v0.2.",
+      "design": "**Settled 2026-07-09 (Ben, market-exchanges design session).** Axis B of automatic exchanges — the counterparty control, and the half that makes Trade a Conflict lever. Fast-follow to BL-160 (Axis A resource bands); realises the 'counterparty preference' open Brief in SYSTEMS.md § Trade.\n\n**Model.** A per (player-corp) allow/deny list of rival corps, applied as a filter inside clear_markets' matching loop (skip disallowed (buyer, seller) pairs). Two modes: DENY-LIST (the common case — refuse to match a named rival: an embargo) and ALLOW-LIST (the extreme — trade ONLY with named corps: an exclusive supply relationship). Complements the existing soft `preferred_seller` +10% tie-hint with a HARD include/exclude.\n\n**Surface.** The action lives on the RIVAL's Selection panel ('Embargo / Trade-only') — where the player is already looking at that competitor (BL-093 made Selection action-first). The BL-160 Policy view reflects the resulting state.\n\n**Serialisation.** The counterparty list is player-authored world state -> serialised alongside the BL-160 policy table (flat binary).\n\n**Scope / sequence.** v0.2, after BL-160 — requires its derive/overlay plumbing.\n\n**Authority** -> docs/SYSTEMS.md § Trade on landing."
     }
   ]
 }

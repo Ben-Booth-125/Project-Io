@@ -198,181 +198,58 @@ ImVec4 construction_status_colour(float rate)
                           : ImVec4{0.55f, 0.80f, 0.55f, 1.0f};  // on schedule
 }
 
-// --- Build front door (tile Selection element) -------------------------------
-// Compact cost + material annotation for a build button (BL-044/BL-095-lite
-// legibility): the credit cost plus every required material, priced at the
-// tile's local market and folded into the credit total. `ok` gates the button
-// on balance alone — materials are bought from the market, not drawn from the
-// corp's own pool, so the label communicates the requirement without a
-// separate pool-availability gate (construction.cpp mirrors this).
-struct build_afford { std::string label; bool ok; };
-build_afford build_cost_annotation(const world& w, const recipe_registry& reg,
-                                   building_type type, entity_id tile, float balance)
+// --- Build-here nav affordance (BL-139) ---------------------------------------
+// The tile is now the primary selection subject and leads with tile *detail*
+// (terrain/deposits/owner/habitability, draw_tile_summary below), not the build
+// picker. "Build here" becomes a small navigation affordance near the top of
+// that detail rather than an inline building-type list — the old full
+// front-door UI (extraction/processing/port buttons with live cost + material
+// status) has been retired from this panel. TODO(BL-139): there is not yet a
+// distinct navigable "build ledger" surface, so this stubs onto the existing
+// Construction panel (which a sibling item is concurrently reworking into that
+// destination); wire this to the real build ledger once it exists.
+void draw_build_here_affordance(ui_state& ui)
 {
-    const building_economics& e = reg.economics(type);
-
-    const market_component* mkt = nullptr;
-    {
-        const entity_id mid = market_for_tile(w, tile);
-        if (mid != null_entity)
-        {
-            const auto mit = w.markets.find(mid);
-            if (mit != w.markets.end())
-                mkt = &mit->second;
-        }
-    }
-
-    float material_cost = 0.0f;
-    std::string s = std::to_string(static_cast<int>(e.build_cost)) + " cr";
-    for (std::size_t r = 0; r < resource_count; ++r)
-    {
-        const float need = e.resource_build_cost[r];
-        if (need <= 0.0f)
-            continue;
-        const float p = mkt ? (mkt->price[r] > 0.0f ? mkt->price[r] : mkt->base_price[r]) : 0.0f;
-        material_cost += need * p;
-        s += " · " + std::to_string(static_cast<int>(need)) + ' '
-           + resource_name(static_cast<resource_type>(r));
-    }
-    const float total = e.build_cost + material_cost;
-    return { s, balance >= total };
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Build here \xe2\x96\xb8");
+    if (ImGui::Button("Build here"))
+        ui.show_construction_panel = true; // stub destination — see TODO above
 }
 
-// BL-095 task E: the prospective build's *starting* material status, rendered under a
-// front-door build button. Recomputes the same rate run_construction will apply on
-// the first tick — the per-tick material need vs the candidate tile's local market
-// supply — so the player reads "materials scarce here" (or "paused") before
-// committing, in place of the old binary yes/no. A build with no material cost has
-// nothing to gate, so its status line is omitted. On schedule stays muted (the cost
-// annotation already carries the detail); scarce/paused speak up.
-void draw_prospective_build_status(const world& w, const recipe_registry& reg,
-                                   building_type type, entity_id tile)
+// Resolve the (at most one) building occupying a tile — the standing invariant
+// a tile carries zero or one building means this never needs a list. Linear
+// scan mirrors the existing per-body building lookup in tile_inspector.cpp;
+// the building map is small in the prototype scope.
+entity_id building_on_tile(const world& w, entity_id tile)
 {
-    const building_economics& econ = reg.economics(type);
-    bool needs_material = false;
-    for (std::size_t r = 0; r < resource_count; ++r)
-        if (econ.resource_build_cost[r] > 0.0f) { needs_material = true; break; }
-    if (!needs_material)
-        return;
-
-    const float rate = construction_rate(w, reg, type, tile);
-    // Match construct_building's ticks_remaining seeding (truncated build_duration).
-    const int   base = static_cast<int>(econ.build_duration_ticks);
-    const std::string msg = construction_status(rate, base);
-    if (rate >= 1.0f)
-        ImGui::TextDisabled("%s", msg.c_str());
-    else
-        ImGui::TextColored(construction_status_colour(rate), "%s", msg.c_str());
+    for (const auto& [id, b] : w.buildings)
+        if (b.tile == tile)
+            return id;
+    return null_entity;
 }
 
-// The per-tile entry to construction (docs/ui/SELECTION.md): offers the buildable
-// types + cost and, on click, enqueues a construction request on this tile for the
-// player corporation. The request is executed by app against the mutable world —
-// here we only read and enqueue. Reached only for a selected tile.
-void draw_build_front_door(const world& w, const recipe_registry& reg,
-                           ui_state& ui, entity_id tile)
+// The building sub-element (BL-139): when a building occupies the selected
+// tile, it renders BELOW the tile detail as a subordinate row, not the lead
+// content. Reuses the existing single-click-selects/double-click-navigates
+// model (docs/ui/SELECTION.md): a click re-points the Selection element at the
+// building; a double-click navigates into the building's full detail via
+// focus_on_entity, the same dispatch the canvases use.
+void draw_tile_building_subelement(const world& w, ui_state& ui, entity_id tile)
 {
-    const auto tit = w.tiles.find(tile);
-    if (tit == w.tiles.end())
+    const entity_id bid = building_on_tile(w, tile);
+    if (bid == null_entity)
         return;
-    const tile_component& tc = tit->second;
 
     ImGui::Separator();
-    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Build here");
+    ImGui::TextDisabled("On this tile");
 
-    // A whole-tile blocker (ocean) means no building type is offerable here; show
-    // the reason-code text rather than a bare hardcoded string (BL-071). A generic
-    // non-extraction building surfaces the tile-level verdict.
-    if (const placement_rules::placement_result r =
-            placement_rules::can_place(tc, building_type::processing_facility,
-                                       resource_type::iron_ore);
-        !r)
-    {
-        ImGui::TextDisabled("%s.", r.message());
-        return;
-    }
-
-    // Player balance gates affordability (a building the corp cannot pay for is
-    // offered disabled, so the cost is still legible).
-    float balance = 0.0f;
-    const auto pit = w.corporations.find(w.player_entity);
-    if (pit != w.corporations.end())
-        balance = pit->second.balance;
-
-    // Enqueue helper — sets the pending request app executes this frame.
-    auto enqueue = [&ui, tile](building_type type, resource_type target) {
-        ui.construction.pending_tile   = tile;
-        ui.construction.pending_type   = type;
-        ui.construction.pending_target = target;
-    };
-
-    // --- Extraction: only the extractable resources actually deposited here ---
-    bool any_extractable = false;
-    for (const resource_type r : placement_rules::k_extractable)
-        if (tc.resource_deposit[static_cast<std::size_t>(r)] > 0.0f)
-            any_extractable = true;
-
-    if (any_extractable)
-    {
-        // A compact target picker over the deposits present, writing construction.target.
-        if (!placement_rules::is_extractable(ui.construction.target) ||
-            tc.resource_deposit[static_cast<std::size_t>(ui.construction.target)] <= 0.0f)
-        {
-            // Default the target to the first present extractable so the button is valid.
-            for (const resource_type r : placement_rules::k_extractable)
-                if (tc.resource_deposit[static_cast<std::size_t>(r)] > 0.0f)
-                { ui.construction.target = r; break; }
-        }
-        for (const resource_type r : placement_rules::k_extractable)
-        {
-            if (tc.resource_deposit[static_cast<std::size_t>(r)] <= 0.0f)
-                continue;
-            const bool sel = (ui.construction.target == r);
-            if (ImGui::RadioButton(resource_name(r), sel))
-                ui.construction.target = r;
-            ImGui::SameLine();
-        }
-        ImGui::NewLine();
-
-        const build_afford ext =
-            build_cost_annotation(w, reg, building_type::extraction_site, tile, balance);
-        ImGui::BeginDisabled(!ext.ok);
-        if (ImGui::Button("Build extraction site"))
-            enqueue(building_type::extraction_site, ui.construction.target);
-        ImGui::EndDisabled();
-        ImGui::SameLine();
-        ImGui::TextDisabled("%s", ext.label.c_str());
-        draw_prospective_build_status(w, reg, building_type::extraction_site, tile);
-    }
-    else
-    {
-        ImGui::TextDisabled("No extractable deposit here.");
-    }
-
-    // --- Processing facility + Port: any non-ocean land tile ---
-    const build_afford proc =
-        build_cost_annotation(w, reg, building_type::processing_facility, tile, balance);
-    ImGui::BeginDisabled(!proc.ok);
-    if (ImGui::Button("Build processing facility"))
-        enqueue(building_type::processing_facility, resource_type::iron_ore);
-    ImGui::EndDisabled();
-    ImGui::SameLine();
-    ImGui::TextDisabled("%s", proc.label.c_str());
-    draw_prospective_build_status(w, reg, building_type::processing_facility, tile);
-
-    const build_afford prt =
-        build_cost_annotation(w, reg, building_type::port, tile, balance);
-    ImGui::BeginDisabled(!prt.ok);
-    if (ImGui::Button("Build port"))
-        enqueue(building_type::port, resource_type::iron_ore);
-    ImGui::EndDisabled();
-    ImGui::SameLine();
-    ImGui::TextDisabled("%s", prt.label.c_str());
-    draw_prospective_build_status(w, reg, building_type::port, tile);
-
-    // Outcome of the most recent attempt, if any.
-    if (!ui.construction.last_message.empty())
-        ImGui::TextDisabled("%s", ui.construction.last_message.c_str());
+    const building_component& b = w.buildings.at(bid);
+    const bool selected = (ui.selected_entity == bid);
+    const std::string label = std::string(building_type_name(b.type))
+                             + (is_player_owned(w, bid) ? "" : "  (rival)");
+    if (ImGui::Selectable(label.c_str(), selected))
+        ui.selected_entity = bid;
+    if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+        focus_on_entity(w, ui, bid); // double-click descends into the building
 }
 
 // Headline label for a selected entity. Bodies carry a name; the other kinds
@@ -618,8 +495,15 @@ void draw_selection_action(const world& w, const recipe_registry& reg,
     switch (kind)
     {
         case selection_kind::tile:
-            // Build front door — the buildable types + cost, a tile's primary move.
-            draw_build_front_door(w, reg, ui, sel);
+            // BL-139: the tile is the primary selection subject now. Lead with the
+            // "Build here" nav affordance (stub — see draw_build_here_affordance),
+            // then the tile's own detail (terrain/deposits/owner/habitability, the
+            // shared draw_tile_summary content builder), then the building — if any
+            // occupies this tile — as a subordinate sub-element below it.
+            draw_build_here_affordance(ui);
+            ImGui::Separator();
+            draw_tile_summary(w, sel);
+            draw_tile_building_subelement(w, ui, sel);
             break;
 
         case selection_kind::body:
@@ -790,18 +674,24 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
     const float action_w  = (content_w - style.ItemSpacing.x) * 0.58f;
 
     // Two fill-height columns: action leads at a fixed split, facts to its right.
+    // Container policy (LAYOUT.md): the Selection element wraps text rather than
+    // clipping it, with vertical scroll as the overflow behaviour — so each column
+    // wraps at its own width (PushTextWrapPos(0.0f) wraps at the current window's
+    // right edge) and keeps its scrollbar instead of suppressing it.
     ImGui::BeginChild("##sel_action", {action_w, 0.0f}, false,
-                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
                       ImGuiWindowFlags_NoSavedSettings);
+    ImGui::PushTextWrapPos(0.0f);
     draw_selection_action(w, reg, ui, kind);
+    ImGui::PopTextWrapPos();
     ImGui::EndChild();
 
     ImGui::SameLine();
 
     ImGui::BeginChild("##sel_facts", {0.0f, 0.0f}, false,
-                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
                       ImGuiWindowFlags_NoSavedSettings);
+    ImGui::PushTextWrapPos(0.0f);
     draw_selection_facts(w, reg, report, ui, kind);
+    ImGui::PopTextWrapPos();
     ImGui::EndChild();
 
     ImGui::End();

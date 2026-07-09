@@ -39,6 +39,7 @@
 #include "world/supply_system.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cmath>
 #include <cstdio>
@@ -231,6 +232,17 @@ app::app()
     ui::load_ui_font();
 }
 
+namespace {
+constexpr std::array<float, 3> k_ui_scale_px = {16.0f, 20.0f, 24.0f}; ///< BL-063 steps: 1.0 / 1.25 / 1.5 of the 16px base.
+} // namespace
+
+void app::apply_ui_scale()
+{
+    const int step = std::clamp(m_settings.ui_scale_step, 0, static_cast<int>(k_ui_scale_px.size()) - 1);
+    ui::reload_ui_font(k_ui_scale_px[static_cast<std::size_t>(step)]);
+    ImGui_ImplSDLRenderer3_DestroyFontsTexture();
+}
+
 app::~app()
 {
     ImGui_ImplSDLRenderer3_Shutdown();
@@ -248,6 +260,7 @@ int app::run()
     // never touches settings, keeping golden captures at the fixed default size.
     load_settings();
     apply_display_settings();
+    apply_ui_scale();
 
     m_lua.load("scripts/init.lua");
 
@@ -290,6 +303,11 @@ int app::run()
         // Mirror the day tick onto the world so read-only UI surfaces can age trade
         // routes for the activity fog (BL-089) without threading the tick everywhere.
         m_world.current_day_tick = static_cast<int>(m_sim_loop.day_tick());
+
+        // Continuous sim time for the intra-body vision beam (BL-152/154). The actual
+        // vision refresh (update_body_vision) runs in render(), so both the live loop
+        // and the --verify capture path (capture_frame -> render) get it.
+        m_ui.sim_now_days = now_days;
 
         // Resolve the economy on each econ-tick (quarter) boundary the clock crosses.
         const uint64_t econ = m_sim_loop.econ_tick();
@@ -1421,7 +1439,7 @@ void app::draw_main_menu()
 
         // Nations on the home body (the Voronoi merge target).
         ImGui::SetNextItemWidth(280.0f);
-        ImGui::SliderInt("##nations", &wp.nation_count, 6, 20, "Nations: %d");
+        ImGui::SliderInt("##nations", &wp.nation_count, 6, 30, "Nations: %d");
 
         // Bodies — the count knob is phased to a later update; shown disabled so the
         // intent reads without implying it works yet.
@@ -1537,6 +1555,13 @@ void app::render()
                 break;
 
             case canvas_level::planetary:
+                // Refresh the intra-body vision model (BL-151/152/154) for the active
+                // body just before drawing it: permanent building pockets + corp-centre→
+                // market corridors, and the live convoy paths the beam head glides along.
+                // Here (not the run loop) so the --verify capture path gets it too. Needs
+                // a non-const world for the route-cached pathfinder, so it cannot live in
+                // the const-world draw. Derived VIEW state — no feedback into the sim.
+                ui::update_body_vision(m_world, m_ui, m_ui.sim_now_days);
                 ui::draw_body_surface_canvas(m_world, m_ui, m_registry, m_last_econ_report, {0.0f, 0.0f}, disp, primary_input,
                                              {mm_origin.x, mm_origin.y + mm_h * 0.5f});
                 ui::draw_circumplanetary_canvas(m_world, m_ui, inset_origin, inset_size, minimap_input, true);
@@ -1583,11 +1608,23 @@ void app::render()
         ui::draw_overlay_controls(m_ui, mm_origin.x, lens_bar_y, mm_w);
     }
 
-    // Time panel — top-right, same width as the minimap. Two columns: a compact
-    // date/quarter block (left, 25%) and the speed controls (right, 75%). The
-    // panel takes input (the speed buttons), so it is not flagged NoInputs.
+    // Time panel — top-right, same width as the minimap (BL-138 compact redesign).
+    // Three rows: the year alone, centred and prominent; a date/quarter line
+    // (left) beside the compact speed controls (right); and the quarter-progress
+    // bar directly under the date line. The panel takes input (the speed
+    // buttons), so it is not flagged NoInputs.
     const float tick_w = mm_w;
-    const float time_h = mm_h * 0.5f;
+    // Height is content-derived (BL-097), not a fraction of the minimap's
+    // resolution-scaled mm_h (the BL-093 anti-pattern). Year row on top; left
+    // column: the date line plus the quarter-progress bar; right column: the
+    // speed-button row. Whichever column is taller sets the content height.
+    const float time_line_h    = ImGui::GetTextLineHeightWithSpacing();
+    const float time_frame_h   = ImGui::GetFrameHeight();
+    const float year_row_h     = time_line_h * 1.4f;
+    const float date_col_h     = time_line_h + time_frame_h;
+    const float ctrl_col_h     = time_frame_h;
+    const float time_content_h = year_row_h + std::max(date_col_h, ctrl_col_h);
+    const float time_h         = time_content_h + ImGui::GetStyle().WindowPadding.y * 2.0f;
     {
         ImGui::SetNextWindowPos({disp.x - margin - tick_w, margin});
         ImGui::SetNextWindowSize({tick_w, time_h});
@@ -1605,35 +1642,39 @@ void app::render()
         const uint64_t day = m_sim_loop.day_tick();
         const ui::fmt::calendar_date date = ui::fmt::date_from_day(day);
 
-        // 25% / 75% split via a two-column stretch table.
+        // --- Year: alone on top, centred and visually prominent.
+        {
+            const std::string year_str = std::to_string(date.year);
+            ImGui::SetWindowFontScale(1.4f);
+            const float text_w = ImGui::CalcTextSize(year_str.c_str()).x;
+            ImGui::SetCursorPosX((ImGui::GetContentRegionAvail().x - text_w) * 0.5f);
+            ImGui::TextUnformatted(year_str.c_str());
+            ImGui::SetWindowFontScale(1.0f);
+        }
+
+        // 25% / 75% split via a two-column stretch table: the date line + its
+        // progress bar (left) and the speed controls (right).
         if (ImGui::BeginTable("##time_cols", 2, ImGuiTableFlags_SizingStretchProp))
         {
             ImGui::TableSetupColumn("##date", ImGuiTableColumnFlags_WidthStretch, 0.25f);
             ImGui::TableSetupColumn("##ctrl", ImGuiTableColumnFlags_WidthStretch, 0.75f);
             ImGui::TableNextRow();
 
-            // --- Left: a date/quarter block in three rows. The progress bar
-            // shows how far through the current quarter the campaign is (the
-            // economy resolves on the quarter boundary).
+            // --- Left: "Jan 1st (Q1)" then the quarter-progress bar directly
+            // below it (the economy resolves on the quarter boundary).
             ImGui::TableSetColumnIndex(0);
-            ImGui::Text("%d Q%d", date.year, date.quarter);
-            ImGui::Text("%s %02d", ui::fmt::month_abbrev(date.month), date.day);
-            // Quarter-progress bar (the economy resolves on the quarter boundary); the
-            // "Qx in Nd" readout was removed as noise.
-            ImGui::ProgressBar(ui::fmt::quarter_progress(day), {-1.0f, 0.0f}, "");
+            ImGui::Text("%s %s (Q%d)", ui::fmt::month_abbrev(date.month),
+                        ui::fmt::ordinal_day(date.day).c_str(), date.quarter);
+            // Progress bar sits narrower than the date column and centred within it,
+            // rather than stretched flush to the column's left edge.
+            const float bar_w = ImGui::GetContentRegionAvail().x * 0.7f;
+            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (ImGui::GetContentRegionAvail().x - bar_w) * 0.5f);
+            ImGui::ProgressBar(ui::fmt::quarter_progress(day), {bar_w, 0.0f}, "");
 
-            // --- Right: the compressed speed controls.
+            // --- Right: the compressed speed controls. No "Sim NNNN" tick
+            // counter or "(paused)/(I..V)" text readout — the highlighted
+            // speed button already carries that state.
             ImGui::TableSetColumnIndex(1);
-            ImGui::Text("Sim %llu", m_sim_loop.sim_tick());
-            ImGui::SameLine();
-            if (m_sim_loop.paused())
-                ImGui::TextDisabled("(paused)");
-            else
-            {
-                static constexpr const char* mult_labels[] = {"", "I", "II", "III", "IV", "V"};
-                const int s = m_sim_loop.speed();
-                ImGui::TextDisabled("(%s)", (s >= 1 && s <= sim_loop::max_speed) ? mult_labels[s] : "?");
-            }
 
             // Pause plus speed buttons. The active speed is highlighted. When running,
             // the pause slot is a blank button carrying a filled square glyph (drawn
@@ -1801,7 +1842,7 @@ void app::render()
     }
     // Construction panel — an ordinary fold-out tab in the shell column (BL-122),
     // one of the mutually-exclusive column occupants (ledgers + Selection).
-    ui::draw_construction_panel(m_world, m_registry, m_ui, &m_ui.show_construction_panel);
+    ui::draw_construction_panel(m_world, m_registry, m_last_econ_report, m_ui, &m_ui.show_construction_panel);
     ui::draw_market_ledger(m_world, m_ui, m_market_history, m_ui.show_market_ledger);
     ui::draw_balance_ledger(m_world, m_last_econ_report, m_balance_history, m_ui.show_balance_ledger);
     ui::draw_corporation_panel(m_world, m_ui, m_ui.show_corporation_panel);
@@ -1955,6 +1996,22 @@ void app::render()
                 save_settings();
             }
 
+            ImGui::SeparatorText("Accessibility");
+            static const char* ui_scale_labels[] = {"1.0x", "1.25x", "1.5x"};
+            if (ImGui::BeginCombo("UI Scale", ui_scale_labels[m_settings.ui_scale_step]))
+            {
+                for (int i = 0; i < IM_ARRAYSIZE(ui_scale_labels); ++i)
+                {
+                    if (ImGui::Selectable(ui_scale_labels[i], i == m_settings.ui_scale_step))
+                    {
+                        m_settings.ui_scale_step = i;
+                        apply_ui_scale();
+                        save_settings();
+                    }
+                }
+                ImGui::EndCombo();
+            }
+
             // Live window size (also reflects a free drag-resize of the frame).
             int win_w = 0, win_h = 0;
             SDL_GetWindowSize(m_window, &win_w, &win_h);
@@ -2010,6 +2067,7 @@ void app::load_settings()
             else if (key == "window_h")   m_settings.window_h   = std::stoi(val);
             else if (key == "fullscreen") m_settings.fullscreen = (std::stoi(val) != 0);
             else if (key == "vsync")      m_settings.vsync      = (std::stoi(val) != 0);
+            else if (key == "ui_scale_step") m_settings.ui_scale_step = std::stoi(val);
         }
         catch (const std::exception&) { /* skip malformed value */ }
     }
@@ -2017,6 +2075,7 @@ void app::load_settings()
     // Clamp to a sane floor so a corrupt file can't produce an unusable window.
     m_settings.window_w = std::max(640, m_settings.window_w);
     m_settings.window_h = std::max(480, m_settings.window_h);
+    m_settings.ui_scale_step = std::clamp(m_settings.ui_scale_step, 0, 2);
 }
 
 void app::save_settings() const
@@ -2030,7 +2089,8 @@ void app::save_settings() const
     out << "window_w="   << m_settings.window_w        << '\n'
         << "window_h="   << m_settings.window_h        << '\n'
         << "fullscreen=" << (m_settings.fullscreen ? 1 : 0) << '\n'
-        << "vsync="      << (m_settings.vsync ? 1 : 0)      << '\n';
+        << "vsync="      << (m_settings.vsync ? 1 : 0)      << '\n'
+        << "ui_scale_step=" << m_settings.ui_scale_step     << '\n';
 }
 
 void app::apply_display_settings()

@@ -2,9 +2,12 @@
 
 #include "components.hpp"
 
+#include <cstdint>
 #include <map>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 /// The system's single asteroid belt — a band between two orbital radii. The
 /// belt is not a body (it owns no entity); it is rendered as a thick, translucent
@@ -19,6 +22,24 @@ struct asteroid_belt
     /// Whether the system has a belt to draw.
     /// @return True when the band has positive width.
     bool present() const { return outer_radius_au > inner_radius_au && outer_radius_au > 0.0f; }
+};
+
+/// Result of an intra-body pathfind (BL-077): the terrain-weighted path cost, whether the
+/// cheapest path crosses ocean (=> sea mode, else land), and whether the endpoints connect.
+/// Symmetric in its endpoints (edge cost is the average of the two tiles), so it caches under
+/// a canonicalised (body, lo_tile, hi_tile) key.
+struct logistics_path
+{
+    float cost          = 0.0f;
+    bool  crosses_ocean = false;
+    bool  reachable     = false;
+    /// The tile sequence of the best path, in canonical (lo→hi) endpoint order —
+    /// i.e. from min(src,dst) to max(src,dst), since the weighted path is symmetric
+    /// and cached on the unordered pair. A caller that dispatched src→dst reverses
+    /// this when src != lo. Empty when unreachable; a single tile when src == dst.
+    /// Populated by intra_body_path (BL-152, for the convoy vision beam); the cost
+    /// fields above stand alone for callers that ignore it.
+    std::vector<entity_id> tiles;
 };
 
 /// ECS registry. Entities are plain integer IDs; components are stored in
@@ -120,6 +141,27 @@ struct world
     /// symmetrically when that path exists (none is wired in world/* yet).
     std::vector<trade_route> trade_routes;
 
+    /// Proximity-glimpse stamps (BL-099) — the sim day tick at which a player convoy
+    /// last passed within `glimpse_radius_au_default` (AU) of this body while completing
+    /// an inter-body lane. Sampled once at the discrete completion tick by
+    /// record_proximity_glimpses (orbits have already advanced for that frame), so no
+    /// past position is ever reconstructed — the fog reads the stamp, never recomputes
+    /// geometry. Held off `body_component` (the `corp_body_pools` rationale) to keep the
+    /// body's future flat-binary layout untouched. std::map for deterministic iteration.
+    std::map<entity_id, int> body_last_glimpse_tick;
+
+    /// Lazily-built per-body raster index (grid_y*grid_width + grid_x -> tile entity, or
+    /// null_entity for an absent cell), for O(1) neighbour lookup in intra-body pathfinding
+    /// (BL-077). A derived cache, not authored state: built on first use by body_tile_grid(),
+    /// a pure function of the body's tiles (independent of tiles-map iteration order).
+    std::unordered_map<entity_id, std::vector<entity_id>> body_tile_index;
+
+    /// Route-cost cache for intra-body A* (BL-077), keyed by (body, lo_tile, hi_tile) with the
+    /// tile pair canonicalised (the weighted path is symmetric). A derived cache; invalidated
+    /// when road_level changes (road placement, BL-147). Keeps per-Tick per-lane A* off the
+    /// dispatch hot path.
+    std::map<std::tuple<entity_id, entity_id, entity_id>, logistics_path> astar_cost_cache;
+
     /// Stockpile pool for a (corporation, body) pair, inserting an empty pool on
     /// first access. The single point through which the economy systems read and
     /// write the shared pool.
@@ -220,6 +262,17 @@ enum class activity_vis : uint8_t
 /// (90 days) by default — a calibration constant (headless-tuned).
 inline constexpr int route_fresh_ticks_default = 90;
 
+/// Proximity-glimpse corridor half-width in AU (BL-099): a body whose closest approach
+/// to a completed player lane's endpoint->endpoint segment is within this distance gets a
+/// faint glimpse. A calibration constant (headless-tuned) — set so a frontier body one
+/// hop off a major lane glimpses while distant bodies do not.
+inline constexpr float glimpse_radius_au_default = 0.25f;
+
+/// Freshness window in sim day ticks for a proximity glimpse (BL-099): a body glimpsed
+/// within this many ticks of "now" reads as `known_stale`; older decays back to
+/// `unknown`. A glimpse is fainter than a route, so it never rises to `known`/`visible`.
+inline constexpr int glimpse_fresh_ticks_default = 90;
+
 /// Body-level activity visibility for the player, derived from routes + live convoys
 /// + ownership + the current tick. Pure and deterministic; no stored state.
 /// `home_body` and any body the player owns a building on are always `visible`.
@@ -232,4 +285,30 @@ inline constexpr int route_fresh_ticks_default = 90;
 /// @param route_fresh_ticks Freshness window; defaults to route_fresh_ticks_default.
 /// @return                  The body's activity tier for the player.
 activity_vis body_activity_visibility(const world& w, entity_id body, int now_tick,
-                                      int route_fresh_ticks = route_fresh_ticks_default);
+                                      int route_fresh_ticks   = route_fresh_ticks_default,
+                                      int glimpse_fresh_ticks = glimpse_fresh_ticks_default);
+
+// ---------------------------------------------------------------------------
+// Proximity-glimpse peek (BL-099)
+// ---------------------------------------------------------------------------
+// The third illumination geometry over the activity fog (after endpoints + corridors):
+// a body a player convoy merely passes NEAR (not an endpoint) on a completed lane gets a
+// faint, decaying glimpse. Deterministic by sample-and-store — body positions are mutated
+// state (orbital_angle_rad advances per frame), NOT a pure function of tick, so they
+// cannot be reconstructed at a later read; instead the closest-approach set is sampled
+// once at the discrete completion tick and the glimpse tick is stored. No per-frame
+// proximity test, no orbital-drift flicker, no RNG.
+
+/// Closest approach (AU) of `body`'s current position to the lane's endpoint->endpoint
+/// line segment, using the flat orbital-plane projection the sim uses (r*cos(theta),
+/// r*sin(theta)). Pure read; factored out so the headless harness can assert the geometry
+/// directly. Returns a large sentinel if `body` is an endpoint or any id is unknown.
+float body_closest_approach_au(const world& w, entity_id body, entity_id lane_a, entity_id lane_b);
+
+/// Sample every body's closest approach to the just-completed player lane (lane_a, lane_b)
+/// and stamp a proximity glimpse (body_last_glimpse_tick[body] = tick) on any body within
+/// `radius_au` that is neither an endpoint nor the star. Called from credit_arrived_convoys
+/// at the discrete completion tick, when orbits have already advanced for the frame — so the
+/// sampled positions ARE the completion-tick positions.
+void record_proximity_glimpses(world& w, entity_id lane_a, entity_id lane_b, int tick,
+                               float radius_au = glimpse_radius_au_default);

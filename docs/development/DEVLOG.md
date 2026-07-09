@@ -6,6 +6,204 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — v0.1.0 legibility polish + UX-review Batch Delivery (BL-133–145, BL-159) (2026-07-09)
+
+**Context.** The 2026-07-08 UX/lens-legibility review had left 14 `designed` items sitting toward
+the v0.1.0 cut (backlog.json, `version_goal` mostly v0.0.9/undated). Promoted the full set into a
+Batch Delivery — the first time this session ran the worktree fan-out model at this width (8
+concurrent agents).
+
+**Wave 1 (8 worktree agents, disjoint file scopes, all landed):**
+- **BL-141** — `docs/ui/LAYOUT.md` § Container vocabulary: 9 named UI containers (fold-out column,
+  on-canvas legend, selection element, header/balance strip, time panel, hover card, minimap lens
+  bar, nav rail, ImGui table), each with a sizing rule, a wrap-or-guaranteed-fit text policy, and an
+  overflow rule. Gates BL-140.
+- **BL-138** — compact time panel (`app.cpp`, `format.{cpp,hpp}`): year alone on top, `"Jan 1st (Q1)"`
+  date line (new `ordinal_day` formatter), progress bar directly below it, compact `"> I II III IV V"`
+  speed controls; dropped the tick counter and paused/speed text readout.
+- **BL-142** — Balance Ledger pinned permanently to `w.player_entity` (corp selector + rival-runway
+  fallback removed, closing a BL-068 privacy gap), plus disabled "Policies"/"Budget laws" TODO stub
+  sections.
+- **BL-159 + BL-143** — sell-order management relocated from the Building ledger onto a new Market
+  Ledger tab (reachable by tab or by market selection), then the Construction fold-out renamed
+  "Building" with Construction (queue + per-quarter opex) / Buildings (aggregate list: workforce,
+  profit, status, policy-placeholder stub) tabs; the old Build front-door and Sell Orders tab removed.
+- **BL-144** — Tile Ledger re-hosted from a standalone `ImGui::Begin` window onto the shared
+  `ui::foldout_begin/end` chrome, joining the other ledgers as a mutually-exclusive column occupant.
+- **BL-145** — corporation `industrial_focus` UI readout hidden across all four surfaces that showed
+  it (economy/corporation panels, entity summary, profile panel); data untouched, nation "Economic
+  focus" left visible.
+- **BL-139** — tile made the primary selection subject: tile detail (terrain/deposits/owner/
+  habitability) leads, an occupying building appears as a sub-element (double-click navigates in),
+  and a stub "build here" affordance sits at the top (wired to the existing Building panel pending a
+  real build-ledger destination).
+- **BL-133/134/135/136/137 (lens legibility cluster, one agent, sequential)** — BL-137 recoloured the
+  Production lens to a dedicated red→green ramp (kept separate from the Market lens's shared
+  `diverging_colour`); BL-134 moved the shared lens-good selector from the minimap strip into the
+  on-canvas legend as a scrollable combo; BL-133 added `draw_country_key` (swatch + nation name,
+  modelled on `draw_market_key`); BL-136 reworked the Opportunity metric into a body-relative,
+  volume-weighted unmet-demand rank (mirroring the Scarcity lens) and dropped the "(unmet demand)"
+  label qualifier; BL-135 replaced the Workforce/Opportunity full-tile tints with a red→green
+  per-tile dot mark (new `icons::value_mark` glyph) on every buildable tile, suppressing the building
+  glyph on occupied tiles under those two lenses.
+
+**Wave 2:** **BL-140** — UI text/image containment pass over `header_panel.cpp` (balance-strip
+guaranteed-fit + last-resort elide-with-tooltip for the debt flag), `selection_panel.cpp` (wrap +
+scroll instead of clipped/no-scrollbar columns); `body_surface_canvas.cpp` and the `app.cpp` time
+panel were audited and found already compliant.
+
+**Merge notes.** Two agents (BL-144, the lens cluster) hit a background API disconnect mid-task;
+resumed cleanly via SendMessage with a status recap, no rework lost. Three merge conflicts arose
+against *other* concurrent work already on `main` from earlier the same session — `tile_inspector.cpp`
+(an older `ledger_window_spawn/size` signature had already changed), `app.cpp`'s time panel (an
+existing BL-097 content-derived-height fix predated this batch's fixed-fraction height), and
+`draw_market_key` in `body_surface_canvas.cpp` (had already gained city-name labels). All three
+resolved by hand, grafting this batch's new content onto the better/newer upstream approach rather
+than reverting it.
+
+**Verified:** full integrating build after every merge, final build 615/615 targets green,
+**20/20 CTest headless harnesses PASS** (no regressions). All 14 items flipped to `complete` in
+backlog.json; `requirements.json § 2026-07-09-uxbatch` (9 groups) all `complete`. Not independently
+visually verified (no `scripts/verify/*.lua` golden authored for this batch — a candidate follow-up).
+Authority propagates to LAYOUT.md, LENSES.md, DISCOVERY.md per item on next doc-authority pass.
+
+---
+
+## Session — Fog of war: activity-fog shadow + Planetary reach fog + convoy beam (2026-07-09)
+
+**Context.** Started by bringing local `main` up to speed (merged 6 upstream commits — the mobile
+BL-087 tech-tree work — into 20 unpushed local commits; one DEVLOG append-conflict resolved keeping
+both entries) and rebuilding. Ben then playtested and couldn't see any fog; three items followed.
+
+**BL-150 — activity fog as a dim shadow (Solar).** The BL-089 activity fog was absence-by-default (an
+un-networked body drew nothing), so with little commerce the map read as no-fog. Inverted it: bodies
+outside the player's network render dimmed (per-body brightness ramp unknown/stale/known/visible =
+0.36/0.60/0.84/1.0 + shadow-wash alpha), brightening as commerce reaches them. `dim_rgb` helper +
+`activity_fog_*` ramps in presentation.hpp.
+
+**BL-151 — intra-body reach fog (Planetary).** Ben expected fog on the *home planet* over intra-body
+trade — which didn't exist (the activity fog is body-level, Solar-only). Added a per-tile Planetary
+fog: the surface reads mostly unknown, lit only in a tight BFS pocket (radius 3) around the player's
+building tiles + live convoy endpoints. **Design calls (Ben):** commercial-reach semantics (not
+unknown-terrain — it's your own soil); live-derived (no save-format change). First cut lit the whole
+market catchment — Ben: 'too wide'; tightened to presence-radius pockets for a sense of movement +
+unknowns. Probe at landing: home body 7 markets, player reaches 1.
+
+**BL-152 — convoy vision beam.** Ben: 'convoys should send a radius-2 beam of vision which lags and
+dims over 1 econ tick.' Exposed the convoy's tile path (`logistics_path.tiles`, reconstructed via a
+came_from walk in `intra_body_path`, canonical lo→hi, wrap-aware — verified by a throwaway headless
+probe: contiguity, canonical order, single-tile src==dst). A live convoy floods a radius-2 pocket
+along the segment it traversed that econ tick, stamped into `ui_state.convoy_vision` (tile → sim
+time) by `ui::update_convoy_vision` in step_economy; the canvas fades it over one econ tick (90 days)
+against continuous `sim_now_days`, so the beam trails and dims smoothly behind the convoy. Confirmed
+convoys are live (dispatch/advance/credit each econ step). Derived VIEW state only — never serialised,
+no world/* feedback, determinism preserved.
+
+**Verification.** Full build clean throughout. Visual: `scripts/verify/intrabody_fog.lua` (default +
+wide + convoy-beam captures) — static fog + lit HQ pocket confirmed by eye; convoy path reconstruction
+by ad-hoc headless probe (4 assertions PASS). Cross-platform goldens not re-blessed (by-eye per the
+Windows-golden-mismatch note).
+
+**BL-154 — moving beam + permanent corridors (same session, refining 151/152).** Ben: the beam should
+*move* with a head and tail that update, and there should be *permanent vision from the corp centre of
+operation to the market centre, as a 3-wide beam*. Reworked the vision model into three derived layers
+(`update_body_vision`, called from render()'s planetary branch so --verify gets it too): (1) permanent
+radius-2 pockets around player buildings, (2) permanent 3-wide corridors from the corp centre of
+operation (lowest-id player building tile) to each operated market centre, (3) a render-time moving
+beam — `convoy_beams` stores path+progress+speed, the canvas interpolates the head by the fraction
+through the current econ tick (so it glides smoothly) and trails a dimming tail one tick's travel back.
+Replaced BL-152's per-econ-step timestamp-fade buffer. The path-exposure work from 152 stands.
+
+**BL-153 filed (deferred).** Ben's "money based on distance rather than time" is an economy-seam change
+(today convoy profit is the destination price differential; distance is only a *cost* via logistics).
+Filed design-owed, post-v0.1.0 — needs a design pass, not bundled with the visuals.
+
+**Left open.** Radius/tuning knobs (building pocket radius 2, corridor width 3, beam radius 2) are
+Ben-tunable one-liners. The path-reconstruction probe was run ad hoc, not saved as a `tools/verify/*.cpp`
+harness — candidate follow-up. Authority propagated to DISCOVERY.md ("Illumination (Planetary canvas)").
+
+**Sequencing (Ben, end of session).** The fog/vision work looks good but depends on systems that still
+need stress-testing (the convoy/economy/dispatch loop the beams and corridors read) before it can be
+called done. Retargeted BL-150/151/152/154 `version_goal` → **v0.1.1** (from v0.0.9). The code stays on
+`main`; it is complete-as-implemented but not counted as shipped until the dependent systems are proven.
+
+## Session — Roadmap refocus: expanded-prototype arc + Era→Filter (2026-07-09)
+
+**Context.** A roadmap pass following the version-goal backfill. Ben directed a structural refocus
+of the forward map: extend it past the v0.1.0 prototype cut into an expanded prototype, and set the
+shape of the next three milestone bands. Doc + backlog-metadata change; no `src/` touch.
+
+**Decisions (Ben).**
+- **v0.2.0 is *the refocus*** — the player-identity pivot (BL-094): nation becomes the strategic
+  actor, the chartered corp (prototyped as one) stays the economic actor. Tagged `version_goal:
+  v0.2.0`.
+- **Roads move to v0.1.1** — BL-146–149 (generated road network + A\* cost, planetary rendering +
+  player-placeable roads, city logistics discount, inland hub) leave the v0.1.0 cut queue and open
+  the v0.1.x band. Re-tagged `v0.1.0 → v0.1.1`.
+- **v0.1.x pads out the expanded prototype** — a design-forward *ponder + stub* band for **laws,
+  techs, military systems, and politics (stub)**, positioning the data model ahead of v0.2.0/v0.3.0.
+  Theme-level only; no backlog items minted this session.
+- **v0.3.0 = politics + the filter system** — promote the political stub into a working layer, and
+  **rename/reframe Era → Filter** (BL-087's catastrophic-event / quest-tree model re-read as a
+  world-state *filter*). Tagged BL-087 `version_goal: v0.3.0`.
+
+**What shipped.** `ROADMAP.md` forward half rewritten: intro now spans the cut → expanded prototype
+(v0.1.x → v0.3.0), framed as *direction, not committed scope* (past v0.1.0 is beyond
+TECH_FOUNDATIONS prototype scope by design); new `### v0.1.x / v0.2.0 / v0.3.0` sections; v0.1.0
+retitled *Quality audit + legibility polish + cut* and its done-definition reframed as *the
+prototype cut*. `backlog.json` metadata: BL-146–149 → v0.1.1, BL-094 → v0.2.0, BL-087 → v0.3.0
+(surgical CRLF-safe edits; JSON re-validated).
+
+**Open items / flags.**
+- **Naming watch — Filter vs Lens.** "Filter" (Era rename, v0.3.0) sits near the map-lens
+  vocabulary in `LENSES.md`; flagged in the roadmap to confirm the two read as distinct before the
+  rename lands.
+- **v0.1.x band itemised** (follow-up, same session): Ben asked for one placeholder item per minor
+  until the v0.2.0 refocus. Created **BL-155** (v0.1.2 Laws), **BL-156** (v0.1.3 Techs, precursor to
+  BL-087), **BL-157** (v0.1.4 Military stub), **BL-158** (v0.1.5 Politics stub) — all `design-owed`,
+  authority docs/SYSTEMS.md, framed as design + data-model stub within post-cut scope. IDs allocated
+  off the cross-branch max via `next_id.js` (BL-155 was next safe). ROADMAP v0.1.x bullets now name
+  the minors + item IDs.
+- **Era→Filter is authority-time-sliced** — `ERAS.md` / `GLOSSARY.md` / era enums stay as-is until
+  the v0.3.0 work lands.
+
+## Session — BL-129: prose pass on the central documentation (2026-07-08)
+
+**Context.** Ben green-lit BL-129 CENTRAL_DOC_PROSE_PASS ("burn some Fable 5 on it — rewrite the
+docs"), explicitly delegating the prose the item had reserved for him. Doc-only; Light-plus mode
+(no REFINED promotion, no requirement group — doc-only exempt), run at full multi-agent depth for
+quality.
+
+**What shipped.** 18 clause-level edits across CLAUDE.md, io-standing-rules.md,
+DEVELOPMENT_PRACTICES.md, and DELIVERY.md: the central docs now name the reward of the discipline —
+craft, satisfaction, momentum — around the rules, with no rule text changed. The anchor passage
+lands in DELIVERY.md § The one idea ("the method answers to the game's own standard: each change
+feeds something, composes cleanly, reads legibly") with a one-sentence echo in CLAUDE.md's pipeline
+intro. The Light family carries "the small win stays whole" (CLAUDE.md) / "a clean one-liner is a
+pleasure" (DELIVERY); the Tone pair gains a compression gradient ("the clever one is a debt" terse
+in standing-rules, "+ is a pleasure to explain" full in DEVELOPMENT_PRACTICES); "the quietly-wrong"
+names the enemy at both verification seams (tests-alongside, retroactive merge verify); "a stop is
+a finish, not an abandonment" (depth verbs); "left clean, it resumes without archaeology" (both
+pausing homes); taste scoped under Rule 0a ("taste qualifies… it gets the same two options").
+
+**Method.** Two Workflow fan-outs. (1) Survey (4 per-doc + 1 voice-anchor agents) → three competing
+full drafts (minimal-weave / one-named-home / full-coverage) → a three-lens judge panel (register
+skeptic / operating-system critic / craft judge); final synthesis in the main session. (2) A
+post-apply adversarial verify (rule-preservation / register / echo-integrity skeptics) over the
+real diff: 11 findings, 8 corrections accepted, the rest rejected as re-litigating the item's
+premise (recorded in the item's design field).
+
+**In-session decisions (for Ben's review).**
+- Ben's sketch "when the path is clear, keep moving; save the ceremony for the seam" was adjusted
+  to "the ceremony is for the work that earns it": two independent passes found "the seam"
+  mis-narrows Full's three triggers, and "keep moving" both preaches and introduces a
+  path-clarity mode signal Rule 0 doesn't have.
+- "A game about elegant systems, built by an elegant system" (the item's own summary line) was
+  deliberately not used — closest to poster register of all the candidates. One-line add if wanted.
+- The taste sentence was moved out of the Light bullet into § Ad-hoc ideas: in the mode definition
+  it read as license to act on unscoped noticings without Rule 0a's two-option offer.
+- The register verifier argued for deleting the pleasure/kernel sentences outright; rejected — they
+  are the item's payload. If they still read wrong on the fortieth session, each is a one-line revert.
 ## Session — BL-087 tech/quest design resolutions (mobile, 2026-07-08)
 
 **Context.** Mobile design session (cloud, doc-only) working the BL-087 owed set — the six open

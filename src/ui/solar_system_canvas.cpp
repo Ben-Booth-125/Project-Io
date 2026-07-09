@@ -203,6 +203,20 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
 
         const bool this_hovered = (id == hovered_body);
 
+        // Activity fog as a dim shadow (BL-150): classify the body's commercial-
+        // activity tier once (home is always full-bright), then dim its body + label
+        // brightness and cast a translucent dark wash over the dimmer tiers, so a
+        // body outside the player's commercial network reads as *fogged* and
+        // brightens as commerce reaches it. Derived read only — no sim state. The
+        // same `av` feeds the fine-grained lower-left pulse badge below.
+        const bool is_home = (id == w.home_body && w.home_body != null_entity);
+        const activity_vis av = is_home
+                                    ? activity_vis::visible
+                                    : body_activity_visibility(w, id, w.current_day_tick);
+        const int   av_i       = static_cast<int>(av);
+        const float fog_bright = is_home ? 1.0f : palette::activity_fog_brightness[av_i];
+        const int   fog_shadow = is_home ? 0    : palette::activity_fog_shadow_alpha[av_i];
+
         // Home-body halo (BL-085): an always-on "you are here" ring around the
         // player's home world, drawn behind the body so it reads as identity chrome
         // distinct from the survey badge and the selection/hover highlight. Player
@@ -214,7 +228,13 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
             dl->AddCircle(pos, hr, palette::corp_colour(0), 0, 2.0f);
         }
 
-        dl->AddCircleFilled(pos, radius, style.colour);
+        dl->AddCircleFilled(pos, radius, palette::dim_rgb(style.colour, fog_bright));
+
+        // Activity-fog shadow wash (BL-150): a translucent dark disc cast over the
+        // dimmest tiers (unknown, stale), slightly larger than the body so it reads
+        // as a shadow the body sits within. The lit tiers carry brightness alone.
+        if (fog_shadow > 0)
+            dl->AddCircleFilled(pos, radius + 1.0f, IM_COL32(8, 10, 16, fog_shadow));
 
         // Shared selection / hover / pinned ring. Pinning is not yet wired, so
         // pinned is always false here.
@@ -253,7 +273,6 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
         // shows only for known / stale / visible non-home bodies.
         if (id != w.home_body)
         {
-            const activity_vis av = body_activity_visibility(w, id, w.current_day_tick);
             if (av != activity_vis::unknown)
             {
                 const float  ar = std::max(4.0f, 6.0f * element_scale);
@@ -279,7 +298,11 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
                     pos.x - text_size.x * 0.5f,
                     pos.y + radius + 2.0f,
                 };
-                dl->AddText(label_pos, IM_COL32(255, 255, 255, 255), body.name.c_str());
+                // Dim the label to match the body's activity-fog brightness (BL-150),
+                // so an un-networked body's name recedes with it rather than reading
+                // full-bright over a shadowed dot.
+                dl->AddText(label_pos, palette::dim_rgb(IM_COL32(255, 255, 255, 255), fog_bright),
+                            body.name.c_str());
             }
         }
     }

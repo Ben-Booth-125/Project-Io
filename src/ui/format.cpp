@@ -101,6 +101,23 @@ std::string percent(double fraction, int decimals)
     return buf;
 }
 
+std::string ordinal_day(int day)
+{
+    const int rem100 = day % 100;
+    const char* suffix = "th";
+    if (rem100 < 11 || rem100 > 13)
+    {
+        switch (day % 10)
+        {
+            case 1: suffix = "st"; break;
+            case 2: suffix = "nd"; break;
+            case 3: suffix = "rd"; break;
+            default: suffix = "th"; break;
+        }
+    }
+    return std::to_string(day) + suffix;
+}
+
 const char* month_abbrev(int month)
 {
     if (month < 1 || month > months_per_year)

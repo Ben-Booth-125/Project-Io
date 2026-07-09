@@ -123,6 +123,69 @@ session boundary is drawn *between* them.
 
 ---
 
+## 2026-07-09 Batch — v0.1.0 legibility polish + UX-review cluster (BL-133–145, BL-159) — **COMPLETE**
+
+Fourteen items (the full 2026-07-08 UX-review cluster) landed in one Batch Delivery, fanned to 8
+wave-1 worktree agents + 1 wave-2 agent. Wave 1 (fully disjoint file scopes, ran concurrently):
+**A** BL-141 container vocabulary (`docs/ui/LAYOUT.md`), **B** BL-138 compact time panel (`app.cpp`,
+`format.{cpp,hpp}`), **C** BL-142 budget view player-only (`balance_ledger.cpp`), **D** BL-159 then
+BL-143 sequential (`market_ledger.cpp` → `construction_panel.cpp`, `nav_pane.cpp`), **E** BL-144 tile
+ledger fold-out standard (`tile_inspector.cpp`), **F** BL-145 corp focus invisible (4 panel files),
+**G** BL-139 tile-primary selection (`selection_panel.cpp`), **G2** the lens legibility cluster —
+BL-137→134→133→136→135 sequential in one agent (`body_surface_canvas.cpp`, `overlay.cpp`,
+`icons.{hpp,cpp}`). Wave 2: **H** BL-140 UI text/image containment, run after wave 1 merged since it
+mechanically applies A's vocabulary across the surfaces the other waves had just changed.
+
+Two agents (E, G2) hit a background API disconnect mid-task and were resumed via SendMessage with a
+status recap; both picked up cleanly from their last commit. Two merge conflicts surfaced against
+concurrent upstream work landed earlier the same session (`tile_inspector.cpp`'s ledger-chrome
+signature had already changed; `app.cpp`'s time panel had an older BL-097 height fix and
+`body_surface_canvas.cpp`'s `draw_market_key` had gained city-name labels) — both resolved by hand,
+keeping the newer/better upstream approach (content-derived height, city-name labels) while grafting
+in this batch's new content. Full integrating build green after every merge; final build 615/615
+targets, **20/20 CTest harnesses PASS**, no regressions. All 14 items flipped to `complete` in
+backlog.json; requirements `requirements.json § 2026-07-09-uxbatch` (9 groups) all `complete`.
+Per-item detail: DEVLOG 2026-07-09.
+
+---
+
+## 2026-07-08 Batch — Backlog refinement pass (BL-011, BL-014, BL-016, BL-053, BL-063, BL-097) — **COMPLETE (residue noted)**
+
+Five design-owed items designed and promoted in one session, fanned to 5 worktree agents (Wave 1:
+reach/supply lenses, accessibility palette+contrast, accessibility UI-scale, country generation,
+view-bounding audit) + 1 follow-on (Wave 2: view-bounding fix, informed by the audit's findings).
+All branches merged clean except one `backlog.json` conflict (country-gen agent's worktree had
+branched before the design-settling commit landed; reconciled by hand). Full app build green
+throughout; `world_audit`/`world_determinism` re-run after every merge, ALL PASS, no regressions.
+
+**BL-053** (country generation) fully complete: discovered the size-variance mechanism
+(`merge_small_nations`) already existed from an earlier commit, retuned constants (14→24 nations,
+34 seeds pre-merge), harness-verified (count [20,28] + max≥3× min both PASS).
+**BL-063** (UI-scale) fully complete: discrete 1.0/1.25/1.5× font-atlas reload, persisted in
+`options.cfg`, wired into the F10 Options window.
+**BL-097** (view-bounding) fully complete: audit found 2 real bugs (time-panel height pinned to
+`mm_h*0.5f`; Tile Ledger spawn anchored off the stale `profile_panel_width`), both fixed; the rest
+of the shell (header/profile/nav-rail/minimap/explorer/economy-panel/lens-key) confirmed already
+correct.
+**BL-011/BL-014** (Reach + Supply-routes lenses) code-complete with one scope deviation: rendered
+as an on-canvas key/readout rather than cross-body glow/edges, since `body_surface_canvas.cpp`
+only ever draws the active body's own tile grid — the fuller cross-body visual is a follow-up for
+`solar_system_canvas.cpp`.
+**BL-016** (lens palette) code-complete for the palette half (Okabe-Ito/Viridis re-hue); on-canvas
+country/market labels + Corporation-lens legend deferred as a `body_surface_canvas.cpp`/`overlay.cpp`
+follow-up.
+
+**Residue (recorded, not dropped):** visual goldens need re-blessing (lens hues changed); the
+`palette::text_secondary` AA token isn't yet wired into ~90 existing `TextDisabled` call sites; a
+`scripts/verify/*.lua` multi-resolution sweep script (for BL-097) wasn't authored; `docs/ui/ACCESSIBILITY.md`
+still isn't written. Requirements `requirements.json` § {reach-supply-lenses, accessibility-strand-1}
+remain `pending` on visual verification; § {country-generation-variety} complete; § {view-bounding-audit}
+pending on the visual sweep. Permanent record: `docs/development/backlog.json` (BL-011/014/016/053/063/097
+all flipped to `complete`), commits `35dd1fb`, `287d8e0`, `95788ef`→`004c5f9` (merge), `1ffe395`→`2506c97`
+(merge), `47da542`→`02819a7` (merge). Summary retained one cycle.
+
+---
+
 ## 2026-07-07 Batch — Economy dynamism (BL-078, BL-095, BL-096, BL-079, BL-112) — **COMPLETE**
 
 Five interlocking economy items delivered 2026-07-07. **BL-078** redefined the nation substrate into a
@@ -293,3 +356,41 @@ interaction/hover-gated surfaces (BL-070 popup interior, BL-089 tooltip) code-ve
 disproportionate to a polish minor — re-assess at the v0.1.0 boundary). Permanent record: DEVLOG
 2026-07-05, `req/requirements.json`, backlog resolutions, `docs/ui/{MENU,LAYOUT,SELECTION,ICONS,
 DISCOVERY}.md`. Summary retained one cycle (from 2026-07-05).
+
+---
+
+## BL-099 — Commercial-fog proximity-glimpse peek (delivered 2026-07-08) — **COMPLETE**
+
+BL-089 deferral 2 of 2, landed as its own item. **Sample-and-store** dissolved the determinism
+objection that caused the deferral: body positions are mutated `orbital_angle_rad` (not pure in tick),
+so `record_proximity_glimpses` samples the closest-approach set ONCE at a player convoy's discrete
+completion tick (in `credit_arrived_convoys`, after orbits advanced for that frame) and stores the tick
+in `world.body_last_glimpse_tick` (off `body_component`); `body_activity_visibility` returns
+`known_stale` for a glimpsed-but-unrouted body within `glimpse_fresh_ticks_default` (90), never
+`known`/`visible`, and a body's own route outranks a glimpse. R = `glimpse_radius_au_default` (0.25 AU).
+The renderer was untouched (BL-089's blessed `known_stale` badge path). Built main-session-serial.
+
+Verified: `commercial_fog_harness` 19/19 (10 new BL-099 assertions — geometry, tier, endpoint-exclusion,
+decay, route-precedence, determinism) + full CTest **19/19** (determinism intact); on-canvas by-eye via
+`scripts/verify/proximity_glimpse.lua` before/after. Requirements `requirements.json § proximity-glimpse`
+R1+R2 complete. Authority propagated to `docs/ui/DISCOVERY.md`. Golden bless owed on the Linux box
+(new `proximity_glimpse` goldens + `commercial_fog_solar` re-bless — its `known_stale` set widened).
+Summary retained one cycle (from 2026-07-08).
+
+---
+
+## BL-077 — Planetary logistics: economic core (delivered 2026-07-08) — **COMPLETE**
+
+Rescoped core of the logistics epic, built main-session-serial. **Data model** (A): tile_component.road_level
+(default 0), land_use infrastructure value, per-body grid->tile index + A* route cache on world. **A* pathfinder**
+(B, new world/logistics.{hpp,cpp}): canonical landform cost table (TILES.md), terrain-weighted A* over the tile grid
+(4-cardinal, column wrap, road discount, ocean sea-leg + land/sea mode selection), symmetric edge cost, cached;
+reuses nation_generation's Dijkstra shape, expansion_cost untouched (world-gen determinism). **Intra-body dispatch**
+(C, supply_system.cpp): same-body market shortfalls source the corp's on-body pool, hauling from its representative
+tile to the short market's centre_tile via A*, mode land/sea by ocean-crossing, cost reg.logistics_cost(mode)*dist*qty;
+inter-body space path unchanged. **Harness** (D, tools/verify/logistics_harness.cpp).
+
+Verified: logistics_harness 19/19 + full CTest **20/20** (econ_stability + pregame_balance stable on the real world,
+determinism intact, supply_advance + trade_routes unaffected). Commits a202dc8 (facility) + this (dispatch).
+Requirements planetary-logistics-core R1-R3 complete. Authority: SUPPLY.md. Summary retained one cycle (from 2026-07-08).
+

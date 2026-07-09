@@ -12,18 +12,6 @@
 namespace ui {
 
 namespace {
-
-const char* focus_label(industrial_focus f)
-{
-    switch (f)
-    {
-        case industrial_focus::extraction: return "Extraction";
-        case industrial_focus::processing: return "Processing";
-        case industrial_focus::trade:      return "Trade";
-    }
-    return "Unknown";
-}
-
 } // namespace
 
 void draw_corporation_panel(const world& w, ui_state& s, bool& open)
@@ -56,13 +44,14 @@ void draw_corporation_panel(const world& w, ui_state& s, bool& open)
         ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg;
 
     // In the ~244px shell column the name is the identity and must win the width, so it
-    // stretches while Focus/Balance take tight fixed widths (a generous fixed width here
+    // stretches while Balance takes a tight fixed width (a generous fixed width here
     // is exactly what re-collapsed the name to one glyph). Building count is dropped — a
-    // minor stat, still on the Selection panel when a corp is clicked.
-    if (ImGui::BeginTable("##corps", 3, table_flags))
+    // minor stat, still on the Selection panel when a corp is clicked. BL-145: the Focus
+    // column is hidden blanket (industrial_focus stays a data-model field for
+    // world-gen/economy, just not surfaced in UI).
+    if (ImGui::BeginTable("##corps", 2, table_flags))
     {
         ImGui::TableSetupColumn("Corporation", ImGuiTableColumnFlags_WidthStretch);
-        ImGui::TableSetupColumn("Focus",   ImGuiTableColumnFlags_WidthFixed, 70.0f);
         ImGui::TableSetupColumn("Balance", ImGuiTableColumnFlags_WidthFixed, 62.0f);
         ImGui::TableHeadersRow();
 
@@ -88,9 +77,6 @@ void draw_corporation_panel(const world& w, ui_state& s, bool& open)
             }
 
             ImGui::TableSetColumnIndex(1);
-            ImGui::TextDisabled("%s", focus_label(cc.focus));
-
-            ImGui::TableSetColumnIndex(2);
             {
                 const ImU32 col = (cc.balance < 0.0f) ? palette::negative : palette::positive;
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(col), "%.1f", cc.balance);

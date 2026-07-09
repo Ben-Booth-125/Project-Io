@@ -41,12 +41,18 @@ Separate thinking from doing, and **size the effort to the job** (Rule 0). For a
 is thirty seconds in your head; for a big one, write it down. Do not apply the heavy version to
 small jobs.
 
+The method answers to the game's own standard: each change feeds something, composes cleanly,
+reads legibly — the same test the systems must pass, applied to the work that builds them. A
+small job finished clean in one motion is the method working, not the method skipped. The
+ceremony is for the work that earns it — spent there, it buys the speed everywhere else.
+
 ## Two modes (Rule 0)
 
 Every non-trivial task states its mode:
 
 - **Light** — a one-line fix, an obvious cleanup, a doc tweak. Make it, check it, say what you
-  did. No tasks, no requirements, no ceremony. **This is the default.**
+  did. No tasks, no requirements, no ceremony. A clean one-liner is a pleasure; ceremony would
+  rob the small win of it. **This is the default.**
 - **Full** — work whose coordination cost it repays. Run the Delivery lifecycle below and make
   each step visible. Full is *earned* when the work touches the economy / save-format /
   integration seam, spans more than ~2 files of real logic, or carries determinism/reconciliation
@@ -62,6 +68,9 @@ clarifying questions:
   assumptions in the item's design body / open questions.
 - **B) Implement now** — build immediately, smoke-test, and **ask before committing**. No polish
   or refinements until the user confirms.
+
+Taste qualifies: when something merely reads wrong, fixing it is work, not vanity — it gets the
+same two options.
 
 ## Design state — the two open states
 
@@ -114,7 +123,8 @@ same subject differently:
 
 ## Depth verbs — how far to take an item
 
-Name *how far* an instruction carries an item, so effort is never ambiguous:
+Name *how far* an instruction carries an item, so effort is never ambiguous and a stop is a
+finish, not an abandonment:
 
 - **Design** — design depth only. Settle a `design-owed` item's open questions into the item and
   flip it to `designed`, then **stop**. No tasks, no code, no authority-doc edit.
@@ -237,7 +247,8 @@ Consequences:
   well-scoped agent is the unit that pays back.
 - **Agents build and commit on their own worktree branch**; the **main session merges** them in
   dependency order, runs the integrating build, and verifies. Assume nothing about an agent's
-  self-reported success — verify retroactively after merge.
+  self-reported success — verify retroactively after merge. The retroactive pass is where the
+  quietly-wrong surfaces, while it is still one slice deep.
 - **Sub-agents must use the Bash tool with a heredoc for all git commits.** The project's
   `settings.json` allow rule is `Bash(git commit*)` — the PowerShell tool is not covered and
   will stall on a permission prompt. Every sub-agent prompt should include: *"Use the Bash tool
@@ -283,4 +294,5 @@ memory `backlog-id-collision-hazard`):
 - **Pausing is legitimate.** Driving a group to complete in one block is the default, not a
   mandate. When ending early serves the work, **pause** the group (REFINED.md true to state, build
   green or breakage noted, a short "resume here" line) rather than force completion or cancel it.
-  A paused group is a deliberate scoping choice, distinct from a *cancelled* one.
+  Left clean, it resumes without archaeology. A paused group is a deliberate scoping choice,
+  distinct from a *cancelled* one.

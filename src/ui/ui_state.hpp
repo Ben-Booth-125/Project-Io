@@ -5,6 +5,8 @@
 
 #include <imgui.h>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 /// Which rung of the canvas zoom ladder currently fills the primary viewport.
@@ -34,6 +36,8 @@ enum class overlay_mode
     production,  ///< Per-tile production-intensity surface (Σ output×price, log scale). See LENSES.md § Production lens.
     scarcity,    ///< Per-market supply-shortfall blocks (hot where demand outran supply). See LENSES.md § Scarcity lens.
     industry,    ///< Per-tile nation-substrate throughput field (occupation × terrain richness). See LENSES.md § Industry lens (BL-084).
+    reach,       ///< Body-level commercial reach: bodies connected via the corp's trade_route entries, tiered by recency. BL-011. See LENSES.md § Reach lens.
+    supply_routes, ///< Aggregated trade_route graph: one edge per body pair, thickness from log-scaled convoy_count, colour from recency tier. BL-014. See LENSES.md § Supply-routes lens.
 };
 
 /// A selectable on-canvas marker registered each frame by the Planetary canvas
@@ -119,6 +123,10 @@ struct ui_state
     // panel's construction.panel_view for the template.
     int  economy_view = 0; ///< Economy panel: 0=Corps, 1=Holdings, 2=Markets (BL-117).
 
+    /// Market Ledger: 0=Prices, 1=Sell Orders (BL-159 — sell-order management
+    /// relocated here from the Construction/Building panel).
+    int  market_ledger_view = 0;
+
     // --- application / system menu (BL-070) ---
     // The corner gear popup for session control (Pause/Resume, Exit Game). Opened
     // by the gear button and toggled by Esc; confirm_exit_pending arms the inline
@@ -165,6 +173,26 @@ struct ui_state
     float planetary_zoom  = 4.0f / 3.0f; ///< Scroll-wheel zoom factor. 4/3 shows 3/4 of the grid height on load.
     float planetary_pan_x = 0.0f; ///< Pan offset of the grid centre from the canvas centre, screen px.
     float planetary_pan_y = 0.0f; ///< Pan offset of the grid centre from the canvas centre, screen px.
+
+    // --- intra-body vision model (BL-151/152/154) ---
+    // The Planetary canvas reads three vision layers, all derived VIEW state — never
+    // serialised, never fed back into the simulation, so world/* stays deterministic.
+    // Refreshed each frame by ui::update_body_vision for the active body.
+
+    /// Permanently-lit tiles: radius-2 pockets around the player's own building tiles
+    /// (your installations are always visible) + 3-wide corridors from the corp centre
+    /// of operation to each market centre the player operates in. Rendered at full
+    /// vision (no fade).
+    std::unordered_set<entity_id> permanent_vision;
+
+    /// A live player intra-body convoy, for the render-time moving beam. The path is
+    /// the convoy's tile route in travel order (src→dst); progress/speed drive a head
+    /// that interpolates smoothly along it between econ steps, with a tail that lags
+    /// and dims one econ tick's travel behind the head.
+    struct convoy_beam { std::vector<entity_id> path; float progress = 0.0f; float speed = 0.0f; };
+    std::vector<convoy_beam> convoy_beams;
+
+    double sim_now_days = 0.0; ///< Latest continuous sim time (elapsed days); the beam-motion clock.
 
     // --- hover-card state (BL-060) ---
     entity_id hovered_entity = null_entity; ///< Entity the cursor rested on last frame; used to detect stable hover.

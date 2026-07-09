@@ -1,5 +1,7 @@
 #include "supply_system.hpp"
 
+#include "logistics.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <numbers>
@@ -69,6 +71,14 @@ void credit_arrived_convoys(world& w, int tick)
                 rit->last_tick = tick;
                 ++rit->convoy_count;
             }
+
+            // Proximity-glimpse peek (BL-099): a player convoy completing this inter-body
+            // lane faintly lights any frontier body it passed near — the "route past a
+            // frontier to reveal it" mechanic. Player-only (a glimpse is the player's own
+            // commercial reach expanding their sight); sampled here at the discrete
+            // completion tick from live orbital positions, then stored (never reconstructed).
+            if (convoy.corp == w.player_entity)
+                record_proximity_glimpses(w, src_body, dest_body, tick);
         }
     }
 
@@ -122,6 +132,31 @@ bool corp_has_launchpad_on(const world& w, const corporation_component& corp, en
     return false;
 }
 
+/// Tile of the corp's lowest-id building on `body` — its production anchor, used as the
+/// intra-body haul origin (BL-077). Mirrors market_clearing's representative_tile, kept local
+/// here to avoid a supply_system -> market_clearing link dependency. null_entity if the corp
+/// holds nothing on the body.
+entity_id corp_representative_tile(const world& w, const corporation_component& corp, entity_id body)
+{
+    entity_id best_building = null_entity;
+    entity_id best_tile     = null_entity;
+    for (const entity_id bid : corp.assets)
+    {
+        const auto bit = w.buildings.find(bid);
+        if (bit == w.buildings.end())
+            continue;
+        const auto tit = w.tiles.find(bit->second.tile);
+        if (tit == w.tiles.end() || tit->second.body != body)
+            continue;
+        if (best_building == null_entity || bid < best_building)
+        {
+            best_building = bid;
+            best_tile     = bit->second.tile;
+        }
+    }
+    return best_tile;
+}
+
 /// Find the market entity for a given body. Returns null_entity if none exists.
 entity_id market_for_body(const world& w, entity_id body)
 {
@@ -166,21 +201,42 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
                     if (src_key.first != corp_id)
                         continue;
                     const entity_id src_body = src_key.second;
-                    if (src_body == dest_body)
-                        continue; // same body: no convoy needed
 
                     const float surplus = src_pool.quantities[ri];
                     if (surplus <= 0.0f)
                         continue;
+                    const float qty = std::min(surplus, shortfall);
 
-                    const convoy_mode mode = convoy_mode::space;
-                    if (!corp_has_launchpad_on(w, corp, src_body))
-                        continue;
+                    convoy_mode mode;
+                    float       dist;
+                    float       unit_cost;
+                    if (src_body == dest_body)
+                    {
+                        // Intra-body (BL-077): haul the corp's on-body stockpile from its
+                        // representative tile to the short market's centre, terrain-weighted
+                        // over the tile grid (land, or sea when the path must cross water).
+                        const entity_id origin      = corp_representative_tile(w, corp, src_body);
+                        const entity_id dest_centre = dest_market.centre_tile;
+                        if (origin == null_entity || dest_centre == null_entity)
+                            continue; // no production anchor / unanchored market: cannot route
+                        const logistics_path path = intra_body_path(w, src_body, origin, dest_centre);
+                        if (!path.reachable)
+                            continue;
+                        mode      = path.crosses_ocean ? convoy_mode::sea : convoy_mode::land;
+                        dist      = path.cost;
+                        unit_cost = reg.logistics_cost(mode);
+                    }
+                    else
+                    {
+                        // Inter-body: straight-line space lane, launchpad-gated (unchanged).
+                        if (!corp_has_launchpad_on(w, corp, src_body))
+                            continue;
+                        mode      = convoy_mode::space;
+                        dist      = body_distance_au(w, src_body, dest_body);
+                        unit_cost = logistics_cost_space;
+                    }
 
-                    const float dist = body_distance_au(w, src_body, dest_body);
-                    const float qty  = std::min(surplus, shortfall);
-                    const float cost = logistics_cost_space * dist * qty;
-
+                    const float cost = unit_cost * dist * qty;
                     if (cost < best_cost)
                     {
                         best_src_body   = src_body;
@@ -218,6 +274,6 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
             }
         }
     }
-    (void)reg;
-    (void)logistics_cost_land; // land-mode dispatch deferred (same-body shortfalls resolved by production)
+    (void)logistics_cost_land; // intra-body reads reg.logistics_cost(land/sea) directly; this
+                               // param is retained for caller/signature stability.
 }

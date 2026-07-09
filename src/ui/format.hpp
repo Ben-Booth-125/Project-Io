@@ -81,6 +81,14 @@ struct calendar_date
 /// The calendar year day 0 falls in. The campaign opens on January 1st 1960.
 constexpr int campaign_epoch_year = 1960;
 
+/// Render a day-of-month as an English ordinal string ("1st", "2nd", "3rd",
+/// "4th", ..., "21st", "22nd", "23rd", "24th", ...), following the standard
+/// suffix rule (the 11th/12th/13th exception applies regardless of tens digit).
+///
+/// @param day Day-of-month (any positive value; not range-checked against 30).
+/// @return    Ordinal string, e.g. "1st".
+std::string ordinal_day(int day);
+
 /// Three-letter English month abbreviation for a 1-12 month index ("Jan".."Dec").
 /// Returns "?" for an out-of-range month so a bad value is visible rather than
 /// reading as a silent wrong month. Used by the compact `Jan 01` calendar line.

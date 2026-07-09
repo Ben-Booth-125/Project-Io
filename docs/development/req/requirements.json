@@ -5303,6 +5303,354 @@
           "notes": ""
         }
       ]
+    },
+    {
+      "brief": "proximity-glimpse",
+      "title": "BL-099 Commercial-fog proximity-glimpse peek (BL-089 deferral 2 of 2)",
+      "promoted_from": "backlog.json BL-099 (standalone item lifted from BL-089's deferrals; requires BL-089)",
+      "difficulty": 2,
+      "importance": "B",
+      "evaluated_difficulty": 2,
+      "status": "complete",
+      "resolved": "2026-07-08",
+      "resolution": "Delivered BL-089's second documented deferral via sample-and-store, which dissolves the determinism obstacle (body positions are mutated orbital_angle_rad, not pure in tick): record_proximity_glimpses samples live positions at a player convoy's discrete completion tick (credit_arrived_convoys, when orbits have already advanced for the frame) and stamps body_last_glimpse_tick[body] on any non-endpoint body within glimpse_radius_au_default (0.25 AU) of the endpoint->endpoint segment; body_activity_visibility returns known_stale for a glimpsed-but-unrouted body within glimpse_fresh_ticks_default (90), never known/visible. Stored off body_component in a world map to keep the flat-binary layout untouched; all reads (solar badge, hover, Selection) widen with zero renderer change. Verified: commercial_fog_harness 19/19 (10 new assertions) + full CTest 19/19 (incl. determinism); on-canvas by-eye (proximity_glimpse before/after). Golden bless owed on the Linux box.",
+      "batch": null,
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "Item-spanning (visual): after a player convoy completes a space lane that passes near a frontier body (neither endpoint, no player route of its own), that body enters the activity fog at the faint known_stale tier on the Solar canvas -- the same badge the endpoint/corridor fog already renders -- while a body far from every completed lane stays unknown.",
+          "verification": ["visual: scripts/verify/proximity_glimpse.lua golden"],
+          "result_metric": "By-eye confirmed (proximity_glimpse before/after, software renderer): the completed player Kepler->Pallas lit corridor runs directly past route-free Cinder; endpoint bodies (Kepler/Pallas) show activity badges via the same render path that draws the known_stale glimpse. Cinder's known_stale tier + the within-R/beyond-R/decay geometry are proven exhaustively in commercial_fog_harness (R2).",
+          "notes": "The known_stale badge render is unchanged from BL-089 (blessed); BL-099 only widens which bodies reach that tier (a data change, proven headless). Cinder's own badge is occluded in-capture by the lit corridor drawn over it (Cinder is ~collinear with the lane -- the strongest glimpse case). Golden bless owed on Linux (Windows window opens 1720x1080 vs the 1280x720 golden; goldens are Linux-blessed per the cross-platform policy). Also owed on Linux: re-bless commercial_fog_solar, whose known_stale set legitimately widens (Selene now glimpses on the Kepler->Cinder completion)."
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "Deterministic by sample-and-store: at a player convoy's discrete completion tick, record_proximity_glimpses samples live body positions and stamps body_last_glimpse_tick[body]=tick for every non-endpoint body whose closest approach to the endpoint->endpoint segment is <= glimpse_radius_au_default. body_activity_visibility returns known_stale (never known/visible) for a body glimpsed within glimpse_fresh_ticks, unknown once it decays or lies beyond R; a body with its own route keeps its route tier. Same inputs -> same glimpse set (no orbital-drift, no RNG, no reconstruction of past positions).",
+          "verification": ["headless: tools/verify/commercial_fog_harness.cpp (extended)"],
+          "result_metric": "PASS: commercial_fog_harness 19/19 (10 new BL-099 assertions) -- closest-approach geometry (near=0.1AU, far>R, endpoint sentinel), within-R -> known_stale, beyond-R -> unknown, endpoint not self-glimpsed, glimpse never exceeds known_stale, own fresh route outranks glimpse, decay past the window -> unknown, idempotent re-sample (deterministic set). Full CTest suite 19/19 incl. determinism_harness + world_determinism.",
+          "notes": "Sample-and-store resolves the BL-089/v0.0.9 deferral: positions are mutated state (orbital_angle_rad), not a pure function of tick, so the glimpse is frozen at the completion tick (orbits already advanced for that frame in step_economy) rather than reconstructed at a later read. Stored off body_component in a world map (body_last_glimpse_tick) to keep the future flat-binary layout untouched. The sample call lives in supply_system.cpp credit_arrived_convoys (the actual completion hook), correcting BL-099's files list which omitted it."
+        }
+      ]
+    },
+    {
+      "brief": "planetary-logistics-core",
+      "title": "BL-077 Planetary logistics: economic core (data model + A* distance + intra-body dispatch)",
+      "promoted_from": "backlog.json BL-077 (rescoped core; decomposed 2026-07-08)",
+      "difficulty": 4,
+      "importance": "B",
+      "evaluated_difficulty": 4,
+      "status": "complete",
+      "resolved": "2026-07-08",
+      "resolution": "Delivered the BL-077 economic core. Data model: tile_component.road_level (default 0), land_use infrastructure value, per-body grid->tile index + A* route cache on world. Pathfinder (world/logistics.{hpp,cpp}): canonical landform cost table (TILES.md), terrain-weighted A* (4-cardinal, column wrap, road discount, ocean sea-leg + mode selection), symmetric edge cost, cached. Intra-body dispatch (supply_system.cpp): same-body market shortfalls now source the corp's on-body pool, hauling from its representative tile to the short market's centre_tile via A*, mode land/sea by ocean-crossing, cost reg.logistics_cost(mode)*dist*qty; the inter-body space path is unchanged. Verified: logistics_harness 19/19 (geometry, weighting, wrap, road discount, cache, mode selection, intra-body dispatch cost) + full CTest 20/20 -- econ_stability + pregame_balance_harness stable on the real world, determinism_harness + world_determinism intact, supply_advance + trade_routes unaffected. nation_generation expansion_cost left untouched (world-gen determinism). Follow-ons BL-146..149 spun off.",
+      "batch": null,
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "Item-spanning (headless): intra-body convoy distance is a terrain-weighted A* over the tile grid -- a path across cheap terrain costs less than one forced over mountains, road_level discounts a tile, the east-west cylinder wrap is respected (a route wrapping the shorter way is cheaper), and the route cache returns an identical cost on re-query. An intra-body (same-body) market shortfall dispatches a land/sea convoy whose cost uses that A* distance, not the space path.",
+          "verification": ["headless: tools/verify/logistics_harness.cpp"],
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "Data-model foundation: tile_component gains road_level (default 0); land_use_component::type gains infrastructure; a per-body grid->tile-entity index gives O(1) neighbour lookup (no linear scan of the tiles map); a canonical landform logistics-cost table matches TILES.md (plains 1.0 .. mountain 2.0). World generation determinism is preserved (nation_generation expansion_cost untouched).",
+          "verification": ["headless: tools/verify/logistics_harness.cpp", "headless: tools/verify/determinism_harness.cpp"],
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "dispatch_convoys creates same-body convoys for intra-body shortfalls (today skipped) with mode land (default) or sea (path crosses ocean) and A*-based cost; the inter-body space path is unchanged. Deterministic source selection.",
+          "verification": ["headless: tools/verify/logistics_harness.cpp"],
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "batch": "2026-07-08-backlog-refinement",
+      "brief": "reach-supply-lenses",
+      "title": "BL-011 + BL-014 — Reach and Supply-routes lenses",
+      "promoted_from": "backlog.json BL-011, BL-014",
+      "difficulty": 4,
+      "importance": "B",
+      "evaluated_difficulty": 4,
+      "status": "pending",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "pending",
+          "requirement": "ITEM-SPANNING: both lenses render correctly from the existing trade_route list, with no new data model added.",
+          "verification": [
+            "visual: src/ui/body_surface_canvas.cpp reach + supply-route overlays"
+          ],
+          "result_metric": "Code-complete (commit 35dd1fb), full build clean. Rendered as an on-canvas key/readout, not cross-body markers (body_surface_canvas.cpp only draws the active body). Visual capture not yet run.",
+          "notes": "Cross-body glow/edge rendering deferred to solar_system_canvas.cpp as a follow-up."
+        },
+        {
+          "id": "R2",
+          "status": "pending",
+          "requirement": "BL-011: Reach lens highlights bodies connected via the selected corp's trade_route entries, tiered by last_tick recency.",
+          "verification": [
+            "visual: src/ui/body_surface_canvas.cpp reach overlay"
+          ],
+          "result_metric": "Code-complete: draw_reach_key lists connected bodies + recency tier from world.trade_routes filtered to the player entity. Visual verification outstanding.",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "status": "pending",
+          "requirement": "BL-014: Supply-routes lens draws one aggregated edge per unordered (body_a, body_b) pair, thickness log-scaled from convoy_count, colour from recency tier.",
+          "verification": [
+            "visual: src/ui/body_surface_canvas.cpp supply-route overlay"
+          ],
+          "result_metric": "Code-complete: draw_supply_routes_key renders log-scaled thickness bars per lane. Visual verification outstanding.",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "batch": "2026-07-08-backlog-refinement",
+      "brief": "accessibility-strand-1",
+      "title": "BL-016 + BL-063 — colourblind-safe palette + legibility baseline",
+      "promoted_from": "backlog.json BL-016, BL-063",
+      "difficulty": 3,
+      "importance": "B",
+      "evaluated_difficulty": 3,
+      "status": "pending",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "pending",
+          "requirement": "ITEM-SPANNING: lens colours are colourblind-safe and secondary text clears WCAG AA, with a working UI-scale setting.",
+          "verification": [
+            "visual: src/ui/presentation.hpp + fonts.cpp"
+          ],
+          "result_metric": "Partial: palette + scale + new AA token landed (commits 287d8e0, ab6bd9f8479f60edf's merge). On-canvas labels/legend and the ~90-site TextDisabled wiring not done.",
+          "notes": "Full build clean, world_audit/world_determinism unaffected."
+        },
+        {
+          "id": "R2",
+          "status": "pending",
+          "requirement": "BL-016: Country/Corporation lenses use Okabe-Ito hues; Resource/Scarcity/Population/Production/Industry use a Viridis-style ordered ramp.",
+          "verification": [
+            "visual: src/ui/body_surface_canvas.cpp lens overlays"
+          ],
+          "result_metric": "Code-complete: corp_table/nation_table re-picked to Okabe-Ito, resource_table retinted for the ore/crop collision. Visual goldens need re-blessing (hues changed) before this can close.",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "status": "complete",
+          "requirement": "BL-063: a discrete UI-scale setting (1.0/1.25/1.5) persists across sessions and re-loads the font atlas at the chosen size.",
+          "verification": [
+            "headless: options.cfg round-trip",
+            "visual: scale applied on relaunch"
+          ],
+          "result_metric": "PASS: ui::reload_ui_font + app::apply_ui_scale wired to F10 Options combo, ui_scale_step persisted in options.cfg, re-applied at startup. Full build clean.",
+          "notes": ""
+        },
+        {
+          "id": "R4",
+          "status": "pending",
+          "requirement": "BL-063: audited secondary/label text tokens in presentation.hpp meet 4.5:1 contrast against the dark theme.",
+          "verification": [
+            "code: src/ui/presentation.hpp contrast audit"
+          ],
+          "result_metric": "Audit done, palette::text_secondary (~10:1) added. Not yet wired into the ~90 existing TextDisabled call sites across selection_panel.cpp/header_panel.cpp/profile_panel.cpp/explorer_panel.cpp etc — separate follow-up sweep.",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "batch": "2026-07-08-backlog-refinement",
+      "brief": "country-generation-variety",
+      "title": "BL-053 — larger, size-varied country generation",
+      "promoted_from": "backlog.json BL-053",
+      "difficulty": 4,
+      "importance": "B",
+      "evaluated_difficulty": 4,
+      "status": "complete",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "Nation generation produces a larger country count (~24) with a genuinely uneven size distribution, deterministically, via the existing merge_small_nations mechanism.",
+          "verification": [
+            "headless: world_audit nation-count + size-variance assertion"
+          ],
+          "result_metric": "PASS: Nations: 24 (min tiles 15, max tiles 1093) — count in [20,28] and max>=3x min both PASS.",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "complete",
+          "requirement": "Determinism preserved: identical seed produces identical nation partition.",
+          "verification": [
+            "headless: world_determinism"
+          ],
+          "result_metric": "PASS: ALL PASS (0 failures), including the default-descriptor sanity check updated to 24 nations.",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "batch": "2026-07-08-backlog-refinement",
+      "brief": "view-bounding-audit",
+      "title": "BL-097 — bound shell panels from content, not resolution-scaled dimensions",
+      "promoted_from": "backlog.json BL-097",
+      "difficulty": 3,
+      "importance": "B",
+      "evaluated_difficulty": 3,
+      "status": "pending",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "pending",
+          "requirement": "ITEM-SPANNING: every audited shell panel is sized from content (text-line units) and anchored to a fixed shell edge, at both 1280x720 and 1920x1080.",
+          "verification": [
+            "visual: multi-resolution capture sweep"
+          ],
+          "result_metric": "Code-complete (commit 47da542): time-panel height and ledger-spawn anchor fixed by code inspection; header/profile/nav-rail/minimap/explorer/economy-panel/lens-key confirmed already correct by the audit. Full build clean. No actual multi-resolution visual capture run.",
+          "notes": "scripts/verify/*.lua sweep script not authored — candidate follow-up tool per DELIVERY.md tool-creation discipline."
+        },
+        {
+          "id": "R2",
+          "status": "pending",
+          "requirement": "No audited panel clips, overflows, or overlaps a neighbour at a small (1000x600) or large (1920x1080) window size.",
+          "verification": [
+            "visual: scripts/verify/*.lua multi-resolution sweep (candidate new script)"
+          ],
+          "result_metric": "Fixes are correct by code inspection (content-derived sizing, fixed-edge anchoring) but not confirmed by an actual multi-resolution screenshot pass.",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "batch": "2026-07-09-fog",
+      "title": "BL-152 — convoy vision beam (a live convoy lights a radius-2 beam that lags and dims over one econ tick)",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-152",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING: a live player intra-body convoy lights a radius-2 vision pocket along its route on the Planetary canvas, brightening the fog there; the pocket ages to full fog over one econ tick (90 days) against sim_now_days, so it lags and dims behind the moving convoy.",
+          "verification": [
+            "visual: scripts/verify/intrabody_fog.lua (intrabody_fog_convoy_beam capture)",
+            "headless: convoy path reconstruction asserted ad hoc (intra_body_path returns a contiguous, canonical lo->hi tile sequence; single-tile when src==dst)"
+          ],
+          "result_metric": "Full build clean. Static capture shows the beam pocket lit on the fogged surface; the temporal fade is not capturable in a still. Path reconstruction verified by a throwaway headless probe (4 assertions PASS: reachable, 3-tile no-wrap path, canonical order under reverse query, single-tile src==dst) run 2026-07-09, then removed.",
+          "notes": "Beam illumination is derived VIEW state, refreshed via ui::update_body_vision, computed in the canvas — never serialised, no feedback into world/*, so determinism is preserved. The headless probe was run ad hoc, not saved as a tools/verify/*.cpp harness (candidate follow-up per DELIVERY.md tool-creation discipline). NOTE: the per-econ-step timestamp-fade mechanism named here was superseded same day by BL-154's render-time moving beam; the requirement (a convoy lights a radius-2 beam that lags and dims over one econ tick) still holds."
+        }
+      ]
+    },
+    {
+      "batch": "2026-07-09-fog",
+      "title": "BL-154 — moving head/tail convoy beam + permanent corp-centre->market corridors",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-154",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING: on the Planetary canvas, the player's own building tiles + a 3-wide corridor from the corp centre of operation to each market centre it operates in read permanently lit; a live player intra-body convoy shows a radius-2 beam with a bright head that glides smoothly along its route (interpolated by the fraction through the current econ tick) and a tail that dims one econ tick's travel behind it; everything else reads fogged.",
+          "verification": [
+            "visual: scripts/verify/intrabody_fog.lua (default + wide captures show permanent pockets/corridors lit, globe fogged)"
+          ],
+          "result_metric": "Full build clean. Wide + default captures confirm the permanent building pockets + corridors render lit and the rest of the body fogged. The moving beam's smooth head/tail motion is verified by construction (render-time interpolation of stored path+progress+speed by econ-tick fraction) but not by a still — it only manifests with a live inter-market intra-body convoy, which the same-market verify seed does not produce; confirmed by live playtest.",
+          "notes": "All three vision layers are derived VIEW state (ui_state.permanent_vision + convoy_beams), rebuilt each frame in ui::update_body_vision, called from render()'s planetary branch so the --verify capture path and a live body-switch both get it. No serialisation, no world/* feedback; determinism preserved. Corp centre of operation = lowest-id player building tile on the body (mirrors market_clearing's file-local representative_tile)."
+        }
+      ]
+    },
+    {
+      "batch": "2026-07-09-uxbatch",
+      "title": "BL-141 — UI container vocabulary",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-141",
+      "rows": [
+        { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING: LAYOUT.md documents the closed container vocabulary (9 containers, each with sizing/min-max/text-policy/overflow) that BL-140 applies mechanically.", "verification": ["code: docs/ui/LAYOUT.md section added"], "result_metric": "", "notes": "Doc-only; gates BL-140." }
+      ]
+    },
+    {
+      "batch": "2026-07-09-uxbatch",
+      "title": "BL-138 — Time control compact redesign",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-138",
+      "rows": [
+        { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING: the app.cpp time panel renders the compact mockup layout — year on top, 'Mon Nth (Qn)' date line with ordinal day, progress bar directly below the date line, speed controls '> I II III IV V' compact on the right, tick-counter/paused-text readout dropped.", "verification": ["visual", "code"], "result_metric": "", "notes": "New ordinal-day formatter in format.cpp/.hpp." }
+      ]
+    },
+    {
+      "batch": "2026-07-09-uxbatch",
+      "title": "BL-142 — Budget view player-only",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-142",
+      "rows": [
+        { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING: the Balance Ledger drops the corporation selector and per-corp fallback, pinned to w.player_entity only (no rival treasury inspection); disabled 'Policies'/'Budget laws' TODO stub sections are signposted.", "verification": ["code", "visual"], "result_metric": "", "notes": "Aligns with BL-068 competitor-privacy rule." }
+      ]
+    },
+    {
+      "batch": "2026-07-09-uxbatch",
+      "title": "BL-159 + BL-143 — Sell orders on market + Building ledger redesign",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-159, BL-143",
+      "rows": [
+        { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING (BL-159, lands first): sell-order management moves to a Market Ledger tab, reachable via its tab button or by selecting a market; carries over the columns/actions from the old draw_sell_orders_section.", "verification": ["code", "visual"], "result_metric": "", "notes": "market_ledger.cpp only; must land before/with BL-143's removal." },
+        { "id": "R2", "status": "complete", "requirement": "ITEM-SPANNING (BL-143): the Construction fold-out is renamed 'Building' with two tabs — Construction (queue + per-quarter estimated cost) and Buildings (aggregate list: workforce/profit/status + policy-placeholder TODO stub); the Build front-door and Sell Orders tab are removed.", "verification": ["code", "visual"], "result_metric": "", "notes": "construction_panel.cpp, nav_pane.cpp. Depends on R1 (BL-159) landing first." }
+      ]
+    },
+    {
+      "batch": "2026-07-09-uxbatch",
+      "title": "BL-144 — Tile ledger fold-out standard",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-144",
+      "rows": [
+        { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING: the Tile Ledger is converted from a standalone ImGui::Begin window to ui::foldout_begin/foldout_end, matching market_ledger/balance_ledger/construction_panel, and becomes a mutually-exclusive column occupant.", "verification": ["code", "visual"], "result_metric": "", "notes": "tile_inspector.cpp only; mirrors BL-122." }
+      ]
+    },
+    {
+      "batch": "2026-07-09-uxbatch",
+      "title": "BL-145 — Corp focus invisible",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-145",
+      "rows": [
+        { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING: the corporation industrial_focus readout is hidden from all four UI surfaces (economy_panel, corporation_panel, entity_summary, profile_panel) while the underlying data stays intact; nation 'Economic focus' is left visible.", "verification": ["code", "visual"], "result_metric": "", "notes": "" }
+      ]
+    },
+    {
+      "batch": "2026-07-09-uxbatch",
+      "title": "BL-139 — Selection tile ledger building",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-139",
+      "rows": [
+        { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING: selecting a tile opens the tile ledger with tile detail (terrain/deposits/owner/habitability) as lead content; an occupying building appears as a sub-element (double-click navigates to its full detail); an empty tile carries a top-of-ledger navigation affordance toward a build ledger (stub target acceptable — the build ledger surface itself is out of scope here).", "verification": ["code", "visual"], "result_metric": "", "notes": "selection_panel.cpp only." }
+      ]
+    },
+    {
+      "batch": "2026-07-09-uxbatch",
+      "title": "BL-133/134/135/136/137 — Lens legibility cluster (body_surface_canvas)",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-133, BL-134, BL-135, BL-136, BL-137",
+      "rows": [
+        { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING (BL-137): the Production-intensity tile tint recolours to a dedicated red->green ramp (red=low, green=high), independent of the shared diverging_colour used by the Market key.", "verification": ["code", "visual"], "result_metric": "", "notes": "" },
+        { "id": "R2", "status": "complete", "requirement": "ITEM-SPANNING (BL-134): the shared lens-good selector moves from the minimap strip into the on-canvas legend as a scrollable ImGui BeginCombo, for the Resource/Market/Scarcity lenses.", "verification": ["code", "visual"], "result_metric": "", "notes": "Legend becomes an interactive ImGui child; do this before adding BL-133's key so the new container shape is established." },
+        { "id": "R3", "status": "complete", "requirement": "ITEM-SPANNING (BL-133): draw_country_key renders one swatch+nation-name per nation present on the body, sorted by nation id, wired into the overlay_mode::country branch of the legend dispatch.", "verification": ["code", "visual"], "result_metric": "", "notes": "" },
+        { "id": "R4", "status": "complete", "requirement": "ITEM-SPANNING (BL-136): the Opportunity lens metric becomes a body-relative, volume-weighted unmet-demand rank (mirrors the Scarcity lens's body-relative treatment) instead of a max-absolute price/base ratio; label drops the '(unmet demand)' qualifier.", "verification": ["code", "visual"], "result_metric": "", "notes": "Must land before R5 (BL-135), which consumes this metric." },
+        { "id": "R5", "status": "complete", "requirement": "ITEM-SPANNING (BL-135): the Workforce and Opportunity lenses replace full-tile tint with a red->green per-tile dot mark on every buildable tile, suppressing the building glyph on occupied tiles while the lens is active; legend re-keys to a red->green ramp.", "verification": ["code", "visual"], "result_metric": "", "notes": "New dot glyph in ui::icons. Depends on R4 for the Opportunity metric." }
+      ]
+    },
+    {
+      "batch": "2026-07-09-uxbatch",
+      "title": "BL-140 — UI text/image containment",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-140",
+      "rows": [
+        { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING: every on-screen text/image across header/balance strip, time panel, on-canvas legends, selection element, ledgers, hover card, and ImGui tables is placed in a BL-141 container and takes that container's wrap-or-fit text policy, with no silent truncation down to the 1280x720 verify window.", "verification": ["code", "visual"], "result_metric": "", "notes": "Requires BL-141 (container vocabulary) and runs LAST, after all other uxbatch items land, since it is a mechanical pass over the surfaces they just changed." }
+      ]
     }
+
   ]
 }

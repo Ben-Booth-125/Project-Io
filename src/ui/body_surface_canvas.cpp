@@ -6,8 +6,10 @@
 #include "hover_card.hpp"
 #include "hover_content.hpp"
 #include "icons.hpp"
+#include "market_ledger.hpp" // market_city_name (Market lens catchment key, BL-015)
 #include "nav_pane.hpp"
 #include "presentation.hpp"
+#include "world/logistics.hpp"       // intra_body_path (convoy vision beam, BL-152)
 #include "world/market_clearing.hpp" // market_for_tile (Scarcity catchment, prices)
 #include "world/placement_rules.hpp"
 #include "world/survey_system.hpp"   // survey_tile_visible (region mask, BL-067)
@@ -21,6 +23,7 @@
 #include <iterator>
 #include <limits>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace ui {
@@ -101,6 +104,12 @@ ImU32 lerp_colour(ImU32 a, ImU32 b, float t)
 /// declared so the Production key (above its definition) can sample the same band.
 ImU32 diverging_colour(float ratio);
 
+/// Diverging red→green colour for a ratio relative to 1.0 (defined below); forward
+/// declared so the Production key (above its definition) can sample the same band.
+/// Distinct ramp from diverging_colour (BL-137) — dedicated so the Market lens's
+/// cool/warm scale is untouched.
+ImU32 production_colour(float ratio);
+
 /// Shared chrome for an on-canvas lens key: a rounded dark panel of @p box_w ×
 /// @p body_h at the left edge (inset past the nav rail), vertically centred —
 /// clear of the Selection panel, the header/Explorer, and the lens control strip.
@@ -121,17 +130,55 @@ void begin_lens_key(ImDrawList* dl, ImVec2 anchor, float box_w,
     out_w = box_w - 2.0f * pad;
 }
 
+/// The lens-local resource/good selector for the Resource, Market, and Scarcity
+/// lenses (BL-134): all three pick "which resource" from the same `lens_resource`
+/// field (LENSES.md says the selectors share a form), so one combo serves them.
+/// Now lives at the top of the on-canvas legend (moved off the minimap strip,
+/// which the former popup button docked in) — a real scrollable ImGui::BeginCombo,
+/// hosted in a small borderless window since the legend itself paints on the
+/// background draw list rather than a live ImGui window.
+constexpr float kLensComboH = 22.0f;
+
+void draw_lens_resource_combo(ui_state& state, ImVec2 pos, float w)
+{
+    ImGui::SetNextWindowPos(pos, ImGuiCond_Always);
+    ImGui::SetNextWindowSize({w, kLensComboH}, ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.0f);
+    constexpr ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoTitleBar  | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoCollapse  | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoNav |
+        ImGuiWindowFlags_NoSavedSettings;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0.0f, 0.0f});
+    ImGui::Begin("##lens_key_resource_combo", nullptr, flags);
+    ImGui::SetNextItemWidth(w);
+    if (ImGui::BeginCombo("##lens_key_resource", presentation_of(state.lens_resource).name))
+    {
+        for (std::size_t i = 0; i < resource_count; ++i)
+        {
+            const resource_type r = static_cast<resource_type>(i);
+            if (ImGui::Selectable(presentation_of(r).name, r == state.lens_resource))
+                state.lens_resource = r;
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::End();
+    ImGui::PopStyleVar();
+}
+
 /// On-canvas legend for the Resource lens (BL-019): the selected resource's name
 /// and identity swatch, plus a note that the fill marks the contiguous deposit.
 /// Flat, not a gradient — the lens shows deposit *shape*, not magnitude.
 void draw_resource_key(ImDrawList* dl, ImVec2 anchor,
-                       const ui_state& state)
+                       ui_state& state)
 {
     const float pad    = 8.0f;
     const float line_h = ImGui::GetTextLineHeight();
-    const float body_h = pad + line_h + 4.0f + line_h + 4.0f + line_h + pad;
+    const float body_h = pad + kLensComboH + 4.0f + line_h + 4.0f + line_h + 4.0f + line_h + pad;
     float x, y, bar_w;
     begin_lens_key(dl, anchor, 168.0f, body_h, pad, x, y, bar_w);
+
+    draw_lens_resource_combo(state, {x, y}, bar_w);
+    y += kLensComboH + 4.0f;
 
     dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Resource deposit");
     y += line_h + 4.0f;
@@ -143,9 +190,11 @@ void draw_resource_key(ImDrawList* dl, ImVec2 anchor,
     dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "filled = deposit present");
 }
 
-/// On-canvas legend for the Opportunity lens (BL-112): a diverging supplied→unmet
-/// gradient bar over the per-catchment unmet-demand surface (biggest tradeable
-/// price/base ratio — a market bidding above its floor is the gap to fill).
+/// On-canvas legend for the Opportunity lens (BL-136): a body-relative red→green
+/// rank bar over the volume-weighted unmet-demand-gap field — each market's
+/// demand-gap × demand-volume score, ranked against the body max (mirrors the
+/// Scarcity lens's per-market normalisation). Standard key width — the former
+/// "(unmet demand)" qualifier that widened this box is gone (BL-136).
 void draw_opportunity_key(ImDrawList* dl, ImVec2 anchor)
 {
     const float pad    = 8.0f;
@@ -153,26 +202,24 @@ void draw_opportunity_key(ImDrawList* dl, ImVec2 anchor)
     const float bar_h  = 10.0f;
     const float body_h = pad + line_h + 4.0f + bar_h + 2.0f + line_h + pad;
     float x, y, bar_w;
-    // A touch wider than the other keys so the "(unmet demand)" qualifier fits.
-    begin_lens_key(dl, anchor, 190.0f, body_h, pad, x, y, bar_w);
+    begin_lens_key(dl, anchor, 168.0f, body_h, pad, x, y, bar_w);
 
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Opportunity (unmet demand)");
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Opportunity");
     y += line_h + 4.0f;
-    constexpr ImU32 loss   = IM_COL32(216, 100,  96, 255);
-    constexpr ImU32 profit = IM_COL32(110, 200, 120, 255);
+    constexpr ImU32 low  = IM_COL32(216, 100,  96, 255);
+    constexpr ImU32 high = IM_COL32(110, 200, 120, 255);
     constexpr int segs = 24;
     for (int i = 0; i < segs; ++i)
     {
         const float t = static_cast<float>(i) / (segs - 1);
-        const ImU32 c = t < 0.5f ? lerp_colour(loss, IM_COL32(40, 40, 48, 255), t * 2.0f)
-                                 : lerp_colour(IM_COL32(40, 40, 48, 255), profit, (t - 0.5f) * 2.0f);
+        const ImU32 c = lerp_colour(low, high, t);
         dl->AddRectFilled({ x + bar_w * static_cast<float>(i) / segs, y },
                           { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
     }
     y += bar_h + 2.0f;
-    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "supplied");
-    const ImVec2 ts = ImGui::CalcTextSize("unmet");
-    dl->AddText({x + bar_w - ts.x, y}, IM_COL32(170, 175, 185, 255), "unmet");
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "low");
+    const ImVec2 ts = ImGui::CalcTextSize("high");
+    dl->AddText({x + bar_w - ts.x, y}, IM_COL32(170, 175, 185, 255), "high");
 }
 
 /// On-canvas legend for the Production lens (BL-009): a diverging cool→warm bar
@@ -192,7 +239,7 @@ void draw_production_key(ImDrawList* dl, ImVec2 anchor)
     for (int i = 0; i < segs; ++i)
     {
         const float t = static_cast<float>(i) / (segs - 1);
-        const ImU32 c = diverging_colour(std::pow(4.0f, t * 2.0f - 1.0f));
+        const ImU32 c = production_colour(std::pow(4.0f, t * 2.0f - 1.0f));
         dl->AddRectFilled({ x + bar_w * static_cast<float>(i) / segs, y },
                           { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
     }
@@ -216,20 +263,114 @@ ImU32 diverging_colour(float ratio)
     return d < 0.0f ? lerp_colour(neutral, cool, -d) : lerp_colour(neutral, warm, d);
 }
 
+/// Diverging red→green colour for a ratio relative to 1.0 (BL-137, Production lens):
+/// `ratio = value / mean`; 1.0 is the neutral mid-tone, < 1 (below mean) trends red,
+/// > 1 (above mean) trends green. Same log-of-ratio centring as diverging_colour, but
+/// a dedicated ramp — diverging_colour stays untouched for the Market lens.
+ImU32 production_colour(float ratio)
+{
+    ratio = std::clamp(ratio, 0.25f, 4.0f);
+    const float d = std::log(ratio) / std::log(4.0f); // [-1, 1]
+    constexpr ImU32 neutral = IM_COL32(205, 205, 210, 255);
+    constexpr ImU32 low     = IM_COL32(216, 100,  96, 255);
+    constexpr ImU32 high    = IM_COL32(110, 200, 120, 255);
+    return d < 0.0f ? lerp_colour(neutral, low, -d) : lerp_colour(neutral, high, d);
+}
+
 /// On-canvas legend for the Market lens: a diverging cheap↔dear gradient bar plus
 /// the selected good's name and its current price ratio (or an "untraded" note when
 /// the body's market has no entry for it). Same left-edge placement as the Resource key.
 // BL-015: market lens is now a catchment-boundary tint (one colour per market).
-// The key shows a colour swatch per market with an ordinal label.
-void draw_market_key(ImDrawList* dl, ImVec2 anchor,
-                     const ui_state& /*state*/,
+// The key shows a colour swatch per market labelled with its city name (matching the
+// ledger / selection / CSV — never a bare ordinal, which the player never sees elsewhere).
+void draw_market_key(ImDrawList* dl, ImVec2 anchor, const world& w,
+                     ui_state& state,
                      const std::unordered_map<entity_id, ImU32>& catchment_colours)
 {
     const float pad    = 8.0f;
     const float line_h = ImGui::GetTextLineHeight();
     const float swatch = line_h;
     const int   n      = static_cast<int>(catchment_colours.size());
-    const float box_w  = 140.0f;
+    // Stable legend order — the source map iterates arbitrarily; sort by market id so the
+    // swatch list does not reshuffle frame to frame (colours stay keyed to their market).
+    std::vector<std::pair<entity_id, ImU32>> entries(catchment_colours.begin(),
+                                                     catchment_colours.end());
+    std::sort(entries.begin(), entries.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
+
+    // Size the box to the widest label so long city names are not clipped.
+    float label_w = ImGui::CalcTextSize("Market catchments").x;
+    for (const auto& [mid, col] : entries)
+        label_w = std::max(label_w,
+            swatch + 4.0f + ImGui::CalcTextSize(market_city_name(w, mid).c_str()).x);
+    const float box_w = std::max(140.0f, label_w + 2.0f * pad);
+
+    const float body_h = pad + kLensComboH + 4.0f + line_h + 4.0f
+                       + static_cast<float>(std::max(n, 1)) * (swatch + 2.0f)
+                       + pad;
+
+    const ImVec2 p0 = { anchor.x - box_w, anchor.y - body_h * 0.5f };
+    const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
+    dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
+    dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
+
+    float x = p0.x + pad;
+    float y = p0.y + pad * 0.5f;
+
+    draw_lens_resource_combo(state, {x, y}, box_w - 2.0f * pad);
+    y += kLensComboH + 4.0f;
+
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Market catchments");
+    y += line_h + 4.0f;
+
+    if (entries.empty())
+    {
+        dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "No markets");
+        return;
+    }
+
+    for (const auto& [mid, col] : entries)
+    {
+        dl->AddRectFilled({x, y}, {x + swatch, y + swatch}, col);
+        const std::string label = market_city_name(w, mid);
+        dl->AddText({x + swatch + 4.0f, y}, IM_COL32(220, 220, 220, 255), label.c_str());
+        y += swatch + 2.0f;
+    }
+}
+
+/// On-canvas legend for the Country lens (BL-133): one colour swatch + nation name
+/// per nation present on the active body, sorted by nation id for a stable order.
+/// Modelled on draw_market_key; the box auto-sizes to the widest name so every
+/// label guaranteed-fits (CalcTextSize pattern draw_market_key already uses).
+/// Colour source is palette::nation_colour — the same source the tile tint itself
+/// uses (the country lens's tile-tint pass, above).
+void draw_country_key(ImDrawList* dl, ImVec2 anchor, const world& w, const ui_state& state)
+{
+    std::vector<entity_id> present;
+    for (const auto& [tid, nid] : w.tile_to_nation)
+    {
+        const auto tile_it = w.tiles.find(tid);
+        if (tile_it == w.tiles.end() || tile_it->second.body != state.active_body)
+            continue;
+        if (std::find(present.begin(), present.end(), nid) == present.end())
+            present.push_back(nid);
+    }
+    std::sort(present.begin(), present.end());
+
+    const float pad    = 8.0f;
+    const float line_h = ImGui::GetTextLineHeight();
+    const float swatch = line_h;
+
+    float name_w = ImGui::CalcTextSize("Countries").x;
+    for (const entity_id nid : present)
+    {
+        const auto nat_it = w.nations.find(nid);
+        if (nat_it == w.nations.end())
+            continue;
+        name_w = std::max(name_w, ImGui::CalcTextSize(nat_it->second.name.c_str()).x);
+    }
+    const float box_w  = pad * 2.0f + swatch + 4.0f + name_w;
+    const int   n      = static_cast<int>(present.size());
     const float body_h = pad + line_h + 4.0f
                        + static_cast<float>(std::max(n, 1)) * (swatch + 2.0f)
                        + pad;
@@ -242,24 +383,23 @@ void draw_market_key(ImDrawList* dl, ImVec2 anchor,
     float x = p0.x + pad;
     float y = p0.y + pad * 0.5f;
 
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Market catchments");
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Countries");
     y += line_h + 4.0f;
 
-    if (catchment_colours.empty())
+    if (present.empty())
     {
-        dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "No markets");
+        dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "No nations");
         return;
     }
 
-    int idx = 1;
-    for (const auto& [mid, col] : catchment_colours)
+    for (const entity_id nid : present)
     {
-        dl->AddRectFilled({x, y}, {x + swatch, y + swatch}, col);
-        char label[32];
-        std::snprintf(label, sizeof(label), " Market %d", idx);
-        dl->AddText({x + swatch + 4.0f, y}, IM_COL32(220, 220, 220, 255), label);
+        const auto nat_it = w.nations.find(nid);
+        if (nat_it == w.nations.end())
+            continue;
+        dl->AddRectFilled({x, y}, {x + swatch, y + swatch}, palette::nation_colour(nid));
+        dl->AddText({x + swatch + 4.0f, y}, IM_COL32(220, 220, 220, 255), nat_it->second.name.c_str());
         y += swatch + 2.0f;
-        ++idx;
     }
 }
 
@@ -285,22 +425,23 @@ void draw_population_key(ImDrawList* dl, ImVec2 anchor)
     dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Workforce efficiency");
     y += line_h + 4.0f;
 
-    // Gradient maps the workforce-efficiency range the lens tints by (0.5×→1.0×),
-    // so the bar reads as the labour multiplier rather than raw habitability.
-    constexpr ImU32 live = IM_COL32(80, 200, 110, 255);
+    // Red→green rank bar (BL-135): mirrors the per-tile value-mark dot the lens
+    // now draws instead of a full-tile tint — low efficiency reads red, full
+    // labour reads green.
+    constexpr ImU32 low  = IM_COL32(216, 100,  96, 255);
+    constexpr ImU32 high = IM_COL32(110, 200, 120, 255);
     constexpr int segs = 24;
     for (int i = 0; i < segs; ++i)
     {
-        const float t0  = static_cast<float>(i) / segs;
-        const float eff = 0.5f + 0.5f * t0; // 0.5× at the low end → 1.0× at full labour
-        const ImU32 c   = lerp_colour(IM_COL32(40, 40, 48, 255), live, 0.15f + 0.7f * eff);
+        const float t0 = static_cast<float>(i) / segs;
+        const ImU32 c  = lerp_colour(low, high, t0);
         dl->AddRectFilled({ x + bar_w * t0, y },
                           { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
     }
     y += bar_h + 2.0f;
-    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "0.5x");
-    const ImVec2 hts = ImGui::CalcTextSize("1.0x");
-    dl->AddText({x + bar_w - hts.x, y}, IM_COL32(170, 175, 185, 255), "1.0x");
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "low");
+    const ImVec2 hts = ImGui::CalcTextSize("high");
+    dl->AddText({x + bar_w - hts.x, y}, IM_COL32(170, 175, 185, 255), "high");
 }
 
 /// On-canvas legend for the Industry lens (BL-084): a low→high amber gradient bar
@@ -346,14 +487,15 @@ void draw_industry_key(ImDrawList* dl, ImVec2 anchor)
 /// On-canvas legend for the Scarcity lens: an abundant→scarce gradient bar (no tint
 /// → hot) plus the selected resource's name and swatch. Same placement as the others.
 void draw_scarcity_key(ImDrawList* dl, ImVec2 anchor,
-                       const ui_state& state)
+                       ui_state& state)
 {
     const float pad    = 8.0f;
     const float box_w  = 156.0f;
     const float line_h = ImGui::GetTextLineHeight();
     const float bar_h  = 10.0f;
 
-    const float body_h = pad + line_h + 4.0f + bar_h + 2.0f + line_h + 4.0f + line_h + pad;
+    const float body_h = pad + kLensComboH + 4.0f
+                       + line_h + 4.0f + bar_h + 2.0f + line_h + 4.0f + line_h + pad;
     const ImVec2 p0 = { anchor.x - box_w, anchor.y - body_h * 0.5f };
     const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
     dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
@@ -362,6 +504,9 @@ void draw_scarcity_key(ImDrawList* dl, ImVec2 anchor,
     const float x     = p0.x + pad;
     const float bar_w = box_w - 2.0f * pad;
     float       y     = p0.y + pad * 0.5f;
+
+    draw_lens_resource_combo(state, {x, y}, bar_w);
+    y += kLensComboH + 4.0f;
 
     dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Market scarcity");
     y += line_h + 4.0f;
@@ -389,7 +534,230 @@ void draw_scarcity_key(ImDrawList* dl, ImVec2 anchor,
                 presentation_of(state.lens_resource).name);
 }
 
+/// Recency-tier colour shared by the Reach and Supply-routes keys, mirroring the
+/// activity-fog convention (DISCOVERY.md, BL-089): fresh reads green, gone-cold
+/// reads greyed. (No `visible` case here — a trade_route-only reach has no live
+/// convoy/ownership signal to promote it past `known`.)
+ImU32 reach_tier_colour(activity_vis tier)
+{
+    return (tier == activity_vis::known) ? palette::activity_known : palette::activity_stale;
+}
+
+/// A body this canvas's active body is connected to via a player `trade_route`,
+/// tiered by recency. Shared shape for the Reach lens's pre-pass and key.
+struct reach_link { entity_id other_body; activity_vis tier; };
+
+/// One aggregated player trade lane touching the active body. Shared shape for
+/// the Supply-routes lens's pre-pass and key.
+struct supply_edge { entity_id other_body; int convoy_count; activity_vis tier; };
+
+/// On-canvas legend for the Reach lens (BL-011): this canvas only ever shows the
+/// active body's tile grid (never other bodies), so the "highlight the connected
+/// bodies" the design calls for reads here as a list of the active body's own
+/// connections (name + recency tier) — the body-marker glow the design describes
+/// belongs on the Solar canvas, out of this lens work's file scope.
+void draw_reach_key(ImDrawList* dl, ImVec2 anchor, const world& w,
+                    const std::vector<reach_link>& links)
+{
+    const float pad     = 8.0f;
+    const float box_w   = 176.0f;
+    const float line_h  = ImGui::GetTextLineHeight();
+    const int   n       = static_cast<int>(links.size());
+    const float body_h  = pad + line_h + 4.0f + std::max(1, n) * (line_h + 2.0f) + pad;
+    const ImVec2 p0 = { anchor.x - box_w, anchor.y - body_h * 0.5f };
+    const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
+    dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
+    dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
+
+    const float x = p0.x + pad;
+    float       y = p0.y + pad * 0.5f;
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Reach (your trade network)");
+    y += line_h + 4.0f;
+
+    if (links.empty())
+    {
+        dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "no routes from this body");
+        return;
+    }
+    for (const reach_link& link : links)
+    {
+        const auto  it   = w.bodies.find(link.other_body);
+        const char* name = (it != w.bodies.end()) ? it->second.name.c_str() : "unknown body";
+        const ImU32 c    = reach_tier_colour(link.tier);
+        dl->AddCircleFilled({x + 4.0f, y + line_h * 0.5f}, 3.5f, c);
+        dl->AddText({x + 12.0f, y}, c, name);
+        y += line_h + 2.0f;
+    }
+}
+
+/// On-canvas legend for the Supply-routes lens (BL-014): one row per aggregated
+/// lane touching the active body — a thickness bar log-scaled from convoy_count
+/// stands in for the edge-thickness encoding the design specifies for the
+/// (out-of-scope-here) Solar-canvas graph rendering, and colour is the shared
+/// recency tier.
+void draw_supply_routes_key(ImDrawList* dl, ImVec2 anchor, const world& w,
+                            const std::vector<supply_edge>& edges)
+{
+    const float pad     = 8.0f;
+    const float box_w   = 176.0f;
+    const float line_h  = ImGui::GetTextLineHeight();
+    const float bar_max = 40.0f;
+    const int   n       = static_cast<int>(edges.size());
+    const float body_h  = pad + line_h + 4.0f + std::max(1, n) * (line_h + 2.0f) + pad;
+    const ImVec2 p0 = { anchor.x - box_w, anchor.y - body_h * 0.5f };
+    const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
+    dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
+    dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
+
+    const float x = p0.x + pad;
+    float       y = p0.y + pad * 0.5f;
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Supply routes");
+    y += line_h + 4.0f;
+
+    if (edges.empty())
+    {
+        dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "no lanes from this body");
+        return;
+    }
+    for (const supply_edge& edge : edges)
+    {
+        const auto  it   = w.bodies.find(edge.other_body);
+        const char* name = (it != w.bodies.end()) ? it->second.name.c_str() : "unknown body";
+        const ImU32 c    = reach_tier_colour(edge.tier);
+        // Log-scaled thickness (BL-014, settled): a bare completion reads as a
+        // thin sliver; heavy repeat traffic saturates toward bar_max rather than
+        // dominating the row linearly.
+        const float thickness = std::clamp(3.0f + 6.0f * std::log(1.0f + static_cast<float>(edge.convoy_count)),
+                                            3.0f, bar_max);
+        dl->AddRectFilled({x, y + line_h * 0.5f - 2.0f}, {x + thickness, y + line_h * 0.5f + 2.0f}, c);
+        dl->AddText({x + bar_max + 6.0f, y}, c, name);
+        y += line_h + 2.0f;
+    }
+}
+
 } // namespace
+
+void update_body_vision(world& w, ui_state& state, double now_days)
+{
+    state.sim_now_days = now_days;
+    state.permanent_vision.clear();
+    state.convoy_beams.clear();
+
+    const entity_id body = state.active_body;
+    if (body == null_entity) return;
+    const auto bit = w.bodies.find(body);
+    if (bit == w.bodies.end()) return;
+    const int gw = std::max(1, bit->second.grid_width);
+    const int gh = std::max(1, bit->second.grid_height);
+    const std::vector<entity_id>& grid = body_tile_grid(w, body);
+    if (static_cast<int>(grid.size()) < gw * gh) return;
+
+    // Odd-r offset neighbours (col, row deltas), matching the surface draw's grid.
+    static const int even_off[6][2] =
+        {{+1, 0}, {0, -1}, {-1, -1}, {-1, 0}, {-1, +1}, {0, +1}};
+    static const int odd_off[6][2] =
+        {{+1, 0}, {+1, -1}, {0, -1}, {-1, 0}, {0, +1}, {+1, +1}};
+
+    // Flood `radius` hops out from `seeds` into `out` (odd-r neighbours, column wrap).
+    auto flood = [&](const std::vector<entity_id>& seeds, int radius,
+                     std::unordered_set<entity_id>& out) {
+        std::vector<entity_id> frontier;
+        for (const entity_id s : seeds)
+            if (s != null_entity && out.insert(s).second) frontier.push_back(s);
+        for (int r = 0; r < radius && !frontier.empty(); ++r)
+        {
+            std::vector<entity_id> next;
+            for (const entity_id tid : frontier)
+            {
+                const auto tit = w.tiles.find(tid);
+                if (tit == w.tiles.end()) continue;
+                const tile_component& t = tit->second;
+                const int (*off)[2] = (t.grid_y & 1) ? odd_off : even_off;
+                for (int k = 0; k < 6; ++k)
+                {
+                    const int nrow = t.grid_y + off[k][1];
+                    if (nrow < 0 || nrow >= gh) continue;
+                    int ncol = (t.grid_x + off[k][0]) % gw;
+                    if (ncol < 0) ncol += gw;
+                    const entity_id nb = grid[static_cast<std::size_t>(nrow) * gw + ncol];
+                    if (nb != null_entity && out.insert(nb).second) next.push_back(nb);
+                }
+            }
+            frontier.swap(next);
+        }
+    };
+
+    // The player's building tiles on this body + the markets whose catchment they sit
+    // in — the markets the corp operates in (stable; buildings don't move). The centre
+    // of operation is the lowest-id player building tile on the body (mirrors
+    // market_clearing's file-local representative_tile, which is not header-visible).
+    std::vector<entity_id> player_building_tiles;
+    std::unordered_set<entity_id> operated_markets;
+    entity_id centre         = null_entity;
+    entity_id centre_building = null_entity;
+    const auto pit = w.corporations.find(w.player_entity);
+    if (pit != w.corporations.end())
+    {
+        for (const entity_id bid : pit->second.assets)
+        {
+            const auto bld = w.buildings.find(bid);
+            if (bld == w.buildings.end()) continue;
+            const entity_id t = bld->second.tile;
+            const auto tit = w.tiles.find(t);
+            if (tit == w.tiles.end() || tit->second.body != body) continue;
+            player_building_tiles.push_back(t);
+            const entity_id mid = market_for_tile(w, t);
+            if (mid != null_entity) operated_markets.insert(mid);
+            if (centre_building == null_entity || bid < centre_building)
+            {
+                centre_building = bid;
+                centre          = t;
+            }
+        }
+    }
+
+    // Layer 1 (permanent): radius-2 pockets around the player's own installations —
+    // your buildings are always visible.
+    flood(player_building_tiles, 2, state.permanent_vision);
+
+    // Layer 2 (permanent): 3-wide corridors from the corp centre of operation to each
+    // market centre it operates in. A 3-wide corridor is the path tiles flooded one hop
+    // to each side.
+    if (centre != null_entity)
+    {
+        for (const entity_id mid : operated_markets)
+        {
+            const auto mk = w.markets.find(mid);
+            if (mk == w.markets.end()) continue;
+            const entity_id mc = mk->second.centre_tile;
+            if (mc == null_entity) continue;
+            const logistics_path lp = intra_body_path(w, body, centre, mc);
+            if (!lp.reachable || lp.tiles.empty()) continue;
+            flood(lp.tiles, 1, state.permanent_vision);
+        }
+    }
+
+    // Layer 3 (moving): the tile path + progress/speed of each live player intra-body
+    // convoy, oriented src→dst. The renderer interpolates a head along it and trails a
+    // dimming tail one econ tick's travel behind.
+    for (const auto& cv : w.convoys)
+    {
+        if (cv.corp != w.player_entity) continue;
+        const auto sm = w.markets.find(cv.source_market);
+        const auto dm = w.markets.find(cv.dest_market);
+        if (sm == w.markets.end() || dm == w.markets.end()) continue;
+        if (sm->second.body != body || dm->second.body != body) continue;
+        const entity_id st = sm->second.centre_tile;
+        const entity_id dt = dm->second.centre_tile;
+        if (st == null_entity || dt == null_entity) continue;
+        const logistics_path lp = intra_body_path(w, body, st, dt);
+        if (!lp.reachable || lp.tiles.empty()) continue;
+        std::vector<entity_id> path = lp.tiles;
+        if (st != std::min(st, dt)) std::reverse(path.begin(), path.end());
+        state.convoy_beams.push_back(
+            { std::move(path), std::clamp(cv.progress, 0.0f, 1.0f), std::max(cv.speed, 0.0f) });
+    }
+}
 
 void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_registry& reg,
                               const economy_report& report, ImVec2 origin, ImVec2 size,
@@ -670,31 +1038,31 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     }
     const float prod_mean = prod_count > 0 ? std::exp(prod_log_sum / static_cast<float>(prod_count)) : 0.0f;
 
-    // Opportunity lens pre-pass (BL-112): a market-level unmet-demand field, keyed
-    // off the live price-discovering market (BL-078). The opportunity is the gap a
-    // scarce, high-priced market opens up — for each market on the body, the largest
-    // tradeable price/base ratio: a good bid above its floor is demand outrunning
-    // supply, exactly the margin the player can fill. Untradeable goods (base_price
-    // 0 — the space-era resources) carry no floor and are skipped. Every tile in a
-    // market's catchment reads that market's gap (market_for_tile); diverging
-    // oversupplied(red)→opportunity(green) about the neutral floor, on the same
-    // symmetric price band as diverging_colour.
-    std::unordered_map<entity_id, float> opp_ratio; // market id → biggest tradeable price/base ratio
+    // Opportunity lens pre-pass (BL-136): a body-relative, volume-weighted rank of
+    // the unmet-demand gap, replacing the old max-absolute price/base ratio (which
+    // saturated green in the saturated economy — every market bids over its floor).
+    // For each market: sum the per-good demand gap (demand outrunning supply, like
+    // the Scarcity pre-pass) and weight it by the market's total demand volume, so
+    // a large market's real gap outranks a tiny market's high-ratio blip. Scores are
+    // then ranked against the body max (mirrors the Scarcity lens's normalisation) —
+    // strongest gaps read green, met markets read low/red.
+    std::unordered_map<entity_id, float> opp_score; // market id → volume-weighted demand-gap score
+    float opp_max_score = 0.0f;
     if (state.overlay == overlay_mode::opportunity)
     {
         for (const auto& [mid, mk] : w.markets)
         {
             if (mk.body != state.active_body)
                 continue;
-            float best = 0.0f;
+            float gap = 0.0f, volume = 0.0f;
             for (std::size_t r = 0; r < resource_count; ++r)
             {
-                if (mk.base_price[r] <= 0.0f) // untradeable good — no floor to bid over
-                    continue;
-                best = std::max(best, mk.price[r] / mk.base_price[r]);
+                gap    += std::max(0.0f, mk.demand[r] - mk.supply[r]);
+                volume += mk.demand[r];
             }
-            if (best > 0.0f)
-                opp_ratio[mid] = best;
+            const float score = gap * volume;
+            opp_score[mid] = score;
+            opp_max_score  = std::max(opp_max_score, score);
         }
     }
 
@@ -752,6 +1120,124 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             const float thr = tile.substrate_density * (0.35f + 0.65f * dep_norm);
             industry_field[tid] = thr;
             industry_max = std::max(industry_max, thr);
+        }
+    }
+
+    // Reach lens pre-pass (BL-011): `trade_route` is body-level, not per-tile, and
+    // this canvas only ever shows the *active* body's tile grid (never other
+    // bodies), so the "body-to-body highlight" the design calls for reads here as
+    // a per-body connectivity readout for the active body — every other endpoint
+    // it is connected to, tiered by recency. Player's own routes only, per the
+    // competitor-visibility rule (rival lanes stay private). No falloff/distance
+    // model: trade_route carries none to derive one from.
+    std::vector<reach_link> reach_links;
+    if (state.overlay == overlay_mode::reach)
+    {
+        for (const trade_route& route : w.trade_routes)
+        {
+            if (route.corp != w.player_entity)
+                continue;
+            entity_id other = null_entity;
+            if (route.body_a == state.active_body)      other = route.body_b;
+            else if (route.body_b == state.active_body) other = route.body_a;
+            else                                        continue;
+            const bool fresh = (w.current_day_tick - route.last_tick) <= route_fresh_ticks_default;
+            reach_links.push_back({other, fresh ? activity_vis::known : activity_vis::known_stale});
+        }
+    }
+
+    // Supply-routes lens pre-pass (BL-014): one aggregated edge per unordered
+    // (body_a, body_b) pair touching the active body, built from `w.trade_routes`
+    // at render time (not per-frame convoy positions). `trade_route` is already
+    // upserted per (pair, corp), so filtering to the player's corp yields at most
+    // one entry per pair directly — no further aggregation needed. Thickness is
+    // log-scaled convoy_count; colour/alpha is the same recency tier as Reach.
+    std::vector<supply_edge> supply_edges;
+    if (state.overlay == overlay_mode::supply_routes)
+    {
+        for (const trade_route& route : w.trade_routes)
+        {
+            if (route.corp != w.player_entity)
+                continue;
+            entity_id other = null_entity;
+            if (route.body_a == state.active_body)      other = route.body_b;
+            else if (route.body_b == state.active_body) other = route.body_a;
+            else                                        continue;
+            const bool fresh = (w.current_day_tick - route.last_tick) <= route_fresh_ticks_default;
+            supply_edges.push_back({other, route.convoy_count,
+                                    fresh ? activity_vis::known : activity_vis::known_stale});
+        }
+    }
+
+    // Intra-body vision — the moving convoy beam (BL-152/154). Permanent vision
+    // (state.permanent_vision: radius-2 pockets around the player's buildings + 3-wide
+    // corridors from the corp centre of operation to each market centre it operates in)
+    // is precomputed each frame in update_body_vision. Here we add the *moving* beam:
+    // for each live player convoy we interpolate a HEAD along its path by the fraction
+    // through the current econ tick — so it glides smoothly between quarterly steps —
+    // and trail a dimming TAIL one econ tick's travel behind it. beam_intensity holds
+    // each lit tile's brightness (0..1); the tile loop blends it with permanent vision
+    // to size the fog wash. Survey fog (BL-067) still owns unrevealed tiles.
+    std::unordered_map<entity_id, float> beam_intensity;
+    {
+        // Fraction through the current econ tick (90 days); mirrors sim_loop::econ_tick_days.
+        const float frac = static_cast<float>(
+            std::fmod(std::max(0.0, state.sim_now_days), 90.0) / 90.0);
+        constexpr int beam_radius = 2; // Ben's spec: a radius-2 beam of vision.
+        static const int even_off[6][2] =
+            {{+1, 0}, {0, -1}, {-1, -1}, {-1, 0}, {-1, +1}, {0, +1}};
+        static const int odd_off[6][2] =
+            {{+1, 0}, {+1, -1}, {0, -1}, {-1, 0}, {0, +1}, {+1, +1}};
+
+        // Flood radius-2 around a path tile, marking each at `inten` (keeping the max).
+        auto light = [&](entity_id centre_tile, float inten) {
+            if (centre_tile == null_entity) return;
+            std::unordered_set<entity_id> seen;
+            std::vector<entity_id> frontier{ centre_tile };
+            seen.insert(centre_tile);
+            { float& v = beam_intensity[centre_tile]; if (inten > v) v = inten; }
+            for (int r = 0; r < beam_radius && !frontier.empty(); ++r)
+            {
+                std::vector<entity_id> next;
+                for (const entity_id tid : frontier)
+                {
+                    const auto tit = w.tiles.find(tid);
+                    if (tit == w.tiles.end()) continue;
+                    const tile_component& t = tit->second;
+                    const int (*off)[2] = (t.grid_y & 1) ? odd_off : even_off;
+                    for (int k = 0; k < 6; ++k)
+                    {
+                        const int nrow = t.grid_y + off[k][1];
+                        if (nrow < 0 || nrow >= gh) continue;
+                        int ncol = (t.grid_x + off[k][0]) % gw;
+                        if (ncol < 0) ncol += gw;
+                        const auto nb = tile_at.find(static_cast<long long>(nrow) * gw + ncol);
+                        if (nb == tile_at.end()) continue;
+                        if (seen.insert(nb->second).second)
+                        {
+                            next.push_back(nb->second);
+                            float& v = beam_intensity[nb->second]; if (inten > v) v = inten;
+                        }
+                    }
+                }
+                frontier.swap(next);
+            }
+        };
+
+        for (const auto& cb : state.convoy_beams)
+        {
+            const int n = static_cast<int>(cb.path.size());
+            if (n == 0) continue;
+            // Head glides: last econ-step progress + this tick's fraction of a step.
+            const float p    = std::clamp(cb.progress + cb.speed * frac, 0.0f, 1.0f);
+            const int   head = std::clamp(static_cast<int>(std::lround(p * (n - 1))), 0, n - 1);
+            // Tail = one econ tick's travel in tiles (>=1), dimming to 0 at its far end.
+            const int   tail = std::max(1, static_cast<int>(std::lround(cb.speed * (n - 1))));
+            for (int i = head; i >= 0 && i >= head - tail; --i)
+            {
+                const float inten = 1.0f - static_cast<float>(head - i) / static_cast<float>(tail);
+                if (inten > 0.0f) light(cb.path[static_cast<std::size_t>(i)], inten);
+            }
         }
     }
 
@@ -847,41 +1333,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (col_it != market_catchment_colour.end())
                 fill = lerp_colour(fill, col_it->second, 0.55f);
         }
-        // Population lens (re-keyed, BL-069): tint a tile by the *workforce
-        // efficiency* its habitability yields (workforce.hpp), not raw habitability.
-        // Tiles at/above habitability 0.6 read at full labour (flat brightest green);
-        // below 0.6 they grade down sharply — so the lens shows the 0.6 efficiency
-        // cliff, the siting signal "build where habitability ≥ 0.6 for full workforce".
-        // Zero-habitability tiles (ocean, barren) stay untinted so terrain still reads.
-        else if (state.overlay == overlay_mode::population)
-        {
-            const float h = std::clamp(tile.habitability, 0.0f, 1.0f);
-            if (h > 0.0f)
-            {
-                const float eff = workforce_efficiency(h);
-                constexpr ImU32 live = IM_COL32(80, 200, 110, 255);
-                fill = lerp_colour(fill, live, 0.15f + 0.7f * eff);
-            }
-        }
-        // Opportunity lens (BL-112): tint a tile by the unmet-demand margin of its
-        // catchment market — the biggest tradeable price/base ratio (pre-pass above).
-        // A good bid above its floor is demand the player can supply; the whole
-        // catchment reads that market's gap. Diverging oversupplied(red)→
-        // opportunity(green) about the neutral floor (ratio 1.0), on the symmetric
-        // [0.25×, 4×] price band diverging_colour uses. Tiles with no market keep hue.
-        else if (state.overlay == overlay_mode::opportunity)
-        {
-            const auto it = opp_ratio.find(market_for_tile(w, id));
-            if (it != opp_ratio.end())
-            {
-                const float ratio = std::clamp(it->second, 0.25f, 4.0f);
-                const float d     = std::log(ratio) / std::log(4.0f); // [-1, 1]
-                constexpr ImU32 loss   = IM_COL32(216, 100,  96, 255);
-                constexpr ImU32 profit = IM_COL32(110, 200, 120, 255);
-                fill = d < 0.0f ? lerp_colour(fill, loss, -d * 0.75f)
-                                : lerp_colour(fill, profit, d * 0.75f);
-            }
-        }
+        // Population (Workforce) and Opportunity lenses (BL-135): no longer a
+        // full-tile tint — each reads as a per-tile red→green dot mark, drawn
+        // below alongside the building glyph (workforce_efficiency / the
+        // body-relative demand-gap rank respectively). Tiles keep terrain hue here.
         // Production lens (BL-009): tint a producing tile by output sell value this
         // tick, log-scaled relative to the body's producing-tile mean (above mean
         // warm, below cool). Idle / exhausted / unbuilt tiles read cold (no tint).
@@ -889,7 +1344,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         {
             const auto it = prod_value.find(id);
             if (it != prod_value.end() && prod_mean > 0.0f)
-                fill = lerp_colour(fill, diverging_colour(it->second / prod_mean), 0.6f);
+                fill = lerp_colour(fill, production_colour(it->second / prod_mean), 0.6f);
         }
         // Scarcity lens (BL-018): a market-level shortfall field. Every tile in a
         // market's catchment reads as one chunky block tinted by that market's
@@ -965,6 +1420,27 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         const bool revealed = survey_tile_visible(body.survey, gw, gh, tile.grid_x, tile.grid_y);
         if (!revealed)
             fill = IM_COL32(12, 14, 20, 255);
+
+        // Intra-body vision fog (BL-151/152/154): dim any *revealed* tile by how little
+        // the player sees it. Vision = 1 in permanent vision (building pockets + the
+        // corp-centre→market corridors, from update_body_vision); otherwise the moving
+        // convoy beam's contribution (bright at the head, dimming down the tail). The
+        // fog wash scales with (1 − vision), so the surface reads mostly unknown, lit
+        // along the player's corridors, with a convoy's beam gliding and trailing over
+        // them. Survey mask owns unrevealed tiles, so this skips them.
+        if (revealed)
+        {
+            float vision = (state.permanent_vision.find(id) != state.permanent_vision.end())
+                               ? 1.0f : 0.0f;
+            if (vision < 1.0f)
+            {
+                const auto bi = beam_intensity.find(id);
+                if (bi != beam_intensity.end())
+                    vision = std::max(vision, bi->second);
+            }
+            if (vision < 1.0f)
+                fill = lerp_colour(fill, IM_COL32(8, 10, 16, 255), 0.5f * (1.0f - vision));
+        }
 
         // Range of wrap copies that land inside the canvas horizontally.
         const int k_min = (period_px > 0.0f)
@@ -1078,7 +1554,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 if (corp_it != tile_to_corp.end())
                     marker_col = corp_identity(corp_it->second);
 
-                icons::building(dl, {cx, cy}, mr, built_type, marker_col);
+                // The Workforce (Population lens) and Opportunity lenses replace the
+                // building silhouette with the per-tile value mark drawn below
+                // (BL-135) — the mark reads the tile's rank, not its installation.
+                if (state.overlay != overlay_mode::population &&
+                    state.overlay != overlay_mode::opportunity)
+                    icons::building(dl, {cx, cy}, mr, built_type, marker_col);
 
                 // Owner-identity tag (BL-090): a small corp emblem tucked at the
                 // building glyph's lower-right, for BOTH player and rival buildings —
@@ -1112,6 +1593,35 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                         state.marker_hit_zones.push_back(hz);
                     }
                 }
+            }
+
+            // Value-lens tile marks (BL-135): Workforce (Population lens) and
+            // Opportunity replace their old full-tile tint with a per-tile red→green
+            // dot on every BUILDABLE tile (valid terrain for activity — ocean
+            // excluded), not just occupied ones. Workforce reads
+            // workforce_efficiency(habitability); Opportunity reads the same
+            // body-relative demand-gap rank as its (now-removed) tile tint (BL-136).
+            // Drawn instead of, not blended with, the building glyph on occupied
+            // tiles (suppressed above).
+            if ((state.overlay == overlay_mode::population ||
+                 state.overlay == overlay_mode::opportunity) &&
+                !placement_rules::is_ocean_tile(tile.composition))
+            {
+                float t = 0.0f; // body-relative rank, [0, 1], red(low) -> green(high)
+                if (state.overlay == overlay_mode::population)
+                {
+                    t = workforce_efficiency(std::clamp(tile.habitability, 0.0f, 1.0f));
+                }
+                else // opportunity
+                {
+                    const auto it = opp_score.find(market_for_tile(w, id));
+                    if (it != opp_score.end() && opp_max_score > 0.0f)
+                        t = std::clamp(it->second / opp_max_score, 0.0f, 1.0f);
+                }
+                constexpr ImU32 low  = IM_COL32(216, 100,  96, 255);
+                constexpr ImU32 high = IM_COL32(110, 200, 120, 255);
+                const float mr = std::max(2.0f, draw_r * 0.22f);
+                icons::value_mark(dl, {cx, cy}, mr, lerp_colour(low, high, t));
             }
 
             // Supply lens: draw a convoy glyph on every tile when the active body
@@ -1429,10 +1939,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // On-canvas lens key (drawn unclipped, flush-left of the minimap so it reads as a
     // drawer folding out from it — anchor passed in as lens_key_anchor; before the
     // input early-out so it shows in headless captures too).
-    if (state.overlay == overlay_mode::resource)
+    if (state.overlay == overlay_mode::country)
+        draw_country_key(dl, lens_key_anchor, w, state);
+    else if (state.overlay == overlay_mode::resource)
         draw_resource_key(dl, lens_key_anchor, state);
     else if (state.overlay == overlay_mode::market)
-        draw_market_key(dl, lens_key_anchor, state, market_catchment_colour);
+        draw_market_key(dl, lens_key_anchor, w, state, market_catchment_colour);
     else if (state.overlay == overlay_mode::population)
         draw_population_key(dl, lens_key_anchor);
     else if (state.overlay == overlay_mode::opportunity)
@@ -1443,6 +1955,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         draw_scarcity_key(dl, lens_key_anchor, state);
     else if (state.overlay == overlay_mode::industry)
         draw_industry_key(dl, lens_key_anchor);
+    else if (state.overlay == overlay_mode::reach)
+        draw_reach_key(dl, lens_key_anchor, w, reach_links);
+    else if (state.overlay == overlay_mode::supply_routes)
+        draw_supply_routes_key(dl, lens_key_anchor, w, supply_edges);
 
     if (!input_enabled)
         return;

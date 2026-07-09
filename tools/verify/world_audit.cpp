@@ -382,10 +382,10 @@ int main()
         if (t > max_tiles) max_tiles = t;
     }
     if (min_tiles < 0) min_tiles = 0;
-    const bool count_ok    = nation_n >= 12 && nation_n <= 16;
+    const bool count_ok    = nation_n >= 20 && nation_n <= 28;
     const bool variance_ok = min_tiles > 0 && max_tiles >= 3 * min_tiles;
     std::printf("Nations: %d (min tiles %d, max tiles %d)\n", nation_n, min_tiles, max_tiles);
-    std::printf("  BL-053 R1 nation count in [12,16]: %s\n", count_ok ? "PASS" : "FAIL");
+    std::printf("  BL-053 R1 nation count in [20,28]: %s\n", count_ok ? "PASS" : "FAIL");
     std::printf("  BL-053 R2 strong size variance (max >= 3x min): %s\n",
                 variance_ok ? "PASS" : "FAIL");
 
