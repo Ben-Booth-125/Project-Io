@@ -2431,6 +2431,7 @@
     },
     {
       "id": "BL-133",
+      "version_goal": "v0.1.0",
       "short_name": "COUNTRY_LENS_LEGEND",
       "category": "Canvas",
       "title": "Country lens has no legend — colours with no names",
@@ -2451,6 +2452,7 @@
     },
     {
       "id": "BL-134",
+      "version_goal": "v0.1.0",
       "short_name": "LENS_SELECTOR_IN_LEGEND",
       "category": "Canvas",
       "title": "Move the lens good-selector into the legend as a scrollable dropdown",
@@ -2472,6 +2474,7 @@
     },
     {
       "id": "BL-135",
+      "version_goal": "v0.1.0",
       "short_name": "VALUE_LENS_TILE_MARKS",
       "category": "Canvas",
       "title": "Value lenses (Workforce, Opportunity) as per-tile red→green marks, not full-tile tint",
@@ -2494,6 +2497,7 @@
     },
     {
       "id": "BL-136",
+      "version_goal": "v0.1.0",
       "short_name": "OPPORTUNITY_DEMAND_SIGNAL",
       "category": "Canvas",
       "title": "Opportunity lens reads uniformly green — differentiate unmet demand + drop the qualifier",
@@ -2515,6 +2519,7 @@
     },
     {
       "id": "BL-137",
+      "version_goal": "v0.1.0",
       "short_name": "PRODUCTION_LENS_RED_GREEN",
       "category": "Canvas",
       "title": "Production intensity lens: recolour blue↔orange to red→green",
@@ -2535,6 +2540,7 @@
     },
     {
       "id": "BL-138",
+      "version_goal": "v0.1.0",
       "short_name": "TIME_CONTROL_COMPACT_REDESIGN",
       "category": "Canvas",
       "title": "Compact time-control panel redesign (mockup supplied)",
@@ -2557,6 +2563,7 @@
     },
     {
       "id": "BL-139",
+      "version_goal": "v0.1.0",
       "short_name": "SELECTION_TILE_LEDGER_BUILDING",
       "category": "Canvas",
       "title": "Tile selection opens a tile-detail ledger that includes its building (one tile = one building)",
@@ -2577,6 +2584,7 @@
     },
     {
       "id": "BL-140",
+      "version_goal": "v0.1.0",
       "short_name": "UI_TEXT_IMAGE_CONTAINMENT",
       "category": "Canvas",
       "title": "Containerise every text/image — wrap or fit, never truncate in narrow views",
@@ -2602,6 +2610,7 @@
     },
     {
       "id": "BL-141",
+      "version_goal": "v0.1.0",
       "short_name": "UI_CONTAINER_VOCABULARY",
       "category": "Canvas",
       "title": "Define each permitted UI container (the container vocabulary)",
@@ -2622,6 +2631,7 @@
     },
     {
       "id": "BL-142",
+      "version_goal": "v0.1.0",
       "short_name": "BUDGET_VIEW_PLAYER_ONLY",
       "category": "Canvas",
       "title": "Budget view = player only, with a Policies / Budget-laws TODO skeleton",
@@ -2642,6 +2652,7 @@
     },
     {
       "id": "BL-143",
+      "version_goal": "v0.1.0",
       "short_name": "BUILDING_LEDGER_REDESIGN",
       "category": "Canvas",
       "title": "Rename Construction → 'Building' with Construction/Buildings tabs; drop the build front-door and sell orders",
@@ -2663,6 +2674,7 @@
     },
     {
       "id": "BL-144",
+      "version_goal": "v0.1.0",
       "short_name": "TILE_LEDGER_FOLDOUT_STANDARD",
       "category": "Canvas",
       "title": "History/Tile ledger opens as a separate window — re-host into the fold-out column standard",
@@ -2683,6 +2695,7 @@
     },
     {
       "id": "BL-145",
+      "version_goal": "v0.1.0",
       "short_name": "CORP_FOCUS_INVISIBLE",
       "category": "Canvas",
       "title": "Corporation focuses should be invisible (hide industrial_focus from the UI)",
@@ -2706,6 +2719,7 @@
     },
     {
       "id": "BL-146",
+      "version_goal": "v0.1.0",
       "short_name": "ROAD_NETWORK_GENERATION",
       "category": "Infrastructure",
       "title": "Generated road network + A* cost integration",
@@ -2732,6 +2746,7 @@
     },
     {
       "id": "BL-147",
+      "version_goal": "v0.1.0",
       "short_name": "ROAD_RENDER_PLACEMENT",
       "category": "Infrastructure",
       "title": "Road rendering on the planetary canvas + player-placeable roads",
@@ -2758,6 +2773,7 @@
     },
     {
       "id": "BL-148",
+      "version_goal": "v0.1.0",
       "short_name": "CITIES_AS_LOGISTICS_HUBS",
       "category": "Infrastructure",
       "title": "Cities as free logistics hubs (agglomeration discount)",
@@ -2781,6 +2797,7 @@
     },
     {
       "id": "BL-149",
+      "version_goal": "v0.1.0",
       "short_name": "INLAND_LOGISTICS_HUB",
       "category": "Infrastructure",
       "title": "Inland Logistics Hub building (land-mode convoy consolidator)",
@@ -2807,6 +2824,7 @@
     },
     {
       "id": "BL-150",
+      "version_goal": "v0.1.0",
       "short_name": "ACTIVITY_FOG_DIM_SHADOW",
       "category": "Canvas",
       "title": "Render the commercial-activity fog as a dim shadow (make the unlit map read as fogged)",
