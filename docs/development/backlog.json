@@ -2888,8 +2888,8 @@
       "short_name": "SELL_ORDERS_ON_MARKET",
       "category": "Trade",
       "title": "Relocate sell-order management from the Building ledger to the market surface",
-      "status": "design-owed",
-      "glyph": "~",
+      "status": "designed",
+      "glyph": "✓",
       "priority": "A",
       "difficulty": 3,
       "parked": false,
@@ -2904,7 +2904,7 @@
       ],
       "authority_doc": "docs/ui/ledgers/market.md",
       "summary": "Filed 2026-07-09 as the required companion to BL-143 (Building-ledger redesign), which removes the 'Sell Orders' tab from the construction/Building ledger. Sell orders currently live ONLY in draw_sell_orders_section (construction_panel.cpp:361), so removing that tab is a functional regression unless relocated. Ben (2026-07-08 UX review): sell orders are a MARKET function and belong on the market surface. This item moves sell-order management to the Market Ledger / market selection so no function is lost when BL-143 lands.",
-      "design": "**design-owed — companion to and gate for BL-143.** Move sell-order management out of the Building ledger (draw_sell_orders_section, construction_panel.cpp:361 — its only current home) onto the **market surface**: the Market Ledger (market_ledger.cpp) and/or market selection. It must land **with or before** BL-143's removal of the Sell Orders tab, so there is never a window without a sell-order UI (BL-143 requires BL-155). Open (for promotion/mockup): whether sell orders read best as a Market Ledger section/tab or in the market's Selection element; which columns/actions carry over from draw_sell_orders_section; and how the player targets 'which resource / which market' to post an order against. Authority → docs/ui/ledgers/market.md on landing. 2026-07-08 UX review."
+      "design": "**Settled (Ben).** Relocate sell-order management out of the Building ledger (draw_sell_orders_section, construction_panel.cpp:361 — its only current home) onto the **market surface**, as a **tab on the Market Ledger** (market_ledger.cpp). The tab is reachable **both** by its ledger tab **button** and by **market selection** (selecting a market targets/opens the Market Ledger on that market), and is paired with a **lens** — the existing Market lens (LENSES.md) surfaces sell-order activity on-canvas and links into the tab. Must land **with or before** BL-143's removal of the Building ledger's Sell Orders tab, so there is never a window without a sell-order UI (BL-143 requires BL-155). Carry over the columns/actions from draw_sell_orders_section; the market is chosen by selection (or the tab's own market target) rather than a free-standing picker. Open (proportions only, at promotion): the tab's column layout and how the on-canvas lens affordance reads. Authority → docs/ui/ledgers/market.md (+ LENSES.md for the lens link) on landing. 2026-07-08 UX review."
     }
   ]
 }
