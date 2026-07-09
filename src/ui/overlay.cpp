@@ -45,7 +45,7 @@ const char* overlay_mode_name(overlay_mode m)
         case overlay_mode::corporation: return "Corporation ownership";
         case overlay_mode::resource:    return "Resource deposits";
         case overlay_mode::population:  return "Workforce efficiency";
-        case overlay_mode::opportunity: return "Opportunity (unmet demand)";
+        case overlay_mode::opportunity: return "Opportunity";
         case overlay_mode::production:  return "Production intensity";
         case overlay_mode::scarcity:    return "Market scarcity";
         case overlay_mode::industry:    return "Industry density";

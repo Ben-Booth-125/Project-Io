@@ -187,9 +187,11 @@ void draw_resource_key(ImDrawList* dl, ImVec2 anchor,
     dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "filled = deposit present");
 }
 
-/// On-canvas legend for the Opportunity lens (BL-112): a diverging supplied→unmet
-/// gradient bar over the per-catchment unmet-demand surface (biggest tradeable
-/// price/base ratio — a market bidding above its floor is the gap to fill).
+/// On-canvas legend for the Opportunity lens (BL-136): a body-relative red→green
+/// rank bar over the volume-weighted unmet-demand-gap field — each market's
+/// demand-gap × demand-volume score, ranked against the body max (mirrors the
+/// Scarcity lens's per-market normalisation). Standard key width — the former
+/// "(unmet demand)" qualifier that widened this box is gone (BL-136).
 void draw_opportunity_key(ImDrawList* dl, ImVec2 anchor)
 {
     const float pad    = 8.0f;
@@ -197,26 +199,24 @@ void draw_opportunity_key(ImDrawList* dl, ImVec2 anchor)
     const float bar_h  = 10.0f;
     const float body_h = pad + line_h + 4.0f + bar_h + 2.0f + line_h + pad;
     float x, y, bar_w;
-    // A touch wider than the other keys so the "(unmet demand)" qualifier fits.
-    begin_lens_key(dl, anchor, 190.0f, body_h, pad, x, y, bar_w);
+    begin_lens_key(dl, anchor, 168.0f, body_h, pad, x, y, bar_w);
 
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Opportunity (unmet demand)");
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Opportunity");
     y += line_h + 4.0f;
-    constexpr ImU32 loss   = IM_COL32(216, 100,  96, 255);
-    constexpr ImU32 profit = IM_COL32(110, 200, 120, 255);
+    constexpr ImU32 low  = IM_COL32(216, 100,  96, 255);
+    constexpr ImU32 high = IM_COL32(110, 200, 120, 255);
     constexpr int segs = 24;
     for (int i = 0; i < segs; ++i)
     {
         const float t = static_cast<float>(i) / (segs - 1);
-        const ImU32 c = t < 0.5f ? lerp_colour(loss, IM_COL32(40, 40, 48, 255), t * 2.0f)
-                                 : lerp_colour(IM_COL32(40, 40, 48, 255), profit, (t - 0.5f) * 2.0f);
+        const ImU32 c = lerp_colour(low, high, t);
         dl->AddRectFilled({ x + bar_w * static_cast<float>(i) / segs, y },
                           { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
     }
     y += bar_h + 2.0f;
-    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "supplied");
-    const ImVec2 ts = ImGui::CalcTextSize("unmet");
-    dl->AddText({x + bar_w - ts.x, y}, IM_COL32(170, 175, 185, 255), "unmet");
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "low");
+    const ImVec2 ts = ImGui::CalcTextSize("high");
+    dl->AddText({x + bar_w - ts.x, y}, IM_COL32(170, 175, 185, 255), "high");
 }
 
 /// On-canvas legend for the Production lens (BL-009): a diverging cool→warm bar
@@ -800,31 +800,31 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     }
     const float prod_mean = prod_count > 0 ? std::exp(prod_log_sum / static_cast<float>(prod_count)) : 0.0f;
 
-    // Opportunity lens pre-pass (BL-112): a market-level unmet-demand field, keyed
-    // off the live price-discovering market (BL-078). The opportunity is the gap a
-    // scarce, high-priced market opens up — for each market on the body, the largest
-    // tradeable price/base ratio: a good bid above its floor is demand outrunning
-    // supply, exactly the margin the player can fill. Untradeable goods (base_price
-    // 0 — the space-era resources) carry no floor and are skipped. Every tile in a
-    // market's catchment reads that market's gap (market_for_tile); diverging
-    // oversupplied(red)→opportunity(green) about the neutral floor, on the same
-    // symmetric price band as diverging_colour.
-    std::unordered_map<entity_id, float> opp_ratio; // market id → biggest tradeable price/base ratio
+    // Opportunity lens pre-pass (BL-136): a body-relative, volume-weighted rank of
+    // the unmet-demand gap, replacing the old max-absolute price/base ratio (which
+    // saturated green in the saturated economy — every market bids over its floor).
+    // For each market: sum the per-good demand gap (demand outrunning supply, like
+    // the Scarcity pre-pass) and weight it by the market's total demand volume, so
+    // a large market's real gap outranks a tiny market's high-ratio blip. Scores are
+    // then ranked against the body max (mirrors the Scarcity lens's normalisation) —
+    // strongest gaps read green, met markets read low/red.
+    std::unordered_map<entity_id, float> opp_score; // market id → volume-weighted demand-gap score
+    float opp_max_score = 0.0f;
     if (state.overlay == overlay_mode::opportunity)
     {
         for (const auto& [mid, mk] : w.markets)
         {
             if (mk.body != state.active_body)
                 continue;
-            float best = 0.0f;
+            float gap = 0.0f, volume = 0.0f;
             for (std::size_t r = 0; r < resource_count; ++r)
             {
-                if (mk.base_price[r] <= 0.0f) // untradeable good — no floor to bid over
-                    continue;
-                best = std::max(best, mk.price[r] / mk.base_price[r]);
+                gap    += std::max(0.0f, mk.demand[r] - mk.supply[r]);
+                volume += mk.demand[r];
             }
-            if (best > 0.0f)
-                opp_ratio[mid] = best;
+            const float score = gap * volume;
+            opp_score[mid] = score;
+            opp_max_score  = std::max(opp_max_score, score);
         }
     }
 
@@ -993,23 +993,19 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 fill = lerp_colour(fill, live, 0.15f + 0.7f * eff);
             }
         }
-        // Opportunity lens (BL-112): tint a tile by the unmet-demand margin of its
-        // catchment market — the biggest tradeable price/base ratio (pre-pass above).
-        // A good bid above its floor is demand the player can supply; the whole
-        // catchment reads that market's gap. Diverging oversupplied(red)→
-        // opportunity(green) about the neutral floor (ratio 1.0), on the symmetric
-        // [0.25×, 4×] price band diverging_colour uses. Tiles with no market keep hue.
+        // Opportunity lens (BL-136): tint a tile by its catchment market's
+        // body-relative demand-gap rank (pre-pass above) — low/red (met demand,
+        // or a tiny market's gap) → high/green (the body's strongest, largest
+        // unmet-demand opportunity). Tiles with no market keep terrain hue.
         else if (state.overlay == overlay_mode::opportunity)
         {
-            const auto it = opp_ratio.find(market_for_tile(w, id));
-            if (it != opp_ratio.end())
+            const auto it = opp_score.find(market_for_tile(w, id));
+            if (it != opp_score.end() && opp_max_score > 0.0f)
             {
-                const float ratio = std::clamp(it->second, 0.25f, 4.0f);
-                const float d     = std::log(ratio) / std::log(4.0f); // [-1, 1]
-                constexpr ImU32 loss   = IM_COL32(216, 100,  96, 255);
-                constexpr ImU32 profit = IM_COL32(110, 200, 120, 255);
-                fill = d < 0.0f ? lerp_colour(fill, loss, -d * 0.75f)
-                                : lerp_colour(fill, profit, d * 0.75f);
+                const float t = std::clamp(it->second / opp_max_score, 0.0f, 1.0f);
+                constexpr ImU32 low  = IM_COL32(216, 100,  96, 255);
+                constexpr ImU32 high = IM_COL32(110, 200, 120, 255);
+                fill = lerp_colour(fill, lerp_colour(low, high, t), 0.75f);
             }
         }
         // Production lens (BL-009): tint a producing tile by output sell value this
