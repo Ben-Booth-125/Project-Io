@@ -5564,6 +5564,92 @@
           "notes": "All three vision layers are derived VIEW state (ui_state.permanent_vision + convoy_beams), rebuilt each frame in ui::update_body_vision, called from render()'s planetary branch so the --verify capture path and a live body-switch both get it. No serialisation, no world/* feedback; determinism preserved. Corp centre of operation = lowest-id player building tile on the body (mirrors market_clearing's file-local representative_tile)."
         }
       ]
+    },
+    {
+      "batch": "2026-07-09-uxbatch",
+      "title": "BL-141 — UI container vocabulary",
+      "status": "active",
+      "promoted_from": "backlog.json BL-141",
+      "rows": [
+        { "id": "R1", "status": "active", "requirement": "ITEM-SPANNING: LAYOUT.md documents the closed container vocabulary (9 containers, each with sizing/min-max/text-policy/overflow) that BL-140 applies mechanically.", "verification": ["code: docs/ui/LAYOUT.md section added"], "result_metric": "", "notes": "Doc-only; gates BL-140." }
+      ]
+    },
+    {
+      "batch": "2026-07-09-uxbatch",
+      "title": "BL-138 — Time control compact redesign",
+      "status": "active",
+      "promoted_from": "backlog.json BL-138",
+      "rows": [
+        { "id": "R1", "status": "active", "requirement": "ITEM-SPANNING: the app.cpp time panel renders the compact mockup layout — year on top, 'Mon Nth (Qn)' date line with ordinal day, progress bar directly below the date line, speed controls '> I II III IV V' compact on the right, tick-counter/paused-text readout dropped.", "verification": ["visual", "code"], "result_metric": "", "notes": "New ordinal-day formatter in format.cpp/.hpp." }
+      ]
+    },
+    {
+      "batch": "2026-07-09-uxbatch",
+      "title": "BL-142 — Budget view player-only",
+      "status": "active",
+      "promoted_from": "backlog.json BL-142",
+      "rows": [
+        { "id": "R1", "status": "active", "requirement": "ITEM-SPANNING: the Balance Ledger drops the corporation selector and per-corp fallback, pinned to w.player_entity only (no rival treasury inspection); disabled 'Policies'/'Budget laws' TODO stub sections are signposted.", "verification": ["code", "visual"], "result_metric": "", "notes": "Aligns with BL-068 competitor-privacy rule." }
+      ]
+    },
+    {
+      "batch": "2026-07-09-uxbatch",
+      "title": "BL-159 + BL-143 — Sell orders on market + Building ledger redesign",
+      "status": "active",
+      "promoted_from": "backlog.json BL-159, BL-143",
+      "rows": [
+        { "id": "R1", "status": "active", "requirement": "ITEM-SPANNING (BL-159, lands first): sell-order management moves to a Market Ledger tab, reachable via its tab button or by selecting a market; carries over the columns/actions from the old draw_sell_orders_section.", "verification": ["code", "visual"], "result_metric": "", "notes": "market_ledger.cpp only; must land before/with BL-143's removal." },
+        { "id": "R2", "status": "active", "requirement": "ITEM-SPANNING (BL-143): the Construction fold-out is renamed 'Building' with two tabs — Construction (queue + per-quarter estimated cost) and Buildings (aggregate list: workforce/profit/status + policy-placeholder TODO stub); the Build front-door and Sell Orders tab are removed.", "verification": ["code", "visual"], "result_metric": "", "notes": "construction_panel.cpp, nav_pane.cpp. Depends on R1 (BL-159) landing first." }
+      ]
+    },
+    {
+      "batch": "2026-07-09-uxbatch",
+      "title": "BL-144 — Tile ledger fold-out standard",
+      "status": "active",
+      "promoted_from": "backlog.json BL-144",
+      "rows": [
+        { "id": "R1", "status": "active", "requirement": "ITEM-SPANNING: the Tile Ledger is converted from a standalone ImGui::Begin window to ui::foldout_begin/foldout_end, matching market_ledger/balance_ledger/construction_panel, and becomes a mutually-exclusive column occupant.", "verification": ["code", "visual"], "result_metric": "", "notes": "tile_inspector.cpp only; mirrors BL-122." }
+      ]
+    },
+    {
+      "batch": "2026-07-09-uxbatch",
+      "title": "BL-145 — Corp focus invisible",
+      "status": "active",
+      "promoted_from": "backlog.json BL-145",
+      "rows": [
+        { "id": "R1", "status": "active", "requirement": "ITEM-SPANNING: the corporation industrial_focus readout is hidden from all four UI surfaces (economy_panel, corporation_panel, entity_summary, profile_panel) while the underlying data stays intact; nation 'Economic focus' is left visible.", "verification": ["code", "visual"], "result_metric": "", "notes": "" }
+      ]
+    },
+    {
+      "batch": "2026-07-09-uxbatch",
+      "title": "BL-139 — Selection tile ledger building",
+      "status": "active",
+      "promoted_from": "backlog.json BL-139",
+      "rows": [
+        { "id": "R1", "status": "active", "requirement": "ITEM-SPANNING: selecting a tile opens the tile ledger with tile detail (terrain/deposits/owner/habitability) as lead content; an occupying building appears as a sub-element (double-click navigates to its full detail); an empty tile carries a top-of-ledger navigation affordance toward a build ledger (stub target acceptable — the build ledger surface itself is out of scope here).", "verification": ["code", "visual"], "result_metric": "", "notes": "selection_panel.cpp only." }
+      ]
+    },
+    {
+      "batch": "2026-07-09-uxbatch",
+      "title": "BL-133/134/135/136/137 — Lens legibility cluster (body_surface_canvas)",
+      "status": "active",
+      "promoted_from": "backlog.json BL-133, BL-134, BL-135, BL-136, BL-137",
+      "rows": [
+        { "id": "R1", "status": "active", "requirement": "ITEM-SPANNING (BL-137): the Production-intensity tile tint recolours to a dedicated red->green ramp (red=low, green=high), independent of the shared diverging_colour used by the Market key.", "verification": ["code", "visual"], "result_metric": "", "notes": "" },
+        { "id": "R2", "status": "active", "requirement": "ITEM-SPANNING (BL-134): the shared lens-good selector moves from the minimap strip into the on-canvas legend as a scrollable ImGui BeginCombo, for the Resource/Market/Scarcity lenses.", "verification": ["code", "visual"], "result_metric": "", "notes": "Legend becomes an interactive ImGui child; do this before adding BL-133's key so the new container shape is established." },
+        { "id": "R3", "status": "active", "requirement": "ITEM-SPANNING (BL-133): draw_country_key renders one swatch+nation-name per nation present on the body, sorted by nation id, wired into the overlay_mode::country branch of the legend dispatch.", "verification": ["code", "visual"], "result_metric": "", "notes": "" },
+        { "id": "R4", "status": "active", "requirement": "ITEM-SPANNING (BL-136): the Opportunity lens metric becomes a body-relative, volume-weighted unmet-demand rank (mirrors the Scarcity lens's body-relative treatment) instead of a max-absolute price/base ratio; label drops the '(unmet demand)' qualifier.", "verification": ["code", "visual"], "result_metric": "", "notes": "Must land before R5 (BL-135), which consumes this metric." },
+        { "id": "R5", "status": "active", "requirement": "ITEM-SPANNING (BL-135): the Workforce and Opportunity lenses replace full-tile tint with a red->green per-tile dot mark on every buildable tile, suppressing the building glyph on occupied tiles while the lens is active; legend re-keys to a red->green ramp.", "verification": ["code", "visual"], "result_metric": "", "notes": "New dot glyph in ui::icons. Depends on R4 for the Opportunity metric." }
+      ]
+    },
+    {
+      "batch": "2026-07-09-uxbatch",
+      "title": "BL-140 — UI text/image containment",
+      "status": "active",
+      "promoted_from": "backlog.json BL-140",
+      "rows": [
+        { "id": "R1", "status": "active", "requirement": "ITEM-SPANNING: every on-screen text/image across header/balance strip, time panel, on-canvas legends, selection element, ledgers, hover card, and ImGui tables is placed in a BL-141 container and takes that container's wrap-or-fit text policy, with no silent truncation down to the 1280x720 verify window.", "verification": ["code", "visual"], "result_metric": "", "notes": "Requires BL-141 (container vocabulary) and runs LAST, after all other uxbatch items land, since it is a mechanical pass over the surfaces they just changed." }
+      ]
     }
 
   ]
