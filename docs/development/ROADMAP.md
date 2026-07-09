@@ -1,17 +1,21 @@
 # Project Io — Roadmap
 
-The milestone map from the current state to **v0.1.0**, the finished prototype. This
-document is **forward-facing and lean**: it names the version sequence, the *theme* of each
-minor, and the done-definition for v0.1.0. It deliberately does **not** enumerate individual
-items — that lives in the backlog ([`backlog.json`](backlog.json) metadata + [`BACKLOG.md`](BACKLOG.md)
-design prose) and the active worklist [`REFINED.md`](REFINED.md). The roadmap sits *above* both: it
-says which theme each minor carries; the backlog and worklist say what work realises it.
+The milestone map from the current state through the **v0.1.0** prototype cut and on into the
+**expanded prototype** (v0.1.x → v0.3.0). This document is **forward-facing and lean**: it names
+the version sequence, the *theme* of each minor, and the done-definition for the prototype cut. It
+deliberately does **not** enumerate individual items — that lives in the backlog
+([`backlog.json`](backlog.json) metadata + [`BACKLOG.md`](BACKLOG.md) design prose) and the active
+worklist [`REFINED.md`](REFINED.md). The roadmap sits *above* both: it says which theme each minor
+carries; the backlog and worklist say what work realises it.
 
-The prototype validates the **economy loop only**. The full scope and its exclusions
-(Conflict, Research, Policy, Diplomacy beyond a data-model stub) are owned by
-[`../tech/TECH_FOUNDATIONS.md`](../tech/TECH_FOUNDATIONS.md); the development constraints and
-tone that govern *how* the work is done live in
-[`DEVELOPMENT_PRACTICES.md`](DEVELOPMENT_PRACTICES.md). This document owns only the milestones.
+**v0.1.0 validates the economy loop only** — its scope and exclusions (Conflict, Research, Policy,
+Diplomacy beyond a data-model stub) are owned by
+[`../tech/TECH_FOUNDATIONS.md`](../tech/TECH_FOUNDATIONS.md). Everything **past v0.1.0** — the
+expanded-prototype milestones below — sits *beyond* that scope by design, and is named here as
+**direction, not committed scope**: each theme earns its item-level detail (and its own
+done-definition) when it reaches promotion. The development constraints and tone that govern *how*
+the work is done live in [`DEVELOPMENT_PRACTICES.md`](DEVELOPMENT_PRACTICES.md); this document owns
+only the milestones.
 
 ---
 
@@ -82,38 +86,26 @@ Per-item detail is in `DEVLOG.md`.
 
 ---
 
-## The road to v0.1.0
+## The arc from here
 
-One more minor version, then the cut. The v0.0.6, v0.0.7, and v0.0.8 themes have shipped; the
-remaining road is a lighter polish pass and the final quality gate.
+The map no longer ends at the prototype cut. Ben's **2026-07-09 refocus** extends it: **v0.1.0**
+still cuts the economy-loop prototype; then the **v0.1.x** band lays groundwork for an *expanded
+prototype*, **v0.2.0** refocuses who the player is, and **v0.3.0** brings the political layer and
+the filter system online. The v0.0.6–v0.0.8 themes have shipped, and *v0.0.9 — Budget clarity +
+polish* was cut 2026-07-05 (in-app system menu BL-070, the ledger/panel legibility bugs
+BL-081/082, the corp-emblem glyph family BL-090, one BL-089 deferral; per-item record in
+`DEVLOG.md` and § Near-term publish plan).
 
-### v0.0.9 — Budget clarity + polish
+### v0.1.0 — Quality audit + legibility polish + cut
 
-*Theme: make the financial pressure legible.* The full budget breakdown and debt-interest system
-that anchored this minor's original brief **shipped early, folded into v0.0.8** (BL-072/073/074 —
-itemised income/expenditure, projected runway, and per-building profitability all landed
-2026-06-30–07-01). That leaves v0.0.9 reading as a **lighter polish minor**: close the remaining
-legibility rough edges and clear the smaller open items that don't warrant their own theme.
-Candidate strands (see § The sessions for the live, backlog-sourced list):
+*Theme: make it read cleanly, prove it holds up, then ship.* The prototype cut carries two strands.
+First, a **legibility polish batch** — the 2026-07-08 lens/UI review (BL-133–145, BL-150): a
+Country-lens legend, red→green per-tile value marks, containerised text (wrap-or-fit, never
+truncate), a tile-detail ledger, a player-only budget view, and the compact time panel. Second,
+the **quality audit** — three instruments, then the cut. *(Roads and planetary logistics, once
+queued for this cut, now open v0.1.1.)*
 
-- **In-app system menu** (BL-070) — Exit Game / pause reachable without the keyboard.
-- **Ledger and panel legibility bugs** (BL-081/082) — cramped economy-ledger cells; the
-  construction panel occluding the Selection/Tile panel during placement.
-- **The BL-089 documented deferrals** — a proximity-glimpse refinement and a hover activity-line
-  surfacing, both explicitly deferred at BL-089's landing rather than re-opening the item.
-- **Time-control reassessment** (BL-008) — the countdown/speed-curve work shipped in v0.0.8;
-  reassess whether anything further is worth doing here.
-- **Corp-emblem promotion** (BL-090) — a shared glyph family for the geometric emblem, used on
-  map and selection markers.
-
-Deeper opens queue toward the v0.0.9/v0.1.0 boundary rather than filling this minor: planetary
-logistics (BL-077), the two economy-dynamism design-owed items (BL-078/079), and the Era-1
-tech/quest design (BL-087) — each is either still design-owed or large enough to want its own
-assessment once the polish pass clears.
-
-### v0.1.0 — Quality audit + cut
-
-*Theme: prove it holds up, then ship.* No new systems. Three audit instruments, then the cut:
+**Audit instruments** — no new systems:
 
 - **Frame budget.** Frame-time HUD: last / avg / max ms + 1% lows. Targets: **avg < 8 ms,
   max < 16.7 ms** panning the full Kepler tile grid (15,120 tiles). If max spikes the HUD says
@@ -127,12 +119,57 @@ assessment once the polish pass clears.
 Plus hygiene: warning-clean build, one-off static-analysis (cppcheck), headless harnesses green.
 Final verification pass against the done-definition below, then the Cut.
 
+### v0.1.x — Expanded-prototype groundwork
+
+*Theme: ponder and stub what the expanded prototype will need — design-forward, data-model-first,
+no committed systems yet.* Past the cut, the v0.1.x band is where the game's next dimensions get
+their first shape: enough design and stubbing that the v0.2.0 refocus and the v0.3.0 political
+layer land on positioned ground rather than a greenfield. Only v0.1.1 is a concrete build minor;
+the rest of the band is deliberately design-forward and will firm into named minors as it settles.
+
+- **v0.1.1 — Roads & planetary logistics.** BL-146–149: a generated per-nation road lattice with
+  A\* cost integration, planetary road rendering + player-placeable infrastructure, cities as free
+  logistics hubs (agglomeration discount), and the inland logistics-hub building. The one concrete
+  expanded-prototype minor; it also retires the "roads are an invisible tile attribute" concern.
+- **Laws.** First pass at the law / policy surface — what a law *is* as a data object and how it
+  gates or modifies economic (and later political) behaviour. Design + stub.
+- **Techs.** Early design toward the tech / quest system (BL-087) — the condition-set gate model
+  (gate = quest = tech) that the v0.3.0 filter system formalises. Design only at this stage.
+- **Military systems.** The Conflict dimension's first data-model footing — units, forces, and the
+  seams they need in the world model. Stub, not mechanics (Conflict proper stays post-cut scope).
+- **Politics (stub).** A data-model stub only — enough political layer for the v0.2.0 nation actor
+  to have something to own, deferring the working system to v0.3.0.
+
+### v0.2.0 — The refocus (nation as the strategic actor)
+
+*Theme: change who the player is.* The player pivots from **corporation** to **nation** as the
+strategic actor — owning research, military, and intelligence — while the corporation stays the
+**economic** actor, prototyped as a single chartered corp (= today's player corp) so the v0.0.x
+economy loop survives intact underneath and the nation is a thin strategic layer above it
+(**BL-094**, settled 2026-07-04). This is the hinge from *economy sandbox* toward *grand strategy*:
+the laws / techs / military / politics stubbed across v0.1.x now hang off an actor that can own
+them.
+
+### v0.3.0 — Politics + the filter system
+
+*Theme: the political layer for real, and Era → Filter.* Two coupled deliverables:
+
+- **Politics.** Promote the v0.1.x political stub into a working layer — the nation's political
+  character, its relationships, and the levers the player-as-nation actually pulls.
+- **The filter system (Era → Filter).** Rename and reframe **Era** as **Filter**: the world-state
+  gate governing what content is available when (**BL-087**'s catastrophic-event / quest-tree model
+  re-read as a *filter* over the world). A terminology change with reach — `ERAS.md`,
+  `GLOSSARY.md`, the era enums, and any `era_*` symbols — folded into the work when it lands, not
+  ahead of it (authority time-slice). *(Naming watch: "filter" sits near the map-lens vocabulary in
+  `LENSES.md`; confirm the two read as distinct before the rename lands.)*
+
 ---
 
-## Done-definition — v0.1.0 (full economy loop)
+## Done-definition — v0.1.0 (the prototype cut)
 
-v0.1.0 is the **economy loop, validated and playable end-to-end** — not the full game. It is
-cut when all of the following hold:
+v0.1.0 is the **economy loop, validated and playable end-to-end** — not the full game. It remains
+the **prototype cut**; the expanded-prototype milestones above (v0.1.x → v0.3.0) are theme-level
+and earn their own done-definitions as they firm up. v0.1.0 is cut when all of the following hold:
 
 - The player can **construct and manage** buildings — placement with cost and validation,
   recipe and workforce control — not merely observe authored assets. *(Shipped v0.0.7.)*

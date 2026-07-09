@@ -1132,6 +1132,7 @@
     },
     {
       "id": "BL-087",
+      "version_goal": "v0.3.0",
       "short_name": "ERA1_TECH_QUEST_SYSTEM",
       "category": "Research",
       "title": "Era 1 tech / quest system — structure, itemisation schema & gate model (design)",
@@ -1534,6 +1535,7 @@
     },
     {
       "id": "BL-094",
+      "version_goal": "v0.2.0",
       "short_name": "PLAYER_NATION_PIVOT",
       "category": "Concept",
       "title": "v0.2.0 player-identity pivot — nation as the strategic actor, chartered corp (prototyped as 1) as the economic one",
@@ -2719,7 +2721,7 @@
     },
     {
       "id": "BL-146",
-      "version_goal": "v0.1.0",
+      "version_goal": "v0.1.1",
       "short_name": "ROAD_NETWORK_GENERATION",
       "category": "Infrastructure",
       "title": "Generated road network + A* cost integration",
@@ -2746,7 +2748,7 @@
     },
     {
       "id": "BL-147",
-      "version_goal": "v0.1.0",
+      "version_goal": "v0.1.1",
       "short_name": "ROAD_RENDER_PLACEMENT",
       "category": "Infrastructure",
       "title": "Road rendering on the planetary canvas + player-placeable roads",
@@ -2773,7 +2775,7 @@
     },
     {
       "id": "BL-148",
-      "version_goal": "v0.1.0",
+      "version_goal": "v0.1.1",
       "short_name": "CITIES_AS_LOGISTICS_HUBS",
       "category": "Infrastructure",
       "title": "Cities as free logistics hubs (agglomeration discount)",
@@ -2797,7 +2799,7 @@
     },
     {
       "id": "BL-149",
-      "version_goal": "v0.1.0",
+      "version_goal": "v0.1.1",
       "short_name": "INLAND_LOGISTICS_HUB",
       "category": "Infrastructure",
       "title": "Inland Logistics Hub building (land-mode convoy consolidator)",
