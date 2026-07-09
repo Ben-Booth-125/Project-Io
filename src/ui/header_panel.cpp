@@ -84,22 +84,58 @@ void draw_header_panel(const world& w,
     if (balance_history.size() >= 2)
         net = balance_history.back() - balance_history[balance_history.size() - 2];
 
+    // Guaranteed-fit strip (LAYOUT.md container vocabulary): the strip never wraps
+    // to a second line. The three balance/stockpile/net figures are bounded-length
+    // (fmt::credits/rate abbreviate to a handful of characters) and always drawn in
+    // full; the decorative extras — the in-debt flag and the sparkline — are the
+    // genuine last resort to drop first when the available width is too narrow to
+    // hold everything, so a load-bearing number is never silently clipped.
+    const bool         in_debt      = balance < 0.0f;
+    const std::string  debt_text    = "[in debt - interest accruing]";
+    const ImVec2       item_spacing = ImGui::GetStyle().ItemSpacing;
+    const float        spark_width  = 96.0f;
+
+    float used_width = ImGui::CalcTextSize("BALANCE").x + item_spacing.x +
+                       ImGui::CalcTextSize(fmt::credits(balance).c_str()).x + item_spacing.x +
+                       ImGui::CalcTextSize("   |   STOCKPILE").x + item_spacing.x +
+                       ImGui::CalcTextSize(fmt::credits(valuation).c_str()).x + item_spacing.x +
+                       ImGui::CalcTextSize("   |   NET").x + item_spacing.x +
+                       ImGui::CalcTextSize(fmt::rate(net, "qtr").c_str()).x;
+
+    const float available   = ImGui::GetContentRegionAvail().x;
+    bool        show_debt   = in_debt;
+    bool        show_spark  = balance_history.size() >= 2;
+
+    if (show_debt && used_width + item_spacing.x + ImGui::CalcTextSize(debt_text.c_str()).x > available)
+        show_debt = false; // drop the debt flag first — the red number already carries the signal
+    else if (show_debt)
+        used_width += item_spacing.x + ImGui::CalcTextSize(debt_text.c_str()).x;
+
+    if (show_spark && used_width + item_spacing.x + spark_width > available)
+        show_spark = false; // drop the sparkline next if still too tight
+
     // --- Balance (negatives flagged red, per the economy-panel convention) ---
     ImGui::TextDisabled("BALANCE");
     ImGui::SameLine();
     {
-        const ImU32 col = (balance < 0.0f) ? palette::negative : palette::positive;
+        const ImU32 col = in_debt ? palette::negative : palette::positive;
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(col), "%s", fmt::credits(balance).c_str());
     }
 
     // BL-073: explicit in-debt affordance — a negative balance is now self-
     // accelerating (interest accrues each quarter), so flag it plainly rather than
     // relying on the red number alone.
-    if (balance < 0.0f)
+    if (show_debt)
     {
         ImGui::SameLine();
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative),
-                           "[in debt - interest accruing]");
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative), "%s", debt_text.c_str());
+    }
+    else if (in_debt)
+    {
+        ImGui::SameLine();
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative), "[in debt]");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", debt_text.c_str());
     }
 
     // --- Estimated stockpile valuation ---
@@ -116,7 +152,7 @@ void draw_header_panel(const world& w,
         const ImU32 col = value_colour(fmt::sign_of(net));
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(col), "%s", fmt::rate(net, "qtr").c_str());
     }
-    if (balance_history.size() >= 2)
+    if (show_spark)
     {
         ImGui::SameLine();
         ImGui::PlotLines("##balance_spark",
@@ -124,7 +160,7 @@ void draw_header_panel(const world& w,
                          static_cast<int>(balance_history.size()),
                          0, nullptr,
                          FLT_MAX, FLT_MAX,
-                         {96.0f, ImGui::GetFrameHeight()});
+                         {spark_width, ImGui::GetFrameHeight()});
     }
 
     ImGui::End();
