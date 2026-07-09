@@ -123,22 +123,29 @@ session boundary is drawn *between* them.
 
 ---
 
-## 2026-07-09 Batch — v0.1.0 legibility polish + UX-review cluster (BL-133–145, BL-159)
+## 2026-07-09 Batch — v0.1.0 legibility polish + UX-review cluster (BL-133–145, BL-159) — **COMPLETE**
 
-Requirements: requirements.json § batch `2026-07-09-uxbatch` (9 groups, one per task below).
+Fourteen items (the full 2026-07-08 UX-review cluster) landed in one Batch Delivery, fanned to 8
+wave-1 worktree agents + 1 wave-2 agent. Wave 1 (fully disjoint file scopes, ran concurrently):
+**A** BL-141 container vocabulary (`docs/ui/LAYOUT.md`), **B** BL-138 compact time panel (`app.cpp`,
+`format.{cpp,hpp}`), **C** BL-142 budget view player-only (`balance_ledger.cpp`), **D** BL-159 then
+BL-143 sequential (`market_ledger.cpp` → `construction_panel.cpp`, `nav_pane.cpp`), **E** BL-144 tile
+ledger fold-out standard (`tile_inspector.cpp`), **F** BL-145 corp focus invisible (4 panel files),
+**G** BL-139 tile-primary selection (`selection_panel.cpp`), **G2** the lens legibility cluster —
+BL-137→134→133→136→135 sequential in one agent (`body_surface_canvas.cpp`, `overlay.cpp`,
+`icons.{hpp,cpp}`). Wave 2: **H** BL-140 UI text/image containment, run after wave 1 merged since it
+mechanically applies A's vocabulary across the surfaces the other waves had just changed.
 
-Wave 1 (parallel worktree agents, disjoint file scopes):
-- **[1] A — BL-141 container vocabulary.** Files: `docs/ui/LAYOUT.md`. Deps: independent root. Parallel-safe with all. Satisfies: uxbatch/BL-141 R1.
-- **[2] B — BL-138 compact time panel.** Files: `src/core/app.cpp`, `src/ui/format.{cpp,hpp}`. Deps: independent root. Parallel-safe with A, C–G (not with H, which also touches `app.cpp` — H runs in wave 2). Satisfies: uxbatch/BL-138 R1.
-- **[2] C — BL-142 budget view player-only.** Files: `src/ui/balance_ledger.cpp`. Deps: independent root. Parallel-safe with all. Satisfies: uxbatch/BL-142 R1.
-- **[3+3] D — BL-159 then BL-143 (sequential, one agent).** Files: `src/ui/market_ledger.cpp` (BL-159 first), then `src/ui/construction_panel.cpp`, `src/ui/nav_pane.cpp` (BL-143). Deps: independent root; BL-143 internally depends on BL-159 landing first (same agent, in order). Parallel-safe with A, B, C, E, F, G. Satisfies: uxbatch/BL-159+143 R1, R2.
-- **[2] E — BL-144 tile ledger fold-out standard.** Files: `src/ui/tile_inspector.cpp`. Deps: independent root. Parallel-safe with all. Satisfies: uxbatch/BL-144 R1.
-- **[2] F — BL-145 corp focus invisible.** Files: `src/ui/economy_panel.cpp`, `src/ui/corporation_panel.cpp`, `src/ui/entity_summary.cpp`, `src/ui/profile_panel.cpp`. Deps: independent root. Parallel-safe with all. Satisfies: uxbatch/BL-145 R1.
-- **[3] G — BL-139 selection tile ledger building.** Files: `src/ui/selection_panel.cpp`. Deps: independent root (couples design-wise to D/BL-143 but disjoint files — stub the build-ledger nav target). Parallel-safe with all. Satisfies: uxbatch/BL-139 R1.
-- **[1+3+4+3+2] G2 — Lens legibility cluster, sequential in one agent (order: BL-137 → BL-134 → BL-133 → BL-136 → BL-135).** Files: `src/ui/body_surface_canvas.cpp`, `src/ui/overlay.cpp`, `src/ui/icons.{hpp,cpp}`. Deps: independent root. Parallel-safe with A–G (disjoint files). Satisfies: uxbatch/BL-133-137 R1–R5.
-
-Parallelisation note: A, B, C, D, E, F, G, G2 all run concurrently as wave-1 worktree agents (8-way fan-out, file scopes disjoint). Wave 2 (main session, after wave 1 merges + build green):
-- **[4] H — BL-140 UI text/image containment.** Files: `src/ui/header_panel.cpp`, `src/ui/selection_panel.cpp`, `src/ui/body_surface_canvas.cpp`, `src/core/app.cpp`. Deps: A (container vocabulary) + all of wave 1 landed (mechanical pass over surfaces they just changed). Satisfies: uxbatch/BL-140 R1.
+Two agents (E, G2) hit a background API disconnect mid-task and were resumed via SendMessage with a
+status recap; both picked up cleanly from their last commit. Two merge conflicts surfaced against
+concurrent upstream work landed earlier the same session (`tile_inspector.cpp`'s ledger-chrome
+signature had already changed; `app.cpp`'s time panel had an older BL-097 height fix and
+`body_surface_canvas.cpp`'s `draw_market_key` had gained city-name labels) — both resolved by hand,
+keeping the newer/better upstream approach (content-derived height, city-name labels) while grafting
+in this batch's new content. Full integrating build green after every merge; final build 615/615
+targets, **20/20 CTest harnesses PASS**, no regressions. All 14 items flipped to `complete` in
+backlog.json; requirements `requirements.json § 2026-07-09-uxbatch` (9 groups) all `complete`.
+Per-item detail: DEVLOG 2026-07-09.
 
 ---
 

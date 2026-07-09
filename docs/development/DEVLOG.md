@@ -6,6 +6,69 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — v0.1.0 legibility polish + UX-review Batch Delivery (BL-133–145, BL-159) (2026-07-09)
+
+**Context.** The 2026-07-08 UX/lens-legibility review had left 14 `designed` items sitting toward
+the v0.1.0 cut (backlog.json, `version_goal` mostly v0.0.9/undated). Promoted the full set into a
+Batch Delivery — the first time this session ran the worktree fan-out model at this width (8
+concurrent agents).
+
+**Wave 1 (8 worktree agents, disjoint file scopes, all landed):**
+- **BL-141** — `docs/ui/LAYOUT.md` § Container vocabulary: 9 named UI containers (fold-out column,
+  on-canvas legend, selection element, header/balance strip, time panel, hover card, minimap lens
+  bar, nav rail, ImGui table), each with a sizing rule, a wrap-or-guaranteed-fit text policy, and an
+  overflow rule. Gates BL-140.
+- **BL-138** — compact time panel (`app.cpp`, `format.{cpp,hpp}`): year alone on top, `"Jan 1st (Q1)"`
+  date line (new `ordinal_day` formatter), progress bar directly below it, compact `"> I II III IV V"`
+  speed controls; dropped the tick counter and paused/speed text readout.
+- **BL-142** — Balance Ledger pinned permanently to `w.player_entity` (corp selector + rival-runway
+  fallback removed, closing a BL-068 privacy gap), plus disabled "Policies"/"Budget laws" TODO stub
+  sections.
+- **BL-159 + BL-143** — sell-order management relocated from the Building ledger onto a new Market
+  Ledger tab (reachable by tab or by market selection), then the Construction fold-out renamed
+  "Building" with Construction (queue + per-quarter opex) / Buildings (aggregate list: workforce,
+  profit, status, policy-placeholder stub) tabs; the old Build front-door and Sell Orders tab removed.
+- **BL-144** — Tile Ledger re-hosted from a standalone `ImGui::Begin` window onto the shared
+  `ui::foldout_begin/end` chrome, joining the other ledgers as a mutually-exclusive column occupant.
+- **BL-145** — corporation `industrial_focus` UI readout hidden across all four surfaces that showed
+  it (economy/corporation panels, entity summary, profile panel); data untouched, nation "Economic
+  focus" left visible.
+- **BL-139** — tile made the primary selection subject: tile detail (terrain/deposits/owner/
+  habitability) leads, an occupying building appears as a sub-element (double-click navigates in),
+  and a stub "build here" affordance sits at the top (wired to the existing Building panel pending a
+  real build-ledger destination).
+- **BL-133/134/135/136/137 (lens legibility cluster, one agent, sequential)** — BL-137 recoloured the
+  Production lens to a dedicated red→green ramp (kept separate from the Market lens's shared
+  `diverging_colour`); BL-134 moved the shared lens-good selector from the minimap strip into the
+  on-canvas legend as a scrollable combo; BL-133 added `draw_country_key` (swatch + nation name,
+  modelled on `draw_market_key`); BL-136 reworked the Opportunity metric into a body-relative,
+  volume-weighted unmet-demand rank (mirroring the Scarcity lens) and dropped the "(unmet demand)"
+  label qualifier; BL-135 replaced the Workforce/Opportunity full-tile tints with a red→green
+  per-tile dot mark (new `icons::value_mark` glyph) on every buildable tile, suppressing the building
+  glyph on occupied tiles under those two lenses.
+
+**Wave 2:** **BL-140** — UI text/image containment pass over `header_panel.cpp` (balance-strip
+guaranteed-fit + last-resort elide-with-tooltip for the debt flag), `selection_panel.cpp` (wrap +
+scroll instead of clipped/no-scrollbar columns); `body_surface_canvas.cpp` and the `app.cpp` time
+panel were audited and found already compliant.
+
+**Merge notes.** Two agents (BL-144, the lens cluster) hit a background API disconnect mid-task;
+resumed cleanly via SendMessage with a status recap, no rework lost. Three merge conflicts arose
+against *other* concurrent work already on `main` from earlier the same session — `tile_inspector.cpp`
+(an older `ledger_window_spawn/size` signature had already changed), `app.cpp`'s time panel (an
+existing BL-097 content-derived-height fix predated this batch's fixed-fraction height), and
+`draw_market_key` in `body_surface_canvas.cpp` (had already gained city-name labels). All three
+resolved by hand, grafting this batch's new content onto the better/newer upstream approach rather
+than reverting it.
+
+**Verified:** full integrating build after every merge, final build 615/615 targets green,
+**20/20 CTest headless harnesses PASS** (no regressions). All 14 items flipped to `complete` in
+backlog.json; `requirements.json § 2026-07-09-uxbatch` (9 groups) all `complete`. Not independently
+visually verified (no `scripts/verify/*.lua` golden authored for this batch — a candidate follow-up).
+Authority propagates to LAYOUT.md, LENSES.md, DISCOVERY.md per item on next doc-authority pass.
+
+---
+
 ## Session — Fog of war: activity-fog shadow + Planetary reach fog + convoy beam (2026-07-09)
 
 **Context.** Started by bringing local `main` up to speed (merged 6 upstream commits — the mobile
