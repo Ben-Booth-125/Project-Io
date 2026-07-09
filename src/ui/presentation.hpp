@@ -100,6 +100,33 @@ inline constexpr ImU32 activity_stale   = IM_COL32(140, 142, 150, 210); ///< Rou
 inline constexpr ImU32 activity_visible = IM_COL32(150, 230, 190, 255); ///< Live lane / player presence.
 inline constexpr ImU32 activity_corridor= IM_COL32(120, 205, 160, 130); ///< Lit trade corridor between bodies.
 
+// --- activity fog as a dim shadow (BL-150) ---
+// The activity fog (BL-089) is absence-by-default: an un-networked body is a plain
+// astronomy dot, so with little player commerce the whole map reads as "no fog".
+// BL-150 inverts that: a body outside the player's commercial network is drawn
+// DIMMED (body + label brightness scaled below), and the dimmest tiers also get a
+// translucent dark wash cast over the body, so the un-networked map reads as fogged
+// and brightens as commerce reaches it. Indexed by activity_vis ordinal
+// (unknown, known_stale, known, visible) — a monotonic ramp to full brightness.
+// Kept visually distinct from the geographic survey fog (the '?' badge, BL-067):
+// this is a brightness/shadow treatment, not a glyph. Home is always full-bright.
+inline constexpr float activity_fog_brightness[4] = { 0.36f, 0.60f, 0.84f, 1.0f };
+inline constexpr int   activity_fog_shadow_alpha[4] = { 105, 50, 0, 0 };
+
+/// Scale an ImU32 colour's RGB channels by @p b (0..1), preserving its alpha. Used
+/// for the activity-fog dim (BL-150): a dimmed body/label keeps its hue and opacity
+/// but reads darker. @p b is clamped to [0, 1].
+inline ImU32 dim_rgb(ImU32 c, float b)
+{
+    if (b > 1.0f) b = 1.0f;
+    if (b < 0.0f) b = 0.0f;
+    const int a = (c >> IM_COL32_A_SHIFT) & 0xFF;
+    const int r = static_cast<int>(((c >> IM_COL32_R_SHIFT) & 0xFF) * b);
+    const int g = static_cast<int>(((c >> IM_COL32_G_SHIFT) & 0xFF) * b);
+    const int bl= static_cast<int>(((c >> IM_COL32_B_SHIFT) & 0xFF) * b);
+    return IM_COL32(r, g, bl, a);
+}
+
 /// Number of reserved corporation colour slots. These are the on-canvas identity
 /// colours for corporations (player vs. rivals); slot 0 is the player's corp.
 /// (Renamed from faction_slot_count, BL-052 — this palette is corporation
