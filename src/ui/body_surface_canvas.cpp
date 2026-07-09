@@ -324,6 +324,71 @@ void draw_market_key(ImDrawList* dl, ImVec2 anchor,
     }
 }
 
+/// On-canvas legend for the Country lens (BL-133): one colour swatch + nation name
+/// per nation present on the active body, sorted by nation id for a stable order.
+/// Modelled on draw_market_key; the box auto-sizes to the widest name so every
+/// label guaranteed-fits (CalcTextSize pattern draw_market_key already uses).
+/// Colour source is palette::nation_colour — the same source the tile tint itself
+/// uses (the country lens's tile-tint pass, above).
+void draw_country_key(ImDrawList* dl, ImVec2 anchor, const world& w, const ui_state& state)
+{
+    std::vector<entity_id> present;
+    for (const auto& [tid, nid] : w.tile_to_nation)
+    {
+        const auto tile_it = w.tiles.find(tid);
+        if (tile_it == w.tiles.end() || tile_it->second.body != state.active_body)
+            continue;
+        if (std::find(present.begin(), present.end(), nid) == present.end())
+            present.push_back(nid);
+    }
+    std::sort(present.begin(), present.end());
+
+    const float pad    = 8.0f;
+    const float line_h = ImGui::GetTextLineHeight();
+    const float swatch = line_h;
+
+    float name_w = ImGui::CalcTextSize("Countries").x;
+    for (const entity_id nid : present)
+    {
+        const auto nat_it = w.nations.find(nid);
+        if (nat_it == w.nations.end())
+            continue;
+        name_w = std::max(name_w, ImGui::CalcTextSize(nat_it->second.name.c_str()).x);
+    }
+    const float box_w  = pad * 2.0f + swatch + 4.0f + name_w;
+    const int   n      = static_cast<int>(present.size());
+    const float body_h = pad + line_h + 4.0f
+                       + static_cast<float>(std::max(n, 1)) * (swatch + 2.0f)
+                       + pad;
+
+    const ImVec2 p0 = { anchor.x - box_w, anchor.y - body_h * 0.5f };
+    const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
+    dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
+    dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
+
+    float x = p0.x + pad;
+    float y = p0.y + pad * 0.5f;
+
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Countries");
+    y += line_h + 4.0f;
+
+    if (present.empty())
+    {
+        dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "No nations");
+        return;
+    }
+
+    for (const entity_id nid : present)
+    {
+        const auto nat_it = w.nations.find(nid);
+        if (nat_it == w.nations.end())
+            continue;
+        dl->AddRectFilled({x, y}, {x + swatch, y + swatch}, palette::nation_colour(nid));
+        dl->AddText({x + swatch + 4.0f, y}, IM_COL32(220, 220, 220, 255), nat_it->second.name.c_str());
+        y += swatch + 2.0f;
+    }
+}
+
 /// On-canvas legend for the Population lens: a low→high habitability gradient bar
 /// (dark substrate → liveable green). Same left-edge placement as the other keys.
 void draw_population_key(ImDrawList* dl, ImVec2 anchor)
@@ -1494,7 +1559,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // On-canvas lens key (drawn unclipped, flush-left of the minimap so it reads as a
     // drawer folding out from it — anchor passed in as lens_key_anchor; before the
     // input early-out so it shows in headless captures too).
-    if (state.overlay == overlay_mode::resource)
+    if (state.overlay == overlay_mode::country)
+        draw_country_key(dl, lens_key_anchor, w, state);
+    else if (state.overlay == overlay_mode::resource)
         draw_resource_key(dl, lens_key_anchor, state);
     else if (state.overlay == overlay_mode::market)
         draw_market_key(dl, lens_key_anchor, state, market_catchment_colour);
