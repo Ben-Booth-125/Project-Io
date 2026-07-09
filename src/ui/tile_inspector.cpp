@@ -1,6 +1,6 @@
 #include "tile_inspector.hpp"
 
-#include "ledger_chrome.hpp" // shared ledger-window size + spawn anchor
+#include "foldout_column.hpp" // shell fold-out column host (BL-122/BL-144)
 #include "presentation.hpp"
 #include "world/components.hpp"
 
@@ -24,18 +24,17 @@ void draw_tile_inspector(const world& w, const ui_state& s, bool* p_open)
         body_ids.push_back(id);
     std::sort(body_ids.begin(), body_ids.end());
 
-    // Shared ledger-window chrome: one size + one spawn anchor for the whole
-    // ledger family (docs/ui/LAYOUT.md § Uniform ledger-window chrome).
-    const ImVec2 disp = ImGui::GetIO().DisplaySize;
-    ImGui::SetNextWindowPos(ledger_window_spawn(disp.x), ImGuiCond_Once);
-    ImGui::SetNextWindowSize(ledger_window_size(disp.x, disp.y), ImGuiCond_Once);
-    // Passing p_open gives the window a close button that clears the flag.
-    ImGui::Begin("Tile Ledger", p_open);
+    // Re-hosted into the shell fold-out column (BL-144); closed via the nav rail.
+    if (!ui::foldout_begin("Tile Ledger"))
+    {
+        ui::foldout_end();
+        return;
+    }
 
     if (body_ids.empty())
     {
         ImGui::TextDisabled("No bodies in world.");
-        ImGui::End();
+        ui::foldout_end();
         return;
     }
 
@@ -231,7 +230,7 @@ void draw_tile_inspector(const world& w, const ui_state& s, bool* p_open)
     if (!any_market)
         ImGui::TextDisabled("No market.");
 
-    ImGui::End();
+    ui::foldout_end();
 }
 
 } // namespace ui
