@@ -2874,7 +2874,53 @@
       ],
       "authority_doc": "docs/ui/DISCOVERY.md",
       "summary": "Filed + landed 2026-07-09 (Ben, the 'things are moving' half of BL-151). A live player convoy emits a radius-2 beam of vision along the tiles it moves through; that vision lags and dims over one econ tick (90 days). The moving-presence complement to BL-151's static-presence pocket.",
-      "design": "**Spec (Ben).** 'Convoys should send a radius 2 beam of vision which lags and dims over 1 econ tick.'\n\n**Path exposure.** `logistics_path` (world.hpp) gained a `tiles` sequence; `intra_body_path` (logistics.cpp) reconstructs it via a came_from parent-walk, stored in canonical lo->hi endpoint order (the route cache is keyed on the unordered pair). Deterministic; wrap-aware (the grid is a horizontal cylinder). Verified by a throwaway headless probe (contiguity, canonical order, single-tile src==dst).\n\n**Vision buffer.** `ui_state.convoy_vision` maps tile -> the sim time (elapsed days) a beam last lit it; `ui_state.sim_now_days` is the continuous fade clock (set every frame in app.cpp). Derived VIEW state only — never serialised, no feedback into world/*, so world determinism is preserved (a `world/*` standing rule).\n\n**Refresh (per econ step).** `ui::update_convoy_vision` (body_surface_canvas) runs in app::step_economy after advance_convoys (before arrived convoys are retired). For each live player intra-body convoy it maps progress -> a path-index segment (where it was one tick ago .. now), floods radius-2 (odd-r neighbours) around that segment, and stamps now_days. Prunes entries older than one econ tick.\n\n**Render.** The Planetary fog (BL-151) now blends a beam vision term: vision = 1 in the static pocket, else max with the beam's fading contribution (1 - age/90); fog wash = 0.5*(1 - vision). So a convoy's beam trails and dims behind it over one econ tick. Uses continuous sim time, so it fades smoothly between quarter boundaries rather than snapping.\n\n**Scope note.** Intra-body convoys only (inter-body activity reads on the Solar fog, BL-089/150). econ_tick_days (90) mirrored as a local constant in the canvas to avoid a ui->core include. **Authority:** docs/ui/DISCOVERY.md."
+      "design": "**Spec (Ben).** 'Convoys should send a radius 2 beam of vision which lags and dims over 1 econ tick.'\n\n**Path exposure.** `logistics_path` (world.hpp) gained a `tiles` sequence; `intra_body_path` (logistics.cpp) reconstructs it via a came_from parent-walk, stored in canonical lo->hi endpoint order (the route cache is keyed on the unordered pair). Deterministic; wrap-aware (the grid is a horizontal cylinder). Verified by a throwaway headless probe (contiguity, canonical order, single-tile src==dst).\n\n**Vision buffer.** `ui_state.convoy_vision` maps tile -> the sim time (elapsed days) a beam last lit it; `ui_state.sim_now_days` is the continuous fade clock (set every frame in app.cpp). Derived VIEW state only — never serialised, no feedback into world/*, so world determinism is preserved (a `world/*` standing rule).\n\n**Refresh (per econ step).** `ui::update_convoy_vision` (body_surface_canvas) runs in app::step_economy after advance_convoys (before arrived convoys are retired). For each live player intra-body convoy it maps progress -> a path-index segment (where it was one tick ago .. now), floods radius-2 (odd-r neighbours) around that segment, and stamps now_days. Prunes entries older than one econ tick.\n\n**Render.** The Planetary fog (BL-151) now blends a beam vision term: vision = 1 in the static pocket, else max with the beam's fading contribution (1 - age/90); fog wash = 0.5*(1 - vision). So a convoy's beam trails and dims behind it over one econ tick. Uses continuous sim time, so it fades smoothly between quarter boundaries rather than snapping.\n\n**Scope note.** Intra-body convoys only (inter-body activity reads on the Solar fog, BL-089/150). econ_tick_days (90) mirrored as a local constant in the canvas to avoid a ui->core include. **Authority:** docs/ui/DISCOVERY.md.\n\n**Superseded 2026-07-09 by BL-154:** the per-econ-step segment-flood + timestamp-fade was replaced by a render-time moving head/tail beam (interpolated by econ-tick fraction) + permanent corp-centre->market corridors. The path-exposure work here stands; the buffer/refresh mechanism was reworked."
+    },
+    {
+      "id": "BL-153",
+      "short_name": "CONVOY_PAY_BY_DISTANCE",
+      "category": "Economy",
+      "title": "Convoy payout weighted by haul distance, not just destination price",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "B",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-09",
+      "version_goal": "post-v0.1.0",
+      "files": [
+        "src/world/supply_system.cpp",
+        "src/world/market_clearing.cpp"
+      ],
+      "authority_doc": "docs/economy/PRODUCTION.md",
+      "summary": "Filed 2026-07-09 (Ben, alongside the convoy vision work). Ben: players should 'get money based on distance rather than just time'. Today a convoy has NO time- or distance-based payout: its cargo is delivered into the destination market and sold at the live clearing price (the price differential IS the profit); logistics COST already scales with path distance (logistics_cost x A* path cost). So distance shows up as a cost, not a revenue term. This item asks whether long hauls should also PAY more — a distance-scaled delivery margin on top of the price differential.",
+      "design": "**Current model.** `credit_arrived_convoys` (supply_system.cpp) delivers cargo to the destination pool + injects it into market supply; `clear_markets` prices it. Profit = buy-low/sell-high across the price gap. Distance enters only as logistics cost (`intra_body_path` cost x per-mode `logistics_cost`), reducing net on long hauls — the opposite of a distance reward.\n\n**The question (design-owed, Ben's call).** Should distance be a REVENUE lever, not just a cost? Options to weigh: (a) a distance-scaled delivery margin/bonus credited on arrival (longer haul -> higher per-unit payout), (b) leave revenue alone and instead make distance-cost more legible (surface it), (c) a hauling contract/tariff mechanic. This touches the economy seam (determinism, balance) and the corp agency model — needs a design pass before code, and must justify itself against Trade/Conflict (standing rules). Deferred from the 2026-07-09 vision-beam session; not implemented. **Authority:** docs/economy/PRODUCTION.md (once landed)."
+    },
+    {
+      "id": "BL-154",
+      "short_name": "CONVOY_BEAM_MOVING_CORRIDORS",
+      "category": "Canvas",
+      "title": "Moving head/tail convoy beam + permanent corp-centre-to-market corridors",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-09",
+      "version_goal": "v0.0.9",
+      "files": [
+        "src/ui/ui_state.hpp",
+        "src/ui/body_surface_canvas.cpp",
+        "src/ui/body_surface_canvas.hpp",
+        "src/core/app.cpp"
+      ],
+      "authority_doc": "docs/ui/DISCOVERY.md",
+      "summary": "Filed + landed 2026-07-09 (Ben, refining BL-151/152). Two changes to the intra-body vision model: (1) the convoy beam should MOVE with a head and tail that update (not a uniformly-fading segment); (2) permanent vision as a 3-wide beam from the corp centre of operation to the market centre. Reworks the vision buffers accordingly.",
+      "design": "**Change 1 — moving head/tail beam.** The BL-152 buffer (per-econ-step segment flood, uniform timestamp fade) read as a chunky blob that stepped once per quarter. Replaced with a RENDER-TIME moving beam: `ui_state.convoy_beams` stores each live player intra-body convoy's tile path + progress + speed (rebuilt each frame in `update_body_vision`); the canvas interpolates a HEAD along the path by the fraction through the current econ tick (`fmod(sim_now_days,90)/90`), so it glides smoothly between quarterly steps, and trails a TAIL one econ tick's travel behind, ramping intensity 1->0 head->tail, radius-2 around each path tile. So the beam has a bright moving head and a dimming tail.\n\n**Change 2 — permanent corp-centre->market corridors (Ben: 'from the corp centre of operation to the market centre, as a 3 wide beam').** `ui_state.permanent_vision` (non-fading) = radius-2 pockets around the player's own building tiles + 3-wide corridors (path flooded radius 1) from the corp centre of operation (lowest-id player building tile on the body, mirroring market_clearing's file-local representative_tile) to each market centre the player operates in (the catchment markets of its buildings). Always visible.\n\n**Plumbing.** `update_body_vision` (renamed from update_convoy_vision) rebuilds both buffers per frame for the active body; moved from app::step_economy to render() (planetary branch) so the --verify capture path gets it too, and so a body switch is tracked immediately. Pathfinder is route-cache-backed (steady-state = lookups). Derived VIEW state only — no serialisation, no world/* feedback; determinism preserved.\n\n**Render.** Fog vision = 1 in permanent_vision, else the moving beam's intensity; wash = 0.5*(1 - vision). Verified: full build clean; wide + default captures show permanent pockets/corridors lit and the globe fogged (the moving beam's motion only manifests with a live inter-market intra-body convoy, not the same-market verify seed). **Authority:** docs/ui/DISCOVERY.md."
     }
   ]
 }

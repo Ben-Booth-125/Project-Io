@@ -304,9 +304,9 @@ int app::run()
         // routes for the activity fog (BL-089) without threading the tick everywhere.
         m_world.current_day_tick = static_cast<int>(m_sim_loop.day_tick());
 
-        // Continuous sim time for the convoy vision-beam fade (BL-152): the Planetary
-        // canvas ages each beam-lit tile against this every frame, so the trail dims
-        // smoothly between econ steps rather than snapping at quarter boundaries.
+        // Continuous sim time for the intra-body vision beam (BL-152/154). The actual
+        // vision refresh (update_body_vision) runs in render(), so both the live loop
+        // and the --verify capture path (capture_frame -> render) get it.
         m_ui.sim_now_days = now_days;
 
         // Resolve the economy on each econ-tick (quarter) boundary the clock crosses.
@@ -387,11 +387,6 @@ void app::step_economy()
                      m_registry.logistics_cost(convoy_mode::land),
                      m_registry.logistics_cost(convoy_mode::space));
     advance_convoys(m_world);
-
-    // Refresh the convoy vision beam (BL-152) at the convoys' new positions, before
-    // credit_arrived_convoys retires the arrived ones — an arriving convoy still lights
-    // its destination. Uses continuous sim time so the fade clock matches the renderer.
-    ui::update_convoy_vision(m_world, m_ui, m_sim_loop.elapsed_days());
     m_last_econ_report = run_economy_step(m_world, m_registry);
     auto flows = clear_markets(m_world, m_registry, m_last_econ_report, m_ui.sell_orders);
     apply_budget(m_world, m_registry, flows, m_last_econ_report.workforce_contention,
@@ -1560,6 +1555,13 @@ void app::render()
                 break;
 
             case canvas_level::planetary:
+                // Refresh the intra-body vision model (BL-151/152/154) for the active
+                // body just before drawing it: permanent building pockets + corp-centre→
+                // market corridors, and the live convoy paths the beam head glides along.
+                // Here (not the run loop) so the --verify capture path gets it too. Needs
+                // a non-const world for the route-cached pathfinder, so it cannot live in
+                // the const-world draw. Derived VIEW state — no feedback into the sim.
+                ui::update_body_vision(m_world, m_ui, m_ui.sim_now_days);
                 ui::draw_body_surface_canvas(m_world, m_ui, m_registry, m_last_econ_report, {0.0f, 0.0f}, disp, primary_input,
                                              {mm_origin.x, mm_origin.y + mm_h * 0.5f});
                 ui::draw_circumplanetary_canvas(m_world, m_ui, inset_origin, inset_size, minimap_input, true);

@@ -38,17 +38,18 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                               const economy_report& report, ImVec2 origin, ImVec2 size,
                               bool input_enabled, ImVec2 lens_key_anchor);
 
-/// Refresh the convoy vision beam buffer (BL-152). For each live player intra-body
-/// convoy, relight a radius-2 pocket along the path segment it traversed this econ
-/// tick, stamping @p now_days into state.convoy_vision; prune entries older than one
-/// econ tick (fully faded). Called once per econ step from app::step_economy — it
-/// needs a non-const world for the (cached) pathfinder, so it cannot run inside the
-/// const-world draw. The Planetary canvas reads the buffer against state.sim_now_days
-/// to dim the beam as it ages.
+/// Refresh the intra-body vision model for state.active_body (BL-151/152/154). Rebuilds
+/// state.permanent_vision (radius-2 pockets around the player's building tiles + 3-wide
+/// corridors from the corp centre of operation to each market centre it operates in) and
+/// state.convoy_beams (the tile path + progress/speed of each live player intra-body
+/// convoy, for the render-time moving head/tail beam). Called every frame from the app
+/// loop — it needs a non-const world for the (cached) pathfinder, so it cannot run in
+/// the const-world draw; per-frame keeps it correct across a body switch, and the beam
+/// paths are route-cache hits after the first build.
 ///
 /// @param w        World (non-const: the intra-body pathfinder mutates its route cache).
-/// @param state    Shared UI state; state.convoy_vision is refreshed and pruned.
-/// @param now_days Current continuous sim time in elapsed days (the fade clock).
-void update_convoy_vision(world& w, ui_state& state, double now_days);
+/// @param state    Shared UI state; permanent_vision and convoy_beams are rebuilt.
+/// @param now_days Current continuous sim time in elapsed days (stored as the beam clock).
+void update_body_vision(world& w, ui_state& state, double now_days);
 
 } // namespace ui

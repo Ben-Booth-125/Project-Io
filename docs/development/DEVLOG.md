@@ -41,9 +41,23 @@ wide + convoy-beam captures) — static fog + lit HQ pocket confirmed by eye; co
 by ad-hoc headless probe (4 assertions PASS). Cross-platform goldens not re-blessed (by-eye per the
 Windows-golden-mismatch note).
 
-**Left open.** Radius knobs (`fog_reveal_radius`=3, beam radius 2) are Ben-tunable one-liners. The
-path-reconstruction probe was run ad hoc, not saved as a `tools/verify/*.cpp` harness — candidate
-follow-up. Authority propagated to DISCOVERY.md (new "Illumination (Planetary canvas)" section).
+**BL-154 — moving beam + permanent corridors (same session, refining 151/152).** Ben: the beam should
+*move* with a head and tail that update, and there should be *permanent vision from the corp centre of
+operation to the market centre, as a 3-wide beam*. Reworked the vision model into three derived layers
+(`update_body_vision`, called from render()'s planetary branch so --verify gets it too): (1) permanent
+radius-2 pockets around player buildings, (2) permanent 3-wide corridors from the corp centre of
+operation (lowest-id player building tile) to each operated market centre, (3) a render-time moving
+beam — `convoy_beams` stores path+progress+speed, the canvas interpolates the head by the fraction
+through the current econ tick (so it glides smoothly) and trails a dimming tail one tick's travel back.
+Replaced BL-152's per-econ-step timestamp-fade buffer. The path-exposure work from 152 stands.
+
+**BL-153 filed (deferred).** Ben's "money based on distance rather than time" is an economy-seam change
+(today convoy profit is the destination price differential; distance is only a *cost* via logistics).
+Filed design-owed, post-v0.1.0 — needs a design pass, not bundled with the visuals.
+
+**Left open.** Radius/tuning knobs (building pocket radius 2, corridor width 3, beam radius 2) are
+Ben-tunable one-liners. The path-reconstruction probe was run ad hoc, not saved as a `tools/verify/*.cpp`
+harness — candidate follow-up. Authority propagated to DISCOVERY.md ("Illumination (Planetary canvas)").
 
 ## Session — BL-129: prose pass on the central documentation (2026-07-08)
 

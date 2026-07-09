@@ -1,10 +1,12 @@
--- Visual verification for the intra-body activity fog + convoy vision beam (BL-151/152).
+-- Visual verification for the intra-body vision model (BL-151/152/154).
 -- Descends to the home planet (Kepler, fully surveyed, player buildings present):
---   BL-151: the surface reads mostly UNKNOWN, lit only in a tight pocket around the
---           player's presence (own building tiles); everything else takes a dark wash.
---   BL-152: a live player convoy lights a radius-2 beam of vision along its route,
---           which then dims over one econ tick. (Static capture shows the lit pocket;
---           the fade is temporal and not visible in a still.)
+--   BL-151/154: the surface reads mostly UNKNOWN, lit only in permanent pockets around
+--           the player's buildings + 3-wide corridors from the corp centre of operation
+--           to each market centre it operates in; everything else takes a dark wash.
+--   BL-152/154: a live player intra-body convoy lights a radius-2 beam with a bright
+--           head that glides along its route and a tail that dims one econ tick behind.
+--           (A still shows lit pockets; the head/tail MOTION needs a live inter-market
+--           intra-body convoy and is confirmed in the running app, not this capture.)
 
 verify.goto_surface("home")
 verify.capture("intrabody_fog_default")

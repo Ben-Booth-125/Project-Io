@@ -6,6 +6,7 @@
 #include <imgui.h>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 /// Which rung of the canvas zoom ladder currently fills the primary viewport.
@@ -169,16 +170,25 @@ struct ui_state
     float planetary_pan_x = 0.0f; ///< Pan offset of the grid centre from the canvas centre, screen px.
     float planetary_pan_y = 0.0f; ///< Pan offset of the grid centre from the canvas centre, screen px.
 
-    // --- convoy vision beam (BL-152) ---
-    // A live player convoy lights a radius-2 beam of vision along the tiles it moves
-    // through; that vision *lags and dims over one econ tick* (90 days). This buffer
-    // maps a tile id -> the sim time (elapsed days) the beam last lit it. Refreshed
-    // each econ step by ui::update_convoy_vision (convoy positions are known there),
-    // read every frame by the Planetary canvas which computes the fade against
-    // sim_now_days. Derived VIEW state only — never serialised, never feeds the
-    // simulation, so it introduces no non-determinism into world/*.
-    std::unordered_map<entity_id, double> convoy_vision;
-    double sim_now_days = 0.0; ///< Latest continuous sim time (elapsed days); the fade clock.
+    // --- intra-body vision model (BL-151/152/154) ---
+    // The Planetary canvas reads three vision layers, all derived VIEW state — never
+    // serialised, never fed back into the simulation, so world/* stays deterministic.
+    // Refreshed each frame by ui::update_body_vision for the active body.
+
+    /// Permanently-lit tiles: radius-2 pockets around the player's own building tiles
+    /// (your installations are always visible) + 3-wide corridors from the corp centre
+    /// of operation to each market centre the player operates in. Rendered at full
+    /// vision (no fade).
+    std::unordered_set<entity_id> permanent_vision;
+
+    /// A live player intra-body convoy, for the render-time moving beam. The path is
+    /// the convoy's tile route in travel order (src→dst); progress/speed drive a head
+    /// that interpolates smoothly along it between econ steps, with a tail that lags
+    /// and dims one econ tick's travel behind the head.
+    struct convoy_beam { std::vector<entity_id> path; float progress = 0.0f; float speed = 0.0f; };
+    std::vector<convoy_beam> convoy_beams;
+
+    double sim_now_days = 0.0; ///< Latest continuous sim time (elapsed days); the beam-motion clock.
 
     // --- hover-card state (BL-060) ---
     entity_id hovered_entity = null_entity; ///< Entity the cursor rested on last frame; used to detect stable hover.

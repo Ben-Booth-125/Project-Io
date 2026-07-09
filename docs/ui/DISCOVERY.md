@@ -170,20 +170,24 @@ lit only where the player has presence — so an own-territory home planet still
   player's own soil, so "fog" means *where your logistics operate*, not *where the land is unmapped*.
 - **Substrate:** live-derived, **no stored state / no save-format change** (intra-body traffic records
   nothing persistent — the Solar fog's `trade_route` substrate is inter-body only).
-- **Static presence pocket:** a breadth-first flood of `fog_reveal_radius` (=3) tile-hops from the
-  player's own building tiles + the endpoint `centre_tile` of any live player convoy on the body.
-  Every *revealed* tile (survey owns the unrevealed ones) outside the pocket takes a dark wash
-  (`lerp 0.5` toward near-black), applied over the lens fill so a fogged region's analytic read dims
-  with it. Always-on, all overlays.
-- **Convoy vision beam (BL-152):** a live player intra-body convoy lights a **radius-2** beam of
-  vision along the tiles it moves through, which **lags and dims over one econ tick** (90 days). The
-  beam is derived VIEW state (`ui_state.convoy_vision`: tile → the sim time it was last lit), refreshed
-  each econ step by `ui::update_convoy_vision` (which reads the convoy's path from `intra_body_path`'s
-  now-exposed tile sequence and floods radius-2 around the segment traversed that tick), and faded in
-  the canvas against `ui_state.sim_now_days` — continuous sim time, so the trail melts smoothly rather
-  than snapping at quarter boundaries. Vision blends: `1` in the static pocket, else the beam's
-  `1 − age/90`; the fog wash scales with `1 − vision`. The beam is the "things are moving" half; the
-  static pocket is the "where I operate" half.
+Three vision layers, all derived VIEW state (`ui_state`, rebuilt each frame by `ui::update_body_vision`
+for the active body — never serialised, no feedback into `world/*`). A tile's `vision` is `1` in the
+permanent layers, else the moving beam's intensity; the fog wash scales with `1 − vision`, applied over
+the lens fill so a fogged region's analytic read dims with it. Survey owns the *unrevealed* tiles.
+
+- **Permanent building pockets (BL-151/154):** a radius-2 flood around each of the player's own
+  building tiles — your installations are always visible.
+- **Permanent corp-centre → market corridors (BL-154):** a **3-wide** corridor (the A* path flooded
+  one hop to each side) from the **corp centre of operation** (the lowest-id player building tile on
+  the body) to each **market centre** the corp operates in (the catchment markets of its buildings).
+  Your trade spine is always lit.
+- **Moving convoy beam (BL-152/154):** a live player intra-body convoy lights a **radius-2** beam with
+  a bright **head** and a dimming **tail**. `ui_state.convoy_beams` stores each convoy's tile path
+  (from `intra_body_path`'s now-exposed sequence) + progress + speed; the canvas interpolates the head
+  along the path by the fraction through the current econ tick (`fmod(sim_now_days, 90)/90`), so it
+  **glides smoothly** between quarterly steps, and trails a tail one econ tick's travel behind (intensity
+  ramping `1 → 0` head → tail). This is the "things are moving" layer; the corridors + pockets are the
+  "where I operate" layer.
 
 ---
 

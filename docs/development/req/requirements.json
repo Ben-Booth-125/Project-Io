@@ -5543,7 +5543,25 @@
             "headless: convoy path reconstruction asserted ad hoc (intra_body_path returns a contiguous, canonical lo->hi tile sequence; single-tile when src==dst)"
           ],
           "result_metric": "Full build clean. Static capture shows the beam pocket lit on the fogged surface; the temporal fade is not capturable in a still. Path reconstruction verified by a throwaway headless probe (4 assertions PASS: reachable, 3-tile no-wrap path, canonical order under reverse query, single-tile src==dst) run 2026-07-09, then removed.",
-          "notes": "Beam illumination is derived VIEW state (ui_state.convoy_vision), refreshed in app::step_economy via ui::update_convoy_vision, faded in the canvas — never serialised, no feedback into world/*, so determinism is preserved. The headless probe was run ad hoc, not saved as a tools/verify/*.cpp harness (candidate follow-up per DELIVERY.md tool-creation discipline)."
+          "notes": "Beam illumination is derived VIEW state, refreshed via ui::update_body_vision, computed in the canvas — never serialised, no feedback into world/*, so determinism is preserved. The headless probe was run ad hoc, not saved as a tools/verify/*.cpp harness (candidate follow-up per DELIVERY.md tool-creation discipline). NOTE: the per-econ-step timestamp-fade mechanism named here was superseded same day by BL-154's render-time moving beam; the requirement (a convoy lights a radius-2 beam that lags and dims over one econ tick) still holds."
+        }
+      ]
+    },
+    {
+      "batch": "2026-07-09-fog",
+      "title": "BL-154 — moving head/tail convoy beam + permanent corp-centre->market corridors",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-154",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING: on the Planetary canvas, the player's own building tiles + a 3-wide corridor from the corp centre of operation to each market centre it operates in read permanently lit; a live player intra-body convoy shows a radius-2 beam with a bright head that glides smoothly along its route (interpolated by the fraction through the current econ tick) and a tail that dims one econ tick's travel behind it; everything else reads fogged.",
+          "verification": [
+            "visual: scripts/verify/intrabody_fog.lua (default + wide captures show permanent pockets/corridors lit, globe fogged)"
+          ],
+          "result_metric": "Full build clean. Wide + default captures confirm the permanent building pockets + corridors render lit and the rest of the body fogged. The moving beam's smooth head/tail motion is verified by construction (render-time interpolation of stored path+progress+speed by econ-tick fraction) but not by a still — it only manifests with a live inter-market intra-body convoy, which the same-market verify seed does not produce; confirmed by live playtest.",
+          "notes": "All three vision layers are derived VIEW state (ui_state.permanent_vision + convoy_beams), rebuilt each frame in ui::update_body_vision, called from render()'s planetary branch so the --verify capture path and a live body-switch both get it. No serialisation, no world/* feedback; determinism preserved. Corp centre of operation = lowest-id player building tile on the body (mirrors market_clearing's file-local representative_tile)."
         }
       ]
     }

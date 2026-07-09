@@ -507,20 +507,20 @@ void draw_supply_routes_key(ImDrawList* dl, ImVec2 anchor, const world& w,
 
 } // namespace
 
-void update_convoy_vision(world& w, ui_state& state, double now_days)
+void update_body_vision(world& w, ui_state& state, double now_days)
 {
-    // Fade window: a beam-lit tile returns to full fog one econ tick after it was last
-    // lit. Mirrors sim_loop::econ_tick_days (90) — kept local to avoid a ui->core
-    // include; if that constant changes, change this too.
-    constexpr double econ_tick_days = 90.0;
-    constexpr int    beam_radius    = 2; // Ben's spec: a radius-2 beam of vision.
+    state.sim_now_days = now_days;
+    state.permanent_vision.clear();
+    state.convoy_beams.clear();
 
-    // Prune fully-faded entries so the buffer cannot grow without bound.
-    for (auto it = state.convoy_vision.begin(); it != state.convoy_vision.end(); )
-    {
-        if (now_days - it->second >= econ_tick_days) it = state.convoy_vision.erase(it);
-        else ++it;
-    }
+    const entity_id body = state.active_body;
+    if (body == null_entity) return;
+    const auto bit = w.bodies.find(body);
+    if (bit == w.bodies.end()) return;
+    const int gw = std::max(1, bit->second.grid_width);
+    const int gh = std::max(1, bit->second.grid_height);
+    const std::vector<entity_id>& grid = body_tile_grid(w, body);
+    if (static_cast<int>(grid.size()) < gw * gh) return;
 
     // Odd-r offset neighbours (col, row deltas), matching the surface draw's grid.
     static const int even_off[6][2] =
@@ -528,54 +528,13 @@ void update_convoy_vision(world& w, ui_state& state, double now_days)
     static const int odd_off[6][2] =
         {{+1, 0}, {+1, -1}, {0, -1}, {-1, 0}, {0, +1}, {+1, +1}};
 
-    for (const auto& cv : w.convoys)
-    {
-        if (cv.corp != w.player_entity) continue;
-        const auto sm = w.markets.find(cv.source_market);
-        const auto dm = w.markets.find(cv.dest_market);
-        if (sm == w.markets.end() || dm == w.markets.end()) continue;
-        const entity_id body = sm->second.body;
-        if (dm->second.body != body) continue; // intra-body only; inter-body reads on Solar
-        const entity_id src_tile = sm->second.centre_tile;
-        const entity_id dst_tile = dm->second.centre_tile;
-        if (src_tile == null_entity || dst_tile == null_entity) continue;
-
-        const logistics_path lp = intra_body_path(w, body, src_tile, dst_tile);
-        if (!lp.reachable || lp.tiles.empty()) continue;
-
-        // Orient the cached (lo→hi) path to the convoy's src→dst travel direction.
-        std::vector<entity_id> path = lp.tiles;
-        if (src_tile != std::min(src_tile, dst_tile))
-            std::reverse(path.begin(), path.end());
-
-        // The segment covered this econ tick: from where it was one step ago to now.
-        const int   n    = static_cast<int>(path.size());
-        const float cur  = std::clamp(cv.progress, 0.0f, 1.0f);
-        const float span = std::max(cv.speed, 1.0f / static_cast<float>(std::max(1, n)));
-        const float prev = std::max(0.0f, cur - span);
-        int i0 = static_cast<int>(std::lround(prev * (n - 1)));
-        int i1 = static_cast<int>(std::lround(cur  * (n - 1)));
-        if (i0 > i1) std::swap(i0, i1);
-        i0 = std::clamp(i0, 0, n - 1);
-        i1 = std::clamp(i1, 0, n - 1);
-
-        const auto bit = w.bodies.find(body);
-        if (bit == w.bodies.end()) continue;
-        const int gw = std::max(1, bit->second.grid_width);
-        const int gh = std::max(1, bit->second.grid_height);
-        const std::vector<entity_id>& grid = body_tile_grid(w, body);
-        if (static_cast<int>(grid.size()) < gw * gh) continue;
-
-        // Seed the traversed segment, then flood radius-2 around it; stamp now_days so
-        // the whole beam pocket reads full and ages together.
-        std::unordered_set<entity_id> lit;
+    // Flood `radius` hops out from `seeds` into `out` (odd-r neighbours, column wrap).
+    auto flood = [&](const std::vector<entity_id>& seeds, int radius,
+                     std::unordered_set<entity_id>& out) {
         std::vector<entity_id> frontier;
-        auto seed = [&](entity_id tid) {
-            if (tid != null_entity && lit.insert(tid).second) frontier.push_back(tid);
-        };
-        for (int i = i0; i <= i1; ++i) seed(path[static_cast<std::size_t>(i)]);
-
-        for (int r = 0; r < beam_radius && !frontier.empty(); ++r)
+        for (const entity_id s : seeds)
+            if (s != null_entity && out.insert(s).second) frontier.push_back(s);
+        for (int r = 0; r < radius && !frontier.empty(); ++r)
         {
             std::vector<entity_id> next;
             for (const entity_id tid : frontier)
@@ -591,12 +550,82 @@ void update_convoy_vision(world& w, ui_state& state, double now_days)
                     int ncol = (t.grid_x + off[k][0]) % gw;
                     if (ncol < 0) ncol += gw;
                     const entity_id nb = grid[static_cast<std::size_t>(nrow) * gw + ncol];
-                    if (nb != null_entity && lit.insert(nb).second) next.push_back(nb);
+                    if (nb != null_entity && out.insert(nb).second) next.push_back(nb);
                 }
             }
             frontier.swap(next);
         }
-        for (const entity_id tid : lit) state.convoy_vision[tid] = now_days;
+    };
+
+    // The player's building tiles on this body + the markets whose catchment they sit
+    // in — the markets the corp operates in (stable; buildings don't move). The centre
+    // of operation is the lowest-id player building tile on the body (mirrors
+    // market_clearing's file-local representative_tile, which is not header-visible).
+    std::vector<entity_id> player_building_tiles;
+    std::unordered_set<entity_id> operated_markets;
+    entity_id centre         = null_entity;
+    entity_id centre_building = null_entity;
+    const auto pit = w.corporations.find(w.player_entity);
+    if (pit != w.corporations.end())
+    {
+        for (const entity_id bid : pit->second.assets)
+        {
+            const auto bld = w.buildings.find(bid);
+            if (bld == w.buildings.end()) continue;
+            const entity_id t = bld->second.tile;
+            const auto tit = w.tiles.find(t);
+            if (tit == w.tiles.end() || tit->second.body != body) continue;
+            player_building_tiles.push_back(t);
+            const entity_id mid = market_for_tile(w, t);
+            if (mid != null_entity) operated_markets.insert(mid);
+            if (centre_building == null_entity || bid < centre_building)
+            {
+                centre_building = bid;
+                centre          = t;
+            }
+        }
+    }
+
+    // Layer 1 (permanent): radius-2 pockets around the player's own installations —
+    // your buildings are always visible.
+    flood(player_building_tiles, 2, state.permanent_vision);
+
+    // Layer 2 (permanent): 3-wide corridors from the corp centre of operation to each
+    // market centre it operates in. A 3-wide corridor is the path tiles flooded one hop
+    // to each side.
+    if (centre != null_entity)
+    {
+        for (const entity_id mid : operated_markets)
+        {
+            const auto mk = w.markets.find(mid);
+            if (mk == w.markets.end()) continue;
+            const entity_id mc = mk->second.centre_tile;
+            if (mc == null_entity) continue;
+            const logistics_path lp = intra_body_path(w, body, centre, mc);
+            if (!lp.reachable || lp.tiles.empty()) continue;
+            flood(lp.tiles, 1, state.permanent_vision);
+        }
+    }
+
+    // Layer 3 (moving): the tile path + progress/speed of each live player intra-body
+    // convoy, oriented src→dst. The renderer interpolates a head along it and trails a
+    // dimming tail one econ tick's travel behind.
+    for (const auto& cv : w.convoys)
+    {
+        if (cv.corp != w.player_entity) continue;
+        const auto sm = w.markets.find(cv.source_market);
+        const auto dm = w.markets.find(cv.dest_market);
+        if (sm == w.markets.end() || dm == w.markets.end()) continue;
+        if (sm->second.body != body || dm->second.body != body) continue;
+        const entity_id st = sm->second.centre_tile;
+        const entity_id dt = dm->second.centre_tile;
+        if (st == null_entity || dt == null_entity) continue;
+        const logistics_path lp = intra_body_path(w, body, st, dt);
+        if (!lp.reachable || lp.tiles.empty()) continue;
+        std::vector<entity_id> path = lp.tiles;
+        if (st != std::min(st, dt)) std::reverse(path.begin(), path.end());
+        state.convoy_beams.push_back(
+            { std::move(path), std::clamp(cv.progress, 0.0f, 1.0f), std::max(cv.speed, 0.0f) });
     }
 }
 
@@ -1010,68 +1039,75 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
     }
 
-    // Intra-body commercial-reach fog (BL-151): the player's local visibility on this
-    // body. Vision is a TIGHT pocket around the player's actual presence, not a whole
-    // market catchment — the map should read mostly *unknown*, lit only where the
-    // player has activity, so the surface conveys unknowns (and, as lanes come and go,
-    // movement). Reveal sources are the player's own building tiles plus the endpoint
-    // tiles of any live player convoy on this body (an active lane lights both ends);
-    // a breadth-first flood out to `fog_reveal_radius` tiles from every source marks
-    // the visible pocket. Everything else is drawn fogged (a dark wash on the tile fill
-    // in the loop below). Derived live — no stored state. The geographic survey fog
-    // (BL-067) still owns unrevealed tiles; this dims on top of revealed ones only.
-    constexpr int fog_reveal_radius = 3; // tile hops of vision from a presence source
-    std::unordered_set<entity_id> revealed_by_activity;
+    // Intra-body vision — the moving convoy beam (BL-152/154). Permanent vision
+    // (state.permanent_vision: radius-2 pockets around the player's buildings + 3-wide
+    // corridors from the corp centre of operation to each market centre it operates in)
+    // is precomputed each frame in update_body_vision. Here we add the *moving* beam:
+    // for each live player convoy we interpolate a HEAD along its path by the fraction
+    // through the current econ tick — so it glides smoothly between quarterly steps —
+    // and trail a dimming TAIL one econ tick's travel behind it. beam_intensity holds
+    // each lit tile's brightness (0..1); the tile loop blends it with permanent vision
+    // to size the fog wash. Survey fog (BL-067) still owns unrevealed tiles.
+    std::unordered_map<entity_id, float> beam_intensity;
     {
-        // Odd-r offset neighbours (col, row deltas), matching the Country-lens border
-        // pass; the grid is a horizontal cylinder so columns wrap, rows clamp.
+        // Fraction through the current econ tick (90 days); mirrors sim_loop::econ_tick_days.
+        const float frac = static_cast<float>(
+            std::fmod(std::max(0.0, state.sim_now_days), 90.0) / 90.0);
+        constexpr int beam_radius = 2; // Ben's spec: a radius-2 beam of vision.
         static const int even_off[6][2] =
             {{+1, 0}, {0, -1}, {-1, -1}, {-1, 0}, {-1, +1}, {0, +1}};
         static const int odd_off[6][2] =
             {{+1, 0}, {+1, -1}, {0, -1}, {-1, 0}, {0, +1}, {+1, +1}};
 
-        std::vector<entity_id> frontier; // BFS seed set: player presence tiles
-        auto seed = [&](entity_id tid) {
-            if (tid == null_entity) return;
-            const auto it = w.tiles.find(tid);
-            if (it != w.tiles.end() && it->second.body == state.active_body &&
-                revealed_by_activity.insert(tid).second)
-                frontier.push_back(tid);
-        };
-        for (const auto& [tid, corp] : tile_to_corp)
-            if (corp == w.player_entity)
-                seed(tid);
-        for (const auto& cv : w.convoys)
-        {
-            if (cv.corp != w.player_entity) continue;
-            const auto sm = w.markets.find(cv.source_market);
-            if (sm != w.markets.end()) seed(sm->second.centre_tile);
-            const auto dm = w.markets.find(cv.dest_market);
-            if (dm != w.markets.end()) seed(dm->second.centre_tile);
-        }
-        // Flood out radius hops. frontier holds the current ring; grow ring by ring.
-        for (int step = 0; step < fog_reveal_radius && !frontier.empty(); ++step)
-        {
-            std::vector<entity_id> next;
-            for (const entity_id tid : frontier)
+        // Flood radius-2 around a path tile, marking each at `inten` (keeping the max).
+        auto light = [&](entity_id centre_tile, float inten) {
+            if (centre_tile == null_entity) return;
+            std::unordered_set<entity_id> seen;
+            std::vector<entity_id> frontier{ centre_tile };
+            seen.insert(centre_tile);
+            { float& v = beam_intensity[centre_tile]; if (inten > v) v = inten; }
+            for (int r = 0; r < beam_radius && !frontier.empty(); ++r)
             {
-                const auto tit = w.tiles.find(tid);
-                if (tit == w.tiles.end()) continue;
-                const tile_component& t = tit->second;
-                const int (*off)[2] = (t.grid_y & 1) ? odd_off : even_off;
-                for (int n = 0; n < 6; ++n)
+                std::vector<entity_id> next;
+                for (const entity_id tid : frontier)
                 {
-                    const int nrow = t.grid_y + off[n][1];
-                    if (nrow < 0 || nrow >= gh) continue;
-                    int ncol = (t.grid_x + off[n][0]) % gw;
-                    if (ncol < 0) ncol += gw;
-                    const auto nb = tile_at.find(static_cast<long long>(nrow) * gw + ncol);
-                    if (nb == tile_at.end()) continue;
-                    if (revealed_by_activity.insert(nb->second).second)
-                        next.push_back(nb->second);
+                    const auto tit = w.tiles.find(tid);
+                    if (tit == w.tiles.end()) continue;
+                    const tile_component& t = tit->second;
+                    const int (*off)[2] = (t.grid_y & 1) ? odd_off : even_off;
+                    for (int k = 0; k < 6; ++k)
+                    {
+                        const int nrow = t.grid_y + off[k][1];
+                        if (nrow < 0 || nrow >= gh) continue;
+                        int ncol = (t.grid_x + off[k][0]) % gw;
+                        if (ncol < 0) ncol += gw;
+                        const auto nb = tile_at.find(static_cast<long long>(nrow) * gw + ncol);
+                        if (nb == tile_at.end()) continue;
+                        if (seen.insert(nb->second).second)
+                        {
+                            next.push_back(nb->second);
+                            float& v = beam_intensity[nb->second]; if (inten > v) v = inten;
+                        }
+                    }
                 }
+                frontier.swap(next);
             }
-            frontier.swap(next);
+        };
+
+        for (const auto& cb : state.convoy_beams)
+        {
+            const int n = static_cast<int>(cb.path.size());
+            if (n == 0) continue;
+            // Head glides: last econ-step progress + this tick's fraction of a step.
+            const float p    = std::clamp(cb.progress + cb.speed * frac, 0.0f, 1.0f);
+            const int   head = std::clamp(static_cast<int>(std::lround(p * (n - 1))), 0, n - 1);
+            // Tail = one econ tick's travel in tiles (>=1), dimming to 0 at its far end.
+            const int   tail = std::max(1, static_cast<int>(std::lround(cb.speed * (n - 1))));
+            for (int i = head; i >= 0 && i >= head - tail; --i)
+            {
+                const float inten = 1.0f - static_cast<float>(head - i) / static_cast<float>(tail);
+                if (inten > 0.0f) light(cb.path[static_cast<std::size_t>(i)], inten);
+            }
         }
     }
 
@@ -1286,26 +1322,22 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         if (!revealed)
             fill = IM_COL32(12, 14, 20, 255);
 
-        // Intra-body commercial-reach fog (BL-151/152): dim any *revealed* tile by how
-        // little the player sees it. Vision = 1 inside the static presence pocket (BFS
-        // reveal set above); otherwise the convoy beam's fading contribution (BL-152) —
-        // a tile lit by a passing convoy reads 1 and decays to 0 over one econ tick
-        // (90 days) as it ages against sim_now_days. The fog wash scales with (1 −
-        // vision), so the surface reads mostly unknown, lit around presence, with a
-        // convoy's beam trailing and dimming behind it. Survey mask owns unrevealed
-        // tiles, so this skips them.
+        // Intra-body vision fog (BL-151/152/154): dim any *revealed* tile by how little
+        // the player sees it. Vision = 1 in permanent vision (building pockets + the
+        // corp-centre→market corridors, from update_body_vision); otherwise the moving
+        // convoy beam's contribution (bright at the head, dimming down the tail). The
+        // fog wash scales with (1 − vision), so the surface reads mostly unknown, lit
+        // along the player's corridors, with a convoy's beam gliding and trailing over
+        // them. Survey mask owns unrevealed tiles, so this skips them.
         if (revealed)
         {
-            float vision = (revealed_by_activity.find(id) != revealed_by_activity.end())
+            float vision = (state.permanent_vision.find(id) != state.permanent_vision.end())
                                ? 1.0f : 0.0f;
             if (vision < 1.0f)
             {
-                const auto cvit = state.convoy_vision.find(id);
-                if (cvit != state.convoy_vision.end())
-                {
-                    const float age = static_cast<float>((state.sim_now_days - cvit->second) / 90.0);
-                    vision = std::max(vision, std::clamp(1.0f - age, 0.0f, 1.0f));
-                }
+                const auto bi = beam_intensity.find(id);
+                if (bi != beam_intensity.end())
+                    vision = std::max(vision, bi->second);
             }
             if (vision < 1.0f)
                 fill = lerp_colour(fill, IM_COL32(8, 10, 16, 255), 0.5f * (1.0f - vision));
