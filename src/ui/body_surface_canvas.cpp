@@ -127,17 +127,55 @@ void begin_lens_key(ImDrawList* dl, ImVec2 anchor, float box_w,
     out_w = box_w - 2.0f * pad;
 }
 
+/// The lens-local resource/good selector for the Resource, Market, and Scarcity
+/// lenses (BL-134): all three pick "which resource" from the same `lens_resource`
+/// field (LENSES.md says the selectors share a form), so one combo serves them.
+/// Now lives at the top of the on-canvas legend (moved off the minimap strip,
+/// which the former popup button docked in) — a real scrollable ImGui::BeginCombo,
+/// hosted in a small borderless window since the legend itself paints on the
+/// background draw list rather than a live ImGui window.
+constexpr float kLensComboH = 22.0f;
+
+void draw_lens_resource_combo(ui_state& state, ImVec2 pos, float w)
+{
+    ImGui::SetNextWindowPos(pos, ImGuiCond_Always);
+    ImGui::SetNextWindowSize({w, kLensComboH}, ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.0f);
+    constexpr ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoTitleBar  | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoCollapse  | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoNav |
+        ImGuiWindowFlags_NoSavedSettings;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0.0f, 0.0f});
+    ImGui::Begin("##lens_key_resource_combo", nullptr, flags);
+    ImGui::SetNextItemWidth(w);
+    if (ImGui::BeginCombo("##lens_key_resource", presentation_of(state.lens_resource).name))
+    {
+        for (std::size_t i = 0; i < resource_count; ++i)
+        {
+            const resource_type r = static_cast<resource_type>(i);
+            if (ImGui::Selectable(presentation_of(r).name, r == state.lens_resource))
+                state.lens_resource = r;
+        }
+        ImGui::EndCombo();
+    }
+    ImGui::End();
+    ImGui::PopStyleVar();
+}
+
 /// On-canvas legend for the Resource lens (BL-019): the selected resource's name
 /// and identity swatch, plus a note that the fill marks the contiguous deposit.
 /// Flat, not a gradient — the lens shows deposit *shape*, not magnitude.
 void draw_resource_key(ImDrawList* dl, ImVec2 anchor,
-                       const ui_state& state)
+                       ui_state& state)
 {
     const float pad    = 8.0f;
     const float line_h = ImGui::GetTextLineHeight();
-    const float body_h = pad + line_h + 4.0f + line_h + 4.0f + line_h + pad;
+    const float body_h = pad + kLensComboH + 4.0f + line_h + 4.0f + line_h + 4.0f + line_h + pad;
     float x, y, bar_w;
     begin_lens_key(dl, anchor, 168.0f, body_h, pad, x, y, bar_w);
+
+    draw_lens_resource_combo(state, {x, y}, bar_w);
+    y += kLensComboH + 4.0f;
 
     dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Resource deposit");
     y += line_h + 4.0f;
@@ -242,7 +280,7 @@ ImU32 production_colour(float ratio)
 // BL-015: market lens is now a catchment-boundary tint (one colour per market).
 // The key shows a colour swatch per market with an ordinal label.
 void draw_market_key(ImDrawList* dl, ImVec2 anchor,
-                     const ui_state& /*state*/,
+                     ui_state& state,
                      const std::unordered_map<entity_id, ImU32>& catchment_colours)
 {
     const float pad    = 8.0f;
@@ -250,7 +288,7 @@ void draw_market_key(ImDrawList* dl, ImVec2 anchor,
     const float swatch = line_h;
     const int   n      = static_cast<int>(catchment_colours.size());
     const float box_w  = 140.0f;
-    const float body_h = pad + line_h + 4.0f
+    const float body_h = pad + kLensComboH + 4.0f + line_h + 4.0f
                        + static_cast<float>(std::max(n, 1)) * (swatch + 2.0f)
                        + pad;
 
@@ -261,6 +299,9 @@ void draw_market_key(ImDrawList* dl, ImVec2 anchor,
 
     float x = p0.x + pad;
     float y = p0.y + pad * 0.5f;
+
+    draw_lens_resource_combo(state, {x, y}, box_w - 2.0f * pad);
+    y += kLensComboH + 4.0f;
 
     dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Market catchments");
     y += line_h + 4.0f;
@@ -366,14 +407,15 @@ void draw_industry_key(ImDrawList* dl, ImVec2 anchor)
 /// On-canvas legend for the Scarcity lens: an abundant→scarce gradient bar (no tint
 /// → hot) plus the selected resource's name and swatch. Same placement as the others.
 void draw_scarcity_key(ImDrawList* dl, ImVec2 anchor,
-                       const ui_state& state)
+                       ui_state& state)
 {
     const float pad    = 8.0f;
     const float box_w  = 156.0f;
     const float line_h = ImGui::GetTextLineHeight();
     const float bar_h  = 10.0f;
 
-    const float body_h = pad + line_h + 4.0f + bar_h + 2.0f + line_h + 4.0f + line_h + pad;
+    const float body_h = pad + kLensComboH + 4.0f
+                       + line_h + 4.0f + bar_h + 2.0f + line_h + 4.0f + line_h + pad;
     const ImVec2 p0 = { anchor.x - box_w, anchor.y - body_h * 0.5f };
     const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
     dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
@@ -382,6 +424,9 @@ void draw_scarcity_key(ImDrawList* dl, ImVec2 anchor,
     const float x     = p0.x + pad;
     const float bar_w = box_w - 2.0f * pad;
     float       y     = p0.y + pad * 0.5f;
+
+    draw_lens_resource_combo(state, {x, y}, bar_w);
+    y += kLensComboH + 4.0f;
 
     dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Market scarcity");
     y += line_h + 4.0f;
