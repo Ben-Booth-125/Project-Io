@@ -674,18 +674,24 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
     const float action_w  = (content_w - style.ItemSpacing.x) * 0.58f;
 
     // Two fill-height columns: action leads at a fixed split, facts to its right.
+    // Container policy (LAYOUT.md): the Selection element wraps text rather than
+    // clipping it, with vertical scroll as the overflow behaviour — so each column
+    // wraps at its own width (PushTextWrapPos(0.0f) wraps at the current window's
+    // right edge) and keeps its scrollbar instead of suppressing it.
     ImGui::BeginChild("##sel_action", {action_w, 0.0f}, false,
-                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
                       ImGuiWindowFlags_NoSavedSettings);
+    ImGui::PushTextWrapPos(0.0f);
     draw_selection_action(w, reg, ui, kind);
+    ImGui::PopTextWrapPos();
     ImGui::EndChild();
 
     ImGui::SameLine();
 
     ImGui::BeginChild("##sel_facts", {0.0f, 0.0f}, false,
-                      ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse |
                       ImGuiWindowFlags_NoSavedSettings);
+    ImGui::PushTextWrapPos(0.0f);
     draw_selection_facts(w, reg, report, ui, kind);
+    ImGui::PopTextWrapPos();
     ImGui::EndChild();
 
     ImGui::End();
