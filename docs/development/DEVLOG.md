@@ -64,6 +64,46 @@ need stress-testing (the convoy/economy/dispatch loop the beams and corridors re
 called done. Retargeted BL-150/151/152/154 `version_goal` → **v0.1.1** (from v0.0.9). The code stays on
 `main`; it is complete-as-implemented but not counted as shipped until the dependent systems are proven.
 
+## Session — Roadmap refocus: expanded-prototype arc + Era→Filter (2026-07-09)
+
+**Context.** A roadmap pass following the version-goal backfill. Ben directed a structural refocus
+of the forward map: extend it past the v0.1.0 prototype cut into an expanded prototype, and set the
+shape of the next three milestone bands. Doc + backlog-metadata change; no `src/` touch.
+
+**Decisions (Ben).**
+- **v0.2.0 is *the refocus*** — the player-identity pivot (BL-094): nation becomes the strategic
+  actor, the chartered corp (prototyped as one) stays the economic actor. Tagged `version_goal:
+  v0.2.0`.
+- **Roads move to v0.1.1** — BL-146–149 (generated road network + A\* cost, planetary rendering +
+  player-placeable roads, city logistics discount, inland hub) leave the v0.1.0 cut queue and open
+  the v0.1.x band. Re-tagged `v0.1.0 → v0.1.1`.
+- **v0.1.x pads out the expanded prototype** — a design-forward *ponder + stub* band for **laws,
+  techs, military systems, and politics (stub)**, positioning the data model ahead of v0.2.0/v0.3.0.
+  Theme-level only; no backlog items minted this session.
+- **v0.3.0 = politics + the filter system** — promote the political stub into a working layer, and
+  **rename/reframe Era → Filter** (BL-087's catastrophic-event / quest-tree model re-read as a
+  world-state *filter*). Tagged BL-087 `version_goal: v0.3.0`.
+
+**What shipped.** `ROADMAP.md` forward half rewritten: intro now spans the cut → expanded prototype
+(v0.1.x → v0.3.0), framed as *direction, not committed scope* (past v0.1.0 is beyond
+TECH_FOUNDATIONS prototype scope by design); new `### v0.1.x / v0.2.0 / v0.3.0` sections; v0.1.0
+retitled *Quality audit + legibility polish + cut* and its done-definition reframed as *the
+prototype cut*. `backlog.json` metadata: BL-146–149 → v0.1.1, BL-094 → v0.2.0, BL-087 → v0.3.0
+(surgical CRLF-safe edits; JSON re-validated).
+
+**Open items / flags.**
+- **Naming watch — Filter vs Lens.** "Filter" (Era rename, v0.3.0) sits near the map-lens
+  vocabulary in `LENSES.md`; flagged in the roadmap to confirm the two read as distinct before the
+  rename lands.
+- **v0.1.x band itemised** (follow-up, same session): Ben asked for one placeholder item per minor
+  until the v0.2.0 refocus. Created **BL-155** (v0.1.2 Laws), **BL-156** (v0.1.3 Techs, precursor to
+  BL-087), **BL-157** (v0.1.4 Military stub), **BL-158** (v0.1.5 Politics stub) — all `design-owed`,
+  authority docs/SYSTEMS.md, framed as design + data-model stub within post-cut scope. IDs allocated
+  off the cross-branch max via `next_id.js` (BL-155 was next safe). ROADMAP v0.1.x bullets now name
+  the minors + item IDs.
+- **Era→Filter is authority-time-sliced** — `ERAS.md` / `GLOSSARY.md` / era enums stay as-is until
+  the v0.3.0 work lands.
+
 ## Session — BL-129: prose pass on the central documentation (2026-07-08)
 
 **Context.** Ben green-lit BL-129 CENTRAL_DOC_PROSE_PASS ("burn some Fable 5 on it — rewrite the

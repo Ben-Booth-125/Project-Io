@@ -2922,6 +2922,90 @@
       "authority_doc": "docs/ui/DISCOVERY.md",
       "summary": "Filed + landed 2026-07-09 (Ben, refining BL-151/152). Two changes to the intra-body vision model: (1) the convoy beam should MOVE with a head and tail that update (not a uniformly-fading segment); (2) permanent vision as a 3-wide beam from the corp centre of operation to the market centre. Reworks the vision buffers accordingly.",
       "design": "**Change 1 — moving head/tail beam.** The BL-152 buffer (per-econ-step segment flood, uniform timestamp fade) read as a chunky blob that stepped once per quarter. Replaced with a RENDER-TIME moving beam: `ui_state.convoy_beams` stores each live player intra-body convoy's tile path + progress + speed (rebuilt each frame in `update_body_vision`); the canvas interpolates a HEAD along the path by the fraction through the current econ tick (`fmod(sim_now_days,90)/90`), so it glides smoothly between quarterly steps, and trails a TAIL one econ tick's travel behind, ramping intensity 1->0 head->tail, radius-2 around each path tile. So the beam has a bright moving head and a dimming tail.\n\n**Change 2 — permanent corp-centre->market corridors (Ben: 'from the corp centre of operation to the market centre, as a 3 wide beam').** `ui_state.permanent_vision` (non-fading) = radius-2 pockets around the player's own building tiles + 3-wide corridors (path flooded radius 1) from the corp centre of operation (lowest-id player building tile on the body, mirroring market_clearing's file-local representative_tile) to each market centre the player operates in (the catchment markets of its buildings). Always visible.\n\n**Plumbing.** `update_body_vision` (renamed from update_convoy_vision) rebuilds both buffers per frame for the active body; moved from app::step_economy to render() (planetary branch) so the --verify capture path gets it too, and so a body switch is tracked immediately. Pathfinder is route-cache-backed (steady-state = lookups). Derived VIEW state only — no serialisation, no world/* feedback; determinism preserved.\n\n**Render.** Fog vision = 1 in permanent_vision, else the moving beam's intensity; wash = 0.5*(1 - vision). Verified: full build clean; wide + default captures show permanent pockets/corridors lit and the globe fogged (the moving beam's motion only manifests with a live inter-market intra-body convoy, not the same-market verify seed). **Authority:** docs/ui/DISCOVERY.md."
+    },
+    {
+      "id": "BL-155",
+      "version_goal": "v0.1.2",
+      "short_name": "LAW_POLICY_SURFACE_DESIGN",
+      "category": "Policy",
+      "title": "Laws & policy surface — design + data-model stub (v0.1.2 expanded-prototype groundwork)",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "B",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-09",
+      "files": [
+        "docs/SYSTEMS.md"
+      ],
+      "authority_doc": "docs/SYSTEMS.md",
+      "summary": "Roadmap v0.1.2 expanded-prototype groundwork (Ben, 2026-07-09 refocus). First pass at the law / policy surface: what a law IS as a data object and how it gates or modifies economic (and later political) behaviour. Design-forward + data-model stub only — no committed mechanics — so the v0.2.0 nation actor and the v0.3.0 political layer land on prepared ground. Design-owed: the law-object schema, the prototype lever set, and the enforcement seam are all open.",
+      "design": "**Theme (roadmap v0.1.2).** Define the **law / policy** surface as a first-class data object: a law is a named, serialisable record that gates or modifies behaviour (initially economic — tax, tariff, subsidy, extraction cap — later political). This item settles the *shape*, not the mechanics.\n\n**Scope.** Design + a data-model stub only. Enumerate the law-object schema (id, subject, condition, effect), sketch a small prototype lever set, and name the enforcement seam in the economy step where a law would read. No UI, no active law effects committed — the point is to position the model.\n\n**Open questions.** Law-object schema; which levers are prototype-worthy vs deferred; where enforcement hooks into `economy_system` without breaking determinism; how laws relate to the future filter system (BL-087) and the nation actor (BL-094) that will own them.\n\n**Standing-rule note.** Policy proper is post-prototype scope (TECH_FOUNDATIONS); this is the design + stub that precedes it, not the system. **Authority:** docs/SYSTEMS.md once landed."
+    },
+    {
+      "id": "BL-156",
+      "version_goal": "v0.1.3",
+      "short_name": "TECH_SYSTEM_EARLY_DESIGN",
+      "category": "Research",
+      "title": "Tech system — early design toward the quest/gate model (v0.1.3 expanded-prototype groundwork)",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "B",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-09",
+      "files": [
+        "docs/SYSTEMS.md"
+      ],
+      "authority_doc": "docs/SYSTEMS.md",
+      "summary": "Roadmap v0.1.3 expanded-prototype groundwork (Ben, 2026-07-09 refocus). Early design toward the tech / quest system — the condition-set gate model (gate = quest = tech, one object) that BL-087 reframed and that the v0.3.0 filter system will formalise. Design only at this stage: settle the tech-object and gate-condition shape so later work has a spine. Precursor to BL-087 (filter system, v0.3.0).",
+      "design": "**Theme (roadmap v0.1.3).** The early-design pass for the **tech system**, feeding the unified gate model BL-087 settled: a **gate = quest = tech** is one condition-set object, so a tech can gate on economic OR world state. This item does the groundwork design; BL-087 formalises it as the filter system in v0.3.0.\n\n**Scope.** Design only — no implementation. Settle the tech / gate-condition object shape, the capstone-vs-ordinary distinction, and how a tech unlock threads into content availability (buildings, recipes, quest trees). Position it so v0.3.0's Era→Filter rename inherits a coherent model.\n\n**Open questions.** Tech-object schema and its overlap with the law object (BL-155); which conditions are expressible in the prototype; how quest trees hang off capstones; the boundary between this precursor and BL-087's full design.\n\n**Relates:** BL-087 (filter system, v0.3.0 — this is its early-design precursor), BL-155 (shared condition-set shape). **Authority:** docs/SYSTEMS.md once landed."
+    },
+    {
+      "id": "BL-157",
+      "version_goal": "v0.1.4",
+      "short_name": "MILITARY_DATAMODEL_STUB",
+      "category": "Military",
+      "title": "Military systems — data-model footing stub (v0.1.4 expanded-prototype groundwork)",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "C",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-09",
+      "files": [
+        "docs/SYSTEMS.md"
+      ],
+      "authority_doc": "docs/SYSTEMS.md",
+      "summary": "Roadmap v0.1.4 expanded-prototype groundwork (Ben, 2026-07-09 refocus). The Conflict dimension's first data-model footing: units, forces, and the seams they need in the world model. Stub, NOT mechanics — Conflict proper stays post-cut scope (TECH_FOUNDATIONS). Positions the model so the v0.2.0 nation actor (which owns military) has something concrete to hold. Design-owed: unit/force schema and the world-model seams are open.",
+      "design": "**Theme (roadmap v0.1.4).** Lay the **data-model footing** for the military / Conflict dimension: what a unit and a force are as records, where they sit in the world model, and which seams (movement, ownership, position) they touch. This is scaffolding for the v0.2.0 nation-as-strategic-actor pivot, which gives military to the nation.\n\n**Scope.** Data-model stub only — no combat, no movement mechanics, no AI. Conflict proper is post-prototype scope (TECH_FOUNDATIONS § exclusions); this item only positions the entities so later conflict work is not greenfield.\n\n**Open questions.** Unit / force schema; how forces relate to the nation actor (BL-094) and to territory; the serialisation seam; the minimum stub that earns its place without inviting scope creep.\n\n**Standing-rule note.** No AI faction behaviour beyond the data-model minimum (io-standing-rules § Determinism). **Authority:** docs/SYSTEMS.md once landed."
+    },
+    {
+      "id": "BL-158",
+      "version_goal": "v0.1.5",
+      "short_name": "POLITICS_DATAMODEL_STUB",
+      "category": "Politics",
+      "title": "Politics — data-model stub for the v0.2.0 nation actor (v0.1.5 expanded-prototype groundwork)",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "C",
+      "difficulty": 2,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-09",
+      "files": [
+        "docs/SYSTEMS.md"
+      ],
+      "authority_doc": "docs/SYSTEMS.md",
+      "summary": "Roadmap v0.1.5 expanded-prototype groundwork (Ben, 2026-07-09 refocus). A data-model stub only — enough political layer for the v0.2.0 nation actor to have something to own — deferring the working political system to v0.3.0. Positions nation political character, relationships, and lever slots as records without committing mechanics. Design-owed: the political-state schema is open. Last v0.1.x band item before the v0.2.0 refocus.",
+      "design": "**Theme (roadmap v0.1.5).** The thinnest useful **political stub**: the data slots the v0.2.0 nation actor needs to own — political character, inter-nation relationships, and placeholder lever slots — as serialisable records, with no working system behind them yet. The real political layer is promoted in v0.3.0 (politics + the filter system).\n\n**Scope.** Data-model stub only. No political mechanics, no AI decision-making, no diplomacy beyond the existing data-model stub (TECH_FOUNDATIONS). This closes the v0.1.x groundwork band: after it, the model is positioned for the v0.2.0 refocus.\n\n**Open questions.** Political-state schema; overlap with the existing nation generation (BL-054 territory + political-character assignment); which relationship data is worth stubbing now vs at v0.3.0; the boundary between this stub and the v0.3.0 working layer.\n\n**Relates:** BL-094 (the nation actor that owns this, v0.2.0), v0.3.0 politics (the working system this stubs toward), BL-054 (existing nation political character). **Authority:** docs/SYSTEMS.md once landed."
     }
   ]
 }
