@@ -38,4 +38,17 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                               const economy_report& report, ImVec2 origin, ImVec2 size,
                               bool input_enabled, ImVec2 lens_key_anchor);
 
+/// Refresh the convoy vision beam buffer (BL-152). For each live player intra-body
+/// convoy, relight a radius-2 pocket along the path segment it traversed this econ
+/// tick, stamping @p now_days into state.convoy_vision; prune entries older than one
+/// econ tick (fully faded). Called once per econ step from app::step_economy — it
+/// needs a non-const world for the (cached) pathfinder, so it cannot run inside the
+/// const-world draw. The Planetary canvas reads the buffer against state.sim_now_days
+/// to dim the beam as it ages.
+///
+/// @param w        World (non-const: the intra-body pathfinder mutates its route cache).
+/// @param state    Shared UI state; state.convoy_vision is refreshed and pruned.
+/// @param now_days Current continuous sim time in elapsed days (the fade clock).
+void update_convoy_vision(world& w, ui_state& state, double now_days);
+
 } // namespace ui

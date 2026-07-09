@@ -127,6 +127,7 @@ logistics_path intra_body_path(world& w, entity_id body, entity_id src_tile, ent
         res.reachable     = true;
         res.cost          = 0.0f;
         res.crosses_ocean = (sit->second.composition == terrain_composition::ocean);
+        res.tiles         = { src_tile };
         w.astar_cost_cache.emplace(key, res);
         return res;
     }
@@ -138,6 +139,7 @@ logistics_path intra_body_path(world& w, entity_id body, entity_id src_tile, ent
     std::vector<float> dist(static_cast<std::size_t>(total), 1e30f);
     std::vector<char>  settled(static_cast<std::size_t>(total), 0);
     std::vector<char>  crossed(static_cast<std::size_t>(total), 0); // best path touches ocean?
+    std::vector<int>   came_from(static_cast<std::size_t>(total), -1); // parent idx for path reconstruction (BL-152)
 
     const auto tile_at = [&](int idx) -> const tile_component* {
         const entity_id tid = grid[static_cast<std::size_t>(idx)];
@@ -197,6 +199,7 @@ logistics_path intra_body_path(world& w, entity_id body, entity_id src_tile, ent
                 crossed[static_cast<std::size_t>(nidx)] =
                     (crossed[static_cast<std::size_t>(idx)]
                      || n_tc->composition == terrain_composition::ocean) ? 1 : 0;
+                came_from[static_cast<std::size_t>(nidx)] = idx;
                 pq.push({ nd, nc, nr });
             }
         }
@@ -207,6 +210,22 @@ logistics_path intra_body_path(world& w, entity_id body, entity_id src_tile, ent
         res.reachable     = true;
         res.cost          = dist[static_cast<std::size_t>(destIdx)];
         res.crosses_ocean = crossed[static_cast<std::size_t>(destIdx)] != 0;
+
+        // Reconstruct the tile sequence (BL-152). Walk parents dest→start, mapping
+        // each raster index to its tile id, then reverse to src→dst. Canonicalise to
+        // lo→hi (the cache is keyed on the unordered pair) so every reader sees one
+        // stable order regardless of which direction first populated the entry.
+        std::vector<entity_id> seq;
+        for (int i = destIdx; i != -1; i = came_from[static_cast<std::size_t>(i)])
+        {
+            const entity_id tid = grid[static_cast<std::size_t>(i)];
+            if (tid != null_entity) seq.push_back(tid);
+            if (i == start) break;
+        }
+        std::reverse(seq.begin(), seq.end()); // now src→dst
+        if (src_tile != lo)                   // canonicalise to lo→hi
+            std::reverse(seq.begin(), seq.end());
+        res.tiles = std::move(seq);
     }
     w.astar_cost_cache.emplace(key, res);
     return res;

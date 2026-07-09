@@ -6,6 +6,45 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — Fog of war: activity-fog shadow + Planetary reach fog + convoy beam (2026-07-09)
+
+**Context.** Started by bringing local `main` up to speed (merged 6 upstream commits — the mobile
+BL-087 tech-tree work — into 20 unpushed local commits; one DEVLOG append-conflict resolved keeping
+both entries) and rebuilding. Ben then playtested and couldn't see any fog; three items followed.
+
+**BL-150 — activity fog as a dim shadow (Solar).** The BL-089 activity fog was absence-by-default (an
+un-networked body drew nothing), so with little commerce the map read as no-fog. Inverted it: bodies
+outside the player's network render dimmed (per-body brightness ramp unknown/stale/known/visible =
+0.36/0.60/0.84/1.0 + shadow-wash alpha), brightening as commerce reaches them. `dim_rgb` helper +
+`activity_fog_*` ramps in presentation.hpp.
+
+**BL-151 — intra-body reach fog (Planetary).** Ben expected fog on the *home planet* over intra-body
+trade — which didn't exist (the activity fog is body-level, Solar-only). Added a per-tile Planetary
+fog: the surface reads mostly unknown, lit only in a tight BFS pocket (radius 3) around the player's
+building tiles + live convoy endpoints. **Design calls (Ben):** commercial-reach semantics (not
+unknown-terrain — it's your own soil); live-derived (no save-format change). First cut lit the whole
+market catchment — Ben: 'too wide'; tightened to presence-radius pockets for a sense of movement +
+unknowns. Probe at landing: home body 7 markets, player reaches 1.
+
+**BL-152 — convoy vision beam.** Ben: 'convoys should send a radius-2 beam of vision which lags and
+dims over 1 econ tick.' Exposed the convoy's tile path (`logistics_path.tiles`, reconstructed via a
+came_from walk in `intra_body_path`, canonical lo→hi, wrap-aware — verified by a throwaway headless
+probe: contiguity, canonical order, single-tile src==dst). A live convoy floods a radius-2 pocket
+along the segment it traversed that econ tick, stamped into `ui_state.convoy_vision` (tile → sim
+time) by `ui::update_convoy_vision` in step_economy; the canvas fades it over one econ tick (90 days)
+against continuous `sim_now_days`, so the beam trails and dims smoothly behind the convoy. Confirmed
+convoys are live (dispatch/advance/credit each econ step). Derived VIEW state only — never serialised,
+no world/* feedback, determinism preserved.
+
+**Verification.** Full build clean throughout. Visual: `scripts/verify/intrabody_fog.lua` (default +
+wide + convoy-beam captures) — static fog + lit HQ pocket confirmed by eye; convoy path reconstruction
+by ad-hoc headless probe (4 assertions PASS). Cross-platform goldens not re-blessed (by-eye per the
+Windows-golden-mismatch note).
+
+**Left open.** Radius knobs (`fog_reveal_radius`=3, beam radius 2) are Ben-tunable one-liners. The
+path-reconstruction probe was run ad hoc, not saved as a `tools/verify/*.cpp` harness — candidate
+follow-up. Authority propagated to DISCOVERY.md (new "Illumination (Planetary canvas)" section).
+
 ## Session — BL-129: prose pass on the central documentation (2026-07-08)
 
 **Context.** Ben green-lit BL-129 CENTRAL_DOC_PROSE_PASS ("burn some Fable 5 on it — rewrite the

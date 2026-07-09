@@ -5527,6 +5527,25 @@
           "notes": ""
         }
       ]
+    },
+    {
+      "batch": "2026-07-09-fog",
+      "title": "BL-152 — convoy vision beam (a live convoy lights a radius-2 beam that lags and dims over one econ tick)",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-152",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "complete",
+          "requirement": "ITEM-SPANNING: a live player intra-body convoy lights a radius-2 vision pocket along its route on the Planetary canvas, brightening the fog there; the pocket ages to full fog over one econ tick (90 days) against sim_now_days, so it lags and dims behind the moving convoy.",
+          "verification": [
+            "visual: scripts/verify/intrabody_fog.lua (intrabody_fog_convoy_beam capture)",
+            "headless: convoy path reconstruction asserted ad hoc (intra_body_path returns a contiguous, canonical lo->hi tile sequence; single-tile when src==dst)"
+          ],
+          "result_metric": "Full build clean. Static capture shows the beam pocket lit on the fogged surface; the temporal fade is not capturable in a still. Path reconstruction verified by a throwaway headless probe (4 assertions PASS: reachable, 3-tile no-wrap path, canonical order under reverse query, single-tile src==dst) run 2026-07-09, then removed.",
+          "notes": "Beam illumination is derived VIEW state (ui_state.convoy_vision), refreshed in app::step_economy via ui::update_convoy_vision, faded in the canvas — never serialised, no feedback into world/*, so determinism is preserved. The headless probe was run ad hoc, not saved as a tools/verify/*.cpp harness (candidate follow-up per DELIVERY.md tool-creation discipline)."
+        }
+      ]
     }
 
   ]

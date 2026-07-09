@@ -5,6 +5,7 @@
 
 #include <imgui.h>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 /// Which rung of the canvas zoom ladder currently fills the primary viewport.
@@ -167,6 +168,17 @@ struct ui_state
     float planetary_zoom  = 4.0f / 3.0f; ///< Scroll-wheel zoom factor. 4/3 shows 3/4 of the grid height on load.
     float planetary_pan_x = 0.0f; ///< Pan offset of the grid centre from the canvas centre, screen px.
     float planetary_pan_y = 0.0f; ///< Pan offset of the grid centre from the canvas centre, screen px.
+
+    // --- convoy vision beam (BL-152) ---
+    // A live player convoy lights a radius-2 beam of vision along the tiles it moves
+    // through; that vision *lags and dims over one econ tick* (90 days). This buffer
+    // maps a tile id -> the sim time (elapsed days) the beam last lit it. Refreshed
+    // each econ step by ui::update_convoy_vision (convoy positions are known there),
+    // read every frame by the Planetary canvas which computes the fade against
+    // sim_now_days. Derived VIEW state only — never serialised, never feeds the
+    // simulation, so it introduces no non-determinism into world/*.
+    std::unordered_map<entity_id, double> convoy_vision;
+    double sim_now_days = 0.0; ///< Latest continuous sim time (elapsed days); the fade clock.
 
     // --- hover-card state (BL-060) ---
     entity_id hovered_entity = null_entity; ///< Entity the cursor rested on last frame; used to detect stable hover.

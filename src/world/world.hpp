@@ -33,6 +33,13 @@ struct logistics_path
     float cost          = 0.0f;
     bool  crosses_ocean = false;
     bool  reachable     = false;
+    /// The tile sequence of the best path, in canonical (lo→hi) endpoint order —
+    /// i.e. from min(src,dst) to max(src,dst), since the weighted path is symmetric
+    /// and cached on the unordered pair. A caller that dispatched src→dst reverses
+    /// this when src != lo. Empty when unreachable; a single tile when src == dst.
+    /// Populated by intra_body_path (BL-152, for the convoy vision beam); the cost
+    /// fields above stand alone for callers that ignore it.
+    std::vector<entity_id> tiles;
 };
 
 /// ECS registry. Entities are plain integer IDs; components are stored in

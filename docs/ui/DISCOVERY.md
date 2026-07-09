@@ -158,6 +158,33 @@ Rendered in `src/ui/solar_system_canvas.cpp` (see [`SOLAR.md`](SOLAR.md) for the
 - **Selection panel** — a body gains a "Commercial activity" section keyed on the tier (unknown →
   "outside your trade network"; known/visible → the market pulse; stale → a greyed note).
 
+### Illumination (Planetary canvas) — the intra-body reach fog (BL-151/152)
+
+The body-level tier above is a *coarse* per-body read on the Solar canvas. On the **Planetary
+surface** the activity fog is a **per-tile** treatment, rendered in `src/ui/body_surface_canvas.cpp`.
+It is a *third* visibility axis, independent of both the survey fog and the body-level tier: it asks
+"where on **this** body does my commerce actually reach?" The surface reads as **mostly unknown**,
+lit only where the player has presence — so an own-territory home planet still carries fog of war.
+
+- **Semantics (Ben's call):** commercial *reach*, not unknown terrain — the home planet is the
+  player's own soil, so "fog" means *where your logistics operate*, not *where the land is unmapped*.
+- **Substrate:** live-derived, **no stored state / no save-format change** (intra-body traffic records
+  nothing persistent — the Solar fog's `trade_route` substrate is inter-body only).
+- **Static presence pocket:** a breadth-first flood of `fog_reveal_radius` (=3) tile-hops from the
+  player's own building tiles + the endpoint `centre_tile` of any live player convoy on the body.
+  Every *revealed* tile (survey owns the unrevealed ones) outside the pocket takes a dark wash
+  (`lerp 0.5` toward near-black), applied over the lens fill so a fogged region's analytic read dims
+  with it. Always-on, all overlays.
+- **Convoy vision beam (BL-152):** a live player intra-body convoy lights a **radius-2** beam of
+  vision along the tiles it moves through, which **lags and dims over one econ tick** (90 days). The
+  beam is derived VIEW state (`ui_state.convoy_vision`: tile → the sim time it was last lit), refreshed
+  each econ step by `ui::update_convoy_vision` (which reads the convoy's path from `intra_body_path`'s
+  now-exposed tile sequence and floods radius-2 around the segment traversed that tick), and faded in
+  the canvas against `ui_state.sim_now_days` — continuous sim time, so the trail melts smoothly rather
+  than snapping at quarter boundaries. Vision blends: `1` in the static pocket, else the beam's
+  `1 − age/90`; the fog wash scales with `1 − vision`. The beam is the "things are moving" half; the
+  static pocket is the "where I operate" half.
+
 ---
 
 ## Determinism, serialisation, scope

@@ -1,18 +1,20 @@
--- One-off smoke test for the intra-body commercial-reach fog (BL-151).
--- Descends to the home planet (Kepler, fully surveyed, player buildings present)
--- and captures the surface: tiles whose catchment market the player reaches (owns a
--- building there, or a live convoy touches it) read full-bright; every other market's
--- catchment reads fogged (dark wash). Confirms the fog renders on the Planetary canvas.
+-- Visual verification for the intra-body activity fog + convoy vision beam (BL-151/152).
+-- Descends to the home planet (Kepler, fully surveyed, player buildings present):
+--   BL-151: the surface reads mostly UNKNOWN, lit only in a tight pocket around the
+--           player's presence (own building tiles); everything else takes a dark wash.
+--   BL-152: a live player convoy lights a radius-2 beam of vision along its route,
+--           which then dims over one econ tick. (Static capture shows the lit pocket;
+--           the fade is temporal and not visible in a still.)
 
 verify.goto_surface("home")
 verify.capture("intrabody_fog_default")
 
--- Zoom out to see the whole body: the player reaches only its own HQ catchment, so
--- the other market catchments across the globe should read fogged (dark wash).
+-- Zoom out to see the whole body: only the HQ pocket is lit, the rest reads fogged.
 verify.set_zoom(0.35)
 verify.capture("intrabody_fog_wide")
 
--- Seed a live intra-body convoy between two markets on Kepler so a second catchment
--- lights up (reach via live convoy, not just building ownership).
+-- Seed a live player convoy on the home body and run one econ step so the vision-beam
+-- update (app::step_economy -> ui::update_convoy_vision) lights the beam pocket.
 verify.seed_convoy("Kepler", "Kepler", "iron_ore", 20, 0.4)
-verify.capture("intrabody_fog_convoy")
+verify.econ_step(1)
+verify.capture("intrabody_fog_convoy_beam")

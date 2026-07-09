@@ -2848,6 +2848,33 @@
       "authority_doc": "docs/ui/DISCOVERY.md",
       "summary": "Filed + landed 2026-07-09 (Ben, follow-on from BL-150). The commercial-activity fog (BL-089) is body-level only, rendered on the Solar canvas; the Planetary canvas had no activity fog, so the home surface read as fully known. Ben expected fog of war on the home planet over intra-body trade. This adds a THIRD visibility treatment: a per-tile intra-body fog on the Planetary canvas so the surface reads as mostly unknown, lit only around the player's own presence.",
       "design": "**Semantics (Ben's call).** Commercial reach, not unknown-terrain: the home planet is the player's own territory, so 'fog' means *where your logistics actually operate*. **Substrate (Ben's call).** Live-derived, no stored state / no save-format change; intra-body traffic records nothing persistent.\n\n**Model.** Vision is a TIGHT pocket around the player's actual presence, not a whole market catchment (a first cut lit the entire catchment — Ben: 'too wide'; the point is a sense of movement + unknowns). Reveal sources: the player's own building tiles + the endpoint (`centre_tile`) of any live player convoy on the active body. A breadth-first flood out to `fog_reveal_radius` (=3) tile-hops from every source marks the visible pocket (odd-r offset neighbours, column wrap); every other revealed tile takes a dark wash (`lerp 0.5` toward IM_COL32(8,10,16)). Applied over the lens fill (a fogged region's analytic read dims with it). The geographic survey fog (BL-067) still owns unrevealed tiles — this dims revealed ones only. Always-on, all overlays. Convoys confirmed live (dispatch/advance/credit run every econ step, app.cpp:381).\n\n**Verify.** `scripts/verify/intrabody_fog.lua` (goto_surface home + zoom-out capture). Probe at landing: home body 7 markets, player reaches 1 -> 6 catchments fogged; tightened to radius pockets so the HQ region reads lit and the rest of the globe fogged at both play and wide zoom.\n\n**Follow-up -> BL-152:** a live convoy should emit a radius-2 vision BEAM that travels its route and lags/dims over ~1 econ tick (needs `logistics_path` to return its tile sequence — currently cost-only). That is the 'things are moving' half; this item is the static-presence half."
+    },
+    {
+      "id": "BL-152",
+      "short_name": "CONVOY_VISION_BEAM",
+      "category": "Canvas",
+      "title": "Convoy vision beam — a live convoy lights a radius-2 beam that lags and dims over one econ tick",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 3,
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-09",
+      "version_goal": "v0.0.9",
+      "files": [
+        "src/world/world.hpp",
+        "src/world/logistics.cpp",
+        "src/ui/ui_state.hpp",
+        "src/ui/body_surface_canvas.cpp",
+        "src/ui/body_surface_canvas.hpp",
+        "src/core/app.cpp",
+        "scripts/verify/intrabody_fog.lua"
+      ],
+      "authority_doc": "docs/ui/DISCOVERY.md",
+      "summary": "Filed + landed 2026-07-09 (Ben, the 'things are moving' half of BL-151). A live player convoy emits a radius-2 beam of vision along the tiles it moves through; that vision lags and dims over one econ tick (90 days). The moving-presence complement to BL-151's static-presence pocket.",
+      "design": "**Spec (Ben).** 'Convoys should send a radius 2 beam of vision which lags and dims over 1 econ tick.'\n\n**Path exposure.** `logistics_path` (world.hpp) gained a `tiles` sequence; `intra_body_path` (logistics.cpp) reconstructs it via a came_from parent-walk, stored in canonical lo->hi endpoint order (the route cache is keyed on the unordered pair). Deterministic; wrap-aware (the grid is a horizontal cylinder). Verified by a throwaway headless probe (contiguity, canonical order, single-tile src==dst).\n\n**Vision buffer.** `ui_state.convoy_vision` maps tile -> the sim time (elapsed days) a beam last lit it; `ui_state.sim_now_days` is the continuous fade clock (set every frame in app.cpp). Derived VIEW state only — never serialised, no feedback into world/*, so world determinism is preserved (a `world/*` standing rule).\n\n**Refresh (per econ step).** `ui::update_convoy_vision` (body_surface_canvas) runs in app::step_economy after advance_convoys (before arrived convoys are retired). For each live player intra-body convoy it maps progress -> a path-index segment (where it was one tick ago .. now), floods radius-2 (odd-r neighbours) around that segment, and stamps now_days. Prunes entries older than one econ tick.\n\n**Render.** The Planetary fog (BL-151) now blends a beam vision term: vision = 1 in the static pocket, else max with the beam's fading contribution (1 - age/90); fog wash = 0.5*(1 - vision). So a convoy's beam trails and dims behind it over one econ tick. Uses continuous sim time, so it fades smoothly between quarter boundaries rather than snapping.\n\n**Scope note.** Intra-body convoys only (inter-body activity reads on the Solar fog, BL-089/150). econ_tick_days (90) mirrored as a local constant in the canvas to avoid a ui->core include. **Authority:** docs/ui/DISCOVERY.md."
     }
   ]
 }
