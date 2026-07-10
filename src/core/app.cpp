@@ -56,6 +56,16 @@
 static constexpr int window_w = 1720;
 static constexpr int window_h = 1080;
 
+// Verify captures render at a FIXED small size, independent of the interactive
+// window default above, so goldens stay renderer-/machine-independent and match the
+// documented 1280x720 standard even as the interactive default grows. Growing
+// window_w/window_h must NOT silently move the golden resolution — that desynced the
+// whole golden set in 6a04ec9 (captures 1720x1080 vs goldens 1280x720). run_verify
+// forces the window to this size before capturing. See DEVELOPMENT_PRACTICES
+// § Display environment.
+static constexpr int verify_w = 1280;
+static constexpr int verify_h = 720;
+
 // ---------------------------------------------------------------------------
 // Unified key-binding table (BL-062).
 // Every keyboard shortcut is defined once here.  handle_key_down loops over
@@ -205,8 +215,9 @@ app::app()
     SDL_SetRenderVSync(m_renderer, 1);
 
     // Record the display environment on startup so the runtime resolution is on the
-    // log. Verify captures render at window_w×window_h; the interactive window is
-    // resizable and the desktop may be far larger, so UI chrome must stay
+    // log. Verify captures render at the fixed verify_w×verify_h (run_verify resizes
+    // the window); the interactive window is resizable and the desktop may be far
+    // larger, so UI chrome must stay
     // resolution-robust (BL-093 sized the Selection element to its content for this
     // reason). See docs/development/DEVELOPMENT_PRACTICES.md § Display environment.
     {
@@ -513,9 +524,9 @@ void app::setup_world(world_params params)
 
 int app::run_verify(const std::string& script_path, bool bless)
 {
-    // Deterministic, non-interactive setup: fixed window (the window_w/window_h
-    // constants), seeded world, sim left paused so orbits and ticks never advance
-    // between captures. The script drives view/overlay state directly.
+    // Deterministic, non-interactive setup: fixed window (resized to verify_w/
+    // verify_h below), seeded world, sim left paused so orbits and ticks never
+    // advance between captures. The script drives view/overlay state directly.
     setup_world();
     load_economy();
     m_sim_loop.set_speed(0);
@@ -523,6 +534,14 @@ int app::run_verify(const std::string& script_path, bool bless)
     // The harness renders the live world, not the main menu — flip past the launch
     // screen. A menu-verification script re-enters the menu with verify.show_menu.
     m_screen = app_screen::in_game;
+
+    // Force the fixed verify capture size (verify_w × verify_h), decoupled from the
+    // interactive window default (window_w × window_h) which is now larger. This
+    // keeps captures + committed goldens at the 1280×720 standard regardless of the
+    // interactive default. SyncWindow blocks until the resize is applied so the very
+    // first capture already renders at the fixed size.
+    SDL_SetWindowSize(m_window, verify_w, verify_h);
+    SDL_SyncWindow(m_window);
 
     // Golden-image diffing: goldens live in a "golden" directory beside the verify
     // script, so running against the source script path (the skill's iteration

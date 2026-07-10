@@ -33,12 +33,21 @@ reference image). The mockup is a structural redesign of the tile panel, not jus
   carrying the BL-071 affordances, and actually performing the build.
 
 **Verification.** New `scripts/verify/selection_tile_layout.lua` — captures a single-deposit water tile
-and a multi-deposit built land tile; verified by-eye (software renderer). Golden PNGs deferred: the
-verify window default moved to 1720×1080 (commit 6a04ec9) while the committed golden set is still
-1280×720, so blessing one re-res pair would be inconsistent — left to a repo-wide re-bless. Requirement
-group appended to `req/requirements.json` (BL-123, complete). `docs/ui/SELECTION.md` updated (new
-§ The tile element's layout; the action/facts tile row + build-front-door/affordance subsections
-marked superseded-for-tiles).
+and a multi-deposit built land tile. Requirement group appended to `req/requirements.json` (BL-123,
+complete). `docs/ui/SELECTION.md` updated (new § The tile element's layout; the action/facts tile row
++ build-front-door/affordance subsections marked superseded-for-tiles).
+
+**Follow-on fix — verify capture resolution + repo-wide golden re-bless.** Discovered while blessing
+the new check that the verify capture window had silently drifted to **1720×1080** (commit 6a04ec9
+bumped the interactive default `window_w/window_h`, and verify captured at that default), size-
+mismatching **every** committed 1280×720 golden — the whole visual gate was red. Fix: `run_verify`
+now forces a fixed **`verify_w × verify_h` (1280×720)** capture size, decoupled from the interactive
+default (`app.cpp`), restoring the documented standard so growing the interactive window can never
+again move the golden resolution. Then re-blessed the entire set on the software renderer to current
+UI (Ben's call). Result: **53/54 checks green**; the lone failure `recipe_workforce.lua` is a
+pre-existing content expectation (`verify.expect: player has a processing facility`) unrelated to this
+work. The golden PNGs are stored effectively uncompressed (~3.69MB each = 1280×720×4) — a future
+cleanup could run them through real PNG compression to shrink the golden dir dramatically.
 
 **Open.** The other selection kinds (body/building/market/nation/corp) still use the action|facts
 split — they get their own vertical layouts as Ben mocks each. BL-162 awaits its mockup.
