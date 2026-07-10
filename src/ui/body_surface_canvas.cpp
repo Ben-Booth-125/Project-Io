@@ -180,6 +180,125 @@ void draw_lens_resource_combo(ui_state& state, ImVec2 pos, float w)
     ImGui::PopStyleVar();
 }
 
+/// Marker glyph for a count-driven lens-key row: a filled swatch (Country / Market),
+/// a small dot (Reach), or a thickness bar (Supply). Lets one scrollable renderer
+/// serve every list-shaped legend.
+enum class key_marker { swatch, dot, bar };
+
+/// One row of a count-driven lens key: a marker + a label, each with its own colour
+/// (swatch legends label in neutral grey; the connection legends colour the label by
+/// recency tier). `bar_frac` is the [0,1] fill only key_marker::bar reads.
+struct key_row
+{
+    ImU32       marker_colour;
+    ImU32       label_colour;
+    std::string label;
+    key_marker  marker;
+    float       bar_frac = 0.0f;
+};
+
+/// Shared chrome for a count-driven, potentially-overflowing lens key (BL-163/164):
+/// a dark panel with a fixed header (and an optional good-selector combo, for the
+/// Market lens) over a bounded, smoothly-scrolling body that hosts the rows. The
+/// box's right edge sits at @p anchor.x; its height is capped to the canvas vertical
+/// span [@p top_limit, @p bottom_limit] so a long list never overruns the canvas —
+/// the rows scroll (wheel/drag) inside a borderless ImGui child instead of the box
+/// growing off-screen. Must run inside the ImGui frame (it opens child windows, like
+/// draw_lens_resource_combo). @p combo_state != nullptr draws the resource selector.
+void draw_scroll_list_key(ImVec2 anchor, float top_limit, float bottom_limit,
+                          const char* id, const char* header, float box_w,
+                          const std::vector<key_row>& rows, const char* empty_note,
+                          ui_state* combo_state)
+{
+    const float pad      = 8.0f;
+    const float line_h   = ImGui::GetTextLineHeight();
+    const float swatch   = line_h;
+    const float row_h    = line_h + 2.0f;              // matches the legacy per-row advance
+    const float header_h = line_h + 4.0f;
+    const float combo_h  = combo_state ? (kLensComboH + 4.0f) : 0.0f;
+    const float bar_max  = 40.0f;                      // key_marker::bar full length
+
+    const int   n         = std::max(1, static_cast<int>(rows.size()));
+    const float content_h = static_cast<float>(n) * row_h;
+
+    // Height budget: fixed chrome (pads + optional combo + header) plus as much of the
+    // row list as the canvas span allows; the remainder scrolls.
+    const float chrome    = pad + combo_h + header_h + pad;
+    const float avail     = std::max(row_h, (bottom_limit - top_limit) - chrome);
+    const float body_h    = std::min(content_h, avail);
+    const float box_h     = chrome + body_h;
+
+    // Vertically centre on the anchor, then clamp into the canvas span so it never
+    // spills past the top or bottom edge.
+    float top = anchor.y - box_h * 0.5f;
+    top       = std::clamp(top, top_limit, std::max(top_limit, bottom_limit - box_h));
+    const ImVec2 p0 = { anchor.x - box_w, top };
+    const ImVec2 p1 = { p0.x + box_w, p0.y + box_h };
+
+    ImDrawList* dl = ImGui::GetBackgroundDrawList();
+    dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
+    dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
+
+    const float x = p0.x + pad;
+    float       y = p0.y + pad * 0.5f;
+
+    if (combo_state)
+    {
+        draw_lens_resource_combo(*combo_state, {x, y}, box_w - 2.0f * pad);
+        y += kLensComboH + 4.0f;
+    }
+
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), header);
+    y += header_h;
+
+    if (rows.empty())
+    {
+        dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), empty_note);
+        return;
+    }
+
+    // Scrollable body: a borderless child overlaying the row area (the combo pattern),
+    // so overflow scrolls with a clean scrollbar rather than overrunning the canvas.
+    const ImVec2 body_pos = { x, y };
+    const float  body_w   = box_w - 2.0f * pad;
+    ImGui::SetNextWindowPos(body_pos, ImGuiCond_Always);
+    ImGui::SetNextWindowSize({ body_w, body_h }, ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.0f);
+    constexpr ImGuiWindowFlags wflags =
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoNav   | ImGuiWindowFlags_NoSavedSettings;
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0.0f, 0.0f});
+    ImGui::Begin(id, nullptr, wflags);
+    ImGui::BeginChild("##rows", { body_w, body_h }, false, ImGuiWindowFlags_NoBackground);
+    ImDrawList* wdl = ImGui::GetWindowDrawList();
+    for (const key_row& r : rows)
+    {
+        const ImVec2 c = ImGui::GetCursorScreenPos();
+        switch (r.marker)
+        {
+            case key_marker::swatch:
+                wdl->AddRectFilled(c, { c.x + swatch, c.y + swatch }, r.marker_colour);
+                break;
+            case key_marker::dot:
+                wdl->AddCircleFilled({ c.x + 4.0f, c.y + line_h * 0.5f }, 3.5f, r.marker_colour);
+                break;
+            case key_marker::bar:
+            {
+                const float th = 3.0f + (bar_max - 3.0f) * std::clamp(r.bar_frac, 0.0f, 1.0f);
+                wdl->AddRectFilled({ c.x, c.y + line_h * 0.5f - 2.0f },
+                                   { c.x + th, c.y + line_h * 0.5f + 2.0f }, r.marker_colour);
+                break;
+            }
+        }
+        const float text_x = (r.marker == key_marker::bar) ? (bar_max + 6.0f) : (swatch + 4.0f);
+        wdl->AddText({ c.x + text_x, c.y }, r.label_colour, r.label.c_str());
+        ImGui::Dummy({ body_w, row_h });
+    }
+    ImGui::EndChild();
+    ImGui::End();
+    ImGui::PopStyleVar();
+}
+
 /// On-canvas legend for the Resource lens (BL-019): the selected resource's name
 /// and identity swatch, plus a note that the fill marks the contiguous deposit.
 /// Flat, not a gradient — the lens shows deposit *shape*, not magnitude.
@@ -297,14 +416,13 @@ ImU32 production_colour(float ratio)
 // BL-015: market lens is now a catchment-boundary tint (one colour per market).
 // The key shows a colour swatch per market labelled with its city name (matching the
 // ledger / selection / CSV — never a bare ordinal, which the player never sees elsewhere).
-void draw_market_key(ImDrawList* dl, ImVec2 anchor, const world& w,
+void draw_market_key(ImVec2 anchor, float top_limit, float bottom_limit, const world& w,
                      ui_state& state,
                      const std::unordered_map<entity_id, ImU32>& catchment_colours)
 {
     const float pad    = 8.0f;
     const float line_h = ImGui::GetTextLineHeight();
     const float swatch = line_h;
-    const int   n      = static_cast<int>(catchment_colours.size());
     // Stable legend order — the source map iterates arbitrarily; sort by market id so the
     // swatch list does not reshuffle frame to frame (colours stay keyed to their market).
     std::vector<std::pair<entity_id, ImU32>> entries(catchment_colours.begin(),
@@ -319,37 +437,14 @@ void draw_market_key(ImDrawList* dl, ImVec2 anchor, const world& w,
             swatch + 4.0f + ImGui::CalcTextSize(market_city_name(w, mid).c_str()).x);
     const float box_w = std::max(140.0f, label_w + 2.0f * pad);
 
-    const float body_h = pad + kLensComboH + 4.0f + line_h + 4.0f
-                       + static_cast<float>(std::max(n, 1)) * (swatch + 2.0f)
-                       + pad;
-
-    const ImVec2 p0 = { anchor.x - box_w, anchor.y - body_h * 0.5f };
-    const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
-    dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
-    dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
-
-    float x = p0.x + pad;
-    float y = p0.y + pad * 0.5f;
-
-    draw_lens_resource_combo(state, {x, y}, box_w - 2.0f * pad);
-    y += kLensComboH + 4.0f;
-
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Market catchments");
-    y += line_h + 4.0f;
-
-    if (entries.empty())
-    {
-        dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "No markets");
-        return;
-    }
-
+    std::vector<key_row> rows;
+    rows.reserve(entries.size());
     for (const auto& [mid, col] : entries)
-    {
-        dl->AddRectFilled({x, y}, {x + swatch, y + swatch}, col);
-        const std::string label = market_city_name(w, mid);
-        dl->AddText({x + swatch + 4.0f, y}, IM_COL32(220, 220, 220, 255), label.c_str());
-        y += swatch + 2.0f;
-    }
+        rows.push_back({ col, IM_COL32(220, 220, 220, 255), market_city_name(w, mid),
+                         key_marker::swatch, 0.0f });
+
+    draw_scroll_list_key(anchor, top_limit, bottom_limit, "##lens_key_market",
+                         "Market catchments", box_w, rows, "No markets", &state);
 }
 
 /// On-canvas legend for the Country lens (BL-133): one colour swatch + nation name
@@ -358,7 +453,8 @@ void draw_market_key(ImDrawList* dl, ImVec2 anchor, const world& w,
 /// label guaranteed-fits (CalcTextSize pattern draw_market_key already uses).
 /// Colour source is palette::nation_colour — the same source the tile tint itself
 /// uses (the country lens's tile-tint pass, above).
-void draw_country_key(ImDrawList* dl, ImVec2 anchor, const world& w, const ui_state& state)
+void draw_country_key(ImVec2 anchor, float top_limit, float bottom_limit,
+                      const world& w, const ui_state& state)
 {
     std::vector<entity_id> present;
     for (const auto& [tid, nid] : w.tile_to_nation)
@@ -383,38 +479,21 @@ void draw_country_key(ImDrawList* dl, ImVec2 anchor, const world& w, const ui_st
             continue;
         name_w = std::max(name_w, ImGui::CalcTextSize(nat_it->second.name.c_str()).x);
     }
-    const float box_w  = pad * 2.0f + swatch + 4.0f + name_w;
-    const int   n      = static_cast<int>(present.size());
-    const float body_h = pad + line_h + 4.0f
-                       + static_cast<float>(std::max(n, 1)) * (swatch + 2.0f)
-                       + pad;
+    const float box_w = pad * 2.0f + swatch + 4.0f + name_w;
 
-    const ImVec2 p0 = { anchor.x - box_w, anchor.y - body_h * 0.5f };
-    const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
-    dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
-    dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
-
-    float x = p0.x + pad;
-    float y = p0.y + pad * 0.5f;
-
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Countries");
-    y += line_h + 4.0f;
-
-    if (present.empty())
-    {
-        dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "No nations");
-        return;
-    }
-
+    std::vector<key_row> rows;
+    rows.reserve(present.size());
     for (const entity_id nid : present)
     {
         const auto nat_it = w.nations.find(nid);
         if (nat_it == w.nations.end())
             continue;
-        dl->AddRectFilled({x, y}, {x + swatch, y + swatch}, palette::nation_colour(nid));
-        dl->AddText({x + swatch + 4.0f, y}, IM_COL32(220, 220, 220, 255), nat_it->second.name.c_str());
-        y += swatch + 2.0f;
+        rows.push_back({ palette::nation_colour(nid), IM_COL32(220, 220, 220, 255),
+                         nat_it->second.name, key_marker::swatch, 0.0f });
     }
+
+    draw_scroll_list_key(anchor, top_limit, bottom_limit, "##lens_key_country",
+                         "Countries", box_w, rows, "No nations", nullptr);
 }
 
 /// On-canvas legend for the Population lens: a low→high habitability gradient bar
@@ -568,38 +647,22 @@ struct supply_edge { entity_id other_body; int convoy_count; activity_vis tier; 
 /// bodies" the design calls for reads here as a list of the active body's own
 /// connections (name + recency tier) — the body-marker glow the design describes
 /// belongs on the Solar canvas, out of this lens work's file scope.
-void draw_reach_key(ImDrawList* dl, ImVec2 anchor, const world& w,
+void draw_reach_key(ImVec2 anchor, float top_limit, float bottom_limit, const world& w,
                     const std::vector<reach_link>& links)
 {
-    const float pad     = 8.0f;
-    const float box_w   = 176.0f;
-    const float line_h  = ImGui::GetTextLineHeight();
-    const int   n       = static_cast<int>(links.size());
-    const float body_h  = pad + line_h + 4.0f + std::max(1, n) * (line_h + 2.0f) + pad;
-    const ImVec2 p0 = { anchor.x - box_w, anchor.y - body_h * 0.5f };
-    const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
-    dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
-    dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
-
-    const float x = p0.x + pad;
-    float       y = p0.y + pad * 0.5f;
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Reach (your trade network)");
-    y += line_h + 4.0f;
-
-    if (links.empty())
-    {
-        dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "no routes from this body");
-        return;
-    }
+    const float box_w = 176.0f;
+    std::vector<key_row> rows;
+    rows.reserve(links.size());
     for (const reach_link& link : links)
     {
         const auto  it   = w.bodies.find(link.other_body);
         const char* name = (it != w.bodies.end()) ? it->second.name.c_str() : "unknown body";
         const ImU32 c    = reach_tier_colour(link.tier);
-        dl->AddCircleFilled({x + 4.0f, y + line_h * 0.5f}, 3.5f, c);
-        dl->AddText({x + 12.0f, y}, c, name);
-        y += line_h + 2.0f;
+        rows.push_back({ c, c, name, key_marker::dot, 0.0f });
     }
+    draw_scroll_list_key(anchor, top_limit, bottom_limit, "##lens_key_reach",
+                         "Reach (your trade network)", box_w, rows,
+                         "no routes from this body", nullptr);
 }
 
 /// On-canvas legend for the Supply-routes lens (BL-014): one row per aggregated
@@ -607,44 +670,27 @@ void draw_reach_key(ImDrawList* dl, ImVec2 anchor, const world& w,
 /// stands in for the edge-thickness encoding the design specifies for the
 /// (out-of-scope-here) Solar-canvas graph rendering, and colour is the shared
 /// recency tier.
-void draw_supply_routes_key(ImDrawList* dl, ImVec2 anchor, const world& w,
+void draw_supply_routes_key(ImVec2 anchor, float top_limit, float bottom_limit, const world& w,
                             const std::vector<supply_edge>& edges)
 {
-    const float pad     = 8.0f;
-    const float box_w   = 176.0f;
-    const float line_h  = ImGui::GetTextLineHeight();
-    const float bar_max = 40.0f;
-    const int   n       = static_cast<int>(edges.size());
-    const float body_h  = pad + line_h + 4.0f + std::max(1, n) * (line_h + 2.0f) + pad;
-    const ImVec2 p0 = { anchor.x - box_w, anchor.y - body_h * 0.5f };
-    const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
-    dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
-    dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
-
-    const float x = p0.x + pad;
-    float       y = p0.y + pad * 0.5f;
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Supply routes");
-    y += line_h + 4.0f;
-
-    if (edges.empty())
-    {
-        dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "no lanes from this body");
-        return;
-    }
+    const float box_w = 176.0f;
+    std::vector<key_row> rows;
+    rows.reserve(edges.size());
     for (const supply_edge& edge : edges)
     {
         const auto  it   = w.bodies.find(edge.other_body);
         const char* name = (it != w.bodies.end()) ? it->second.name.c_str() : "unknown body";
         const ImU32 c    = reach_tier_colour(edge.tier);
-        // Log-scaled thickness (BL-014, settled): a bare completion reads as a
-        // thin sliver; heavy repeat traffic saturates toward bar_max rather than
-        // dominating the row linearly.
-        const float thickness = std::clamp(3.0f + 6.0f * std::log(1.0f + static_cast<float>(edge.convoy_count)),
-                                            3.0f, bar_max);
-        dl->AddRectFilled({x, y + line_h * 0.5f - 2.0f}, {x + thickness, y + line_h * 0.5f + 2.0f}, c);
-        dl->AddText({x + bar_max + 6.0f, y}, c, name);
-        y += line_h + 2.0f;
+        // Log-scaled thickness (BL-014, settled): a bare completion reads as a thin
+        // sliver; heavy repeat traffic saturates toward the bar's full length rather
+        // than dominating the row linearly. Expressed as a [0,1] fraction of bar_max
+        // (37 = bar_max 40 − base 3) so the shared renderer paints the bar.
+        const float frac = std::clamp(6.0f * std::log(1.0f + static_cast<float>(edge.convoy_count)) / 37.0f,
+                                      0.0f, 1.0f);
+        rows.push_back({ c, c, name, key_marker::bar, frac });
     }
+    draw_scroll_list_key(anchor, top_limit, bottom_limit, "##lens_key_supply",
+                         "Supply routes", box_w, rows, "no lanes from this body", nullptr);
 }
 
 } // namespace
@@ -1949,12 +1995,17 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // On-canvas lens key (drawn unclipped, flush-left of the minimap so it reads as a
     // drawer folding out from it — anchor passed in as lens_key_anchor; before the
     // input early-out so it shows in headless captures too).
+    // Count-driven keys (Country/Market/Reach/Supply) are bounded to the canvas
+    // vertical span [key_top, key_bot] so a long entry list scrolls inside the box
+    // rather than overrunning the canvas edges (BL-163/164).
+    const float key_top = grid_area_origin.y + 8.0f;
+    const float key_bot = origin.y + size.y - 8.0f;
     if (state.overlay == overlay_mode::country)
-        draw_country_key(dl, lens_key_anchor, w, state);
+        draw_country_key(lens_key_anchor, key_top, key_bot, w, state);
     else if (state.overlay == overlay_mode::resource)
         draw_resource_key(dl, lens_key_anchor, state);
     else if (state.overlay == overlay_mode::market)
-        draw_market_key(dl, lens_key_anchor, w, state, market_catchment_colour);
+        draw_market_key(lens_key_anchor, key_top, key_bot, w, state, market_catchment_colour);
     else if (state.overlay == overlay_mode::population)
         draw_population_key(dl, lens_key_anchor);
     else if (state.overlay == overlay_mode::opportunity)
@@ -1966,9 +2017,9 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     else if (state.overlay == overlay_mode::industry)
         draw_industry_key(dl, lens_key_anchor);
     else if (state.overlay == overlay_mode::reach)
-        draw_reach_key(dl, lens_key_anchor, w, reach_links);
+        draw_reach_key(lens_key_anchor, key_top, key_bot, w, reach_links);
     else if (state.overlay == overlay_mode::supply_routes)
-        draw_supply_routes_key(dl, lens_key_anchor, w, supply_edges);
+        draw_supply_routes_key(lens_key_anchor, key_top, key_bot, w, supply_edges);
 
     if (!input_enabled)
         return;

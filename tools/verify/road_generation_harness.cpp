@@ -1,0 +1,113 @@
+// Headless harness for BL-146 (road-network generation). No SDL / Lua / ImGui.
+// Builds the hard-coded world and asserts:
+//   R1 presence   — road generation stamps road_level > 0 on some Kepler land
+//                   tiles (the lattice exists), and never on ocean tiles.
+//   R2 two-tier   — both local (1) and trunk (2) tiers appear, and no tile
+//                   carries a tier beyond trunk (generation ceiling).
+//   R3 connectivity — every population centre with >=1 same-nation peer sits on,
+//                   or orthogonally adjacent to, a roaded tile (its lattice reached
+//                   it). Uses the same 4-cardinal + column-wrap topology as gen.
+//   R4 determinism — a second generation yields an identical road_level field.
+// Exit non-zero on any failure.
+
+#include "world/components.hpp"
+#include "world/hard_coded_world.hpp"
+#include "world/world.hpp"
+
+#include <cstdio>
+#include <map>
+#include <vector>
+
+static int g_fail = 0;
+static void check(bool ok, const char* what)
+{
+    std::printf("[%s] %s\n", ok ? "PASS" : "FAIL", what);
+    if (!ok) ++g_fail;
+}
+
+int main()
+{
+    world w = make_hard_coded_world();
+    const entity_id kepler = w.home_body;
+    const auto bit = w.bodies.find(kepler);
+    if (bit == w.bodies.end()) { std::printf("[FAIL] no home body\n"); return 1; }
+    const int gw = bit->second.grid_width;
+    const int gh = bit->second.grid_height;
+
+    // Raster index of Kepler tiles (grid_y*gw + grid_x -> tile), for adjacency.
+    std::vector<entity_id> grid(static_cast<std::size_t>(gw) * gh, null_entity);
+    int roaded_land = 0, roaded_ocean = 0, local_tiles = 0, trunk_tiles = 0, over_trunk = 0;
+    for (const auto& [tid, tc] : w.tiles)
+    {
+        if (tc.body != kepler) continue;
+        if (tc.grid_x >= 0 && tc.grid_x < gw && tc.grid_y >= 0 && tc.grid_y < gh)
+            grid[static_cast<std::size_t>(tc.grid_y) * gw + tc.grid_x] = tid;
+        if (tc.road_level > 0)
+        {
+            if (tc.composition == terrain_composition::ocean) ++roaded_ocean;
+            else                                              ++roaded_land;
+            if (tc.road_level == 1) ++local_tiles;
+            else if (tc.road_level == 2) ++trunk_tiles;
+            else ++over_trunk;
+        }
+    }
+
+    // R1 presence.
+    check(roaded_land > 0, "R1 road lattice exists (some Kepler land tile has road_level > 0)");
+    check(roaded_ocean == 0, "R1 no road_level stamped on ocean tiles");
+
+    // R2 two-tier.
+    check(local_tiles > 0, "R2 local roads present (road_level 1)");
+    check(trunk_tiles > 0, "R2 trunk roads present (road_level 2)");
+    check(over_trunk == 0, "R2 no tile exceeds the trunk tier (road_level <= 2)");
+
+    // R3 connectivity — a centre with a same-nation peer must touch a road tile
+    // (itself or a 4-cardinal neighbour, column-wrapped).
+    auto nation_of = [&](entity_id t) -> entity_id {
+        const auto it = w.tile_to_nation.find(t);
+        return (it != w.tile_to_nation.end()) ? it->second : null_entity;
+    };
+    auto road_at = [&](int r, int c) -> bool {
+        if (r < 0 || r >= gh) return false;
+        const entity_id t = grid[static_cast<std::size_t>(r) * gw + c];
+        if (t == null_entity) return false;
+        const auto it = w.tiles.find(t);
+        return it != w.tiles.end() && it->second.road_level > 0;
+    };
+    // Count same-nation peers per nation among centres.
+    std::map<entity_id, int> centres_per_nation;
+    for (const auto& [cid, tile] : w.population_centre_tile)
+    {
+        const auto tit = w.tiles.find(tile);
+        if (tit == w.tiles.end() || tit->second.body != kepler) continue;
+        centres_per_nation[nation_of(tile)]++;
+    }
+    int checked = 0, connected = 0;
+    for (const auto& [cid, tile] : w.population_centre_tile)
+    {
+        const auto tit = w.tiles.find(tile);
+        if (tit == w.tiles.end() || tit->second.body != kepler) continue;
+        if (centres_per_nation[nation_of(tile)] < 2) continue; // isolated centre: no edge owed
+        ++checked;
+        const int r = tit->second.grid_y, c = tit->second.grid_x;
+        const bool touches = road_at(r, c) || road_at(r, (c + 1) % gw) ||
+                             road_at(r, (c + gw - 1) % gw) || road_at(r - 1, c) || road_at(r + 1, c);
+        if (touches) ++connected;
+    }
+    std::printf("      (connectivity: %d/%d non-isolated centres touch a road)\n", connected, checked);
+    check(checked > 0 && connected == checked,
+          "R3 every non-isolated population centre touches its road lattice");
+
+    // R4 determinism — regenerate and compare the whole road_level field by tile.
+    world w2 = make_hard_coded_world();
+    int mismatches = 0;
+    for (const auto& [tid, tc] : w.tiles)
+    {
+        const auto it = w2.tiles.find(tid);
+        if (it == w2.tiles.end() || it->second.road_level != tc.road_level) ++mismatches;
+    }
+    check(mismatches == 0, "R4 road_level field identical across two generations");
+
+    std::printf("%s (%d failure(s))\n", g_fail ? "ROAD GEN AUDIT FAILED" : "ROAD GEN AUDIT OK", g_fail);
+    return g_fail ? 1 : 0;
+}

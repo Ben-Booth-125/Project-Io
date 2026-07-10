@@ -6,6 +6,84 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — Generated road network (BL-146) (2026-07-10)
+
+**Context.** Continuing the backlog review: with the legend pair done, moved to the road/logistics
+chain. Verified its gate (BL-077) is genuinely complete — the `road_level` tile field, the
+terrain-weighted A* (`intra_body_path`), the per-body raster index, and `supply_system.cpp` all exist
+— so BL-146 was truly ready, not just marked ready. Tuning settled with Ben up front: **local=tier 1,
+trunk=tier 2** (`road_traversal_multiplier` = 1/(1+0.5·tier)); **major centre = population scale ≥ 3**.
+
+**Landed.** New `src/world/road_generation.{hpp,cpp}` — `generate_roads(w, body)`, wired into
+`hard_coded_world.cpp` right after `generate_nations`. Deterministic, no seed of its own (a pure
+function of the generated tiles/nations/centres). Per nation over its population centres: pairwise
+terrain-weighted A* costs → **Kruskal MST** tie-broken by `(cost, lo-tile-id, hi-tile-id)` → plus
+**relative-neighbour redundancy** edges (keep a non-MST edge unless some third centre is closer to
+both endpoints) for realistic loops. Each edge is **trunk** (road_level 2) when both endpoints are
+major, else **local** (1), rasterised along its A* path taking `max` road_level on overlap and
+**skipping ocean** tiles. Then one **local border link** between the nearest centre pair of each
+territorially-adjacent nation pair (adjacency from a 4-cardinal + column-wrap tile scan), stitching the
+per-nation lattices into a continent-wide network.
+
+**Cache gotcha (caught + fixed).** `intra_body_path` caches costs in `world.astar_cost_cache`. The
+pass measures lanes **road-free** (correct — the MST is laid out on base terrain), which populates the
+cache with pre-road costs; left alone, gameplay dispatch would read those stale costs and the roads
+would have no economic effect. `generate_roads` now **clears `astar_cost_cache`** after stamping, per
+the field's documented "invalidated when road_level changes" contract (world.hpp). The raster index is
+road-independent and kept.
+
+**Verified.** New `tools/verify/road_generation_harness.cpp` (auto-built + CTest-registered by the
+world-superset block): **R1** lattice exists + no ocean roads, **R2** both tiers present + none exceed
+trunk, **R3** 14/14 non-isolated centres touch a road, **R4** road_level identical across two
+generations (the determinism guard, stronger than a `determinism_harness` field add). Regression:
+`determinism_harness` / `logistics_harness` / `trade_routes_harness` / `econ_harness` / `world_audit`
+all green — no economic knock-on. Authority propagated to SUPPLY.md + TILE_GENERATION.md.
+
+**Open.** No on-canvas rendering yet (roads only stamp `road_level`) — that plus player placement is
+**BL-147**, now unblocked; it touches `body_surface_canvas.cpp` and should sequence after the legend
+work (done). A new-building consolidator (BL-149) and cities-as-hubs discount (BL-148) round out the
+chain. The harness should be named in the `verifier-headless` skill (a skill edit — pending Ben's OK);
+it already runs as a permanent CTest test regardless.
+
+---
+
+## Session — On-canvas legends: bounded scrollable body (BL-164, folds BL-163); BL-165 reconciled (2026-07-10)
+
+**Context.** Backlog review with Ben — which designed items point at v0.1.0 and are doable now. Three
+designed items target v0.1.0 (the on-canvas legend/nav polish cluster). BL-165 (selection-aware
+descend) turned out to be **already landed** in commit 82e00f4 with its status stale at `designed`;
+reconciled to `complete`. Then took the legend pair. Ben's call: **fold BL-163 and BL-164 into one**
+— BL-164's scrollable child structurally cures the overrun, so the interim box-clamp was throwaway.
+
+**Diagnosis (by capture).** The on-canvas legend overrun was **not** the fixed 3-line Resource key
+that BL-163's prose named (its line-refs had drifted); it was the **count-driven** keys — Country,
+Market, Reach, Supply. `begin_lens_key` centred an **unbounded** `body_h` on the anchor (the minimap's
+vertical centre), so a long entry list spilled off the canvas. Confirmed on the Country lens: ~20
+nations, the box ran straight off the bottom with the tail unreachable.
+
+**Landed.** A shared **`draw_scroll_list_key`** helper (`src/ui/body_surface_canvas.cpp`): a dark
+panel with a fixed header (+ an optional good-selector combo, for the Market lens) over a **bounded,
+wheel/drag-scrolling borderless ImGui child** hosting the rows (the `draw_lens_resource_combo`
+pattern). Box height is **capped to the canvas vertical span** `[grid_top+8, canvas_bottom-8]` passed
+from `draw_body_surface_canvas` and clamped in-bounds, so overflow scrolls with a clean scrollbar
+instead of overrunning. The four count-driven keys were converted onto it via a
+**`key_row{marker_colour, label_colour, label, key_marker, bar_frac}`** vocabulary — `key_marker`
+covers the swatch (Country/Market), dot (Reach), and thickness-bar (Supply) glyphs. The fixed-height
+gradient-bar keys (Production/Scarcity/Population/Industry/Opportunity) keep their `begin_lens_key`
+chrome untouched.
+
+**Verified** by capture on this Windows box (software renderer, 1280×720): `country_lens_full` shows
+the full ~20-nation list bounded within the canvas (pre-fix it ran off the bottom); `market_lens`
+shows the Iron Ore combo + Market catchments swatch list intact through the shared helper.
+
+**Open.** Goldens for the changed lenses (`country_lens`, `market_lens`, and `reach`/`supply` where
+the key renders) need **re-blessing on Linux CI** — the legend change is intentional, so the raised
+diff (~9% country, ~3.4% market) is expected; not blanket-blessed here per the cross-platform-golden
+policy. The scroll path itself wasn't visually exercised (the test bodies' lists fit the bounded box
+without needing to scroll); it rests on ImGui's standard `BeginChild` overflow behaviour.
+
+---
+
 ## Session — Tile construction ledger, first pass (BL-162) (2026-07-10)
 
 **Context.** Ben: "there's actually no way to build anything" — the tile Selection element's

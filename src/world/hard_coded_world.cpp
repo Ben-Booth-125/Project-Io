@@ -4,6 +4,7 @@
 #include "nation_generation.hpp"
 #include "orbital_system.hpp"
 #include "population_generation.hpp"
+#include "road_generation.hpp"
 #include "tile_generation.hpp"
 
 #include <algorithm>
@@ -157,6 +158,11 @@ world make_hard_coded_world(world_params params)
     generate_nations(w, kepler, kepler_tiles, 180, 84,
         nation_params{ .nation_count = pre_seed_n, .min_seed_separation = 5, .merge_to = merge_to },
         /*seed=*/params.seed ^ 0x4A71012u);
+
+    // Road network (BL-146): stamp each nation's road lattice onto tile.road_level,
+    // after nations + population centres exist. Deterministic; no seed of its own —
+    // a pure function of the generated tiles/nations/centres.
+    generate_roads(w, kepler);
 
     // Attach installations to the first two land tiles found in raster order.
     {
