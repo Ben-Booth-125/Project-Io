@@ -112,8 +112,9 @@ mockup, top to bottom:
    `(1 − hazard)`, the two tile-local factors of `run_extraction` (`economy_system.cpp`); the uniform
    base-rate/workforce scalars cancel in the Tile-vs-P10 comparison. The list **always shows a vertical
    scrollbar** (a tile can carry more resources than fit).
-4. **2×2 action button grid** — **Construct Buildings** (routes to the construction panel — the stub
-   destination until the dedicated tile-construction panel lands, see below), **Manage Buildings**
+4. **2×2 action button grid** — **Construct Buildings** (opens the **tile construction ledger**,
+   BL-162 — `draw_construction_ledger`, which lists the placeable building types for this tile and
+   actually builds; see below), **Manage Buildings**
    (disabled unless a building occupies the tile; routes to the management panel), **History** and
    **Supply** (drawn for layout completeness, **not yet wired** — History has no surface yet, and
    real Supply routing is Layer-5-gated per LENSES.md).
@@ -125,9 +126,12 @@ panel); and the BL-139 building sub-element (a building on the tile is now reach
 Buildings**, not an inline "On this tile" row). The other selection kinds are unaffected and keep the
 action/facts form until they get their own mockups.
 
-> The dedicated **tile-construction panel** (owed, backlog) mirrors this element but charts each
-> candidate building's **expected profit** in place of the production graphs, and is the surface that
-> actually performs construction (today's "Construct Buildings" routes back to a panel that does not).
+> The **tile construction ledger** (BL-162, `draw_construction_ledger`) is the surface "Construct
+> Buildings" opens: a fold-out-column list of every building type placeable on the selected tile —
+> placeholder image, full cost (budget + materials), a reason-coded validity read (e.g. *"A port must
+> sit on the coast"*), and a **Build** action that enqueues the construction on the tile (the
+> `construction.pending_tile` seam app executes). **First pass** — a follow-on adds the per-candidate
+> **expected-profit** chart BL-162 calls for; today's images are placeholders.
 
 ### The tile element's action is the build front door *(superseded for tiles by BL-123 — see above; retained as the design of the owed tile-construction panel)*
 

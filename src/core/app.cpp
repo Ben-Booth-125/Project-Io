@@ -639,6 +639,7 @@ int app::run_verify(const std::string& script_path, bool bless)
         else if (name == "market")       m_ui.show_market_ledger = open;
         else if (name == "balance")      m_ui.show_balance_ledger = open;
         else if (name == "corporation")  m_ui.show_corporation_panel = open;
+        else if (name == "build")        m_ui.show_build_ledger = open; // tile construction ledger (BL-162)
     });
 
     // Open the Layer 4 construction / building-management panel so a capture shows
@@ -1886,8 +1887,21 @@ void app::render()
             ui::close_all_panels(m_ui); // new selection takes the column
         m_prev_selection = m_ui.selected_entity;
     }
+    // The fold-out column, when no nav ledger owns it, shows either the tile
+    // construction ledger (BL-162, when the player opened it from a tile) or the
+    // Selection element. The build ledger only applies to a selected tile.
     if (!ui::any_panel_open(m_ui))
-        ui::draw_selection_panel(m_world, m_registry, m_last_econ_report, m_ui);
+    {
+        const bool sel_is_tile = m_ui.selected_entity != null_entity &&
+                                 m_world.tiles.count(m_ui.selected_entity) > 0;
+        if (m_ui.show_build_ledger && sel_is_tile)
+            ui::draw_construction_ledger(m_world, m_registry, m_ui);
+        else
+        {
+            m_ui.show_build_ledger = false; // not a tile → no build ledger
+            ui::draw_selection_panel(m_world, m_registry, m_last_econ_report, m_ui);
+        }
+    }
 
     // Execute any construction request queued this frame by the build front door
     // (tile Selection element) or a placement-mode canvas click. Centralised here

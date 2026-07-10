@@ -6,6 +6,37 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — Tile construction ledger, first pass (BL-162) (2026-07-10)
+
+**Context.** Ben: "there's actually no way to build anything" — the tile Selection element's
+"Construct Buildings" button stubbed onto the management panel, which can't construct. He asked for a
+view to choose which buildings to place, with placeholder images. This is BL-162, filed earlier this
+session.
+
+**Landed.** A tile-contextual **construction ledger** (`draw_construction_ledger`,
+`src/ui/selection_panel.cpp`), opened by "Construct Buildings" (new `ui_state::show_build_ledger`; it
+reads `selected_entity` as the target tile). Fills the fold-out column, mutually exclusive with the
+Selection element and nav ledgers (added to `close_all_panels`; app draws it in place of the Selection
+panel while its flag is set). Lists the placeable building types for the tile — one **Extraction**
+option per deposited extractable resource, plus **Processing Facility / Port / Launchpad** — each in a
+bordered container with a **placeholder image** (grey box + the building's marker glyph), name, full
+**cost** (budget + materials from the registry), a **reason-coded validity** read (invalid types show
+*why*, e.g. "A port must sit on the coast"), and a **Build** button. Build **actually builds**: it
+enqueues on `ui_state::construction.pending_tile`, the same seam `app::render` executes (and the
+placement-mode canvas click uses). Player balance heads the list as the affordability context;
+`construction.last_message` surfaces the outcome.
+
+**Verified** via `scripts/verify/tile_build_ledger.lua` (land + water tiles; goldens blessed).
+`show_panel("build", …)` added to the verify API. Note: a new selection closes column panels, so the
+build flag must be set a frame after the selection — the script captures once to settle, then opens.
+
+**Open (BL-162 residue).** First pass: the per-candidate **expected-profit chart** BL-162 calls for is
+not yet built; images are placeholders; Ben's layout review pending. Stone/Timber show production
+graphs but no extraction option (they are outside the Layer-3 `k_extractable` set) — a model note, not
+a ledger bug.
+
+---
+
 ## Session — Tile Selection element redesign (BL-123) (2026-07-10)
 
 **Context.** Toward the v0.1.0 cut, Ben supplied a **mockup** for the tile Selection element,

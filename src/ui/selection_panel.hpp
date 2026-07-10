@@ -44,4 +44,26 @@ namespace ui {
 void draw_selection_panel(const world& w, const recipe_registry& reg,
                           const economy_report& report, ui_state& ui);
 
+/// Draw the **tile construction ledger** (BL-162) — the tile-contextual surface that
+/// actually lets the player build. Opened by the tile Selection element's "Construct
+/// Buildings" button (which sets ui_state::show_build_ledger); reads
+/// ui_state::selected_entity as the target tile. Fills the shell fold-out column
+/// (foldout_column_rect), mutually exclusive with the Selection element and the
+/// nav-rail ledgers — the app draws it in place of the Selection panel while its flag
+/// is set and no nav ledger owns the column.
+///
+/// Lists every building type placeable on the tile (via placement_rules) with a
+/// placeholder image, its full construction cost (budget + materials, from the
+/// registry), a reason-coded validity read, and a Build action that enqueues a
+/// construction request on the tile (ui_state::construction.pending_tile) — executed
+/// by app against the mutable world, the same seam the placement-mode canvas click
+/// uses. First pass: profit charting (per BL-162) is a follow-on; the images are
+/// placeholders.
+///
+/// @param w    Read-only world (tile + deposits + player balance).
+/// @param reg  Loaded registry — per-type build costs.
+/// @param ui   UI state; read for the selected tile, written by the close button and
+///             the Build action (enqueue).
+void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_state& ui);
+
 } // namespace ui

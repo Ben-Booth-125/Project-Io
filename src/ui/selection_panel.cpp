@@ -9,6 +9,7 @@
 #include "world/building_profit.hpp" // per-building profitability estimate (BL-074)
 #include "world/economy_system.hpp" // economy_report (workforce cap, BL-069)
 #include "world/market_clearing.hpp"
+#include "world/placement_rules.hpp" // buildable-type validity for the build ledger (BL-162)
 #include "world/survey_system.hpp"
 
 #include <imgui.h>
@@ -666,7 +667,7 @@ void draw_tile_selection(const world& w, ui_state& ui)
     const ImVec2 bsz = {bw, btn_h};
 
     if (ImGui::Button("Construct\nBuildings", bsz))
-        ui.show_construction_panel = true; // stub → owed tile-construction panel
+        ui.show_build_ledger = true; // opens the tile construction ledger (BL-162)
     ImGui::SameLine();
     ImGui::BeginDisabled(building_on_tile(w, sel) == null_entity);
     if (ImGui::Button("Manage\nBuildings", bsz))
@@ -793,6 +794,149 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
     ImGui::PushTextWrapPos(0.0f);
     draw_selection_facts(w, reg, report, ui, kind);
     ImGui::PopTextWrapPos();
+    ImGui::EndChild();
+
+    ImGui::End();
+}
+
+// The tile construction ledger (BL-162): the tile-contextual surface that actually
+// lets the player build. Lists every building type placeable on the selected tile —
+// each in a bordered container (a placeholder image + name + full cost + a reason-coded
+// validity read + a Build action) — and enqueues the chosen build on the tile via the
+// construction.pending_tile seam app executes. First pass; per BL-162 the deposit
+// graphs' place is eventually taken by an expected-profit chart, and the images are
+// placeholders.
+void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_state& ui)
+{
+    const entity_id tile_id = ui.selected_entity;
+    const auto tit = w.tiles.find(tile_id);
+    if (tit == w.tiles.end())
+    {
+        ui.show_build_ledger = false; // selection is not a tile — nothing to build on
+        return;
+    }
+    const tile_component& tile = tit->second;
+
+    const foldout_rect r       = foldout_column_rect();
+    const float        bar_w   = r.w;
+    const float        frame_h = ImGui::GetFrameHeight();
+    const ImGuiStyle&  style   = ImGui::GetStyle();
+
+    ImGui::SetNextWindowPos({r.x, r.y}, ImGuiCond_Always);
+    ImGui::SetNextWindowSize({r.w, r.h}, ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.90f);
+    constexpr ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoTitleBar            |
+        ImGuiWindowFlags_NoResize              |
+        ImGuiWindowFlags_NoMove                |
+        ImGuiWindowFlags_NoCollapse            |
+        ImGuiWindowFlags_NoNav                 |
+        ImGuiWindowFlags_NoBringToFrontOnFocus |
+        ImGuiWindowFlags_NoScrollbar           |
+        ImGuiWindowFlags_NoScrollWithMouse     |
+        ImGuiWindowFlags_NoSavedSettings;
+    ImGui::Begin("##build_ledger", nullptr, flags);
+
+    // ── Header: Construct · [x, y] ............................... [x] ──
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Construct");
+    ImGui::SameLine();
+    ImGui::TextDisabled("[%d, %d]", tile.grid_x, tile.grid_y);
+    const float btn = frame_h;
+    ImGui::SameLine(bar_w - style.WindowPadding.x - btn);
+    if (ImGui::Button("x", {btn, btn}))
+        ui.show_build_ledger = false; // back to the tile Selection element
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Close");
+
+    ImGui::Separator();
+
+    // Player balance — the affordability context for every Build button below.
+    float balance = 0.0f;
+    if (const auto pit = w.corporations.find(w.player_entity); pit != w.corporations.end())
+        balance = pit->second.balance;
+    ImGui::TextDisabled("Balance: %.0f cr", static_cast<double>(balance));
+
+    // Last construction outcome (set by app after executing a request).
+    if (!ui.construction.last_message.empty())
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::neutral), "%s",
+                           ui.construction.last_message.c_str());
+
+    // Candidate placements for this tile: one extraction option per extractable
+    // resource actually deposited here, then the fixed processing / port / launchpad
+    // types. Validity + reason come from the shared placement_rules seam.
+    struct candidate { building_type type; resource_type target; std::string name; };
+    std::vector<candidate> cands;
+    for (const resource_type er : placement_rules::k_extractable)
+        if (tile.resource_deposit[static_cast<std::size_t>(er)] > 0.0f)
+            cands.push_back({building_type::extraction_site, er,
+                             std::string("Extraction: ") + resource_name(er)});
+    cands.push_back({building_type::processing_facility, resource_type::iron_ore, "Processing Facility"});
+    cands.push_back({building_type::port,                resource_type::iron_ore, "Port"});
+    cands.push_back({building_type::launchpad,           resource_type::iron_ore, "Launchpad"});
+
+    constexpr float img   = 56.0f;
+    const float     row_h = img + style.WindowPadding.y * 2.0f + 8.0f;
+
+    ImGui::BeginChild("##build_list", {0.0f, 0.0f}, false,
+                      ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysVerticalScrollbar);
+    for (const candidate& c : cands)
+    {
+        const building_economics& econ = reg.economics(c.type);
+        const placement_rules::placement_result pr =
+            placement_rules::can_place_in_world(w, tile_id, c.type, c.target);
+        const bool affordable = balance >= econ.build_cost;
+
+        ImGui::BeginChild(c.name.c_str(), {0.0f, row_h}, true,
+                          ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
+        ImDrawList* cdl = ImGui::GetWindowDrawList();
+
+        // Placeholder image: a grey box carrying the building's marker glyph.
+        const ImVec2 ip = ImGui::GetCursorScreenPos();
+        const ImVec2 imx = {ip.x + img, ip.y + img};
+        cdl->AddRectFilled(ip, imx, IM_COL32(72, 72, 72, 255), 3.0f);
+        cdl->AddRect(ip, imx, IM_COL32(110, 110, 110, 255), 3.0f);
+        icons::building(cdl, {ip.x + img * 0.5f, ip.y + img * 0.5f}, img * 0.28f, c.type,
+                        IM_COL32(150, 235, 160, 255));
+        ImGui::Dummy({img, img});
+        ImGui::SameLine();
+
+        ImGui::BeginGroup();
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", c.name.c_str());
+
+        // Cost: budget then any material requirements.
+        std::string cost = std::to_string(static_cast<int>(econ.build_cost)) + " cr";
+        for (std::size_t i = 0; i < resource_count; ++i)
+            if (econ.resource_build_cost[i] > 0.0f)
+                cost += ", " + std::to_string(static_cast<int>(econ.resource_build_cost[i]))
+                      + " " + presentation_of(static_cast<resource_type>(i)).abbrev;
+        ImGui::TextDisabled("%s", cost.c_str());
+
+        // Action: Build when valid (disabled + noted when unaffordable); else the reason.
+        if (pr.ok())
+        {
+            ImGui::BeginDisabled(!affordable);
+            if (ImGui::Button("Build"))
+            {
+                ui.construction.pending_tile   = tile_id;
+                ui.construction.pending_type   = c.type;
+                ui.construction.pending_target = c.target;
+            }
+            ImGui::EndDisabled();
+            if (!affordable)
+            {
+                ImGui::SameLine();
+                ImGui::TextDisabled("Can't afford");
+            }
+        }
+        else
+        {
+            ImGui::TextColored(ImVec4{0.90f, 0.55f, 0.55f, 1.0f}, "%s", pr.message());
+        }
+        ImGui::EndGroup();
+
+        ImGui::EndChild();
+        ImGui::Spacing();
+    }
     ImGui::EndChild();
 
     ImGui::End();
