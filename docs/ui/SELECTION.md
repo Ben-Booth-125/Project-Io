@@ -101,11 +101,17 @@ mockup, top to bottom:
 1. **Placeholder image** — a bordered grey box (a future tile portrait / terrain thumbnail;
    literally a placeholder for the prototype).
 2. **`[x, y]` coordinate caption** — a slim strip beneath the image.
-3. **Deposit bars** — each of the tile's non-zero deposits as a **vertical bar chart** whose axis
-   ceiling is that resource's **world-max deposit** (rounded to a nice 1/2/5 ceiling), so a bar reads
-   as *this tile's yield relative to the best tile anywhere*, not a bare absolute. Dotted gridlines,
-   `0`/ceiling ticks (plus a mid tick when the ceiling ≥ 100), in a scrollable list. This is the
-   "relative production to the world max" read.
+3. **Production graphs** — one per resource deposited on the tile, each in its **own bordered
+   container** with its header (so the name reads as that graph's title, not a floating label). The
+   graph is a **stacked vertical bar** carrying two numbers: **Tile** — how much this tile produces
+   (bottom, green) — and **P10** — what the 10th-percentile tile produces for that resource (stacked
+   on top, muted), with a small legend naming each value. Comparing the Tile bar against the P10
+   reference tells the player *how effective this tile is for generation*. Axis ceiling spans the
+   stacked total (nice 1/2/5 rounding, dotted gridlines, `0`/ceiling ticks plus a mid tick when
+   ceiling ≥ 100). "Production" is the tile's **hazard-adjusted yield** — deposit richness ×
+   `(1 − hazard)`, the two tile-local factors of `run_extraction` (`economy_system.cpp`); the uniform
+   base-rate/workforce scalars cancel in the Tile-vs-P10 comparison. The list **always shows a vertical
+   scrollbar** (a tile can carry more resources than fit).
 4. **2×2 action button grid** — **Construct Buildings** (routes to the construction panel — the stub
    destination until the dedicated tile-construction panel lands, see below), **Manage Buildings**
    (disabled unless a building occupies the tile; routes to the management panel), **History** and
@@ -120,7 +126,7 @@ Buildings**, not an inline "On this tile" row). The other selection kinds are un
 action/facts form until they get their own mockups.
 
 > The dedicated **tile-construction panel** (owed, backlog) mirrors this element but charts each
-> candidate building's **expected profit** in place of the deposit bars, and is the surface that
+> candidate building's **expected profit** in place of the production graphs, and is the surface that
 > actually performs construction (today's "Construct Buildings" routes back to a panel that does not).
 
 ### The tile element's action is the build front door *(superseded for tiles by BL-123 — see above; retained as the design of the owed tile-construction panel)*

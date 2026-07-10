@@ -49,6 +49,16 @@ pre-existing content expectation (`verify.expect: player has a processing facili
 work. The golden PNGs are stored effectively uncompressed (~3.69MB each = 1280×720×4) — a future
 cleanup could run them through real PNG compression to shrink the golden dir dramatically.
 
+**Graph refinement (same session, Ben live-review).** Reworked the tile graphs on Ben's feedback:
+(1) each graph now sits in its **own bordered container** with its header inside (headers were
+floating, unaligned with their bars); (2) the bar is now a **stacked production graph** — **Tile**
+(this tile's hazard-adjusted yield, `deposit × (1 − hazard)`) on the bottom and **P10** (the
+10th-percentile production across all tiles carrying that resource, via `nth_element`) stacked on
+top, with a legend — so the player reads *how effective the tile is for generation* by Tile-vs-P10;
+(3) the resource list now **always** shows a vertical scrollbar (`AlwaysVerticalScrollbar`) so a tile
+with many resources is fully scrollable. Replaced the earlier world-max single-bar treatment. Goldens
+re-blessed.
+
 **Open.** The other selection kinds (body/building/market/nation/corp) still use the action|facts
 split — they get their own vertical layouts as Ben mocks each. BL-162 awaits its mockup.
 

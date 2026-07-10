@@ -13,23 +13,32 @@
 
 #include <imgui.h>
 
-#include <algorithm> // std::max (world-max deposit), std::min/std::clamp (build rate, bar fraction)
+#include <algorithm> // std::min/clamp (build rate), std::nth_element (P10 production)
 #include <cmath>     // std::ceil (construction ETA), std::pow/log10/floor (nice_ceil axis)
-#include <cstdio>    // std::snprintf (tile coord caption + axis tick labels)
+#include <cstddef>   // std::ptrdiff_t (nth_element iterator offset)
+#include <cstdio>    // std::snprintf (tile coord caption + chart labels)
 #include <cstring>   // std::strcmp (header title/kind de-dup)
 #include <string>    // ticks_label / construction_status
+#include <vector>    // P10 production sample (tenth_percentile_production)
 
 namespace ui {
 
 namespace {
 
-// --- Tile deposit bar-chart helpers (BL-123) ---------------------------------
-// The redesigned tile Selection element (docs/ui/SELECTION.md, Ben's mockup) plots
-// each of the tile's non-zero deposits as a vertical bar whose full height is the
-// *world-max* deposit for that resource — so the bar reads as "this tile's yield
-// relative to the best tile anywhere", not a bare absolute. The placement-affordance
-// readout (BL-071) and the build front door moved off this panel to the owed
-// tile-construction panel (backlog); this panel is now tile detail + navigation.
+// --- Tile production bar-chart helpers (BL-123) ------------------------------
+// The redesigned tile Selection element (docs/ui/SELECTION.md, Ben's mockup) plots,
+// per resource deposited on the tile, a STACKED bar reading two numbers: (A) how much
+// this tile produces, and (B) what the 10th-percentile tile produces, stacked on top
+// of A. Comparing A against the P10 reference tells the player how effective this tile
+// is for generation. Each graph sits in its own bordered container with its header, and
+// the resource list always shows a scrollbar (a tile can carry more than fit). The
+// placement-affordance readout (BL-071) and the build front door moved off this panel to
+// the owed tile-construction panel (backlog); this panel is now tile detail + navigation.
+//
+// "Production" is the tile's hazard-adjusted extraction yield — deposit richness scaled
+// by (1 - hazard), the same two factors run_extraction multiplies (economy_system.cpp).
+// The uniform base_rate/workforce scalars are dropped: they cancel in the tile-vs-P10
+// comparison, so this keeps the deposit-magnitude numbers Ben's mockup showed.
 
 // Round @p v up to a 'nice' axis ceiling (1 / 2 / 5 x a power of ten): 45->50,
 // 18->20, 130->200. Gives the bar a legible top gridline instead of a ragged max.
@@ -51,20 +60,48 @@ void dotted_hline(ImDrawList* dl, float x0, float x1, float y, ImU32 col)
         dl->AddLine({x, y}, {std::min(x + 3.0f, x1), y}, col, 1.0f);
 }
 
-// One resource's vertical bar chart inside the rect [mn, mx]: a left gutter of tick
-// labels (0 / ceiling, plus a mid tick when the ceiling is >= 100), dotted gridlines,
-// and a centred fill bar rising to deposit/ceiling of the height.
-void draw_deposit_bar(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
-                      float deposit, float ceiling, ImU32 fill)
+// A tile's production for resource @p r: hazard-adjusted deposit richness (the two
+// tile-local factors of run_extraction's yield). Zero when the tile has no deposit.
+float tile_production(const tile_component& t, std::size_t r)
 {
-    constexpr float gutter = 34.0f; // room for a "200"-wide tick label
+    return t.resource_deposit[r] * (1.0f - t.hazard_level);
+}
+
+// The 10th-percentile production across every tile that carries resource @p r — the
+// low-end reference the player compares a tile against ("is this tile better than the
+// bottom 10%?"). nth_element (O(N)) picks the percentile without a full sort.
+float tenth_percentile_production(const world& w, std::size_t r)
+{
+    std::vector<float> vals;
+    vals.reserve(w.tiles.size());
+    for (const auto& [id, t] : w.tiles)
+        if (t.resource_deposit[r] > 0.0f)
+            vals.push_back(tile_production(t, r));
+    if (vals.empty())
+        return 0.0f;
+    const std::size_t k = static_cast<std::size_t>(0.10f * static_cast<float>(vals.size() - 1));
+    std::nth_element(vals.begin(), vals.begin() + static_cast<std::ptrdiff_t>(k), vals.end());
+    return vals[k];
+}
+
+// One resource's chart inside [mn, mx]: a left gutter of tick labels (0 / ceiling, plus
+// a mid tick when the ceiling >= 100) with dotted gridlines, a STACKED bar (tile
+// production on the bottom, 10th-percentile production stacked on top), and a small
+// two-row legend naming each value. @p ceiling spans the stacked total.
+void draw_production_chart(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
+                           float tile_val, float pct_val, float ceiling,
+                           ImU32 tile_col, ImU32 pct_col)
+{
+    constexpr float gutter = 40.0f; // room for a tick label
     const float plot_x0 = mn.x + gutter;
     const float y0 = mn.y, y1 = mx.y;
     const ImU32 grid_col  = IM_COL32(120, 120, 120, 150);
     const ImU32 label_col = IM_COL32(150, 150, 150, 255);
 
+    const auto y_of = [&](float v) { return y1 - (v / ceiling) * (y1 - y0); };
+
     const auto tick = [&](float v) {
-        const float ty = y1 - (v / ceiling) * (y1 - y0);
+        const float ty = y_of(v);
         dotted_hline(dl, plot_x0, mx.x, ty, grid_col);
         char buf[16];
         std::snprintf(buf, sizeof buf, "%g", static_cast<double>(v));
@@ -76,12 +113,24 @@ void draw_deposit_bar(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
         tick(ceiling * 0.5f);
     tick(ceiling);
 
-    // The fill bar, centred in the plot area, rising to its fraction of the height.
-    const float frac = std::clamp(deposit / ceiling, 0.0f, 1.0f);
-    const float bar_w = 44.0f;
-    const float cx = (plot_x0 + mx.x) * 0.5f;
-    dl->AddRectFilled({cx - bar_w * 0.5f, y1 - frac * (y1 - y0)},
-                      {cx + bar_w * 0.5f, y1}, fill, 2.0f);
+    // Stacked bar: tile production (bottom) then the P10 reference stacked on top.
+    constexpr float bar_w = 40.0f;
+    const float bar_x0 = plot_x0 + 6.0f;
+    const float a_top     = y_of(tile_val);
+    const float stack_top = y_of(tile_val + pct_val);
+    dl->AddRectFilled({bar_x0, a_top}, {bar_x0 + bar_w, y1}, tile_col);          // A
+    dl->AddRectFilled({bar_x0, stack_top}, {bar_x0 + bar_w, a_top}, pct_col);    // B on top
+
+    // Legend to the right of the bar: swatch + label + value, one row each.
+    const float lx = bar_x0 + bar_w + 14.0f;
+    const auto legend = [&](float ly, ImU32 col, const char* name, float val) {
+        dl->AddRectFilled({lx, ly + 2.0f}, {lx + 10.0f, ly + 12.0f}, col);
+        char buf[40];
+        std::snprintf(buf, sizeof buf, "%s %.1f", name, static_cast<double>(val));
+        dl->AddText({lx + 16.0f, ly}, IM_COL32(210, 210, 210, 255), buf);
+    };
+    legend(y0 + 2.0f,  tile_col, "Tile",      tile_val);
+    legend(y0 + 22.0f, pct_col,  "P10",       pct_val);
 }
 
 // --- Analog construction status (BL-095 task E) ------------------------------
@@ -565,31 +614,47 @@ void draw_tile_selection(const world& w, ui_state& ui)
     if (bars_h < 60.0f)
         bars_h = 60.0f;
 
-    // ── Deposit bars, world-max-relative (one pass to find each resource's max) ──
-    float wmax[resource_count] = {};
-    for (const auto& [id, t] : w.tiles)
-        for (std::size_t r = 0; r < resource_count; ++r)
-            wmax[r] = std::max(wmax[r], t.resource_deposit[r]);
+    // ── Production graphs: one bordered container per deposited resource, each a
+    // stacked bar (tile production + the 10th-percentile reference). The list ALWAYS
+    // carries a vertical scrollbar — a tile can hold more resources than fit — so the
+    // player can scroll through every one. ──
+    constexpr float chart_h = 80.0f;
+    const float row_h = frame_h + chart_h + style.ItemSpacing.y + style.WindowPadding.y * 2.0f + 4.0f;
+    constexpr ImU32 tile_col = IM_COL32(150, 235, 160, 255); // this tile's production (green)
+    constexpr ImU32 p10_col  = IM_COL32(150, 160, 190, 255); // 10th-percentile reference (muted)
+    constexpr float gutter   = 40.0f;                        // == draw_production_chart gutter
 
-    ImGui::BeginChild("##tile_bars", {content_w, bars_h}, false,
-                      ImGuiWindowFlags_NoSavedSettings);
+    ImGui::BeginChild("##tile_graphs", {content_w, bars_h}, false,
+                      ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysVerticalScrollbar);
     bool any_deposit = false;
     for (std::size_t r = 0; r < resource_count; ++r)
     {
-        const float dep = tile.resource_deposit[r];
-        if (dep <= 0.0f)
+        if (tile.resource_deposit[r] <= 0.0f)
             continue;
         any_deposit = true;
         const resource_presentation& rp = presentation_of(static_cast<resource_type>(r));
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", rp.name);
 
-        constexpr float chart_h = 70.0f;
-        const ImVec2 p = ImGui::GetCursorScreenPos();
+        // Each graph + its header live in one bordered container, so the header reads
+        // as that graph's title rather than floating above the list.
+        ImGui::BeginChild(rp.name, {0.0f, row_h}, true,
+                          ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
+        ImDrawList* cdl = ImGui::GetWindowDrawList(); // child-local: clips to this box
+
+        const float a       = tile_production(tile, r);
+        const float p10     = tenth_percentile_production(w, r);
+        const float ceiling = nice_ceil((a + p10) > 0.0f ? (a + p10) : 1.0f);
+
+        // Header indented to the plot origin, so the name sits above its bar.
+        ImGui::Indent(gutter);
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", rp.name);
+        ImGui::Unindent(gutter);
+
+        const ImVec2 p  = ImGui::GetCursorScreenPos();
         const float  cw = ImGui::GetContentRegionAvail().x;
         ImGui::Dummy({cw, chart_h});
-        const float ceiling = nice_ceil(wmax[r] > 0.0f ? wmax[r] : dep);
-        draw_deposit_bar(dl, p, {p.x + cw, p.y + chart_h}, dep, ceiling,
-                         IM_COL32(150, 235, 160, 255));
+        draw_production_chart(cdl, p, {p.x + cw, p.y + chart_h}, a, p10, ceiling,
+                              tile_col, p10_col);
+        ImGui::EndChild();
         ImGui::Spacing();
     }
     if (!any_deposit)
