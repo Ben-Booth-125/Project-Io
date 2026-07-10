@@ -939,6 +939,14 @@ int app::run_verify(const std::string& script_path, bool bless)
             { m_ui.selected_entity = bid; m_ui.selection_hidden_for = null_entity; break; }
         }
     });
+    // select_body picks a body by name, exactly as a single-click on the Solar /
+    // Circumplanetary canvas would (sets selected_entity to the body). Lets a
+    // script stage the selection-aware descend gesture (BL-165).
+    v.set_function("select_body", [this](const std::string& name) {
+        for (const auto& [bid, bc] : m_world.bodies)
+            if (bc.name == name)
+            { m_ui.selected_entity = bid; m_ui.selection_hidden_for = null_entity; break; }
+    });
 
     // Force the player corp balance to an exact value (verify harness): lets a
     // script stage a debt scenario so the BL-073 interest charge and the in-debt
