@@ -6,6 +6,45 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — Tile Selection element redesign (BL-123) (2026-07-10)
+
+**Context.** Toward the v0.1.0 cut, Ben supplied a **mockup** for the tile Selection element,
+fulfilling the long-owed BL-123 `SELECTION_ELEMENT_RESIZE` (design-owed since 2026-07-06, awaiting a
+reference image). The mockup is a structural redesign of the tile panel, not just a resize.
+
+**Landed.**
+- **`draw_tile_selection` (`src/ui/selection_panel.cpp`)** — a selected **tile** now takes a vertical
+  stack instead of the action|facts split: a placeholder image box, an `[x, y]` coordinate caption,
+  the tile's non-zero deposits as **world-max-relative** vertical bar charts (each axis ceiling is the
+  nice-rounded max of that resource's deposit across all tiles; dotted gridlines; scrollable), and a
+  **2×2 action button grid** — Construct Buildings, Manage Buildings (disabled unless a building
+  occupies the tile), History and Supply.
+- **Q&A decisions (Ben).** Tile only for this pass (other kinds keep action|facts until each is
+  mocked). **History** and **Supply** are drawn but **unwired stubs** (History has no surface; real
+  Supply is Layer-5-gated). The BL-071 affordance readout and the "Build here" front door were
+  **removed** from the panel; their placement-suitability logic moves to a new item.
+- **Removed as superseded:** the tile branch of `draw_selection_action`/`draw_selection_facts`, the
+  build-here front door, the affordance readout (`draw_tile_affordances`), and the BL-139 building
+  sub-element (a building on the tile is now reached via **Manage Buildings**). Cleaned up the now-dead
+  includes and the orphaned `scale_label` helper.
+- **BL-162 `TILE_CONSTRUCTION_PANEL` filed** — Ben flagged that Construct Buildings routes to a panel
+  that *cannot actually build*. New (design-owed, v0.1.0) item: a tile-specific construction panel
+  laid out like the tile Selection element but charting **expected profit** per candidate building,
+  carrying the BL-071 affordances, and actually performing the build.
+
+**Verification.** New `scripts/verify/selection_tile_layout.lua` — captures a single-deposit water tile
+and a multi-deposit built land tile; verified by-eye (software renderer). Golden PNGs deferred: the
+verify window default moved to 1720×1080 (commit 6a04ec9) while the committed golden set is still
+1280×720, so blessing one re-res pair would be inconsistent — left to a repo-wide re-bless. Requirement
+group appended to `req/requirements.json` (BL-123, complete). `docs/ui/SELECTION.md` updated (new
+§ The tile element's layout; the action/facts tile row + build-front-door/affordance subsections
+marked superseded-for-tiles).
+
+**Open.** The other selection kinds (body/building/market/nation/corp) still use the action|facts
+split — they get their own vertical layouts as Ben mocks each. BL-162 awaits its mockup.
+
+---
+
 ## Session — v0.1.0 legibility polish + UX-review Batch Delivery (BL-133–145, BL-159) (2026-07-09)
 
 **Context.** The 2026-07-08 UX/lens-legibility review had left 14 `designed` items sitting toward

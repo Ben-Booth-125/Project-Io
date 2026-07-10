@@ -1,6 +1,5 @@
 #include "selection_panel.hpp"
 
-#include "entity_summary.hpp"
 #include "foldout_column.hpp" // shell fold-out column host (shared with the ledgers)
 #include "icons.hpp"
 #include "presentation.hpp"
@@ -10,113 +9,79 @@
 #include "world/building_profit.hpp" // per-building profitability estimate (BL-074)
 #include "world/economy_system.hpp" // economy_report (workforce cap, BL-069)
 #include "world/market_clearing.hpp"
-#include "world/placement_rules.hpp"
 #include "world/survey_system.hpp"
-#include "world/workforce.hpp"      // workforce_efficiency (BL-069)
 
 #include <imgui.h>
 
-#include <algorithm> // std::max (bar-width clamp), std::min/std::clamp (build rate, BL-095)
-#include <cmath>     // std::ceil (construction ETA, BL-095)
+#include <algorithm> // std::max (world-max deposit), std::min/std::clamp (build rate, bar fraction)
+#include <cmath>     // std::ceil (construction ETA), std::pow/log10/floor (nice_ceil axis)
+#include <cstdio>    // std::snprintf (tile coord caption + axis tick labels)
 #include <cstring>   // std::strcmp (header title/kind de-dup)
-#include <string>    // affordance-row labels (BL-071)
-#include <utility>   // std::move
-#include <vector>    // affordance groupings (BL-071)
+#include <string>    // ticks_label / construction_status
 
 namespace ui {
 
 namespace {
 
-// --- Selected-tile affordance readout (BL-071) -------------------------------
-// The inverse of the placement-suitability surface: given a *tile*, which building
-// types suit it? Always-on for any selected tile (docs/ui/SELECTION.md), so the
-// player can read a tile before arming a building. Shows the tile's territory owner
-// and a thrives / valid / invalid grouping over the prototype-buildable types,
-// reading the same placement_rules seam the build front door and the armed hover
-// card use.
-void draw_tile_affordances(const world& w, entity_id tile_id)
+// --- Tile deposit bar-chart helpers (BL-123) ---------------------------------
+// The redesigned tile Selection element (docs/ui/SELECTION.md, Ben's mockup) plots
+// each of the tile's non-zero deposits as a vertical bar whose full height is the
+// *world-max* deposit for that resource — so the bar reads as "this tile's yield
+// relative to the best tile anywhere", not a bare absolute. The placement-affordance
+// readout (BL-071) and the build front door moved off this panel to the owed
+// tile-construction panel (backlog); this panel is now tile detail + navigation.
+
+// Round @p v up to a 'nice' axis ceiling (1 / 2 / 5 x a power of ten): 45->50,
+// 18->20, 130->200. Gives the bar a legible top gridline instead of a ragged max.
+float nice_ceil(float v)
 {
-    const auto tit = w.tiles.find(tile_id);
-    if (tit == w.tiles.end())
-        return;
-    const tile_component& tc = tit->second;
-
-    ImGui::Separator();
-    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Suited for");
-
-    // Territory owner: the nation whose territory contains this tile, if any.
-    const char* territory = "unclaimed";
-    for (const auto& [nid, nc] : w.nations)
-    {
-        bool found = false;
-        for (entity_id t : nc.tiles)
-            if (t == tile_id) { found = true; break; }
-        if (found) { territory = nc.name.c_str(); break; }
-    }
-    ImGui::TextDisabled("Territory: %s", territory);
-
-    struct fit { std::string label; const char* reason; };
-    std::vector<fit> thrives, valid, invalid;
-
-    // Extraction: one entry per extractable resource actually deposited here; a
-    // rich deposit 'thrives', a thinner one is merely 'valid'. When nothing
-    // extractable is present, a single invalid line names the reason.
-    bool any_ext = false;
-    for (const resource_type r : placement_rules::k_extractable)
-    {
-        const float dep = tc.resource_deposit[static_cast<std::size_t>(r)];
-        if (dep <= 0.0f)
-            continue;
-        any_ext = true;
-        fit f{std::string("Extraction: ") + resource_name(r), nullptr};
-        if (dep >= 0.6f) thrives.push_back(std::move(f));
-        else             valid.push_back(std::move(f));
-    }
-    if (!any_ext)
-        invalid.push_back({"Extraction",
-            placement_rules::placement_reason_text(placement_rules::placement_reason::no_deposit)});
-
-    // Processing facility + Port: the world-level check (a port needs a coast).
-    const auto classify = [&](building_type type, const char* label) {
-        const placement_rules::placement_result pr =
-            placement_rules::can_place_in_world(w, tile_id, type, resource_type::iron_ore);
-        if (pr) valid.push_back({label, nullptr});
-        else    invalid.push_back({label, pr.message()});
-    };
-    classify(building_type::processing_facility, "Processing facility");
-    classify(building_type::port, "Port");
-
-    // Render the three groups; skip an empty group. Only 'invalid' carries a reason.
-    const auto group = [](const char* head, const ImVec4& col,
-                          const std::vector<fit>& rows, bool with_reason) {
-        if (rows.empty())
-            return;
-        ImGui::TextColored(col, "%s", head);
-        for (const fit& f : rows)
-        {
-            if (with_reason && f.reason)
-                ImGui::BulletText("%s - %s", f.label.c_str(), f.reason);
-            else
-                ImGui::BulletText("%s", f.label.c_str());
-        }
-    };
-    group("Thrives", ImVec4{0.55f, 0.90f, 0.55f, 1.0f}, thrives, false);
-    group("Valid",   ImVec4{0.80f, 0.80f, 0.80f, 1.0f}, valid,   false);
-    group("Invalid", ImVec4{0.90f, 0.55f, 0.55f, 1.0f}, invalid, true);
+    if (v <= 0.0f)
+        return 1.0f;
+    const float mag = std::pow(10.0f, std::floor(std::log10(v)));
+    const float n   = v / mag; // 1..10
+    const float step = (n <= 1.0f) ? 1.0f : (n <= 2.0f) ? 2.0f : (n <= 5.0f) ? 5.0f : 10.0f;
+    return step * mag;
 }
 
-// BL-069: population-centre scale label (1–5 → village … metropolis).
-const char* scale_label(int scale)
+// A faint dotted horizontal rule across a chart's gridline, drawn as short dashes
+// (ImDrawList has no native dashed line). Matches the mockup's dotted scale lines.
+void dotted_hline(ImDrawList* dl, float x0, float x1, float y, ImU32 col)
 {
-    switch (scale)
-    {
-        case 1:  return "village";
-        case 2:  return "town";
-        case 3:  return "city";
-        case 4:  return "conurbation";
-        case 5:  return "metropolis";
-        default: return "settlement";
-    }
+    for (float x = x0; x < x1; x += 6.0f)
+        dl->AddLine({x, y}, {std::min(x + 3.0f, x1), y}, col, 1.0f);
+}
+
+// One resource's vertical bar chart inside the rect [mn, mx]: a left gutter of tick
+// labels (0 / ceiling, plus a mid tick when the ceiling is >= 100), dotted gridlines,
+// and a centred fill bar rising to deposit/ceiling of the height.
+void draw_deposit_bar(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
+                      float deposit, float ceiling, ImU32 fill)
+{
+    constexpr float gutter = 34.0f; // room for a "200"-wide tick label
+    const float plot_x0 = mn.x + gutter;
+    const float y0 = mn.y, y1 = mx.y;
+    const ImU32 grid_col  = IM_COL32(120, 120, 120, 150);
+    const ImU32 label_col = IM_COL32(150, 150, 150, 255);
+
+    const auto tick = [&](float v) {
+        const float ty = y1 - (v / ceiling) * (y1 - y0);
+        dotted_hline(dl, plot_x0, mx.x, ty, grid_col);
+        char buf[16];
+        std::snprintf(buf, sizeof buf, "%g", static_cast<double>(v));
+        const ImVec2 ts = ImGui::CalcTextSize(buf);
+        dl->AddText({plot_x0 - 6.0f - ts.x, ty - ts.y * 0.5f}, label_col, buf);
+    };
+    tick(0.0f);
+    if (ceiling >= 100.0f)
+        tick(ceiling * 0.5f);
+    tick(ceiling);
+
+    // The fill bar, centred in the plot area, rising to its fraction of the height.
+    const float frac = std::clamp(deposit / ceiling, 0.0f, 1.0f);
+    const float bar_w = 44.0f;
+    const float cx = (plot_x0 + mx.x) * 0.5f;
+    dl->AddRectFilled({cx - bar_w * 0.5f, y1 - frac * (y1 - y0)},
+                      {cx + bar_w * 0.5f, y1}, fill, 2.0f);
 }
 
 // --- Analog construction status (BL-095 task E) ------------------------------
@@ -198,58 +163,17 @@ ImVec4 construction_status_colour(float rate)
                           : ImVec4{0.55f, 0.80f, 0.55f, 1.0f};  // on schedule
 }
 
-// --- Build-here nav affordance (BL-139) ---------------------------------------
-// The tile is now the primary selection subject and leads with tile *detail*
-// (terrain/deposits/owner/habitability, draw_tile_summary below), not the build
-// picker. "Build here" becomes a small navigation affordance near the top of
-// that detail rather than an inline building-type list — the old full
-// front-door UI (extraction/processing/port buttons with live cost + material
-// status) has been retired from this panel. TODO(BL-139): there is not yet a
-// distinct navigable "build ledger" surface, so this stubs onto the existing
-// Construction panel (which a sibling item is concurrently reworking into that
-// destination); wire this to the real build ledger once it exists.
-void draw_build_here_affordance(ui_state& ui)
-{
-    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Build here \xe2\x96\xb8");
-    if (ImGui::Button("Build here"))
-        ui.show_construction_panel = true; // stub destination — see TODO above
-}
-
 // Resolve the (at most one) building occupying a tile — the standing invariant
 // a tile carries zero or one building means this never needs a list. Linear
 // scan mirrors the existing per-body building lookup in tile_inspector.cpp;
-// the building map is small in the prototype scope.
+// the building map is small in the prototype scope. Used by the tile panel's
+// "Manage Buildings" button to gate on whether there is anything to manage.
 entity_id building_on_tile(const world& w, entity_id tile)
 {
     for (const auto& [id, b] : w.buildings)
         if (b.tile == tile)
             return id;
     return null_entity;
-}
-
-// The building sub-element (BL-139): when a building occupies the selected
-// tile, it renders BELOW the tile detail as a subordinate row, not the lead
-// content. Reuses the existing single-click-selects/double-click-navigates
-// model (docs/ui/SELECTION.md): a click re-points the Selection element at the
-// building; a double-click navigates into the building's full detail via
-// focus_on_entity, the same dispatch the canvases use.
-void draw_tile_building_subelement(const world& w, ui_state& ui, entity_id tile)
-{
-    const entity_id bid = building_on_tile(w, tile);
-    if (bid == null_entity)
-        return;
-
-    ImGui::Separator();
-    ImGui::TextDisabled("On this tile");
-
-    const building_component& b = w.buildings.at(bid);
-    const bool selected = (ui.selected_entity == bid);
-    const std::string label = std::string(building_type_name(b.type))
-                             + (is_player_owned(w, bid) ? "" : "  (rival)");
-    if (ImGui::Selectable(label.c_str(), selected))
-        ui.selected_entity = bid;
-    if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-        focus_on_entity(w, ui, bid); // double-click descends into the building
 }
 
 // Headline label for a selected entity. Bodies carry a name; the other kinds
@@ -494,18 +418,10 @@ void draw_selection_action(const world& w, const recipe_registry& reg,
     const entity_id sel = ui.selected_entity;
     switch (kind)
     {
-        case selection_kind::tile:
-            // BL-139: the tile is the primary selection subject now. Lead with the
-            // "Build here" nav affordance (stub — see draw_build_here_affordance),
-            // then the tile's own detail (terrain/deposits/owner/habitability, the
-            // shared draw_tile_summary content builder), then the building — if any
-            // occupies this tile — as a subordinate sub-element below it.
-            draw_build_here_affordance(ui);
-            ImGui::Separator();
-            draw_tile_summary(w, sel);
-            draw_tile_building_subelement(w, ui, sel);
-            break;
-
+        // NOTE: selection_kind::tile no longer routes here — a selected tile takes
+        // the dedicated vertical layout (draw_tile_selection, BL-123), not the
+        // action|facts split. The remaining kinds keep the action|facts form until
+        // they get their own mockups.
         case selection_kind::body:
         {
             const auto bit = w.bodies.find(sel);
@@ -576,9 +492,7 @@ void draw_selection_facts(const world& w, const recipe_registry& reg,
     const entity_id sel = ui.selected_entity;
     switch (kind)
     {
-        case selection_kind::tile:
-            draw_tile_affordances(w, sel);          // BL-071: what this tile is good for
-            break;
+        // selection_kind::tile is handled by draw_tile_selection (BL-123), not here.
         case selection_kind::body:
             draw_activity_section(w, sel);          // BL-089: commercial pulse
             break;
@@ -591,6 +505,119 @@ void draw_selection_facts(const world& w, const recipe_registry& reg,
         default:
             break;
     }
+}
+
+// The redesigned tile Selection element (BL-123, Ben's mockup): a vertical stack
+// rather than the action|facts split — a placeholder image + [x, y] caption, the
+// tile's deposits as world-max-relative bar charts, and a 2x2 action button grid.
+// Tile-only for now; the other kinds keep the action|facts form (draw_selection_
+// action / facts) until they get their own mockups. Construct Buildings stubs onto
+// the existing Construction panel (the dedicated tile-construction panel is owed);
+// History and Supply are drawn but not yet wired.
+void draw_tile_selection(const world& w, ui_state& ui)
+{
+    const entity_id sel = ui.selected_entity;
+    const auto tit = w.tiles.find(sel);
+    if (tit == w.tiles.end())
+    {
+        ImGui::TextDisabled("\xe2\x80\x94");
+        return;
+    }
+    const tile_component& tile = tit->second;
+    const ImGuiStyle&     style = ImGui::GetStyle();
+    ImDrawList*           dl    = ImGui::GetWindowDrawList();
+
+    const auto centred = [&](ImVec2 mn, ImVec2 mx, const char* s, ImU32 col) {
+        const ImVec2 ts = ImGui::CalcTextSize(s);
+        dl->AddText({(mn.x + mx.x - ts.x) * 0.5f, (mn.y + mx.y - ts.y) * 0.5f}, col, s);
+    };
+
+    const float content_w = ImGui::GetContentRegionAvail().x;
+
+    // ── Placeholder image (fixed top) ──
+    {
+        const float img_h = content_w * 0.5f;
+        const ImVec2 p = ImGui::GetCursorScreenPos();
+        const ImVec2 mx = {p.x + content_w, p.y + img_h};
+        dl->AddRectFilled(p, mx, IM_COL32(72, 72, 72, 255), 3.0f);
+        dl->AddRect(p, mx, IM_COL32(110, 110, 110, 255), 3.0f);
+        centred(p, mx, "PLACEHOLDER IMAGE", IM_COL32(180, 180, 180, 255));
+        ImGui::Dummy({content_w, img_h});
+    }
+    // ── [x, y] coordinate caption strip ──
+    {
+        const float cap_h = ImGui::GetFrameHeight();
+        const ImVec2 p = ImGui::GetCursorScreenPos();
+        const ImVec2 mx = {p.x + content_w, p.y + cap_h};
+        dl->AddRectFilled(p, mx, IM_COL32(55, 55, 55, 255), 2.0f);
+        char buf[32];
+        std::snprintf(buf, sizeof buf, "[%d, %d]", tile.grid_x, tile.grid_y);
+        centred(p, mx, buf, IM_COL32(200, 200, 200, 255));
+        ImGui::Dummy({content_w, cap_h});
+    }
+    ImGui::Spacing();
+
+    // Reserve the 2x2 button grid at the bottom; the bar list fills the space between.
+    const float frame_h = ImGui::GetFrameHeight();
+    const float btn_h   = frame_h * 2.2f;
+    const float grid_h  = btn_h * 2.0f + style.ItemSpacing.y;
+    float bars_h = ImGui::GetContentRegionAvail().y - grid_h - style.ItemSpacing.y * 2.0f;
+    if (bars_h < 60.0f)
+        bars_h = 60.0f;
+
+    // ── Deposit bars, world-max-relative (one pass to find each resource's max) ──
+    float wmax[resource_count] = {};
+    for (const auto& [id, t] : w.tiles)
+        for (std::size_t r = 0; r < resource_count; ++r)
+            wmax[r] = std::max(wmax[r], t.resource_deposit[r]);
+
+    ImGui::BeginChild("##tile_bars", {content_w, bars_h}, false,
+                      ImGuiWindowFlags_NoSavedSettings);
+    bool any_deposit = false;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        const float dep = tile.resource_deposit[r];
+        if (dep <= 0.0f)
+            continue;
+        any_deposit = true;
+        const resource_presentation& rp = presentation_of(static_cast<resource_type>(r));
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", rp.name);
+
+        constexpr float chart_h = 70.0f;
+        const ImVec2 p = ImGui::GetCursorScreenPos();
+        const float  cw = ImGui::GetContentRegionAvail().x;
+        ImGui::Dummy({cw, chart_h});
+        const float ceiling = nice_ceil(wmax[r] > 0.0f ? wmax[r] : dep);
+        draw_deposit_bar(dl, p, {p.x + cw, p.y + chart_h}, dep, ceiling,
+                         IM_COL32(150, 235, 160, 255));
+        ImGui::Spacing();
+    }
+    if (!any_deposit)
+        ImGui::TextDisabled("No deposits");
+    ImGui::EndChild();
+
+    // ── 2x2 action button grid ──
+    const float bw  = (content_w - style.ItemSpacing.x) * 0.5f;
+    const ImVec2 bsz = {bw, btn_h};
+
+    if (ImGui::Button("Construct\nBuildings", bsz))
+        ui.show_construction_panel = true; // stub → owed tile-construction panel
+    ImGui::SameLine();
+    ImGui::BeginDisabled(building_on_tile(w, sel) == null_entity);
+    if (ImGui::Button("Manage\nBuildings", bsz))
+        ui.show_construction_panel = true;
+    ImGui::EndDisabled();
+
+    // History / Supply: drawn for layout completeness, wired to nothing yet
+    // (BL-123 § stubs). The tooltip keeps the no-op honest rather than silent.
+    const auto stub = [&](const char* label) {
+        ImGui::Button(label, bsz);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Not yet available");
+    };
+    stub("History");
+    ImGui::SameLine();
+    stub("Supply");
 }
 
 } // namespace
@@ -668,6 +695,15 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
     }
 
     ImGui::Separator();
+
+    // A selected tile takes the dedicated vertical layout (BL-123, Ben's mockup);
+    // the other kinds keep the action|facts split until they get their own mockups.
+    if (kind == selection_kind::tile)
+    {
+        draw_tile_selection(w, ui);
+        ImGui::End();
+        return;
+    }
 
     // ── Action (left, dominant) │ Facts (right, muted) ──
     const float content_w = bar_w - style.WindowPadding.x * 2.0f;

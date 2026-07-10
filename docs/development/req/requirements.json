@@ -5650,6 +5650,15 @@
       "rows": [
         { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING: every on-screen text/image across header/balance strip, time panel, on-canvas legends, selection element, ledgers, hover card, and ImGui tables is placed in a BL-141 container and takes that container's wrap-or-fit text policy, with no silent truncation down to the 1280x720 verify window.", "verification": ["code", "visual"], "result_metric": "", "notes": "Requires BL-141 (container vocabulary) and runs LAST, after all other uxbatch items land, since it is a mechanical pass over the surfaces they just changed." }
       ]
+    },
+    {
+      "batch": "2026-07-10",
+      "title": "BL-123 — Selection element resize (tile vertical layout)",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-123",
+      "rows": [
+        { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING: a selected TILE renders as a vertical stack — a placeholder image + [x,y] coordinate caption at top, the tile's non-zero deposits as vertical bar charts each scaled to that resource's world-max deposit (nice-ceiling axis with dotted gridlines, scrollable list), and a 2x2 action button grid at the bottom (Construct Buildings, Manage Buildings, History, Supply). Manage Buildings is disabled when no building occupies the tile; History and Supply are drawn but unwired stubs. The old action|facts split and the BL-071 affordance readout no longer render for a tile; the other selection kinds keep the action|facts form.", "verification": ["code", "visual"], "result_metric": "", "notes": "selection_panel.cpp only. Verified by-eye via scripts/verify/selection_tile_layout.lua (selection_tile_layout + selection_tile_layout_built captures, software renderer). Golden PNGs intentionally not committed: the code's verify window is now 1720x1080 (commit 6a04ec9) while the whole committed golden set is still 1280x720, so a lone re-res pair would be inconsistent — deferring to a repo-wide re-bless." }
+      ]
     }
 
   ]
