@@ -1303,7 +1303,12 @@ void app::process_events(bool& running)
     while (SDL_PollEvent(&event))
     {
         ImGui_ImplSDL3_ProcessEvent(&event);
-        if (event.type == SDL_EVENT_QUIT)
+        // Quit on the app-level quit OR the window's close (X) button. SDL3 delivers
+        // the title-bar close as SDL_EVENT_WINDOW_CLOSE_REQUESTED, distinct from
+        // SDL_EVENT_QUIT; without handling it, clicking X leaves the process running
+        // with no visible window. Treat either as "shut the app down".
+        if (event.type == SDL_EVENT_QUIT ||
+            event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED)
             running = false;
         else if (event.type == SDL_EVENT_KEY_DOWN)
             handle_key_down(event.key);
