@@ -585,7 +585,7 @@ void draw_tile_selection(const world& w, ui_state& ui)
 
     // ── Placeholder image (fixed top) ──
     {
-        const float img_h = content_w * 0.5f;
+        const float img_h = content_w * 0.28f;
         const ImVec2 p = ImGui::GetCursorScreenPos();
         const ImVec2 mx = {p.x + content_w, p.y + img_h};
         dl->AddRectFilled(p, mx, IM_COL32(72, 72, 72, 255), 3.0f);
