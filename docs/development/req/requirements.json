@@ -5669,6 +5669,16 @@
       "rows": [
         { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING: the count-driven on-canvas lens legends (Country, Market, Reach, Supply) never overrun the canvas. Their box height is capped to the canvas vertical span; when the entry list exceeds that height the rows live in a bounded, wheel/drag-scrolling ImGui child with a clean scrollbar while the header (and the Market lens's good-selector combo) stay fixed. A long list (e.g. the Country lens's full nation set) is fully reachable rather than clipped off the canvas bottom.", "verification": ["visual", "code"], "result_metric": "", "notes": "body_surface_canvas.cpp only. New shared helper draw_scroll_list_key + key_row/key_marker vocabulary; the four count-driven keys converted onto it, vertical bounds [grid_top+8, canvas_bottom-8] passed from draw_body_surface_canvas. Verified by capture on this Windows box (software renderer, 1280x720): country_lens_full shows the full ~20-nation list bounded within the canvas (pre-fix it ran off the bottom); market_lens shows the Iron Ore combo + Market catchments swatch list intact. Goldens for country_lens/market_lens (and reach/supply where the key renders) need re-blessing on Linux CI — the legend change is intentional, so the raised diff is expected. Per the cross-platform-golden policy the re-bless is done on Linux, not blanket-blessed here." }
       ]
+    },
+
+    {
+      "batch": "2026-07-10",
+      "title": "BL-146 — Generated road network + A* cost integration",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-146",
+      "rows": [
+        { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING: world generation deterministically stamps a road network onto tile.road_level after nations + population centres exist. Each nation's population centres are connected by a backbone (MST + relative-neighbour redundancy over terrain-weighted A* costs), two-tier (trunk road_level 2 between major centres scale>=3, else local road_level 1), rasterised along the A* path (max on overlap, ocean tiles skipped); territorially-adjacent nations get one local border link between their nearest centre pair. The generated field is reproducible across two generations, and the A* cost cache is invalidated so gameplay dispatch sees the roaded costs.", "verification": ["headless"], "result_metric": "8/8 checks", "notes": "New src/world/road_generation.{hpp,cpp}, wired in hard_coded_world.cpp after generate_nations; clears world.astar_cost_cache after stamping. Verified via tools/verify/road_generation_harness.cpp (auto-built by the CTest world-superset block, registered as CTest test 'road_generation_harness'): R1 lattice exists + no ocean roads, R2 both tiers present + none exceed trunk, R3 14/14 non-isolated centres touch a road, R4 road_level identical across two generations. Regression: determinism_harness/logistics_harness/trade_routes_harness/econ_harness/world_audit all green. road_level determinism guard lives in this dedicated harness's R4 (stronger than a determinism_harness field add). Tuning settled with Ben: local=1/trunk=2, major=scale>=3." }
+      ]
     }
 
   ]
