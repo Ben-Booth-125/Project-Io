@@ -44,3 +44,20 @@ construction_result construct_building(world& w, const recipe_registry& reg,
                                        entity_id corp, entity_id tile,
                                        building_type type, resource_type target,
                                        entity_id& out_building);
+
+/// Attempt to place a road segment on `tile` for corporation `corp` (BL-147). A road is a
+/// per-tile mutation, not a building: on success it raises `tile_component.road_level` to the
+/// local tier (1), which lowers that tile's intra-body A* traversal cost, and invalidates the
+/// world's A* cost cache so dispatch sees the roaded cost. The cost (registry `road_econ`) is a
+/// flat credit sum plus materials priced from the tile's local market, debited up front (roads
+/// are instant, unlike durative building construction). The build front door (SELECTION.md) and
+/// app's pending-road handler route through this single function.
+///
+/// @param w     World; mutated only on success (road_level raised, cache cleared, balance debited).
+/// @param reg   Loaded registry (road cost).
+/// @param corp  Corporation placing (and paying) — usually w.player_entity.
+/// @param tile  Target tile entity.
+/// @return      `placed` on success; `invalid_tile` (ocean / already a road), `insufficient_funds`,
+///              `no_corp`, or `no_tile` on refusal.
+construction_result place_road(world& w, const recipe_registry& reg,
+                               entity_id corp, entity_id tile);

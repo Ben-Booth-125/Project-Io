@@ -870,9 +870,10 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
         if (tile.resource_deposit[static_cast<std::size_t>(er)] > 0.0f)
             cands.push_back({building_type::extraction_site, er,
                              std::string("Extraction: ") + resource_name(er)});
-    cands.push_back({building_type::processing_facility, resource_type::iron_ore, "Processing Facility"});
-    cands.push_back({building_type::port,                resource_type::iron_ore, "Port"});
-    cands.push_back({building_type::launchpad,           resource_type::iron_ore, "Launchpad"});
+    cands.push_back({building_type::processing_facility,  resource_type::iron_ore, "Processing Facility"});
+    cands.push_back({building_type::port,                 resource_type::iron_ore, "Port"});
+    cands.push_back({building_type::launchpad,            resource_type::iron_ore, "Launchpad"});
+    cands.push_back({building_type::inland_logistics_hub, resource_type::iron_ore, "Inland Logistics Hub"}); // BL-149
 
     constexpr float img   = 56.0f;
     const float     row_h = img + style.WindowPadding.y * 2.0f + 8.0f;
@@ -937,6 +938,60 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
         ImGui::EndChild();
         ImGui::Spacing();
     }
+
+    // Road placement (BL-147) — a per-tile mutation, not a building, so it takes its own
+    // affordance + the pending_road_tile path (place_road) rather than the candidate loop above.
+    {
+        const road_economics& re = reg.road_econ();
+        const placement_rules::placement_result pr = placement_rules::can_place_road(tile);
+        const bool affordable = balance >= re.build_cost;
+
+        ImGui::BeginChild("Road##build", {0.0f, row_h}, true,
+                          ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
+        ImDrawList* cdl = ImGui::GetWindowDrawList();
+
+        const ImVec2 ip = ImGui::GetCursorScreenPos();
+        const ImVec2 imx = {ip.x + img, ip.y + img};
+        cdl->AddRectFilled(ip, imx, IM_COL32(72, 72, 72, 255), 3.0f);
+        cdl->AddRect(ip, imx, IM_COL32(110, 110, 110, 255), 3.0f);
+        // A short road glyph: a pale segment across the placeholder box.
+        cdl->AddLine({ip.x + img * 0.2f, ip.y + img * 0.7f}, {ip.x + img * 0.8f, ip.y + img * 0.3f},
+                     IM_COL32(210, 200, 150, 255), 3.0f);
+        ImGui::Dummy({img, img});
+        ImGui::SameLine();
+
+        ImGui::BeginGroup();
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Road");
+
+        std::string cost = std::to_string(static_cast<int>(re.build_cost)) + " cr";
+        for (std::size_t i = 0; i < resource_count; ++i)
+            if (re.resource_build_cost[i] > 0.0f)
+                cost += ", " + std::to_string(static_cast<int>(re.resource_build_cost[i]))
+                      + " " + presentation_of(static_cast<resource_type>(i)).abbrev;
+        ImGui::TextDisabled("%s", cost.c_str());
+
+        if (pr.ok())
+        {
+            ImGui::BeginDisabled(!affordable);
+            if (ImGui::Button("Build##road"))
+                ui.construction.pending_road_tile = tile_id;
+            ImGui::EndDisabled();
+            if (!affordable)
+            {
+                ImGui::SameLine();
+                ImGui::TextDisabled("Can't afford");
+            }
+        }
+        else
+        {
+            ImGui::TextColored(ImVec4{0.90f, 0.55f, 0.55f, 1.0f}, "%s", pr.message());
+        }
+        ImGui::EndGroup();
+
+        ImGui::EndChild();
+        ImGui::Spacing();
+    }
+
     ImGui::EndChild();
 
     ImGui::End();

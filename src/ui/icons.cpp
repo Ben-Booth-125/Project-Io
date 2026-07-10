@@ -54,15 +54,32 @@ void triangle(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
     dl->AddPolyline(v, 3, outline, ImDrawFlags_Closed, 1.0f);
 }
 
+// Flat-top hexagon with a small hub dot — the Inland Logistics Hub marker (BL-149). A
+// six-sided network-node silhouette, distinct from the launchpad circle and the port
+// triangle, evoking a routing waypoint the land network converges on.
+void hub_node(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
+{
+    ImVec2 v[6];
+    for (int i = 0; i < 6; ++i)
+    {
+        const float a = 3.14159265f / 3.0f * static_cast<float>(i); // 0°,60°,… flat-top
+        v[i] = { c.x + r * std::cos(a), c.y + r * std::sin(a) };
+    }
+    dl->AddConvexPolyFilled(v, 6, fill);
+    dl->AddPolyline(v, 6, outline, ImDrawFlags_Closed, 1.0f);
+    dl->AddCircleFilled(c, r * 0.28f, outline); // hub node at the centre
+}
+
 } // namespace
 
 void building(ImDrawList* dl, ImVec2 centre, float r, building_type type, ImU32 fill)
 {
     switch (type)
     {
-        case building_type::extraction_site:     ore_chunk(dl, centre, r, fill); break;
-        case building_type::processing_facility: square(dl, centre, r, fill);    break;
-        case building_type::port:                triangle(dl, centre, r, fill);  break;
+        case building_type::extraction_site:      ore_chunk(dl, centre, r, fill); break;
+        case building_type::processing_facility:  square(dl, centre, r, fill);    break;
+        case building_type::port:                 triangle(dl, centre, r, fill);  break;
+        case building_type::inland_logistics_hub: hub_node(dl, centre, r, fill);  break; // BL-149
         default:
             dl->AddCircleFilled(centre, r, fill);
             dl->AddCircle(centre, r, outline, 0, 1.0f);

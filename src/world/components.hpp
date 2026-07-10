@@ -96,6 +96,7 @@ enum class building_type : uint8_t
     processing_facility = 2,
     port                = 3,
     launchpad           = 4, ///< Space-launch facility; gates space-mode convoy dispatch.
+    inland_logistics_hub = 5, ///< BL-149: land-mode logistics node; its tile discounts intra-body haul cost (like a city).
 };
 
 /// Sentinel `building_component.recipe` value meaning "no processing recipe is

@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <cmath>
 #include <numbers>
+#include <unordered_map>
+#include <unordered_set>
 
 void advance_convoys(world& w)
 {
@@ -166,6 +168,57 @@ entity_id market_for_body(const world& w, entity_id body)
     return null_entity;
 }
 
+/// BL-148/149 logistics-node lookups, built once per dispatch pass. `pop_tile_scale`
+/// maps a population-centre's tile to its scale (tier 1–5, BL-148 — cities are free hubs);
+/// `hub_tiles` holds every completed inland_logistics_hub's tile (BL-149 — the player
+/// extends the land network). A convoy's intra-body haul is discounted for each such node
+/// its A* path crosses.
+struct logistics_nodes
+{
+    std::unordered_map<entity_id, int> pop_tile_scale;
+    std::unordered_set<entity_id>      hub_tiles;
+};
+
+logistics_nodes collect_logistics_nodes(const world& w)
+{
+    logistics_nodes nodes;
+    for (const auto& [centre_id, tile_id] : w.population_centre_tile)
+    {
+        const auto pit = w.population_centres.find(centre_id);
+        const int  scale = (pit != w.population_centres.end()) ? pit->second.scale : 1;
+        nodes.pop_tile_scale[tile_id] = scale;
+    }
+    for (const auto& [bid, bc] : w.buildings)
+    {
+        // A hub confers its discount only while it is built AND active — a decommissioned
+        // hub is inert, matching how the production loop treats it (economy_system.cpp).
+        if (bc.type == building_type::inland_logistics_hub && bc.ticks_remaining <= 0
+            && !bc.decommissioned)
+            nodes.hub_tiles.insert(bc.tile);
+    }
+    return nodes;
+}
+
+/// Fraction in [0, cap] to discount an intra-body haul cost by — summed over the
+/// population-centre (scale-weighted) and hub (flat) tiles the path crosses, capped.
+/// Deterministic: a pure function of the path tiles and the node sets.
+float node_discount_fraction(const logistics_path& path, const logistics_nodes& nodes,
+                             const logistics_node_params& np)
+{
+    float disc = 0.0f;
+    for (const entity_id t : path.tiles)
+    {
+        if (const auto it = nodes.pop_tile_scale.find(t); it != nodes.pop_tile_scale.end())
+            disc += np.city_discount_per_scale * static_cast<float>(it->second);
+        if (nodes.hub_tiles.count(t) != 0)
+            disc += np.hub_discount;
+    }
+    // Enforce the invariant a route is never free (and never *credits* the corp) regardless of
+    // how the cap tunable is authored: a misconfigured cap >= 1 would otherwise flip the sign of
+    // the haul cost. Clamp the final discount to [0, 0.95] at this single choke point.
+    return std::clamp(std::min(disc, np.discount_cap), 0.0f, 0.95f);
+}
+
 } // namespace
 
 void dispatch_convoys(world& w, const recipe_registry& reg,
@@ -174,6 +227,11 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
     // One dispatch pass per (corp, dest_body, resource) shortfall.
     // Shortfall = market demand exceeded supply in the last clearing pass.
     // We fix quantities at a single batch = shortfall amount, capped by source surplus.
+
+    // BL-148/149: build the logistics-node lookups once — cities (population centres) and the
+    // player's inland logistics hubs discount any intra-body haul whose A* path crosses them.
+    const logistics_nodes  nodes = collect_logistics_nodes(w);
+    const logistics_node_params& node_params = reg.logistics_nodes();
 
     for (auto& [corp_id, corp] : w.corporations)
     {
@@ -210,6 +268,7 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
                     convoy_mode mode;
                     float       dist;
                     float       unit_cost;
+                    float       node_discount = 0.0f; // BL-148/149: intra-body city/hub discount.
                     if (src_body == dest_body)
                     {
                         // Intra-body (BL-077): haul the corp's on-body stockpile from its
@@ -225,6 +284,8 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
                         mode      = path.crosses_ocean ? convoy_mode::sea : convoy_mode::land;
                         dist      = path.cost;
                         unit_cost = reg.logistics_cost(mode);
+                        // BL-148/149: discount the haul for the cities + hubs its path crosses.
+                        node_discount = node_discount_fraction(path, nodes, node_params);
                     }
                     else
                     {
@@ -236,7 +297,7 @@ void dispatch_convoys(world& w, const recipe_registry& reg,
                         unit_cost = logistics_cost_space;
                     }
 
-                    const float cost = unit_cost * dist * qty;
+                    const float cost = unit_cost * dist * qty * (1.0f - node_discount);
                     if (cost < best_cost)
                     {
                         best_src_body   = src_body;

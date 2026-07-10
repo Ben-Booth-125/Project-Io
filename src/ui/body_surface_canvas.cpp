@@ -1524,6 +1524,50 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (!revealed)
                 continue;
 
+            // Road network (BL-146 generated + BL-147 player-placed). Always-on under every
+            // lens (roads are terrain, not an overlay): draw an edge from each roaded tile to
+            // its roaded cardinal neighbour in the right + down directions, so each segment is
+            // drawn once. Trunk roads (both ends road_level >= 2, the generated backbone) read
+            // thicker/brighter than local roads (road_level 1, the tier the player places). The
+            // neighbour is taken at the same wrap offset k; a right-edge that wraps the cylinder
+            // seam is shifted one period so the segment stays short. Skips edges into an
+            // unrevealed (unsurveyed) neighbour so roads don't leak past the survey fog.
+            if (tile.road_level > 0)
+            {
+                static const int road_off[2][2] = {{+1, 0}, {0, +1}}; // right, down
+                for (int n = 0; n < 2; ++n)
+                {
+                    const int nrow = tile.grid_y + road_off[n][1];
+                    if (nrow < 0 || nrow >= gh)
+                        continue;
+                    const int raw_col = tile.grid_x + road_off[n][0];
+                    int ncol = raw_col % gw;
+                    if (ncol < 0)
+                        ncol += gw;
+
+                    const auto nb_it = tile_at.find(static_cast<long long>(nrow) * gw + ncol);
+                    if (nb_it == tile_at.end())
+                        continue;
+                    const auto nb_tile_it = w.tiles.find(nb_it->second);
+                    if (nb_tile_it == w.tiles.end() || nb_tile_it->second.road_level == 0)
+                        continue;
+                    if (!survey_tile_visible(body.survey, gw, gh, ncol, nrow))
+                        continue;
+
+                    ImVec2 nb_sc = to_screen(hex_local_centre(ncol, nrow, hex_size));
+                    nb_sc.x += static_cast<float>(k) * period_px;
+                    if (raw_col >= gw)
+                        nb_sc.x += period_px; // right-edge wrapped the seam: keep the line short
+
+                    const bool  trunk = (tile.road_level >= 2 && nb_tile_it->second.road_level >= 2);
+                    const ImU32 col   = trunk ? IM_COL32(225, 205, 150, 235)
+                                              : IM_COL32(175, 158, 120, 205);
+                    const float thick = trunk ? std::max(2.0f, draw_r * 0.22f)
+                                              : std::max(1.2f, draw_r * 0.13f);
+                    dl->AddLine({cx, cy}, {nb_sc.x, nb_sc.y}, col, thick);
+                }
+            }
+
             // Nation borders (Country lens only). Draw a dark line on every hex
             // edge shared with a neighbour of a different owner — including the
             // claimed/unclaimed boundary. The grid is odd-r offset, so the six

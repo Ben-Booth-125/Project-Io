@@ -123,6 +123,23 @@ session boundary is drawn *between* them.
 
 ---
 
+## v0.1.1 Batch — Roads & planetary logistics (BL-148, BL-149, BL-147) — **COMPLETE**
+
+Three `designed` items delivered in one main-session-serial Batch Delivery (shared files +
+co-evolving discount interface, so no fan-out). **BL-148** shared logistics-node discount in
+`dispatch_convoys` (scans `logistics_path.tiles`; population-centre tiles discount by scale, capped;
+tunables `economy.lua`). **BL-149** `inland_logistics_hub` building type (enum + econ + placement +
+front door + hexagon glyph); its completed tiles reuse the BL-148 node scan (flat discount). **BL-147**
+always-on road-edge render in `body_surface_canvas.cpp` (trunk vs local) + player `place_road`
+(`construction.cpp`; money + materials; raises `road_level`, clears `astar_cost_cache`) via the build
+front door. Also fixed pre-existing BL-146 residue (`corp_terrain_matrix` CMake target missing
+`road_generation.cpp` + `logistics.cpp`). Verified: build green (348 targets), **CTest 21/21**
+(determinism intact), `logistics_harness` T8/T9/T10 (city/hub discount + `place_road`), visual
+`roads.lua`. Requirements `requirements.json § 2026-07-10-roads` (3 groups) all complete. Per-item
+detail: DEVLOG 2026-07-10. Commits: one per item. Summary retained one cycle.
+
+---
+
 ## 2026-07-09 Batch — v0.1.0 legibility polish + UX-review cluster (BL-133–145, BL-159) — **COMPLETE**
 
 Fourteen items (the full 2026-07-08 UX-review cluster) landed in one Batch Delivery, fanned to 8

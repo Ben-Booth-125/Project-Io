@@ -7,6 +7,7 @@
 // Run: ctest --test-dir build -R logistics_harness   (or the built exe directly)
 
 #include "world/components.hpp"
+#include "world/construction.hpp"
 #include "world/logistics.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/supply_system.hpp"
@@ -177,6 +178,111 @@ int main()
         check(spent > 0.0f, "intra-body logistics cost is debited from the corp balance");
         // A* (0,0)->(0,2) = 2 plains edges = 2.0; qty = min(100,10) = 10; land unit cost 0.02.
         check(approx(spent, 0.02f * 2.0f * 10.0f), "intra-body cost = land(0.02) * A*(2.0) * qty(10) = 0.4");
+    }
+
+    // Shared T7-shape setup for the BL-148/149 node-discount tests: a 3-tall plains column,
+    // a corp with an anchor at (0,0) + a pool surplus, a short market at (0,2). The path
+    // (0,0)->(0,2) crosses tile (0,1). Undiscounted cost is 0.02*2.0*10 = 0.4; a logistics
+    // node on the path discounts it. Returns the credits spent on the single dispatched convoy.
+    auto dispatch_spend = [](world& w, entity_id& out_corp, entity_id& out_mid_tile) -> float {
+        const entity_id corp = w.create_entity();
+        corporation_component cc{}; cc.is_player = true; cc.balance = 1000.0f;
+        const entity_id body = make_grid(w, 1, 3, terrain_landform::plains);
+        const entity_id anchor = tile_at(w, body, 0, 0);
+        const entity_id bld = w.create_entity();
+        building_component bc{}; bc.tile = anchor;
+        w.buildings[bld] = bc;
+        cc.assets.push_back(bld);
+        w.corporations[corp] = cc;
+        w.player_entity = corp;
+        w.pool_for(corp, body).quantities[0] = 100.0f;
+        const entity_id short_market = w.create_entity();
+        market_component mm{}; mm.body = body; mm.centre_tile = tile_at(w, body, 0, 2);
+        mm.demand[0] = 10.0f; mm.supply[0] = 0.0f;
+        w.markets[short_market] = mm;
+        out_corp     = corp;
+        out_mid_tile = tile_at(w, body, 0, 1); // the tile the path crosses
+        return w.corporations[corp].balance;
+    };
+
+    // T8 — BL-148 city discount: a population centre (scale 3) on the crossed tile discounts
+    // the haul by city_per_scale(0.04) * 3 = 0.12, so cost 0.4 -> 0.352.
+    {
+        world w; entity_id corp, mid;
+        const float bal_before = dispatch_spend(w, corp, mid);
+        const entity_id centre = w.create_entity();
+        population_centre_component pc{}; pc.scale = 3;
+        w.population_centres[centre]    = pc;
+        w.population_centre_tile[centre] = mid;
+        recipe_registry reg; // default node discount: city_per_scale 0.04, hub 0.12, cap 0.50
+        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
+                         reg.logistics_cost(convoy_mode::space));
+        const float spent = bal_before - w.corporations[corp].balance;
+        check(spent < 0.4f, "a route through a city costs less than the undiscounted 0.4");
+        check(approx(spent, 0.4f * (1.0f - 0.12f)), "city scale-3 discount: 0.4 * (1 - 0.12) = 0.352");
+    }
+
+    // T9 — BL-149 hub discount: a completed Inland Logistics Hub on the crossed tile discounts
+    // the haul by the flat hub rate (0.12), reusing the same node-scan, so cost 0.4 -> 0.352.
+    {
+        world w; entity_id corp, mid;
+        const float bal_before = dispatch_spend(w, corp, mid);
+        const entity_id hub = w.create_entity();
+        building_component hb{};
+        hb.tile = mid; hb.type = building_type::inland_logistics_hub; hb.ticks_remaining = 0;
+        w.buildings[hub] = hb;
+        recipe_registry reg;
+        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
+                         reg.logistics_cost(convoy_mode::space));
+        const float spent = bal_before - w.corporations[corp].balance;
+        check(spent < 0.4f, "a route through an inland logistics hub costs less than 0.4");
+        check(approx(spent, 0.4f * (1.0f - 0.12f)), "hub flat discount: 0.4 * (1 - 0.12) = 0.352");
+    }
+
+    // T9b — a DECOMMISSIONED hub confers NO discount: an inert hub is treated like the
+    // production loop treats it (economy_system.cpp), so the haul pays the full 0.4.
+    {
+        world w; entity_id corp, mid;
+        const float bal_before = dispatch_spend(w, corp, mid);
+        const entity_id hub = w.create_entity();
+        building_component hb{};
+        hb.tile = mid; hb.type = building_type::inland_logistics_hub;
+        hb.ticks_remaining = 0; hb.decommissioned = true;
+        w.buildings[hub] = hb;
+        recipe_registry reg;
+        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
+                         reg.logistics_cost(convoy_mode::space));
+        const float spent = bal_before - w.corporations[corp].balance;
+        check(approx(spent, 0.4f), "a decommissioned hub confers no discount (full 0.4 cost)");
+    }
+
+    // T10 — BL-147 road placement: place_road on a road-free land tile raises road_level to 1,
+    // debits the flat cost (no market -> no material charge), and invalidates the A* cache; a
+    // second placement on the same tile is rejected (already a road).
+    {
+        world w;
+        const entity_id corp = w.create_entity();
+        corporation_component cc{}; cc.balance = 1000.0f;
+        w.corporations[corp] = cc;
+        const entity_id body = make_grid(w, 3, 1, terrain_landform::plains);
+        const entity_id t = tile_at(w, body, 1, 0);
+
+        recipe_registry reg; // default road_econ: 40 cr flat, no materials (no Lua load)
+        (void)intra_body_path(w, body, tile_at(w,body,0,0), tile_at(w,body,2,0)); // warm the cache
+        const bool  cache_warm = !w.astar_cost_cache.empty();
+        const float bal_before = w.corporations[corp].balance;
+
+        const construction_result r = place_road(w, reg, corp, t);
+        check(r == construction_result::placed, "place_road on a land tile succeeds");
+        check(w.tiles[t].road_level == 1, "placed road raises the tile road_level to 1 (local)");
+        check(approx(bal_before - w.corporations[corp].balance, 40.0f),
+              "road debits the flat build_cost (40 cr, no market materials)");
+        check(cache_warm && w.astar_cost_cache.empty(),
+              "road placement invalidates the A* cost cache");
+
+        const construction_result r2 = place_road(w, reg, corp, t);
+        check(r2 == construction_result::invalid_tile,
+              "a second road on the same tile is rejected (already a road)");
     }
 
     std::printf("\n%s  (%d failure%s)\n",

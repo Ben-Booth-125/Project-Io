@@ -1921,6 +1921,27 @@ void app::render()
         m_ui.construction.pending_tile = null_entity; // consume the request
     }
 
+    // Execute any road-placement request queued this frame by the build front door's
+    // "Road" affordance (BL-147). A road is a per-tile mutation (raises road_level, lowers
+    // A* cost), not a building, so it routes through place_road rather than construct_building.
+    if (m_ui.construction.pending_road_tile != null_entity)
+    {
+        const construction_result r = place_road(
+            m_world, m_registry, m_world.player_entity, m_ui.construction.pending_road_tile);
+        switch (r)
+        {
+            case construction_result::placed:
+                m_ui.construction.last_message = "Road built."; break;
+            case construction_result::invalid_tile:
+                m_ui.construction.last_message = "Can't build a road there."; break;
+            case construction_result::insufficient_funds:
+                m_ui.construction.last_message = "Can't afford the road."; break;
+            default:
+                m_ui.construction.last_message = "Road placement failed."; break;
+        }
+        m_ui.construction.pending_road_tile = null_entity; // consume the request
+    }
+
     // Execute any survey dispatch queued this frame by the Selection-panel Survey
     // button. Centralised here (like construction) so the const-world UI surfaces
     // only enqueue; the balance debit + schedule arming happen once against app's

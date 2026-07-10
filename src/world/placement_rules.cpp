@@ -18,6 +18,7 @@ const char* placement_reason_text(placement_reason r)
         case placement_reason::unsurveyed:        return "Body not yet surveyed";
         case placement_reason::slot_full:         return "No build slot free here";
         case placement_reason::no_tile:           return "No such tile";
+        case placement_reason::already_road:      return "This tile already has a road";
     }
     return "Cannot build here";
 }
@@ -70,6 +71,18 @@ bool can_place_population_centre(const tile_component& tc)
     return tc.habitability > 0.0f;
 }
 
+placement_result can_place_road(const tile_component& tc)
+{
+    // No road on water — roads are land infrastructure.
+    if (is_ocean_tile(tc.composition))
+        return placement_reason::ocean;
+    // One road per tile: an already-roaded tile is a no-op (the generated lattice, or a
+    // prior placement, already lowered its cost). Reject rather than silently re-charge.
+    if (tc.road_level > 0)
+        return placement_reason::already_road;
+    return placement_reason::ok;
+}
+
 placement_result can_place(const tile_component& tc, building_type type, resource_type target)
 {
     // No building ever sits on water.
@@ -88,6 +101,7 @@ placement_result can_place(const tile_component& tc, building_type type, resourc
 
         case building_type::processing_facility:
         case building_type::port:
+        case building_type::inland_logistics_hub: // BL-149: any non-ocean land tile (the land-network node).
         case building_type::none:
         default:
             // Any non-ocean land tile is valid for non-extraction buildings.

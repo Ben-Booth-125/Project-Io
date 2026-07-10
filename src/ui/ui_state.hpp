@@ -73,6 +73,12 @@ struct construction_state
     building_type pending_type   = building_type::extraction_site;
     resource_type pending_target = resource_type::iron_ore;
 
+    /// Pending road-placement request (BL-147) — set by the build front door's "Road"
+    /// affordance and executed by `app::render` via `place_road` (a road is a per-tile
+    /// mutation, not a building, so it takes a distinct path from `pending_tile`).
+    /// `null_entity` = nothing pending.
+    entity_id     pending_road_tile = null_entity;
+
     /// Last construction outcome, set by app after executing a request — a short
     /// human string shown by the build UI ("Built.", "Can't afford it.", …).
     std::string   last_message;

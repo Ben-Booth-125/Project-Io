@@ -6,6 +6,74 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — v0.1.1 Batch: Roads & planetary logistics (BL-147/148/149) (2026-07-10)
+
+**Context.** Opened the v0.1.1 minor (Roads & planetary logistics) as a Batch Delivery while v0.1.0's
+quality audit is still open — flagged, not blocking (the roads work is independent of the audit
+instruments). BL-077 (logistics core), BL-146 (road generation), and the activity-fog cluster
+(BL-150/151/152/154) had already landed, so the batch was the three remaining `designed` items:
+**BL-148** cities-as-hubs, **BL-149** the Inland Logistics Hub, **BL-147** road render + placement.
+Serial in the main session — the three collide on `economy.lua` / `placement_rules.cpp` /
+`selection_panel.cpp`, and BL-149's hub tiles feed BL-148's discount scan (co-evolving interface), so
+no fan-out.
+
+**Design calls (Ben, up front).** (1) Road placement pays **money + materials** (mini-building cost
+model), not free or money-only. (2) The Inland Logistics Hub is a **logistics-discount node** reusing
+BL-148's city discount — not a full point-to-point→hub-to-hub routing rework (that would exceed the d3).
+(3) Roads render **always-on** like terrain, not behind a lens.
+
+**BL-148 — cities as free logistics hubs.** A shared **logistics-node discount** in `dispatch_convoys`
+(`supply_system.cpp`): the intra-body haul cost is scaled by `(1 − discount)`, where the discount sums
+over the nodes the A* path crosses — each population-centre tile contributes `city_per_scale × scale`
+(tier 1–5) — capped. Because BL-152 already exposed `logistics_path.tiles`, the scan reads the cached
+path directly; the node lookups (`population_centre_tile → scale`, plus completed hub tiles) are built
+**once per dispatch pass**, not per shortfall. Tunables in `economy.lua logistics.node_discount`.
+Deterministic — a pure function of the path tiles + node sets.
+
+**BL-149 — Inland Logistics Hub.** New `building_type::inland_logistics_hub` (=5); `m_building_econ`
+bumped 5→6; registry `named_type` + `economy.buildings.inland_logistics_hub` (250 cr + 30 steel, 0
+base_rate/workforce like the port); explicit land placement case; build-front-door candidate;
+`building_type_name` (also fixed a latent `launchpad → "None"` omission); a hexagon `hub_node` glyph.
+Its **completed** tiles join the same node set BL-148 scans (flat `hub_discount`), so building a hub on
+a corridor cheapens hauls through it — the player-placeable counterpart to a city's free hub.
+
+**BL-147 — road render + placement.** *Render:* an always-on road-edge pass in
+`body_surface_canvas.cpp` (inside the wrap-copy loop) draws a segment from each roaded tile to its
+roaded right/down cardinal neighbour (each edge once), **trunk** (road_level 2) thicker/brighter than
+**local** (1); a cylinder-seam edge is shifted one period; edges into an unrevealed neighbour are
+skipped so roads don't leak past the survey fog. *Placement:* a "Road" affordance in the build front
+door sets `pending_road_tile`; `app.cpp` runs `place_road` (`construction.{hpp,cpp}`) — gate
+`balance ≥ build_cost + materials` (materials priced from the local market), debit, raise
+`tile.road_level` to 1 (local), **clear `astar_cost_cache`**. `can_place_road` + an `already_road`
+reason; cost `economy.roads.local` (40 cr + 5 steel) via a new `road_economics`.
+
+**Pre-existing residue caught + fixed.** The full build first failed on `corp_terrain_matrix.exe` —
+unresolved `generate_roads`. Its hand-rolled CMake source list was never updated when **BL-146** added
+`road_generation.cpp` (called by `hard_coded_world.cpp`); added `road_generation.cpp` + `logistics.cpp`
+to that target. A BL-146 landing gap surfaced here, not from this batch.
+
+**Verified.** Full build green (348 targets). **CTest 21/21** incl. `determinism_harness` /
+`world_determinism` (no new serialized state — UI-only `pending_road_tile`, derived discount;
+determinism preserved) and `logistics_harness` extended with **T8** (scale-3 city on the path:
+0.4→0.352), **T9** (hub on the path: 0.4→0.352), **T10** (`place_road` raises road_level, debits 40 cr,
+clears the cache, rejects a double road). New visual `scripts/verify/roads.lua`: the lattice renders
+always-on on Kepler; the build front door lists Road (40 cr + 5 Stl) and Inland Logistics Hub
+(250 cr + 30 Stl, hexagon glyph). Independent adversarial `code-reviewer` pass over the diff surfaced two low-severity fixes, both applied + regression-checked: (1) a **decommissioned** hub still conferred its discount (now gated on `!decommissioned`, mirroring the production loop; harness **T9b**), and (2) the node discount is **clamped to [0, 0.95]** at the choke point, so a misconfigured `cap` tunable can't flip a haul's cost negative. Authority
+propagated: SUPPLY.md (node discount + road placement), PRODUCTION.md (hub building), PLANETARY.md (road
+render), ICONS.md (hub glyph).
+
+**Deferred (recorded, not dropped).** (a) An always-on **road legend chip** — roads read as lines
+without one; a permanent legend would clutter the lens-driven strip. (b) **Trunk placement / road
+upgrade** — the player places local (road_level 1) only; upgrading a tile to trunk is a later nicety.
+(c) **Road ↔ commercial-fog interaction** — roads draw full-bright on any survey-revealed tile,
+including commercially-fogged ones (roads are known terrain); dimming them with the activity fog is a
+possible follow-up. (d) **BL-153** (convoy pay-by-distance, design-owed) stays out of v0.1.1.
+
+**Note.** v0.1.0's quality audit (frame budget, econ-tick scaling, data-creep instruments) remains
+open — this batch moved ahead of it at Ben's direction; the audit is still owed before the v0.1.0 cut.
+
+---
+
 ## Session — Generated road network (BL-146) (2026-07-10)
 
 **Context.** Continuing the backlog review: with the legend pair done, moved to the road/logistics

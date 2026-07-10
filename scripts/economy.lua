@@ -73,6 +73,30 @@ economy = {
             build_duration_ticks = 6.0,
             resource_costs = { steel = 50.0, refined_fuel = 20.0 },
         },
+        -- BL-149: Inland Logistics Hub — a land-mode convoy consolidator. Produces
+        -- nothing (base_rate 0, like the port); its value is the logistics-node discount
+        -- its tile confers on intra-body hauls that pass through it (see logistics.node_discount).
+        -- Cheaper than a launchpad but dearer than a port, reflecting its network reach.
+        inland_logistics_hub = {
+            base_rate   = 0.0,
+            maintenance = 12.0,
+            base_wage   = 8.0,
+            build_cost  = 250.0,
+            build_duration_ticks = 3.0,
+            resource_costs = { steel = 30.0 },
+        },
+    },
+
+    -- BL-147: player-placeable roads. A road is a per-tile mutation (raises tile.road_level,
+    -- lowering its A* traversal cost), not a building — so it has no maintenance/recipe, just an
+    -- up-front placement cost. `local` is the tier the player places (road_level 1); the generated
+    -- lattice (BL-146) also seeds trunk (road_level 2). Cost mirrors a building's shape (credits +
+    -- materials from the local market) but is far cheaper — a road tile is a small reach investment.
+    roads = {
+        ["local"] = {
+            build_cost = 40.0,
+            resource_costs = { steel = 5.0 },
+        },
     },
 
     -- BL-078: the elastic nation-substrate model. The saturated background
@@ -134,6 +158,18 @@ logistics = {
         sea   = 0.05,
         air   = 0.15,
         space = 1.00,
+    },
+
+    -- BL-148 / BL-149: logistics-node discount. An intra-body convoy's haul cost is discounted
+    -- for each logistics node its A* path crosses — population centres (BL-148, cities are free
+    -- hubs) and player-built Inland Logistics Hubs (BL-149). A city discounts by its scale (tier
+    -- 1–5); a hub by a flat amount. The total is capped so a route can never be free. Together
+    -- with the generated road lattice (BL-146) this makes the world's cities a cheap network the
+    -- specialist player plugs its remote extraction into.
+    node_discount = {
+        city_per_scale = 0.04, -- discount fraction per population-centre scale point on the path.
+        hub            = 0.12, -- flat discount fraction per Inland Logistics Hub tile on the path.
+        cap            = 0.50, -- ceiling on the summed node discount (fraction of the haul cost).
     },
 }
 

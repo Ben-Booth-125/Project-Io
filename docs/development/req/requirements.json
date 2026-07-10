@@ -5679,6 +5679,34 @@
       "rows": [
         { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING: world generation deterministically stamps a road network onto tile.road_level after nations + population centres exist. Each nation's population centres are connected by a backbone (MST + relative-neighbour redundancy over terrain-weighted A* costs), two-tier (trunk road_level 2 between major centres scale>=3, else local road_level 1), rasterised along the A* path (max on overlap, ocean tiles skipped); territorially-adjacent nations get one local border link between their nearest centre pair. The generated field is reproducible across two generations, and the A* cost cache is invalidated so gameplay dispatch sees the roaded costs.", "verification": ["headless"], "result_metric": "8/8 checks", "notes": "New src/world/road_generation.{hpp,cpp}, wired in hard_coded_world.cpp after generate_nations; clears world.astar_cost_cache after stamping. Verified via tools/verify/road_generation_harness.cpp (auto-built by the CTest world-superset block, registered as CTest test 'road_generation_harness'): R1 lattice exists + no ocean roads, R2 both tiers present + none exceed trunk, R3 14/14 non-isolated centres touch a road, R4 road_level identical across two generations. Regression: determinism_harness/logistics_harness/trade_routes_harness/econ_harness/world_audit all green. road_level determinism guard lives in this dedicated harness's R4 (stronger than a determinism_harness field add). Tuning settled with Ben: local=1/trunk=2, major=scale>=3." }
       ]
+    },
+    {
+      "batch": "2026-07-10-roads",
+      "title": "BL-148 — Cities as free logistics hubs (agglomeration discount)",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-148",
+      "rows": [
+        { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING: an intra-body dispatch route whose A* path passes through population-centre tiles costs less than the same route with no population-centre tiles on it; the discount scales with the summed centre scale (tier) of the nodes on the path and is bounded (>= 0, capped). Determinism preserved.", "verification": ["headless"], "result_metric": "", "notes": "supply_system.cpp discount over logistics_path.tiles; tunables in economy.lua (logistics.city_discount_per_scale / discount_cap). Verified by logistics_harness.cpp new city-discount assertions." }
+      ]
+    },
+    {
+      "batch": "2026-07-10-roads",
+      "title": "BL-149 — Inland Logistics Hub building (land-mode convoy consolidator)",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-149",
+      "rows": [
+        { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING: a new inland_logistics_hub building_type exists (enum + econ entry + registry + placement rule + build-front-door affordance), places on non-ocean land, and its tile acts as a logistics node — an intra-body route whose A* path passes through a hub tile costs less than the same route without it, reusing the BL-148 node discount.", "verification": ["headless", "visual"], "result_metric": "", "notes": "components.hpp enum; recipe_registry m_building_econ 5->6 + named_type; economy.lua econ entry + logistics.hub_discount; placement_rules case; selection_panel build front door; presentation building_type_name; icons hub glyph. Headless: logistics_harness hub-discount assertion. Visual: build front door lists + places the hub." }
+      ]
+    },
+    {
+      "batch": "2026-07-10-roads",
+      "title": "BL-147 — Road rendering on the Planetary canvas + player-placeable roads",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-147",
+      "rows": [
+        { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING: the generated road lattice renders always-on on the Planetary canvas as edges between adjacent road tiles, with trunk (road_level 2) visually distinct (thicker/brighter) from local (road_level 1).", "verification": ["visual"], "result_metric": "", "notes": "body_surface_canvas.cpp road-edge pass in the wrap-copy loop; scripts/verify/roads.lua captures the home body." },
+        { "id": "R2", "status": "complete", "requirement": "the player can place a road segment via the tile build front door on a valid non-ocean, road-free land tile, gated on balance >= build_cost + materials (materials priced from the local market); placing sets tile.road_level and invalidates the A* cost cache, lowering that tile's traversal cost.", "verification": ["visual", "code"], "result_metric": "", "notes": "place_road in construction.{hpp,cpp}; can_place_road + already_road reason in placement_rules; pending_road_tile in ui_state; app.cpp branch; economy.lua roads cost + recipe_registry road_economics. Cost 40 cr + 5 steel; local road_level 1." }
+      ]
     }
 
   ]

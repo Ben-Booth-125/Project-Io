@@ -137,10 +137,11 @@ void recipe_registry::load_from_lua(lua_state& lua)
     {
         struct named_type { const char* key; building_type type; };
         const named_type types[] = {
-            { "extraction_site",     building_type::extraction_site },
-            { "processing_facility", building_type::processing_facility },
-            { "port",                building_type::port },
-            { "launchpad",           building_type::launchpad },
+            { "extraction_site",      building_type::extraction_site },
+            { "processing_facility",  building_type::processing_facility },
+            { "port",                 building_type::port },
+            { "launchpad",            building_type::launchpad },
+            { "inland_logistics_hub", building_type::inland_logistics_hub }, // BL-149
         };
         for (const named_type& nt : types)
         {
@@ -159,6 +160,23 @@ void recipe_registry::load_from_lua(lua_state& lua)
                 read_resource_map(*rcosts, e.resource_build_cost,
                                   std::string("buildings.") + nt.key + ".resource_costs");
             m_building_econ[static_cast<std::size_t>(nt.type)] = e;
+        }
+    }
+
+    // BL-147 road-placement cost (economy.roads.local). Same shape as a building's cost
+    // (flat credits + market-bought materials) but paid up front at placement.
+    sol::optional<sol::table> roads = (*econ)["roads"];
+    if (roads)
+    {
+        sol::optional<sol::table> local = (*roads)["local"];
+        if (local)
+        {
+            road_economics re;
+            re.build_cost = local->get_or("build_cost", re.build_cost);
+            sol::optional<sol::table> rcosts = (*local)["resource_costs"];
+            if (rcosts)
+                read_resource_map(*rcosts, re.resource_build_cost, "roads.local.resource_costs");
+            m_road_econ = re;
         }
     }
 
@@ -182,6 +200,18 @@ void recipe_registry::load_from_lua(lua_state& lua)
                 if (v)
                     m_logistics_costs[static_cast<std::size_t>(nm.mode)] = *v;
             }
+        }
+
+        // BL-148/149 logistics-node discount (logistics.node_discount). Partial table falls
+        // back to the struct defaults (which mirror economy.lua).
+        sol::optional<sol::table> nd = (*logistics)["node_discount"];
+        if (nd)
+        {
+            logistics_node_params p;
+            p.city_discount_per_scale = nd->get_or("city_per_scale", p.city_discount_per_scale);
+            p.hub_discount            = nd->get_or("hub",            p.hub_discount);
+            p.discount_cap            = nd->get_or("cap",            p.discount_cap);
+            m_logistics_nodes = p;
         }
     }
 }
