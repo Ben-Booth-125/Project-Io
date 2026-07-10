@@ -6,6 +6,43 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — On-canvas legends: bounded scrollable body (BL-164, folds BL-163); BL-165 reconciled (2026-07-10)
+
+**Context.** Backlog review with Ben — which designed items point at v0.1.0 and are doable now. Three
+designed items target v0.1.0 (the on-canvas legend/nav polish cluster). BL-165 (selection-aware
+descend) turned out to be **already landed** in commit 82e00f4 with its status stale at `designed`;
+reconciled to `complete`. Then took the legend pair. Ben's call: **fold BL-163 and BL-164 into one**
+— BL-164's scrollable child structurally cures the overrun, so the interim box-clamp was throwaway.
+
+**Diagnosis (by capture).** The on-canvas legend overrun was **not** the fixed 3-line Resource key
+that BL-163's prose named (its line-refs had drifted); it was the **count-driven** keys — Country,
+Market, Reach, Supply. `begin_lens_key` centred an **unbounded** `body_h` on the anchor (the minimap's
+vertical centre), so a long entry list spilled off the canvas. Confirmed on the Country lens: ~20
+nations, the box ran straight off the bottom with the tail unreachable.
+
+**Landed.** A shared **`draw_scroll_list_key`** helper (`src/ui/body_surface_canvas.cpp`): a dark
+panel with a fixed header (+ an optional good-selector combo, for the Market lens) over a **bounded,
+wheel/drag-scrolling borderless ImGui child** hosting the rows (the `draw_lens_resource_combo`
+pattern). Box height is **capped to the canvas vertical span** `[grid_top+8, canvas_bottom-8]` passed
+from `draw_body_surface_canvas` and clamped in-bounds, so overflow scrolls with a clean scrollbar
+instead of overrunning. The four count-driven keys were converted onto it via a
+**`key_row{marker_colour, label_colour, label, key_marker, bar_frac}`** vocabulary — `key_marker`
+covers the swatch (Country/Market), dot (Reach), and thickness-bar (Supply) glyphs. The fixed-height
+gradient-bar keys (Production/Scarcity/Population/Industry/Opportunity) keep their `begin_lens_key`
+chrome untouched.
+
+**Verified** by capture on this Windows box (software renderer, 1280×720): `country_lens_full` shows
+the full ~20-nation list bounded within the canvas (pre-fix it ran off the bottom); `market_lens`
+shows the Iron Ore combo + Market catchments swatch list intact through the shared helper.
+
+**Open.** Goldens for the changed lenses (`country_lens`, `market_lens`, and `reach`/`supply` where
+the key renders) need **re-blessing on Linux CI** — the legend change is intentional, so the raised
+diff (~9% country, ~3.4% market) is expected; not blanket-blessed here per the cross-platform-golden
+policy. The scroll path itself wasn't visually exercised (the test bodies' lists fit the bounded box
+without needing to scroll); it rests on ImGui's standard `BeginChild` overflow behaviour.
+
+---
+
 ## Session — Tile construction ledger, first pass (BL-162) (2026-07-10)
 
 **Context.** Ben: "there's actually no way to build anything" — the tile Selection element's

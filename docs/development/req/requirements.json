@@ -5659,6 +5659,16 @@
       "rows": [
         { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING: a selected TILE renders as a vertical stack — a placeholder image + [x,y] coordinate caption at top, the tile's non-zero deposits as vertical bar charts each scaled to that resource's world-max deposit (nice-ceiling axis with dotted gridlines, scrollable list), and a 2x2 action button grid at the bottom (Construct Buildings, Manage Buildings, History, Supply). Manage Buildings is disabled when no building occupies the tile; History and Supply are drawn but unwired stubs. The old action|facts split and the BL-071 affordance readout no longer render for a tile; the other selection kinds keep the action|facts form.", "verification": ["code", "visual"], "result_metric": "", "notes": "selection_panel.cpp only. Verified via scripts/verify/selection_tile_layout.lua (selection_tile_layout + selection_tile_layout_built), goldens blessed on the software renderer at 1280x720. NOTE: this work also fixed the verify capture resolution (it had drifted to 1720x1080 in commit 6a04ec9, size-mismatching every committed golden) — app.cpp now forces verify_w x verify_h (1280x720) in run_verify, and the whole golden set was re-blessed to current UI. 53/54 checks green (recipe_workforce.lua fails on a pre-existing content expectation, unrelated)." }
       ]
+    },
+
+    {
+      "batch": "2026-07-10",
+      "title": "BL-164 — On-canvas lens legends: bounded scrollable body (also resolves BL-163 overrun)",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-164 (BL-163 folded in)",
+      "rows": [
+        { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING: the count-driven on-canvas lens legends (Country, Market, Reach, Supply) never overrun the canvas. Their box height is capped to the canvas vertical span; when the entry list exceeds that height the rows live in a bounded, wheel/drag-scrolling ImGui child with a clean scrollbar while the header (and the Market lens's good-selector combo) stay fixed. A long list (e.g. the Country lens's full nation set) is fully reachable rather than clipped off the canvas bottom.", "verification": ["visual", "code"], "result_metric": "", "notes": "body_surface_canvas.cpp only. New shared helper draw_scroll_list_key + key_row/key_marker vocabulary; the four count-driven keys converted onto it, vertical bounds [grid_top+8, canvas_bottom-8] passed from draw_body_surface_canvas. Verified by capture on this Windows box (software renderer, 1280x720): country_lens_full shows the full ~20-nation list bounded within the canvas (pre-fix it ran off the bottom); market_lens shows the Iron Ore combo + Market catchments swatch list intact. Goldens for country_lens/market_lens (and reach/supply where the key renders) need re-blessing on Linux CI — the legend change is intentional, so the raised diff is expected. Per the cross-platform-golden policy the re-bless is done on Linux, not blanket-blessed here." }
+      ]
     }
 
   ]
