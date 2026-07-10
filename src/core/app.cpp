@@ -1636,22 +1636,21 @@ void app::render()
         ui::draw_overlay_controls(m_ui, mm_origin.x, lens_bar_y, mm_w);
     }
 
-    // Time panel — top-right, same width as the minimap (BL-138 compact redesign).
-    // Three rows: the year alone, centred and prominent; a date/quarter line
-    // (left) beside the compact speed controls (right); and the quarter-progress
-    // bar directly under the date line. The panel takes input (the speed
-    // buttons), so it is not flagged NoInputs.
+    // Time panel — top-right, same width as the minimap (BL-138 compact redesign,
+    // proportions revised on Ben's 2026-07-10 review). Four left-aligned stacked
+    // rows: the year and the date/quarter line at the SAME size (the year is no
+    // longer an oversized centred heading), then a full-width quarter-progress bar
+    // aligned with the full-width speed-control row directly below it. The panel
+    // takes input (the speed buttons), so it is not flagged NoInputs.
     const float tick_w = mm_w;
     // Height is content-derived (BL-097), not a fraction of the minimap's
-    // resolution-scaled mm_h (the BL-093 anti-pattern). Year row on top; left
-    // column: the date line plus the quarter-progress bar; right column: the
-    // speed-button row. Whichever column is taller sets the content height.
+    // resolution-scaled mm_h (the BL-093 anti-pattern): year + date lines, the thin
+    // progress bar, and the speed-button row, plus the inter-row spacing.
     const float time_line_h    = ImGui::GetTextLineHeightWithSpacing();
     const float time_frame_h   = ImGui::GetFrameHeight();
-    const float year_row_h     = time_line_h * 1.4f;
-    const float date_col_h     = time_line_h + time_frame_h;
-    const float ctrl_col_h     = time_frame_h;
-    const float time_content_h = year_row_h + std::max(date_col_h, ctrl_col_h);
+    const float time_prog_h    = 10.0f; // thin quarter-progress bar
+    const float time_spacing   = ImGui::GetStyle().ItemSpacing.y;
+    const float time_content_h = time_line_h * 2.0f + time_prog_h + time_frame_h + time_spacing * 3.0f;
     const float time_h         = time_content_h + ImGui::GetStyle().WindowPadding.y * 2.0f;
     {
         ImGui::SetNextWindowPos({disp.x - margin - tick_w, margin});
@@ -1670,44 +1669,24 @@ void app::render()
         const uint64_t day = m_sim_loop.day_tick();
         const ui::fmt::calendar_date date = ui::fmt::date_from_day(day);
 
-        // --- Year: alone on top, centred and visually prominent.
+        // --- Year and date/quarter: the SAME size, left-aligned as a stacked pair
+        // (Ben's 2026-07-10 review). The year is no longer an oversized centred
+        // heading — both read at the base font size, aligned on the panel's left edge.
+        ImGui::TextUnformatted(std::to_string(date.year).c_str());
+        ImGui::Text("%s %s (Q%d)", ui::fmt::month_abbrev(date.month),
+                    ui::fmt::ordinal_day(date.day).c_str(), date.quarter);
+
+        // --- Quarter-progress bar: full width, so it aligns with the speed-control
+        // row directly below it (the economy resolves on the quarter boundary).
+        ImGui::ProgressBar(ui::fmt::quarter_progress(day),
+                           {ImGui::GetContentRegionAvail().x, time_prog_h}, "");
+
+        // --- Speed controls: a full-width row of pause + speed-tier buttons, aligned
+        // with the progress bar above. The active speed is highlighted. When running,
+        // the pause slot is a blank button carrying a filled square glyph (drawn
+        // below); when paused it flips to a play ">" so it reflects the toggle state.
+        // Speed tiers use Roman numerals (I–V); the square avoids "||" reading as II.
         {
-            const std::string year_str = std::to_string(date.year);
-            ImGui::SetWindowFontScale(1.4f);
-            const float text_w = ImGui::CalcTextSize(year_str.c_str()).x;
-            ImGui::SetCursorPosX((ImGui::GetContentRegionAvail().x - text_w) * 0.5f);
-            ImGui::TextUnformatted(year_str.c_str());
-            ImGui::SetWindowFontScale(1.0f);
-        }
-
-        // 25% / 75% split via a two-column stretch table: the date line + its
-        // progress bar (left) and the speed controls (right).
-        if (ImGui::BeginTable("##time_cols", 2, ImGuiTableFlags_SizingStretchProp))
-        {
-            ImGui::TableSetupColumn("##date", ImGuiTableColumnFlags_WidthStretch, 0.25f);
-            ImGui::TableSetupColumn("##ctrl", ImGuiTableColumnFlags_WidthStretch, 0.75f);
-            ImGui::TableNextRow();
-
-            // --- Left: "Jan 1st (Q1)" then the quarter-progress bar directly
-            // below it (the economy resolves on the quarter boundary).
-            ImGui::TableSetColumnIndex(0);
-            ImGui::Text("%s %s (Q%d)", ui::fmt::month_abbrev(date.month),
-                        ui::fmt::ordinal_day(date.day).c_str(), date.quarter);
-            // Progress bar sits narrower than the date column and centred within it,
-            // rather than stretched flush to the column's left edge.
-            const float bar_w = ImGui::GetContentRegionAvail().x * 0.7f;
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (ImGui::GetContentRegionAvail().x - bar_w) * 0.5f);
-            ImGui::ProgressBar(ui::fmt::quarter_progress(day), {bar_w, 0.0f}, "");
-
-            // --- Right: the compressed speed controls. No "Sim NNNN" tick
-            // counter or "(paused)/(I..V)" text readout — the highlighted
-            // speed button already carries that state.
-            ImGui::TableSetColumnIndex(1);
-
-            // Pause plus speed buttons. The active speed is highlighted. When running,
-            // the pause slot is a blank button carrying a filled square glyph (drawn
-            // below); when paused it flips to a play ">" so it reflects the toggle state.
-            // Speed tiers use Roman numerals (I–V); the square avoids "||" reading as II.
             const char* labels[] = {m_sim_loop.paused() ? ">" : "##pause", "I", "II", "III", "IV", "V"};
             const int   speeds[] = { 0,    1,   2,   3,   4,   5 };
             const int   n        = 6;
@@ -1757,8 +1736,6 @@ void app::render()
                 if (i + 1 < n)
                     ImGui::SameLine();
             }
-
-            ImGui::EndTable();
         }
 
         ImGui::End();
