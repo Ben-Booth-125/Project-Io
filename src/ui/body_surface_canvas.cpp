@@ -100,6 +100,21 @@ ImU32 lerp_colour(ImU32 a, ImU32 b, float t)
     return IM_COL32(r, g, bl, 255);
 }
 
+/// Shared red→yellow→green ramp for every "red to green" lens (Opportunity,
+/// Population/workforce, Production). `t` in [0, 1]: 0 = red (low), 0.5 = yellow
+/// (mid), 1 = green (high). Routing all these lenses through one helper keeps a
+/// mid value reading **yellow** rather than the muddy brown a direct red→green
+/// blend (or the former grey neutral) produces. Ben's directive 2026-07-10.
+ImU32 ryg_colour(float t)
+{
+    constexpr ImU32 red    = IM_COL32(216, 100,  96, 255);
+    constexpr ImU32 yellow = IM_COL32(228, 200,  84, 255);
+    constexpr ImU32 green  = IM_COL32(110, 200, 120, 255);
+    t = std::clamp(t, 0.0f, 1.0f);
+    return t < 0.5f ? lerp_colour(red,    yellow, t * 2.0f)
+                    : lerp_colour(yellow, green,  (t - 0.5f) * 2.0f);
+}
+
 /// Diverging warm↔cool colour for a ratio relative to 1.0 (defined below); forward
 /// declared so the Production key (above its definition) can sample the same band.
 ImU32 diverging_colour(float ratio);
@@ -206,13 +221,11 @@ void draw_opportunity_key(ImDrawList* dl, ImVec2 anchor)
 
     dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Opportunity");
     y += line_h + 4.0f;
-    constexpr ImU32 low  = IM_COL32(216, 100,  96, 255);
-    constexpr ImU32 high = IM_COL32(110, 200, 120, 255);
     constexpr int segs = 24;
     for (int i = 0; i < segs; ++i)
     {
         const float t = static_cast<float>(i) / (segs - 1);
-        const ImU32 c = lerp_colour(low, high, t);
+        const ImU32 c = ryg_colour(t);
         dl->AddRectFilled({ x + bar_w * static_cast<float>(i) / segs, y },
                           { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
     }
@@ -263,18 +276,19 @@ ImU32 diverging_colour(float ratio)
     return d < 0.0f ? lerp_colour(neutral, cool, -d) : lerp_colour(neutral, warm, d);
 }
 
-/// Diverging red→green colour for a ratio relative to 1.0 (BL-137, Production lens):
-/// `ratio = value / mean`; 1.0 is the neutral mid-tone, < 1 (below mean) trends red,
-/// > 1 (above mean) trends green. Same log-of-ratio centring as diverging_colour, but
-/// a dedicated ramp — diverging_colour stays untouched for the Market lens.
+/// Diverging red→yellow→green colour for a ratio relative to 1.0 (BL-137, Production
+/// lens): `ratio = value / mean`; 1.0 is the yellow mid-tone, < 1 (below mean) trends
+/// red, > 1 (above mean) trends green. Same log-of-ratio centring as diverging_colour,
+/// but routed through the shared ryg_colour ramp — diverging_colour stays untouched for
+/// the Market lens.
 ImU32 production_colour(float ratio)
 {
     ratio = std::clamp(ratio, 0.25f, 4.0f);
     const float d = std::log(ratio) / std::log(4.0f); // [-1, 1]
-    constexpr ImU32 neutral = IM_COL32(205, 205, 210, 255);
-    constexpr ImU32 low     = IM_COL32(216, 100,  96, 255);
-    constexpr ImU32 high    = IM_COL32(110, 200, 120, 255);
-    return d < 0.0f ? lerp_colour(neutral, low, -d) : lerp_colour(neutral, high, d);
+    // Map the diverging axis onto the shared red→yellow→green ramp so the mean
+    // (d = 0) reads yellow, below-mean red, above-mean green — one vocabulary
+    // across the red-to-green lenses (Ben's directive 2026-07-10).
+    return ryg_colour((d + 1.0f) * 0.5f);
 }
 
 /// On-canvas legend for the Market lens: a diverging cheap↔dear gradient bar plus
@@ -428,13 +442,11 @@ void draw_population_key(ImDrawList* dl, ImVec2 anchor)
     // Red→green rank bar (BL-135): mirrors the per-tile value-mark dot the lens
     // now draws instead of a full-tile tint — low efficiency reads red, full
     // labour reads green.
-    constexpr ImU32 low  = IM_COL32(216, 100,  96, 255);
-    constexpr ImU32 high = IM_COL32(110, 200, 120, 255);
     constexpr int segs = 24;
     for (int i = 0; i < segs; ++i)
     {
         const float t0 = static_cast<float>(i) / segs;
-        const ImU32 c  = lerp_colour(low, high, t0);
+        const ImU32 c  = ryg_colour(t0);
         dl->AddRectFilled({ x + bar_w * t0, y },
                           { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
     }
@@ -1618,10 +1630,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     if (it != opp_score.end() && opp_max_score > 0.0f)
                         t = std::clamp(it->second / opp_max_score, 0.0f, 1.0f);
                 }
-                constexpr ImU32 low  = IM_COL32(216, 100,  96, 255);
-                constexpr ImU32 high = IM_COL32(110, 200, 120, 255);
                 const float mr = std::max(2.0f, draw_r * 0.22f);
-                icons::value_mark(dl, {cx, cy}, mr, lerp_colour(low, high, t));
+                icons::value_mark(dl, {cx, cy}, mr, ryg_colour(t));
             }
 
             // Supply lens: draw a convoy glyph on every tile when the active body
@@ -2064,6 +2074,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 marker_hit = mkt_hit;
 
             state.selected_entity = (marker_hit != null_entity) ? marker_hit : hovered_tile;
+            // A fresh click is an explicit select gesture: re-show the panel even
+            // when it re-selects the same entity the player had dismissed (close
+            // hides, does not destroy — SELECTION.md).
+            state.selection_hidden_for = null_entity;
         }
         else if (hovered_tile != null_entity)
         {
