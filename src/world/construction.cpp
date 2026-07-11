@@ -108,7 +108,7 @@ construction_result construct_building(world& w, const recipe_registry& reg,
 }
 
 construction_result place_road(world& w, const recipe_registry& reg,
-                               entity_id corp, entity_id tile)
+                               entity_id corp, entity_id tile, std::uint8_t tier)
 {
     const auto corp_it = w.corporations.find(corp);
     if (corp_it == w.corporations.end())
@@ -118,12 +118,12 @@ construction_result place_road(world& w, const recipe_registry& reg,
     if (tile_it == w.tiles.end())
         return construction_result::no_tile;
 
-    // Validity: non-ocean land, not already roaded (BL-147).
-    if (!placement_rules::can_place_road(tile_it->second))
+    // Validity: non-ocean land, and this tier strictly upgrades the tile (BL-172).
+    if (!placement_rules::can_place_road(tile_it->second, tier))
         return construction_result::invalid_tile;
 
     corporation_component& cc = corp_it->second;
-    const road_economics&  re = reg.road_econ();
+    const road_economics&  re = reg.road_econ(tier);
 
     // Material cost priced from the tile's local market, mirroring construct_building — but
     // debited up front in one shot (a road is instant, not a durative pay-as-you-build).
@@ -150,10 +150,10 @@ construction_result place_road(world& w, const recipe_registry& reg,
     if (cc.balance < total_cost)
         return construction_result::insufficient_funds;
 
-    // Commit: debit, raise the tile to the local road tier, invalidate the A* cost cache
+    // Commit: debit, raise the tile to the chosen road tier, invalidate the A* cost cache
     // (road_level changed, so cached path costs are stale — world.hpp invalidation contract).
     cc.balance -= total_cost;
-    tile_it->second.road_level = 1; // local road tier (BL-146 trunk is 2; player places local).
+    tile_it->second.road_level = tier; // BL-172: 1=Track, 2=Road, 3=Highway (upgrade-in-place).
     w.astar_cost_cache.clear();
 
     return construction_result::placed;

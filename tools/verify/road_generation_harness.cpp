@@ -2,8 +2,8 @@
 // Builds the hard-coded world and asserts:
 //   R1 presence   — road generation stamps road_level > 0 on some Kepler land
 //                   tiles (the lattice exists), and never on ocean tiles.
-//   R2 two-tier   — both local (1) and trunk (2) tiers appear, and no tile
-//                   carries a tier beyond trunk (generation ceiling).
+//   R2 three-tier — all three tiers appear — Track (1), Road (2), Highway (3) —
+//                   and no tile carries a tier beyond Highway (generation ceiling).
 //   R3 connectivity — every population centre with >=1 same-nation peer sits on,
 //                   or orthogonally adjacent to, a roaded tile (its lattice reached
 //                   it). Uses the same 4-cardinal + column-wrap topology as gen.
@@ -36,7 +36,8 @@ int main()
 
     // Raster index of Kepler tiles (grid_y*gw + grid_x -> tile), for adjacency.
     std::vector<entity_id> grid(static_cast<std::size_t>(gw) * gh, null_entity);
-    int roaded_land = 0, roaded_ocean = 0, local_tiles = 0, trunk_tiles = 0, over_trunk = 0;
+    int roaded_land = 0, roaded_ocean = 0;
+    int track_tiles = 0, road_tiles = 0, highway_tiles = 0, over_highway = 0;
     for (const auto& [tid, tc] : w.tiles)
     {
         if (tc.body != kepler) continue;
@@ -46,9 +47,10 @@ int main()
         {
             if (tc.composition == terrain_composition::ocean) ++roaded_ocean;
             else                                              ++roaded_land;
-            if (tc.road_level == 1) ++local_tiles;
-            else if (tc.road_level == 2) ++trunk_tiles;
-            else ++over_trunk;
+            if      (tc.road_level == 1) ++track_tiles;
+            else if (tc.road_level == 2) ++road_tiles;
+            else if (tc.road_level == 3) ++highway_tiles;
+            else                         ++over_highway;
         }
     }
 
@@ -56,10 +58,13 @@ int main()
     check(roaded_land > 0, "R1 road lattice exists (some Kepler land tile has road_level > 0)");
     check(roaded_ocean == 0, "R1 no road_level stamped on ocean tiles");
 
-    // R2 two-tier.
-    check(local_tiles > 0, "R2 local roads present (road_level 1)");
-    check(trunk_tiles > 0, "R2 trunk roads present (road_level 2)");
-    check(over_trunk == 0, "R2 no tile exceeds the trunk tier (road_level <= 2)");
+    // R2 three-tier ladder (BL-172): Track (1) / Road (2) / Highway (3).
+    std::printf("      (tiers: track=%d road=%d highway=%d over=%d)\n",
+                track_tiles, road_tiles, highway_tiles, over_highway);
+    check(track_tiles > 0, "R2 track roads present (road_level 1)");
+    check(road_tiles > 0, "R2 road-tier roads present (road_level 2)");
+    check(highway_tiles > 0, "R2 highway roads present (road_level 3)");
+    check(over_highway == 0, "R2 no tile exceeds the highway tier (road_level <= 3)");
 
     // R3 connectivity — a centre with a same-nation peer must touch a road tile
     // (itself or a 4-cardinal neighbour, column-wrapped).

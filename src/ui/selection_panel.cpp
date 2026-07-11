@@ -504,11 +504,13 @@ void draw_selection_action(const world& w, const recipe_registry& reg,
                     ImGui::TextColored(construction_status_colour(rate), "%s",
                         construction_status(rate, b.ticks_remaining).c_str());
                 }
-                // Manage — routes to the building-management panel (construction_panel),
-                // which owns the workforce / recipe / decommission controls.
+                // Manage — routes to the tile-scoped Manage ledger (construction_panel's
+                // draw_building_manage_ledger), which owns the workforce / recipe /
+                // decommission controls for *this* building, rather than the corp-wide
+                // Building ledger. Symmetric with the tile's "Construct Buildings" front door.
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Manage");
                 if (ImGui::Button("Manage building"))
-                    ui.show_construction_panel = true;
+                    ui.show_manage_ledger = true;
             }
             else
             {
@@ -671,7 +673,7 @@ void draw_tile_selection(const world& w, ui_state& ui)
     ImGui::SameLine();
     ImGui::BeginDisabled(building_on_tile(w, sel) == null_entity);
     if (ImGui::Button("Manage\nBuildings", bsz))
-        ui.show_construction_panel = true;
+        ui.show_manage_ledger = true; // tile-scoped Manage ledger (draw_building_manage_ledger)
     ImGui::EndDisabled();
 
     // History / Supply: drawn for layout completeness, wired to nothing yet
@@ -939,57 +941,83 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
         ImGui::Spacing();
     }
 
-    // Road placement (BL-147) — a per-tile mutation, not a building, so it takes its own
-    // affordance + the pending_road_tile path (place_road) rather than the candidate loop above.
+    // Road placement (BL-147 core, BL-172 tier ladder) — a per-tile mutation, not a building, so
+    // it takes its own affordances + the pending_road_tile/tier path (place_road). Three tiers:
+    // Track (1) / Road (2) / Highway (3); the glyph weight + brightness mirror the on-canvas
+    // render, and each shows its own cost + validity (upgrade-in-place is allowed, so a tile that
+    // already carries an equal-or-better road greys out only the tiers it meets or exceeds).
     {
-        const road_economics& re = reg.road_econ();
-        const placement_rules::placement_result pr = placement_rules::can_place_road(tile);
-        const bool affordable = balance >= re.build_cost;
-
-        ImGui::BeginChild("Road##build", {0.0f, row_h}, true,
-                          ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
-        ImDrawList* cdl = ImGui::GetWindowDrawList();
-
-        const ImVec2 ip = ImGui::GetCursorScreenPos();
-        const ImVec2 imx = {ip.x + img, ip.y + img};
-        cdl->AddRectFilled(ip, imx, IM_COL32(72, 72, 72, 255), 3.0f);
-        cdl->AddRect(ip, imx, IM_COL32(110, 110, 110, 255), 3.0f);
-        // A short road glyph: a pale segment across the placeholder box.
-        cdl->AddLine({ip.x + img * 0.2f, ip.y + img * 0.7f}, {ip.x + img * 0.8f, ip.y + img * 0.3f},
-                     IM_COL32(210, 200, 150, 255), 3.0f);
-        ImGui::Dummy({img, img});
-        ImGui::SameLine();
-
-        ImGui::BeginGroup();
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Road");
-
-        std::string cost = std::to_string(static_cast<int>(re.build_cost)) + " cr";
-        for (std::size_t i = 0; i < resource_count; ++i)
-            if (re.resource_build_cost[i] > 0.0f)
-                cost += ", " + std::to_string(static_cast<int>(re.resource_build_cost[i]))
-                      + " " + presentation_of(static_cast<resource_type>(i)).abbrev;
-        ImGui::TextDisabled("%s", cost.c_str());
-
-        if (pr.ok())
+        struct road_tier_affordance
         {
-            ImGui::BeginDisabled(!affordable);
-            if (ImGui::Button("Build##road"))
-                ui.construction.pending_road_tile = tile_id;
-            ImGui::EndDisabled();
-            if (!affordable)
+            const char*  name;
+            std::uint8_t level;
+            float        glyph_thick; // matches the canvas weight ladder
+            ImU32        glyph_col;
+        };
+        static const road_tier_affordance road_tiers[3] = {
+            { "Track",   1, 2.0f, IM_COL32(175, 158, 120, 255) },
+            { "Road",    2, 3.0f, IM_COL32(205, 188, 140, 255) },
+            { "Highway", 3, 4.0f, IM_COL32(225, 205, 150, 255) },
+        };
+
+        for (const road_tier_affordance& rt : road_tiers)
+        {
+            ImGui::PushID(static_cast<int>(rt.level)); // unique ImGui ids per tier
+
+            const road_economics& re = reg.road_econ(rt.level);
+            const placement_rules::placement_result pr =
+                placement_rules::can_place_road(tile, rt.level);
+            const bool affordable = balance >= re.build_cost;
+
+            ImGui::BeginChild("road##build", {0.0f, row_h}, true,
+                              ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
+            ImDrawList* cdl = ImGui::GetWindowDrawList();
+
+            const ImVec2 ip = ImGui::GetCursorScreenPos();
+            const ImVec2 imx = {ip.x + img, ip.y + img};
+            cdl->AddRectFilled(ip, imx, IM_COL32(72, 72, 72, 255), 3.0f);
+            cdl->AddRect(ip, imx, IM_COL32(110, 110, 110, 255), 3.0f);
+            // A short road glyph: a segment across the box, weighted by tier (matches the canvas).
+            cdl->AddLine({ip.x + img * 0.2f, ip.y + img * 0.7f},
+                         {ip.x + img * 0.8f, ip.y + img * 0.3f}, rt.glyph_col, rt.glyph_thick);
+            ImGui::Dummy({img, img});
+            ImGui::SameLine();
+
+            ImGui::BeginGroup();
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", rt.name);
+
+            std::string cost = std::to_string(static_cast<int>(re.build_cost)) + " cr";
+            for (std::size_t i = 0; i < resource_count; ++i)
+                if (re.resource_build_cost[i] > 0.0f)
+                    cost += ", " + std::to_string(static_cast<int>(re.resource_build_cost[i]))
+                          + " " + presentation_of(static_cast<resource_type>(i)).abbrev;
+            ImGui::TextDisabled("%s", cost.c_str());
+
+            if (pr.ok())
             {
-                ImGui::SameLine();
-                ImGui::TextDisabled("Can't afford");
+                ImGui::BeginDisabled(!affordable);
+                if (ImGui::Button("Build"))
+                {
+                    ui.construction.pending_road_tile = tile_id;
+                    ui.construction.pending_road_tier = rt.level;
+                }
+                ImGui::EndDisabled();
+                if (!affordable)
+                {
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("Can't afford");
+                }
             }
-        }
-        else
-        {
-            ImGui::TextColored(ImVec4{0.90f, 0.55f, 0.55f, 1.0f}, "%s", pr.message());
-        }
-        ImGui::EndGroup();
+            else
+            {
+                ImGui::TextColored(ImVec4{0.90f, 0.55f, 0.55f, 1.0f}, "%s", pr.message());
+            }
+            ImGui::EndGroup();
 
-        ImGui::EndChild();
-        ImGui::Spacing();
+            ImGui::EndChild();
+            ImGui::Spacing();
+            ImGui::PopID();
+        }
     }
 
     ImGui::EndChild();

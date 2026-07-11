@@ -87,16 +87,20 @@ economy = {
         },
     },
 
-    -- BL-147: player-placeable roads. A road is a per-tile mutation (raises tile.road_level,
-    -- lowering its A* traversal cost), not a building — so it has no maintenance/recipe, just an
-    -- up-front placement cost. `local` is the tier the player places (road_level 1); the generated
-    -- lattice (BL-146) also seeds trunk (road_level 2). Cost mirrors a building's shape (credits +
-    -- materials from the local market) but is far cheaper — a road tile is a small reach investment.
+    -- Player-placeable roads, now a three-tier ladder (BL-172; BL-147 shipped a single tier). A
+    -- road is a per-tile mutation (raises tile.road_level, lowering its A* traversal cost), not a
+    -- building — no maintenance/recipe, just an up-front placement cost. The tiers, by road_level:
+    --   track (1)   — minor / low-throughput; traversal x0.67. The cheap reach investment.
+    --   road (2)    — regular; traversal x0.50.
+    --   highway (3) — high-throughput backbone; traversal x0.40 (diminishing returns).
+    -- ("Throughput" is cost-discount, not a capacity cap — per-node capacity is out of prototype
+    -- scope, SUPPLY.md.) Generation (BL-146/BL-172) lays Road/Highway between cities; the player
+    -- places any tier and may upgrade in place. Cost mirrors a building's shape (credits +
+    -- materials from the local market) but is far cheaper — a road tile is a small reach step.
     roads = {
-        ["local"] = {
-            build_cost = 40.0,
-            resource_costs = { steel = 5.0 },
-        },
+        track   = { build_cost = 25.0, resource_costs = { steel = 3.0  } },
+        road    = { build_cost = 45.0, resource_costs = { steel = 6.0  } },
+        highway = { build_cost = 90.0, resource_costs = { steel = 14.0 } },
     },
 
     -- BL-078: the elastic nation-substrate model. The saturated background

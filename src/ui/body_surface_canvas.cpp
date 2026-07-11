@@ -1524,23 +1524,34 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             if (!revealed)
                 continue;
 
-            // Road network (BL-146 generated + BL-147 player-placed). Always-on under every
-            // lens (roads are terrain, not an overlay): draw an edge from each roaded tile to
-            // its roaded cardinal neighbour in the right + down directions, so each segment is
-            // drawn once. Trunk roads (both ends road_level >= 2, the generated backbone) read
-            // thicker/brighter than local roads (road_level 1, the tier the player places). The
-            // neighbour is taken at the same wrap offset k; a right-edge that wraps the cylinder
-            // seam is shifted one period so the segment stays short. Skips edges into an
-            // unrevealed (unsurveyed) neighbour so roads don't leak past the survey fog.
+            // Road network (BL-146/BL-172 generated + BL-147/BL-172 player-placed). Always-on
+            // under every lens (roads are terrain, not an overlay). BL-172 span/symmetry fix:
+            // each roaded tile draws its OWN half of every shared road edge — from its centre to
+            // the MIDPOINT of the centre-to-neighbour line — toward each roaded, survey-revealed
+            // cardinal neighbour (the 4 directions the intra-body A* actually traverses; ocean is
+            // never roaded, so "land" is implicit). Two roaded tiles' halves meet exactly at the
+            // shared-edge midpoint = one continuous span, identical whichever tile is "from", and
+            // the survey fog clips cleanly (a masked neighbour draws nothing). A small centre cap
+            // rounds junctions and keeps an isolated / just-placed road tile visible. Styled by
+            // THIS tile's tier — Track(1) thin/dim, Road(2) medium, Highway(3) thick/bright — so a
+            // tier change reads as a taper at the midpoint. Seam-crossing edges shift one period.
             if (tile.road_level > 0)
             {
-                static const int road_off[2][2] = {{+1, 0}, {0, +1}}; // right, down
-                for (int n = 0; n < 2; ++n)
+                ImU32 col; float thick;
+                switch (tile.road_level)
                 {
-                    const int nrow = tile.grid_y + road_off[n][1];
+                    case 1:  col = IM_COL32(175, 158, 120, 205); thick = std::max(1.2f, draw_r * 0.12f); break;
+                    case 2:  col = IM_COL32(205, 188, 140, 225); thick = std::max(1.8f, draw_r * 0.18f); break;
+                    default: col = IM_COL32(225, 205, 150, 238); thick = std::max(2.4f, draw_r * 0.24f); break;
+                }
+
+                static const int card_off[4][2] = {{+1, 0}, {-1, 0}, {0, +1}, {0, -1}};
+                for (int n = 0; n < 4; ++n)
+                {
+                    const int nrow = tile.grid_y + card_off[n][1];
                     if (nrow < 0 || nrow >= gh)
                         continue;
-                    const int raw_col = tile.grid_x + road_off[n][0];
+                    const int raw_col = tile.grid_x + card_off[n][0];
                     int ncol = raw_col % gw;
                     if (ncol < 0)
                         ncol += gw;
@@ -1556,16 +1567,16 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
                     ImVec2 nb_sc = to_screen(hex_local_centre(ncol, nrow, hex_size));
                     nb_sc.x += static_cast<float>(k) * period_px;
-                    if (raw_col >= gw)
-                        nb_sc.x += period_px; // right-edge wrapped the seam: keep the line short
+                    if (raw_col >= gw)      nb_sc.x += period_px; // east across the cylinder seam
+                    else if (raw_col < 0)   nb_sc.x -= period_px; // west across the seam
 
-                    const bool  trunk = (tile.road_level >= 2 && nb_tile_it->second.road_level >= 2);
-                    const ImU32 col   = trunk ? IM_COL32(225, 205, 150, 235)
-                                              : IM_COL32(175, 158, 120, 205);
-                    const float thick = trunk ? std::max(2.0f, draw_r * 0.22f)
-                                              : std::max(1.2f, draw_r * 0.13f);
-                    dl->AddLine({cx, cy}, {nb_sc.x, nb_sc.y}, col, thick);
+                    // This tile's half only: centre -> shared-edge midpoint (the neighbour draws
+                    // its half, and the two meet — continuous and symmetric, no "from vs to").
+                    const ImVec2 mid = {(cx + nb_sc.x) * 0.5f, (cy + nb_sc.y) * 0.5f};
+                    dl->AddLine({cx, cy}, mid, col, thick);
                 }
+                // Centre cap: rounds junctions and keeps a lone / just-placed road tile visible.
+                dl->AddCircleFilled({cx, cy}, std::max(1.5f, thick * 0.75f), col);
             }
 
             // Nation borders (Country lens only). Draw a dark line on every hex

@@ -652,6 +652,7 @@ int app::run_verify(const std::string& script_path, bool bless)
         else if (name == "balance")      m_ui.show_balance_ledger = open;
         else if (name == "corporation")  m_ui.show_corporation_panel = open;
         else if (name == "build")        m_ui.show_build_ledger = open; // tile construction ledger (BL-162)
+        else if (name == "manage")       m_ui.show_manage_ledger = open; // tile building-management ledger
     });
 
     // Open the Layer 4 construction / building-management panel so a capture shows
@@ -1901,13 +1902,25 @@ void app::render()
     // Selection element. The build ledger only applies to a selected tile.
     if (!ui::any_panel_open(m_ui))
     {
-        const bool sel_is_tile = m_ui.selected_entity != null_entity &&
-                                 m_world.tiles.count(m_ui.selected_entity) > 0;
-        if (m_ui.show_build_ledger && sel_is_tile)
+        const entity_id sel        = m_ui.selected_entity;
+        const bool      sel_is_tile = sel != null_entity && m_world.tiles.count(sel) > 0;
+
+        // A building is manageable when the selection *is* a building, or a tile carrying
+        // one — the same resolution draw_building_manage_ledger uses. Gates the tile-scoped
+        // Manage ledger so it wins the column only when there is a building to show.
+        bool can_manage = sel != null_entity && m_world.buildings.count(sel) > 0;
+        if (!can_manage && sel_is_tile)
+            for (const auto& [bid, b] : m_world.buildings)
+                if (b.tile == sel) { can_manage = true; break; }
+
+        if (m_ui.show_manage_ledger && can_manage)
+            ui::draw_building_manage_ledger(m_world, m_registry, m_ui);
+        else if (m_ui.show_build_ledger && sel_is_tile)
             ui::draw_construction_ledger(m_world, m_registry, m_ui);
         else
         {
-            m_ui.show_build_ledger = false; // not a tile → no build ledger
+            m_ui.show_build_ledger  = false; // not a tile → no build ledger
+            m_ui.show_manage_ledger = false; // no manageable building → no manage ledger
             ui::draw_selection_panel(m_world, m_registry, m_last_econ_report, m_ui);
         }
     }
@@ -1948,17 +1961,24 @@ void app::render()
         m_ui.construction.pending_tile = null_entity; // consume the request
     }
 
-    // Execute any road-placement request queued this frame by the build front door's
-    // "Road" affordance (BL-147). A road is a per-tile mutation (raises road_level, lowers
-    // A* cost), not a building, so it routes through place_road rather than construct_building.
+    // Execute any road-placement request queued this frame by the build front door's Track/Road/
+    // Highway affordances (BL-147 core, BL-172 tier). A road is a per-tile mutation (raises
+    // road_level, lowers A* cost), not a building, so it routes through place_road.
     if (m_ui.construction.pending_road_tile != null_entity)
     {
         const construction_result r = place_road(
-            m_world, m_registry, m_world.player_entity, m_ui.construction.pending_road_tile);
+            m_world, m_registry, m_world.player_entity, m_ui.construction.pending_road_tile,
+            m_ui.construction.pending_road_tier);
         switch (r)
         {
             case construction_result::placed:
-                m_ui.construction.last_message = "Road built."; break;
+            {
+                static const char* const kName[3] = { "Track", "Road", "Highway" };
+                const std::uint8_t t = m_ui.construction.pending_road_tier;
+                const std::size_t  i = (t < 1u ? 1u : (t > 3u ? 3u : t)) - 1u;
+                m_ui.construction.last_message = std::string(kName[i]) + " built.";
+                break;
+            }
             case construction_result::invalid_tile:
                 m_ui.construction.last_message = "Can't build a road there."; break;
             case construction_result::insufficient_funds:

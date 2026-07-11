@@ -163,20 +163,25 @@ void recipe_registry::load_from_lua(lua_state& lua)
         }
     }
 
-    // BL-147 road-placement cost (economy.roads.local). Same shape as a building's cost
-    // (flat credits + market-bought materials) but paid up front at placement.
+    // Road-placement cost per tier (economy.roads.{track,road,highway}, BL-172; BL-147 shipped a
+    // single `local` tier). Same shape as a building's cost (flat credits + market-bought
+    // materials) but paid up front at placement. Tier index 0..2 = Track/Road/Highway.
     sol::optional<sol::table> roads = (*econ)["roads"];
     if (roads)
     {
-        sol::optional<sol::table> local = (*roads)["local"];
-        if (local)
+        static constexpr const char* kTierKey[3] = { "track", "road", "highway" };
+        for (std::uint8_t tier = 1; tier <= 3; ++tier)
         {
-            road_economics re;
-            re.build_cost = local->get_or("build_cost", re.build_cost);
-            sol::optional<sol::table> rcosts = (*local)["resource_costs"];
+            sol::optional<sol::table> t = (*roads)[kTierKey[tier - 1]];
+            if (!t)
+                continue;
+            road_economics re = m_road_econ[tier - 1]; // keep the struct default as the fallback
+            re.build_cost = t->get_or("build_cost", re.build_cost);
+            sol::optional<sol::table> rcosts = (*t)["resource_costs"];
             if (rcosts)
-                read_resource_map(*rcosts, re.resource_build_cost, "roads.local.resource_costs");
-            m_road_econ = re;
+                read_resource_map(*rcosts, re.resource_build_cost,
+                                  std::string("roads.") + kTierKey[tier - 1] + ".resource_costs");
+            m_road_econ[tier - 1] = re;
         }
     }
 

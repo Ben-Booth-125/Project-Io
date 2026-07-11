@@ -133,9 +133,10 @@ struct tile_component
     float      habitability;     ///< 0.0 (uninhabitable) – 1.0 (hospitable).
     float      substrate_density = 0.0f; ///< Background nation industrial occupation [0, 1].
 
-    /// Road tier on this tile (BL-077). 0 = no road; higher tiers lower the intra-body A*
-    /// traversal cost of the tile (road_traversal_multiplier). Populated by BL-146 road
-    /// generation and BL-147 player placement; 0 everywhere in the economic core.
+    /// Road tier on this tile (BL-077 field; BL-172 ladder). 0 = no road; 1 = Track, 2 = Road,
+    /// 3 = Highway. Higher tiers lower the intra-body A* traversal cost of the tile
+    /// (road_traversal_multiplier: x0.67 / x0.50 / x0.40). Populated by BL-146/BL-172 road
+    /// generation and BL-147/BL-172 player placement; 0 everywhere in the economic core.
     std::uint8_t road_level = 0;
 };
 

@@ -1,12 +1,13 @@
--- Visual verification for the road network (BL-146 generation + BL-147 rendering &
+-- Visual verification for the road network (BL-146 generation + BL-147/BL-172 rendering &
 -- placement) and the Inland Logistics Hub (BL-149) build affordance.
 --
---   BL-147 R1: the generated road lattice renders always-on on the Planetary canvas as
---           edges between adjacent road tiles — trunk (road_level 2, the backbone) thicker
---           and brighter than local (road_level 1). Visible on the home body (Kepler), which
---           generates with a per-nation road network (BL-146).
---   BL-147 R2 / BL-149: the tile build front door lists a "Road" affordance and an
---           "Inland Logistics Hub" alongside the buildings, each with its cost + validity.
+--   BL-172 R1: the generated road lattice renders always-on on the Planetary canvas as
+--           continuous, symmetric spans (each roaded tile draws its own half of the shared edge,
+--           meeting at the edge midpoint — no "from vs to" asymmetry), over a three-tier ladder:
+--           Track (road_level 1) thin/dim, Road (2) medium, Highway (3) thick/bright. Visible on
+--           the home body (Kepler), which generates with a per-nation road network (BL-146/172).
+--   BL-172 R1 / BL-149: the tile build front door lists THREE road affordances — Track, Road,
+--           Highway (each with its own cost + validity) — and an "Inland Logistics Hub".
 -- Run with: ProjectIo --verify scripts/verify/roads.lua
 
 verify.econ_step(4)                     -- populate market state (build-cost context)

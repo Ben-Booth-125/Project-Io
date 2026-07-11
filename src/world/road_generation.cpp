@@ -14,13 +14,26 @@
 
 namespace {
 
-// Road tiers (BL-146, settled with Ben 2026-07-10). road_traversal_multiplier =
-// 1/(1+0.5*tier), so local (1) cuts a tile's cost to x0.67 and trunk (2) to x0.50,
-// leaving tier 3 (x0.40) as headroom for player-placed upgrades (BL-147).
-constexpr std::uint8_t kLocalRoad = 1;
-constexpr std::uint8_t kTrunkRoad = 2;
-// A centre this size or larger anchors the trunk backbone (City=3 .. Metropolis=5).
+// Road tiers (BL-172 three-tier ladder; BL-146 shipped local/trunk). road_traversal_multiplier
+// = 1/(1+0.5*tier): Track(1) x0.67, Road(2) x0.50, Highway(3) x0.40. Generation assigns a tier
+// per edge from the two centres' scales; the player may then upgrade any tile (BL-172 place_road).
+constexpr std::uint8_t kTrack   = 1;
+constexpr std::uint8_t kRoad    = 2;
+constexpr std::uint8_t kHighway = 3;
+// Scale thresholds: a Highway joins two major centres (City=3 .. Metropolis=5); a Road needs at
+// least one Town+ (scale 2); everything smaller (and every cross-nation border link) is a Track.
 constexpr int          kMajorScale = 3;
+constexpr int          kMidScale   = 2;
+
+// Tier for an edge between two centres of the given scales (BL-172).
+std::uint8_t edge_tier(int scale_a, int scale_b)
+{
+    if (scale_a >= kMajorScale && scale_b >= kMajorScale)
+        return kHighway;
+    if (scale_a >= kMidScale || scale_b >= kMidScale)
+        return kRoad;
+    return kTrack;
+}
 
 constexpr float kUnreachable = std::numeric_limits<float>::max();
 
@@ -158,13 +171,11 @@ void generate_roads(world& w, entity_id body)
                 chosen.emplace_back(e.a, e.b);
         }
 
-        // 3+4. Rasterise: trunk when both endpoints are major centres, else local.
+        // 3+4. Rasterise: tier by the two centres' scales (Highway / Road / Track).
         for (const auto& [a, b] : chosen)
         {
-            const bool trunk = nodes[members[a]].scale >= kMajorScale &&
-                               nodes[members[b]].scale >= kMajorScale;
-            stamp_edge(w, body, nodes[members[a]].tile, nodes[members[b]].tile,
-                       trunk ? kTrunkRoad : kLocalRoad);
+            const std::uint8_t tier = edge_tier(nodes[members[a]].scale, nodes[members[b]].scale);
+            stamp_edge(w, body, nodes[members[a]].tile, nodes[members[b]].tile, tier);
         }
     }
 
@@ -222,7 +233,7 @@ void generate_roads(world& w, entity_id body)
                 }
             }
         if (best_a != null_entity)
-            stamp_edge(w, body, best_a, best_b, kLocalRoad);
+            stamp_edge(w, body, best_a, best_b, kTrack);
     }
 
     // The A* cost cache (world.astar_cost_cache) was populated road-free while this

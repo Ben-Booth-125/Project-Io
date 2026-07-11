@@ -18,7 +18,7 @@ const char* placement_reason_text(placement_reason r)
         case placement_reason::unsurveyed:        return "Body not yet surveyed";
         case placement_reason::slot_full:         return "No build slot free here";
         case placement_reason::no_tile:           return "No such tile";
-        case placement_reason::already_road:      return "This tile already has a road";
+        case placement_reason::already_road:      return "This tile already has an equal or better road";
     }
     return "Cannot build here";
 }
@@ -71,14 +71,15 @@ bool can_place_population_centre(const tile_component& tc)
     return tc.habitability > 0.0f;
 }
 
-placement_result can_place_road(const tile_component& tc)
+placement_result can_place_road(const tile_component& tc, std::uint8_t tier)
 {
     // No road on water — roads are land infrastructure.
     if (is_ocean_tile(tc.composition))
         return placement_reason::ocean;
-    // One road per tile: an already-roaded tile is a no-op (the generated lattice, or a
-    // prior placement, already lowered its cost). Reject rather than silently re-charge.
-    if (tc.road_level > 0)
+    // Upgrade-in-place (BL-172): a tile already carrying an equal-or-better road is a no-op — you
+    // can raise a Track to a Road/Highway, but not re-lay the same or a lower tier. Reject rather
+    // than silently re-charge (BL-147 rejected any road; the tier check generalises that).
+    if (tc.road_level >= tier)
         return placement_reason::already_road;
     return placement_reason::ok;
 }

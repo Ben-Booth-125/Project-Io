@@ -6,6 +6,48 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — Road tiers + spanning render fix (BL-172; BL-173 filed) (2026-07-11)
+
+**Context.** Ben: fix roads so they "span two tiles, or at least visually, so there's no difference
+between a road from and a road to," and add highways / lower-throughput roads / railroads — railroad
+to the backlog, the road fix delivered now. Decisions (Ben, via question): **3-tier ladder**
+Track/Road/Highway, and ship the **full ladder end-to-end** (render + economy + generation +
+placement) now; railroad is a distinct transport *mode*, not a road tier → **BL-173**. "Span two
+tiles" taken as **render-only** (his "or at least visually") — `road_level` stays a per-tile field,
+no save-format change. Full-mode, **main-session-serial** (the registry→placement→front-door chain is
+interdependent, so fan-out buys nothing).
+
+**Landed (v0.1.0).**
+- **Span/symmetry fix** (`body_surface_canvas.cpp`) — the road block previously drew a
+  centre-to-centre segment only when *both* a tile and its right/down rectangular neighbour were
+  roaded. Rewritten: each roaded tile draws its **own half** of every shared edge (centre → hex-edge
+  midpoint) toward each roaded, survey-revealed **cardinal** neighbour (the 4 the intra-body A*
+  traverses). The two halves meet at the midpoint = one continuous, **symmetric** span (no "from vs
+  to"); a small **centre cap** rounds junctions and keeps a lone / just-placed road visible.
+- **3-tier ladder** — Track/Road/Highway = `road_level` 1/2/3, traversal ×0.67/0.50/0.40 (the
+  existing `1/(1+0.5·tier)` curve already yields these — no retune). "Throughput" is cost-discount,
+  not a capacity cap (per-node capacity stays out of scope). Generation (`road_generation.cpp`)
+  assigns per edge by centre scale — **Highway** between majors (`scale ≥ 3`), **Road** for Town+
+  (`≥ 2`), **Track** else + Track border links (Kepler: track=198 road=89 highway=35, connected,
+  deterministic). Economy: `recipe_registry` road cost → `std::array<road_economics,3>` +
+  `road_econ(tier)`; `economy.lua` `roads.track/road/highway` (25/45/90 cr + steel). Placement:
+  `place_road(tile, tier)` + `can_place_road(tc, tier)` **upgrade-in-place** (raise a Track to a
+  Highway; same-or-lower refused); build front door (`selection_panel.cpp`) lists all three tiers
+  with per-tier cost/validity/glyph-weight; `ui_state.pending_road_tier` + `app.cpp` tier-named
+  feedback ("Highway built.").
+- **Tools** — `road_generation_harness` R2 now asserts all three tiers present + ceiling
+  `road_level ≤ 3`; `logistics_harness` T10 places a Track (cost 25), upgrades Track→Highway (debits
+  90), and rejects the same/lower tier. **Docs** — SUPPLY.md tier table + generation/placement, a
+  GLOSSARY **Road (Track/Road/Highway)** term, PLANETARY render note.
+
+**Verified.** Build **347/347 clean**; **CTest 21/21** (determinism_harness + world_determinism
+intact through the generation-tier change); visual `roads.lua` — front door lists Track/Road/Highway,
+the lattice renders as continuous symmetric spans.
+
+**Open / deferred.** On-canvas road **weight/tier-contrast tuning** — roads read faint next to nation
+borders and the Track→Highway contrast is subtle at map zoom; **Ben: commit as-is, tune later**.
+Railroad transport mode → **BL-173** (design-owed).
+
 ## Session — Budget ledger redesign (BL-171) (2026-07-11)
 
 **Context.** Ben supplied a mockup for the Budget (Balance) ledger. It's more than a relayout — it

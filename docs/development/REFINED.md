@@ -123,6 +123,26 @@ session boundary is drawn *between* them.
 
 ---
 
+## Road tiers + span fix (promoted from backlog.json § BL-172) — **COMPLETE**
+
+Requirements: requirements.json § 2026-07-11-road-tiers (R1–R3 complete). Ben's call (2026-07-11):
+3-tier ladder Track/Road/Highway, ship end-to-end; railroad → BL-173. Built main-session-serial —
+the registry struct → placement → front-door chain is interdependent, so fan-out buys nothing.
+Delivered: build 347/347 clean, CTest 21/21 (determinism intact), visual roads.lua verified.
+Deferred (Ben): on-canvas road weight/tier-contrast tuning (faint vs nation borders) — tune later.
+
+- **[2] A — Economy foundation: `road_economics` → per-tier; `road_econ(tier)` accessor; Lua `roads.track/road/highway` + loader; multiplier/field comments.** Files: `src/world/recipe_registry.hpp`, `src/world/recipe_registry.cpp`, `scripts/economy.lua`, `src/world/components.hpp`, `src/world/logistics.cpp`. Deps: foundation. Satisfies: R3.
+- **[2] B — Generation: 3-tier assignment by centre scale (Highway/Road/Track); header comment.** Files: `src/world/road_generation.cpp`, `src/world/road_generation.hpp`. Deps: A (tier constants shared conceptually, none in code). Satisfies: R2.
+- **[2] C — Placement: `place_road(tier)` + `can_place_road(tc,tier)` upgrade-in-place.** Files: `src/world/placement_rules.hpp`, `src/world/placement_rules.cpp`, `src/world/construction.hpp`, `src/world/construction.cpp`. Deps: A. Satisfies: R3.
+- **[2] D — UI plumbing: `pending_road_tier`; app passes tier; build front door lists Track/Road/Highway.** Files: `src/ui/ui_state.hpp`, `src/core/app.cpp`, `src/ui/selection_panel.cpp`. Deps: A, C. Satisfies: R1, R3.
+- **[3] E — Render span/symmetry fix + 3-tier styling (the headline fix).** Files: `src/ui/body_surface_canvas.cpp`. Deps: none (reads road_level). Satisfies: R1.
+- **[2] F — Tools stay green: road_generation_harness R2 (3-tier ceiling), logistics_harness T10 (tier + upgrade), roads.lua (3 tiers + front door).** Files: `tools/verify/road_generation_harness.cpp`, `tools/verify/logistics_harness.cpp`, `scripts/verify/roads.lua`. Deps: A, B, C. Satisfies: R2, R3.
+- **[1] G — Docs: SUPPLY.md tier ladder + GLOSSARY Track/Road/Highway + PLANETARY/ICONS render note.** Files: `docs/economy/SUPPLY.md`, `docs/GLOSSARY.md`, `docs/ui/PLANETARY.md`, `docs/ui/ICONS.md`. Deps: all. Satisfies: authority propagation.
+
+Parallelisation note: A is the foundation (registry/Lua). B ∥ C ∥ E are independent given A (disjoint files). D depends on A+C; F depends on A+B+C; G closes. Run serial in main session (interdependent chain, small files) — no worktree fan-out.
+
+---
+
 ## v0.1.1 Batch — Roads & planetary logistics (BL-148, BL-149, BL-147) — **COMPLETE**
 
 Three `designed` items delivered in one main-session-serial Batch Delivery (shared files +

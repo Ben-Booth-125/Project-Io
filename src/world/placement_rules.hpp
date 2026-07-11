@@ -94,9 +94,11 @@ resource_type richest_extractable(const tile_component& tc, bool& any);
 /// mutation (raises tile_component.road_level, lowering its A* traversal cost), not a
 /// building. Valid only on a non-ocean land tile that does not already carry a road.
 ///
-/// @param tc  The candidate tile.
-/// @return    `ok`, or `ocean` / `already_road`. Converts to bool for boolean call sites.
-placement_result can_place_road(const tile_component& tc);
+/// @param tc    The candidate tile.
+/// @param tier  The road tier to place (BL-172): 1=Track, 2=Road, 3=Highway. Upgrade-in-place —
+///              valid only if strictly higher than the tile's current road_level.
+/// @return    `ok`, or `ocean` / `already_road` (already at or above @p tier). Converts to bool.
+placement_result can_place_road(const tile_component& tc, std::uint8_t tier = 1);
 
 /// Returns true if a population centre may be placed on this tile.
 ///

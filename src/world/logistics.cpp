@@ -57,7 +57,8 @@ float landform_logistics_cost(terrain_landform lf)
 
 float road_traversal_multiplier(std::uint8_t road_level)
 {
-    // Each tier cuts the traversal cost; tier 0 = 1.0. 1/(1 + 0.5*tier): tier1 ~0.67, tier2 0.5.
+    // Each tier cuts the traversal cost; tier 0 = 1.0. 1/(1 + 0.5*tier): Track(1) ~0.67,
+    // Road(2) 0.50, Highway(3) 0.40 — diminishing returns up the ladder (BL-172).
     return 1.0f / (1.0f + 0.5f * static_cast<float>(road_level));
 }
 
