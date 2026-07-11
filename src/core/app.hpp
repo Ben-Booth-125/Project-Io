@@ -14,7 +14,9 @@
 #include "ui/plot_history.hpp"
 
 #include <cstdint>
+#include <deque>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 /// Top-level application object. Owns the SDL window and renderer, orchestrates
@@ -158,6 +160,7 @@ private:
     std::vector<float> m_income_history;      ///< Recent player income per econ tick (market sales); feeds economy panel graph.
     std::vector<float> m_expenditure_history; ///< Recent player expenditure per econ tick (auto-buys + wages + maintenance); feeds economy panel graph.
     ui::market_plot_history m_market_history; ///< Price / supply / demand history per market, per resource; feeds market ledger graphs.
+    std::deque<std::unordered_map<entity_id, int>> m_building_rank_hist; ///< Player-building profit rankings (entity→rank), one snapshot per econ tick, last 5 kept; the oldest is ~4 ticks (a year) back, feeding the Budget ledger's rank-change column (BL-171).
     entity_id   m_prev_selection = null_entity; ///< selected_entity last frame; a change to a new selection closes any open ledger so the Selection element takes the shared fold-out column.
 
     bool        m_show_help        = false;   ///< Toggle for the F1 key-binding cheat-sheet overlay.

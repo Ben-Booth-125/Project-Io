@@ -147,9 +147,12 @@ Infrastructure buildings affect logistical or economic capacity rather than extr
 |----------|----------|-----|-------|
 | Port | Enables stockpile exchange and convoy dispatch on the body | 0 | 5 |
 | Launchpad | Required to dispatch convoys to off-world bodies; consumes propellant per launch | 0 (built), 1 (operational) | 5 |
+| Inland Logistics Hub | Land-mode logistics node: its tile discounts the A\* haul cost of any intra-body convoy routed through it (SUPPLY.md § Logistics-node discount). The player-placeable counterpart to a city's free-hub discount — extends the cheap land network out to remote sites. Produces nothing (0 workforce). | 0 | 5 |
 | Orbital Port | Receives off-world convoys; required on any non-terrestrial body to accept supply | 1 | 5 |
 | Warehouse | Increases the stockpile capacity of the body | Any | 5+ |
 | Storage Depot | Increases the throughput cap for a body's stockpile (see logistics note below) | 0 | 5+ |
+
+> **Implemented (BL-149, v0.1.1).** The **Inland Logistics Hub** is live as `building_type::inland_logistics_hub`: a placeable non-producing building whose tile joins the population-centre set that discounts intra-body haul cost (`dispatch_convoys`). Placement, cost (`economy.buildings.inland_logistics_hub`), the build-front-door affordance, and the hexagon marker glyph all landed; the discount reuses the BL-148 node scan.
 
 The Launchpad is the physical gate to Era 1: it must be constructed on the home body before any convoy can depart for a space destination, and each operation consumes propellant. See **`docs/economy/ERAS.md`** for the full Era 0→1 transition conditions.
 

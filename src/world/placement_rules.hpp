@@ -39,6 +39,7 @@ enum class placement_reason : uint8_t
     unsurveyed,        ///< Body not yet surveyed (reserved).
     slot_full,         ///< A per-type build cap is reached (reserved, generic).
     no_tile,           ///< Tile entity does not exist (defensive; mirrors construction_result::no_tile).
+    already_road,      ///< Road placement onto a tile that already carries a road (BL-147).
 };
 
 /// Human-readable one-line explanation for a placement reason, for surfacing on
@@ -88,6 +89,16 @@ float extractable_deposit(const tile_component& tc);
 /// The richest prototype-extractable resource on a tile. `any` is set false when
 /// the tile carries none (callers fall back to a default target).
 resource_type richest_extractable(const tile_component& tc, bool& any);
+
+/// May the player place a road segment on this tile (BL-147)? A road is a per-tile
+/// mutation (raises tile_component.road_level, lowering its A* traversal cost), not a
+/// building. Valid only on a non-ocean land tile that does not already carry a road.
+///
+/// @param tc    The candidate tile.
+/// @param tier  The road tier to place (BL-172): 1=Track, 2=Road, 3=Highway. Upgrade-in-place —
+///              valid only if strictly higher than the tile's current road_level.
+/// @return    `ok`, or `ocean` / `already_road` (already at or above @p tier). Converts to bool.
+placement_result can_place_road(const tile_component& tc, std::uint8_t tier = 1);
 
 /// Returns true if a population centre may be placed on this tile.
 ///

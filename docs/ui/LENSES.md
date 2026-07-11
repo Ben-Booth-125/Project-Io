@@ -271,7 +271,14 @@ combo). On-canvas keys/strip are anchored **flush-left of the minimap** (their r
 minimap's left edge, vertically centred on the minimap — a `lens_key_anchor` passed from `app.cpp`),
 reading as a drawer folding out from the minimap's left side and clearing the widened
 Selection/ledger column (relocated 2026-07-06 from the former canvas-left-edge placement past the nav
-rail). Verified by `scripts/verify/market_lens.lua`, which runs `verify.econ_step(12)`
+rail). The **count-driven keys** — Country, Market, Reach, Supply, whose row list grows with the
+world (nations/markets/lanes present) — share `draw_scroll_list_key` (`body_surface_canvas.cpp`,
+BL-163/164, 2026-07-10): the box height is **capped to the canvas vertical span** and its rows live
+in a **bounded, wheel/drag-scrolling ImGui child** with a clean scrollbar, so a long list scrolls
+inside the box rather than overrunning the canvas edges (the pre-fix failure — e.g. a ~20-nation
+Country legend spilling off the bottom). The header stays fixed above the scroll region, and the
+Market lens's good-selector combo sits above the header. The fixed-height gradient-bar keys
+(Production, Scarcity, Population, Industry, Opportunity) keep their simple `begin_lens_key` chrome. Verified by `scripts/verify/market_lens.lua`, which runs `verify.econ_step(12)`
 to diverge prices from base before capture (and a new `verify.show_panel("economy", false)` hook to
 clear the panel `econ_step` opens), against blessed goldens.
 

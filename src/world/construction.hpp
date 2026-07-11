@@ -44,3 +44,23 @@ construction_result construct_building(world& w, const recipe_registry& reg,
                                        entity_id corp, entity_id tile,
                                        building_type type, resource_type target,
                                        entity_id& out_building);
+
+/// Attempt to place a road of tier `tier` on `tile` for corporation `corp` (BL-147 core, BL-172
+/// tier ladder). A road is a per-tile mutation, not a building: on success it raises
+/// `tile_component.road_level` to `tier` (1=Track, 2=Road, 3=Highway), which lowers that tile's
+/// intra-body A* traversal cost, and invalidates the world's A* cost cache so dispatch sees the
+/// roaded cost. Upgrade-in-place is allowed (raise a Track to a Highway); re-laying the same or a
+/// lower tier is refused (`invalid_tile`). The cost (registry `road_econ(tier)`) is a flat credit
+/// sum plus materials priced from the tile's local market, debited up front (roads are instant,
+/// unlike durative building construction). The build front door (SELECTION.md) and app's
+/// pending-road handler route through this single function.
+///
+/// @param w     World; mutated only on success (road_level raised, cache cleared, balance debited).
+/// @param reg   Loaded registry (per-tier road cost).
+/// @param corp  Corporation placing (and paying) — usually w.player_entity.
+/// @param tile  Target tile entity.
+/// @param tier  Road tier to place: 1=Track (default, = BL-147 behaviour), 2=Road, 3=Highway.
+/// @return      `placed` on success; `invalid_tile` (ocean / already at or above `tier`),
+///              `insufficient_funds`, `no_corp`, or `no_tile` on refusal.
+construction_result place_road(world& w, const recipe_registry& reg,
+                               entity_id corp, entity_id tile, std::uint8_t tier = 1);

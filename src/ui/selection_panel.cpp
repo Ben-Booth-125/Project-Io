@@ -1,6 +1,5 @@
 #include "selection_panel.hpp"
 
-#include "entity_summary.hpp"
 #include "foldout_column.hpp" // shell fold-out column host (shared with the ledgers)
 #include "icons.hpp"
 #include "presentation.hpp"
@@ -10,113 +9,129 @@
 #include "world/building_profit.hpp" // per-building profitability estimate (BL-074)
 #include "world/economy_system.hpp" // economy_report (workforce cap, BL-069)
 #include "world/market_clearing.hpp"
-#include "world/placement_rules.hpp"
+#include "world/placement_rules.hpp" // buildable-type validity for the build ledger (BL-162)
 #include "world/survey_system.hpp"
-#include "world/workforce.hpp"      // workforce_efficiency (BL-069)
 
 #include <imgui.h>
 
-#include <algorithm> // std::max (bar-width clamp), std::min/std::clamp (build rate, BL-095)
-#include <cmath>     // std::ceil (construction ETA, BL-095)
+#include <algorithm> // std::min/clamp (build rate), std::nth_element (P10 production)
+#include <cmath>     // std::ceil (construction ETA), std::pow/log10/floor (nice_ceil axis)
+#include <cstddef>   // std::ptrdiff_t (nth_element iterator offset)
+#include <cstdio>    // std::snprintf (tile coord caption + chart labels)
 #include <cstring>   // std::strcmp (header title/kind de-dup)
-#include <string>    // affordance-row labels (BL-071)
-#include <utility>   // std::move
-#include <vector>    // affordance groupings (BL-071)
+#include <string>    // ticks_label / construction_status
+#include <vector>    // P10 production sample (tenth_percentile_production)
 
 namespace ui {
 
 namespace {
 
-// --- Selected-tile affordance readout (BL-071) -------------------------------
-// The inverse of the placement-suitability surface: given a *tile*, which building
-// types suit it? Always-on for any selected tile (docs/ui/SELECTION.md), so the
-// player can read a tile before arming a building. Shows the tile's territory owner
-// and a thrives / valid / invalid grouping over the prototype-buildable types,
-// reading the same placement_rules seam the build front door and the armed hover
-// card use.
-void draw_tile_affordances(const world& w, entity_id tile_id)
+// --- Tile production bar-chart helpers (BL-123) ------------------------------
+// The redesigned tile Selection element (docs/ui/SELECTION.md, Ben's mockup) plots,
+// per resource deposited on the tile, a STACKED bar reading two numbers: (A) how much
+// this tile produces, and (B) what the 10th-percentile tile produces, stacked on top
+// of A. Comparing A against the P10 reference tells the player how effective this tile
+// is for generation. Each graph sits in its own bordered container with its header, and
+// the resource list always shows a scrollbar (a tile can carry more than fit). The
+// placement-affordance readout (BL-071) and the build front door moved off this panel to
+// the owed tile-construction panel (backlog); this panel is now tile detail + navigation.
+//
+// "Production" is the tile's hazard-adjusted extraction yield — deposit richness scaled
+// by (1 - hazard), the same two factors run_extraction multiplies (economy_system.cpp).
+// The uniform base_rate/workforce scalars are dropped: they cancel in the tile-vs-P10
+// comparison, so this keeps the deposit-magnitude numbers Ben's mockup showed.
+
+// Round @p v up to a 'nice' axis ceiling (1 / 2 / 5 x a power of ten): 45->50,
+// 18->20, 130->200. Gives the bar a legible top gridline instead of a ragged max.
+float nice_ceil(float v)
 {
-    const auto tit = w.tiles.find(tile_id);
-    if (tit == w.tiles.end())
-        return;
-    const tile_component& tc = tit->second;
-
-    ImGui::Separator();
-    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Suited for");
-
-    // Territory owner: the nation whose territory contains this tile, if any.
-    const char* territory = "unclaimed";
-    for (const auto& [nid, nc] : w.nations)
-    {
-        bool found = false;
-        for (entity_id t : nc.tiles)
-            if (t == tile_id) { found = true; break; }
-        if (found) { territory = nc.name.c_str(); break; }
-    }
-    ImGui::TextDisabled("Territory: %s", territory);
-
-    struct fit { std::string label; const char* reason; };
-    std::vector<fit> thrives, valid, invalid;
-
-    // Extraction: one entry per extractable resource actually deposited here; a
-    // rich deposit 'thrives', a thinner one is merely 'valid'. When nothing
-    // extractable is present, a single invalid line names the reason.
-    bool any_ext = false;
-    for (const resource_type r : placement_rules::k_extractable)
-    {
-        const float dep = tc.resource_deposit[static_cast<std::size_t>(r)];
-        if (dep <= 0.0f)
-            continue;
-        any_ext = true;
-        fit f{std::string("Extraction: ") + resource_name(r), nullptr};
-        if (dep >= 0.6f) thrives.push_back(std::move(f));
-        else             valid.push_back(std::move(f));
-    }
-    if (!any_ext)
-        invalid.push_back({"Extraction",
-            placement_rules::placement_reason_text(placement_rules::placement_reason::no_deposit)});
-
-    // Processing facility + Port: the world-level check (a port needs a coast).
-    const auto classify = [&](building_type type, const char* label) {
-        const placement_rules::placement_result pr =
-            placement_rules::can_place_in_world(w, tile_id, type, resource_type::iron_ore);
-        if (pr) valid.push_back({label, nullptr});
-        else    invalid.push_back({label, pr.message()});
-    };
-    classify(building_type::processing_facility, "Processing facility");
-    classify(building_type::port, "Port");
-
-    // Render the three groups; skip an empty group. Only 'invalid' carries a reason.
-    const auto group = [](const char* head, const ImVec4& col,
-                          const std::vector<fit>& rows, bool with_reason) {
-        if (rows.empty())
-            return;
-        ImGui::TextColored(col, "%s", head);
-        for (const fit& f : rows)
-        {
-            if (with_reason && f.reason)
-                ImGui::BulletText("%s - %s", f.label.c_str(), f.reason);
-            else
-                ImGui::BulletText("%s", f.label.c_str());
-        }
-    };
-    group("Thrives", ImVec4{0.55f, 0.90f, 0.55f, 1.0f}, thrives, false);
-    group("Valid",   ImVec4{0.80f, 0.80f, 0.80f, 1.0f}, valid,   false);
-    group("Invalid", ImVec4{0.90f, 0.55f, 0.55f, 1.0f}, invalid, true);
+    if (v <= 0.0f)
+        return 1.0f;
+    const float mag = std::pow(10.0f, std::floor(std::log10(v)));
+    const float n   = v / mag; // 1..10
+    const float step = (n <= 1.0f) ? 1.0f : (n <= 2.0f) ? 2.0f : (n <= 5.0f) ? 5.0f : 10.0f;
+    return step * mag;
 }
 
-// BL-069: population-centre scale label (1–5 → village … metropolis).
-const char* scale_label(int scale)
+// A faint dotted horizontal rule across a chart's gridline, drawn as short dashes
+// (ImDrawList has no native dashed line). Matches the mockup's dotted scale lines.
+void dotted_hline(ImDrawList* dl, float x0, float x1, float y, ImU32 col)
 {
-    switch (scale)
-    {
-        case 1:  return "village";
-        case 2:  return "town";
-        case 3:  return "city";
-        case 4:  return "conurbation";
-        case 5:  return "metropolis";
-        default: return "settlement";
-    }
+    for (float x = x0; x < x1; x += 6.0f)
+        dl->AddLine({x, y}, {std::min(x + 3.0f, x1), y}, col, 1.0f);
+}
+
+// A tile's production for resource @p r: hazard-adjusted deposit richness (the two
+// tile-local factors of run_extraction's yield). Zero when the tile has no deposit.
+float tile_production(const tile_component& t, std::size_t r)
+{
+    return t.resource_deposit[r] * (1.0f - t.hazard_level);
+}
+
+// The 10th-percentile production across every tile that carries resource @p r — the
+// low-end reference the player compares a tile against ("is this tile better than the
+// bottom 10%?"). nth_element (O(N)) picks the percentile without a full sort.
+float tenth_percentile_production(const world& w, std::size_t r)
+{
+    std::vector<float> vals;
+    vals.reserve(w.tiles.size());
+    for (const auto& [id, t] : w.tiles)
+        if (t.resource_deposit[r] > 0.0f)
+            vals.push_back(tile_production(t, r));
+    if (vals.empty())
+        return 0.0f;
+    const std::size_t k = static_cast<std::size_t>(0.10f * static_cast<float>(vals.size() - 1));
+    std::nth_element(vals.begin(), vals.begin() + static_cast<std::ptrdiff_t>(k), vals.end());
+    return vals[k];
+}
+
+// One resource's chart inside [mn, mx]: a left gutter of tick labels (0 / ceiling, plus
+// a mid tick when the ceiling >= 100) with dotted gridlines, a STACKED bar (tile
+// production on the bottom, 10th-percentile production stacked on top), and a small
+// two-row legend naming each value. @p ceiling spans the stacked total.
+void draw_production_chart(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
+                           float tile_val, float pct_val, float ceiling,
+                           ImU32 tile_col, ImU32 pct_col)
+{
+    constexpr float gutter = 40.0f; // room for a tick label
+    const float plot_x0 = mn.x + gutter;
+    const float y0 = mn.y, y1 = mx.y;
+    const ImU32 grid_col  = IM_COL32(120, 120, 120, 150);
+    const ImU32 label_col = IM_COL32(150, 150, 150, 255);
+
+    const auto y_of = [&](float v) { return y1 - (v / ceiling) * (y1 - y0); };
+
+    const auto tick = [&](float v) {
+        const float ty = y_of(v);
+        dotted_hline(dl, plot_x0, mx.x, ty, grid_col);
+        char buf[16];
+        std::snprintf(buf, sizeof buf, "%g", static_cast<double>(v));
+        const ImVec2 ts = ImGui::CalcTextSize(buf);
+        dl->AddText({plot_x0 - 6.0f - ts.x, ty - ts.y * 0.5f}, label_col, buf);
+    };
+    tick(0.0f);
+    if (ceiling >= 100.0f)
+        tick(ceiling * 0.5f);
+    tick(ceiling);
+
+    // Stacked bar: tile production (bottom) then the P10 reference stacked on top.
+    constexpr float bar_w = 40.0f;
+    const float bar_x0 = plot_x0 + 6.0f;
+    const float a_top     = y_of(tile_val);
+    const float stack_top = y_of(tile_val + pct_val);
+    dl->AddRectFilled({bar_x0, a_top}, {bar_x0 + bar_w, y1}, tile_col);          // A
+    dl->AddRectFilled({bar_x0, stack_top}, {bar_x0 + bar_w, a_top}, pct_col);    // B on top
+
+    // Legend to the right of the bar: swatch + label + value, one row each.
+    const float lx = bar_x0 + bar_w + 14.0f;
+    const auto legend = [&](float ly, ImU32 col, const char* name, float val) {
+        dl->AddRectFilled({lx, ly + 2.0f}, {lx + 10.0f, ly + 12.0f}, col);
+        char buf[40];
+        std::snprintf(buf, sizeof buf, "%s %.1f", name, static_cast<double>(val));
+        dl->AddText({lx + 16.0f, ly}, IM_COL32(210, 210, 210, 255), buf);
+    };
+    legend(y0 + 2.0f,  tile_col, "Tile",      tile_val);
+    legend(y0 + 22.0f, pct_col,  "P10",       pct_val);
 }
 
 // --- Analog construction status (BL-095 task E) ------------------------------
@@ -198,58 +213,17 @@ ImVec4 construction_status_colour(float rate)
                           : ImVec4{0.55f, 0.80f, 0.55f, 1.0f};  // on schedule
 }
 
-// --- Build-here nav affordance (BL-139) ---------------------------------------
-// The tile is now the primary selection subject and leads with tile *detail*
-// (terrain/deposits/owner/habitability, draw_tile_summary below), not the build
-// picker. "Build here" becomes a small navigation affordance near the top of
-// that detail rather than an inline building-type list — the old full
-// front-door UI (extraction/processing/port buttons with live cost + material
-// status) has been retired from this panel. TODO(BL-139): there is not yet a
-// distinct navigable "build ledger" surface, so this stubs onto the existing
-// Construction panel (which a sibling item is concurrently reworking into that
-// destination); wire this to the real build ledger once it exists.
-void draw_build_here_affordance(ui_state& ui)
-{
-    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Build here \xe2\x96\xb8");
-    if (ImGui::Button("Build here"))
-        ui.show_construction_panel = true; // stub destination — see TODO above
-}
-
 // Resolve the (at most one) building occupying a tile — the standing invariant
 // a tile carries zero or one building means this never needs a list. Linear
 // scan mirrors the existing per-body building lookup in tile_inspector.cpp;
-// the building map is small in the prototype scope.
+// the building map is small in the prototype scope. Used by the tile panel's
+// "Manage Buildings" button to gate on whether there is anything to manage.
 entity_id building_on_tile(const world& w, entity_id tile)
 {
     for (const auto& [id, b] : w.buildings)
         if (b.tile == tile)
             return id;
     return null_entity;
-}
-
-// The building sub-element (BL-139): when a building occupies the selected
-// tile, it renders BELOW the tile detail as a subordinate row, not the lead
-// content. Reuses the existing single-click-selects/double-click-navigates
-// model (docs/ui/SELECTION.md): a click re-points the Selection element at the
-// building; a double-click navigates into the building's full detail via
-// focus_on_entity, the same dispatch the canvases use.
-void draw_tile_building_subelement(const world& w, ui_state& ui, entity_id tile)
-{
-    const entity_id bid = building_on_tile(w, tile);
-    if (bid == null_entity)
-        return;
-
-    ImGui::Separator();
-    ImGui::TextDisabled("On this tile");
-
-    const building_component& b = w.buildings.at(bid);
-    const bool selected = (ui.selected_entity == bid);
-    const std::string label = std::string(building_type_name(b.type))
-                             + (is_player_owned(w, bid) ? "" : "  (rival)");
-    if (ImGui::Selectable(label.c_str(), selected))
-        ui.selected_entity = bid;
-    if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-        focus_on_entity(w, ui, bid); // double-click descends into the building
 }
 
 // Headline label for a selected entity. Bodies carry a name; the other kinds
@@ -494,18 +468,10 @@ void draw_selection_action(const world& w, const recipe_registry& reg,
     const entity_id sel = ui.selected_entity;
     switch (kind)
     {
-        case selection_kind::tile:
-            // BL-139: the tile is the primary selection subject now. Lead with the
-            // "Build here" nav affordance (stub — see draw_build_here_affordance),
-            // then the tile's own detail (terrain/deposits/owner/habitability, the
-            // shared draw_tile_summary content builder), then the building — if any
-            // occupies this tile — as a subordinate sub-element below it.
-            draw_build_here_affordance(ui);
-            ImGui::Separator();
-            draw_tile_summary(w, sel);
-            draw_tile_building_subelement(w, ui, sel);
-            break;
-
+        // NOTE: selection_kind::tile no longer routes here — a selected tile takes
+        // the dedicated vertical layout (draw_tile_selection, BL-123), not the
+        // action|facts split. The remaining kinds keep the action|facts form until
+        // they get their own mockups.
         case selection_kind::body:
         {
             const auto bit = w.bodies.find(sel);
@@ -538,11 +504,13 @@ void draw_selection_action(const world& w, const recipe_registry& reg,
                     ImGui::TextColored(construction_status_colour(rate), "%s",
                         construction_status(rate, b.ticks_remaining).c_str());
                 }
-                // Manage — routes to the building-management panel (construction_panel),
-                // which owns the workforce / recipe / decommission controls.
+                // Manage — routes to the tile-scoped Manage ledger (construction_panel's
+                // draw_building_manage_ledger), which owns the workforce / recipe /
+                // decommission controls for *this* building, rather than the corp-wide
+                // Building ledger. Symmetric with the tile's "Construct Buildings" front door.
                 ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Manage");
                 if (ImGui::Button("Manage building"))
-                    ui.show_construction_panel = true;
+                    ui.show_manage_ledger = true;
             }
             else
             {
@@ -576,9 +544,7 @@ void draw_selection_facts(const world& w, const recipe_registry& reg,
     const entity_id sel = ui.selected_entity;
     switch (kind)
     {
-        case selection_kind::tile:
-            draw_tile_affordances(w, sel);          // BL-071: what this tile is good for
-            break;
+        // selection_kind::tile is handled by draw_tile_selection (BL-123), not here.
         case selection_kind::body:
             draw_activity_section(w, sel);          // BL-089: commercial pulse
             break;
@@ -591,6 +557,135 @@ void draw_selection_facts(const world& w, const recipe_registry& reg,
         default:
             break;
     }
+}
+
+// The redesigned tile Selection element (BL-123, Ben's mockup): a vertical stack
+// rather than the action|facts split — a placeholder image + [x, y] caption, the
+// tile's deposits as world-max-relative bar charts, and a 2x2 action button grid.
+// Tile-only for now; the other kinds keep the action|facts form (draw_selection_
+// action / facts) until they get their own mockups. Construct Buildings stubs onto
+// the existing Construction panel (the dedicated tile-construction panel is owed);
+// History and Supply are drawn but not yet wired.
+void draw_tile_selection(const world& w, ui_state& ui)
+{
+    const entity_id sel = ui.selected_entity;
+    const auto tit = w.tiles.find(sel);
+    if (tit == w.tiles.end())
+    {
+        ImGui::TextDisabled("\xe2\x80\x94");
+        return;
+    }
+    const tile_component& tile = tit->second;
+    const ImGuiStyle&     style = ImGui::GetStyle();
+    ImDrawList*           dl    = ImGui::GetWindowDrawList();
+
+    const auto centred = [&](ImVec2 mn, ImVec2 mx, const char* s, ImU32 col) {
+        const ImVec2 ts = ImGui::CalcTextSize(s);
+        dl->AddText({(mn.x + mx.x - ts.x) * 0.5f, (mn.y + mx.y - ts.y) * 0.5f}, col, s);
+    };
+
+    const float content_w = ImGui::GetContentRegionAvail().x;
+
+    // ── Placeholder image (fixed top) ──
+    {
+        const float img_h = content_w * 0.28f;
+        const ImVec2 p = ImGui::GetCursorScreenPos();
+        const ImVec2 mx = {p.x + content_w, p.y + img_h};
+        dl->AddRectFilled(p, mx, IM_COL32(72, 72, 72, 255), 3.0f);
+        dl->AddRect(p, mx, IM_COL32(110, 110, 110, 255), 3.0f);
+        centred(p, mx, "PLACEHOLDER IMAGE", IM_COL32(180, 180, 180, 255));
+        ImGui::Dummy({content_w, img_h});
+    }
+    // ── [x, y] coordinate caption strip ──
+    {
+        const float cap_h = ImGui::GetFrameHeight();
+        const ImVec2 p = ImGui::GetCursorScreenPos();
+        const ImVec2 mx = {p.x + content_w, p.y + cap_h};
+        dl->AddRectFilled(p, mx, IM_COL32(55, 55, 55, 255), 2.0f);
+        char buf[32];
+        std::snprintf(buf, sizeof buf, "[%d, %d]", tile.grid_x, tile.grid_y);
+        centred(p, mx, buf, IM_COL32(200, 200, 200, 255));
+        ImGui::Dummy({content_w, cap_h});
+    }
+    ImGui::Spacing();
+
+    // Reserve the 2x2 button grid at the bottom; the bar list fills the space between.
+    const float frame_h = ImGui::GetFrameHeight();
+    const float btn_h   = frame_h * 2.2f;
+    const float grid_h  = btn_h * 2.0f + style.ItemSpacing.y;
+    float bars_h = ImGui::GetContentRegionAvail().y - grid_h - style.ItemSpacing.y * 2.0f;
+    if (bars_h < 60.0f)
+        bars_h = 60.0f;
+
+    // ── Production graphs: one bordered container per deposited resource, each a
+    // stacked bar (tile production + the 10th-percentile reference). The list ALWAYS
+    // carries a vertical scrollbar — a tile can hold more resources than fit — so the
+    // player can scroll through every one. ──
+    constexpr float chart_h = 80.0f;
+    const float row_h = frame_h + chart_h + style.ItemSpacing.y + style.WindowPadding.y * 2.0f + 4.0f;
+    constexpr ImU32 tile_col = IM_COL32(150, 235, 160, 255); // this tile's production (green)
+    constexpr ImU32 p10_col  = IM_COL32(150, 160, 190, 255); // 10th-percentile reference (muted)
+    constexpr float gutter   = 40.0f;                        // == draw_production_chart gutter
+
+    ImGui::BeginChild("##tile_graphs", {content_w, bars_h}, false,
+                      ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysVerticalScrollbar);
+    bool any_deposit = false;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        if (tile.resource_deposit[r] <= 0.0f)
+            continue;
+        any_deposit = true;
+        const resource_presentation& rp = presentation_of(static_cast<resource_type>(r));
+
+        // Each graph + its header live in one bordered container, so the header reads
+        // as that graph's title rather than floating above the list.
+        ImGui::BeginChild(rp.name, {0.0f, row_h}, true,
+                          ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
+        ImDrawList* cdl = ImGui::GetWindowDrawList(); // child-local: clips to this box
+
+        const float a       = tile_production(tile, r);
+        const float p10     = tenth_percentile_production(w, r);
+        const float ceiling = nice_ceil((a + p10) > 0.0f ? (a + p10) : 1.0f);
+
+        // Header indented to the plot origin, so the name sits above its bar.
+        ImGui::Indent(gutter);
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", rp.name);
+        ImGui::Unindent(gutter);
+
+        const ImVec2 p  = ImGui::GetCursorScreenPos();
+        const float  cw = ImGui::GetContentRegionAvail().x;
+        ImGui::Dummy({cw, chart_h});
+        draw_production_chart(cdl, p, {p.x + cw, p.y + chart_h}, a, p10, ceiling,
+                              tile_col, p10_col);
+        ImGui::EndChild();
+        ImGui::Spacing();
+    }
+    if (!any_deposit)
+        ImGui::TextDisabled("No deposits");
+    ImGui::EndChild();
+
+    // ── 2x2 action button grid ──
+    const float bw  = (content_w - style.ItemSpacing.x) * 0.5f;
+    const ImVec2 bsz = {bw, btn_h};
+
+    if (ImGui::Button("Construct\nBuildings", bsz))
+        ui.show_build_ledger = true; // opens the tile construction ledger (BL-162)
+    ImGui::SameLine();
+    ImGui::BeginDisabled(building_on_tile(w, sel) == null_entity);
+    if (ImGui::Button("Manage\nBuildings", bsz))
+        ui.show_manage_ledger = true; // tile-scoped Manage ledger (draw_building_manage_ledger)
+    ImGui::EndDisabled();
+
+    // History / Supply: drawn for layout completeness, wired to nothing yet
+    // (BL-123 § stubs). The tooltip keeps the no-op honest rather than silent.
+    const auto stub = [&](const char* label) {
+        ImGui::Button(label, bsz);
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Not yet available");
+    };
+    stub("History");
+    ImGui::SameLine();
+    stub("Supply");
 }
 
 } // namespace
@@ -669,6 +764,15 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
 
     ImGui::Separator();
 
+    // A selected tile takes the dedicated vertical layout (BL-123, Ben's mockup);
+    // the other kinds keep the action|facts split until they get their own mockups.
+    if (kind == selection_kind::tile)
+    {
+        draw_tile_selection(w, ui);
+        ImGui::End();
+        return;
+    }
+
     // ── Action (left, dominant) │ Facts (right, muted) ──
     const float content_w = bar_w - style.WindowPadding.x * 2.0f;
     const float action_w  = (content_w - style.ItemSpacing.x) * 0.58f;
@@ -692,6 +796,230 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
     ImGui::PushTextWrapPos(0.0f);
     draw_selection_facts(w, reg, report, ui, kind);
     ImGui::PopTextWrapPos();
+    ImGui::EndChild();
+
+    ImGui::End();
+}
+
+// The tile construction ledger (BL-162): the tile-contextual surface that actually
+// lets the player build. Lists every building type placeable on the selected tile —
+// each in a bordered container (a placeholder image + name + full cost + a reason-coded
+// validity read + a Build action) — and enqueues the chosen build on the tile via the
+// construction.pending_tile seam app executes. First pass; per BL-162 the deposit
+// graphs' place is eventually taken by an expected-profit chart, and the images are
+// placeholders.
+void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_state& ui)
+{
+    const entity_id tile_id = ui.selected_entity;
+    const auto tit = w.tiles.find(tile_id);
+    if (tit == w.tiles.end())
+    {
+        ui.show_build_ledger = false; // selection is not a tile — nothing to build on
+        return;
+    }
+    const tile_component& tile = tit->second;
+
+    const foldout_rect r       = foldout_column_rect();
+    const float        bar_w   = r.w;
+    const float        frame_h = ImGui::GetFrameHeight();
+    const ImGuiStyle&  style   = ImGui::GetStyle();
+
+    ImGui::SetNextWindowPos({r.x, r.y}, ImGuiCond_Always);
+    ImGui::SetNextWindowSize({r.w, r.h}, ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.90f);
+    constexpr ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoTitleBar            |
+        ImGuiWindowFlags_NoResize              |
+        ImGuiWindowFlags_NoMove                |
+        ImGuiWindowFlags_NoCollapse            |
+        ImGuiWindowFlags_NoNav                 |
+        ImGuiWindowFlags_NoBringToFrontOnFocus |
+        ImGuiWindowFlags_NoScrollbar           |
+        ImGuiWindowFlags_NoScrollWithMouse     |
+        ImGuiWindowFlags_NoSavedSettings;
+    ImGui::Begin("##build_ledger", nullptr, flags);
+
+    // ── Header: Construct · [x, y] ............................... [x] ──
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Construct");
+    ImGui::SameLine();
+    ImGui::TextDisabled("[%d, %d]", tile.grid_x, tile.grid_y);
+    const float btn = frame_h;
+    ImGui::SameLine(bar_w - style.WindowPadding.x - btn);
+    if (ImGui::Button("x", {btn, btn}))
+        ui.show_build_ledger = false; // back to the tile Selection element
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Close");
+
+    ImGui::Separator();
+
+    // Player balance — the affordability context for every Build button below.
+    float balance = 0.0f;
+    if (const auto pit = w.corporations.find(w.player_entity); pit != w.corporations.end())
+        balance = pit->second.balance;
+    ImGui::TextDisabled("Balance: %.0f cr", static_cast<double>(balance));
+
+    // Last construction outcome (set by app after executing a request).
+    if (!ui.construction.last_message.empty())
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::neutral), "%s",
+                           ui.construction.last_message.c_str());
+
+    // Candidate placements for this tile: one extraction option per extractable
+    // resource actually deposited here, then the fixed processing / port / launchpad
+    // types. Validity + reason come from the shared placement_rules seam.
+    struct candidate { building_type type; resource_type target; std::string name; };
+    std::vector<candidate> cands;
+    for (const resource_type er : placement_rules::k_extractable)
+        if (tile.resource_deposit[static_cast<std::size_t>(er)] > 0.0f)
+            cands.push_back({building_type::extraction_site, er,
+                             std::string("Extraction: ") + resource_name(er)});
+    cands.push_back({building_type::processing_facility,  resource_type::iron_ore, "Processing Facility"});
+    cands.push_back({building_type::port,                 resource_type::iron_ore, "Port"});
+    cands.push_back({building_type::launchpad,            resource_type::iron_ore, "Launchpad"});
+    cands.push_back({building_type::inland_logistics_hub, resource_type::iron_ore, "Inland Logistics Hub"}); // BL-149
+
+    constexpr float img   = 56.0f;
+    const float     row_h = img + style.WindowPadding.y * 2.0f + 8.0f;
+
+    ImGui::BeginChild("##build_list", {0.0f, 0.0f}, false,
+                      ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysVerticalScrollbar);
+    for (const candidate& c : cands)
+    {
+        const building_economics& econ = reg.economics(c.type);
+        const placement_rules::placement_result pr =
+            placement_rules::can_place_in_world(w, tile_id, c.type, c.target);
+        const bool affordable = balance >= econ.build_cost;
+
+        ImGui::BeginChild(c.name.c_str(), {0.0f, row_h}, true,
+                          ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
+        ImDrawList* cdl = ImGui::GetWindowDrawList();
+
+        // Placeholder image: a grey box carrying the building's marker glyph.
+        const ImVec2 ip = ImGui::GetCursorScreenPos();
+        const ImVec2 imx = {ip.x + img, ip.y + img};
+        cdl->AddRectFilled(ip, imx, IM_COL32(72, 72, 72, 255), 3.0f);
+        cdl->AddRect(ip, imx, IM_COL32(110, 110, 110, 255), 3.0f);
+        icons::building(cdl, {ip.x + img * 0.5f, ip.y + img * 0.5f}, img * 0.28f, c.type,
+                        IM_COL32(150, 235, 160, 255));
+        ImGui::Dummy({img, img});
+        ImGui::SameLine();
+
+        ImGui::BeginGroup();
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", c.name.c_str());
+
+        // Cost: budget then any material requirements.
+        std::string cost = std::to_string(static_cast<int>(econ.build_cost)) + " cr";
+        for (std::size_t i = 0; i < resource_count; ++i)
+            if (econ.resource_build_cost[i] > 0.0f)
+                cost += ", " + std::to_string(static_cast<int>(econ.resource_build_cost[i]))
+                      + " " + presentation_of(static_cast<resource_type>(i)).abbrev;
+        ImGui::TextDisabled("%s", cost.c_str());
+
+        // Action: Build when valid (disabled + noted when unaffordable); else the reason.
+        if (pr.ok())
+        {
+            ImGui::BeginDisabled(!affordable);
+            if (ImGui::Button("Build"))
+            {
+                ui.construction.pending_tile   = tile_id;
+                ui.construction.pending_type   = c.type;
+                ui.construction.pending_target = c.target;
+            }
+            ImGui::EndDisabled();
+            if (!affordable)
+            {
+                ImGui::SameLine();
+                ImGui::TextDisabled("Can't afford");
+            }
+        }
+        else
+        {
+            ImGui::TextColored(ImVec4{0.90f, 0.55f, 0.55f, 1.0f}, "%s", pr.message());
+        }
+        ImGui::EndGroup();
+
+        ImGui::EndChild();
+        ImGui::Spacing();
+    }
+
+    // Road placement (BL-147 core, BL-172 tier ladder) — a per-tile mutation, not a building, so
+    // it takes its own affordances + the pending_road_tile/tier path (place_road). Three tiers:
+    // Track (1) / Road (2) / Highway (3); the glyph weight + brightness mirror the on-canvas
+    // render, and each shows its own cost + validity (upgrade-in-place is allowed, so a tile that
+    // already carries an equal-or-better road greys out only the tiers it meets or exceeds).
+    {
+        struct road_tier_affordance
+        {
+            const char*  name;
+            std::uint8_t level;
+            float        glyph_thick; // matches the canvas weight ladder
+            ImU32        glyph_col;
+        };
+        static const road_tier_affordance road_tiers[3] = {
+            { "Track",   1, 2.0f, IM_COL32(175, 158, 120, 255) },
+            { "Road",    2, 3.0f, IM_COL32(205, 188, 140, 255) },
+            { "Highway", 3, 4.0f, IM_COL32(225, 205, 150, 255) },
+        };
+
+        for (const road_tier_affordance& rt : road_tiers)
+        {
+            ImGui::PushID(static_cast<int>(rt.level)); // unique ImGui ids per tier
+
+            const road_economics& re = reg.road_econ(rt.level);
+            const placement_rules::placement_result pr =
+                placement_rules::can_place_road(tile, rt.level);
+            const bool affordable = balance >= re.build_cost;
+
+            ImGui::BeginChild("road##build", {0.0f, row_h}, true,
+                              ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
+            ImDrawList* cdl = ImGui::GetWindowDrawList();
+
+            const ImVec2 ip = ImGui::GetCursorScreenPos();
+            const ImVec2 imx = {ip.x + img, ip.y + img};
+            cdl->AddRectFilled(ip, imx, IM_COL32(72, 72, 72, 255), 3.0f);
+            cdl->AddRect(ip, imx, IM_COL32(110, 110, 110, 255), 3.0f);
+            // A short road glyph: a segment across the box, weighted by tier (matches the canvas).
+            cdl->AddLine({ip.x + img * 0.2f, ip.y + img * 0.7f},
+                         {ip.x + img * 0.8f, ip.y + img * 0.3f}, rt.glyph_col, rt.glyph_thick);
+            ImGui::Dummy({img, img});
+            ImGui::SameLine();
+
+            ImGui::BeginGroup();
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", rt.name);
+
+            std::string cost = std::to_string(static_cast<int>(re.build_cost)) + " cr";
+            for (std::size_t i = 0; i < resource_count; ++i)
+                if (re.resource_build_cost[i] > 0.0f)
+                    cost += ", " + std::to_string(static_cast<int>(re.resource_build_cost[i]))
+                          + " " + presentation_of(static_cast<resource_type>(i)).abbrev;
+            ImGui::TextDisabled("%s", cost.c_str());
+
+            if (pr.ok())
+            {
+                ImGui::BeginDisabled(!affordable);
+                if (ImGui::Button("Build"))
+                {
+                    ui.construction.pending_road_tile = tile_id;
+                    ui.construction.pending_road_tier = rt.level;
+                }
+                ImGui::EndDisabled();
+                if (!affordable)
+                {
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("Can't afford");
+                }
+            }
+            else
+            {
+                ImGui::TextColored(ImVec4{0.90f, 0.55f, 0.55f, 1.0f}, "%s", pr.message());
+            }
+            ImGui::EndGroup();
+
+            ImGui::EndChild();
+            ImGui::Spacing();
+            ImGui::PopID();
+        }
+    }
+
     ImGui::EndChild();
 
     ImGui::End();

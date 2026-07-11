@@ -390,6 +390,13 @@ read only the profile, never the body's identity.
   ceiling from TILES.md, plus a hazard base) modified by landform (mountain/rift
   raise hazard and cut habitability; valley raises habitability), with light
   jitter.
+- **`road_level` is stamped outside this pipeline.** The six-pass tile generation
+  leaves `tile_component.road_level` at 0; it is populated *after* nation and
+  population-centre generation by the **road pass** (BL-146, `generate_roads` in
+  `src/world/road_generation.cpp`, run from `hard_coded_world.cpp`), which needs the
+  cities the pipeline does not yet know about. It is deterministic from the same
+  world state — no new seed. See SUPPLY.md for the network shape and the A* cost
+  effect; the on-canvas rendering is the BL-147 follow-on.
 
 ### Deviations from the tables above
 

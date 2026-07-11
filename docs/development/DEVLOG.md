@@ -6,6 +6,324 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — Road tiers + spanning render fix (BL-172; BL-173 filed) (2026-07-11)
+
+**Context.** Ben: fix roads so they "span two tiles, or at least visually, so there's no difference
+between a road from and a road to," and add highways / lower-throughput roads / railroads — railroad
+to the backlog, the road fix delivered now. Decisions (Ben, via question): **3-tier ladder**
+Track/Road/Highway, and ship the **full ladder end-to-end** (render + economy + generation +
+placement) now; railroad is a distinct transport *mode*, not a road tier → **BL-173**. "Span two
+tiles" taken as **render-only** (his "or at least visually") — `road_level` stays a per-tile field,
+no save-format change. Full-mode, **main-session-serial** (the registry→placement→front-door chain is
+interdependent, so fan-out buys nothing).
+
+**Landed (v0.1.0).**
+- **Span/symmetry fix** (`body_surface_canvas.cpp`) — the road block previously drew a
+  centre-to-centre segment only when *both* a tile and its right/down rectangular neighbour were
+  roaded. Rewritten: each roaded tile draws its **own half** of every shared edge (centre → hex-edge
+  midpoint) toward each roaded, survey-revealed **cardinal** neighbour (the 4 the intra-body A*
+  traverses). The two halves meet at the midpoint = one continuous, **symmetric** span (no "from vs
+  to"); a small **centre cap** rounds junctions and keeps a lone / just-placed road visible.
+- **3-tier ladder** — Track/Road/Highway = `road_level` 1/2/3, traversal ×0.67/0.50/0.40 (the
+  existing `1/(1+0.5·tier)` curve already yields these — no retune). "Throughput" is cost-discount,
+  not a capacity cap (per-node capacity stays out of scope). Generation (`road_generation.cpp`)
+  assigns per edge by centre scale — **Highway** between majors (`scale ≥ 3`), **Road** for Town+
+  (`≥ 2`), **Track** else + Track border links (Kepler: track=198 road=89 highway=35, connected,
+  deterministic). Economy: `recipe_registry` road cost → `std::array<road_economics,3>` +
+  `road_econ(tier)`; `economy.lua` `roads.track/road/highway` (25/45/90 cr + steel). Placement:
+  `place_road(tile, tier)` + `can_place_road(tc, tier)` **upgrade-in-place** (raise a Track to a
+  Highway; same-or-lower refused); build front door (`selection_panel.cpp`) lists all three tiers
+  with per-tier cost/validity/glyph-weight; `ui_state.pending_road_tier` + `app.cpp` tier-named
+  feedback ("Highway built.").
+- **Tools** — `road_generation_harness` R2 now asserts all three tiers present + ceiling
+  `road_level ≤ 3`; `logistics_harness` T10 places a Track (cost 25), upgrades Track→Highway (debits
+  90), and rejects the same/lower tier. **Docs** — SUPPLY.md tier table + generation/placement, a
+  GLOSSARY **Road (Track/Road/Highway)** term, PLANETARY render note.
+
+**Verified.** Build **347/347 clean**; **CTest 21/21** (determinism_harness + world_determinism
+intact through the generation-tier change); visual `roads.lua` — front door lists Track/Road/Highway,
+the lattice renders as continuous symmetric spans.
+
+**Open / deferred.** On-canvas road **weight/tier-contrast tuning** — roads read faint next to nation
+borders and the Track→Highway contrast is subtle at map zoom; **Ben: commit as-is, tune later**.
+Railroad transport mode → **BL-173** (design-owed).
+
+## Session — Budget ledger redesign (BL-171) (2026-07-11)
+
+**Context.** Ben supplied a mockup for the Budget (Balance) ledger. It's more than a relayout — it
+introduces player **Tax** and **Wages** levers, which map to **BL-155** (laws & policy, v0.1.2).
+Decisions (Ben): build the in-scope UI now and **stub** the levers; the profit chart **replaces** the
+itemised cashflow table here ("too much detail at first glance" — it returns in a dedicated breakdown
+menu later); **Tax** = a player-set policy lever; **Wages** = a cost↔workforce trade-off.
+
+**Landed (UI, v0.1.0).** `draw_balance_ledger` (`src/ui/balance_ledger.cpp`) rebuilt to the mockup:
+(1) centred **corp-name** header; (2) a **profit line chart** — profit/tick = income − expenditure over
+the recent window, gold polyline + zero baseline, K-formatted axis, handles the early-game net loss
+(BL-112); (3) stubbed **Taxes** / **Wages** tier selectors (`– I II III IV V +`, active tier green,
+interactive but **no economic effect** — `ui_state.budget_tax_tier`/`budget_wage_tier`, tooltip points
+to BL-155); (4) an **Assets** block — Buildings Owned, Income (economy report), **Cargo Value** (the
+`player_stockpile_value` valuation, now **exported** from `header_panel` so the ledger and the header
+STOCKPILE figure share one computation); (5) a **placeholder** BUILDING_RANK_TABLE box. The former
+itemised cashflow table (BL-072) is removed from this surface. Signature change: the ledger now takes
+`player_plot_history` (for the chart) + `ui_state`; app.cpp call site updated.
+
+**Verified** via `scripts/verify/balance_ledger.lua` (golden re-blessed at 1280×720). Requirement group
+appended (BL-171 R1). BL-155's design updated with the confirmed Tax/Wages lever intent.
+
+**Rank table landed + two bug fixes (same session, Ben review).** Implemented the real **top-8
+buildings-by-profit** table (`rank_player_buildings_by_profit` — player-owned buildings that report,
+by estimated net, BL-074), with a **rank-change-vs-a-year-ago** column: app snapshots the ranking each
+econ tick (`m_building_rank_hist`, last 5) and passes the 4-ticks-ago map; the ledger shows ASCII
+`+N`/`-N`/`=` (the default ImGui font lacks ▲/▼ glyphs — they rendered as "?"). New
+`scripts/verify/budget_ledger_ranked.lua` builds producing extraction sites (the cold-verify player
+owns only a Port, which never reports) and captures the populated table. Fixed two bugs Ben flagged:
+(a) the Tax/Wages tier controls' buttons **collided on ImGui id** (both draw "-"/"I".."V"/"+") —
+`PushID` per control; (b) a **1-frame double-draw** — a new selection while a ledger was open drew both
+the ledger and the selection for one frame, because the new-selection `close_all_panels` ran *after*
+the ledgers drew; moved it *before* them (app.cpp).
+
+**Open (residue).** Wire the Tax/Wages levers to real economics (→ BL-155, v0.1.2). Real building art
+(placeholders today). Currency shown as `Cr` (mockup used `€`). Broad golden drift: the roads/logistics
+work (BL-147–149) renders roads on the planetary canvas, so surface captures (tile_build_ledger,
+selection_tile_layout, …) now differ ~2.9% — a separate re-bless owed to that work, not this.
+
+---
+
+## Session — v0.1.1 Batch: Roads & planetary logistics (BL-147/148/149) (2026-07-10)
+
+**Context.** Opened the v0.1.1 minor (Roads & planetary logistics) as a Batch Delivery while v0.1.0's
+quality audit is still open — flagged, not blocking (the roads work is independent of the audit
+instruments). BL-077 (logistics core), BL-146 (road generation), and the activity-fog cluster
+(BL-150/151/152/154) had already landed, so the batch was the three remaining `designed` items:
+**BL-148** cities-as-hubs, **BL-149** the Inland Logistics Hub, **BL-147** road render + placement.
+Serial in the main session — the three collide on `economy.lua` / `placement_rules.cpp` /
+`selection_panel.cpp`, and BL-149's hub tiles feed BL-148's discount scan (co-evolving interface), so
+no fan-out.
+
+**Design calls (Ben, up front).** (1) Road placement pays **money + materials** (mini-building cost
+model), not free or money-only. (2) The Inland Logistics Hub is a **logistics-discount node** reusing
+BL-148's city discount — not a full point-to-point→hub-to-hub routing rework (that would exceed the d3).
+(3) Roads render **always-on** like terrain, not behind a lens.
+
+**BL-148 — cities as free logistics hubs.** A shared **logistics-node discount** in `dispatch_convoys`
+(`supply_system.cpp`): the intra-body haul cost is scaled by `(1 − discount)`, where the discount sums
+over the nodes the A* path crosses — each population-centre tile contributes `city_per_scale × scale`
+(tier 1–5) — capped. Because BL-152 already exposed `logistics_path.tiles`, the scan reads the cached
+path directly; the node lookups (`population_centre_tile → scale`, plus completed hub tiles) are built
+**once per dispatch pass**, not per shortfall. Tunables in `economy.lua logistics.node_discount`.
+Deterministic — a pure function of the path tiles + node sets.
+
+**BL-149 — Inland Logistics Hub.** New `building_type::inland_logistics_hub` (=5); `m_building_econ`
+bumped 5→6; registry `named_type` + `economy.buildings.inland_logistics_hub` (250 cr + 30 steel, 0
+base_rate/workforce like the port); explicit land placement case; build-front-door candidate;
+`building_type_name` (also fixed a latent `launchpad → "None"` omission); a hexagon `hub_node` glyph.
+Its **completed** tiles join the same node set BL-148 scans (flat `hub_discount`), so building a hub on
+a corridor cheapens hauls through it — the player-placeable counterpart to a city's free hub.
+
+**BL-147 — road render + placement.** *Render:* an always-on road-edge pass in
+`body_surface_canvas.cpp` (inside the wrap-copy loop) draws a segment from each roaded tile to its
+roaded right/down cardinal neighbour (each edge once), **trunk** (road_level 2) thicker/brighter than
+**local** (1); a cylinder-seam edge is shifted one period; edges into an unrevealed neighbour are
+skipped so roads don't leak past the survey fog. *Placement:* a "Road" affordance in the build front
+door sets `pending_road_tile`; `app.cpp` runs `place_road` (`construction.{hpp,cpp}`) — gate
+`balance ≥ build_cost + materials` (materials priced from the local market), debit, raise
+`tile.road_level` to 1 (local), **clear `astar_cost_cache`**. `can_place_road` + an `already_road`
+reason; cost `economy.roads.local` (40 cr + 5 steel) via a new `road_economics`.
+
+**Pre-existing residue caught + fixed.** The full build first failed on `corp_terrain_matrix.exe` —
+unresolved `generate_roads`. Its hand-rolled CMake source list was never updated when **BL-146** added
+`road_generation.cpp` (called by `hard_coded_world.cpp`); added `road_generation.cpp` + `logistics.cpp`
+to that target. A BL-146 landing gap surfaced here, not from this batch.
+
+**Verified.** Full build green (348 targets). **CTest 21/21** incl. `determinism_harness` /
+`world_determinism` (no new serialized state — UI-only `pending_road_tile`, derived discount;
+determinism preserved) and `logistics_harness` extended with **T8** (scale-3 city on the path:
+0.4→0.352), **T9** (hub on the path: 0.4→0.352), **T10** (`place_road` raises road_level, debits 40 cr,
+clears the cache, rejects a double road). New visual `scripts/verify/roads.lua`: the lattice renders
+always-on on Kepler; the build front door lists Road (40 cr + 5 Stl) and Inland Logistics Hub
+(250 cr + 30 Stl, hexagon glyph). Independent adversarial `code-reviewer` pass over the diff surfaced two low-severity fixes, both applied + regression-checked: (1) a **decommissioned** hub still conferred its discount (now gated on `!decommissioned`, mirroring the production loop; harness **T9b**), and (2) the node discount is **clamped to [0, 0.95]** at the choke point, so a misconfigured `cap` tunable can't flip a haul's cost negative. Authority
+propagated: SUPPLY.md (node discount + road placement), PRODUCTION.md (hub building), PLANETARY.md (road
+render), ICONS.md (hub glyph).
+
+**Deferred (recorded, not dropped).** (a) An always-on **road legend chip** — roads read as lines
+without one; a permanent legend would clutter the lens-driven strip. (b) **Trunk placement / road
+upgrade** — the player places local (road_level 1) only; upgrading a tile to trunk is a later nicety.
+(c) **Road ↔ commercial-fog interaction** — roads draw full-bright on any survey-revealed tile,
+including commercially-fogged ones (roads are known terrain); dimming them with the activity fog is a
+possible follow-up. (d) **BL-153** (convoy pay-by-distance, design-owed) stays out of v0.1.1.
+
+**Note.** v0.1.0's quality audit (frame budget, econ-tick scaling, data-creep instruments) remains
+open — this batch moved ahead of it at Ben's direction; the audit is still owed before the v0.1.0 cut.
+
+---
+
+## Session — Generated road network (BL-146) (2026-07-10)
+
+**Context.** Continuing the backlog review: with the legend pair done, moved to the road/logistics
+chain. Verified its gate (BL-077) is genuinely complete — the `road_level` tile field, the
+terrain-weighted A* (`intra_body_path`), the per-body raster index, and `supply_system.cpp` all exist
+— so BL-146 was truly ready, not just marked ready. Tuning settled with Ben up front: **local=tier 1,
+trunk=tier 2** (`road_traversal_multiplier` = 1/(1+0.5·tier)); **major centre = population scale ≥ 3**.
+
+**Landed.** New `src/world/road_generation.{hpp,cpp}` — `generate_roads(w, body)`, wired into
+`hard_coded_world.cpp` right after `generate_nations`. Deterministic, no seed of its own (a pure
+function of the generated tiles/nations/centres). Per nation over its population centres: pairwise
+terrain-weighted A* costs → **Kruskal MST** tie-broken by `(cost, lo-tile-id, hi-tile-id)` → plus
+**relative-neighbour redundancy** edges (keep a non-MST edge unless some third centre is closer to
+both endpoints) for realistic loops. Each edge is **trunk** (road_level 2) when both endpoints are
+major, else **local** (1), rasterised along its A* path taking `max` road_level on overlap and
+**skipping ocean** tiles. Then one **local border link** between the nearest centre pair of each
+territorially-adjacent nation pair (adjacency from a 4-cardinal + column-wrap tile scan), stitching the
+per-nation lattices into a continent-wide network.
+
+**Cache gotcha (caught + fixed).** `intra_body_path` caches costs in `world.astar_cost_cache`. The
+pass measures lanes **road-free** (correct — the MST is laid out on base terrain), which populates the
+cache with pre-road costs; left alone, gameplay dispatch would read those stale costs and the roads
+would have no economic effect. `generate_roads` now **clears `astar_cost_cache`** after stamping, per
+the field's documented "invalidated when road_level changes" contract (world.hpp). The raster index is
+road-independent and kept.
+
+**Verified.** New `tools/verify/road_generation_harness.cpp` (auto-built + CTest-registered by the
+world-superset block): **R1** lattice exists + no ocean roads, **R2** both tiers present + none exceed
+trunk, **R3** 14/14 non-isolated centres touch a road, **R4** road_level identical across two
+generations (the determinism guard, stronger than a `determinism_harness` field add). Regression:
+`determinism_harness` / `logistics_harness` / `trade_routes_harness` / `econ_harness` / `world_audit`
+all green — no economic knock-on. Authority propagated to SUPPLY.md + TILE_GENERATION.md.
+
+**Open.** No on-canvas rendering yet (roads only stamp `road_level`) — that plus player placement is
+**BL-147**, now unblocked; it touches `body_surface_canvas.cpp` and should sequence after the legend
+work (done). A new-building consolidator (BL-149) and cities-as-hubs discount (BL-148) round out the
+chain. The harness should be named in the `verifier-headless` skill (a skill edit — pending Ben's OK);
+it already runs as a permanent CTest test regardless.
+
+---
+
+## Session — On-canvas legends: bounded scrollable body (BL-164, folds BL-163); BL-165 reconciled (2026-07-10)
+
+**Context.** Backlog review with Ben — which designed items point at v0.1.0 and are doable now. Three
+designed items target v0.1.0 (the on-canvas legend/nav polish cluster). BL-165 (selection-aware
+descend) turned out to be **already landed** in commit 82e00f4 with its status stale at `designed`;
+reconciled to `complete`. Then took the legend pair. Ben's call: **fold BL-163 and BL-164 into one**
+— BL-164's scrollable child structurally cures the overrun, so the interim box-clamp was throwaway.
+
+**Diagnosis (by capture).** The on-canvas legend overrun was **not** the fixed 3-line Resource key
+that BL-163's prose named (its line-refs had drifted); it was the **count-driven** keys — Country,
+Market, Reach, Supply. `begin_lens_key` centred an **unbounded** `body_h` on the anchor (the minimap's
+vertical centre), so a long entry list spilled off the canvas. Confirmed on the Country lens: ~20
+nations, the box ran straight off the bottom with the tail unreachable.
+
+**Landed.** A shared **`draw_scroll_list_key`** helper (`src/ui/body_surface_canvas.cpp`): a dark
+panel with a fixed header (+ an optional good-selector combo, for the Market lens) over a **bounded,
+wheel/drag-scrolling borderless ImGui child** hosting the rows (the `draw_lens_resource_combo`
+pattern). Box height is **capped to the canvas vertical span** `[grid_top+8, canvas_bottom-8]` passed
+from `draw_body_surface_canvas` and clamped in-bounds, so overflow scrolls with a clean scrollbar
+instead of overrunning. The four count-driven keys were converted onto it via a
+**`key_row{marker_colour, label_colour, label, key_marker, bar_frac}`** vocabulary — `key_marker`
+covers the swatch (Country/Market), dot (Reach), and thickness-bar (Supply) glyphs. The fixed-height
+gradient-bar keys (Production/Scarcity/Population/Industry/Opportunity) keep their `begin_lens_key`
+chrome untouched.
+
+**Verified** by capture on this Windows box (software renderer, 1280×720): `country_lens_full` shows
+the full ~20-nation list bounded within the canvas (pre-fix it ran off the bottom); `market_lens`
+shows the Iron Ore combo + Market catchments swatch list intact through the shared helper.
+
+**Open.** Goldens for the changed lenses (`country_lens`, `market_lens`, and `reach`/`supply` where
+the key renders) need **re-blessing on Linux CI** — the legend change is intentional, so the raised
+diff (~9% country, ~3.4% market) is expected; not blanket-blessed here per the cross-platform-golden
+policy. The scroll path itself wasn't visually exercised (the test bodies' lists fit the bounded box
+without needing to scroll); it rests on ImGui's standard `BeginChild` overflow behaviour.
+
+---
+
+## Session — Tile construction ledger, first pass (BL-162) (2026-07-10)
+
+**Context.** Ben: "there's actually no way to build anything" — the tile Selection element's
+"Construct Buildings" button stubbed onto the management panel, which can't construct. He asked for a
+view to choose which buildings to place, with placeholder images. This is BL-162, filed earlier this
+session.
+
+**Landed.** A tile-contextual **construction ledger** (`draw_construction_ledger`,
+`src/ui/selection_panel.cpp`), opened by "Construct Buildings" (new `ui_state::show_build_ledger`; it
+reads `selected_entity` as the target tile). Fills the fold-out column, mutually exclusive with the
+Selection element and nav ledgers (added to `close_all_panels`; app draws it in place of the Selection
+panel while its flag is set). Lists the placeable building types for the tile — one **Extraction**
+option per deposited extractable resource, plus **Processing Facility / Port / Launchpad** — each in a
+bordered container with a **placeholder image** (grey box + the building's marker glyph), name, full
+**cost** (budget + materials from the registry), a **reason-coded validity** read (invalid types show
+*why*, e.g. "A port must sit on the coast"), and a **Build** button. Build **actually builds**: it
+enqueues on `ui_state::construction.pending_tile`, the same seam `app::render` executes (and the
+placement-mode canvas click uses). Player balance heads the list as the affordability context;
+`construction.last_message` surfaces the outcome.
+
+**Verified** via `scripts/verify/tile_build_ledger.lua` (land + water tiles; goldens blessed).
+`show_panel("build", …)` added to the verify API. Note: a new selection closes column panels, so the
+build flag must be set a frame after the selection — the script captures once to settle, then opens.
+
+**Open (BL-162 residue).** First pass: the per-candidate **expected-profit chart** BL-162 calls for is
+not yet built; images are placeholders; Ben's layout review pending. Stone/Timber show production
+graphs but no extraction option (they are outside the Layer-3 `k_extractable` set) — a model note, not
+a ledger bug.
+
+---
+
+## Session — Tile Selection element redesign (BL-123) (2026-07-10)
+
+**Context.** Toward the v0.1.0 cut, Ben supplied a **mockup** for the tile Selection element,
+fulfilling the long-owed BL-123 `SELECTION_ELEMENT_RESIZE` (design-owed since 2026-07-06, awaiting a
+reference image). The mockup is a structural redesign of the tile panel, not just a resize.
+
+**Landed.**
+- **`draw_tile_selection` (`src/ui/selection_panel.cpp`)** — a selected **tile** now takes a vertical
+  stack instead of the action|facts split: a placeholder image box, an `[x, y]` coordinate caption,
+  the tile's non-zero deposits as **world-max-relative** vertical bar charts (each axis ceiling is the
+  nice-rounded max of that resource's deposit across all tiles; dotted gridlines; scrollable), and a
+  **2×2 action button grid** — Construct Buildings, Manage Buildings (disabled unless a building
+  occupies the tile), History and Supply.
+- **Q&A decisions (Ben).** Tile only for this pass (other kinds keep action|facts until each is
+  mocked). **History** and **Supply** are drawn but **unwired stubs** (History has no surface; real
+  Supply is Layer-5-gated). The BL-071 affordance readout and the "Build here" front door were
+  **removed** from the panel; their placement-suitability logic moves to a new item.
+- **Removed as superseded:** the tile branch of `draw_selection_action`/`draw_selection_facts`, the
+  build-here front door, the affordance readout (`draw_tile_affordances`), and the BL-139 building
+  sub-element (a building on the tile is now reached via **Manage Buildings**). Cleaned up the now-dead
+  includes and the orphaned `scale_label` helper.
+- **BL-162 `TILE_CONSTRUCTION_PANEL` filed** — Ben flagged that Construct Buildings routes to a panel
+  that *cannot actually build*. New (design-owed, v0.1.0) item: a tile-specific construction panel
+  laid out like the tile Selection element but charting **expected profit** per candidate building,
+  carrying the BL-071 affordances, and actually performing the build.
+
+**Verification.** New `scripts/verify/selection_tile_layout.lua` — captures a single-deposit water tile
+and a multi-deposit built land tile. Requirement group appended to `req/requirements.json` (BL-123,
+complete). `docs/ui/SELECTION.md` updated (new § The tile element's layout; the action/facts tile row
++ build-front-door/affordance subsections marked superseded-for-tiles).
+
+**Follow-on fix — verify capture resolution + repo-wide golden re-bless.** Discovered while blessing
+the new check that the verify capture window had silently drifted to **1720×1080** (commit 6a04ec9
+bumped the interactive default `window_w/window_h`, and verify captured at that default), size-
+mismatching **every** committed 1280×720 golden — the whole visual gate was red. Fix: `run_verify`
+now forces a fixed **`verify_w × verify_h` (1280×720)** capture size, decoupled from the interactive
+default (`app.cpp`), restoring the documented standard so growing the interactive window can never
+again move the golden resolution. Then re-blessed the entire set on the software renderer to current
+UI (Ben's call). Result: **53/54 checks green**; the lone failure `recipe_workforce.lua` is a
+pre-existing content expectation (`verify.expect: player has a processing facility`) unrelated to this
+work. The golden PNGs are stored effectively uncompressed (~3.69MB each = 1280×720×4) — a future
+cleanup could run them through real PNG compression to shrink the golden dir dramatically.
+
+**Graph refinement (same session, Ben live-review).** Reworked the tile graphs on Ben's feedback:
+(1) each graph now sits in its **own bordered container** with its header inside (headers were
+floating, unaligned with their bars); (2) the bar is now a **stacked production graph** — **Tile**
+(this tile's hazard-adjusted yield, `deposit × (1 − hazard)`) on the bottom and **P10** (the
+10th-percentile production across all tiles carrying that resource, via `nth_element`) stacked on
+top, with a legend — so the player reads *how effective the tile is for generation* by Tile-vs-P10;
+(3) the resource list now **always** shows a vertical scrollbar (`AlwaysVerticalScrollbar`) so a tile
+with many resources is fully scrollable. Replaced the earlier world-max single-bar treatment. Goldens
+re-blessed.
+
+**Open.** The other selection kinds (body/building/market/nation/corp) still use the action|facts
+split — they get their own vertical layouts as Ben mocks each. BL-162 awaits its mockup.
+
+---
+
 ## Session — v0.1.0 legibility polish + UX-review Batch Delivery (BL-133–145, BL-159) (2026-07-09)
 
 **Context.** The 2026-07-08 UX/lens-legibility review had left 14 `designed` items sitting toward

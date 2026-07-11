@@ -120,10 +120,12 @@ const char* building_type_name(building_type t)
 {
     switch (t)
     {
-        case building_type::none:                return "None";
-        case building_type::extraction_site:     return "Extraction Site";
-        case building_type::processing_facility: return "Processing Facility";
-        case building_type::port:                return "Port";
+        case building_type::none:                 return "None";
+        case building_type::extraction_site:      return "Extraction Site";
+        case building_type::processing_facility:  return "Processing Facility";
+        case building_type::port:                 return "Port";
+        case building_type::launchpad:            return "Launchpad";
+        case building_type::inland_logistics_hub: return "Inland Logistics Hub"; // BL-149
     }
     return "None";
 }

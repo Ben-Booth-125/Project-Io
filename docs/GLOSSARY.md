@@ -33,6 +33,9 @@ The smallest subdivision of land on a body. Each tile has a fixed, procedurally 
 **Building**
 A surface installation placed on a tile. Buildings are either **extraction** (harvesting raw materials from tile deposits) or **processing** (consuming inputs and producing outputs via a recipe) or **infrastructure** (affecting logistical or economic capacity). Each building holds a `building_component` and a `stockpile_component`.
 
+**Road (Track / Road / Highway)**
+A per-tile land cost-reducer, not a building — the `tile_component.road_level` field (0 = none) discounts a tile's intra-body A* traversal cost. Three tiers form a ladder (BL-172): **Track** (`road_level` 1, ×0.67 traversal — minor / low-throughput), **Road** (2, ×0.50 — regular), **Highway** (3, ×0.40 — high-throughput backbone). "Throughput" is *cost-discount*, not a capacity cap. Roads are laid by world generation between cities (Highway/Road/Track by centre scale) and placed by the player from the build front door (any tier, upgrade-in-place). A **railroad** is a distinct transport *mode*, not a road tier (deferred, BL-173). See `docs/economy/SUPPLY.md`.
+
 **Canvas**
 A screen that the player navigates to inform decision making and understand what's happening on a body or in space.
 

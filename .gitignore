@@ -2,6 +2,7 @@
 build/
 build-web/
 out/
+dist/
 .cmake/
 
 # Runtime-generated user settings (BL-076 display options)

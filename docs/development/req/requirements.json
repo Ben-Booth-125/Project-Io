@@ -5650,6 +5650,86 @@
       "rows": [
         { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING: every on-screen text/image across header/balance strip, time panel, on-canvas legends, selection element, ledgers, hover card, and ImGui tables is placed in a BL-141 container and takes that container's wrap-or-fit text policy, with no silent truncation down to the 1280x720 verify window.", "verification": ["code", "visual"], "result_metric": "", "notes": "Requires BL-141 (container vocabulary) and runs LAST, after all other uxbatch items land, since it is a mechanical pass over the surfaces they just changed." }
       ]
+    },
+    {
+      "brief": "tile-selection-layout",
+      "batch": "2026-07-10",
+      "title": "BL-123 — Selection element resize (tile vertical layout)",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-123",
+      "rows": [
+        { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING: a selected TILE renders as a vertical stack — a placeholder image + [x,y] coordinate caption at top, the tile's non-zero deposits as vertical bar charts each scaled to that resource's world-max deposit (nice-ceiling axis with dotted gridlines, scrollable list), and a 2x2 action button grid at the bottom (Construct Buildings, Manage Buildings, History, Supply). Manage Buildings is disabled when no building occupies the tile; History and Supply are drawn but unwired stubs. The old action|facts split and the BL-071 affordance readout no longer render for a tile; the other selection kinds keep the action|facts form.", "verification": ["code", "visual"], "result_metric": "", "notes": "selection_panel.cpp only. Verified via scripts/verify/selection_tile_layout.lua (selection_tile_layout + selection_tile_layout_built), goldens blessed on the software renderer at 1280x720. NOTE: this work also fixed the verify capture resolution (it had drifted to 1720x1080 in commit 6a04ec9, size-mismatching every committed golden) — app.cpp now forces verify_w x verify_h (1280x720) in run_verify, and the whole golden set was re-blessed to current UI. 53/54 checks green (recipe_workforce.lua fails on a pre-existing content expectation, unrelated)." }
+      ]
+    },
+
+    {
+      "batch": "2026-07-10",
+      "title": "BL-164 — On-canvas lens legends: bounded scrollable body (also resolves BL-163 overrun)",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-164 (BL-163 folded in)",
+      "rows": [
+        { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING: the count-driven on-canvas lens legends (Country, Market, Reach, Supply) never overrun the canvas. Their box height is capped to the canvas vertical span; when the entry list exceeds that height the rows live in a bounded, wheel/drag-scrolling ImGui child with a clean scrollbar while the header (and the Market lens's good-selector combo) stay fixed. A long list (e.g. the Country lens's full nation set) is fully reachable rather than clipped off the canvas bottom.", "verification": ["visual", "code"], "result_metric": "", "notes": "body_surface_canvas.cpp only. New shared helper draw_scroll_list_key + key_row/key_marker vocabulary; the four count-driven keys converted onto it, vertical bounds [grid_top+8, canvas_bottom-8] passed from draw_body_surface_canvas. Verified by capture on this Windows box (software renderer, 1280x720): country_lens_full shows the full ~20-nation list bounded within the canvas (pre-fix it ran off the bottom); market_lens shows the Iron Ore combo + Market catchments swatch list intact. Goldens for country_lens/market_lens (and reach/supply where the key renders) need re-blessing on Linux CI — the legend change is intentional, so the raised diff is expected. Per the cross-platform-golden policy the re-bless is done on Linux, not blanket-blessed here." }
+      ]
+    },
+
+    {
+      "batch": "2026-07-10",
+      "title": "BL-146 — Generated road network + A* cost integration",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-146",
+      "rows": [
+        { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING: world generation deterministically stamps a road network onto tile.road_level after nations + population centres exist. Each nation's population centres are connected by a backbone (MST + relative-neighbour redundancy over terrain-weighted A* costs), two-tier (trunk road_level 2 between major centres scale>=3, else local road_level 1), rasterised along the A* path (max on overlap, ocean tiles skipped); territorially-adjacent nations get one local border link between their nearest centre pair. The generated field is reproducible across two generations, and the A* cost cache is invalidated so gameplay dispatch sees the roaded costs.", "verification": ["headless"], "result_metric": "8/8 checks", "notes": "New src/world/road_generation.{hpp,cpp}, wired in hard_coded_world.cpp after generate_nations; clears world.astar_cost_cache after stamping. Verified via tools/verify/road_generation_harness.cpp (auto-built by the CTest world-superset block, registered as CTest test 'road_generation_harness'): R1 lattice exists + no ocean roads, R2 both tiers present + none exceed trunk, R3 14/14 non-isolated centres touch a road, R4 road_level identical across two generations. Regression: determinism_harness/logistics_harness/trade_routes_harness/econ_harness/world_audit all green. road_level determinism guard lives in this dedicated harness's R4 (stronger than a determinism_harness field add). Tuning settled with Ben: local=1/trunk=2, major=scale>=3." }
+      ]
+    },
+    {
+      "batch": "2026-07-10-roads",
+      "title": "BL-148 — Cities as free logistics hubs (agglomeration discount)",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-148",
+      "rows": [
+        { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING: an intra-body dispatch route whose A* path passes through population-centre tiles costs less than the same route with no population-centre tiles on it; the discount scales with the summed centre scale (tier) of the nodes on the path and is bounded (>= 0, capped). Determinism preserved.", "verification": ["headless"], "result_metric": "", "notes": "supply_system.cpp discount over logistics_path.tiles; tunables in economy.lua (logistics.city_discount_per_scale / discount_cap). Verified by logistics_harness.cpp new city-discount assertions." }
+      ]
+    },
+    {
+      "batch": "2026-07-10-roads",
+      "title": "BL-149 — Inland Logistics Hub building (land-mode convoy consolidator)",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-149",
+      "rows": [
+        { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING: a new inland_logistics_hub building_type exists (enum + econ entry + registry + placement rule + build-front-door affordance), places on non-ocean land, and its tile acts as a logistics node — an intra-body route whose A* path passes through a hub tile costs less than the same route without it, reusing the BL-148 node discount.", "verification": ["headless", "visual"], "result_metric": "", "notes": "components.hpp enum; recipe_registry m_building_econ 5->6 + named_type; economy.lua econ entry + logistics.hub_discount; placement_rules case; selection_panel build front door; presentation building_type_name; icons hub glyph. Headless: logistics_harness hub-discount assertion. Visual: build front door lists + places the hub." }
+      ]
+    },
+    {
+      "batch": "2026-07-10-roads",
+      "title": "BL-147 — Road rendering on the Planetary canvas + player-placeable roads",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-147",
+      "rows": [
+        { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING: the generated road lattice renders always-on on the Planetary canvas as edges between adjacent road tiles, with trunk (road_level 2) visually distinct (thicker/brighter) from local (road_level 1).", "verification": ["visual"], "result_metric": "", "notes": "body_surface_canvas.cpp road-edge pass in the wrap-copy loop; scripts/verify/roads.lua captures the home body." },
+        { "id": "R2", "status": "complete", "requirement": "the player can place a road segment via the tile build front door on a valid non-ocean, road-free land tile, gated on balance >= build_cost + materials (materials priced from the local market); placing sets tile.road_level and invalidates the A* cost cache, lowering that tile's traversal cost.", "verification": ["visual", "code"], "result_metric": "", "notes": "place_road in construction.{hpp,cpp}; can_place_road + already_road reason in placement_rules; pending_road_tile in ui_state; app.cpp branch; economy.lua roads cost + recipe_registry road_economics. Cost 40 cr + 5 steel; local road_level 1." }
+      ]
+    },
+    {
+      "brief": "budget-ledger-redesign",
+      "batch": "2026-07-11-budget-ledger",
+      "title": "BL-171 — Budget ledger redesign (profit chart, stubbed levers, rank placeholder)",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-171",
+      "rows": [
+        { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING: the Budget (Balance) ledger renders as a vertical stack — a centred corp-name header, a profit line chart (profit per econ tick = income − expenditure, gold polyline, zero baseline, K-formatted value axis), stubbed Taxes and Wages tier selectors ('– I II III IV V +', active tier green, no economic effect), an Assets block (Buildings Owned / Income / Cargo Value), and a top-8 buildings-by-profit table with a rank-change-vs-a-year-ago column (+N/-N/= vs the ranking 4 econ ticks ago). The former itemised cashflow table is intentionally removed from this surface.", "verification": ["visual"], "result_metric": "", "notes": "src/ui/balance_ledger.cpp; empty-state verified via scripts/verify/balance_ledger.lua, populated table via scripts/verify/budget_ledger_ranked.lua (builds producing extraction sites, then econ_step 24). Goldens blessed at 1280x720. Tax/Wages mechanics owed to BL-155. rank_player_buildings_by_profit shared with app (m_building_rank_hist snapshots per tick). player_stockpile_value exported from header_panel.cpp so Cargo Value + header STOCKPILE share one valuation. Also fixed: tier-control ImGui id collision (PushID) and a 1-frame ledger/selection double-draw (new-selection close moved before the ledger draws)." }
+      ]
+    },
+    {
+      "brief": "road-tiers-span-fix",
+      "batch": "2026-07-11-road-tiers",
+      "title": "BL-172 — Road tier ladder (Track/Road/Highway) + spanning/symmetric road render",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-172",
+      "rows": [
+        { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING (visual): roads render as continuous, symmetric spans — each roaded tile draws its own half of the shared edge (centre → hex-edge midpoint) toward every roaded, survey-revealed, land hex-neighbour, so two roaded tiles meet at the midpoint as one line with no 'from vs to' asymmetry and no rectangular-offset gaps; the three tiers Track/Road/Highway (road_level 1/2/3) are visually distinct (increasing thickness + brightness); the build front door offers all three tiers as separate affordances with per-tier cost + validity.", "verification": ["visual"], "result_metric": "", "notes": "body_surface_canvas.cpp wrap-copy road block (6 hex neighbours, half-edge, per-tile-tier style, cylinder-seam wrap). selection_panel.cpp build front door lists Track/Road/Highway. scripts/verify/roads.lua captures the lattice + the front door." },
+        { "id": "R2", "status": "complete", "requirement": "generation assigns three tiers by centre scale — Highway (3) between two major centres (scale>=3), Road (2) when at least one endpoint is Town+ (scale>=2), else Track (1); cross-nation border links stay Track; no tile exceeds road_level 3; deterministic across two generations; roads never stamp on ocean.", "verification": ["headless"], "result_metric": "", "notes": "road_generation.cpp edge_tier by scale; tools/verify/road_generation_harness.cpp R2 asserts Track+Road+Highway present and ceiling <=3, R4 determinism." },
+        { "id": "R3", "status": "complete", "requirement": "the player places any tier from the build front door: place_road(tier) is valid on non-ocean land when tile.road_level < tier (upgrade-in-place: a Track can be raised to a Road/Highway), rejected when road_level >= tier (already at or above); the chosen tier's cost (road_econ(tier): Track 25 / Road 45 / Highway 90 cr + materials) is debited and the A* cost cache invalidated.", "verification": ["headless", "code"], "result_metric": "", "notes": "placement_rules can_place_road(tc,tier); construction place_road(...,tier); recipe_registry road_econ(tier) over std::array<road_economics,3>; economy.lua roads.track/road/highway. tools/verify/logistics_harness.cpp T10 places Track, checks the Track default cost, upgrade-succeeds + same-tier-rejected." }
+      ]
     }
 
   ]

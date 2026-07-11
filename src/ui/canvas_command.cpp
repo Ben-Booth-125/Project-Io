@@ -79,11 +79,30 @@ void apply_canvas_command(const world& w, ui_state& ui, canvas_command cmd)
     switch (cmd)
     {
         case canvas_command::descend:
+        {
+            // Selection-aware descend (BL-165): if a surface-bearing entity is
+            // selected — a body, or a building/unit/market that lives on one —
+            // dive into it via focus_on_entity, re-anchoring to the selection and
+            // landing on its most informative rung (identical to double-click /
+            // the panel's 'go to'). So single-click a body, then Enter, dives into
+            // *that* body rather than dropping a rung on the previous anchor.
+            // Tiles/nations/corporations are excluded (a tile 'go to' is a no-op;
+            // corp/nation would open a ledger, not descend) and fall through to the
+            // blind one-rung drop below, which also serves the no-selection case.
+            const entity_id sel = ui.selected_entity;
+            if (sel != null_entity &&
+                (w.bodies.count(sel) || w.buildings.count(sel) ||
+                 w.units.count(sel)  || w.markets.count(sel)))
+            {
+                focus_on_entity(w, ui, sel);
+                break;
+            }
             if (ui.primary_level == canvas_level::solar)
                 ui.primary_level = canvas_level::circumplanetary;
             else if (ui.primary_level == canvas_level::circumplanetary)
                 ui.primary_level = canvas_level::planetary;
             break;
+        }
 
         case canvas_command::ascend:
             if (ui.primary_level == canvas_level::planetary)

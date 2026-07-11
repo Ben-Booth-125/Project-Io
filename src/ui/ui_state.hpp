@@ -73,6 +73,13 @@ struct construction_state
     building_type pending_type   = building_type::extraction_site;
     resource_type pending_target = resource_type::iron_ore;
 
+    /// Pending road-placement request (BL-147 core, BL-172 tier) — set by the build front door's
+    /// Track/Road/Highway affordances and executed by `app::render` via `place_road` (a road is a
+    /// per-tile mutation, not a building, so it takes a distinct path from `pending_tile`).
+    /// `null_entity` = nothing pending; `pending_road_tier` carries which tier (1/2/3) to place.
+    entity_id     pending_road_tile = null_entity;
+    std::uint8_t  pending_road_tier = 1;
+
     /// Last construction outcome, set by app after executing a request — a short
     /// human string shown by the build UI ("Built.", "Can't afford it.", …).
     std::string   last_message;
@@ -112,13 +119,23 @@ struct ui_state
     bool show_tile_ledger = false; ///< Whether the Tile Ledger window is open. Toggled by the nav pane tab and the window's close button.
     bool show_economy_panel = false; ///< Whether the Layer 3 economy panel is open. Toggled by the nav pane tab and the window's close button.
     bool show_construction_panel = false; ///< Whether the Layer 4 construction / building-management panel is open. Toggled by the nav pane tab and the window's close button.
+    bool show_build_ledger = false;       ///< Whether the tile-contextual construction ledger is open (BL-162). Opened by the tile Selection element's "Construct Buildings" button; reads selected_entity as the target tile. Not a nav-rail ledger — closed by close_all_panels and by selecting a new entity. Mutually exclusive with the Selection element in the fold-out column.
+    bool show_manage_ledger = false;      ///< Whether the tile-contextual building-management ledger is open. The symmetric counterpart to show_build_ledger: opened by the tile Selection element's "Manage Buildings" button (and a selected building's "Manage" button), it draws the per-building management block (workforce / recipe / decommission) for the selection's building instead of the corp-wide Building ledger. Not a nav-rail ledger — closed by close_all_panels and by selecting a new entity. Mutually exclusive with the Selection element in the fold-out column.
     bool show_market_ledger = false; ///< Whether the Market Ledger is open.
     bool show_balance_ledger = false; ///< Whether the Balance Ledger is open.
+
+    // --- Budget ledger stubbed policy levers (BL-171 UI; mechanics owed to BL-155) ---
+    // The Tax and Wages tier selectors are drawn and selectable, but have NO economic
+    // effect yet — they carry the intended player levers (Tax = a player-set policy;
+    // Wages = a cost↔workforce trade-off) whose mechanics are designed under BL-155.
+    // Tiers run 1–5 (I–V); defaults match the mockup (Tax IV, Wages II).
+    int  budget_tax_tier  = 4;
+    int  budget_wage_tier = 2;
     bool show_corporation_panel = false; ///< Whether the Corporation Overview Dashboard is open.
 
     // --- one-question-per-view nav selectors (BL-117 sweep) ---
     // Each fold-out ledger with more than one question splits its content into
-    // button-strip views (ui::nav_button); this is the selected view per panel,
+    // button-strip views (ui::nav_button_strip); this is the selected view per panel,
     // persisted so a panel reopens where the player left it. See the Construction
     // panel's construction.panel_view for the template.
     int  economy_view = 0; ///< Economy panel: 0=Corps, 1=Holdings, 2=Markets (BL-117).

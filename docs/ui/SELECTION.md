@@ -80,7 +80,7 @@ Each kind routes its 'go to' to the right place:
 
 | Selection kind | Action (hero) | Facts (muted) | 'Go to' target |
 |---|---|---|---|
-| **Tile** | **Build here** — the buildable-types front door + cost, affordability-gated (`draw_build_front_door`). | **Thrives / Valid / Invalid** affordance readout (BL-071) — territory owner + which building types suit this tile and why not. | **No-op for now.** A tile is selected from the surface it lives on, so 'go to' has nothing to descend to; pan-to-tile is out of scope. |
+| **Tile** | *(Superseded by the vertical tile layout, BL-123 — see § The tile element's layout below. The two-column action/facts split no longer renders for a tile.)* | | **No-op for now.** A tile is selected from the surface it lives on, so 'go to' has nothing to descend to; pan-to-tile is out of scope. |
 | **Body** (planet/moon/asteroid/station/star) | Unsurveyed → **Dispatch Survey** (BL-067). Surveyed → **Go to surface** (descends via `focus_on_entity`). The star carries neither. | **Commercial activity** pulse (activity fog, BL-089) — see below. | Canvas: `focus_on_surface` — descend to the body's **Planetary tile surface**, the most informative rung. (Not `focus_on_body` / the orbital framing: landing on a sparse circumplanetary view reads as "nothing happened", which was the *only-works-for-Kepler* symptom.) |
 | **Building** (player-owned) | **Manage ▸** — routes to the building-management surface (`construction_panel.cpp`, which already owns the workforce slider / recipe / decommission controls). The panel does not duplicate those controls. | **Profitability readout** (BL-074) — Net/tick, the one decision fact — see below. | Canvas: `focus_on_tile` (host tile). |
 | **Building** (rival) | None — **"Competitor building - intel only."** | Owner name + explicit `private` rows for production/stockpile (BL-068). | Canvas: `focus_on_tile` (host tile). |
@@ -92,7 +92,48 @@ non-spatial entities (nation, corporation) open the relevant ledger. For the
 prototype the spatial kinds (body, tile, building) are wired first; the rest are
 designed here and stubbed.
 
-### The tile element's action is the build front door
+### The tile element's layout (BL-123)
+
+A selected **Tile** does **not** use the two-column action/facts split above — it takes a
+dedicated **vertical layout** (`draw_tile_selection`, `src/ui/selection_panel.cpp`), from Ben's
+mockup, top to bottom:
+
+1. **Placeholder image** — a bordered grey box (a future tile portrait / terrain thumbnail;
+   literally a placeholder for the prototype).
+2. **`[x, y]` coordinate caption** — a slim strip beneath the image.
+3. **Production graphs** — one per resource deposited on the tile, each in its **own bordered
+   container** with its header (so the name reads as that graph's title, not a floating label). The
+   graph is a **stacked vertical bar** carrying two numbers: **Tile** — how much this tile produces
+   (bottom, green) — and **P10** — what the 10th-percentile tile produces for that resource (stacked
+   on top, muted), with a small legend naming each value. Comparing the Tile bar against the P10
+   reference tells the player *how effective this tile is for generation*. Axis ceiling spans the
+   stacked total (nice 1/2/5 rounding, dotted gridlines, `0`/ceiling ticks plus a mid tick when
+   ceiling ≥ 100). "Production" is the tile's **hazard-adjusted yield** — deposit richness ×
+   `(1 − hazard)`, the two tile-local factors of `run_extraction` (`economy_system.cpp`); the uniform
+   base-rate/workforce scalars cancel in the Tile-vs-P10 comparison. The list **always shows a vertical
+   scrollbar** (a tile can carry more resources than fit).
+4. **2×2 action button grid** — **Construct Buildings** (opens the **tile construction ledger**,
+   BL-162 — `draw_construction_ledger`, which lists the placeable building types for this tile and
+   actually builds; see below), **Manage Buildings**
+   (disabled unless a building occupies the tile; routes to the management panel), **History** and
+   **Supply** (drawn for layout completeness, **not yet wired** — History has no surface yet, and
+   real Supply routing is Layer-5-gated per LENSES.md).
+
+This **supersedes**, for tiles: the tile's action/facts row in the table above; the *Build front
+door* and *affordance readout* subsections immediately below (their placement-suitability logic —
+BL-071 Thrives/Valid/Invalid — is **not** shown on this panel and moves to the owed tile-construction
+panel); and the BL-139 building sub-element (a building on the tile is now reached via **Manage
+Buildings**, not an inline "On this tile" row). The other selection kinds are unaffected and keep the
+action/facts form until they get their own mockups.
+
+> The **tile construction ledger** (BL-162, `draw_construction_ledger`) is the surface "Construct
+> Buildings" opens: a fold-out-column list of every building type placeable on the selected tile —
+> placeholder image, full cost (budget + materials), a reason-coded validity read (e.g. *"A port must
+> sit on the coast"*), and a **Build** action that enqueues the construction on the tile (the
+> `construction.pending_tile` seam app executes). **First pass** — a follow-on adds the per-candidate
+> **expected-profit** chart BL-162 calls for; today's images are placeholders.
+
+### The tile element's action is the build front door *(superseded for tiles by BL-123 — see above; retained as the design of the owed tile-construction panel)*
 
 The **Tile** selection's hero action is **"Build here"** — the player's primary construction
 entry point (`draw_build_front_door`). It lists the building types placeable on the selected
@@ -107,7 +148,7 @@ that the mutable-world pass executes (`construct_building`). This is the deliber
 reserved menu — the nav-rail construction surface stays a broad overview (see `docs/ui/MENU.md`,
 BACKLOG § Ledger). The equivalent placement-mode canvas click enqueues the same request.
 
-### The tile element's facts are its affordance readout (BL-071)
+### The tile element's facts are its affordance readout (BL-071) *(superseded for tiles by BL-123 — this readout no longer renders on the Selection panel; it moves to the owed tile-construction panel)*
 
 In the Facts column, a selected tile carries an **always-on affordance readout**
 (`draw_tile_affordances`) — the *inverse* of the placement-suitability surface (`LENSES.md`,
@@ -211,10 +252,11 @@ element stopped calling them.
   the column the Selection is **not drawn**; selection state persists behind an open ledger and the
   element reappears when that ledger closes. Because the column widened (~1.6×) for this, it is a
   tall narrow sidebar, not a wide corner panel.
-- **Content re-lay-out for the narrower column is owed (BL-123 `SELECTION_ELEMENT_RESIZE`).** The
-  Selection *content* still uses the old wide **action | facts** split described below, which was
-  tuned for the full-width bar; re-flowing it for the sidebar's narrower width is an owed design
-  item (Ben to mock) — not designed here.
+- **Content re-lay-out for the narrower column (BL-123 `SELECTION_ELEMENT_RESIZE`) — landed for the
+  tile.** The **tile** now uses the purpose-built vertical layout (§ The tile element's layout above,
+  from Ben's mockup) instead of the wide **action | facts** split. The remaining selection kinds
+  (body, building, market, nation/corp) still use the action|facts split described below and will get
+  their own vertical layouts as Ben mocks each — that residue is what remains of this item.
 - **Fills the fold-out column (BL-124).** Since the move into the column, `draw_selection_panel`
   sizes to `foldout_column_rect` (`{r.w, r.h}`) — it fills the column from below the identity tile
   to the bottom margin, exactly as a ledger does. This **replaced** the old BL-093 content-height

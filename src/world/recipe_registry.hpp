@@ -3,6 +3,7 @@
 #include "components.hpp"
 
 #include <array>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -66,6 +67,32 @@ struct construction_params
     float max_stretch = 10.0f; ///< longest a material-starved build stretches to (×base duration); below 1/max_stretch it pauses.
 };
 
+/// BL-148/149 logistics-node discount tunables, authored in scripts/economy.lua under
+/// the top-level `logistics.node_discount`. A convoy's intra-body haul cost is discounted
+/// for each population-centre (BL-148) and inland_logistics_hub (BL-149) tile its A* path
+/// crosses, so the world's cities and the player's hubs form a cheap logistics network the
+/// player plugs into. See docs/economy/SUPPLY.md (on landing).
+struct logistics_node_params
+{
+    float city_discount_per_scale = 0.04f; ///< discount fraction per population-centre `scale` point (1–5) on the path.
+    float hub_discount            = 0.12f; ///< flat discount fraction per inland_logistics_hub tile on the path.
+    float discount_cap            = 0.50f; ///< ceiling on the summed node discount (fraction of the haul cost).
+};
+
+/// Player road-placement cost for a single tier (BL-147 core, BL-172 ladder), authored in
+/// scripts/economy.lua under `economy.roads.{track,road,highway}`. A placed road tile costs a
+/// flat credit sum plus per-resource materials bought from the local market — the same cost
+/// shape as building construction, but paid up front (roads are instant, per-tile, not
+/// durative). The registry holds one of these per tier; see `recipe_registry::road_econ(tier)`.
+/// See docs/economy/SUPPLY.md / docs/ui/PLANETARY.md.
+struct road_economics
+{
+    float build_cost = 40.0f; ///< flat credit cost of a road tile of this tier.
+    /// Per-resource material cost, indexed by static_cast<std::size_t>(resource_type); bought
+    /// from the tile's local market at its prevailing price. Zero = no requirement.
+    std::array<float, resource_count> resource_build_cost = {};
+};
+
 /// Startup-loaded registry of processing recipes and economy constants. Pure
 /// data once built; constructed either from Lua (load_from_lua) in the real
 /// build or by hand in a headless test harness.
@@ -121,6 +148,18 @@ public:
         return m_logistics_costs[static_cast<std::size_t>(m)];
     }
 
+    /// BL-148/149 logistics-node discount tunables (logistics.node_discount in Lua).
+    const logistics_node_params& logistics_nodes() const { return m_logistics_nodes; }
+
+    /// Player road-placement cost for a tier (BL-172): 1=Track, 2=Road, 3=Highway; clamped to
+    /// [1,3]. Authored in economy.roads.{track,road,highway}. Default arg keeps BL-147 callers
+    /// (Track) unchanged.
+    const road_economics& road_econ(std::uint8_t tier = 1) const
+    {
+        const std::size_t i = (tier < 1u ? 1u : (tier > 3u ? 3u : tier)) - 1u;
+        return m_road_econ[i];
+    }
+
     std::size_t recipe_count() const { return m_recipes.size(); }
 
     /// Returns the number of available recipes for the given building type.
@@ -159,6 +198,12 @@ public:
     {
         m_logistics_costs[static_cast<std::size_t>(m)] = v;
     }
+    void set_logistics_nodes(const logistics_node_params& p) { m_logistics_nodes = p; }
+    void set_road_econ(std::uint8_t tier, const road_economics& r)
+    {
+        const std::size_t i = (tier < 1u ? 1u : (tier > 3u ? 3u : tier)) - 1u;
+        m_road_econ[i] = r;
+    }
     uint16_t add_recipe(const recipe& r)
     {
         m_recipes.push_back(r);
@@ -168,8 +213,9 @@ public:
 private:
     std::vector<recipe> m_recipes;
 
-    /// Indexed by building_type (none / extraction_site / processing_facility / port / launchpad).
-    std::array<building_economics, 5> m_building_econ = {};
+    /// Indexed by building_type (none / extraction_site / processing_facility / port /
+    /// launchpad / inland_logistics_hub — BL-149 bumped the count 5 → 6).
+    std::array<building_economics, 6> m_building_econ = {};
 
     float m_t_full = 1.0f;
     float m_t_idle = 0.2f;
@@ -185,4 +231,17 @@ private:
     /// Logistics base cost per unit distance per unit cargo, indexed by convoy_mode
     /// (land=0, sea=1, air=2, space=3). Defaults match economy.lua values.
     std::array<float, 4> m_logistics_costs = { 0.02f, 0.05f, 0.15f, 1.00f };
+
+    /// BL-148/149 node-discount tunables (logistics.node_discount). Defaults match economy.lua
+    /// so a hand-built harness registry discounts city/hub routes sensibly without Lua.
+    logistics_node_params m_logistics_nodes = {};
+
+    /// Road-placement cost per tier (BL-172): index 0..2 = Track/Road/Highway (road_level 1/2/3).
+    /// Credit defaults are used by the Lua-free harnesses; the material line is seeded from Lua
+    /// (a harness that skips Lua pays credits only).
+    std::array<road_economics, 3> m_road_econ = { {
+        road_economics{ 25.0f, {} }, // Track   (road_level 1)
+        road_economics{ 45.0f, {} }, // Road    (road_level 2)
+        road_economics{ 90.0f, {} }, // Highway (road_level 3)
+    } };
 };

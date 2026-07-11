@@ -331,7 +331,12 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
     else
     {
         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+        {
             state.selected_entity = hovered_body;
+            // A fresh click re-shows a dismissed panel, even on re-selection
+            // of the same body (close hides, does not destroy — SELECTION.md).
+            state.selection_hidden_for = null_entity;
+        }
 
         if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left) &&
             hovered_body != null_entity)

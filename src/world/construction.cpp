@@ -77,8 +77,10 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     building_component bc;
     bc.tile               = tile;
     bc.type               = type;
-    // Staff producing buildings so they run; ports take no L3 production action.
-    bc.workforce_assigned = (type == building_type::port) ? 0.0f : 0.5f;
+    // Staff producing buildings so they run; ports and logistics hubs take no L3
+    // production action (they are passive infrastructure), so they staff at zero.
+    bc.workforce_assigned =
+        (type == building_type::port || type == building_type::inland_logistics_hub) ? 0.0f : 0.5f;
     // Build-time pacing (playtest patch, 2026-07-06): the building sits idle
     // for build_duration_ticks economy ticks before economy_system lets it produce.
     bc.ticks_remaining = static_cast<int>(econ.build_duration_ticks);
@@ -102,5 +104,57 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     // incrementally as the build progresses (pay-as-you-build).
 
     out_building = bld_id;
+    return construction_result::placed;
+}
+
+construction_result place_road(world& w, const recipe_registry& reg,
+                               entity_id corp, entity_id tile, std::uint8_t tier)
+{
+    const auto corp_it = w.corporations.find(corp);
+    if (corp_it == w.corporations.end())
+        return construction_result::no_corp;
+
+    const auto tile_it = w.tiles.find(tile);
+    if (tile_it == w.tiles.end())
+        return construction_result::no_tile;
+
+    // Validity: non-ocean land, and this tier strictly upgrades the tile (BL-172).
+    if (!placement_rules::can_place_road(tile_it->second, tier))
+        return construction_result::invalid_tile;
+
+    corporation_component& cc = corp_it->second;
+    const road_economics&  re = reg.road_econ(tier);
+
+    // Material cost priced from the tile's local market, mirroring construct_building — but
+    // debited up front in one shot (a road is instant, not a durative pay-as-you-build).
+    const market_component* mkt = nullptr;
+    {
+        const entity_id mid = market_for_tile(w, tile);
+        if (mid != null_entity)
+        {
+            const auto mit = w.markets.find(mid);
+            if (mit != w.markets.end())
+                mkt = &mit->second;
+        }
+    }
+    float material_cost = 0.0f;
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        if (re.resource_build_cost[r] <= 0.0f)
+            continue;
+        const float p = mkt ? (mkt->price[r] > 0.0f ? mkt->price[r] : mkt->base_price[r]) : 0.0f;
+        material_cost += re.resource_build_cost[r] * p;
+    }
+
+    const float total_cost = re.build_cost + material_cost;
+    if (cc.balance < total_cost)
+        return construction_result::insufficient_funds;
+
+    // Commit: debit, raise the tile to the chosen road tier, invalidate the A* cost cache
+    // (road_level changed, so cached path costs are stale — world.hpp invalidation contract).
+    cc.balance -= total_cost;
+    tile_it->second.road_level = tier; // BL-172: 1=Track, 2=Road, 3=Highway (upgrade-in-place).
+    w.astar_cost_cache.clear();
+
     return construction_result::placed;
 }

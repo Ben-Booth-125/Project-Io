@@ -109,56 +109,57 @@
       "cluster": "build",
       "title": "Pick a tile, see what I can build, its cost and why-not, and build it",
       "story": "As the player, I want to select a tile and see what I can build there, what it costs in budget and materials, and why I can't build the things I can't, so that I can commit a construction in a few clicks with no guessing.",
-      "coverage": "partial",
-      "glyph": "◐",
+      "coverage": "served",
+      "glyph": "●",
       "traces": {
         "pillars": ["Trade"],
         "systems": ["Infrastructure", "Budget", "Resources", "Environment"],
         "surfaces": [
-          { "doc": "docs/ui/SELECTION.md", "surface": "Selection element build flow + disabled 'Insufficient funds.' reason" },
-          { "doc": "docs/ui/MENU.md", "surface": "Per-tile 'build here' flow" },
-          { "doc": "docs/ui/PLANETARY.md", "surface": "Placement-suitability tint on armed build mode" }
+          { "doc": "docs/ui/PLANETARY.md", "surface": "Single-click a tile to select it" },
+          { "doc": "docs/ui/SELECTION.md", "surface": "Tile Selection element -> 'Construct Buildings' button" },
+          { "doc": "docs/ui/SELECTION.md", "surface": "Tile construction ledger — placeable list with cost + reason-coded why-not + Build (BL-162)" }
         ],
-        "backlog": ["BL-071", "BL-044", "BL-095", "BL-082", "BL-043", "BL-010"],
-        "requirements": ["build-front-door", "construction-pricing", "placement-suitability", "building-placement-rules"]
+        "backlog": ["BL-162", "BL-123", "BL-044", "BL-095", "BL-043", "BL-071"],
+        "requirements": ["construction-pricing", "building-placement-rules", "market-stockpile-build-gate"]
       },
       "walkthrough": [
-        "The player selects a tile -> the Selection element reads the tile (terrain, deposits, buildings) without arming anything.",
-        "The buildable list shows each option with its budget + material cost (BL-044 construction pricing; BL-095 market-stock gate).",
-        "Options the player can't afford or place are shown with a reason — e.g. 'Insufficient funds.' or a terrain/deposit 'why not here' (BL-071).",
-        "The player arms build mode -> affinity tiles tint to show good placement (BL-010 placement-suitability surface).",
-        "The player confirms -> the building is placed and cost debited."
+        "Single-click a tile on the Planetary canvas -> the Selection element reads the tile (per-resource production graphs, terrain, deposits) without arming anything (BL-123).",
+        "Click 'Construct Buildings' -> the tile construction ledger opens in the fold-out column (BL-162), listing every building type placeable on this tile; the player balance heads the list.",
+        "Each option shows its budget + material cost (e.g. '100 cr, 20 Stl') — extraction per deposited resource, plus processing / port / launchpad (and roads / logistics, BL-147-149).",
+        "Options that can't be placed show the reason instead of a Build button — e.g. 'A port must sit on the coast' (BL-071 reason vocabulary); unaffordable options disable Build with 'Can't afford'.",
+        "Click 'Build' on a valid, affordable option -> the construction is enqueued on the tile and the cost debited (the same construct_building path a canvas placement uses)."
       ],
-      "friction": "BL-082: during placement the construction panel occluded the Selection/Tile panel (fixed in v0.0.9 — re-walk to confirm). The 'why not here' reasons (BL-071) and the material-cost / market-stock gate (BL-095, design-owed) should read as one coherent explanation, not two separate refusals.",
-      "written": "2026-07-05",
-      "testing": {"mode": "mixed", "note": "Fresh-start buildability is asserted end-to-end by scripts/verify/fresh_start_build.lua (verify.build_first_valid + expect 'placed') — the acceptance test that would have caught the BL-044 construction deadlock. Cost debit + placement legality are also auto (construction-pricing, building-placement-rules); the 'why-not reads as one explanation' legibility is a manual walk."}
+      "friction": "First pass (BL-162): building images are placeholders and a per-candidate expected-profit chart is owed. The old arm-placement-on-canvas flow and its panel-occlusion issue (BL-082) are retired — the construction ledger is the single build surface now.",
+      "written": "2026-07-11",
+      "testing": {"mode": "mixed", "note": "Fresh-start buildability asserted end-to-end by scripts/verify/fresh_start_build.lua; the construction ledger itself is captured by scripts/verify/tile_build_ledger.lua (land + water tiles — cost + reason-coded why-not). Cost debit + placement legality are headless (construction-pricing, building-placement-rules, market-stockpile-build-gate)."}
     },
     {
       "id": "US-003",
       "cluster": "operate",
       "title": "Know whether a building makes money and what my runway is",
       "story": "As the player, I want to know whether a given building is profitable and whether I can afford my next moves, without hunting across ledgers, so that I can act before bankruptcy rather than discover it.",
-      "coverage": "served",
-      "glyph": "●",
+      "coverage": "partial",
+      "glyph": "◐",
       "traces": {
         "pillars": ["Trade"],
         "systems": ["Budget", "Resources", "Workforce"],
         "surfaces": [
-          { "doc": "docs/ui/LAYOUT.md", "surface": "Economy panel — itemised income/expenditure + projected runway + trend plots" },
-          { "doc": "docs/ui/SELECTION.md", "surface": "Per-building profitability read on selection" }
+          { "doc": "docs/ui/LAYOUT.md", "surface": "Budget ledger — profit chart + top-8 buildings-by-profit rank table (BL-171)" },
+          { "doc": "docs/ui/SELECTION.md", "surface": "Per-building profitability read on selection (BL-074)" },
+          { "doc": "docs/ui/LAYOUT.md", "surface": "Economy panel — balance / income / expenditure trend plots (BL-066)" }
         ],
-        "backlog": ["BL-072", "BL-073", "BL-074", "BL-081", "BL-066"],
-        "requirements": ["budget-breakdown", "debt-interest", "per-building-profitability", "economy-ledger-legibility", "economy-panel"]
+        "backlog": ["BL-171", "BL-074", "BL-072", "BL-066", "BL-155"],
+        "requirements": ["per-building-profitability", "budget-ledger-redesign"]
       },
       "walkthrough": [
-        "The player opens the Economy panel -> income and expenditure are itemised, debt interest is a distinct line, and a projected runway is shown (BL-072/073).",
-        "The player selects a building -> its per-building profitability (revenue vs. running cost) reads on the Selection element (BL-074).",
-        "Balance/market trend plots (BL-066) show the trajectory, so 'am I improving?' is answerable, not just 'where am I now?'.",
-        "The player judges 'is this asset carrying its weight?' and 'how long until I'm underwater?' without cross-referencing raw ledgers."
+        "Open the Budget ledger (nav rail 'Budget') -> a profit line chart shows profit per econ tick, and a top-8 buildings-by-profit table shows which assets carry their weight, with a rank-change-vs-a-year-ago column (BL-171).",
+        "Select a building -> its per-building profitability (revenue vs. running cost) also reads on the Selection element (BL-074).",
+        "The Economy panel's balance / income / expenditure trend plots (BL-066) show the trajectory — 'am I improving?'.",
+        "GAP: 'how long until I'm underwater?' — the projected runway (and the itemised cashflow breakdown, BL-072) were removed from the Budget ledger in the BL-171 redesign (deferred to a dedicated breakdown menu); today runway must be inferred from the balance + the header net-per-quarter figure."
       ],
-      "friction": "BL-081 addressed cramped economy-ledger cells and dropped the per-building table in favour of the on-selection read (v0.0.9). Coverage is served; watch that the profitability figure and the runway agree in sign and framing so they don't read as two contradictory stories.",
-      "written": "2026-07-05",
-      "testing": {"mode": "auto", "note": "Budget itemisation, interest accrual and runway are econ/headless invariants (budget-breakdown, debt-interest, per-building-profitability); eyeball the on-selection read."}
+      "friction": "The BL-171 redesign traded the itemised cashflow table + projected runway for a profit chart + rank table (Ben's call — too much detail at a glance). The 'makes money' leg is now well-served (profit chart + rank table); the 'what's my runway' leg is a GAP until the deferred breakdown menu lands — re-home the runway there (BL-155-adjacent).",
+      "written": "2026-07-11",
+      "testing": {"mode": "mixed", "note": "Per-building profitability is a headless invariant (per-building-profitability); the Budget ledger layout — profit chart + rank table — is golden-backed (budget-ledger-redesign: scripts/verify/balance_ledger.lua + budget_ledger_ranked.lua). The runway leg has no home today, so it is a manual note, not a passing check."}
     },
     {
       "id": "US-004",
@@ -407,6 +408,32 @@
       "friction": "The workforce cap surfaced here is the same cap US-007 hits when raising a workforce target; the two surfaces must tell one consistent story about the ceiling.",
       "written": "2026-07-05",
       "testing": {"mode": "auto", "note": "Population lens + centre markers are golden (population-lens-render, pop-centre-markers); the habitability->workforce cap is headless (population-legibility)."}
+    },
+    {
+      "id": "US-013",
+      "cluster": "find",
+      "title": "Judge how good a specific tile is for production before I build",
+      "story": "As the player, I want to see how productive a specific tile would be — its output relative to the rest of the map — before I commit a building, so that I build on strong ground rather than guessing from raw deposit numbers.",
+      "coverage": "served",
+      "glyph": "●",
+      "traces": {
+        "pillars": ["Trade"],
+        "systems": ["Resources", "Infrastructure", "Environment"],
+        "surfaces": [
+          { "doc": "docs/ui/SELECTION.md", "surface": "Tile Selection element — per-resource production graphs, this tile vs the 10th-percentile tile (BL-123)" }
+        ],
+        "backlog": ["BL-123", "BL-071"],
+        "requirements": ["tile-selection-layout"]
+      },
+      "walkthrough": [
+        "Single-click a tile on the Planetary canvas -> the Selection element opens on that tile.",
+        "For each resource deposited on the tile, a stacked bar reads the tile's own production (hazard-adjusted yield) against the 10th-percentile tile for that resource (BL-123) — a strong tile towers over the P10 reference, a weak one barely clears it.",
+        "The scrollable graph list covers every deposited resource, so the tile's whole production profile is legible before any build decision.",
+        "The player carries that read into 'Construct Buildings' (US-002) to commit on strong ground."
+      ],
+      "friction": "Complements the at-a-glance lens read (US-006): the lens says WHERE broadly, these per-tile graphs say HOW GOOD this exact tile is. Only the prototype-extractable resources (iron ore / petroleum / water / agricultural produce) become buildable extraction; other deposits (stone, timber) show a production bar but no extraction option yet — a legible-but-inert read.",
+      "written": "2026-07-11",
+      "testing": {"mode": "mixed", "note": "The tile production graphs are golden-backed (tile-selection-layout: scripts/verify/selection_tile_layout.lua, single-deposit + multi-deposit built tile). Whether the Tile-vs-P10 framing actually guides a build decision is a manual UX read (walk it, BL-098)."}
     }
   ]
 }

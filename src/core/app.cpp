@@ -56,6 +56,16 @@
 static constexpr int window_w = 1720;
 static constexpr int window_h = 1080;
 
+// Verify captures render at a FIXED small size, independent of the interactive
+// window default above, so goldens stay renderer-/machine-independent and match the
+// documented 1280x720 standard even as the interactive default grows. Growing
+// window_w/window_h must NOT silently move the golden resolution — that desynced the
+// whole golden set in 6a04ec9 (captures 1720x1080 vs goldens 1280x720). run_verify
+// forces the window to this size before capturing. See DEVELOPMENT_PRACTICES
+// § Display environment.
+static constexpr int verify_w = 1280;
+static constexpr int verify_h = 720;
+
 // ---------------------------------------------------------------------------
 // Unified key-binding table (BL-062).
 // Every keyboard shortcut is defined once here.  handle_key_down loops over
@@ -205,8 +215,9 @@ app::app()
     SDL_SetRenderVSync(m_renderer, 1);
 
     // Record the display environment on startup so the runtime resolution is on the
-    // log. Verify captures render at window_w×window_h; the interactive window is
-    // resizable and the desktop may be far larger, so UI chrome must stay
+    // log. Verify captures render at the fixed verify_w×verify_h (run_verify resizes
+    // the window); the interactive window is resizable and the desktop may be far
+    // larger, so UI chrome must stay
     // resolution-robust (BL-093 sized the Selection element to its content for this
     // reason). See docs/development/DEVELOPMENT_PRACTICES.md § Display environment.
     {
@@ -407,6 +418,18 @@ void app::step_economy()
             fit != flows.end() ? fit->second.expenditure : 0.0f);
     }
 
+    // Snapshot the player-building profit ranking for the Budget ledger's rank-change
+    // column (BL-171): keep the last 5 (this tick + the 4 prior = ~a year back).
+    {
+        std::unordered_map<entity_id, int> ranks;
+        const auto ranking = ui::rank_player_buildings_by_profit(m_world, m_registry, m_last_econ_report);
+        for (int i = 0; i < static_cast<int>(ranking.size()); ++i)
+            ranks[ranking[i].first] = i;
+        m_building_rank_hist.push_back(std::move(ranks));
+        if (m_building_rank_hist.size() > 5)
+            m_building_rank_hist.pop_front();
+    }
+
     // Record market price / supply / demand snapshots for the market ledger graphs.
     for (const auto& [mid, mc] : m_world.markets)
     {
@@ -513,9 +536,9 @@ void app::setup_world(world_params params)
 
 int app::run_verify(const std::string& script_path, bool bless)
 {
-    // Deterministic, non-interactive setup: fixed window (the window_w/window_h
-    // constants), seeded world, sim left paused so orbits and ticks never advance
-    // between captures. The script drives view/overlay state directly.
+    // Deterministic, non-interactive setup: fixed window (resized to verify_w/
+    // verify_h below), seeded world, sim left paused so orbits and ticks never
+    // advance between captures. The script drives view/overlay state directly.
     setup_world();
     load_economy();
     m_sim_loop.set_speed(0);
@@ -523,6 +546,14 @@ int app::run_verify(const std::string& script_path, bool bless)
     // The harness renders the live world, not the main menu — flip past the launch
     // screen. A menu-verification script re-enters the menu with verify.show_menu.
     m_screen = app_screen::in_game;
+
+    // Force the fixed verify capture size (verify_w × verify_h), decoupled from the
+    // interactive window default (window_w × window_h) which is now larger. This
+    // keeps captures + committed goldens at the 1280×720 standard regardless of the
+    // interactive default. SyncWindow blocks until the resize is applied so the very
+    // first capture already renders at the fixed size.
+    SDL_SetWindowSize(m_window, verify_w, verify_h);
+    SDL_SyncWindow(m_window);
 
     // Golden-image diffing: goldens live in a "golden" directory beside the verify
     // script, so running against the source script path (the skill's iteration
@@ -620,6 +651,8 @@ int app::run_verify(const std::string& script_path, bool bless)
         else if (name == "market")       m_ui.show_market_ledger = open;
         else if (name == "balance")      m_ui.show_balance_ledger = open;
         else if (name == "corporation")  m_ui.show_corporation_panel = open;
+        else if (name == "build")        m_ui.show_build_ledger = open; // tile construction ledger (BL-162)
+        else if (name == "manage")       m_ui.show_manage_ledger = open; // tile building-management ledger
     });
 
     // Open the Layer 4 construction / building-management panel so a capture shows
@@ -919,6 +952,14 @@ int app::run_verify(const std::string& script_path, bool bless)
                 tit->second.grid_x == col && tit->second.grid_y == row)
             { m_ui.selected_entity = bid; m_ui.selection_hidden_for = null_entity; break; }
         }
+    });
+    // select_body picks a body by name, exactly as a single-click on the Solar /
+    // Circumplanetary canvas would (sets selected_entity to the body). Lets a
+    // script stage the selection-aware descend gesture (BL-165).
+    v.set_function("select_body", [this](const std::string& name) {
+        for (const auto& [bid, bc] : m_world.bodies)
+            if (bc.name == name)
+            { m_ui.selected_entity = bid; m_ui.selection_hidden_for = null_entity; break; }
     });
 
     // Force the player corp balance to an exact value (verify harness): lets a
@@ -1275,7 +1316,12 @@ void app::process_events(bool& running)
     while (SDL_PollEvent(&event))
     {
         ImGui_ImplSDL3_ProcessEvent(&event);
-        if (event.type == SDL_EVENT_QUIT)
+        // Quit on the app-level quit OR the window's close (X) button. SDL3 delivers
+        // the title-bar close as SDL_EVENT_WINDOW_CLOSE_REQUESTED, distinct from
+        // SDL_EVENT_QUIT; without handling it, clicking X leaves the process running
+        // with no visible window. Treat either as "shut the app down".
+        if (event.type == SDL_EVENT_QUIT ||
+            event.type == SDL_EVENT_WINDOW_CLOSE_REQUESTED)
             running = false;
         else if (event.type == SDL_EVENT_KEY_DOWN)
             handle_key_down(event.key);
@@ -1608,22 +1654,21 @@ void app::render()
         ui::draw_overlay_controls(m_ui, mm_origin.x, lens_bar_y, mm_w);
     }
 
-    // Time panel — top-right, same width as the minimap (BL-138 compact redesign).
-    // Three rows: the year alone, centred and prominent; a date/quarter line
-    // (left) beside the compact speed controls (right); and the quarter-progress
-    // bar directly under the date line. The panel takes input (the speed
-    // buttons), so it is not flagged NoInputs.
+    // Time panel — top-right, same width as the minimap (BL-138 compact redesign,
+    // proportions revised on Ben's 2026-07-10 review). Four left-aligned stacked
+    // rows: the year and the date/quarter line at the SAME size (the year is no
+    // longer an oversized centred heading), then a full-width quarter-progress bar
+    // aligned with the full-width speed-control row directly below it. The panel
+    // takes input (the speed buttons), so it is not flagged NoInputs.
     const float tick_w = mm_w;
     // Height is content-derived (BL-097), not a fraction of the minimap's
-    // resolution-scaled mm_h (the BL-093 anti-pattern). Year row on top; left
-    // column: the date line plus the quarter-progress bar; right column: the
-    // speed-button row. Whichever column is taller sets the content height.
+    // resolution-scaled mm_h (the BL-093 anti-pattern): year + date lines, the thin
+    // progress bar, and the speed-button row, plus the inter-row spacing.
     const float time_line_h    = ImGui::GetTextLineHeightWithSpacing();
     const float time_frame_h   = ImGui::GetFrameHeight();
-    const float year_row_h     = time_line_h * 1.4f;
-    const float date_col_h     = time_line_h + time_frame_h;
-    const float ctrl_col_h     = time_frame_h;
-    const float time_content_h = year_row_h + std::max(date_col_h, ctrl_col_h);
+    const float time_prog_h    = 10.0f; // thin quarter-progress bar
+    const float time_spacing   = ImGui::GetStyle().ItemSpacing.y;
+    const float time_content_h = time_line_h * 2.0f + time_prog_h + time_frame_h + time_spacing * 3.0f;
     const float time_h         = time_content_h + ImGui::GetStyle().WindowPadding.y * 2.0f;
     {
         ImGui::SetNextWindowPos({disp.x - margin - tick_w, margin});
@@ -1642,44 +1687,24 @@ void app::render()
         const uint64_t day = m_sim_loop.day_tick();
         const ui::fmt::calendar_date date = ui::fmt::date_from_day(day);
 
-        // --- Year: alone on top, centred and visually prominent.
+        // --- Year and date/quarter: the SAME size, left-aligned as a stacked pair
+        // (Ben's 2026-07-10 review). The year is no longer an oversized centred
+        // heading — both read at the base font size, aligned on the panel's left edge.
+        ImGui::TextUnformatted(std::to_string(date.year).c_str());
+        ImGui::Text("%s %s (Q%d)", ui::fmt::month_abbrev(date.month),
+                    ui::fmt::ordinal_day(date.day).c_str(), date.quarter);
+
+        // --- Quarter-progress bar: full width, so it aligns with the speed-control
+        // row directly below it (the economy resolves on the quarter boundary).
+        ImGui::ProgressBar(ui::fmt::quarter_progress(day),
+                           {ImGui::GetContentRegionAvail().x, time_prog_h}, "");
+
+        // --- Speed controls: a full-width row of pause + speed-tier buttons, aligned
+        // with the progress bar above. The active speed is highlighted. When running,
+        // the pause slot is a blank button carrying a filled square glyph (drawn
+        // below); when paused it flips to a play ">" so it reflects the toggle state.
+        // Speed tiers use Roman numerals (I–V); the square avoids "||" reading as II.
         {
-            const std::string year_str = std::to_string(date.year);
-            ImGui::SetWindowFontScale(1.4f);
-            const float text_w = ImGui::CalcTextSize(year_str.c_str()).x;
-            ImGui::SetCursorPosX((ImGui::GetContentRegionAvail().x - text_w) * 0.5f);
-            ImGui::TextUnformatted(year_str.c_str());
-            ImGui::SetWindowFontScale(1.0f);
-        }
-
-        // 25% / 75% split via a two-column stretch table: the date line + its
-        // progress bar (left) and the speed controls (right).
-        if (ImGui::BeginTable("##time_cols", 2, ImGuiTableFlags_SizingStretchProp))
-        {
-            ImGui::TableSetupColumn("##date", ImGuiTableColumnFlags_WidthStretch, 0.25f);
-            ImGui::TableSetupColumn("##ctrl", ImGuiTableColumnFlags_WidthStretch, 0.75f);
-            ImGui::TableNextRow();
-
-            // --- Left: "Jan 1st (Q1)" then the quarter-progress bar directly
-            // below it (the economy resolves on the quarter boundary).
-            ImGui::TableSetColumnIndex(0);
-            ImGui::Text("%s %s (Q%d)", ui::fmt::month_abbrev(date.month),
-                        ui::fmt::ordinal_day(date.day).c_str(), date.quarter);
-            // Progress bar sits narrower than the date column and centred within it,
-            // rather than stretched flush to the column's left edge.
-            const float bar_w = ImGui::GetContentRegionAvail().x * 0.7f;
-            ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (ImGui::GetContentRegionAvail().x - bar_w) * 0.5f);
-            ImGui::ProgressBar(ui::fmt::quarter_progress(day), {bar_w, 0.0f}, "");
-
-            // --- Right: the compressed speed controls. No "Sim NNNN" tick
-            // counter or "(paused)/(I..V)" text readout — the highlighted
-            // speed button already carries that state.
-            ImGui::TableSetColumnIndex(1);
-
-            // Pause plus speed buttons. The active speed is highlighted. When running,
-            // the pause slot is a blank button carrying a filled square glyph (drawn
-            // below); when paused it flips to a play ">" so it reflects the toggle state.
-            // Speed tiers use Roman numerals (I–V); the square avoids "||" reading as II.
             const char* labels[] = {m_sim_loop.paused() ? ">" : "##pause", "I", "II", "III", "IV", "V"};
             const int   speeds[] = { 0,    1,   2,   3,   4,   5 };
             const int   n        = 6;
@@ -1729,8 +1754,6 @@ void app::render()
                 if (i + 1 < n)
                     ImGui::SameLine();
             }
-
-            ImGui::EndTable();
         }
 
         ImGui::End();
@@ -1835,6 +1858,19 @@ void app::render()
 
     // Left navigation pane and the menus it opens. Starts below the profile.
     ui::draw_nav_pane(m_ui, ui::profile_panel_height);
+
+    // A *new* entity selection closes any open fold-out ledger so the selection takes
+    // the column (SELECTION.md). Run BEFORE the ledgers draw this frame — otherwise a
+    // selection made while a ledger is open double-draws both (ledger, then selection
+    // after the close) for one frame, a visible ghost.
+    if (m_ui.selected_entity != m_prev_selection)
+    {
+        if (m_ui.selected_entity != null_entity &&
+            m_ui.selected_entity != m_ui.selection_hidden_for)
+            ui::close_all_panels(m_ui); // new selection takes the column
+        m_prev_selection = m_ui.selected_entity;
+    }
+
     ui::draw_tile_inspector(m_world, m_ui, &m_ui.show_tile_ledger);
     {
         const ui::player_plot_history phist{m_balance_history, m_income_history, m_expenditure_history};
@@ -1844,23 +1880,50 @@ void app::render()
     // one of the mutually-exclusive column occupants (ledgers + Selection).
     ui::draw_construction_panel(m_world, m_registry, m_last_econ_report, m_ui, &m_ui.show_construction_panel);
     ui::draw_market_ledger(m_world, m_ui, m_market_history, m_ui.show_market_ledger);
-    ui::draw_balance_ledger(m_world, m_last_econ_report, m_balance_history, m_ui.show_balance_ledger);
+    {
+        // Budget ledger (BL-171): profit chart reads the income/expenditure series;
+        // the rank table's change column reads the ranking from ~4 econ ticks back.
+        const ui::player_plot_history bhist{m_balance_history, m_income_history, m_expenditure_history};
+        static const std::unordered_map<entity_id, int> k_no_prior;
+        const auto& prior_rank = (m_building_rank_hist.size() >= 5)
+                                     ? m_building_rank_hist.front() : k_no_prior;
+        ui::draw_balance_ledger(m_world, m_registry, m_last_econ_report, bhist,
+                                prior_rank, m_ui, m_ui.show_balance_ledger);
+    }
     ui::draw_corporation_panel(m_world, m_ui, m_ui.show_corporation_panel);
 
-    // Selection info element — now docked in the shell fold-out column, mutually
-    // exclusive with the ledgers (SELECTION.md). A *new* entity selection closes any
-    // open ledger so the selection takes the column; while a ledger owns the column
-    // the Selection is not drawn (the ledger wins the shared slot). Selection state
-    // persists behind an open ledger, so closing the ledger reveals it again.
-    if (m_ui.selected_entity != m_prev_selection)
-    {
-        if (m_ui.selected_entity != null_entity &&
-            m_ui.selected_entity != m_ui.selection_hidden_for)
-            ui::close_all_panels(m_ui); // new selection takes the column
-        m_prev_selection = m_ui.selected_entity;
-    }
+    // Selection info element — docked in the shell fold-out column, mutually exclusive
+    // with the ledgers (SELECTION.md). While a ledger owns the column the Selection is
+    // not drawn (the ledger wins the shared slot); selection state persists behind it,
+    // so closing the ledger reveals it again. The new-selection close ran above, before
+    // the ledgers drew.
+    // The fold-out column, when no nav ledger owns it, shows either the tile
+    // construction ledger (BL-162, when the player opened it from a tile) or the
+    // Selection element. The build ledger only applies to a selected tile.
     if (!ui::any_panel_open(m_ui))
-        ui::draw_selection_panel(m_world, m_registry, m_last_econ_report, m_ui);
+    {
+        const entity_id sel        = m_ui.selected_entity;
+        const bool      sel_is_tile = sel != null_entity && m_world.tiles.count(sel) > 0;
+
+        // A building is manageable when the selection *is* a building, or a tile carrying
+        // one — the same resolution draw_building_manage_ledger uses. Gates the tile-scoped
+        // Manage ledger so it wins the column only when there is a building to show.
+        bool can_manage = sel != null_entity && m_world.buildings.count(sel) > 0;
+        if (!can_manage && sel_is_tile)
+            for (const auto& [bid, b] : m_world.buildings)
+                if (b.tile == sel) { can_manage = true; break; }
+
+        if (m_ui.show_manage_ledger && can_manage)
+            ui::draw_building_manage_ledger(m_world, m_registry, m_ui);
+        else if (m_ui.show_build_ledger && sel_is_tile)
+            ui::draw_construction_ledger(m_world, m_registry, m_ui);
+        else
+        {
+            m_ui.show_build_ledger  = false; // not a tile → no build ledger
+            m_ui.show_manage_ledger = false; // no manageable building → no manage ledger
+            ui::draw_selection_panel(m_world, m_registry, m_last_econ_report, m_ui);
+        }
+    }
 
     // Execute any construction request queued this frame by the build front door
     // (tile Selection element) or a placement-mode canvas click. Centralised here
@@ -1896,6 +1959,34 @@ void app::render()
                 m_ui.construction.last_message = "Construction failed."; break;
         }
         m_ui.construction.pending_tile = null_entity; // consume the request
+    }
+
+    // Execute any road-placement request queued this frame by the build front door's Track/Road/
+    // Highway affordances (BL-147 core, BL-172 tier). A road is a per-tile mutation (raises
+    // road_level, lowers A* cost), not a building, so it routes through place_road.
+    if (m_ui.construction.pending_road_tile != null_entity)
+    {
+        const construction_result r = place_road(
+            m_world, m_registry, m_world.player_entity, m_ui.construction.pending_road_tile,
+            m_ui.construction.pending_road_tier);
+        switch (r)
+        {
+            case construction_result::placed:
+            {
+                static const char* const kName[3] = { "Track", "Road", "Highway" };
+                const std::uint8_t t = m_ui.construction.pending_road_tier;
+                const std::size_t  i = (t < 1u ? 1u : (t > 3u ? 3u : t)) - 1u;
+                m_ui.construction.last_message = std::string(kName[i]) + " built.";
+                break;
+            }
+            case construction_result::invalid_tile:
+                m_ui.construction.last_message = "Can't build a road there."; break;
+            case construction_result::insufficient_funds:
+                m_ui.construction.last_message = "Can't afford the road."; break;
+            default:
+                m_ui.construction.last_message = "Road placement failed."; break;
+        }
+        m_ui.construction.pending_road_tile = null_entity; // consume the request
     }
 
     // Execute any survey dispatch queued this frame by the Selection-panel Survey
