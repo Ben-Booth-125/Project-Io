@@ -418,6 +418,18 @@ void app::step_economy()
             fit != flows.end() ? fit->second.expenditure : 0.0f);
     }
 
+    // Snapshot the player-building profit ranking for the Budget ledger's rank-change
+    // column (BL-171): keep the last 5 (this tick + the 4 prior = ~a year back).
+    {
+        std::unordered_map<entity_id, int> ranks;
+        const auto ranking = ui::rank_player_buildings_by_profit(m_world, m_registry, m_last_econ_report);
+        for (int i = 0; i < static_cast<int>(ranking.size()); ++i)
+            ranks[ranking[i].first] = i;
+        m_building_rank_hist.push_back(std::move(ranks));
+        if (m_building_rank_hist.size() > 5)
+            m_building_rank_hist.pop_front();
+    }
+
     // Record market price / supply / demand snapshots for the market ledger graphs.
     for (const auto& [mid, mc] : m_world.markets)
     {
@@ -1845,6 +1857,19 @@ void app::render()
 
     // Left navigation pane and the menus it opens. Starts below the profile.
     ui::draw_nav_pane(m_ui, ui::profile_panel_height);
+
+    // A *new* entity selection closes any open fold-out ledger so the selection takes
+    // the column (SELECTION.md). Run BEFORE the ledgers draw this frame — otherwise a
+    // selection made while a ledger is open double-draws both (ledger, then selection
+    // after the close) for one frame, a visible ghost.
+    if (m_ui.selected_entity != m_prev_selection)
+    {
+        if (m_ui.selected_entity != null_entity &&
+            m_ui.selected_entity != m_ui.selection_hidden_for)
+            ui::close_all_panels(m_ui); // new selection takes the column
+        m_prev_selection = m_ui.selected_entity;
+    }
+
     ui::draw_tile_inspector(m_world, m_ui, &m_ui.show_tile_ledger);
     {
         const ui::player_plot_history phist{m_balance_history, m_income_history, m_expenditure_history};
@@ -1855,24 +1880,22 @@ void app::render()
     ui::draw_construction_panel(m_world, m_registry, m_last_econ_report, m_ui, &m_ui.show_construction_panel);
     ui::draw_market_ledger(m_world, m_ui, m_market_history, m_ui.show_market_ledger);
     {
-        // Budget ledger (BL-171): profit chart reads the income/expenditure series.
+        // Budget ledger (BL-171): profit chart reads the income/expenditure series;
+        // the rank table's change column reads the ranking from ~4 econ ticks back.
         const ui::player_plot_history bhist{m_balance_history, m_income_history, m_expenditure_history};
-        ui::draw_balance_ledger(m_world, m_last_econ_report, bhist, m_ui, m_ui.show_balance_ledger);
+        static const std::unordered_map<entity_id, int> k_no_prior;
+        const auto& prior_rank = (m_building_rank_hist.size() >= 5)
+                                     ? m_building_rank_hist.front() : k_no_prior;
+        ui::draw_balance_ledger(m_world, m_registry, m_last_econ_report, bhist,
+                                prior_rank, m_ui, m_ui.show_balance_ledger);
     }
     ui::draw_corporation_panel(m_world, m_ui, m_ui.show_corporation_panel);
 
-    // Selection info element — now docked in the shell fold-out column, mutually
-    // exclusive with the ledgers (SELECTION.md). A *new* entity selection closes any
-    // open ledger so the selection takes the column; while a ledger owns the column
-    // the Selection is not drawn (the ledger wins the shared slot). Selection state
-    // persists behind an open ledger, so closing the ledger reveals it again.
-    if (m_ui.selected_entity != m_prev_selection)
-    {
-        if (m_ui.selected_entity != null_entity &&
-            m_ui.selected_entity != m_ui.selection_hidden_for)
-            ui::close_all_panels(m_ui); // new selection takes the column
-        m_prev_selection = m_ui.selected_entity;
-    }
+    // Selection info element — docked in the shell fold-out column, mutually exclusive
+    // with the ledgers (SELECTION.md). While a ledger owns the column the Selection is
+    // not drawn (the ledger wins the shared slot); selection state persists behind it,
+    // so closing the ledger reveals it again. The new-selection close ran above, before
+    // the ledgers drew.
     // The fold-out column, when no nav ledger owns it, shows either the tile
     // construction ledger (BL-162, when the player opened it from a tile) or the
     // Selection element. The build ledger only applies to a selected tile.

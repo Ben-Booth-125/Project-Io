@@ -28,9 +28,22 @@ itemised cashflow table (BL-072) is removed from this surface. Signature change:
 **Verified** via `scripts/verify/balance_ledger.lua` (golden re-blessed at 1280×720). Requirement group
 appended (BL-171 R1). BL-155's design updated with the confirmed Tax/Wages lever intent.
 
-**Open (residue).** Wire the Tax/Wages levers to real economics (→ BL-155, v0.1.2). Build the real
-top-8 buildings-by-profit table + its rank-change-over-4-ticks history (follow-on; per-building profit
-already exists via BL-074). Currency shown as `Cr` (mockup used `€`).
+**Rank table landed + two bug fixes (same session, Ben review).** Implemented the real **top-8
+buildings-by-profit** table (`rank_player_buildings_by_profit` — player-owned buildings that report,
+by estimated net, BL-074), with a **rank-change-vs-a-year-ago** column: app snapshots the ranking each
+econ tick (`m_building_rank_hist`, last 5) and passes the 4-ticks-ago map; the ledger shows ASCII
+`+N`/`-N`/`=` (the default ImGui font lacks ▲/▼ glyphs — they rendered as "?"). New
+`scripts/verify/budget_ledger_ranked.lua` builds producing extraction sites (the cold-verify player
+owns only a Port, which never reports) and captures the populated table. Fixed two bugs Ben flagged:
+(a) the Tax/Wages tier controls' buttons **collided on ImGui id** (both draw "-"/"I".."V"/"+") —
+`PushID` per control; (b) a **1-frame double-draw** — a new selection while a ledger was open drew both
+the ledger and the selection for one frame, because the new-selection `close_all_panels` ran *after*
+the ledgers drew; moved it *before* them (app.cpp).
+
+**Open (residue).** Wire the Tax/Wages levers to real economics (→ BL-155, v0.1.2). Real building art
+(placeholders today). Currency shown as `Cr` (mockup used `€`). Broad golden drift: the roads/logistics
+work (BL-147–149) renders roads on the planetary canvas, so surface captures (tile_build_ledger,
+selection_tile_layout, …) now differ ~2.9% — a separate re-bless owed to that work, not this.
 
 ---
 

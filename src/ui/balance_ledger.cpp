@@ -4,12 +4,17 @@
 #include "header_panel.hpp"   // player_stockpile_value — shared Cargo Value (BL-171)
 #include "presentation.hpp"
 
+#include "world/building_profit.hpp"  // estimate_building_profit (rank table, BL-171)
+#include "world/recipe_registry.hpp"  // recipe_registry (profit estimate)
+
 #include <imgui.h>
 
-#include <algorithm> // std::min/max
-#include <cmath>     // std::fabs, std::pow/log10/floor (nice axis ceiling)
-#include <cstdio>    // std::snprintf (chart labels)
-#include <string>    // header / label strings
+#include <algorithm>     // std::min/max/sort
+#include <cmath>         // std::fabs, std::pow/log10/floor (nice axis ceiling)
+#include <cstdio>        // std::snprintf (chart labels)
+#include <string>        // header / label strings
+#include <unordered_map> // prior-rank lookup (rank-change column)
+#include <utility>       // std::pair (ranking)
 #include <vector>
 
 namespace ui {
@@ -113,6 +118,9 @@ void draw_profit_chart(ImDrawList* dl, ImVec2 mn, ImVec2 mx, const std::vector<f
 // the Tax/Wages mechanics are owed to BL-155 (a tooltip says so).
 void draw_tier_control(const char* label, int& tier)
 {
+    // Scope the button IDs to this control — both tiers draw the same labels
+    // ("-"/"I".."V"/"+"), so without a per-control ID they collide (ImGui warns).
+    ImGui::PushID(label);
     const float avail = ImGui::GetContentRegionAvail().x;
 
     // Centred label.
@@ -149,12 +157,37 @@ void draw_tier_control(const char* label, int& tier)
     ImGui::SameLine();
     if (ImGui::Button("+", {bw, bw})) tier = std::min(5, tier + 1);
     note();
+    ImGui::PopID();
 }
 
 } // namespace
 
-void draw_balance_ledger(const world& w, const economy_report& report,
-                         const player_plot_history& history, ui_state& ui, bool& open)
+// Player buildings ranked by estimated net profit per tick, descending. Shared by the
+// Budget ledger (current ranking) and app (per-econ-tick snapshots for the rank-change
+// column). Buildings the report hasn't yet touched (has_data == false) are skipped.
+std::vector<std::pair<entity_id, float>>
+rank_player_buildings_by_profit(const world& w, const recipe_registry& reg,
+                                const economy_report& report)
+{
+    std::vector<std::pair<entity_id, float>> out;
+    for (const auto& [id, b] : w.buildings)
+    {
+        if (!is_player_owned(w, id))
+            continue;
+        const building_profit p = estimate_building_profit(w, reg, report, id);
+        if (!p.has_data)
+            continue;
+        out.emplace_back(id, p.net());
+    }
+    std::sort(out.begin(), out.end(),
+              [](const auto& a, const auto& b) { return a.second > b.second; });
+    return out;
+}
+
+void draw_balance_ledger(const world& w, const recipe_registry& reg,
+                         const economy_report& report, const player_plot_history& history,
+                         const std::unordered_map<entity_id, int>& prior_rank,
+                         ui_state& ui, bool& open)
 {
     if (!open)
         return;
@@ -223,24 +256,78 @@ void draw_balance_ledger(const world& w, const economy_report& report,
     ImGui::Text("Cargo Value: Cr %.0f", static_cast<double>(player_stockpile_value(w)));
     ImGui::Spacing();
 
-    // --- Top-buildings-by-profit rank table: placeholder box (BL-171). Per-building
-    // profit exists (BL-074); the rank-change-over-4-ticks history is owed. ---
+    // --- Top-8 buildings by profit, with rank change vs a year ago (BL-171). Profit
+    // is the per-building estimated net (BL-074); the rank-change column compares the
+    // current rank to `prior_rank` (the ranking 4 econ ticks ago, kept by app). ---
+    ImGui::SeparatorText("Top buildings by profit");
+    const std::vector<std::pair<entity_id, float>> ranking =
+        rank_player_buildings_by_profit(w, reg, report);
+    if (ranking.empty())
     {
-        const ImVec2 p = ImGui::GetCursorScreenPos();
-        const float  h = std::max(120.0f, ImGui::GetContentRegionAvail().y - 4.0f);
-        const ImVec2 mx = {p.x + content_w, p.y + h};
-        dl->AddRect(p, mx, IM_COL32(110, 110, 110, 255), 3.0f);
+        ImGui::TextDisabled("No buildings reporting yet - run an economy tick.");
+    }
+    else if (ImGui::BeginTable("##bldg_rank", 3,
+                 ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingStretchProp))
+    {
+        ImGui::TableSetupColumn("Building",   ImGuiTableColumnFlags_WidthStretch, 3.0f);
+        ImGui::TableSetupColumn("Profit/tick", ImGuiTableColumnFlags_WidthStretch, 2.0f);
+        ImGui::TableSetupColumn("vs yr",       ImGuiTableColumnFlags_WidthStretch, 1.4f);
+        ImGui::TableHeadersRow();
 
-        const char* title = "BUILDING_RANK_TABLE";
-        const ImVec2 tts = ImGui::CalcTextSize(title);
-        dl->AddText({p.x + (content_w - tts.x) * 0.5f, p.y + h * 0.42f},
-                    IM_COL32(200, 200, 200, 255), title);
+        const int shown = std::min<int>(8, static_cast<int>(ranking.size()));
+        for (int i = 0; i < shown; ++i)
+        {
+            const entity_id id  = ranking[i].first;
+            const float     net = ranking[i].second;
+            ImGui::TableNextRow();
 
-        ImGui::Dummy({content_w, h * 0.62f});
-        ImGui::PushTextWrapPos(0.0f);
-        ImGui::TextDisabled("Shows the top 8 buildings by profit, their profit, and change "
-                            "in rank from the last year (4 econ ticks).");
-        ImGui::PopTextWrapPos();
+            // Building label: type + tile coordinate (one building per tile).
+            ImGui::TableSetColumnIndex(0);
+            const auto bit = w.buildings.find(id);
+            if (bit != w.buildings.end())
+            {
+                const building_component& b = bit->second;
+                const auto tit = w.tiles.find(b.tile);
+                if (tit != w.tiles.end())
+                    ImGui::Text("%s [%d,%d]", building_type_name(b.type),
+                                tit->second.grid_x, tit->second.grid_y);
+                else
+                    ImGui::TextUnformatted(building_type_name(b.type));
+            }
+            else
+            {
+                ImGui::TextDisabled("(building)");
+            }
+
+            // Profit/tick, coloured by sign.
+            ImGui::TableSetColumnIndex(1);
+            const ImU32 pc = (net < 0.0f) ? palette::negative
+                           : (net > 0.0f) ? palette::positive : palette::neutral;
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(pc), "%+.0f", static_cast<double>(net));
+
+            // Rank change vs 4 econ ticks ago: ▲/▼ places moved, "new" if unranked then.
+            ImGui::TableSetColumnIndex(2);
+            const auto pit = prior_rank.find(id);
+            if (pit == prior_rank.end())
+            {
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::pinned), "new");
+            }
+            else
+            {
+                // ASCII only — the default ImGui font lacks ▲/▼/– glyphs (they render
+                // as "?"). "+N" = climbed N places, "-N" = fell N, "=" = unchanged.
+                const int delta = pit->second - i; // + = climbed the table
+                if (delta > 0)
+                    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::positive),
+                                       "+%d", delta);
+                else if (delta < 0)
+                    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative),
+                                       "-%d", -delta);
+                else
+                    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::neutral), "=");
+            }
+        }
+        ImGui::EndTable();
     }
 
     ui::foldout_end();
