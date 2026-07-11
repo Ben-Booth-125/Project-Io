@@ -30,6 +30,13 @@ void draw_header_panel(const world& w,
                        float left,
                        float right);
 
+/// Estimated liquid value of everything the player holds — each player `(corp, body)`
+/// pool's quantities priced at that body's current market price (resources on a body
+/// with no market/price contribute nothing). The header strip's "STOCKPILE" figure;
+/// also the Budget ledger's "Cargo Value" (BL-171). Exported so both surfaces share
+/// one valuation rather than duplicating it.
+float player_stockpile_value(const world& w);
+
 /// Height of the header strip in pixels. Matches the identity card
 /// (profile_panel_height, 92) so the balance bar and the identity tile read as one
 /// level top band across the window; the strip's content is vertically centred.

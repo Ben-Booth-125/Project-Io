@@ -5707,6 +5707,15 @@
         { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING: the generated road lattice renders always-on on the Planetary canvas as edges between adjacent road tiles, with trunk (road_level 2) visually distinct (thicker/brighter) from local (road_level 1).", "verification": ["visual"], "result_metric": "", "notes": "body_surface_canvas.cpp road-edge pass in the wrap-copy loop; scripts/verify/roads.lua captures the home body." },
         { "id": "R2", "status": "complete", "requirement": "the player can place a road segment via the tile build front door on a valid non-ocean, road-free land tile, gated on balance >= build_cost + materials (materials priced from the local market); placing sets tile.road_level and invalidates the A* cost cache, lowering that tile's traversal cost.", "verification": ["visual", "code"], "result_metric": "", "notes": "place_road in construction.{hpp,cpp}; can_place_road + already_road reason in placement_rules; pending_road_tile in ui_state; app.cpp branch; economy.lua roads cost + recipe_registry road_economics. Cost 40 cr + 5 steel; local road_level 1." }
       ]
+    },
+    {
+      "batch": "2026-07-11-budget-ledger",
+      "title": "BL-171 — Budget ledger redesign (profit chart, stubbed levers, rank placeholder)",
+      "status": "complete",
+      "promoted_from": "backlog.json BL-171",
+      "rows": [
+        { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING: the Budget (Balance) ledger renders as a vertical stack — a centred corp-name header, a profit line chart (profit per econ tick = income − expenditure, gold polyline, zero baseline, K-formatted value axis), stubbed Taxes and Wages tier selectors ('– I II III IV V +', active tier green, no economic effect), an Assets block (Buildings Owned / Income / Cargo Value), and a placeholder BUILDING_RANK_TABLE box. The former itemised cashflow table is intentionally removed from this surface.", "verification": ["visual"], "result_metric": "", "notes": "src/ui/balance_ledger.cpp; verified via scripts/verify/balance_ledger.lua (balance_ledger capture, software renderer; golden blessed at 1280x720). Tax/Wages mechanics owed to BL-155; the rank table is a placeholder (rank-change history is a follow-on). player_stockpile_value exported from header_panel.cpp so the Cargo Value figure and the header STOCKPILE share one valuation." }
+      ]
     }
 
   ]

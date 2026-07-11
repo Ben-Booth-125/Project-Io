@@ -18,9 +18,10 @@ float player_balance(const world& w)
     return (it != w.corporations.end()) ? it->second.balance : 0.0f;
 }
 
-/// Estimated liquid value of everything the player holds: each player `(corp, body)`
-/// pool's quantities priced at that body's current market price. Resources on a body
-/// with no market (or no price) contribute nothing.
+} // namespace
+
+// Declared in header_panel.hpp; shared with the Budget ledger (BL-171) so both the
+// header strip's STOCKPILE figure and the ledger's Cargo Value use one valuation.
 float player_stockpile_value(const world& w)
 {
     std::unordered_map<entity_id, const market_component*> by_body;
@@ -43,8 +44,6 @@ float player_stockpile_value(const world& w)
     }
     return value;
 }
-
-} // namespace
 
 void draw_header_panel(const world& w,
                        const std::vector<float>& balance_history,

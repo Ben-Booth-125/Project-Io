@@ -6,6 +6,34 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — Budget ledger redesign (BL-171) (2026-07-11)
+
+**Context.** Ben supplied a mockup for the Budget (Balance) ledger. It's more than a relayout — it
+introduces player **Tax** and **Wages** levers, which map to **BL-155** (laws & policy, v0.1.2).
+Decisions (Ben): build the in-scope UI now and **stub** the levers; the profit chart **replaces** the
+itemised cashflow table here ("too much detail at first glance" — it returns in a dedicated breakdown
+menu later); **Tax** = a player-set policy lever; **Wages** = a cost↔workforce trade-off.
+
+**Landed (UI, v0.1.0).** `draw_balance_ledger` (`src/ui/balance_ledger.cpp`) rebuilt to the mockup:
+(1) centred **corp-name** header; (2) a **profit line chart** — profit/tick = income − expenditure over
+the recent window, gold polyline + zero baseline, K-formatted axis, handles the early-game net loss
+(BL-112); (3) stubbed **Taxes** / **Wages** tier selectors (`– I II III IV V +`, active tier green,
+interactive but **no economic effect** — `ui_state.budget_tax_tier`/`budget_wage_tier`, tooltip points
+to BL-155); (4) an **Assets** block — Buildings Owned, Income (economy report), **Cargo Value** (the
+`player_stockpile_value` valuation, now **exported** from `header_panel` so the ledger and the header
+STOCKPILE figure share one computation); (5) a **placeholder** BUILDING_RANK_TABLE box. The former
+itemised cashflow table (BL-072) is removed from this surface. Signature change: the ledger now takes
+`player_plot_history` (for the chart) + `ui_state`; app.cpp call site updated.
+
+**Verified** via `scripts/verify/balance_ledger.lua` (golden re-blessed at 1280×720). Requirement group
+appended (BL-171 R1). BL-155's design updated with the confirmed Tax/Wages lever intent.
+
+**Open (residue).** Wire the Tax/Wages levers to real economics (→ BL-155, v0.1.2). Build the real
+top-8 buildings-by-profit table + its rank-change-over-4-ticks history (follow-on; per-building profit
+already exists via BL-074). Currency shown as `Cr` (mockup used `€`).
+
+---
+
 ## Session — v0.1.1 Batch: Roads & planetary logistics (BL-147/148/149) (2026-07-10)
 
 **Context.** Opened the v0.1.1 minor (Roads & planetary logistics) as a Batch Delivery while v0.1.0's

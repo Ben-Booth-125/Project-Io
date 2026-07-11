@@ -121,6 +121,14 @@ struct ui_state
     bool show_build_ledger = false;       ///< Whether the tile-contextual construction ledger is open (BL-162). Opened by the tile Selection element's "Construct Buildings" button; reads selected_entity as the target tile. Not a nav-rail ledger — closed by close_all_panels and by selecting a new entity. Mutually exclusive with the Selection element in the fold-out column.
     bool show_market_ledger = false; ///< Whether the Market Ledger is open.
     bool show_balance_ledger = false; ///< Whether the Balance Ledger is open.
+
+    // --- Budget ledger stubbed policy levers (BL-171 UI; mechanics owed to BL-155) ---
+    // The Tax and Wages tier selectors are drawn and selectable, but have NO economic
+    // effect yet — they carry the intended player levers (Tax = a player-set policy;
+    // Wages = a cost↔workforce trade-off) whose mechanics are designed under BL-155.
+    // Tiers run 1–5 (I–V); defaults match the mockup (Tax IV, Wages II).
+    int  budget_tax_tier  = 4;
+    int  budget_wage_tier = 2;
     bool show_corporation_panel = false; ///< Whether the Corporation Overview Dashboard is open.
 
     // --- one-question-per-view nav selectors (BL-117 sweep) ---
