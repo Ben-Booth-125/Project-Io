@@ -5652,6 +5652,7 @@
       ]
     },
     {
+      "brief": "tile-selection-layout",
       "batch": "2026-07-10",
       "title": "BL-123 — Selection element resize (tile vertical layout)",
       "status": "complete",
@@ -5709,6 +5710,7 @@
       ]
     },
     {
+      "brief": "budget-ledger-redesign",
       "batch": "2026-07-11-budget-ledger",
       "title": "BL-171 — Budget ledger redesign (profit chart, stubbed levers, rank placeholder)",
       "status": "complete",

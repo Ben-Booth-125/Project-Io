@@ -88,9 +88,9 @@ coverage-audit tool are the next passes.
 | Cluster | Stories |
 |---|---|
 | `orient` | ◐ US-001 who/where · ● US-004 zoom ladder · ● US-005 time control |
-| `find` | ● US-006 where to grow |
-| `build` | ◐ US-002 place a building · ● US-007 recipe & workforce |
-| `operate` | ● US-003 profitability & runway · ● US-012 workforce constraint |
+| `find` | ● US-006 where to grow · ● US-013 judge a tile's production |
+| `build` | ● US-002 place a building · ● US-007 recipe & workforce |
+| `operate` | ◐ US-003 profitability & runway · ● US-012 workforce constraint |
 | `expand` | ● US-011 survey a body |
 | `trade` | ● US-008 sell orders & floor · ● US-009 move goods between bodies |
 | `read-rivals` | ● US-010 read a rival |
@@ -108,8 +108,8 @@ story actually has something to run (a brief with golden/visual/headless verific
 | Mode | Stories | How you verify it |
 |---|---|---|
 | **manual** | US-001 orient · US-004 navigation feel · US-010 read-a-rival | Walk the flow live (the BL-098 activity). The value is a judgment — "what's my move?", the click-model *feel*, inferring a rival — that no golden captures. |
-| **mixed** | US-002 build · US-009 convoys · US-011 survey | Run the automatable core (placement legality, convoy logistics, survey determinism), then a short **manual read** on the legibility on top. |
-| **auto** | US-003 · US-005 · US-006 · US-007 · US-008 · US-012 | Re-run the story's requirement briefs — mostly golden/visual renders + headless econ invariants. A red brief = a regression against that player goal. |
+| **mixed** | US-002 build · US-003 budget · US-009 convoys · US-011 survey · US-013 tile read | Run the automatable core (placement legality, convoy logistics, survey determinism, the ledger goldens), then a short **manual read** on the legibility on top. |
+| **auto** | US-005 · US-006 · US-007 · US-008 · US-012 | Re-run the story's requirement briefs — mostly golden/visual renders + headless econ invariants. A red brief = a regression against that player goal. |
 
 **Run the automated set:** `node tools/session/story_check.js --commands` prints the concrete
 `ProjectIo --verify scripts/verify/*.lua` invocations per `auto`/`mixed` story (dispatch each via the
@@ -169,15 +169,23 @@ the walkthrough, and known friction. Requirement slugs are `req/requirements.jso
 - **Walk:** Opportunity lens → net-margin tint → Industry lens → substrate throughput field → Scarcity lens → where a good is absent → all without arming build.
 - **Friction:** several lenses answer "where to grow" differently; the player may not know which answers which. Colour-scheme pass (BL-016) is the open refinement.
 
+#### ● US-013 — Judge how good a specific tile is for production before I build
+> *As the player, I want to see how productive a specific tile would be — its output relative to the
+> rest of the map — before I commit a building, so that I build on strong ground, not on a guess.*
+- **Up:** Trade · Resources, Infrastructure, Environment
+- **Down:** Tile Selection element — per-resource production graphs, this tile vs the 10th-percentile tile ([SELECTION](../ui/SELECTION.md)) · **BL-123/071** · *`tile-selection-layout`*
+- **Walk:** single-click a tile → Selection opens → per deposited resource, a stacked bar reads this tile's production vs the P10 tile (a strong tile towers over the reference) → scroll the full deposit profile → carry the read into **Construct Buildings** (US-002).
+- **Friction:** complements the at-a-glance lens (US-006 says *where*; this says *how good, here*). Only prototype-extractable resources become buildable extraction — stone/timber show a bar but no build option yet (legible-but-inert).
+
 ### `build` — Build
 
-#### ◐ US-002 — Pick a tile, see what I can build, its cost and why-not, and build it
+#### ● US-002 — Pick a tile, see what I can build, its cost and why-not, and build it
 > *As the player, I want to select a tile and see what I can build there, what it costs in budget
 > and materials, and why I can't build the things I can't, so that I can commit in a few clicks.*
 - **Up:** Trade · Infrastructure, Budget, Resources, Environment
-- **Down:** build flow + "Insufficient funds." ([SELECTION](../ui/SELECTION.md)); "build here" ([MENU](../ui/MENU.md)); suitability tint ([PLANETARY](../ui/PLANETARY.md)) · **BL-071/044/095/082/043/010** · *`build-front-door`, `construction-pricing`, `placement-suitability`, `building-placement-rules`*
-- **Walk:** select tile → read without arming → buildable list with budget + material cost → unaffordable/unplaceable show a reason → arm → affinity tiles tint → confirm → placed + debited.
-- **Friction:** BL-082 occlusion fixed in v0.0.9 (re-walk). "Why not here" (BL-071) and the material/market-stock gate (BL-095) should read as *one* explanation, not two refusals.
+- **Down:** single-click tile ([PLANETARY](../ui/PLANETARY.md)); Selection element → "Construct Buildings"; tile construction ledger — cost + reason-coded why-not + Build ([SELECTION](../ui/SELECTION.md)) · **BL-162/123/044/095/043/071** · *`construction-pricing`, `building-placement-rules`, `market-stockpile-build-gate`*
+- **Walk:** single-click tile → Selection reads it (production graphs, terrain) → **Construct Buildings** → construction ledger lists each placeable type with budget+material cost → unplaceable show the reason ("A port must sit on the coast"), unaffordable disable with "Can't afford" → **Build** → construction enqueued + cost debited.
+- **Friction:** first pass (BL-162) — placeholder images, per-candidate expected-profit chart owed. The old arm-placement-on-canvas flow + its BL-082 occlusion are retired; the ledger is the single build surface now.
 
 #### ● US-007 — Set a building's recipe and workforce target
 > *As the player, I want to choose what an existing building produces and how much workforce it
@@ -189,13 +197,13 @@ the walkthrough, and known friction. Requirement slugs are `req/requirements.jso
 
 ### `operate` — Run my economy
 
-#### ● US-003 — Know whether a building makes money and what my runway is
+#### ◐ US-003 — Know whether a building makes money and what my runway is
 > *As the player, I want to know whether a building is profitable and whether I can afford my next
 > moves, without hunting across ledgers, so that I can act before bankruptcy rather than discover it.*
 - **Up:** Trade · Budget, Resources, Workforce
-- **Down:** Economy panel — itemised income/expenditure + runway + trends ([LAYOUT](../ui/LAYOUT.md)); per-building profitability ([SELECTION](../ui/SELECTION.md)) · **BL-072/073/074/081/066** · *`budget-breakdown`, `debt-interest`, `per-building-profitability`, `economy-ledger-legibility`, `economy-panel`*
-- **Walk:** open Economy panel → income/expenditure itemised, debt interest distinct, runway projected → select building → profitability reads → trend plots show trajectory → judge "carrying its weight?" and "how long until underwater?".
-- **Friction:** watch that the profitability figure and the runway agree in sign/framing so they don't read as contradictory.
+- **Down:** Budget ledger — profit chart + top-8 buildings-by-profit rank table ([LAYOUT](../ui/LAYOUT.md)); per-building profitability ([SELECTION](../ui/SELECTION.md)); Economy-panel trend plots ([LAYOUT](../ui/LAYOUT.md)) · **BL-171/074/072/066/155** · *`per-building-profitability`, `budget-ledger-redesign`*
+- **Walk:** open **Budget** → profit chart per econ tick + top-8 rank table (with rank-change vs a year ago) → select a building → per-building profitability reads on Selection → Economy-panel trends show trajectory → **GAP:** runway ("how long until underwater?") was removed in the BL-171 redesign.
+- **Friction:** the redesign traded the itemised cashflow table + projected **runway** for a profit chart + rank table (Ben's call). "Makes money" is now well-served; **"what's my runway" is a gap** until the deferred breakdown menu re-homes it (BL-155-adjacent). This is why US-003 dropped `served` → `partial`.
 
 #### ● US-012 — Understand why my workforce is constrained
 > *As the player, I want to see why workforce is limited on a body and where population concentrates,
