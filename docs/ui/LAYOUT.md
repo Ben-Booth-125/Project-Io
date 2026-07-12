@@ -155,8 +155,9 @@ kind's primary affordance) beside a narrower, muted **FACTS** column. Per
 selection kind: a **tile** offers *Build here* as the hero action beside its
 Thrives/Valid placement facts; a **body** offers *Dispatch Survey* or *Go to
 surface* beside its commercial-activity pulse; a **player-owned building**
-offers a *Manage building* button that routes into the construction panel
-beside its profitability readout; a **rival building** is intel-only — owner
+offers a *Manage building* button that routes into the tile-scoped **Manage
+ledger** (`draw_building_manage_ledger`, the per-building workforce/recipe/
+decommission surface) beside its profitability readout; a **rival building** is intel-only — owner
 and location facts, production/stockpile shown as explicit private rows. The
 old undifferentiated stat-block polymorphism and the separate lens-supplement
 section are gone — the action/facts split *is* the per-kind content now.
@@ -253,10 +254,12 @@ exempt — it is persistent chrome, not a ledger.
 ### One-question-per-view splits (BL-117 sweep)
 
 Fold-out ledgers with more than one question split their content across a **button-strip nav**
-(`ui::nav_button`, `foldout_column.hpp` — a manual `Selectable`/`Button` strip, since
-`ImGui::BeginTabBar` does not render in this build), each view drawing exclusively. The
-**Construction** panel (Build / Manage / Sell Orders) and the **Economy** panel (Corps / Holdings /
-Markets, `ui_state::economy_view`) use this. The **Balance**, **Market**, **Corporation**, and (still-
+(`ui::nav_button_strip`, `foldout_column.hpp` — a manual `Button` strip, since
+`ImGui::BeginTabBar` does not render in this build), each view drawing exclusively. The strip is
+the ledger's **header**: its buttons **span the full width**, dividing it evenly, and render at ~2×
+the body font so the tabs read as the primary switch. The **Building** panel (Construction /
+Buildings) and the **Economy** panel (Corps / Holdings / Markets, `ui_state::economy_view`) use
+this, as does the **Market** ledger (Prices / Sell Orders). The **Balance**, **Market**, **Corporation**, and (still-
 floating) **Tile** ledgers were audited and found to be single-question already — no split. The
 principle is *one question per view, a menu to move between views* — not a mandate to split every
 panel.
@@ -264,7 +267,7 @@ panel.
 **Toggle rule on the strip (BL-126).** Consistent with the universal toggle rule
 (`.claude/rules/io-standing-rules.md`): re-clicking the **currently-active** sub-view tab **closes
 the hosting ledger** (clears its `show_*` flag) — matching the nav-rail icon exactly — rather than
-being a no-op. Switching to a *different* tab is an ordinary view change. `ui::nav_button` takes the
+being a no-op. Switching to a *different* tab is an ordinary view change. `ui::nav_button_strip` takes the
 ledger's open-flag as an optional `close` target; a strip with no flag passed stays a plain,
 non-closing selector.
 

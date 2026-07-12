@@ -115,7 +115,9 @@ mockup, top to bottom:
 4. **2×2 action button grid** — **Construct Buildings** (opens the **tile construction ledger**,
    BL-162 — `draw_construction_ledger`, which lists the placeable building types for this tile and
    actually builds; see below), **Manage Buildings**
-   (disabled unless a building occupies the tile; routes to the management panel), **History** and
+   (disabled unless a building occupies the tile; routes to the tile-scoped **Manage ledger** —
+   `draw_building_manage_ledger`, the symmetric per-building management surface, *not* the corp-wide
+   Building ledger), **History** and
    **Supply** (drawn for layout completeness, **not yet wired** — History has no surface yet, and
    real Supply routing is Layer-5-gated per LENSES.md).
 

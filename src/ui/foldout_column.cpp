@@ -5,6 +5,8 @@
 
 #include <imgui.h>
 
+#include <initializer_list>
+
 namespace ui {
 
 float shell_column_width(float disp_x)
@@ -57,23 +59,51 @@ void foldout_end()
     ImGui::End();
 }
 
-void nav_button(const char* label, int id, int& view, bool* close)
+// The tabbed-ledger header switch renders at this font scale — ~2x the body text so the
+// tabs read as the ledger's primary control, not a footnote (this session's steer).
+constexpr float k_header_tab_scale = 2.0f;
+
+void nav_button_strip(std::initializer_list<const char*> labels, int& view, bool* close)
 {
-    const bool active = (view == id);
-    if (active)
-        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-    if (ImGui::Button(label))
+    const int count = static_cast<int>(labels.size());
+    if (count <= 0)
+        return;
+
+    const ImGuiStyle& style   = ImGui::GetStyle();
+    const float       avail   = ImGui::GetContentRegionAvail().x;
+    const float       spacing = style.ItemSpacing.x;
+    // Divide the full header width evenly between the tabs so the strip spans the header.
+    // Floor to a whole pixel so rounding can only leave the row a hair short — never
+    // overflow into a wrap (SameLine buttons would spill to a second line).
+    float btn_w = (avail - spacing * static_cast<float>(count - 1)) / static_cast<float>(count);
+    btn_w = static_cast<float>(static_cast<int>(btn_w));
+    if (btn_w < 1.0f)
+        btn_w = 1.0f;
+
+    ImGui::SetWindowFontScale(k_header_tab_scale);
+    int id = 0;
+    for (const char* label : labels)
     {
-        // BL-126 toggle rule: re-clicking the active tab closes the hosting ledger (clears
-        // its show_* flag); clicking a different tab is an ordinary view change. When no
-        // close target is supplied, the active re-click stays a no-op.
-        if (active && close)
-            *close = false;
-        else
-            view = id;
+        if (id > 0)
+            ImGui::SameLine();
+        const bool active = (view == id);
+        if (active)
+            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+        if (ImGui::Button(label, {btn_w, 0.0f}))
+        {
+            // BL-126 toggle rule: re-clicking the active tab closes the hosting ledger (clears
+            // its show_* flag); clicking a different tab is an ordinary view change. When no
+            // close target is supplied, the active re-click stays a no-op.
+            if (active && close)
+                *close = false;
+            else
+                view = id;
+        }
+        if (active)
+            ImGui::PopStyleColor();
+        ++id;
     }
-    if (active)
-        ImGui::PopStyleColor();
+    ImGui::SetWindowFontScale(1.0f);
 }
 
 } // namespace ui

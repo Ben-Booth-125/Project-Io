@@ -161,6 +161,15 @@ void draw_market_ledger(const world& w, ui_state& s,
         return;
     }
 
+    // --- View tabs (BL-159): Prices (the original view) / Sell Orders (relocated
+    // from the Construction/Building panel — a market question belongs on the
+    // market surface). Same button-strip idiom as the other split ledgers. The
+    // header sits ABOVE the body/market selectors (this session's steer): the
+    // Prices/Sell-Orders split is the ledger's primary question, while the body and
+    // market combos are cross-cutting selectors that scope whichever view is active.
+    ui::nav_button_strip({"Prices", "Sell Orders"}, s.market_ledger_view, &open);
+    ImGui::Separator();
+
     // --- Body selector ---
     // Collect distinct bodies that have at least one market.
     std::vector<entity_id> bodies;
@@ -253,15 +262,6 @@ void draw_market_ledger(const world& w, ui_state& s,
         return;
     }
     const market_component& mc = w.markets.at(selected_market);
-
-    // --- View tabs (BL-159): Prices (the original view) / Sell Orders (relocated
-    // from the Construction/Building panel — a market question belongs on the
-    // market surface). Same button-strip idiom as the other split ledgers.
-    ui::nav_button("Prices",      0, s.market_ledger_view, &open);
-    ImGui::SameLine();
-    ui::nav_button("Sell Orders", 1, s.market_ledger_view, &open);
-    ImGui::Separator();
-    ImGui::Spacing();
 
     if (s.market_ledger_view == 1)
     {

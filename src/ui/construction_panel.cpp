@@ -204,24 +204,23 @@ void draw_queue_section(const world& w, const recipe_registry& reg)
 // Inline detail under the Buildings tab (BL-143 redesign, folded in from the
 // former standalone "Manage" tab): answers "how do I configure the thing I
 // have" for whichever row the player selected in the buildings table above.
+// Resolve the building a selection refers to: the entity itself when it *is* a building,
+// else the (at most one — the standing one-building-per-tile invariant) building occupying
+// the selected tile. Returns nullptr when neither holds. Shared by the inline Buildings-tab
+// detail and the tile-scoped Manage ledger so both resolve identically.
+building_component* resolve_building_for_selection(world& w, entity_id sel)
+{
+    if (const auto bit = w.buildings.find(sel); bit != w.buildings.end())
+        return &bit->second;
+    for (auto& [id, bld] : w.buildings)
+        if (bld.tile == sel)
+            return &bld;
+    return nullptr;
+}
+
 void draw_selected_section(world& w, const recipe_registry& reg, const ui_state& state)
 {
-    building_component* found = nullptr;
-    if (const auto bit = w.buildings.find(state.selected_entity); bit != w.buildings.end())
-        found = &bit->second;
-    else
-    {
-        // Fall back to tile-match for the normal "select a tile, see its building" case.
-        for (auto& [id, bld] : w.buildings)
-        {
-            if (bld.tile == state.selected_entity)
-            {
-                found = &bld;
-                break;
-            }
-        }
-    }
-
+    building_component* found = resolve_building_for_selection(w, state.selected_entity);
     if (found == nullptr)
     {
         ImGui::TextDisabled("Select a building's tile to manage it.");
@@ -440,9 +439,7 @@ void draw_construction_panel(world& w,
     ui::foldout_begin("Building");
 
     int& view = state.construction.panel_view;
-    ui::nav_button("Construction", 0, view, p_open);
-    ImGui::SameLine();
-    ui::nav_button("Buildings", 1, view, p_open);
+    ui::nav_button_strip({"Construction", "Buildings"}, view, p_open);
     ImGui::Separator();
     ImGui::Spacing();
 
@@ -460,6 +457,68 @@ void draw_construction_panel(world& w,
     }
 
     ui::foldout_end();
+}
+
+// Tile-scoped building-management surface (this session's steer): the contextual
+// counterpart to the tile construction ledger (draw_construction_ledger in
+// selection_panel.cpp). Reached from the tile Selection element's "Manage Buildings"
+// action — and a selected building's "Manage" button — which now route *here* rather
+// than opening the corp-wide Building ledger, so managing *this* tile's building is one
+// focused surface, not the generic construction menu. Reuses draw_selected_section (the
+// per-building management block: workforce / recipe / decommission) under a tile header;
+// draws pinned + borderless into the shared fold-out column, exactly like the build
+// ledger, and is mutually exclusive with the Selection element there.
+void draw_building_manage_ledger(world& w, const recipe_registry& reg, ui_state& ui)
+{
+    // Resolve the building to manage the same way the inline Buildings-tab detail does:
+    // the selection itself when it is a building, else the building on the selected tile.
+    building_component* b = resolve_building_for_selection(w, ui.selected_entity);
+    if (b == nullptr)
+    {
+        ui.show_manage_ledger = false; // nothing to manage — fall back to the Selection element
+        return;
+    }
+
+    const foldout_rect r       = foldout_column_rect();
+    const float        bar_w   = r.w;
+    const float        frame_h = ImGui::GetFrameHeight();
+    const ImGuiStyle&  style   = ImGui::GetStyle();
+
+    ImGui::SetNextWindowPos({r.x, r.y}, ImGuiCond_Always);
+    ImGui::SetNextWindowSize({r.w, r.h}, ImGuiCond_Always);
+    ImGui::SetNextWindowBgAlpha(0.90f);
+    constexpr ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoTitleBar            |
+        ImGuiWindowFlags_NoResize              |
+        ImGuiWindowFlags_NoMove                |
+        ImGuiWindowFlags_NoCollapse            |
+        ImGuiWindowFlags_NoNav                 |
+        ImGuiWindowFlags_NoBringToFrontOnFocus |
+        ImGuiWindowFlags_NoSavedSettings;
+    ImGui::Begin("##manage_ledger", nullptr, flags);
+
+    // ── Header: Manage · <Type> [x, y] ......................... [x] ──
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Manage");
+    ImGui::SameLine();
+    ImGui::TextUnformatted(building_type_name(b->type));
+    if (const auto tit = w.tiles.find(b->tile); tit != w.tiles.end())
+    {
+        ImGui::SameLine();
+        ImGui::TextDisabled("[%d, %d]", tit->second.grid_x, tit->second.grid_y);
+    }
+    const float btn = frame_h;
+    ImGui::SameLine(bar_w - style.WindowPadding.x - btn);
+    if (ImGui::Button("x", {btn, btn}))
+        ui.show_manage_ledger = false; // back to the tile Selection element
+    if (ImGui::IsItemHovered())
+        ImGui::SetTooltip("Close");
+
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    draw_selected_section(w, reg, ui);
+
+    ImGui::End();
 }
 
 } // namespace ui

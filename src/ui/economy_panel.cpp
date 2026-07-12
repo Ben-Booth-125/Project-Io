@@ -285,11 +285,7 @@ void draw_economy_panel(const world& w,
     // views — "how are the corps doing", "what do I hold where", "what's the market
     // doing" — each drawing exclusively, so the panel reads in the narrow shell column.
     int& view = ui.economy_view;
-    ui::nav_button("Corps", 0, view, &ui.show_economy_panel);
-    ImGui::SameLine();
-    ui::nav_button("Holdings", 1, view, &ui.show_economy_panel);
-    ImGui::SameLine();
-    ui::nav_button("Markets", 2, view, &ui.show_economy_panel);
+    ui::nav_button_strip({"Corps", "Holdings", "Markets"}, view, &ui.show_economy_panel);
     ImGui::Separator();
     ImGui::Spacing();
 

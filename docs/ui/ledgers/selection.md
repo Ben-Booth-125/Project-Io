@@ -15,7 +15,7 @@ Not tabbed views — **polymorphic by selection kind**. The "sub-levels" are the
 | **Tile** | **Build here** — build front door: extractable-target radios + Build extraction site / processing facility / port, each cost-annotated (`100 cr · 20 Steel`) and affordability-gated | **Suited for** — territory owner + Thrives/Valid/Invalid affordance readout (BL-071) | No-op (already on the surface) |
 | **Body** (planet/moon/asteroid/station) | Unsurveyed → **Dispatch Survey** (cost·ETA, funds-gated); surveyed → **Go to surface** | **Commercial activity** pulse — busy/steady/quiet or "outside your network" (BL-089) | `focus_on_entity` → Planetary surface |
 | **Body** (star) | none | none | — |
-| **Building** (player) | **Manage building** → opens construction panel | **Profitability (est./tick)** — Revenue/Inputs/Wages/Maint + Net (BL-074) | host tile |
+| **Building** (player) | **Manage building** → opens the tile-scoped **Manage ledger** (`draw_building_manage_ledger`), not the corp-wide Building ledger | **Profitability (est./tick)** — Revenue/Inputs/Wages/Maint + Net (BL-074) | host tile |
 | **Building** (rival) | none — "Competitor building - intel only." | Owner + `Production: private` / `Stockpile: private` (BL-068) | host tile |
 | **Market / Unit** | **Go to** — locate on canvas | (stubbed) | entity position |
 | **Nation / Corporation** | none — "Open its ledger via [>]." | (stubbed) | a ledger |

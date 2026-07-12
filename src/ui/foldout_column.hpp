@@ -1,5 +1,7 @@
 #pragma once
 
+#include <initializer_list>
+
 namespace ui {
 
 /// A screen rect in pixels ({x, y} top-left, {w, h} extent). A small local type so
@@ -35,16 +37,20 @@ bool foldout_begin(const char* name);
 /// ImGui::Begin/End contract.
 void foldout_end();
 
-/// One tab button in a fold-out panel's button-strip nav — the one-question-per-view
-/// selector shared across the BL-117.. sweep (modelled on the Construction panel's
-/// Build/Manage/Sell strip). Highlights when `view == id`; sets `view = id` on click.
-/// Callers place buttons with `ImGui::SameLine()` between them and a `Separator` below.
-/// Used because `ImGui::BeginTabBar`'s header does not render in this build.
+/// The tabbed-ledger header: one full-width button-strip nav — the one-question-per-view
+/// selector shared across the BL-117.. sweep. The buttons **span the whole header**,
+/// dividing the available width evenly, and render at a larger font so the strip reads as
+/// the ledger's primary switch rather than a footnote. The active tab (`view` == its index)
+/// is highlighted; clicking a tab sets `view` to its index. Draw a `Separator` below the
+/// strip. Used because `ImGui::BeginTabBar`'s header does not render in this build.
+///
+/// The `view` value is the zero-based index of the label in `labels` (first label = 0).
 ///
 /// Toggle rule (BL-126, io-standing-rules): re-clicking the *already-active* tab closes
 /// the hosting ledger via `close` (its `show_*` flag) rather than being a no-op; switching
 /// to a different tab is an ordinary view change. Pass the ledger's open-flag as `close`;
 /// `nullptr` (the default) keeps the strip non-closable (a plain view selector).
-void nav_button(const char* label, int id, int& view, bool* close = nullptr);
+void nav_button_strip(std::initializer_list<const char*> labels, int& view,
+                      bool* close = nullptr);
 
 } // namespace ui

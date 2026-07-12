@@ -36,4 +36,17 @@ void draw_construction_panel(world& w,
                              ui_state& state,
                              bool* p_open);
 
+/// Draw the tile-scoped **Manage** ledger — the contextual building-management surface
+/// reached from the tile Selection element's "Manage Buildings" action (and a selected
+/// building's "Manage" button). It shows the per-building management block (workforce /
+/// recipe / decommission) for the building the selection resolves to, pinned + borderless
+/// in the shared fold-out column — the symmetric counterpart to the tile construction
+/// ledger (draw_construction_ledger). Gated by ui.show_manage_ledger; clears that flag and
+/// draws nothing when the selection resolves to no building.
+///
+/// @param w    World — read for building/tile lookup; written by the management controls.
+/// @param reg  Loaded registry (recipe names and per-type economics).
+/// @param ui   Shared UI state — read (selected_entity) and written (show_manage_ledger).
+void draw_building_manage_ledger(world& w, const recipe_registry& reg, ui_state& ui);
+
 } // namespace ui

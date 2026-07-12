@@ -19,6 +19,7 @@ void close_all_panels(ui_state& state)
     state.show_tile_ledger       = false;
     state.show_economy_panel     = false;
     state.show_build_ledger      = false; // tile build ledger (BL-162) is a column occupant too
+    state.show_manage_ledger     = false; // tile manage ledger is a column occupant too
 }
 
 bool any_panel_open(const ui_state& state)
