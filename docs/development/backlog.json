@@ -3444,6 +3444,25 @@
       "authority_doc": "docs/ui/SELECTION.md",
       "summary": "Filed 2026-07-11 from the BL-098 walkthrough (US-012, scored 3.5/5). The Population lens + labelled settlements read well at the map level, but selecting a tile shows its production graph, not the habitability→workforce reason — the 'why is labour capped here' answer isn't where the player looks. Shares the ceiling story with US-007. Design-owed.",
       "design": "**Friction (BL-098 walkthrough, US-012).** US-012 (and the shared cap in US-007) want a 'you asked for X, the body allows Y — because habitability' read on the Selection element. Today the tile Selection shows production vs the P10 reference but not the workforce-ceiling reasoning; the habitability→workforce chain is legible on the lens legend but not where the player is deciding.\n\n**Direction:** surface the already-simulated habitability→workforce feedback (POPULATION.md) on tile/building selection so siting is reasoned, not guessed. It must tell **one consistent story** with US-007's building workforce-target read (the same ceiling seen from two surfaces) — a note both this and [[BL-176]] should honour.\n\n**Evidence:** screenshots/population_legibility_centre_panel (tile Selection shows production, not the workforce reason; 'Dunmoor' settlement renders well on-canvas). Traces US-012 (+US-007); parent review [[BL-098]]. Authority → SELECTION.md (+ POPULATION.md)."
+    },
+    {
+      "id": "BL-180",
+      "short_name": "SCORING_VICTORY_LEDGER",
+      "category": "UI",
+      "title": "Scoring / victory ledger — rank nations by economic, research and military power",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "C",
+      "difficulty": 4,
+      "version_goal": "post-v0.1.0",
+      "parked": true,
+      "requires": ["BL-094"],
+      "blocked_on": [],
+      "written": "2026-07-12",
+      "files": [],
+      "authority_doc": "docs/ui/LAYOUT.md",
+      "summary": "Captured 2026-07-12 from the US-002/US-003 story-review session. A dedicated scoring / victory ledger that ranks the nations across several axes of power rather than one number. Parked with the v0.2.0 nation arc ([[BL-094]]) — it presupposes the nation-tier metrics that pivot introduces (military, research). BL-171's per-building profit rank table is the visual seed. Design-owed.",
+      "design": "**Status:** design-owed — captured 2026-07-12 from the US-002/US-003 story-review session. Parked with the v0.2.0 nation arc ([[BL-094]]); a scoring surface presupposes the nation-tier metrics BL-094 introduces.\n\n**Intent.** A dedicated **scoring / victory ledger**: rank the nations across several axes of power — **economic power** (treasury / production throughput), **research** ([[BL-087]]), and **military strength** ([[BL-094]] v0.2.0 spine) — rather than a single number. The prototype's per-building profit **rank table** ([[BL-171]]) is the visual seed — it already reads 'like a victory ledger', but ranks the player's own buildings; this generalises the same idiom up to the **nation** as the ranked entity.\n\n**Home.** Lives under the **corporation menu**, which [[BL-094]] refactors into *the nation's chartered corps* under national framing — the scoring ledger is the nation-tier view that menu grows into. Rival internals stay private ([[BL-068]]); public power metrics are the legible surface.\n\n**Owed at promotion:** the metric set + weighting, whether it is a live standings table or a win-condition check, and the seam to [[BL-054]] nation behaviour (every nation scored symmetrically). Not designed now — avoids a parked cascade ahead of the v0.2.0 cut.\n\n**Links:** [[BL-094]], [[BL-171]], [[BL-054]], [[BL-087]], [[BL-068]]. Authority → LAYOUT.md on landing."
     }
   ]
 }

@@ -129,7 +129,7 @@
         "Options that can't be placed show the reason instead of a Build button — e.g. 'A port must sit on the coast' (BL-071 reason vocabulary); unaffordable options disable Build with 'Can't afford'.",
         "Click 'Build' on a valid, affordable option -> the construction is enqueued on the tile and the cost debited (the same construct_building path a canvas placement uses)."
       ],
-      "friction": "First pass (BL-162): building images are placeholders and a per-candidate expected-profit chart is owed. The old arm-placement-on-canvas flow and its panel-occlusion issue (BL-082) are retired — the construction ledger is the single build surface now.",
+      "friction": "First pass (BL-162): building images are placeholders. A per-candidate expected-profit chart is NOT a near-term owe — it is deferred to the future corporation / chartered-corps surface (BL-094 national pivot), where per-corp economic reads belong. The old arm-placement-on-canvas flow and its panel-occlusion issue (BL-082) are retired — the construction ledger is the single build surface now.",
       "written": "2026-07-11",
       "testing": {"mode": "mixed", "note": "Fresh-start buildability asserted end-to-end by scripts/verify/fresh_start_build.lua; the construction ledger itself is captured by scripts/verify/tile_build_ledger.lua (land + water tiles — cost + reason-coded why-not). Cost debit + placement legality are headless (construction-pricing, building-placement-rules, market-stockpile-build-gate)."}
     },
@@ -148,16 +148,16 @@
           { "doc": "docs/ui/SELECTION.md", "surface": "Per-building profitability read on selection (BL-074)" },
           { "doc": "docs/ui/LAYOUT.md", "surface": "Economy panel — balance / income / expenditure trend plots (BL-066)" }
         ],
-        "backlog": ["BL-171", "BL-074", "BL-072", "BL-066", "BL-155"],
+        "backlog": ["BL-171", "BL-177", "BL-074", "BL-072", "BL-066", "BL-155"],
         "requirements": ["per-building-profitability", "budget-ledger-redesign"]
       },
       "walkthrough": [
         "Open the Budget ledger (nav rail 'Budget') -> a profit line chart shows profit per econ tick, and a top-8 buildings-by-profit table shows which assets carry their weight, with a rank-change-vs-a-year-ago column (BL-171).",
         "Select a building -> its per-building profitability (revenue vs. running cost) also reads on the Selection element (BL-074).",
         "The Economy panel's balance / income / expenditure trend plots (BL-066) show the trajectory — 'am I improving?'.",
-        "GAP: 'how long until I'm underwater?' — the projected runway (and the itemised cashflow breakdown, BL-072) were removed from the Budget ledger in the BL-171 redesign (deferred to a dedicated breakdown menu); today runway must be inferred from the balance + the header net-per-quarter figure."
+        "GAP: 'how long until I'm underwater?' — the projected runway (and the itemised cashflow breakdown, BL-072) were removed from the Budget ledger in the BL-171 redesign; re-homing the runway read is now filed as BL-177 (BUDGET_RUNWAY_LEGIBILITY, v0.1.0, ROADMAP-tagged BL-155-adjacent). Until BL-177 lands, runway must be inferred from the balance + the header net-per-quarter figure."
       ],
-      "friction": "The BL-171 redesign traded the itemised cashflow table + projected runway for a profit chart + rank table (Ben's call — too much detail at a glance). The 'makes money' leg is now well-served (profit chart + rank table); the 'what's my runway' leg is a GAP until the deferred breakdown menu lands — re-home the runway there (BL-155-adjacent).",
+      "friction": "The BL-171 redesign traded the itemised cashflow table + projected runway for a profit chart + rank table (Ben's call — too much detail at a glance). The 'makes money' leg is now well-served (profit chart + rank table); the 'what's my runway' leg is a GAP until BL-177 (BUDGET_RUNWAY_LEGIBILITY, v0.1.0) lands — the runway/burn read re-homed to a breakdown menu or a compact header/ledger line.",
       "written": "2026-07-11",
       "testing": {"mode": "mixed", "note": "Per-building profitability is a headless invariant (per-building-profitability); the Budget ledger layout — profit chart + rank table — is golden-backed (budget-ledger-redesign: scripts/verify/balance_ledger.lua + budget_ledger_ranked.lua). The runway leg has no home today, so it is a manual note, not a passing check."}
     },

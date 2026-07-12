@@ -185,7 +185,7 @@ the walkthrough, and known friction. Requirement slugs are `req/requirements.jso
 - **Up:** Trade · Infrastructure, Budget, Resources, Environment
 - **Down:** single-click tile ([PLANETARY](../ui/PLANETARY.md)); Selection element → "Construct Buildings"; tile construction ledger — cost + reason-coded why-not + Build ([SELECTION](../ui/SELECTION.md)) · **BL-162/123/044/095/043/071** · *`construction-pricing`, `building-placement-rules`, `market-stockpile-build-gate`*
 - **Walk:** single-click tile → Selection reads it (production graphs, terrain) → **Construct Buildings** → construction ledger lists each placeable type with budget+material cost → unplaceable show the reason ("A port must sit on the coast"), unaffordable disable with "Can't afford" → **Build** → construction enqueued + cost debited.
-- **Friction:** first pass (BL-162) — placeholder images, per-candidate expected-profit chart owed. The old arm-placement-on-canvas flow + its BL-082 occlusion are retired; the ledger is the single build surface now.
+- **Friction:** first pass (BL-162) — placeholder images. The per-candidate expected-profit chart is *not* a near-term owe — it's deferred to the future corporation / chartered-corps surface (BL-094). The old arm-placement-on-canvas flow + its BL-082 occlusion are retired; the ledger is the single build surface now.
 
 #### ● US-007 — Set a building's recipe and workforce target
 > *As the player, I want to choose what an existing building produces and how much workforce it
@@ -201,9 +201,9 @@ the walkthrough, and known friction. Requirement slugs are `req/requirements.jso
 > *As the player, I want to know whether a building is profitable and whether I can afford my next
 > moves, without hunting across ledgers, so that I can act before bankruptcy rather than discover it.*
 - **Up:** Trade · Budget, Resources, Workforce
-- **Down:** Budget ledger — profit chart + top-8 buildings-by-profit rank table ([LAYOUT](../ui/LAYOUT.md)); per-building profitability ([SELECTION](../ui/SELECTION.md)); Economy-panel trend plots ([LAYOUT](../ui/LAYOUT.md)) · **BL-171/074/072/066/155** · *`per-building-profitability`, `budget-ledger-redesign`*
-- **Walk:** open **Budget** → profit chart per econ tick + top-8 rank table (with rank-change vs a year ago) → select a building → per-building profitability reads on Selection → Economy-panel trends show trajectory → **GAP:** runway ("how long until underwater?") was removed in the BL-171 redesign.
-- **Friction:** the redesign traded the itemised cashflow table + projected **runway** for a profit chart + rank table (Ben's call). "Makes money" is now well-served; **"what's my runway" is a gap** until the deferred breakdown menu re-homes it (BL-155-adjacent). This is why US-003 dropped `served` → `partial`.
+- **Down:** Budget ledger — profit chart + top-8 buildings-by-profit rank table ([LAYOUT](../ui/LAYOUT.md)); per-building profitability ([SELECTION](../ui/SELECTION.md)); Economy-panel trend plots ([LAYOUT](../ui/LAYOUT.md)) · **BL-171/177/074/072/066/155** · *`per-building-profitability`, `budget-ledger-redesign`*
+- **Walk:** open **Budget** → profit chart per econ tick + top-8 rank table (with rank-change vs a year ago) → select a building → per-building profitability reads on Selection → Economy-panel trends show trajectory → **GAP:** runway ("how long until underwater?") was removed in the BL-171 redesign, re-homing filed as BL-177.
+- **Friction:** the redesign traded the itemised cashflow table + projected **runway** for a profit chart + rank table (Ben's call). "Makes money" is now well-served; **"what's my runway" is a gap** until **BL-177** (BUDGET_RUNWAY_LEGIBILITY, v0.1.0, ROADMAP-tagged BL-155-adjacent) lands. This is why US-003 dropped `served` → `partial`.
 
 #### ● US-012 — Understand why my workforce is constrained
 > *As the player, I want to see why workforce is limited on a body and where population concentrates,
