@@ -3466,6 +3466,30 @@
       "authority_doc": "docs/economy/PRODUCTION.md",
       "summary": "Split from the 2026-07-15 building-management redesign. The UI shell (title/image, glyph-tagged production-method dropdown, profit + workforce graphs, and a 0-100 workforce-target button grid) landed on that session as the Buildings-tab detail (construction_panel.cpp draw_selected_section). THIS item is the deferred economy half: the player building's workforce should be AUTO-calculated each econ tick to maximise the building's net profit, with the workforce target reframed as an auto-computed heuristic the player may override, NOT an explicit goal.",
       "design": "**Why:** Ben's steer - a manual workforce percentage is busywork; the interesting decision is the override, not the dial. The solver should land the workforce where marginal wage = marginal margin, then surface that as the default target the player can nudge.\n\n**The load-bearing tension (design first):** the standing rule is *the player's own corp is never auto-acted on* (io-standing-rules.md; the BL-079 exception is background corps only). Auto-solving the player's workforce brushes that rule, so this needs an explicit reconciliation: is the solver an advisory *default* the player accepts/overrides (keeps agency, likely fine) or a silent per-tick mutation of the player's building (violates the rule)? Recommended framing: the solver computes a *suggested* target; the player's explicit override pins it until cleared. Determinism must hold (no float drift across save/load).\n\n**Also owed (real data behind the shell):** per-building profit + workforce **history series** to replace the placeholder graphs, and proper per-method **glyphs** in ui::icons (the shell reuses the output resource pip). See the building-management shell notes in the same session's DEVLOG entry.\n\n**Files:** economy_system.cpp (the solver, tick-gated), construction_panel.cpp (target buttons read the solved default), plus ICONS/PRODUCTION doc updates on landing."
+    },
+    {
+      "id": "BL-182",
+      "short_name": "CONSTRUCTION_SCARCITY_MODEL",
+      "category": "Economy",
+      "title": "Make scarcity felt - construction draws from a finite market stockpile, not an infinite supplier",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "A",
+      "difficulty": 4,
+      "version_goal": "v0.3.0",
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-16",
+      "files": [
+        "src/world/construction.cpp",
+        "src/world/market_clearing.cpp",
+        "src/world/economy_system.cpp",
+        "scripts/economy.lua"
+      ],
+      "authority_doc": "docs/economy/PRODUCTION.md",
+      "summary": "Filed 2026-07-16 from Ben's playtest note: \"buildings are very cheap; scarcity needs to be really FELT\". A tuning pass landed the same session (build costs ~7x, materials ~6x, durations ~2.5x in economy.lua) so building is at least a real commitment - but tuning alone cannot produce scarcity, because construction still buys its materials from an effectively INFINITE supplier. THIS item is the structural half: make construction compete for finite supply.",
+      "design": "**The diagnosis (2026-07-16).** Buildings are not instant - BL-095 already made construction durative and pay-as-you-build (construct_building does no up-front debit; build_cost + materials accrue over build_duration_ticks). Two real problems sat underneath the complaint:\n\n1. **Costs were trivial against income** - a 100 cr extraction site against ~900 cr/qtr net from four buildings. Addressed by the 2026-07-16 tuning pass; retune freely.\n2. **The market is an infinite counterparty (the structural blocker).** economy.lua's own note admits it: construction buys its material cost from the tile's local market at prevailing price - \"the resource line is what the cash buys, **not a pool gate**\". Combined with market_clearing's \"supply is always guaranteed to clear (prototype invariant)\" auto-clearing path and the saturated nation substrate, materials can never actually run out. So raising numbers makes building EXPENSIVE, never SCARCE - you just pay more to a supplier that never says no.\n\n**What is owed.** The fuller BL-095 gate/charge model that comment defers: a **depletable market stockpile** that construction draws down and must compete for against other demand (other builders, the substrate, processors auto-buying shortfalls). Scarcity then shows up as the thing the player *feels*: a build that stalls because someone else took the steel, a price that spikes because three sites broke ground at once, a reason to ship materials in rather than assume the local market has them.\n\n**Design questions to settle first:**\n- Does the \"supply always clears\" prototype invariant get relaxed, or does construction become a *privileged* claimant that bids against others? Relaxing it is the honest model but touches every auto-clearing path.\n- How does the nation substrate participate - is it an infinite well (then scarcity is only local/temporal) or itself finite?\n- Failure mode to avoid: BL-044 originally gated construction against the corp's own pool and **deadlocked a fresh start** (a corp's steel surplus auto-sells each tick, so the pool never held enough). Any finite gate must not re-create that deadlock.\n- Determinism: contention between claimants needs a deterministic ordering (run_construction already visits buildings in ascending id order for exactly this reason).\n\n**Fit:** lands naturally in the pivoted **v0.3.0 \"stricter logistics\"** theme (ROADMAP.md, 2026-07-16 pivot) - scarcity and real supply constraint are the same problem seen from two sides. See also the rate gate already live in run_construction (stretch/pause on thin local supply), which is the seam this builds on."
     }
   ]
 }

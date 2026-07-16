@@ -813,7 +813,10 @@ void draw_building_selection(world& w, const recipe_registry& reg,
     }
     ImGui::SeparatorText("Workforce");
     ImGui::PushStyleColor(ImGuiCol_PlotLines, ImGui::ColorConvertU32ToFloat4(palette::workforce));
-    ImGui::PlotLines("##workforce", wf_series, N, 0, nullptr, 0.0f, 120.0f, {graph_w, 60.0f});
+    // Scale over the workforce target's FULL range (0–200 %), not 0–120: the BL-181
+    // solver routinely picks 200 % on a strong site, which a 120 ceiling clipped off the
+    // top — the line read as flat/absent (caught in the 2026-07-16 scarcity playtest).
+    ImGui::PlotLines("##workforce", wf_series, N, 0, nullptr, 0.0f, 200.0f, {graph_w, 60.0f});
     ImGui::PopStyleColor();
 
     // ── Workforce Target: Auto (the economy tick solves the profit-max target each

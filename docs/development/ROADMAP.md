@@ -1,7 +1,7 @@
 # Project Io — Roadmap
 
 The milestone map from the current state through the **v0.1.0** prototype cut and on into the
-**expanded prototype** (v0.1.x → v0.3.0). This document is **forward-facing and lean**: it names
+**expanded prototype** (v0.1.x → v0.4.0). This document is **forward-facing and lean**: it names
 the version sequence, the *theme* of each minor, and the done-definition for the prototype cut. It
 deliberately does **not** enumerate individual items — that lives in the backlog
 ([`backlog.json`](backlog.json) metadata + [`BACKLOG.md`](BACKLOG.md) design prose) and the active
@@ -88,13 +88,27 @@ Per-item detail is in `DEVLOG.md`.
 
 ## The arc from here
 
-The map no longer ends at the prototype cut. Ben's **2026-07-09 refocus** extends it: **v0.1.0**
-still cuts the economy-loop prototype; then the **v0.1.x** band lays groundwork for an *expanded
-prototype*, **v0.2.0** refocuses who the player is, and **v0.3.0** brings the political layer and
-the filter system online. The v0.0.6–v0.0.8 themes have shipped, and *v0.0.9 — Budget clarity +
-polish* was cut 2026-07-05 (in-app system menu BL-070, the ledger/panel legibility bugs
-BL-081/082, the corp-emblem glyph family BL-090, one BL-089 deferral; per-item record in
-`DEVLOG.md` and § Near-term publish plan).
+The map no longer ends at the prototype cut. **v0.1.0** still cuts the economy-loop prototype; then
+the **v0.1.x** band lays groundwork for an *expanded prototype*.
+
+**Ben's 2026-07-16 pivot** re-themed everything past that band. The previous plan made **v0.2.0**
+the *nation refocus* (who the player is) and **v0.3.0** *politics + the filter system*. The new arc
+puts **agency and knowledge first** and pushes the long-game systems out a minor:
+
+| Minor | Theme |
+|---|---|
+| **v0.2.0** | Actors & diplomacy — basic AI, diplomacy options, map reveal *via diplomacy*, moving convoys on and between planets |
+| **v0.3.0** | Intel, military & strict logistics |
+| **v0.4.0** | Law, tech & grand strategy — the depth that makes it more than a quick, easy game |
+
+The reasoning the pivot encodes: a world that never answers back has no one to be strategic
+*against*, so actors and diplomacy come before the systems that presuppose them. Law and tech are
+what stop the game being finishable in an afternoon — but they are depth on top of a living world,
+not a substitute for one. See § Open calls for what this displaces.
+
+The v0.0.6–v0.0.8 themes have shipped, and *v0.0.9 — Budget clarity + polish* was cut 2026-07-05
+(in-app system menu BL-070, the ledger/panel legibility bugs BL-081/082, the corp-emblem glyph
+family BL-090, one BL-089 deferral; per-item record in `DEVLOG.md` and § Near-term publish plan).
 
 ### v0.1.0 — Quality audit + legibility polish + cut
 
@@ -123,8 +137,10 @@ Final verification pass against the done-definition below, then the Cut.
 
 *Theme: ponder and stub what the expanded prototype will need — design-forward, data-model-first,
 no committed systems yet.* Past the cut, the v0.1.x band is where the game's next dimensions get
-their first shape: enough design and stubbing that the v0.2.0 refocus and the v0.3.0 political
-layer land on positioned ground rather than a greenfield. v0.1.1 is a concrete build minor; the
+their first shape, so the minors above land on positioned ground rather than a greenfield. *(After
+the 2026-07-16 pivot these stubs now feed later minors than when they were written — politics/AI
+into v0.2.0, military into v0.3.0, laws/techs out to v0.4.0; see § Open calls.)* v0.1.1 is a
+concrete build minor; the
 rest of the band (v0.1.2–v0.1.5) is deliberately design-forward — each now has a placeholder
 `design-owed` item that firms into real design as it is reached.
 
@@ -144,28 +160,70 @@ rest of the band (v0.1.2–v0.1.5) is deliberately design-forward — each now h
   the v0.2.0 nation actor to have something to own, deferring the working system to v0.3.0. The
   band's last minor before the refocus.
 
-### v0.2.0 — The refocus (nation as the strategic actor)
+### v0.2.0 — Actors & diplomacy (the world answers back)
 
-*Theme: change who the player is.* The player pivots from **corporation** to **nation** as the
-strategic actor — owning research, military, and intelligence — while the corporation stays the
-**economic** actor, prototyped as a single chartered corp (= today's player corp) so the v0.0.x
-economy loop survives intact underneath and the nation is a thin strategic layer above it
-(**BL-094**, settled 2026-07-04). This is the hinge from *economy sandbox* toward *grand strategy*:
-the laws / techs / military / politics stubbed across v0.1.x now hang off an actor that can own
-them.
+*Theme: the world stops being scenery.* Today every other corporation and nation is passive: the
+map is revealed by paying for a survey, goods move but nobody negotiates, and no rival ever reacts.
+v0.2.0 gives the world **agency and a second route to knowledge** — you learn the map by *talking*
+to people, not only by buying a scan. Three coupled strands:
 
-### v0.3.0 — Politics + the filter system
+- **Basic AI.** The first real actor behaviour beyond the BL-079 mechanical stub — enough that
+  rivals and nations *do* things the player must respond to. Scope is "basic" by intent: legible,
+  deterministic reactions, not a strategic planner.
+- **Diplomacy options.** The player-facing verbs — the agreements, offers, and standings that make
+  another actor worth talking to. This is the dimension `TECH_FOUNDATIONS.md` excluded from the
+  prototype cut, now opened deliberately.
+- **Map reveal via diplomacy.** A *second* route through the geographic fog: today the Survey
+  system (BL-067) is the only key, and it is a cash transaction. Diplomacy becomes the alternative —
+  knowledge as something you are *given* or *traded*, not only bought. This lands on
+  [`../ui/DISCOVERY.md`](../ui/DISCOVERY.md)'s existing two-fog model rather than replacing it.
+- **Moving convoys, on and between planets.** Convoys already route and cost (v0.0.6–7) but read as
+  an abstraction; here they become *visible motion* — intra-body movement across the planetary
+  surface as well as the existing inter-body legs. The v0.1.1 road lattice is what intra-body
+  movement rides on.
 
-*Theme: the political layer for real, and Era → Filter.* Two coupled deliverables:
+### v0.3.0 — Intel, military & strict logistics
 
-- **Politics.** Promote the v0.1.x political stub into a working layer — the nation's political
-  character, its relationships, and the levers the player-as-nation actually pulls.
-- **The filter system (Era → Filter).** Rename and reframe **Era** as **Filter**: the world-state
-  gate governing what content is available when (**BL-087**'s catastrophic-event / quest-tree model
-  re-read as a *filter* over the world). A terminology change with reach — `ERAS.md`,
-  `GLOSSARY.md`, the era enums, and any `era_*` symbols — folded into the work when it lands, not
-  ahead of it (authority time-slice). *(Naming watch: "filter" sits near the map-lens vocabulary in
-  `LENSES.md`; confirm the two read as distinct before the rename lands.)*
+*Theme: the pressure dimensions.* With actors that act (v0.2.0), the levers that matter *against*
+them come online, and the supply model stops being forgiving:
+
+- **Intelligence.** Promote the BL-068 visibility rule and the activity fog from a read-only model
+  into something the player invests in and contests — knowing (and denying) becomes a move.
+- **Military.** The Conflict dimension proper, footed on the v0.1.4 data-model stub (**BL-157**).
+- **Stricter logistics.** Tighten the supply system from "routes have a cost" toward real
+  constraint — capacity, reach, and failure that bite. The natural home for the scarcity model
+  (§ Scarcity below) if it has not landed sooner.
+
+### v0.4.0 — Law, tech & grand strategy
+
+*Theme: make it more than a quick, easy game.* The long-game systems that give a campaign depth
+past the first few hours — the ones that reward planning rather than reflexes:
+
+- **Law / policy** — promoting the v0.1.2 design (**BL-155**) into a working surface.
+- **Tech** — promoting the v0.1.3 design (**BL-156**); the condition-set gate model (gate = quest =
+  tech) BL-087 reframed.
+- **Grand-strategy elements** — including the **filter system (Era → Filter)**: reframing **Era** as
+  the world-state gate governing what content is available when (**BL-087**'s catastrophic-event /
+  quest-tree model re-read as a *filter* over the world). A terminology change with reach —
+  `ERAS.md`, `GLOSSARY.md`, the era enums, any `era_*` symbols — folded into the work when it lands,
+  not ahead of it (authority time-slice). *(Naming watch: "filter" sits near the map-lens vocabulary
+  in `LENSES.md`; confirm the two read as distinct before the rename lands.)*
+
+### Open calls this pivot leaves (2026-07-16)
+
+The pivot re-themed v0.2.0–v0.4.0; three consequences are **not** yet decided and are flagged here
+rather than silently resolved:
+
+- **BL-094 — the nation-as-strategic-actor refocus** *was* the v0.2.0 theme (settled 2026-07-04) and
+  is now displaced. Does it fold into v0.2.0's actors/diplomacy work, move out to v0.4.0's
+  grand-strategy band, or lapse? The player-identity question it answers is still open.
+- **The v0.1.x design-forward band** (v0.1.2 Laws, v0.1.3 Techs, v0.1.4 Military, v0.1.5 Politics)
+  now designs things that land two-to-three minors later. Worth deciding whether those design
+  minors stay put (design early, build late) or slide toward their new destinations.
+- **The AI standing rule.** `io-standing-rules.md` prohibits AI faction behaviour beyond the
+  data-model stub (BL-079's narrow exception aside). v0.2.0's "basic AI" will require that rule to
+  be revisited deliberately when the work lands — the same way BL-181 carved its player-corp
+  exception. The rule stands until then.
 
 ---
 

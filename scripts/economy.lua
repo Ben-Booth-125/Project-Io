@@ -41,37 +41,56 @@ economy = {
     -- the small chartered-company layer outpace the automated population/
     -- substrate economy it's supposed to sit on top of (GENERATION_STRATEGY.md).
     buildings = {
+        -- SCARCITY TUNING 2026-07-16 (Ben: "buildings are very cheap; scarcity needs to
+        -- be really felt"). Costs were trivial against income — a 100 cr extraction site
+        -- against ~900 cr/qtr net from four buildings meant the player out-earned a
+        -- building every quarter, so nothing was ever traded off. Build costs are up ~7x,
+        -- material costs ~6x, and durations ~2.5x, so a site is a multi-quarter
+        -- commitment paid down out of running income (pay-as-you-build, BL-095) rather
+        -- than pocket change.
+        --
+        -- The bigger material cost also makes the RATE gate bite: run_construction stretches
+        -- or pauses a build when the local market cannot supply its per-tick material need
+        -- (resource_costs / build_duration_ticks). At 20 steel over 2 ticks (10/tick) the
+        -- saturated substrate covered it trivially; at 120 over 5 (24/tick) a thin local
+        -- steel market visibly stalls the build.
+        --
+        -- NOTE — this is TUNING, not the scarcity model. Construction still BUYS its
+        -- materials from an effectively infinite market (market_clearing's "supply is
+        -- always guaranteed to clear" invariant + the nation substrate), so this makes
+        -- building EXPENSIVE, not genuinely SCARCE. The depletable-market-stockpile gate is
+        -- BL-182 (v0.3.0 strict logistics). Retune freely; these are playtest estimates.
         extraction_site = {
             base_rate   = 20.0,
             maintenance = 5.0,
             base_wage   = 8.0,
-            build_cost  = 100.0,
-            build_duration_ticks = 2.0,
-            resource_costs = { steel = 20.0 },
+            build_cost  = 700.0,
+            build_duration_ticks = 5.0,
+            resource_costs = { steel = 120.0 },
         },
         processing_facility = {
             base_rate   = 8.0,
             maintenance = 10.0,
             base_wage   = 12.0,
-            build_cost  = 200.0,
-            build_duration_ticks = 3.0,
-            resource_costs = { steel = 25.0 },
+            build_cost  = 1400.0,
+            build_duration_ticks = 7.0,
+            resource_costs = { steel = 160.0 },
         },
         port = {
             base_rate   = 0.0,
             maintenance = 8.0,
             base_wage   = 6.0,
-            build_cost  = 150.0,
-            build_duration_ticks = 2.0,
-            resource_costs = { steel = 20.0 },
+            build_cost  = 900.0,
+            build_duration_ticks = 5.0,
+            resource_costs = { steel = 110.0 },
         },
         launchpad = {
             base_rate   = 0.0,
             maintenance = 20.0,
             base_wage   = 15.0,
-            build_cost  = 500.0,
-            build_duration_ticks = 6.0,
-            resource_costs = { steel = 50.0, refined_fuel = 20.0 },
+            build_cost  = 4000.0,
+            build_duration_ticks = 12.0,
+            resource_costs = { steel = 320.0, refined_fuel = 140.0 },
         },
         -- BL-149: Inland Logistics Hub — a land-mode convoy consolidator. Produces
         -- nothing (base_rate 0, like the port); its value is the logistics-node discount
@@ -81,9 +100,9 @@ economy = {
             base_rate   = 0.0,
             maintenance = 12.0,
             base_wage   = 8.0,
-            build_cost  = 250.0,
-            build_duration_ticks = 3.0,
-            resource_costs = { steel = 30.0 },
+            build_cost  = 1600.0,
+            build_duration_ticks = 7.0,
+            resource_costs = { steel = 180.0 },
         },
     },
 
