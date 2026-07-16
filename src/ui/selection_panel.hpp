@@ -30,7 +30,16 @@ namespace ui {
 /// by app against the mutable world). This is the contextual, per-tile entry to
 /// construction — distinct from the broad buildings overview, which earns a menu.
 ///
-/// @param w        Read-only world state (the content source).
+/// Selecting a **building** — or a tile that carries one (a tile holds at most one) —
+/// shows the **building management view** (Ben's 2026-07-16 steer): production method,
+/// profit + workforce history, and the workforce-target control. The tile element is
+/// therefore the *unbuilt-tile prospecting* view. This is why the world is passed
+/// mutable: those controls write the building directly, as the Building ledger's
+/// management block did before it moved here.
+///
+/// @param w        World — read for content; **written** by the building management
+///                 controls (workforce_target / workforce_auto, active_recipe_index /
+///                 recipe, decommissioned).
 /// @param reg      Loaded registry — build costs for the build front door.
 /// @param report   Most recent economy step report — the Population lens reads its
 ///                 body_habitability to show a population centre's workforce cap.
@@ -38,10 +47,10 @@ namespace ui {
 ///                 the close button (hide), and the build front door (enqueue).
 ///
 /// The panel fills the shell fold-out column (foldout_column_rect); it takes no
-/// layout parameters. NOTE: the content still uses the wide-bottom-bar
-/// action|facts split — its re-lay-out for the narrower column is BL-123
+/// layout parameters. NOTE: the remaining kinds still use the wide-bottom-bar
+/// action|facts split — their re-lay-out for the narrower column is BL-123
 /// SELECTION_ELEMENT_RESIZE (Ben to mock).
-void draw_selection_panel(const world& w, const recipe_registry& reg,
+void draw_selection_panel(world& w, const recipe_registry& reg,
                           const economy_report& report, ui_state& ui);
 
 /// Draw the **tile construction ledger** (BL-162) — the tile-contextual surface that

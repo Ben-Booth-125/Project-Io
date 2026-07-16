@@ -952,18 +952,6 @@ int app::run_verify(const std::string& script_path, bool bless)
             { m_ui.selected_entity = bid; m_ui.selection_hidden_for = null_entity; break; }
         }
     });
-    // Switch the construction panel's sub-view (0 = Construction/queue, 1 = Buildings/
-    // management detail) so a script can capture the building-management screen, which
-    // otherwise opens on the queue view. UI state only.
-    v.set_function("construction_view", [this](int view) {
-        m_ui.construction.panel_view = view;
-        // Acknowledge the current selection so the new-selection panel-close (render()
-        // § "new selection takes the column") does not stomp the panel we're staging
-        // for capture. Harness-only convenience; the interactive path never needs it.
-        m_prev_selection          = m_ui.selected_entity;
-        m_ui.selection_hidden_for = m_ui.selected_entity;
-    });
-
     // select_body picks a body by name, exactly as a single-click on the Solar /
     // Circumplanetary canvas would (sets selected_entity to the body). Lets a
     // script stage the selection-aware descend gesture (BL-165).
@@ -1891,7 +1879,7 @@ void app::render()
     }
     // Construction panel — an ordinary fold-out tab in the shell column (BL-122),
     // one of the mutually-exclusive column occupants (ledgers + Selection).
-    ui::draw_construction_panel(m_world, m_registry, m_last_econ_report, m_ui, &m_ui.show_construction_panel);
+    ui::draw_construction_panel(m_world, m_registry, m_ui, &m_ui.show_construction_panel);
     ui::draw_market_ledger(m_world, m_ui, m_market_history, m_ui.show_market_ledger);
     {
         // Budget ledger (BL-171): profit chart reads the income/expenditure series;

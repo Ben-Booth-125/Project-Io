@@ -66,6 +66,9 @@ inline constexpr ImU32 positive = IM_COL32(110, 200, 120, 255); ///< Profit, sur
 inline constexpr ImU32 negative = IM_COL32(216, 100,  96, 255); ///< Loss, deficit, drop.
 inline constexpr ImU32 neutral  = IM_COL32(170, 175, 185, 255); ///< No change / not applicable.
 
+// --- series identity (per-building history graphs, SELECTION.md § building view) ---
+inline constexpr ImU32 workforce = IM_COL32(230, 180,  70, 255); ///< Workforce / labour series (amber).
+
 // --- interaction states (the shared selection / hover / pinned convention) ---
 inline constexpr ImU32 selection = IM_COL32(255, 255, 255, 255); ///< The selected entity.
 inline constexpr ImU32 hover     = IM_COL32(120, 190, 255, 255); ///< The entity under the cursor.

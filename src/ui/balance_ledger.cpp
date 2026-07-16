@@ -53,7 +53,13 @@ void draw_profit_chart(ImDrawList* dl, ImVec2 mn, ImVec2 mx, const std::vector<f
     constexpr float gutter = 44.0f;
     const float plot_x0 = mn.x + gutter;
     const float plot_x1 = mx.x - 6.0f;
-    const float y_top   = mn.y + 14.0f; // room for the "Profit" caption
+    // Reserve a full caption line PLUS half a tick-label line. The top value tick's
+    // label is *centred* on y_top, so half of it rises above y_top; the old flat 14px
+    // reserve left it colliding with the "Profit" caption, which sits in the same
+    // gutter column (Ben's 2026-07-16 overlap report). Derived from the font, not a
+    // magic number, so it holds if the UI font size changes.
+    const float line_h  = ImGui::GetTextLineHeight();
+    const float y_top   = mn.y + line_h * 1.5f + 2.0f;
     const float y_bot   = mx.y - 14.0f; // room for the X labels
 
     // "Profit" caption, top-left (the mockup's vertical axis title, kept horizontal).

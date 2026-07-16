@@ -8,11 +8,15 @@ struct ui_state; // forward-declared; the full definition lives in ui_state.hpp.
 
 namespace ui {
 
-/// Draw the Building Ledger — a ledger-family panel (BL-029, renamed + redesigned
-/// BL-143) with a button-strip nav across two bounded views: Construction (the
-/// in-progress build queue) and Buildings (every player building, with aggregates).
-/// The old Build front-door and Sell Orders tab are gone — building is now reached
-/// only via tile selection (BL-139), and sell orders live on the Market Ledger
+/// Draw the Construction ledger — a ledger-family panel (BL-029, redesigned BL-143,
+/// slimmed to a single view on Ben's 2026-07-16 steer) answering one question: "what's
+/// building?" (the in-progress build queue).
+///
+/// The former "Buildings" tab — a player-building roster plus the selected building's
+/// management detail — is gone: a single building's detail is a *selection* question,
+/// so it now lives in the Selection element (selection_panel.hpp
+/// § draw_selection_panel), reached by selecting the building. The Build front door
+/// moved to the tile Selection element (BL-139) and Sell Orders to the Market Ledger
 /// (BL-159).
 ///
 /// Since BL-122 this is re-hosted into the shell fold-out column (foldout_column.hpp),
@@ -23,16 +27,13 @@ namespace ui {
 ///
 /// When *p_open is false the function draws nothing.
 ///
-/// @param w          World — read for building/tile lookup; written by management
-///                   controls (workforce_target, decommissioned, active_recipe_index).
-/// @param reg        Loaded registry (recipe names and per-type economics).
-/// @param report     Latest economy report (BL-143) — per-building active/idle status
-///                   for the Buildings tab's status column.
-/// @param state      Shared UI state — read (selected_entity) and written (construction).
+/// @param w          World — read for the in-progress build queue.
+/// @param reg        Loaded registry (per-type economics for the queue's cost read).
+/// @param state      Shared UI state — the panel_view field (single view; retained so
+///                   nav_button's toggle rule still closes the ledger).
 /// @param p_open     Open/closed flag; gates whether the panel draws.
 void draw_construction_panel(world& w,
                              const recipe_registry& reg,
-                             const economy_report& report,
                              ui_state& state,
                              bool* p_open);
 

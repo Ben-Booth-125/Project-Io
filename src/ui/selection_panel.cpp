@@ -16,6 +16,7 @@
 
 #include <algorithm> // std::min/clamp (build rate), std::nth_element (top-decile production)
 #include <cmath>     // std::ceil (construction ETA), std::pow/log10/floor (nice_ceil axis)
+#include <cfloat>    // FLT_MAX (PlotLines auto-scale, building management view)
 #include <cstddef>   // std::ptrdiff_t (nth_element iterator offset)
 #include <cstdio>    // std::snprintf (tile coord caption + chart labels)
 #include <cstring>   // std::strcmp (header title/kind de-dup)
@@ -674,12 +675,224 @@ void draw_tile_selection(const world& w, ui_state& ui)
     stub("Supply");
 }
 
+// Resolve the (at most one) building occupying a tile — the standing invariant that a
+// tile carries zero or one building means this never needs a list. Lets a selected
+// *built* tile read as its building (Ben's 2026-07-16 steer): the tile element is the
+// unbuilt-tile prospecting view; anything built shows the management view.
+entity_id building_on_tile(const world& w, entity_id tile)
+{
+    for (const auto& [id, b] : w.buildings)
+        if (b.tile == tile)
+            return id;
+    return null_entity;
+}
+
+// The primary output resource of a recipe — the argmax of its outputs. Tags a
+// production method with a resource pip glyph (proper per-method glyphs are owed).
+resource_type primary_output_resource(const recipe& r)
+{
+    std::size_t best = 0;
+    float best_v = -1.0f;
+    for (std::size_t i = 0; i < resource_count; ++i)
+        if (r.outputs[i] > best_v) { best_v = r.outputs[i]; best = i; }
+    return static_cast<resource_type>(best);
+}
+
+// The building management view (Ben's 2026-07-15 mockup; moved here from the Building
+// ledger's Buildings tab on his 2026-07-16 steer, so the *selection* carries it — the
+// ledger is now Construction-only). A placeholder image, the production-method
+// dropdown, profit + workforce history, and the workforce-target control. The panel
+// header already names the building, so this starts at the image rather than repeating
+// a title.
+//
+// The graphs read PLACEHOLDER deterministic series — no per-building history is
+// recorded yet (owed with BL-181); the profit line anchors to the live estimate. The
+// profit series is coloured by its own trend (green when the latest quarter beats the
+// oldest sample, ~3 years back at 12 quarters; red otherwise); workforce is amber.
+void draw_building_selection(world& w, const recipe_registry& reg,
+                             const economy_report& report, entity_id building_id)
+{
+    const auto bit = w.buildings.find(building_id);
+    if (bit == w.buildings.end())
+    {
+        ImGui::TextDisabled("\xe2\x80\x94");
+        return;
+    }
+    building_component& b = bit->second;
+
+    ImDrawList* dl        = ImGui::GetWindowDrawList();
+    const float content_w = ImGui::GetContentRegionAvail().x;
+
+    // ── Placeholder image ──
+    {
+        const float  img_h = content_w * 0.30f;
+        const ImVec2 p     = ImGui::GetCursorScreenPos();
+        const ImVec2 mx    = {p.x + content_w, p.y + img_h};
+        dl->AddRectFilled(p, mx, IM_COL32(72, 72, 72, 255), 3.0f);
+        dl->AddRect(p, mx, IM_COL32(110, 110, 110, 255), 3.0f);
+        const char*  ph = "PLACEHOLDER IMAGE";
+        const ImVec2 ts = ImGui::CalcTextSize(ph);
+        dl->AddText({(p.x + mx.x - ts.x) * 0.5f, (p.y + mx.y - ts.y) * 0.5f},
+                    IM_COL32(180, 180, 180, 255), ph);
+        ImGui::Dummy({content_w, img_h});
+    }
+
+    // ── Production Methods: the building's recipes, each tagged with its output pip ──
+    ImGui::SeparatorText("Production Methods");
+    const int   n_recipes  = reg.recipe_count(b.type);
+    const float pipr       = ImGui::GetFontSize() * 0.42f;
+    const auto  method_res = [&](int i) -> resource_type {
+        if (b.type == building_type::extraction_site) return b.target_resource;
+        return primary_output_resource(reg.recipe_at(b.type, i));
+    };
+    if (n_recipes >= 1)
+    {
+        b.active_recipe_index = std::clamp(b.active_recipe_index, 0, n_recipes - 1);
+        const recipe& cur     = reg.recipe_at(b.type, b.active_recipe_index);
+        const char*   preview = cur.name.empty() ? "-" : cur.name.c_str();
+
+        const ImVec2 gp = ImGui::GetCursorScreenPos();
+        const float  rh = ImGui::GetFrameHeight();
+        icons::resource(dl, {gp.x + pipr, gp.y + rh * 0.5f}, pipr, method_res(b.active_recipe_index));
+        ImGui::Dummy({pipr * 2.0f + 6.0f, rh});
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+        if (ImGui::BeginCombo("##method", preview))
+        {
+            ImDrawList* pdl = ImGui::GetWindowDrawList(); // popup's own draw list
+            for (int i = 0; i < n_recipes; ++i)
+            {
+                const recipe& ri  = reg.recipe_at(b.type, i);
+                const bool    sel = (i == b.active_recipe_index);
+                const ImVec2  ip  = ImGui::GetCursorScreenPos();
+                const std::string lbl = std::string("     ") + (ri.name.empty() ? "-" : ri.name);
+                if (ImGui::Selectable(lbl.c_str(), sel))
+                {
+                    b.active_recipe_index = i;
+                    b.recipe = reg.recipe_id(ri.name);
+                }
+                icons::resource(pdl, {ip.x + pipr + 2.0f, ip.y + ImGui::GetTextLineHeight() * 0.5f},
+                                pipr, method_res(i));
+                if (sel)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+    }
+    else
+        ImGui::TextDisabled("Single method");
+
+    // ── Profit + Workforce history (placeholder series) ──
+    // 12 quarters == 3 years, so sample 0 is the "up to 3 years ago" reference the
+    // trend colour compares the latest quarter against.
+    constexpr int N       = 12;
+    const float   graph_w = ImGui::GetContentRegionAvail().x;
+    const building_profit prof = estimate_building_profit(w, reg, report, building_id);
+
+    float profit_series[N];
+    const float p_end = prof.has_data ? prof.net() : 0.0f;
+    for (int i = 0; i < N; ++i)
+    {
+        const float t = static_cast<float>(i) / (N - 1);
+        profit_series[i] = (p_end - 35.0f) + t * 35.0f; // gentle ramp to the current estimate
+    }
+    const bool  profit_up  = profit_series[N - 1] >= profit_series[0];
+    const ImU32 profit_col = profit_up ? palette::positive : palette::negative;
+    ImGui::SeparatorText("Profit");
+    ImGui::PushStyleColor(ImGuiCol_PlotLines, ImGui::ColorConvertU32ToFloat4(profit_col));
+    ImGui::PlotLines("##profit", profit_series, N, 0, nullptr, FLT_MAX, FLT_MAX, {graph_w, 60.0f});
+    ImGui::PopStyleColor();
+
+    float wf_series[N];
+    const float wf = static_cast<float>(b.workforce_target);
+    for (int i = 0; i < N; ++i)
+    {
+        const float t   = static_cast<float>(i) / (N - 1);
+        const float dip = -20.0f * std::sin(t * 3.14159265f); // placeholder dip-and-recover
+        wf_series[i]    = std::clamp(wf + dip, 0.0f, 200.0f);
+    }
+    ImGui::SeparatorText("Workforce");
+    ImGui::PushStyleColor(ImGuiCol_PlotLines, ImGui::ColorConvertU32ToFloat4(palette::workforce));
+    ImGui::PlotLines("##workforce", wf_series, N, 0, nullptr, 0.0f, 120.0f, {graph_w, 60.0f});
+    ImGui::PopStyleColor();
+
+    // ── Workforce Target: Auto (the economy tick solves the profit-max target each
+    // tick, BL-181) plus a manual 0–100 grid. A manual tier pins the target and clears
+    // Auto; the Auto button re-enables it and shows the current solved value. ──
+    ImGui::SeparatorText("Workforce Target");
+    {
+        if (b.workforce_auto)
+            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+        char autolbl[32];
+        if (b.workforce_auto)
+            std::snprintf(autolbl, sizeof autolbl, "Auto  (%d%%)", b.workforce_target);
+        else
+            std::snprintf(autolbl, sizeof autolbl, "Auto");
+        if (ImGui::Button(autolbl, {ImGui::GetContentRegionAvail().x, ImGui::GetFrameHeight() * 1.3f}))
+            b.workforce_auto = true;
+        if (b.workforce_auto)
+            ImGui::PopStyleColor();
+
+        const int   tiers[] = {0, 20, 40, 60, 80, 100};
+        const float sp = ImGui::GetStyle().ItemSpacing.x;
+        const float bw = (ImGui::GetContentRegionAvail().x - sp * 2.0f) / 3.0f;
+        const float bh = ImGui::GetFrameHeight() * 1.4f;
+        for (int i = 0; i < 6; ++i)
+        {
+            const bool active = (!b.workforce_auto && b.workforce_target == tiers[i]);
+            if (active)
+                ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+            char lbl[16];
+            std::snprintf(lbl, sizeof lbl, "%d##wf%d", tiers[i], i);
+            if (ImGui::Button(lbl, {bw, bh}))
+            {
+                b.workforce_target = tiers[i];
+                b.workforce_auto   = false; // manual override pins the target
+            }
+            if (active)
+                ImGui::PopStyleColor();
+            if (i % 3 != 2)
+                ImGui::SameLine();
+        }
+    }
+
+    // Under-construction status + decommission (not in the mockup, but load-bearing).
+    if (b.ticks_remaining > 0)
+    {
+        const float rate = construction_rate(w, reg, b.type, b.tile);
+        ImGui::Spacing();
+        ImGui::SeparatorText("Under construction");
+        ImGui::TextColored(construction_status_colour(rate), "%s",
+                           construction_status(rate, b.ticks_remaining).c_str());
+    }
+
+    ImGui::Spacing();
+    if (b.decommissioned)
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative), "DECOMMISSIONED");
+    else if (ImGui::Button("Decommission"))
+        b.decommissioned = true;
+}
+
 } // namespace
 
-void draw_selection_panel(const world& w, const recipe_registry& reg,
+void draw_selection_panel(world& w, const recipe_registry& reg,
                           const economy_report& report, ui_state& ui)
 {
-    const selection_kind kind = selection_kind_of(w, ui.selected_entity);
+    // A selected *built* tile reads as its building (Ben's 2026-07-16 steer) — so the
+    // header names the building and the content is its management view, while the tile
+    // element stays the unbuilt-tile prospecting view. Remapped before the header so
+    // both agree; the hide/close checks stay keyed on the player's actual selection.
+    entity_id      sel  = ui.selected_entity;
+    selection_kind kind = selection_kind_of(w, sel);
+    if (kind == selection_kind::tile)
+    {
+        const entity_id on_tile = building_on_tile(w, sel);
+        if (on_tile != null_entity)
+        {
+            sel  = on_tile;
+            kind = selection_kind::building;
+        }
+    }
 
     // Hidden when nothing valid is selected, or when the player dismissed this
     // exact selection (close hides until the next selection re-shows it).
@@ -720,11 +933,11 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
     {
         const ImVec2 hc = ImGui::GetCursorScreenPos();
         const float  ir = frame_h * 0.40f;
-        draw_selection_icon(w, dl, kind, ui.selected_entity,
+        draw_selection_icon(w, dl, kind, sel,
                             {hc.x + ir, hc.y + frame_h * 0.5f}, ir);
         ImGui::SetCursorScreenPos({hc.x + ir * 2.0f + style.ItemSpacing.x, hc.y});
 
-        const char* title = selection_title(w, kind, ui.selected_entity);
+        const char* title = selection_title(w, kind, sel);
         const char* kname = selection_kind_name(kind);
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", title);
         // Suppress the redundant type label when the title is already the kind name
@@ -738,7 +951,7 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
         const float btn = frame_h;
         ImGui::SameLine(bar_w - style.WindowPadding.x - 2.0f * btn - style.ItemSpacing.x);
         if (ImGui::Button(">", {btn, btn}))
-            focus_on_entity(w, ui, ui.selected_entity);
+            focus_on_entity(w, ui, sel);
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip("Go to");
         ImGui::SameLine();
@@ -750,11 +963,18 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
 
     ImGui::Separator();
 
-    // A selected tile takes the dedicated vertical layout (BL-123, Ben's mockup);
-    // the other kinds keep the action|facts split until they get their own mockups.
+    // Tile and building each take a dedicated vertical layout (Ben's mockups); the
+    // other kinds keep the action|facts split until they get their own. A tile only
+    // reaches here unbuilt — a built one was remapped to its building above.
     if (kind == selection_kind::tile)
     {
         draw_tile_selection(w, ui);
+        ImGui::End();
+        return;
+    }
+    if (kind == selection_kind::building)
+    {
+        draw_building_selection(w, reg, report, sel);
         ImGui::End();
         return;
     }
