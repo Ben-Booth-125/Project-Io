@@ -245,6 +245,10 @@ float wf_target_price(float base, float supply, float demand)
     return std::clamp(target, base * wf_price_floor_mult, base * wf_price_ceil_mult);
 }
 
+} // namespace
+
+// Declared in economy_system.hpp; defined here beside its helpers above (which keep
+// internal linkage). External so the headless harness can exercise it directly.
 int solve_workforce_target(const world& w, const recipe_registry& reg,
                            const building_component& b, float contention)
 {
@@ -313,6 +317,8 @@ int solve_workforce_target(const world& w, const recipe_registry& reg,
     }
     return best_wt;
 }
+
+namespace {
 
 // BL-095: pace each under-construction building against the local market's recent
 // supply of its materials, drawing + paying for them as it builds (pay-as-you-build).

@@ -110,3 +110,27 @@ void inject_substrate_demand(world& w, const recipe_registry& reg);
 /// @param reg Loaded recipe/economy registry.
 /// @return    The step report (building states + auto-bought shortfalls).
 economy_report run_economy_step(world& w, const recipe_registry& reg);
+
+/// Choose the workforce target (0..200, in steps of 10) that maximises this
+/// building's estimated net profit for one tick (BL-181). The underlying model is
+/// LINEAR in the target — output, wages, and the labour part of maintenance all
+/// scale with it — so at fixed prices the optimum would be degenerate bang-bang
+/// (0 or 200). The interior optimum comes from the local market PRICE RESPONSE:
+/// more output → more supply → a lower clearing price (market_clearing's
+/// base·sqrt(demand/supply), clamped to [0.25×, 4×] base). Each candidate is
+/// repriced against that response and the best net wins.
+///
+/// A first-pass heuristic: contention is held at its passed value, input-price
+/// response is ignored (inputs valued at the current price), and the grid is
+/// coarse, so the result can hunt by ±one tier. Deterministic — reads last tick's
+/// market state only. Called from run_economy_step for the player corp's
+/// buildings; exposed for the headless harness (tools/verify/workforce_solver.cpp).
+///
+/// @param w          World; read-only (markets, tiles, population).
+/// @param reg        Loaded registry; supplies the building economics + recipes.
+/// @param b          The building to solve for.
+/// @param contention The (corp, body) workforce contention scalar to assume.
+/// @return           The chosen workforce target, a multiple of 10 in [0, 200]
+///                   (or the building's current target if its tile has no body).
+int solve_workforce_target(const world& w, const recipe_registry& reg,
+                           const building_component& b, float contention);
