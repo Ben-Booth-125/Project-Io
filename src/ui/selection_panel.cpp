@@ -14,13 +14,13 @@
 
 #include <imgui.h>
 
-#include <algorithm> // std::min/clamp (build rate), std::nth_element (P10 production)
+#include <algorithm> // std::min/clamp (build rate), std::nth_element (top-decile production)
 #include <cmath>     // std::ceil (construction ETA), std::pow/log10/floor (nice_ceil axis)
 #include <cstddef>   // std::ptrdiff_t (nth_element iterator offset)
 #include <cstdio>    // std::snprintf (tile coord caption + chart labels)
 #include <cstring>   // std::strcmp (header title/kind de-dup)
 #include <string>    // ticks_label / construction_status
-#include <vector>    // P10 production sample (tenth_percentile_production)
+#include <vector>    // top-decile production sample (top_decile_production)
 
 namespace ui {
 
@@ -28,17 +28,17 @@ namespace {
 
 // --- Tile production bar-chart helpers (BL-123) ------------------------------
 // The redesigned tile Selection element (docs/ui/SELECTION.md, Ben's mockup) plots,
-// per resource deposited on the tile, a STACKED bar reading two numbers: (A) how much
-// this tile produces, and (B) what the 10th-percentile tile produces, stacked on top
-// of A. Comparing A against the P10 reference tells the player how effective this tile
-// is for generation. Each graph sits in its own bordered container with its header, and
-// the resource list always shows a scrollbar (a tile can carry more than fit). The
-// placement-affordance readout (BL-071) and the build front door moved off this panel to
+// per resource deposited on the tile, a CLUSTERED column pair reading two numbers: (A)
+// how much this tile produces, and (B) what a top-decile (90th-percentile) tile produces.
+// Comparing A against the top-decile reference tells the player how close this tile is to
+// a great one for that resource. Each graph sits in its own bordered container with its
+// header, and the resource list always shows a scrollbar (a tile can carry more than fit).
+// The placement-affordance readout (BL-071) and the build front door moved off this panel to
 // the owed tile-construction panel (backlog); this panel is now tile detail + navigation.
 //
 // "Production" is the tile's hazard-adjusted extraction yield — deposit richness scaled
 // by (1 - hazard), the same two factors run_extraction multiplies (economy_system.cpp).
-// The uniform base_rate/workforce scalars are dropped: they cancel in the tile-vs-P10
+// The uniform base_rate/workforce scalars are dropped: they cancel in the tile-vs-benchmark
 // comparison, so this keeps the deposit-magnitude numbers Ben's mockup showed.
 
 // Round @p v up to a 'nice' axis ceiling (1 / 2 / 5 x a power of ten): 45->50,
@@ -68,10 +68,12 @@ float tile_production(const tile_component& t, std::size_t r)
     return t.resource_deposit[r] * (1.0f - t.hazard_level);
 }
 
-// The 10th-percentile production across every tile that carries resource @p r — the
-// low-end reference the player compares a tile against ("is this tile better than the
-// bottom 10%?"). nth_element (O(N)) picks the percentile without a full sort.
-float tenth_percentile_production(const world& w, std::size_t r)
+// The 90th-percentile production across every tile that carries resource @p r — the
+// top-decile reference the player compares a tile against ("how close is this tile to
+// a great one for this resource?"). The bottom-decile floor almost every tile beats
+// was uninformative (Ben's 2026-07-15 review); the aspirational ceiling makes the
+// headroom the signal. nth_element (O(N)) picks the percentile without a full sort.
+float top_decile_production(const world& w, std::size_t r)
 {
     std::vector<float> vals;
     vals.reserve(w.tiles.size());
@@ -80,15 +82,16 @@ float tenth_percentile_production(const world& w, std::size_t r)
             vals.push_back(tile_production(t, r));
     if (vals.empty())
         return 0.0f;
-    const std::size_t k = static_cast<std::size_t>(0.10f * static_cast<float>(vals.size() - 1));
+    const std::size_t k = static_cast<std::size_t>(0.90f * static_cast<float>(vals.size() - 1));
     std::nth_element(vals.begin(), vals.begin() + static_cast<std::ptrdiff_t>(k), vals.end());
     return vals[k];
 }
 
 // One resource's chart inside [mn, mx]: a left gutter of tick labels (0 / ceiling, plus
-// a mid tick when the ceiling >= 100) with dotted gridlines, a STACKED bar (tile
-// production on the bottom, 10th-percentile production stacked on top), and a small
-// two-row legend naming each value. @p ceiling spans the stacked total.
+// a mid tick when the ceiling >= 100) with dotted gridlines, a CLUSTERED column pair
+// (this tile's production beside the top-decile reference, sharing a baseline so
+// the two heights compare directly), and a small two-row legend naming each value. @p
+// ceiling spans the taller column.
 void draw_production_chart(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
                            float tile_val, float pct_val, float ceiling,
                            ImU32 tile_col, ImU32 pct_col)
@@ -114,24 +117,25 @@ void draw_production_chart(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
         tick(ceiling * 0.5f);
     tick(ceiling);
 
-    // Stacked bar: tile production (bottom) then the P10 reference stacked on top.
-    constexpr float bar_w = 40.0f;
+    // Clustered columns: the tile's production and the top-decile reference side by
+    // side, sharing the baseline so their heights read as a direct comparison.
+    constexpr float bar_w = 34.0f;
+    constexpr float gap   = 10.0f;
     const float bar_x0 = plot_x0 + 6.0f;
-    const float a_top     = y_of(tile_val);
-    const float stack_top = y_of(tile_val + pct_val);
-    dl->AddRectFilled({bar_x0, a_top}, {bar_x0 + bar_w, y1}, tile_col);          // A
-    dl->AddRectFilled({bar_x0, stack_top}, {bar_x0 + bar_w, a_top}, pct_col);    // B on top
+    const float bar_x1 = bar_x0 + bar_w + gap;
+    dl->AddRectFilled({bar_x0, y_of(tile_val)}, {bar_x0 + bar_w, y1}, tile_col); // this tile
+    dl->AddRectFilled({bar_x1, y_of(pct_val)},  {bar_x1 + bar_w, y1}, pct_col);  // top-decile reference
 
-    // Legend to the right of the bar: swatch + label + value, one row each.
-    const float lx = bar_x0 + bar_w + 14.0f;
+    // Legend to the right of the columns: swatch + label + value, one row each.
+    const float lx = bar_x1 + bar_w + 14.0f;
     const auto legend = [&](float ly, ImU32 col, const char* name, float val) {
         dl->AddRectFilled({lx, ly + 2.0f}, {lx + 10.0f, ly + 12.0f}, col);
         char buf[40];
         std::snprintf(buf, sizeof buf, "%s %.1f", name, static_cast<double>(val));
         dl->AddText({lx + 16.0f, ly}, IM_COL32(210, 210, 210, 255), buf);
     };
-    legend(y0 + 2.0f,  tile_col, "Tile",      tile_val);
-    legend(y0 + 22.0f, pct_col,  "P10",       pct_val);
+    legend(y0 + 2.0f,  tile_col, "Tile",     tile_val);
+    legend(y0 + 22.0f, pct_col,  "Top 10%",  pct_val);
 }
 
 // --- Analog construction status (BL-095 task E) ------------------------------
@@ -211,19 +215,6 @@ ImVec4 construction_status_colour(float rate)
     return (rate <= 0.0f) ? ImVec4{0.90f, 0.55f, 0.55f, 1.0f}   // paused
          : (rate < 1.0f)  ? ImVec4{0.85f, 0.75f, 0.45f, 1.0f}   // materials scarce
                           : ImVec4{0.55f, 0.80f, 0.55f, 1.0f};  // on schedule
-}
-
-// Resolve the (at most one) building occupying a tile — the standing invariant
-// a tile carries zero or one building means this never needs a list. Linear
-// scan mirrors the existing per-body building lookup in tile_inspector.cpp;
-// the building map is small in the prototype scope. Used by the tile panel's
-// "Manage Buildings" button to gate on whether there is anything to manage.
-entity_id building_on_tile(const world& w, entity_id tile)
-{
-    for (const auto& [id, b] : w.buildings)
-        if (b.tile == tile)
-            return id;
-    return null_entity;
 }
 
 // Headline label for a selected entity. Bodies carry a name; the other kinds
@@ -495,7 +486,7 @@ void draw_selection_action(const world& w, const recipe_registry& reg,
             {
                 // Under construction (BL-095 task E): lead with the live analog build
                 // status — rate / ETA / paused — so a freshly-placed building reads as
-                // "still building" rather than an empty card, before the Manage control.
+                // "still building" rather than an empty card.
                 if (const auto bit = w.buildings.find(sel);
                     bit != w.buildings.end() && bit->second.ticks_remaining > 0)
                 {
@@ -504,13 +495,8 @@ void draw_selection_action(const world& w, const recipe_registry& reg,
                     ImGui::TextColored(construction_status_colour(rate), "%s",
                         construction_status(rate, b.ticks_remaining).c_str());
                 }
-                // Manage — routes to the tile-scoped Manage ledger (construction_panel's
-                // draw_building_manage_ledger), which owns the workforce / recipe /
-                // decommission controls for *this* building, rather than the corp-wide
-                // Building ledger. Symmetric with the tile's "Construct Buildings" front door.
-                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Manage");
-                if (ImGui::Button("Manage building"))
-                    ui.show_manage_ledger = true;
+                // The tile-scoped Manage front door was removed (Ben's 2026-07-15
+                // review) — a selected building shows its facts / build status only.
             }
             else
             {
@@ -618,13 +604,13 @@ void draw_tile_selection(const world& w, ui_state& ui)
         bars_h = 60.0f;
 
     // ── Production graphs: one bordered container per deposited resource, each a
-    // stacked bar (tile production + the 10th-percentile reference). The list ALWAYS
+    // clustered column pair (tile production vs the top-decile reference). The list ALWAYS
     // carries a vertical scrollbar — a tile can hold more resources than fit — so the
     // player can scroll through every one. ──
     constexpr float chart_h = 80.0f;
     const float row_h = frame_h + chart_h + style.ItemSpacing.y + style.WindowPadding.y * 2.0f + 4.0f;
     constexpr ImU32 tile_col = IM_COL32(150, 235, 160, 255); // this tile's production (green)
-    constexpr ImU32 p10_col  = IM_COL32(150, 160, 190, 255); // 10th-percentile reference (muted)
+    constexpr ImU32 p90_col  = IM_COL32(150, 160, 190, 255); // top-decile reference (muted)
     constexpr float gutter   = 40.0f;                        // == draw_production_chart gutter
 
     ImGui::BeginChild("##tile_graphs", {content_w, bars_h}, false,
@@ -644,8 +630,9 @@ void draw_tile_selection(const world& w, ui_state& ui)
         ImDrawList* cdl = ImGui::GetWindowDrawList(); // child-local: clips to this box
 
         const float a       = tile_production(tile, r);
-        const float p10     = tenth_percentile_production(w, r);
-        const float ceiling = nice_ceil((a + p10) > 0.0f ? (a + p10) : 1.0f);
+        const float p90     = top_decile_production(w, r);
+        const float peak    = std::max(a, p90);
+        const float ceiling = nice_ceil(peak > 0.0f ? peak : 1.0f);
 
         // Header indented to the plot origin, so the name sits above its bar.
         ImGui::Indent(gutter);
@@ -655,8 +642,8 @@ void draw_tile_selection(const world& w, ui_state& ui)
         const ImVec2 p  = ImGui::GetCursorScreenPos();
         const float  cw = ImGui::GetContentRegionAvail().x;
         ImGui::Dummy({cw, chart_h});
-        draw_production_chart(cdl, p, {p.x + cw, p.y + chart_h}, a, p10, ceiling,
-                              tile_col, p10_col);
+        draw_production_chart(cdl, p, {p.x + cw, p.y + chart_h}, a, p90, ceiling,
+                              tile_col, p90_col);
         ImGui::EndChild();
         ImGui::Spacing();
     }
@@ -664,17 +651,16 @@ void draw_tile_selection(const world& w, ui_state& ui)
         ImGui::TextDisabled("No deposits");
     ImGui::EndChild();
 
-    // ── 2x2 action button grid ──
+    // ── Action buttons ──
+    // This element is the *unbuilt-tile* prospecting view (Ben's 2026-07-15 review):
+    // its job is "is this tile worth building on?", so Construct is the primary action
+    // and leads full-width. The tile-scoped Manage front door is gone — a built tile's
+    // management is reached elsewhere, not from the prospecting element.
     const float bw  = (content_w - style.ItemSpacing.x) * 0.5f;
     const ImVec2 bsz = {bw, btn_h};
 
-    if (ImGui::Button("Construct\nBuildings", bsz))
+    if (ImGui::Button("Construct\nBuildings", {content_w, btn_h}))
         ui.show_build_ledger = true; // opens the tile construction ledger (BL-162)
-    ImGui::SameLine();
-    ImGui::BeginDisabled(building_on_tile(w, sel) == null_entity);
-    if (ImGui::Button("Manage\nBuildings", bsz))
-        ui.show_manage_ledger = true; // tile-scoped Manage ledger (draw_building_manage_ledger)
-    ImGui::EndDisabled();
 
     // History / Supply: drawn for layout completeness, wired to nothing yet
     // (BL-123 § stubs). The tooltip keeps the no-op honest rather than silent.

@@ -181,6 +181,16 @@ The full policy allocation system — where the player sets targets and shortage
 
 Staffed workforce carries an operating cost: each building incurs a per-tick **wage** of `workforce_assigned × base_wage` (a tunable constant), charged against the corporation's balance (see § Stockpile and output flow and the Budget item in `docs/development/BACKLOG.md`). A sensible `base_wage` is set now and refined once population centres model labour supply.
 
+### Workforce target and the auto-solver (BL-181)
+
+On top of the assigned fraction sits a player-facing **workforce target** (`building_component.workforce_target`, 0–200 % of nominal, default 100 %) — a scalar on both output and the labour portion of wages/maintenance, applied identically in `economy_system` and `budget_system`.
+
+By default a player building's target is **auto-solved** each economy tick (`workforce_auto = true`): `solve_workforce_target` (economy_system.cpp) picks the target that maximises that building's estimated net profit this tick. Because the model is otherwise *linear* in the target (output, wages, and the labour part of maintenance all scale with it), a fixed-price optimum would be degenerate bang-bang (0 % or max) — the **interior optimum comes from the local market price response**: more output raises local supply, which lowers the clearing price (`base · √(demand/supply)`, MARKETS/market_clearing). The solver reprices each candidate tier against that response and takes the best net. It is deterministic (reads last tick's market state), **player-corp only**, and applies only to producing types (extraction / processing).
+
+The target is the *heuristic*, not a hard goal: a manual tier chosen in the building-management UI **pins** the value and clears `workforce_auto`; the **Auto** control re-enables the solver. This is the sole sanctioned auto-action on the player's corp (see `.claude/rules/io-standing-rules.md` § player-corp exception).
+
+*First-pass fidelity (BL-181):* labour contention is held at its current value, input-price response is ignored (inputs valued at the current price), and the tier search is coarse (10 % steps) — so the solved target can hunt by ±one step. A finer model, input-price response, and hysteresis are future work.
+
 ---
 
 ## Stockpile and output flow

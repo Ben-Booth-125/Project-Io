@@ -3444,6 +3444,28 @@
       "authority_doc": "docs/ui/SELECTION.md",
       "summary": "Filed 2026-07-11 from the BL-098 walkthrough (US-012, scored 3.5/5). The Population lens + labelled settlements read well at the map level, but selecting a tile shows its production graph, not the habitability→workforce reason — the 'why is labour capped here' answer isn't where the player looks. Shares the ceiling story with US-007. Design-owed.",
       "design": "**Friction (BL-098 walkthrough, US-012).** US-012 (and the shared cap in US-007) want a 'you asked for X, the body allows Y — because habitability' read on the Selection element. Today the tile Selection shows production vs the P10 reference but not the workforce-ceiling reasoning; the habitability→workforce chain is legible on the lens legend but not where the player is deciding.\n\n**Direction:** surface the already-simulated habitability→workforce feedback (POPULATION.md) on tile/building selection so siting is reasoned, not guessed. It must tell **one consistent story** with US-007's building workforce-target read (the same ceiling seen from two surfaces) — a note both this and [[BL-176]] should honour.\n\n**Evidence:** screenshots/population_legibility_centre_panel (tile Selection shows production, not the workforce reason; 'Dunmoor' settlement renders well on-canvas). Traces US-012 (+US-007); parent review [[BL-098]]. Authority → SELECTION.md (+ POPULATION.md)."
+    },
+    {
+      "id": "BL-181",
+      "short_name": "WORKFORCE_AUTO_SOLVER",
+      "category": "Economy",
+      "title": "Workforce auto-solver - maximise-profit labour with the target as an editable heuristic",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "B",
+      "difficulty": 4,
+      "version_goal": "v0.2.0",
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-15",
+      "files": [
+        "src/world/economy_system.cpp",
+        "src/ui/construction_panel.cpp"
+      ],
+      "authority_doc": "docs/economy/PRODUCTION.md",
+      "summary": "Split from the 2026-07-15 building-management redesign. The UI shell (title/image, glyph-tagged production-method dropdown, profit + workforce graphs, and a 0-100 workforce-target button grid) landed on that session as the Buildings-tab detail (construction_panel.cpp draw_selected_section). THIS item is the deferred economy half: the player building's workforce should be AUTO-calculated each econ tick to maximise the building's net profit, with the workforce target reframed as an auto-computed heuristic the player may override, NOT an explicit goal.",
+      "design": "**Why:** Ben's steer - a manual workforce percentage is busywork; the interesting decision is the override, not the dial. The solver should land the workforce where marginal wage = marginal margin, then surface that as the default target the player can nudge.\n\n**The load-bearing tension (design first):** the standing rule is *the player's own corp is never auto-acted on* (io-standing-rules.md; the BL-079 exception is background corps only). Auto-solving the player's workforce brushes that rule, so this needs an explicit reconciliation: is the solver an advisory *default* the player accepts/overrides (keeps agency, likely fine) or a silent per-tick mutation of the player's building (violates the rule)? Recommended framing: the solver computes a *suggested* target; the player's explicit override pins it until cleared. Determinism must hold (no float drift across save/load).\n\n**Also owed (real data behind the shell):** per-building profit + workforce **history series** to replace the placeholder graphs, and proper per-method **glyphs** in ui::icons (the shell reuses the output resource pip). See the building-management shell notes in the same session's DEVLOG entry.\n\n**Files:** economy_system.cpp (the solver, tick-gated), construction_panel.cpp (target buttons read the solved default), plus ICONS/PRODUCTION doc updates on landing."
     }
   ]
 }

@@ -26,9 +26,16 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   *narrow, local, deterministic* per-building actions from mechanical triggers — idle a
   persistently loss-making building, switch a floored recipe, throttle extraction as a
   deposit depletes. This is **not** a licence for strategic planning, relocation, or
-  global optimisation; the player's own corp is never auto-acted on. Anything broader
-  stays deferred (backlog.json § BL-054). See `src/world/economy_system.cpp`
+  global optimisation; the player's own corp is never auto-acted on **strategically**.
+  Anything broader stays deferred (backlog.json § BL-054). See `src/world/economy_system.cpp`
   (run_economy_step § agency).
+  **Player-corp exception (BL-181, landed 2026-07-15):** the *workforce target* of a
+  player building may be auto-solved each tick to maximise that building's profit — a
+  **narrow, local, deterministic, opt-out** convenience for a single micromanagement dial,
+  not strategic agency. It is opt-out per building (`building_component.workforce_auto`; a
+  manual target in the management UI pins it), and it never places, relocates, retargets,
+  or decommissions. This is the *only* sanctioned auto-action on the player's corp; anything
+  beyond this one dial stays prohibited. See `solve_workforce_target` in economy_system.cpp.
 - Do **not** introduce a retained-mode UI framework in place of ImGui for the prototype.
 
 ## Terms & docs

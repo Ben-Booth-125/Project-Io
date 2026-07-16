@@ -12,8 +12,8 @@
 ///                   months). Supply/demand and prices will resolve here.
 ///
 /// Real-time pacing is a speed multiplier (1x–5x). At 1x a day takes
-/// `seconds_per_day_1x` real seconds; higher speeds divide that, so 3x is about
-/// two seconds per day. Speed 0 pauses the clock.
+/// `seconds_per_day_1x` real seconds; higher speeds divide that. Speed 0 pauses
+/// the clock.
 ///
 /// These calendar and pacing values are deliberately tentative — they are the
 /// single place to retune game time. The render layer reads the tick counters
@@ -26,7 +26,7 @@ public:
     static constexpr int    days_per_month     = 30;  ///< Days per in-game month.
     static constexpr int    months_per_econ    = 3;   ///< Economy resolves quarterly.
     static constexpr int    econ_tick_days     = days_per_month * months_per_econ; ///< 90 days.
-    static constexpr double seconds_per_day_1x = 6.0; ///< Real seconds per day at 1x (=> ~2s/day at 3x).
+    static constexpr double seconds_per_day_1x = 2.0; ///< Real seconds per day at 1x (retuned 3x quicker, 2026-07-15).
     static constexpr int    max_speed          = 5;
 
     /// Non-linear time multiplier for speed level s (1–5).
