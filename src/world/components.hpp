@@ -223,7 +223,16 @@ struct building_component
     /// Player-authored workforce target as a percentage of nominal capacity.
     /// Range [0, 200]; 100 = full nominal staffing. Scales actual output and
     /// the labour portion of maintenance. Applied in economy_system and budget_system.
+    /// When `workforce_auto` is set, the economy tick overwrites this each tick with
+    /// the profit-maximising value (BL-181); a manual override clears the auto flag.
     int  workforce_target = 100;
+
+    /// BL-181: when true (default), the economy tick auto-solves `workforce_target`
+    /// to maximise this building's estimated net profit (player corp only). A manual
+    /// workforce-target choice in the management UI clears this, pinning the target;
+    /// the "Auto" control re-enables it. Reconciles with the "never auto-act the
+    /// player's corp" rule as an opt-out convenience (see io-standing-rules.md).
+    bool workforce_auto = true;
 
     /// When true the building produces nothing and is charged only material
     /// (fixed overhead) maintenance — no labour cost. Pending removal by the

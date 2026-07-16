@@ -6,8 +6,11 @@
 #include <string>  // status strings (BL-095)
 
 #include "foldout_column.hpp" // shell fold-out column host (BL-122)
+#include "icons.hpp"          // production-method pip glyph (building-management shell)
 #include "presentation.hpp"
 #include "ui_state.hpp"
+
+#include <cfloat>  // FLT_MAX (PlotLines auto-scale)
 
 #include "world/budget_system.hpp"     // building_opex / compute_building_opex, body_mean_habitability (BL-143)
 #include "world/building_profit.hpp"   // estimate_building_profit (BL-143 Buildings tab)
@@ -201,10 +204,26 @@ void draw_queue_section(const world& w, const recipe_registry& reg)
 // recipe at construction, so this was blocking the very first thing a player
 // would want to change).
 //
-// Inline detail under the Buildings tab (BL-143 redesign, folded in from the
-// former standalone "Manage" tab): answers "how do I configure the thing I
-// have" for whichever row the player selected in the buildings table above.
-void draw_selected_section(world& w, const recipe_registry& reg, const ui_state& state)
+// The primary output resource of a recipe — the argmax of its outputs. Used to tag a
+// production method with a resource pip glyph (proper per-method glyphs are owed).
+resource_type primary_output_resource(const recipe& r)
+{
+    std::size_t best = 0;
+    float best_v = -1.0f;
+    for (std::size_t i = 0; i < resource_count; ++i)
+        if (r.outputs[i] > best_v) { best_v = r.outputs[i]; best = i; }
+    return static_cast<resource_type>(best);
+}
+
+// Inline detail under the Buildings tab: answers "how do I configure the thing I
+// have" for whichever row the player selected in the buildings table above. Ben's
+// 2026-07-15 building-management mockup (UI shell): title + placeholder image, a
+// production-method dropdown (each method glyph-tagged), profit + workforce graphs,
+// and a workforce-target button grid. The graphs read PLACEHOLDER deterministic
+// series (no per-building history recorded yet) and the target is still a manual
+// field — the auto-solver that treats it as an editable heuristic is a separate item.
+void draw_selected_section(world& w, const recipe_registry& reg,
+                           const economy_report& report, const ui_state& state)
 {
     building_component* found = nullptr;
     if (const auto bit = w.buildings.find(state.selected_entity); bit != w.buildings.end())
@@ -228,29 +247,143 @@ void draw_selected_section(world& w, const recipe_registry& reg, const ui_state&
         return;
     }
 
-    building_component&        b   = *found;
-    const building_economics&  eco = reg.economics(b.type);
-    const recipe*              rcp = reg.get_recipe(b.recipe);
+    building_component& b = *found;
 
-    ImGui::Text("Type: %s", building_type_name(b.type));
+    // --- Title + placeholder image ---
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s",
+                       building_type_name(b.type));
 
-    if (b.type == building_type::extraction_site)
-        ImGui::Text("Target: %s", resource_name(b.target_resource));
+    ImDrawList*  dl        = ImGui::GetWindowDrawList();
+    const float  content_w = ImGui::GetContentRegionAvail().x;
+    {
+        const float  img_h = content_w * 0.34f;
+        const ImVec2 p     = ImGui::GetCursorScreenPos();
+        const ImVec2 mx    = {p.x + content_w, p.y + img_h};
+        dl->AddRectFilled(p, mx, IM_COL32(72, 72, 72, 255), 3.0f);
+        dl->AddRect(p, mx, IM_COL32(110, 110, 110, 255), 3.0f);
+        const char*  ph = "PLACEHOLDER IMAGE";
+        const ImVec2 ts = ImGui::CalcTextSize(ph);
+        dl->AddText({(p.x + mx.x - ts.x) * 0.5f, (p.y + mx.y - ts.y) * 0.5f},
+                    IM_COL32(180, 180, 180, 255), ph);
+        ImGui::Dummy({content_w, img_h});
+    }
+
+    // --- Production Methods: a dropdown of the building's recipes, each tagged with a
+    // resource pip for its primary output. ---
+    ImGui::SeparatorText("Production Methods");
+    const int   n_recipes = reg.recipe_count(b.type);
+    const float pipr      = ImGui::GetFontSize() * 0.42f;
+    const auto  method_res = [&](int i) -> resource_type {
+        if (b.type == building_type::extraction_site) return b.target_resource;
+        return primary_output_resource(reg.recipe_at(b.type, i));
+    };
+    if (n_recipes >= 1)
+    {
+        b.active_recipe_index = std::clamp(b.active_recipe_index, 0, n_recipes - 1);
+        const recipe& cur     = reg.recipe_at(b.type, b.active_recipe_index);
+        const char*   preview = cur.name.empty() ? "-" : cur.name.c_str();
+
+        // Current-method pip, then the combo.
+        const ImVec2 gp = ImGui::GetCursorScreenPos();
+        const float  rh = ImGui::GetFrameHeight();
+        icons::resource(dl, {gp.x + pipr, gp.y + rh * 0.5f}, pipr, method_res(b.active_recipe_index));
+        ImGui::Dummy({pipr * 2.0f + 6.0f, rh});
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+        if (ImGui::BeginCombo("##method", preview))
+        {
+            ImDrawList* pdl = ImGui::GetWindowDrawList(); // popup's own draw list
+            for (int i = 0; i < n_recipes; ++i)
+            {
+                const recipe& ri  = reg.recipe_at(b.type, i);
+                const bool    sel = (i == b.active_recipe_index);
+                const ImVec2  ip  = ImGui::GetCursorScreenPos();
+                const std::string lbl = std::string("     ") + (ri.name.empty() ? "-" : ri.name);
+                if (ImGui::Selectable(lbl.c_str(), sel))
+                {
+                    b.active_recipe_index = i;
+                    b.recipe = reg.recipe_id(ri.name);
+                }
+                icons::resource(pdl, {ip.x + pipr + 2.0f, ip.y + ImGui::GetTextLineHeight() * 0.5f},
+                                pipr, method_res(i));
+                if (sel)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+    }
     else
-        ImGui::TextDisabled("Target: -");
+        ImGui::TextDisabled("Single method");
 
-    if (rcp != nullptr && !rcp->name.empty())
-        ImGui::Text("Recipe: %s", rcp->name.c_str());
-    else
-        ImGui::TextDisabled("Recipe: -");
+    // --- Profit + Workforce graphs (PLACEHOLDER deterministic series until real
+    // per-building history is recorded; the profit line anchors to the live estimate). ---
+    const building_profit prof    = estimate_building_profit(w, reg, report, state.selected_entity);
+    constexpr int         N       = 9;
+    const float           graph_w = ImGui::GetContentRegionAvail().x;
 
-    ImGui::Text("Build cost: %.1f", eco.build_cost);
-    ImGui::Text("Maintenance: %.1f / tick", eco.maintenance);
+    float profit_series[N];
+    const float p_end = prof.has_data ? prof.net() : 0.0f;
+    for (int i = 0; i < N; ++i)
+    {
+        const float t = static_cast<float>(i) / (N - 1);
+        profit_series[i] = (p_end - 35.0f) + t * 35.0f; // gentle ramp to the current estimate
+    }
+    ImGui::SeparatorText("Profit");
+    ImGui::PlotLines("##profit", profit_series, N, 0, nullptr, FLT_MAX, FLT_MAX, {graph_w, 60.0f});
 
-    // BL-095 task E: while under construction, the analog build status — rate / ETA /
-    // paused — recomputed the same way economy_system.cpp § run_construction paces it
-    // (per-tick material need vs the local market's recent supply). Replaces the old
-    // "instant or nothing" read now that construction is durative + material-gated.
+    float wf_series[N];
+    const float wf = static_cast<float>(b.workforce_target);
+    for (int i = 0; i < N; ++i)
+    {
+        const float t   = static_cast<float>(i) / (N - 1);
+        const float dip = -20.0f * std::sin(t * 3.14159265f); // placeholder dip-and-recover
+        wf_series[i]    = std::clamp(wf + dip, 0.0f, 200.0f);
+    }
+    ImGui::SeparatorText("Workforce");
+    ImGui::PlotLines("##workforce", wf_series, N, 0, nullptr, 0.0f, 120.0f, {graph_w, 60.0f});
+
+    // --- Workforce Target: Auto (the economy tick solves the profit-max target each
+    // tick, BL-181) plus a manual 0–100 button grid. A manual tier pins the target and
+    // clears Auto; the Auto button re-enables it and shows the current solved value. ---
+    ImGui::SeparatorText("Workforce Target");
+    {
+        if (b.workforce_auto)
+            ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+        char autolbl[32];
+        if (b.workforce_auto)
+            std::snprintf(autolbl, sizeof autolbl, "Auto  (%d%%)", b.workforce_target);
+        else
+            std::snprintf(autolbl, sizeof autolbl, "Auto");
+        if (ImGui::Button(autolbl, {ImGui::GetContentRegionAvail().x, ImGui::GetFrameHeight() * 1.4f}))
+            b.workforce_auto = true;
+        if (b.workforce_auto)
+            ImGui::PopStyleColor();
+
+        const int   tiers[] = {0, 20, 40, 60, 80, 100};
+        const float sp = ImGui::GetStyle().ItemSpacing.x;
+        const float bw = (ImGui::GetContentRegionAvail().x - sp * 2.0f) / 3.0f;
+        const float bh = ImGui::GetFrameHeight() * 1.6f;
+        for (int i = 0; i < 6; ++i)
+        {
+            const bool active = (!b.workforce_auto && b.workforce_target == tiers[i]);
+            if (active)
+                ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
+            char lbl[16];
+            std::snprintf(lbl, sizeof lbl, "%d##wf%d", tiers[i], i);
+            if (ImGui::Button(lbl, {bw, bh}))
+            {
+                b.workforce_target = tiers[i];
+                b.workforce_auto   = false; // manual override pins the target
+            }
+            if (active)
+                ImGui::PopStyleColor();
+            if (i % 3 != 2)
+                ImGui::SameLine();
+        }
+    }
+
+    // Under-construction status + decommission — kept from the prior detail (not in the
+    // mockup, but load-bearing): the analog build rate/ETA and the stop control.
     if (b.ticks_remaining > 0)
     {
         const float rate = construction_rate(w, reg, b.type, b.tile);
@@ -261,56 +394,10 @@ void draw_selected_section(world& w, const recipe_registry& reg, const ui_state&
     }
 
     ImGui::Spacing();
-    ImGui::SeparatorText("Management");
-
-    // --- Workforce slider ---------------------------------------------------
-    // Shows and edits the player's workforce target (0–200 % of nominal).
-    ImGui::Text("Workforce: %d%%", b.workforce_target);
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(160.0f);
-    ImGui::SliderInt("Workforce##bld", &b.workforce_target, 0, 200);
-    b.workforce_target = std::clamp(b.workforce_target, 0, 200);
-
-    // --- Recipe selector ----------------------------------------------------
-    // Shown only for buildings that have more than one recipe available.
-    const int n_recipes = reg.recipe_count(b.type);
-    if (n_recipes > 1)
-    {
-        b.active_recipe_index = std::clamp(b.active_recipe_index, 0, n_recipes - 1);
-        const recipe& cur_rcp = reg.recipe_at(b.type, b.active_recipe_index);
-        const char* combo_preview = cur_rcp.name.empty() ? "-" : cur_rcp.name.c_str();
-        if (ImGui::BeginCombo("Recipe##bld", combo_preview))
-        {
-            for (int i = 0; i < n_recipes; ++i)
-            {
-                const recipe& r = reg.recipe_at(b.type, i);
-                const bool sel  = (i == b.active_recipe_index);
-                if (ImGui::Selectable(r.name.empty() ? "-" : r.name.c_str(), sel))
-                {
-                    b.active_recipe_index = i;
-                    b.recipe = reg.recipe_id(r.name);
-                }
-                if (sel)
-                    ImGui::SetItemDefaultFocus();
-            }
-            ImGui::EndCombo();
-        }
-    }
-
-    // --- Decommission button ------------------------------------------------
-    ImGui::Spacing();
     if (b.decommissioned)
-    {
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative),
-                           "DECOMMISSIONED");
-    }
-    else
-    {
-        if (ImGui::Button("Decommission"))
-            b.decommissioned = true;
-        ImGui::SameLine();
-        ImGui::TextDisabled("(stops production; material cost only)");
-    }
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative), "DECOMMISSIONED");
+    else if (ImGui::Button("Decommission"))
+        b.decommissioned = true;
 }
 
 // --- Sell orders (player) ----------------------------------------------------
@@ -410,7 +497,7 @@ void draw_buildings_tab(world& w, const recipe_registry& reg,
     ImGui::Spacing();
     ImGui::Separator();
     ImGui::Spacing();
-    draw_selected_section(w, reg, state);
+    draw_selected_section(w, reg, report, state);
 }
 
 } // namespace

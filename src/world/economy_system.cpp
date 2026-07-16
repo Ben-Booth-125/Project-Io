@@ -1,5 +1,6 @@
 #include "economy_system.hpp"
 
+#include "budget_system.hpp"   // compute_building_opex, body_mean_habitability (BL-181 solver)
 #include "building_profit.hpp" // estimate_building_profit (BL-079 corp agency)
 #include "market_clearing.hpp" // market_for_tile (BL-095 construction gate)
 #include "workforce.hpp"
@@ -212,6 +213,105 @@ building_report run_processing(world& w, const recipe_registry& reg,
     rep.active          = true;
     rep.output_quantity = produced;
     return rep;
+}
+
+// --- Player workforce auto-solver (BL-181) --------------------------------------
+// Chooses the workforce target that maximises a player building's estimated net profit
+// this tick. The underlying model is otherwise LINEAR in the workforce target (output,
+// wages, and the labour part of maintenance all scale with it), so at fixed prices the
+// optimum would be degenerate bang-bang (0 or max). The interior optimum comes from the
+// local market PRICE RESPONSE: more output → more supply → a lower clearing price
+// (market_clearing's base·sqrt(demand/supply)). The search reprices each candidate
+// against that response and picks the best net.
+//
+// First-pass heuristic: contention is held at its current value; input-price response is
+// ignored (inputs valued at the current price); the search is over coarse tiers, so the
+// result can hunt by ±one tier. A finer model + hysteresis is future work (BL-181).
+// Deterministic — reads last tick's market state only. Player corp only, opt-out via the
+// building's `workforce_auto` flag (io-standing-rules.md § the player-corp exception).
+constexpr float wf_price_floor_mult = 0.25f; // mirror market_clearing.cpp price band
+constexpr float wf_price_ceil_mult  = 4.0f;
+
+// The market's target (pre-smoothing) clearing price for one resource at a hypothetical
+// supply — the same formula resolve_price aims at, used here as a forward estimate.
+float wf_target_price(float base, float supply, float demand)
+{
+    if (base <= 0.0f)
+        return 0.0f;
+    float target;
+    if (supply <= 0.0f && demand <= 0.0f) target = base;
+    else if (supply <= 0.0f)              target = base * wf_price_ceil_mult;
+    else                                  target = base * std::sqrt(demand / supply);
+    return std::clamp(target, base * wf_price_floor_mult, base * wf_price_ceil_mult);
+}
+
+int solve_workforce_target(const world& w, const recipe_registry& reg,
+                           const building_component& b, float contention)
+{
+    const entity_id body = building_body(w, b);
+    if (body == null_entity)
+        return b.workforce_target;
+
+    const market_component* mkt = nullptr;
+    if (const entity_id mid = market_for_tile(w, b.tile); mid != null_entity)
+        if (const auto it = w.markets.find(mid); it != w.markets.end())
+            mkt = &it->second;
+
+    const building_economics& e   = reg.economics(b.type);
+    const float               hab = body_mean_habitability(w, body);
+    const float               eff = b.workforce_assigned * contention;
+    const float               now = std::clamp(b.workforce_target / 100.0f, 0.0f, 2.0f);
+
+    // Clearing price for resource r if this building's supply of it shifts by delta.
+    const auto price_of = [&](std::size_t r, float supply_delta) -> float {
+        if (mkt == nullptr)
+            return 0.0f;
+        const float supply = std::max(0.0f, mkt->supply[r] + supply_delta);
+        return wf_target_price(mkt->base_price[r], supply, mkt->demand[r]);
+    };
+
+    const auto tit = w.tiles.find(b.tile);
+
+    int   best_wt  = 0;
+    float best_net = -std::numeric_limits<float>::infinity();
+    for (int wt = 0; wt <= 200; wt += 10)
+    {
+        const float wts = wt / 100.0f;
+
+        building_component probe = b;
+        probe.workforce_target   = wt;
+        const building_opex opex = compute_building_opex(probe, e, contention, hab);
+
+        float revenue = 0.0f, input_cost = 0.0f;
+        if (b.type == building_type::extraction_site && tit != w.tiles.end())
+        {
+            const std::size_t ri = static_cast<std::size_t>(b.target_resource);
+            const float rich = tit->second.resource_deposit[ri];
+            const float k    = e.base_rate * rich * eff * (1.0f - tit->second.hazard_level);
+            const float q    = k * wts;
+            revenue = q * price_of(ri, q - k * now); // supply delta vs this building's current output
+        }
+        else if (b.type == building_type::processing_facility)
+        {
+            if (const recipe* rcp = reg.get_recipe(b.recipe))
+            {
+                const float runs     = e.base_rate * eff * wts;
+                const float runs_now = e.base_rate * eff * now;
+                for (std::size_t r = 0; r < resource_count; ++r)
+                {
+                    if (rcp->outputs[r] > 0.0f)
+                        revenue += rcp->outputs[r] * runs *
+                                   price_of(r, rcp->outputs[r] * (runs - runs_now));
+                    if (rcp->inputs[r] > 0.0f)
+                        input_cost += rcp->inputs[r] * runs * price_of(r, 0.0f);
+                }
+            }
+        }
+
+        const float net = revenue - input_cost - opex.maintenance - opex.wages;
+        if (net > best_net) { best_net = net; best_wt = wt; }
+    }
+    return best_wt;
 }
 
 // BL-095: pace each under-construction building against the local market's recent
@@ -428,7 +528,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
             const auto bit = w.buildings.find(building_id);
             if (bit == w.buildings.end())
                 continue;
-            const building_component& b = bit->second;
+            building_component& b = bit->second; // mutable: the auto-solver may set the target
             const entity_id body = building_body(w, b);
 
             // Decommissioned buildings produce nothing — skip production entirely.
@@ -437,6 +537,16 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
             // Still under construction — no production yet (playtest patch, 2026-07-06).
             if (b.ticks_remaining > 0)
                 continue;
+
+            // BL-181: auto-solve the player's workforce target to maximise this
+            // building's profit before it produces. Player corp only, opt-out via
+            // workforce_auto (io-standing-rules.md § player-corp exception). Placed
+            // here — after contention is computed (which reads workforce_assigned, not
+            // the target) — so overwriting the target now is safe for this tick.
+            if (corp == w.player_entity && b.workforce_auto &&
+                (b.type == building_type::extraction_site ||
+                 b.type == building_type::processing_facility))
+                b.workforce_target = solve_workforce_target(w, reg, b, contention_for(body));
 
             switch (b.type)
             {

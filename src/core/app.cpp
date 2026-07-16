@@ -652,7 +652,6 @@ int app::run_verify(const std::string& script_path, bool bless)
         else if (name == "balance")      m_ui.show_balance_ledger = open;
         else if (name == "corporation")  m_ui.show_corporation_panel = open;
         else if (name == "build")        m_ui.show_build_ledger = open; // tile construction ledger (BL-162)
-        else if (name == "manage")       m_ui.show_manage_ledger = open; // tile building-management ledger
     });
 
     // Open the Layer 4 construction / building-management panel so a capture shows
@@ -953,6 +952,18 @@ int app::run_verify(const std::string& script_path, bool bless)
             { m_ui.selected_entity = bid; m_ui.selection_hidden_for = null_entity; break; }
         }
     });
+    // Switch the construction panel's sub-view (0 = Construction/queue, 1 = Buildings/
+    // management detail) so a script can capture the building-management screen, which
+    // otherwise opens on the queue view. UI state only.
+    v.set_function("construction_view", [this](int view) {
+        m_ui.construction.panel_view = view;
+        // Acknowledge the current selection so the new-selection panel-close (render()
+        // § "new selection takes the column") does not stomp the panel we're staging
+        // for capture. Harness-only convenience; the interactive path never needs it.
+        m_prev_selection          = m_ui.selected_entity;
+        m_ui.selection_hidden_for = m_ui.selected_entity;
+    });
+
     // select_body picks a body by name, exactly as a single-click on the Solar /
     // Circumplanetary canvas would (sets selected_entity to the body). Lets a
     // script stage the selection-aware descend gesture (BL-165).
@@ -1665,10 +1676,12 @@ void app::render()
     // resolution-scaled mm_h (the BL-093 anti-pattern): year + date lines, the thin
     // progress bar, and the speed-button row, plus the inter-row spacing.
     const float time_line_h    = ImGui::GetTextLineHeightWithSpacing();
-    const float time_frame_h   = ImGui::GetFrameHeight();
     const float time_prog_h    = 10.0f; // thin quarter-progress bar
     const float time_spacing   = ImGui::GetStyle().ItemSpacing.y;
-    const float time_content_h = time_line_h * 2.0f + time_prog_h + time_frame_h + time_spacing * 3.0f;
+    // Year + date now share one row (Ben's 2026-07-15 review), so the reclaimed
+    // line height goes to a taller speed-button row rather than shrinking the panel.
+    const float time_btn_h     = ImGui::GetFrameHeight() * 2.0f;
+    const float time_content_h = time_line_h + time_prog_h + time_btn_h + time_spacing * 2.0f;
     const float time_h         = time_content_h + ImGui::GetStyle().WindowPadding.y * 2.0f;
     {
         ImGui::SetNextWindowPos({disp.x - margin - tick_w, margin});
@@ -1687,11 +1700,11 @@ void app::render()
         const uint64_t day = m_sim_loop.day_tick();
         const ui::fmt::calendar_date date = ui::fmt::date_from_day(day);
 
-        // --- Year and date/quarter: the SAME size, left-aligned as a stacked pair
-        // (Ben's 2026-07-10 review). The year is no longer an oversized centred
-        // heading — both read at the base font size, aligned on the panel's left edge.
-        ImGui::TextUnformatted(std::to_string(date.year).c_str());
-        ImGui::Text("%s %s (Q%d)", ui::fmt::month_abbrev(date.month),
+        // --- Year + date/quarter on ONE row (Ben's 2026-07-15 review), left-aligned
+        // at the base font size. Sharing a horizontal level frees vertical room for a
+        // taller speed-control row below. Quarter is bracketed [Qn].
+        ImGui::Text("%s   %s %s [Q%d]", std::to_string(date.year).c_str(),
+                    ui::fmt::month_abbrev(date.month),
                     ui::fmt::ordinal_day(date.day).c_str(), date.quarter);
 
         // --- Quarter-progress bar: full width, so it aligns with the speed-control
@@ -1716,7 +1729,7 @@ void app::render()
                 const bool active = (m_sim_loop.speed() == speeds[i]);
                 if (active)
                     ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-                if (ImGui::Button(labels[i], {bw, 0.0f}))
+                if (ImGui::Button(labels[i], {bw, time_btn_h}))
                 {
                     if (speeds[i] == 0)
                     {
@@ -1905,22 +1918,14 @@ void app::render()
         const entity_id sel        = m_ui.selected_entity;
         const bool      sel_is_tile = sel != null_entity && m_world.tiles.count(sel) > 0;
 
-        // A building is manageable when the selection *is* a building, or a tile carrying
-        // one — the same resolution draw_building_manage_ledger uses. Gates the tile-scoped
-        // Manage ledger so it wins the column only when there is a building to show.
-        bool can_manage = sel != null_entity && m_world.buildings.count(sel) > 0;
-        if (!can_manage && sel_is_tile)
-            for (const auto& [bid, b] : m_world.buildings)
-                if (b.tile == sel) { can_manage = true; break; }
-
-        if (m_ui.show_manage_ledger && can_manage)
-            ui::draw_building_manage_ledger(m_world, m_registry, m_ui);
-        else if (m_ui.show_build_ledger && sel_is_tile)
+        // The tile-scoped Manage ledger was retired (Ben's 2026-07-15 review) — the
+        // fold-out column now shows either the tile construction ledger (when opened
+        // from a tile) or the Selection element.
+        if (m_ui.show_build_ledger && sel_is_tile)
             ui::draw_construction_ledger(m_world, m_registry, m_ui);
         else
         {
-            m_ui.show_build_ledger  = false; // not a tile → no build ledger
-            m_ui.show_manage_ledger = false; // no manageable building → no manage ledger
+            m_ui.show_build_ledger = false; // not a tile → no build ledger
             ui::draw_selection_panel(m_world, m_registry, m_last_econ_report, m_ui);
         }
     }
