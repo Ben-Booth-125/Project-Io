@@ -12,6 +12,9 @@ The action that reveals a body's tile surface and deposit richness bands. A body
 **Corporation**
 The player's controlling entity. Unlike nation-states, a corporation begins with no territorial claim or military force and must justify every asset through economic or strategic return. The corporation persists as long as it holds any asset.
 
+**Headquarters (HQ)**
+A corporation's seat building, drawn with the `ui::icons::hq` ringed-star glyph. Today it is the player-only home marker — the `hq` star on the building nearest the home-cluster centroid, paired with the home-cluster ring (BL-085). The **design direction (BL-182, deferred)** is that an HQ projects an **influence range**, and the union of a corporation's HQ ranges forms its **corporate border** — a sphere symmetric with nation territory. A corporation opens with one HQ and builds more as it advances (tech/law-gated); investing in fewer, deeper HQs (**tall**) versus more, spread HQs (**wide**) is the corporation's specialisation lever. See `docs/generation/CORPORATION_GENERATION.md` and BL-182.
+
 **Country**
 A generated nation; the territorial/political unit that holds tiles on a body. The Country map lens (`overlay_mode::country`, formerly "Faction") tints each nation's tiles by its identity colour (`nation_colour`) with dark borders between owners. See **Faction**.
 

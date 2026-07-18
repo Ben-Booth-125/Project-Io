@@ -152,6 +152,13 @@ corporation (not just the player) a readable tile tint. See also the BL-085 home
 drawn only on the player's home body, which is a further, distinct layer of the same identity
 chrome.
 
+**Forward-note (BL-182, deferred).** The lens today tints *held tiles* only. The intended
+extension is a real **corporate border** — a sphere projected from each corporation's **HQ(s)**
+with a **range** (generalising the player-only home ring/HQ star into a ranged border for every
+corp). This is the corporation-side counterpart to the Country lens's national borders. Design and
+open questions live in `docs/development/backlog.json` (BL-182); deferred with corporation-system
+behaviour.
+
 ---
 
 ## Country lens

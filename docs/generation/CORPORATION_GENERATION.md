@@ -146,6 +146,17 @@ data model is designed so that AI behaviour can be added without restructuring i
 
 ## Open items
 
+**Corporate borders — HQ range & the tall/wide axis (BL-182).** Corporations should have
+**borders too**, symmetric with nations: a corporate sphere projected outward from **HQ
+building(s)**, each with an **influence range** (the union of a corp's HQ ranges is its border).
+A corp opens with **one HQ** and can **build more as it advances** (tech/law-gated), which creates
+the specialisation lever — **tall** (deepen fewer HQs) vs **wide** (spread more HQs). Intended as a
+*gameplay* mechanic (range gates/modifies where the corp can operate), not just a visual layer, and
+extensible via laws and technology. It **generalises** the player-only home-cluster ring + `hq` star
+(BL-085; the seed of this) into a real ranged border for every corporation on the **Corporation**
+lens. Deferred with corporation-system behaviour (post-v0.1.0); full design and open questions live
+in `docs/development/backlog.json` (BL-182).
+
 **Building tiers / levels.** A level/tier axis for buildings — **distinct from production
 methods (recipes)**. A specialist's footprint may be characterised as much by the *tier* of its
 assets as by their count, which bears directly on the lean-holdings shape above. Unsettled;
