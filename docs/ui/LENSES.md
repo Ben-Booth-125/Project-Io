@@ -152,12 +152,17 @@ corporation (not just the player) a readable tile tint. See also the BL-085 home
 drawn only on the player's home body, which is a further, distinct layer of the same identity
 chrome.
 
-**Forward-note (BL-182, deferred).** The lens today tints *held tiles* only. The intended
-extension is a real **corporate border** — a sphere projected from each corporation's **HQ(s)**
-with a **range** (generalising the player-only home ring/HQ star into a ranged border for every
-corp). This is the corporation-side counterpart to the Country lens's national borders. Design and
-open questions live in `docs/development/backlog.json` (BL-182); deferred with corporation-system
-behaviour.
+**Corporate reach (BL-182, visual slice — shipped).** Beyond tinting *held tiles*, the lens now
+draws each **rival** corporation's **HQ-projected border**: a **reach ring** centred on that corp's
+HQ (the holding nearest its holdings centroid on the active body) plus an `hq` star, in the corp's
+identity colour, with radius = the holdings extent plus a fixed projected range. This extends the
+identity language of the always-on player-only home ring/HQ star (BL-085) to rivals, so
+corporations read as having **borders too** — the corporation-side counterpart to the Country
+lens's national borders. The player's own border stays the always-on home ring (BL-085), so the
+reach layer excludes the player to avoid a double-draw. This layer is **render-only chrome** — it
+gates nothing. The full *gameplay* mechanic (range that actually gates operations, multi-HQ
+building via advancement, the tall/wide axis, law/tech levers) and its open questions stay
+deferred in `docs/development/backlog.json` (BL-182). See `scripts/verify/corporate_reach.lua`.
 
 ---
 

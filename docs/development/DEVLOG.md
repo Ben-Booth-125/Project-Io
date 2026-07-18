@@ -6,6 +6,47 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — Corporate borders: BL-182 recorded + visual reach slice (BL-183) (2026-07-18)
+
+**Context.** Ben: "corporations should have borders too, with HQ(s) that extend and provide some
+range." Via question he pinned it as a **gameplay mechanic**, with **one HQ that can build others
+with advancement** — enabling a **tall vs wide** specialisation axis, extensible via **laws and
+technology**. Then: deliver + PR immediately.
+
+**Recorded (design).** The full mechanic is unbuilt, `design-owed`, difficulty-5, post-v0.1.0
+corporation-system behaviour (deferred per io-standing-rules) — so it landed as **BL-182**
+(parked) holding the design + open questions, with an Open-items pointer in
+CORPORATION_GENERATION.md, a **Headquarters (HQ)** GLOSSARY term, and a Corporation-lens note in
+LENSES.md. Authority time-slicing kept: prose in the backlog item, not edited into the pipeline as
+settled.
+
+**Landed (visual slice — BL-183).** The in-scope, render-only half: under the **Corporation lens**,
+each **rival** corp on the active body now draws an **HQ-projected border** — a reach ring centred
+on its HQ (holding nearest the holdings centroid) + an `icons::hq` star, in the corp identity
+colour, radius = holdings extent + a fixed projected range (`hex_size * 2.5`), cylinder-seam-wrapped.
+New block in `body_surface_canvas.cpp` right after the BL-085 home-presence block it mirrors.
+
+**Decisions.**
+- **Player excluded from the reach layer** — the always-on BL-085 home ring/HQ star already is the
+  player's border; drawing the reach layer for the player too stacked two rings + two identical
+  stars (flagged by the cold review). Per LENSES the Corporation lens "extends the identity language
+  to rivals", so the reach layer covers rivals; the player keeps its home ring. No double-draw.
+- **Fixed projected range** (not a cost-field) for this slice — simplest deterministic "some range";
+  the cost-field-vs-radius question folds back into BL-182.
+
+**Verification.** Static **cold review PASSED** (compiles-by-inspection, standing invariants,
+geometry — the one gate runnable here). **Could not build or visual-verify in-session:** the SDL3
+FetchContent download is blocked by egress policy (403), and CI (`build.yml`) does not run the
+visual-verify tier (deferred, BL-057). CI will confirm the **compile**; the rendered frame still
+needs an eyeball on a build-capable machine. `scripts/verify/corporate_reach.lua` committed for that
+run. Requirement R1 (BL-183) left **pending** for the same reason — honestly not `complete`.
+
+**Open (fold into BL-182).** Cost-field vs fixed radius, what the border gates, corp-vs-nation /
+corp-vs-corp overlap, per-body vs global HQs, discovery interaction, the advancement curve for
+building further HQs.
+
+---
+
 ## Session — Road tiers + spanning render fix (BL-172; BL-173 filed) (2026-07-11)
 
 **Context.** Ben: fix roads so they "span two tiles, or at least visually, so there's no difference
