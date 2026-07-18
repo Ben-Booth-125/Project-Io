@@ -5730,6 +5730,16 @@
         { "id": "R2", "status": "complete", "requirement": "generation assigns three tiers by centre scale — Highway (3) between two major centres (scale>=3), Road (2) when at least one endpoint is Town+ (scale>=2), else Track (1); cross-nation border links stay Track; no tile exceeds road_level 3; deterministic across two generations; roads never stamp on ocean.", "verification": ["headless"], "result_metric": "", "notes": "road_generation.cpp edge_tier by scale; tools/verify/road_generation_harness.cpp R2 asserts Track+Road+Highway present and ceiling <=3, R4 determinism." },
         { "id": "R3", "status": "complete", "requirement": "the player places any tier from the build front door: place_road(tier) is valid on non-ocean land when tile.road_level < tier (upgrade-in-place: a Track can be raised to a Road/Highway), rejected when road_level >= tier (already at or above); the chosen tier's cost (road_econ(tier): Track 25 / Road 45 / Highway 90 cr + materials) is debited and the A* cost cache invalidated.", "verification": ["headless", "code"], "result_metric": "", "notes": "placement_rules can_place_road(tc,tier); construction place_road(...,tier); recipe_registry road_econ(tier) over std::array<road_economics,3>; economy.lua roads.track/road/highway. tools/verify/logistics_harness.cpp T10 places Track, checks the Track default cost, upgrade-succeeds + same-tier-rejected." }
       ]
+    },
+    {
+      "brief": "corporate-reach-visual",
+      "batch": "2026-07-18-corporate-borders",
+      "title": "BL-183 — Corporate reach layer (visual slice of BL-182): rival HQ border rings on the Corporation lens",
+      "status": "pending",
+      "promoted_from": "backlog.json BL-183 (visual slice of BL-182)",
+      "rows": [
+        { "id": "R1", "status": "pending", "requirement": "ITEM-SPANNING (visual): under the Corporation lens on a body with rival corporations, each RIVAL corporation's holdings on the active body render an HQ-projected border — a reach ring centred on that corp's HQ (the holding nearest its holdings centroid) plus an hq star, both in the corp's identity colour, with ring radius = holdings extent + a fixed projected range; the player corp is excluded (its border stays the always-on BL-085 home ring, so no double ring/star); the layer draws only under the Corporation lens, is cylinder-seam-wrapped, and mutates no world state.", "verification": ["visual"], "result_metric": "", "notes": "body_surface_canvas.cpp new block after the BL-085 home-presence block, gated on overlay_mode::corporation; scripts/verify/corporate_reach.lua captures a wide multi-corp view + a player-HQ frame. Static cold review PASSED (compiles-by-inspection, standing invariants, geometry). PENDING because the visual harness could not run in-session: the SDL3 FetchContent download is blocked by egress policy (403) so no local build, and CI (build.yml) does not run the visual-verify tier (deferred BL-057). CI build.yml will confirm the compile; the rendered frame needs an eyeball on a build-capable machine." }
+      ]
     }
 
   ]

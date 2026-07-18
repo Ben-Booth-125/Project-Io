@@ -3466,6 +3466,54 @@
       "authority_doc": "docs/economy/PRODUCTION.md",
       "summary": "Split from the 2026-07-15 building-management redesign. The UI shell (title/image, glyph-tagged production-method dropdown, profit + workforce graphs, and a 0-100 workforce-target button grid) landed on that session as the Buildings-tab detail (construction_panel.cpp draw_selected_section). THIS item is the deferred economy half: the player building's workforce should be AUTO-calculated each econ tick to maximise the building's net profit, with the workforce target reframed as an auto-computed heuristic the player may override, NOT an explicit goal.",
       "design": "**Why:** Ben's steer - a manual workforce percentage is busywork; the interesting decision is the override, not the dial. The solver should land the workforce where marginal wage = marginal margin, then surface that as the default target the player can nudge.\n\n**The load-bearing tension (design first):** the standing rule is *the player's own corp is never auto-acted on* (io-standing-rules.md; the BL-079 exception is background corps only). Auto-solving the player's workforce brushes that rule, so this needs an explicit reconciliation: is the solver an advisory *default* the player accepts/overrides (keeps agency, likely fine) or a silent per-tick mutation of the player's building (violates the rule)? Recommended framing: the solver computes a *suggested* target; the player's explicit override pins it until cleared. Determinism must hold (no float drift across save/load).\n\n**Also owed (real data behind the shell):** per-building profit + workforce **history series** to replace the placeholder graphs, and proper per-method **glyphs** in ui::icons (the shell reuses the output resource pip). See the building-management shell notes in the same session's DEVLOG entry.\n\n**Files:** economy_system.cpp (the solver, tick-gated), construction_panel.cpp (target buttons read the solved default), plus ICONS/PRODUCTION doc updates on landing."
+    },
+    {
+      "id": "BL-182",
+      "short_name": "CORPORATE_BORDERS",
+      "category": "Generation",
+      "title": "Corporate borders - HQ-projected influence range and the tall/wide specialisation axis",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "F",
+      "difficulty": 5,
+      "version_goal": "post-v0.1.0",
+      "parked": true,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-18",
+      "files": [
+        "docs/generation/CORPORATION_GENERATION.md",
+        "docs/GLOSSARY.md",
+        "docs/ui/LENSES.md",
+        "src/world/corporation_generation.cpp",
+        "src/ui/body_surface_canvas.cpp"
+      ],
+      "authority_doc": "docs/generation/CORPORATION_GENERATION.md",
+      "summary": "Ben's steer (2026-07-18): corporations should have BORDERS like nations do - a corporate sphere projected outward from HQ building(s) with a RANGE, generalising the player-only home-ring/HQ-star chrome (BL-085) into a real ranged border for every corp on the Corporation lens. A corp opens with ONE HQ and builds more as it advances (tech/laws), which creates a TALL (deepen fewer HQs) vs WIDE (spread more HQs) specialisation axis. A gameplay mechanic - HQ range gates/modifies where the corp can operate - not just a visual layer. Deferred with corporation-system behaviour (post-v0.1.0); captured so the data model + lens rendering position for it.",
+      "design": "**Why (Ben's steer, 2026-07-18):** nations have real territory (Country lens: tile ownership + borders) but corporations only get tile *tints* on the tiles they directly hold, plus the player-only home-ring/HQ-star chrome (BL-085). Corporations should have **borders too** - a corporate sphere projected outward from **HQ building(s)** with a **range**, symmetric with how nations hold territory.\n\n**Core model.** Every corporation has at least one **HQ** building. Each HQ projects an **influence range** (a radius / cost-field over the tile grid); the **union of a corp's HQ ranges is its border** (its operating sphere). A corp opens with **one HQ**; as it advances it can **build additional HQs**, each extending reach.\n\n**The tall/wide axis (the point).** This is the specialisation lever: **tall** = invest in fewer HQs, deepening range/potency in place; **wide** = build more HQs, spreading the footprint across more territory (and eventually more bodies). Neither is strictly better - the choice shapes the corp's strategic character. This is what the mechanic is *for*.\n\n**A gameplay mechanic, not just a visual.** The border is load-bearing: HQ range **gates or modifies where the corp can operate** (build / extract / project logistics), so it competes spatially with rival corporations and overlays - does not replace - nation jurisdiction. The exact effect is open (see below).\n\n**Extensible via laws + technology.** HQ **range**, the **max HQ count**, and HQ **potency** are all levers laws and tech can move - this is the framework the later Policy/Research systems build on to differentiate corporations. The advancement that unlocks the 2nd+ HQ is itself a tech/law gate.\n\n**Relationship to existing work.** The player-only home-cluster ring + `icons::hq` star (BL-085; CANVASES/PLANETARY) is the *seed* of this - a per-body 'my region' chrome around the player's holdings. This item **generalises** it into a real, ranged border for **every** corporation, surfaced on the **Corporation** lens (LENSES.md - today the lens only tile-tints held tiles + draws a player border) with the `hq` glyph (ICONS.md) marking each HQ.\n\n**Open questions (why this is design-owed, not designed):**\n- **Range shape** - fixed radius, or a decaying cost-field like the nation Voronoi-BFS budget (NATION_GENERATION.md)? A cost-field composes better with terrain and reads as 'reach'.\n- **What the border gates** - build-only? an extraction/logistics bonus inside it? a hard operate-boundary? This sets how much it constrains vs. flavours play.\n- **Overlap rules** - corp spheres vs. nation territory (a corp operating in a foreign nation), and corp-vs-corp overlap (contested tiles).\n- **Per-body vs. global** - one HQ per body projecting locally (matches BL-085's per-body chrome), or a home HQ + weaker branch offices elsewhere.\n- **Discovery interaction** - the border read against competitor-visibility + the activity fog (DISCOVERY.md: rival buildings visible, internals private).\n- **Advancement curve** - which tech/law unlocks each further HQ, and the cost of going wide vs. tall.\n\n**Prototype scope.** Deferred (post-v0.1.0). Corporation behaviour is deferred from the prototype (io-standing-rules.md; nation behaviour parked BL-054), so this lands with the corporation-system work, not before. Captured now so the data model and the Corporation-lens rendering can position for it.\n\n**Files (on landing):** src/world/corporation_generation.cpp (HQ designation + range), the placement/economy seam (operate-gate), src/ui/body_surface_canvas.cpp + ui_state overlay (border render, generalising the BL-085 chrome); docs CORPORATION_GENERATION.md / LENSES.md / GLOSSARY.md / ICONS.md on landing."
+    },
+    {
+      "id": "BL-183",
+      "short_name": "CORPORATE_REACH_VISUAL",
+      "category": "Canvas",
+      "title": "Corporate reach layer (visual slice of BL-182) - rival HQ border rings on the Corporation lens",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "C",
+      "difficulty": 2,
+      "version_goal": "v0.2.0",
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-18",
+      "files": [
+        "src/ui/body_surface_canvas.cpp",
+        "docs/ui/LENSES.md",
+        "scripts/verify/corporate_reach.lua"
+      ],
+      "authority_doc": "docs/ui/LENSES.md",
+      "summary": "The in-scope, render-only first slice of BL-182: under the Corporation lens, each RIVAL corporation on the active body draws an HQ-projected border - a reach ring centred on its HQ (the holding nearest its holdings centroid) plus an hq star, in the corp's identity colour, radius = holdings extent + a fixed projected range. Extends the always-on player-only home ring/HQ star (BL-085) to rivals so corporations read as having borders too. The player's own border stays the BL-085 home ring (excluded here to avoid a double-draw). Gates nothing, mutates no state - the gameplay mechanic stays deferred in BL-182.",
+      "design": "**Slice, not the mechanic.** This ships only the *legibility* half of BL-182 (which stays parked for the full gameplay mechanic). Render-only; no operate-gating, no multi-HQ, no tall/wide, no law/tech levers.\n\n**Implementation.** New block in body_surface_canvas.cpp immediately after the BL-085 home-presence block, gated on `state.overlay == overlay_mode::corporation`. Groups the active body's `tile_to_corp` tiles by owner (skipping the player), computes each corp's centroid, picks the HQ = nearest holding to the centroid, and draws a reach ring (radius = max HQ-to-holding distance + hex_size * 2.5, in the corp identity colour at ~59% alpha) plus an `icons::hq` star, cylinder-seam-wrapped like the BL-085 block.\n\n**Why skip the player.** The always-on BL-085 home ring/HQ star already IS the player's border; drawing the reach layer for the player too would stack two rings + two identical HQ stars. Per LENSES.md the Corporation lens 'extends the identity language to rivals' - so the reach layer covers rivals and the player keeps its home ring.\n\n**Verification.** `scripts/verify/corporate_reach.lua` (wide multi-corp view + player-HQ frame). Static cold review PASSED (compiles-by-inspection, standing invariants, geometry). NOTE: the full build + visual-verify could NOT be run in-session - the SDL3 FetchContent download is blocked by egress policy (403), and CI (build.yml) does not run the visual-verify tier (deferred, BL-057). The change compiles by inspection and CI build.yml will confirm the compile; the rendered result needs an eyeball on a machine that can build.\n\n**Follow-ups fold back into BL-182:** cost-field vs fixed radius for the range, what the border gates, corp-vs-nation / corp-vs-corp overlap, per-body vs global HQs, discovery interaction, advancement curve."
     }
   ]
 }
