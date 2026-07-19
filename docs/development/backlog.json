@@ -3514,6 +3514,82 @@
       "authority_doc": "docs/ui/LENSES.md",
       "summary": "The in-scope, render-only first slice of BL-182: under the Corporation lens, each RIVAL corporation on the active body draws an HQ-projected border - a reach ring centred on its HQ (the holding nearest its holdings centroid) plus an hq star, in the corp's identity colour, radius = holdings extent + a fixed projected range. Extends the always-on player-only home ring/HQ star (BL-085) to rivals so corporations read as having borders too. The player's own border stays the BL-085 home ring (excluded here to avoid a double-draw). Gates nothing, mutates no state - the gameplay mechanic stays deferred in BL-182.",
       "design": "**Slice, not the mechanic.** This ships only the *legibility* half of BL-182 (which stays parked for the full gameplay mechanic). Render-only; no operate-gating, no multi-HQ, no tall/wide, no law/tech levers.\n\n**Implementation.** New block in body_surface_canvas.cpp immediately after the BL-085 home-presence block, gated on `state.overlay == overlay_mode::corporation`. Groups the active body's `tile_to_corp` tiles by owner (skipping the player), computes each corp's centroid, picks the HQ = nearest holding to the centroid, and draws a reach ring (radius = max HQ-to-holding distance + hex_size * 2.5, in the corp identity colour at ~59% alpha) plus an `icons::hq` star, cylinder-seam-wrapped like the BL-085 block.\n\n**Why skip the player.** The always-on BL-085 home ring/HQ star already IS the player's border; drawing the reach layer for the player too would stack two rings + two identical HQ stars. Per LENSES.md the Corporation lens 'extends the identity language to rivals' - so the reach layer covers rivals and the player keeps its home ring.\n\n**Verification.** `scripts/verify/corporate_reach.lua` (wide multi-corp view + player-HQ frame). Static cold review PASSED (compiles-by-inspection, standing invariants, geometry). NOTE: the full build + visual-verify could NOT be run in-session - the SDL3 FetchContent download is blocked by egress policy (403), and CI (build.yml) does not run the visual-verify tier (deferred, BL-057). The change compiles by inspection and CI build.yml will confirm the compile; the rendered result needs an eyeball on a machine that can build.\n\n**Follow-ups fold back into BL-182:** cost-field vs fixed radius for the range, what the border gates, corp-vs-nation / corp-vs-corp overlap, per-body vs global HQs, discovery interaction, advancement curve."
+    },
+    {
+      "id": "BL-184",
+      "short_name": "ROAD_TIER_LEGEND",
+      "category": "Canvas",
+      "title": "Road-tier legend — teach the Track/Road/Highway read on the Planetary canvas",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "C",
+      "difficulty": 2,
+      "version_goal": "v0.1.1",
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-19",
+      "files": [
+        "src/ui/overlay.cpp",
+        "src/ui/body_surface_canvas.cpp",
+        "src/ui/icons.hpp",
+        "src/ui/icons.cpp",
+        "docs/ui/PLANETARY.md"
+      ],
+      "authority_doc": "docs/ui/PLANETARY.md",
+      "summary": "Filed 2026-07-19 (design session, Ben) from the deferral explicitly noted at the BL-172 road-tier landing (DEVLOG 2026-07-11): the always-on road layer encodes Track/Road/Highway by thickness + brightness only (SUPPLY.md's three-tier ladder), with no legend or key anywhere in the UI, so the distinction is illegible to a new player. Deferred at landing to avoid cluttering the lens-driven strip; captured now as its own item.",
+      "design": "**Problem.** `body_surface_canvas.cpp`'s always-on road-edge pass renders three tiers (Track/Road/Highway = `road_level` 1/2/3) purely by line weight and brightness (thin+dim to thick+bright, per SUPPLY.md's ladder). There is no legend anywhere naming which is which, and roads are the only always-on canvas layer with a visual code and no key.\n\n**Why it isn't a trivial drop-in.** Roads are deliberately NOT lens-gated - they render always-on like terrain (Ben's call at BL-147 landing), which is exactly why they were left out of the per-lens legend drawer (BL-164's fold-out legend is keyed to `overlay_mode`, so it only shows when a lens is active). Giving roads a legend means picking a home that doesn't imply 'roads are a lens.'\n\n**Options (Ben's call):**\n1. **Persistent chip** near the minimap/lens strip, always visible regardless of active lens - three swatches + tier name. Simplest to discover, but adds permanent chrome to an already dense corner (the same crowding concern that deferred this at BL-147/172 landing).\n2. **Contextual read** in the Selection panel / hover-card when a road tile is hovered or selected - zero permanent chrome cost, consistent with how the Tile Ledger and hover cards already surface per-tile detail (SELECTION.md's shared entity content builders).\n3. **One-time teach** - a dismissible callout the first time the player places or reveals a road, then never again. Teaches once, costs nothing after.\n\n**Recommendation.** Option 2 (contextual, via the shared Selection/hover-card builders) reuses existing infrastructure and adds no standing chrome - but Ben owns UI proportions and the call between 'always discoverable' vs 'discovered once and remembered' is his to make.\n\n**Determinism/save.** Pure UI/render - no save-format or world-state change.\n\n**Authority.** PLANETARY.md's road-render section already documents the tier ladder's visual encoding; this item adds the legend/teaching mechanism there once landed."
+    },
+    {
+      "id": "BL-185",
+      "short_name": "ROAD_FOG_DIMMING",
+      "category": "Canvas",
+      "title": "Road ↔ commercial-reach fog interaction — should roads dim with tile vision?",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "C",
+      "difficulty": 2,
+      "version_goal": "v0.1.1",
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-19",
+      "files": [
+        "src/ui/body_surface_canvas.cpp",
+        "docs/ui/DISCOVERY.md"
+      ],
+      "authority_doc": "docs/ui/DISCOVERY.md",
+      "summary": "Filed 2026-07-19 (design session, Ben) from the deferral explicitly noted at the BL-147 road-render landing (DEVLOG 2026-07-10): roads draw full-bright on any survey-revealed tile, including ones the intra-body commercial-reach fog (BL-151/152) would otherwise dim under its analytic wash. Never resolved whether that's a bug or correct - the fog's own semantics (activity, not terrain) cut both ways.",
+      "design": "**Current behaviour.** The Planetary canvas's intra-body reach fog (DISCOVERY.md) derives a per-tile `vision` scalar each frame (1 in the permanent layers - own buildings, the corp-centre-to-market corridor - else the moving convoy beam's intensity); the fog wash applies `(1 - vision)` **over the lens fill**, so a fogged tile's analytic read dims with it. The road-edge pass in `body_surface_canvas.cpp` draws independently of that wash, so a road on a `vision ≈ 0` tile still renders at full brightness - identical treatment to a road on a tile the player actively operates.\n\n**Is this actually wrong?** DISCOVERY.md is explicit that 'Survey owns the unrevealed tiles' and the reach fog's semantics are deliberately 'commercial reach, not unknown terrain' (Ben's call at BL-151 landing) - the home planet is the player's own soil, fog means *where your logistics operate*, not *where the land is unmapped*. A road is arguably physical infrastructure like the tile hex itself (visible once surveyed, never re-hidden), not activity knowledge - in which case full-bright-once-surveyed is correct and the DEVLOG deferral was a false alarm.\n\n**The other reading.** The reach fog's whole point is to make the player's own commercial footprint pop (BL-154: 'your trade spine is always lit'). A road you've never trafficked competes visually with the corridors you actively use; dimming untouched roads the same as the lens fill would sharpen that contrast rather than contradict the fog's intent.\n\n**Options (Ben's call):**\n1. **Leave as-is** - roads are physical terrain, not activity; close this out by adding a line to DISCOVERY.md/PLANETARY.md stating the exclusion is deliberate, so the deferral doesn't resurface as a phantom bug.\n2. **Dim roads by `(1 - vision)`** the same alpha multiply the lens fill already receives, reusing the per-tile `vision` value `body_surface_canvas.cpp` already computes - one multiply in the road draw pass, no new state.\n\n**Recommendation.** Option 2 reads as the better fit for the fog's stated design goal (your own footprint should visually outrank infrastructure you don't use) and is cheap (reuses existing derived `vision`, no new state) - but the physical-vs-activity ambiguity above is a genuine design call, not an implementation detail.\n\n**Determinism/save.** `vision` is already frame-derived, non-serialised VIEW state per DISCOVERY.md's stated invariant (never fed back into `world/*`) - either option is a pure render change."
+    },
+    {
+      "id": "BL-186",
+      "short_name": "LAWS_LEDGER_UI",
+      "category": "Ledger",
+      "title": "Laws ledger — the player-facing surface for enacting/repealing laws (BL-155 companion)",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "B",
+      "difficulty": 4,
+      "version_goal": "v0.1.2",
+      "parked": false,
+      "requires": [
+        "BL-155"
+      ],
+      "blocked_on": [],
+      "written": "2026-07-19",
+      "files": [
+        "src/ui/laws_ledger.hpp",
+        "src/ui/laws_ledger.cpp",
+        "src/ui/balance_ledger.cpp",
+        "src/ui/nav_pane.cpp",
+        "src/ui/ui_state.hpp",
+        "src/core/app.cpp",
+        "docs/ui/LAYOUT.md"
+      ],
+      "authority_doc": "docs/ui/LAYOUT.md",
+      "summary": "Filed 2026-07-19 (design session, Ben) as the UI companion BL-155 explicitly excludes from its own scope ('no UI... committed - the point is to position the model'). BL-155's design is unusually settled for design-owed - a four-family effect taxonomy and ten named laws already enumerated - but nothing yet names how the player actually SEES or ENACTS a law. Also the natural home for finally wiring the stubbed Tax/Wages tier selectors BL-171 already drew into the Budget ledger.",
+      "design": "**Gap.** BL-155 (v0.1.2, Laws & policy surface) settles the law object shape - `condition_set` + polymorphic `effect`, four effect families (margin modifiers, quantity clamps, cost adders, gates), ten named laws, and the determinism seam (`run_economy_step` resolves all active laws' condition-sets at one fixed point) - but is explicitly data-model + stub only, no UI. This item is the missing player-facing half: a place to browse the law list, read what's active, and enact/repeal.\n\n**Shape (matches the existing ledger family).** A new ledger window (`draw_laws_ledger`, alongside `balance_ledger.cpp` / the Market and Construction ledgers), nav-rail toggle per the standing Toggle rule (io-standing-rules.md - re-clicking the active nav icon closes it, doesn't collapse to an overview). Lists the ten BL-155 laws grouped by effect family, each row showing: name, one-line effect description, active/inactive state, and - for conditional laws - the `condition_set` gate in plain language (e.g. a wartime tax reads 'active only during war'). An enact/repeal control per law, gated on the player being able to afford/qualify (exact gate is BL-155's to define; this item only renders + dispatches the toggle).\n\n**The BL-171 reconciliation (the open design question).** The Budget ledger already carries stubbed **Tax** and **Wages** tier selectors (`ui_state.budget_tax_tier` / `budget_wage_tier`, drawn, no economic effect) built ahead of BL-155 landing. Two of BL-155's ten laws - **extraction tax** and **labour-contract floor** - are exactly what those stubs anticipate. Open question for Ben: do the Budget-ledger tier selectors become thin views into this Laws ledger's state (one law, two surfaces), or do they stay as their own simplified fast-path controls with the full Laws ledger reserved for the other eight (and these two shown there read-only)? Either is workable; picking one avoids two ledgers quietly drifting out of sync on the same underlying law.\n\n**Determinism.** Read-only + a single enact/repeal write per player action, landing on the same tick boundary BL-155's condition-set resolution already uses (laws read the *previous* tick's resolved values, never mid-tick mutating ones per BL-155's determinism seam) - this item adds no new determinism risk beyond what BL-155 itself introduces.\n\n**Sequencing.** Hard-blocked on **BL-155** landing its data model and enforcement seam first - this item is the view over that model, not a parallel track. Natural to promote as the second half of the same v0.1.2 batch rather than a fully separate session."
     }
   ]
 }
