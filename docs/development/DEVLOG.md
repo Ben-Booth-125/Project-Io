@@ -6,6 +6,32 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — BL-156 tech system early design resolved (2026-07-19, mobile)
+
+**Context.** Doc-only mobile session. Of the four v0.3.0-feeding design-owed items (BL-087, BL-155,
+BL-156, BL-158), BL-156 had the smallest remaining scope — its shared condition-set predicate was
+already settled 2026-07-11; two narrow questions were left: the **capstone-vs-ordinary rule** and
+**how a tech unlock threads into content availability**.
+
+**Resolved (design, backlog.json only — no code).**
+- **Capstone rule.** Structural: a tech is a capstone iff it's the id a `tech_quest.capstone` field
+  points to, and only a capstone's `payoff` may be `gate`. Economic: only a capstone, or a tech
+  flagged `marquee` (new bool, not a `kind` value), may gate on `market`/`surplus`/count-thresholded
+  `structure` — concentrating BL-087's flagged stall risk at a small, deliberate node set instead of
+  leaking through the whole tree.
+- **Unlock threading**, walked against the real registries rather than invented abstractly:
+  `payoff: recipe` → a new `recipe.required_tech` field (recipe_registry.hpp), filtered at
+  `recipe_count`/`recipe_at`; `building`/`resource` → compiled enums, so these stay code-level
+  (static `enum → tech_id` map at the placement UI, same shape as `active_recipe_index` gating);
+  `efficiency` → a tech-keyed bonus on the relevant `building_economics` field, resolved like a
+  permanent BL-155 law; `enabling` → a plain completed-tech-set membership check, no dedicated
+  field; `gate` → capstones only, threads to `tech_quest.opens` (already modelled).
+
+**Status.** BL-156 → `designed` (✓), all four originally open questions closed. Itemisation (the
+actual ~25-tech Era 1 quest map) remains BL-087's post-prototype job, unaffected by this session.
+
+---
+
 ## Session — Corporate borders: BL-182 recorded + visual reach slice (BL-183) (2026-07-18)
 
 **Context.** Ben: "corporations should have borders too, with HQ(s) that extend and provide some
