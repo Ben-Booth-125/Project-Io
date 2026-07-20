@@ -125,22 +125,32 @@ Final verification pass against the done-definition below, then the Cut.
 no committed systems yet.* Past the cut, the v0.1.x band is where the game's next dimensions get
 their first shape: enough design and stubbing that the v0.2.0 refocus and the v0.3.0 political
 layer land on positioned ground rather than a greenfield. v0.1.1 is a concrete build minor; the
-rest of the band (v0.1.2–v0.1.5) is deliberately design-forward — each now has a placeholder
-`design-owed` item that firms into real design as it is reached.
+rest of the band (v0.1.2–v0.1.6) is deliberately design-forward — each now has a placeholder
+`design-owed` item (v0.1.2's procedural-generation revisit filed with research direction already
+in hand, BL-187) that firms into real design as it is reached.
 
 - **v0.1.1 — Roads & planetary logistics.** BL-146–149: a generated per-nation road lattice with
   A\* cost integration, planetary road rendering + player-placeable infrastructure, cities as free
   logistics hubs (agglomeration discount), and the inland logistics-hub building. The one concrete
-  build minor; it also retires the "roads are an invisible tile attribute" concern.
-- **v0.1.2 — Laws** (**BL-155**). First pass at the law / policy surface — what a law *is* as a
-  data object and how it gates or modifies economic (and later political) behaviour. Design + stub.
-- **v0.1.3 — Techs** (**BL-156**). Early design toward the tech / quest system — the condition-set
+  build minor; it also retires the "roads are an invisible tile attribute" concern. *(Closed
+  2026-07-20 with the BL-184/185 legibility follow-ons — road-tier legend + reach-fog dimming.)*
+- **v0.1.2 — Procedural generation revisit** (**BL-187**, filed 2026-07-20). A deliberate look back
+  at the world-generation pipeline (`GENERATION_STRATEGY.md`'s tile/nation/corporation passes),
+  taking design inspiration from *Shadow Empire*'s layered-causality approach — geology/tectonics
+  driving climate, climate driving terrain and resources, and only then an emergent political-history
+  layer on top — rather than each pass authoring its surface output directly. Design-forward: scope
+  which layers (if any) fit the prototype budget before promoting implementation. Inserted ahead of
+  the Laws/Techs/Military/Politics band below, which each shift one minor later.
+- **v0.1.3 — Laws** (**BL-155**, **BL-186**). First pass at the law / policy surface — what a law
+  *is* as a data object and how it gates or modifies economic (and later political) behaviour, plus
+  the Laws ledger player-facing surface. Design + stub.
+- **v0.1.4 — Techs** (**BL-156**). Early design toward the tech / quest system — the condition-set
   gate model (gate = quest = tech) that BL-087 reframed and the v0.3.0 filter system formalises.
   Design only; precursor to BL-087.
-- **v0.1.4 — Military systems** (**BL-157**). The Conflict dimension's first data-model footing —
+- **v0.1.5 — Military systems** (**BL-157**). The Conflict dimension's first data-model footing —
   units, forces, and the seams they need in the world model. Stub, not mechanics (Conflict proper
   stays post-cut scope).
-- **v0.1.5 — Politics (stub)** (**BL-158**). A data-model stub only — enough political layer for
+- **v0.1.6 — Politics (stub)** (**BL-158**). A data-model stub only — enough political layer for
   the v0.2.0 nation actor to have something to own, deferring the working system to v0.3.0. The
   band's last minor before the refocus.
 
