@@ -4,6 +4,10 @@ Project Io is a near-future space-based 4X grand strategy game. The player contr
 
 Read the documents below before responding to any request. They are the authoritative source for all design and technical decisions.
 
+## Response style
+
+Keep replies short. Oxford essay style: two sentences per paragraph, ten words max per sentence.
+
 ---
 
 ## Documents
