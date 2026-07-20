@@ -8,6 +8,7 @@
 
 #include "world/building_profit.hpp" // per-building profitability estimate (BL-074)
 #include "world/economy_system.hpp" // economy_report (workforce cap, BL-069)
+#include "world/logistics.hpp" // road_traversal_multiplier (BL-184 tier read)
 #include "world/market_clearing.hpp"
 #include "world/placement_rules.hpp" // buildable-type validity for the build ledger (BL-162)
 #include "world/survey_system.hpp"
@@ -592,6 +593,14 @@ void draw_tile_selection(const world& w, ui_state& ui)
         std::snprintf(buf, sizeof buf, "[%d, %d]", tile.grid_x, tile.grid_y);
         centred(p, mx, buf, IM_COL32(200, 200, 200, 255));
         ImGui::Dummy({content_w, cap_h});
+    }
+    // BL-184: contextual road-tier read — name the tier + its traversal discount
+    // when the selected tile carries a road (no persistent legend chrome).
+    if (tile.road_level > 0)
+    {
+        const float mult = road_traversal_multiplier(tile.road_level);
+        ImGui::Text("%s \xe2\x80\x94 %.0f%% traversal cost",
+                    road_tier_name(tile.road_level), static_cast<double>(mult) * 100.0);
     }
     ImGui::Spacing();
 

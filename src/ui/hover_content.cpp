@@ -3,6 +3,7 @@
 #include "icons.hpp"
 #include "presentation.hpp"
 #include "world/components.hpp"
+#include "world/logistics.hpp" // road_tier_name / road_traversal_multiplier (BL-184)
 #include "world/workforce.hpp"
 
 #include <imgui.h>
@@ -255,6 +256,16 @@ void draw_hover_content(const world& w, const ui_state& ui, entity_id eid)
             hover_tile_population(w, tile);
         else
             hover_tile_default(tile);
+
+        // BL-184: contextual road-tier read — name the tier + its traversal discount
+        // whenever the hovered tile carries one, regardless of active lens.
+        if (tile.road_level > 0)
+        {
+            ImGui::Spacing();
+            const float mult = road_traversal_multiplier(tile.road_level);
+            ImGui::Text("%s \xe2\x80\x94 %.0f%% traversal cost",
+                        road_tier_name(tile.road_level), static_cast<double>(mult) * 100.0);
+        }
         return;
     }
 

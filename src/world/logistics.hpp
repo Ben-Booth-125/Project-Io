@@ -33,6 +33,9 @@ float landform_logistics_cost(terrain_landform lf);
 /// core (roads arrive with BL-146); wired here so the follow-on needs no A* change.
 float road_traversal_multiplier(std::uint8_t road_level);
 
+/// Display name for a road tier (BL-184): 1=Track, 2=Road, 3=Highway; "" for 0 (no road).
+const char* road_tier_name(std::uint8_t road_level);
+
 /// Per-body raster index (grid_y*grid_width + grid_x -> tile entity, null_entity for an
 /// absent cell), built and cached in world.body_tile_index on first use. Deterministic —
 /// a pure function of the body's tiles, independent of tiles-map iteration order. Returns

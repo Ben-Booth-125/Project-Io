@@ -6,6 +6,45 @@ Entries that correspond to a tagged snapshot in `backups/` carry an explicit **v
 
 ---
 
+## Session — v0.1.1 close-out: road-tier legend + reach-fog dimming (BL-184/185) (2026-07-20)
+
+**Context.** New PC, session resumed clean (REFINED.md empty, working tree clean). Picked the two
+`designed` items left in v0.1.1 — both filed 2026-07-19 from deferrals noted at the BL-172/BL-147
+road landings — as a small Batch Delivery: same theme (roads), same file (`body_surface_canvas.cpp`),
+d2 each.
+
+**Landed.**
+- **BL-184 — contextual road-tier read.** Settled option (Ben, 2026-07-19): no persistent legend
+  chip. A new shared `road_tier_name(uint8_t)` (`world/logistics.{hpp,cpp}`, alongside the existing
+  `road_traversal_multiplier`) names the tier; consumed by the hover tooltip (`ui/hover_content.cpp`
+  tile dispatch) and the tile Selection panel (`ui/selection_panel.cpp draw_tile_selection`, below the
+  `[x, y]` caption strip) whenever the read tile carries a road, under any lens.
+- **BL-185 — roads dim with the reach fog.** Settled option (Ben, 2026-07-19): dim by vision. The
+  per-tile `vision` scalar (`body_surface_canvas.cpp`, previously scoped inside the fog-wash
+  `if (revealed)` block) is hoisted to `tile_vision` in the enclosing tile-draw scope so the road-edge
+  pass — which runs later in the same wrap-copy loop — can read it; the road tier colour's alpha is
+  scaled by the same `(1 − 0.5·(1−vision))` factor the lens fill lerp already applies, so an untrafficked
+  road now dims like the fill under it instead of drawing independently at full brightness.
+- **Docs.** `PLANETARY.md` road-network row + hover-tooltip row updated; `DISCOVERY.md` gains a line
+  closing the physical-vs-activity ambiguity the BL-147 deferral left open, in favour of "your own
+  footprint outranks infrastructure you don't use." Requirement group `road-tier-legend-fog-batch`
+  appended (`req/requirements.json`).
+
+**Verification.** Static cold review (`verifier-review`, code-reviewer agent over the integrated diff)
+**PASSED** — cross-symbol consistency (`road_tier_name`/`road_traversal_multiplier` declarations vs.
+consumers), the `tile_vision` scope hoist, and the `IM_COL32_*` shift-macro usage in the new
+alpha-multiply block all checked out; no world/*, save-format, or Lua-binding surface touched.
+**Could not build or visual-verify in-session** — same egress block hit at the BL-183 landing two
+sessions ago (`sdl3-populate` FetchContent 403s on this box too, confirmed by a fresh `cmake -S/-B`
+attempt). Requirements R1/R2 (visual) left **pending** for a build-capable machine; R3 (the static
+gate) is the one this session could actually clear.
+
+**Open.** The SDL3 egress block (BL-057, cross-platform build) is now confirmed on *two*
+independent sandboxes across two sessions — worth flagging as a recurring environment gap rather than
+a one-off, if it keeps blocking every remote session's ability to compile or visual-verify.
+
+---
+
 ## Session — Corporate borders: BL-182 recorded + visual reach slice (BL-183) (2026-07-18)
 
 **Context.** Ben: "corporations should have borders too, with HQ(s) that extend and provide some

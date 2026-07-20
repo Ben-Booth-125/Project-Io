@@ -1486,18 +1486,19 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // fog wash scales with (1 − vision), so the surface reads mostly unknown, lit
         // along the player's corridors, with a convoy's beam gliding and trailing over
         // them. Survey mask owns unrevealed tiles, so this skips them.
+        float tile_vision = 1.0f;
         if (revealed)
         {
-            float vision = (state.permanent_vision.find(id) != state.permanent_vision.end())
+            tile_vision = (state.permanent_vision.find(id) != state.permanent_vision.end())
                                ? 1.0f : 0.0f;
-            if (vision < 1.0f)
+            if (tile_vision < 1.0f)
             {
                 const auto bi = beam_intensity.find(id);
                 if (bi != beam_intensity.end())
-                    vision = std::max(vision, bi->second);
+                    tile_vision = std::max(tile_vision, bi->second);
             }
-            if (vision < 1.0f)
-                fill = lerp_colour(fill, IM_COL32(8, 10, 16, 255), 0.5f * (1.0f - vision));
+            if (tile_vision < 1.0f)
+                fill = lerp_colour(fill, IM_COL32(8, 10, 16, 255), 0.5f * (1.0f - tile_vision));
         }
 
         // Range of wrap copies that land inside the canvas horizontally.
@@ -1543,6 +1544,18 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     case 1:  col = IM_COL32(175, 158, 120, 205); thick = std::max(1.2f, draw_r * 0.12f); break;
                     case 2:  col = IM_COL32(205, 188, 140, 225); thick = std::max(1.8f, draw_r * 0.18f); break;
                     default: col = IM_COL32(225, 205, 150, 238); thick = std::max(2.4f, draw_r * 0.24f); break;
+                }
+                // BL-185: roads participate in the reach-fog wash the same way the lens
+                // fill does — the player's own footprint outranks infrastructure they
+                // don't use. Same (1 − vision) alpha multiply as the fill lerp above.
+                if (tile_vision < 1.0f)
+                {
+                    const float dim = 1.0f - 0.5f * (1.0f - tile_vision);
+                    const int r = (col >> IM_COL32_R_SHIFT) & 0xFF;
+                    const int g = (col >> IM_COL32_G_SHIFT) & 0xFF;
+                    const int b = (col >> IM_COL32_B_SHIFT) & 0xFF;
+                    const int a = static_cast<int>(((col >> IM_COL32_A_SHIFT) & 0xFF) * dim);
+                    col = IM_COL32(r, g, b, a);
                 }
 
                 static const int card_off[4][2] = {{+1, 0}, {-1, 0}, {0, +1}, {0, -1}};

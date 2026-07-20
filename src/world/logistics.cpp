@@ -62,6 +62,17 @@ float road_traversal_multiplier(std::uint8_t road_level)
     return 1.0f / (1.0f + 0.5f * static_cast<float>(road_level));
 }
 
+const char* road_tier_name(std::uint8_t road_level)
+{
+    switch (road_level)
+    {
+        case 1:  return "Track";
+        case 2:  return "Road";
+        case 3:  return "Highway";
+        default: return "";
+    }
+}
+
 const std::vector<entity_id>& body_tile_grid(world& w, entity_id body)
 {
     const auto it = w.body_tile_index.find(body);

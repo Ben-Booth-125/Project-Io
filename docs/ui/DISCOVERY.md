@@ -175,6 +175,13 @@ for the active body — never serialised, no feedback into `world/*`). A tile's 
 permanent layers, else the moving beam's intensity; the fog wash scales with `1 − vision`, applied over
 the lens fill so a fogged region's analytic read dims with it. Survey owns the *unrevealed* tiles.
 
+- **Roads participate in the wash (BL-185, settled 2026-07-19):** the road-edge pass
+  (`body_surface_canvas.cpp`) applies the same `1 − vision` alpha scale to a roaded tile's segment
+  colour that the lens fill receives — a road is physical infrastructure, but the reach fog's point
+  is to make the player's own commercial footprint pop, so a road the player has never trafficked
+  reads dimmer than one along an active corridor. This resolves the ambiguity the BL-147 landing
+  deferred: infrastructure the player doesn't use is outranked by the footprint they do.
+
 - **Permanent building pockets (BL-151/154):** a radius-2 flood around each of the player's own
   building tiles — your installations are always visible.
 - **Permanent corp-centre → market corridors (BL-154):** a **3-wide** corridor (the A* path flooded
