@@ -37,6 +37,9 @@ const char* resource_name(resource_type r);
 /// @return  Null-terminated display name.
 const char* composition_name(terrain_composition c);
 
+// BL-184: display name for a tile's road_level (0 = none, 1..3 = Track/Road/Highway).
+const char* road_tier_name(int road_level);
+
 /// Display name for a tile's landform (e.g. "Mountain").
 ///
 /// @param l Landform to name.

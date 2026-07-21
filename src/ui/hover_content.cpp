@@ -3,6 +3,7 @@
 #include "icons.hpp"
 #include "presentation.hpp"
 #include "world/components.hpp"
+#include "world/logistics.hpp"
 #include "world/workforce.hpp"
 
 #include <imgui.h>
@@ -42,6 +43,16 @@ void hover_tile_default(const tile_component& tile)
     ImGui::TextUnformatted(composition_name(tile.composition));
     ImGui::Text("Habitability: %.0f%%",
                 static_cast<double>(tile.habitability) * 100.0);
+
+    // BL-184: name the road tier and its traversal discount, so the always-on
+    // thickness/brightness code has a teachable read.
+    if (tile.road_level > 0)
+    {
+        const float discount =
+            (1.0f - road_traversal_multiplier(tile.road_level)) * 100.0f;
+        ImGui::Text("%s (%.0f%% faster travel)", road_tier_name(tile.road_level),
+                    static_cast<double>(discount));
+    }
 }
 
 // --- BL-069: tile × population lens — quick workforce tell ----------------------

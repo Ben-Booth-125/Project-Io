@@ -88,6 +88,17 @@ const char* composition_name(terrain_composition c)
     return "?";
 }
 
+const char* road_tier_name(int road_level)
+{
+    switch (road_level)
+    {
+        case 1:  return "Track";
+        case 2:  return "Road";
+        case 3:  return "Highway";
+        default: return "None";
+    }
+}
+
 const char* landform_name(terrain_landform l)
 {
     switch (l)

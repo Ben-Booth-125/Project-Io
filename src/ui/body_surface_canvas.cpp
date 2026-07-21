@@ -1486,10 +1486,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // fog wash scales with (1 − vision), so the surface reads mostly unknown, lit
         // along the player's corridors, with a convoy's beam gliding and trailing over
         // them. Survey mask owns unrevealed tiles, so this skips them.
+        float vision = 1.0f;
         if (revealed)
         {
-            float vision = (state.permanent_vision.find(id) != state.permanent_vision.end())
-                               ? 1.0f : 0.0f;
+            vision = (state.permanent_vision.find(id) != state.permanent_vision.end())
+                         ? 1.0f : 0.0f;
             if (vision < 1.0f)
             {
                 const auto bi = beam_intensity.find(id);
@@ -1544,6 +1545,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     case 2:  col = IM_COL32(205, 188, 140, 225); thick = std::max(1.8f, draw_r * 0.18f); break;
                     default: col = IM_COL32(225, 205, 150, 238); thick = std::max(2.4f, draw_r * 0.24f); break;
                 }
+                // BL-185: dim by the same reach-fog wash the lens fill receives, so a road the
+                // player has never trafficked doesn't visually compete with an active corridor.
+                if (vision < 1.0f)
+                    col = lerp_colour(col, IM_COL32(8, 10, 16, 255), 0.5f * (1.0f - vision));
 
                 static const int card_off[4][2] = {{+1, 0}, {-1, 0}, {0, +1}, {0, -1}};
                 for (int n = 0; n < 4; ++n)
