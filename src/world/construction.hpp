@@ -45,6 +45,31 @@ construction_result construct_building(world& w, const recipe_registry& reg,
                                        building_type type, resource_type target,
                                        entity_id& out_building);
 
+/// Remove @p building from the world entirely, freeing its tile (Ben's 2026-07-22
+/// call: "how can I remove the building and build something else").
+///
+/// The inverse of `construct_building`, and distinct from the `decommissioned`
+/// flag — which idles a building in place (it stops producing and stops paying
+/// wages, but still occupies its tile and still pays material upkeep). Idling is
+/// reversible and keeps the asset; demolition destroys it.
+///
+/// No refund. The build cost was spent turning credits into an installation on a
+/// tile; removing the installation does not turn it back. A salvage return is a
+/// separate design question, not a default.
+///
+/// On success the building's `building_component` and `stockpile_component` are
+/// erased and its id is removed from the owning corporation's `assets`. Anything
+/// still holding the id (an `economy_report` row from the last tick) must resolve
+/// it through `w.buildings` and tolerate the miss — the report is regenerated on
+/// the next tick.
+///
+/// @param w        World; mutated only on success.
+/// @param corp     Corporation demolishing — must own the building.
+/// @param building Building entity to remove.
+/// @return         True on success; false if the building does not exist or
+///                 @p corp does not own it.
+bool demolish_building(world& w, entity_id corp, entity_id building);
+
 /// Attempt to place a road of tier `tier` on `tile` for corporation `corp` (BL-147 core, BL-172
 /// tier ladder). A road is a per-tile mutation, not a building: on success it raises
 /// `tile_component.road_level` to `tier` (1=Track, 2=Road, 3=Highway), which lowers that tile's

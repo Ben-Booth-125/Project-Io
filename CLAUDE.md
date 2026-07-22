@@ -4,6 +4,11 @@ Project Io is a near-future space-based 4X grand strategy game. The player contr
 
 Read the documents below before responding to any request. They are the authoritative source for all design and technical decisions.
 
+## Response style
+
+Keep responses terse: **max 2 sentences per paragraph**, **max 15 words per clause**. Break longer
+thoughts into more (short) paragraphs rather than longer ones.
+
 ---
 
 ## Documents
@@ -30,6 +35,11 @@ Testing framework (Catch2), naming conventions, documentation standards, the per
 Running session log — chronological record of what was built each session and
 in-session decisions. Consult when asked about prior work, open items, or why
 a specific implementation choice was made.
+
+**`docs/development/SPRINTS.md`**
+Weekly goal + retro rhythm layered over the backlog — a goal stated at the week's start, a retro
+comparing what landed against it, including the DEVLOG Runtime pacing signal. Feedback for Ben,
+not a new authority. Read/update when starting or closing out a week's work.
 
 **`docs/development/backlog.json`**, **`docs/development/BACKLOG.md`**, **`docs/development/REFINED.md`**, and **`docs/development/DELIVERY.md`**
 The backlog and delivery system. **`backlog.json`** is the canonical **metadata index and design
@@ -89,7 +99,10 @@ Tile classification: the two-axis terrain model (composition × landform), resou
 Population centres, scale/agglomeration mechanics, land-use trade-offs, and habitability feedback. Deferred from the prototype but designed here so the data model positions correctly. Read for questions about workforce, habitability, or population demand.
 
 **`docs/generation/GENERATION_STRATEGY.md`**
-The map of the generation layer — how the per-subject generation docs (tile / nation / corporation / ledger) relate, and the home of the **economic premise**: a saturated, earth-like base whose broad industry the Nation AI owns, with the player and major AI as **specialist** space-interested corporations. Read first for questions spanning more than one generation doc, or about why corporations start lean. Cross-cutting open items (building tiers, allied-corp/franchise origin, post-WW2 grounding) live here.
+The map of the generation layer — how the per-subject generation docs (planetology / tile / nation / corporation / ledger) relate, and the home of the **economic premise**: a saturated, earth-like base whose broad industry the Nation AI owns, with the player and major AI as **specialist** space-interested corporations. Read first for questions spanning more than one generation doc, or about why corporations start lean. Cross-cutting open items (building tiers, allied-corp/franchise origin, post-WW2 grounding) live here.
+
+**`docs/generation/PLANETOLOGY.md`**
+Design-owed authority for the body-level Planetology pass (BL-167) — generated atmosphere/chemistry and a simulated abiogenesis/evolution history, ahead of tile generation, explicitly modelled on Shadow Empire's planet generation. Framed as a first-impression pillar, not a nice-to-have. Read before designing or implementing atmosphere generation, body history, or anything that would consume a body's biosphere-richness outcome.
 
 **`docs/generation/TILE_GENERATION.md`**
 The procedural tile generation strategy and six-pass pipeline used in `hard_coded_world.cpp`. Covers solar parameters (temperature class, atmosphere class, hydrological state, geological activity), prototype body profiles, the hybrid terrain / noise-banded ocean / cluster landform approach, and deposit generation rules. Read before any work on tile generation or the terrain enum expansion.
@@ -149,6 +162,7 @@ backlog**, or **B) implement now** (smoke-test, then ask before committing).
 | **Requirements** (data + history) | `docs/development/req/requirements.json` (policy `docs/development/req/REQUIREMENTS.md`) | |
 | **Standing invariants** | `.claude/rules/io-standing-rules.md` | Always-on; the "do not" rules. |
 | What was built / why | `docs/development/DEVLOG.md` | |
+| **Weekly goal / retro** (feedback for Ben) | `docs/development/SPRINTS.md` | Not an authority — pacing signal only. |
 
 ### The Delivery lifecycle (Full mode)
 

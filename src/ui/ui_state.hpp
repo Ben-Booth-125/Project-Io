@@ -80,6 +80,13 @@ struct construction_state
     entity_id     pending_road_tile = null_entity;
     std::uint8_t  pending_road_tier = 1;
 
+    /// Pending demolition request — set by the building Selection element's Demolish
+    /// control and executed by `app::render` via `demolish_building`. Takes the same
+    /// deferred path as `pending_tile` for the same reason (UI surfaces hold only
+    /// `const world&`), and additionally because erasing from `w.buildings` while a
+    /// draw pass is iterating it would invalidate the iteration.
+    entity_id     pending_demolish = null_entity;
+
     /// Last construction outcome, set by app after executing a request — a short
     /// human string shown by the build UI ("Built.", "Can't afford it.", …).
     std::string   last_message;

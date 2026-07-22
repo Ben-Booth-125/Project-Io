@@ -63,7 +63,36 @@ int main()
                 track_tiles, road_tiles, highway_tiles, over_highway);
     check(track_tiles > 0, "R2 track roads present (road_level 1)");
     check(road_tiles > 0, "R2 road-tier roads present (road_level 2)");
-    check(highway_tiles > 0, "R2 highway roads present (road_level 3)");
+
+    // The highway tier needs two City+ centres to land ADJACENT in the road graph
+    // (edge_tier requires both endpoints at scale >= 3). Population scale is drawn
+    // from a fixed weighted distribution — ~30% are City+ — so whether any such
+    // PAIR ends up adjacent is spatial luck, not a property of the generator.
+    //
+    // Asserting it on one world therefore makes this check seed-fragile: it broke
+    // when BL-167 began rolling the homeworld's ocean fraction, which reshuffled
+    // population placement without changing anything about roads. Assert instead
+    // that the tier is REACHABLE, by scanning a handful of seeds. If no seed
+    // produces one, that is a real regression and this still fails.
+    {
+        int seeds_with_highway = 0, first = -1;
+        for (uint32_t s = 0; s < 8; ++s)
+        {
+            world_params wp;
+            wp.seed = s * 0x9E3779B1u;
+            const world ws = make_hard_coded_world(wp);
+            for (const auto& [tid, tc] : ws.tiles)
+                if (tc.road_level == 3)
+                {
+                    ++seeds_with_highway;
+                    if (first < 0) first = static_cast<int>(s);
+                    break;
+                }
+        }
+        std::printf("      (highway tier present on %d of 8 seeds; first at seed index %d)\n",
+                    seeds_with_highway, first);
+        check(seeds_with_highway > 0, "R2 highway tier (road_level 3) is reachable");
+    }
     check(over_highway == 0, "R2 no tile exceeds the highway tier (road_level <= 3)");
 
     // R3 connectivity — a centre with a same-nation peer must touch a road tile

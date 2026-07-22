@@ -12,6 +12,7 @@
 
 #include "ui/canvas_command.hpp"
 #include "ui/plot_history.hpp"
+#include "world/planetology.hpp"
 
 #include <cstdint>
 #include <deque>
@@ -69,14 +70,39 @@ private:
     void render();
 
     /// Draw the main menu — the deliberate entry point shown at launch (no world
-    /// loaded yet). Wires the "New Game" button to start_new_game() and "Quit" to
-    /// m_quit_requested. Called from render() when m_screen == menu; folded into
-    /// render()'s single capture path so the menu is golden-verifiable.
+    /// loaded yet). Wires the "New Game" button to open_new_world_wizard() and "Quit"
+    /// to m_quit_requested. Carries the seed and the world-shape knobs; the
+    /// Planetology knobs moved into the wizard, where each is decided against a chart.
+    /// Called from render() when m_screen == menu; folded into render()'s single
+    /// capture path so the menu is golden-verifiable.
     void draw_main_menu();
 
-    /// Start a fresh campaign from the menu: reset the sim clock, build the world,
-    /// load the economy, run the pre-game warm start, and switch to the in-game
-    /// screen. Everything run() used to do inline before its loop.
+    /// Draw the New World wizard (BL-167) — the surface between "New Game" and the
+    /// first frame of play. The player walks THREE rounds, each stacking the charts
+    /// and explanations of its chain stages and then taking that round's
+    /// preferences. The charts come from a live resolve_preferences + preview_system
+    /// run, so they show the world the roll actually produced.
+    ///
+    /// NOTHING is generated here. Every frame runs the chain over the prototype body
+    /// set as a pure, throwaway preview; the world itself is built once, from the
+    /// finished preferences, when the player presses "Begin" (start_new_game). Called
+    /// from render() when m_screen == generating.
+    void draw_generation_screen();
+
+    /// Open the wizard at its first round. The menu's "New Game" button — it commits
+    /// nothing and builds nothing, it just hands the player the first decision.
+    void open_new_world_wizard();
+
+    /// Resolve the pending preferences against the seed, then re-run the Planetology
+    /// chain over the prototype body set into m_wiz_preview (and m_wiz_undrawn, the
+    /// same world with the drawdown dial at zero — the Spend chart's "before"
+    /// reference). Called by the wizard whenever a preference or a reroll moves;
+    /// pure, and cheap enough to call freely.
+    void refresh_wizard_preview();
+
+    /// Actually start the campaign, from the params the wizard settled: rebase the
+    /// sim clock, build the world, load the economy, run the pre-game warm start,
+    /// and hand over to play. The wizard's "Begin" button.
     void start_new_game();
 
     /// Build the prototype world and frame the opening view. Shared by run() and
@@ -136,10 +162,18 @@ private:
     /// Re-load the UI font atlas at the size for m_settings.ui_scale_step (BL-063).
     void apply_ui_scale();
 
-    /// Which top-level screen is active. run() opens on the menu; run_verify()
-    /// jumps straight to in_game (the harness renders the live world, not the menu,
-    /// unless a script asks for it via verify.show_menu).
-    enum class app_screen { menu, in_game };
+    /// How many rounds the New World wizard walks (BL-167). Declared here rather than
+    /// beside the wizard code because the verify API — registered long before it —
+    /// clamps against the same count.
+    static constexpr int wizard_round_count = 3;
+
+    /// Which top-level screen is active. run() opens on the menu; "New Game" enters
+    /// `generating` (the New World wizard, where the player takes the three rounds of
+    /// Planetology preferences) and the wizard's "Begin" hands over to play; run_verify() jumps
+    /// straight to in_game (the harness renders the live world, not the menu, unless
+    /// a script asks for it via verify.show_menu / verify.show_generation). Only
+    /// `in_game` simulates.
+    enum class app_screen { menu, generating, in_game };
     app_screen m_screen = app_screen::menu;
     bool       m_quit_requested = false;  ///< Set by the menu's Quit button; breaks the run() loop.
 
@@ -149,8 +183,26 @@ private:
     sim_loop        m_sim_loop;
     lua_state       m_lua;
     world           m_world;
-    world_params    m_pending_world_params; ///< Edited by the New World menu; consumed by start_new_game (BL-114).
+    world_params    m_pending_world_params; ///< Edited by the New World menu and then by the wizard; consumed by start_new_game (BL-114/167).
     world_params    m_active_world_params;  ///< The descriptor the live world was built from; shown as the "seed used".
+
+    // Generation (BL-167). The report is a PRESENTATION artefact filled by
+    // setup_world; it never enters `world`, so it stays off the serialisation seam.
+    // It records the world ACTUALLY BUILT — the wizard decides against its own live
+    // preview, not against this, so nothing reads it yet; it is the planet report's input.
+    generation_report m_generation_report;   ///< Per-body Planetology results + per-stage summaries for the world that was built.
+
+    // --- New World wizard state (BL-167) ---
+    // The wizard walks THREE rounds (each covering several chain stages), recomputing
+    // a THROWAWAY preview of the whole system whenever a preference or a reroll
+    // changes. None of this touches m_world: the world is built once, on "Begin",
+    // from m_pending_world_params.
+    int  m_wiz_round = 0;    ///< Round the player is on, 0 .. wizard_round_count-1.
+    bool m_wiz_dirty = true; ///< A control moved (or the wizard just opened) — recompute the preview next frame.
+    resolved_world m_wiz_resolved{};              ///< The pending preferences resolved against the seed — the params every preview chart is drawn from, plus the reroll cost (attempts / gave_up).
+    std::vector<planetology_state> m_wiz_preview; ///< Live chain result per prototype body at the resolved params.
+    std::vector<planetology_state> m_wiz_undrawn; ///< The same run with drawdown forced to 0 — the Spend chart's "before" reference.
+
     ui_state        m_ui;
     recipe_registry m_registry;          ///< Recipes + economy constants, loaded from Lua at startup.
     tech_tree_registry m_tech_tree;      ///< BL-087 mock tech/quest tree, loaded from Lua at startup; F9 viewer only.

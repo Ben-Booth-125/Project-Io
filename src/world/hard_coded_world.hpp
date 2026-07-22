@@ -1,8 +1,11 @@
 #pragma once
 
+#include "planetology.hpp"
 #include "world.hpp"
 
 #include <cstdint>
+#include <string>
+#include <vector>
 
 /// Resource-abundance tier for a generated world. Earth-like is the ceiling: no
 /// tier exceeds the baseline (GENERATION_STRATEGY.md § The resource ceiling), so
@@ -20,6 +23,38 @@ struct world_params
     abundance_level abundance    = abundance_level::standard; ///< Deposit-density tier (standard = earth-like ceiling).
     int             nation_count = 24;                        ///< Nations on the home body (the Voronoi merge target).
     int             body_count   = 0;                         ///< Reserved — the body-count knob is PHASED to a follow-on (bodies are still hard-coded profiles).
+
+    /// What the player expressed on the New World wizard (BL-167). Preferences,
+    /// not parameters: make_hard_coded_world resolves these against the seed —
+    /// rejecting and rerolling until the homeworld clears the strict Earth-like
+    /// floor — and the resolved values land in the generation_report.
+    world_preferences preferences{};
+};
+
+/// What the generation pass recorded about each body, for the staged generation
+/// screen and the planet report.
+///
+/// This is a PRESENTATION artefact, not simulation state: it is filled during
+/// make_hard_coded_world and handed to the app, which reveals it stage by stage.
+/// It never enters the `world` struct, so it stays off the serialisation seam —
+/// the same reasoning that keeps world_params in the app (BL-114).
+struct generation_report
+{
+    struct body_entry
+    {
+        std::string       name;
+        planetology_state state;
+    };
+
+    world_preferences       preferences{}; ///< What the player asked for.
+    planetology_params      params{};      ///< What the seed actually rolled within it.
+    float                   home_orbit_au = 1.0f; ///< Derived from the star, not authored.
+    uint32_t                attempts      = 1;    ///< Viability draws consumed (reroll cost).
+    std::vector<body_entry> bodies;
+
+    /// Per-stage one-line summary of what the chain did across the whole system,
+    /// indexed by chain_stage. This is what the staged generation screen reveals.
+    std::vector<std::string> stage_lines;
 };
 
 /// Construct and return a world populated with the prototype's authored bodies.
@@ -37,5 +72,8 @@ struct world_params
 ///
 /// @param params The world descriptor — seed + generation knobs. Defaulted so the
 ///               legacy call `make_hard_coded_world()` reproduces the original world.
+/// @param report Optional out-param; when non-null, receives the per-body Planetology
+///               results and the per-stage summaries the generation screen reveals.
+///               The common path passes nullptr and pays nothing.
 /// @return A fully populated world ready to drive the simulation.
-world make_hard_coded_world(world_params params = {});
+world make_hard_coded_world(world_params params = {}, generation_report* report = nullptr);

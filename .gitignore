@@ -52,3 +52,4 @@ screenshots/
 
 # FetchContent cache lives inside build/ — covered above
 .claude/worktrees/
+tools/session/.timer_state

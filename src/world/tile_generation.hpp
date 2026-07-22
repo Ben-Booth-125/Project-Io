@@ -47,6 +47,12 @@ struct body_profile
     composition_bias    bias           = composition_bias::standard;
 };
 
+/// Forward declaration — the Planetology pass (BL-167) runs BEFORE this pipeline
+/// and hands it the body's derived history. Declared rather than included because
+/// planetology.hpp includes THIS header for body_profile; the definition is pulled
+/// in by tile_generation.cpp.
+struct planetology_state;
+
 /// Optional capture of a body's per-pass intermediate state, for analysis.
 ///
 /// Generation is deterministic, so this is reproducible on demand rather than
@@ -85,6 +91,13 @@ struct generation_record
 ///                (GENERATION_STRATEGY.md § The resource ceiling). Applied as a pure
 ///                post-multiply on the deposit array — it consumes no RNG, so a scalar
 ///                of 1.0 reproduces the unscaled surface bit-for-bit.
+/// @param pl      Optional Planetology result for this body (BL-167). When non-null it
+///                does two things: its per-resource `endowment` multiplies the generated
+///                deposits (a pure post-multiply alongside @p deposit_scalar, drawing no
+///                RNG), and a `life_stage` below `land` masks the biotic compositions out
+///                of Pass 4 — so a world whose biosphere never left the water LOOKS dead
+///                on the canvas rather than merely reading poorer in a ledger.
+///                Passing nullptr reproduces the pre-BL-167 surface bit-for-bit.
 /// @param record  Optional out-param; when non-null, receives the per-pass intermediates.
 /// @return        Tile entity IDs in raster order (index = row * gw + col).
 std::vector<entity_id> generate_body_tiles(
@@ -94,6 +107,7 @@ std::vector<entity_id> generate_body_tiles(
     const body_profile& profile,
     uint32_t seed,
     float deposit_scalar = 1.0f,
+    const planetology_state* pl = nullptr,
     generation_record* record = nullptr);
 
 /// Scan raster order and return the first @p n land (non-ocean) tile IDs. Used to
