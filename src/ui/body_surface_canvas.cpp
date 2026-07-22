@@ -100,6 +100,30 @@ ImU32 lerp_colour(ImU32 a, ImU32 b, float t)
     return IM_COL32(r, g, bl, 255);
 }
 
+/// Fill colour of a tile that carries a building — its **plate**. A built tile is
+/// swapped out of the terrain palette entirely (Ben, 2026-07-22): it fills with a
+/// desaturated wash of the owning corporation's identity colour, so ownership — the
+/// most load-bearing read on this canvas — carries at a glance and agrees with the
+/// marker/emblem convention (palette::corp_identity_colour). A building with no
+/// corporate owner gets the neutral industrial plate.
+///
+/// This is the ONE place the plate choice lives, so retuning it (flat neutral, or a
+/// building-type hue) is a single-function edit.
+ImU32 built_plate_colour(bool has_owner, ImU32 owner_colour)
+{
+    // Deep machine grey — deliberately outside the terrain hues so a built tile never
+    // reads as ground, even before the owner tint is mixed in.
+    constexpr ImU32 industrial = IM_COL32(50, 52, 60, 255);
+    return has_owner ? lerp_colour(industrial, owner_colour, 0.55f) : industrial;
+}
+
+/// Building silhouette radius as a fraction of the hex circumradius. The silhouette
+/// is now the tile's *content*, not a marker pinned on terrain, so it scales to the
+/// hex; the value leaves the lower-right corner free for the owner emblem tag and
+/// keeps the widest glyph (the square) inside the hexagon's inradius. Shared with the
+/// construction ghost so the armed preview matches what actually lands.
+constexpr float kBuiltSilhouetteScale = 0.48f;
+
 /// Shared red→yellow→green ramp for every "red to green" lens (Opportunity,
 /// Population/workforce, Production). `t` in [0, 1]: 0 = red (low), 0.5 = yellow
 /// (mid), 1 = green (high). Routing all these lenses through one helper keeps a
@@ -1349,12 +1373,30 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         const ImVec2 lc   = hex_local_centre(tile.grid_x, tile.grid_y, hex_size);
         const ImVec2 sc   = to_screen(lc);
 
-        // Fill is the tile's terrain colour, except under the Faction lens where
-        // a tile owned by a nation is tinted that nation's identity colour. The
-        // tint is a direct replacement (no blend); unclaimed tiles — absent from
-        // tile_to_nation, e.g. ocean — keep their terrain hue so the political
-        // map still reads as terrain underneath.
-        ImU32 fill = terrain_colour(tile.composition);
+        // Does this tile carry a building, and who owns it? Resolved before the fill
+        // so a built tile can start from its owner plate instead of terrain, and so
+        // the marker pass below reuses the one lookup.
+        const auto   built_it   = built_tiles.find(id);
+        const bool   built      = built_it != built_tiles.end();
+        const building_type built_type = built ? built_it->second : building_type::none;
+        const auto   corp_it    = tile_to_corp.find(id);
+        const bool   has_owner  = corp_it != tile_to_corp.end();
+        const ImU32  owner_col  = has_owner ? corp_identity(corp_it->second)
+                                            : IM_COL32(255, 255, 255, 255);
+
+        // Fill starts as the tile's terrain colour — EXCEPT on a built tile, which is
+        // swapped out wholesale for its owner plate (2026-07-22): a tile that carries a
+        // building renders AS an installation, with no terrain showing through around
+        // the glyph. Lens tints then composite over the plate exactly as they do over
+        // terrain — a lens is a mode the player chose, so suppressing it where the
+        // player's own assets sit would blind it where it matters most.
+        //
+        // Under the Faction lens a tile owned by a nation is tinted that nation's
+        // identity colour. The tint is a direct replacement (no blend); unclaimed
+        // tiles — absent from tile_to_nation, e.g. ocean — keep their terrain hue so
+        // the political map still reads as terrain underneath.
+        ImU32 fill = built ? built_plate_colour(has_owner, owner_col)
+                           : terrain_colour(tile.composition);
         if (state.overlay == overlay_mode::country)
         {
             const auto nat_it = w.tile_to_nation.find(id);
@@ -1366,9 +1408,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // with no corporate building keep their terrain hue — no nation underlay.
         else if (state.overlay == overlay_mode::corporation)
         {
-            const auto corp_it = tile_to_corp.find(id);
-            if (corp_it != tile_to_corp.end())
-                fill = corp_identity(corp_it->second);
+            if (has_owner)
+                fill = owner_col;
         }
         // Resource lens (BL-019): flat, uniform fill over the contiguous deposit of
         // the selected resource — the *shape* of the deposit, no magnitude gradient.
@@ -1436,21 +1477,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // accent: a subtle wash at the plain default plus an outline under every
         // lens (drawn in the border pass), so "these tiles are mine" reads without
         // the player having to pick the Corporation lens.
-        bool is_player_tile = false;
-        if (!tile_to_corp.empty())
-        {
-            const auto pc_it = tile_to_corp.find(id);
-            is_player_tile = (pc_it != tile_to_corp.end() && pc_it->second == w.player_entity);
-        }
+        const bool is_player_tile = has_owner && corp_it->second == w.player_entity;
         // Plain-default wash: tint the player's own tiles with the player identity
         // colour when no lens is active. Suppressed under any lens — the outline
-        // carries identity there, so the wash never fights a lens fill.
-        if (is_player_tile && state.overlay == overlay_mode::none)
+        // carries identity there, so the wash never fights a lens fill — and on a
+        // built tile, whose owner plate already IS the player's identity colour.
+        if (is_player_tile && !built && state.overlay == overlay_mode::none)
             fill = lerp_colour(fill, corp_identity(w.player_entity), 0.30f);
 
-        const auto   built_it  = built_tiles.find(id);
-        const bool   built     = built_it != built_tiles.end();
-        const building_type built_type = built ? built_it->second : building_type::none;
         const bool   selected  = (id == state.selected_entity);
 
         // Placement-suitability overlay (BL-010): active only in construction mode.
@@ -1657,35 +1691,43 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
             if (built)
             {
-                const float mr = std::max(2.0f, draw_r * 0.22f);
+                // `mr` is the legacy marker radius, kept solely as the hit-zone scale
+                // below so click routing is unchanged by the silhouette resize.
+                const float mr    = std::max(2.0f, draw_r * 0.22f);
+                // The silhouette is the tile's content now, so it scales to the hex.
+                const float sil_r = std::max(3.0f, draw_r * kBuiltSilhouetteScale);
 
-                // Building markers carry their owning corporation's colour (the
-                // player's corp gets faction slot 0). Always on, independent of
-                // the lens. Tiles with no corporate owner stay white.
-                ImU32 marker_col = IM_COL32(255, 255, 255, 255);
-                const auto corp_it = tile_to_corp.find(id);
-                if (corp_it != tile_to_corp.end())
-                    marker_col = corp_identity(corp_it->second);
+                // The structure reads PALE against its own (dark, owner-tinted) plate,
+                // and still reads when a saturated lens fill is composited over that
+                // plate. Lightening toward white keeps the owner hue, so identity
+                // survives; an unowned tile's owner_col is already white, so it stays
+                // white through the same blend.
+                const ImU32 marker_col =
+                    lerp_colour(owner_col, IM_COL32(255, 255, 255, 255), 0.5f);
 
                 // The Workforce (Population lens) and Opportunity lenses replace the
                 // building silhouette with the per-tile value mark drawn below
                 // (BL-135) — the mark reads the tile's rank, not its installation.
                 if (state.overlay != overlay_mode::population &&
                     state.overlay != overlay_mode::opportunity)
-                    icons::building(dl, {cx, cy}, mr, built_type, marker_col);
+                    icons::building(dl, {cx, cy}, sil_r, built_type, marker_col);
 
-                // Owner-identity tag (BL-090): a small corp emblem tucked at the
-                // building glyph's lower-right, for BOTH player and rival buildings —
+                // Owner-identity tag (BL-090): a small corp emblem tucked into the
+                // hex's lower-right corner, for BOTH player and rival buildings —
                 // the owning corp is public under the BL-068 visibility model, so this
                 // adds no leak. Shape + colour route through the shared palette source
                 // of truth, so the tag matches the identity card and the Selection
-                // header. Kept small (~0.55x the building r) and offset so it never
-                // occludes the silhouette; does not affect hit-testing.
-                if (corp_it != tile_to_corp.end())
+                // header. Parked past the enlarged silhouette (offsets are fractions of
+                // the hex circumradius, chosen to sit inside the lower-right edges) and
+                // backed by a dark disc so it never gets lost against plate, lens fill,
+                // or glyph. Does not affect hit-testing.
+                if (has_owner)
                 {
                     const entity_id owner = corp_it->second;
-                    const float     er    = std::max(1.5f, mr * 0.55f);
-                    icons::corp_emblem(dl, {cx + mr * 0.9f, cy + mr * 0.9f}, er,
+                    const float     er    = std::max(1.5f, draw_r * 0.15f);
+                    const ImVec2    ec    { cx + draw_r * 0.56f, cy + draw_r * 0.40f };
+                    dl->AddCircleFilled(ec, er * 1.40f, IM_COL32(18, 20, 26, 225), 16);
+                    icons::corp_emblem(dl, ec, er,
                                        palette::corp_emblem_shape(owner),
                                        palette::corp_identity_colour(owner, w.player_entity));
                 }
@@ -2096,7 +2138,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         gx /= 6.0f;
         gy /= 6.0f;
 
-        const float mr = std::max(2.0f, draw_r * 0.22f);
+        const float mr = std::max(3.0f, draw_r * kBuiltSilhouetteScale);
 
         // Full world-level check (coastal / launchpad, not just terrain) so the
         // ghost is red — and the reason legible — *before* the click, not after
