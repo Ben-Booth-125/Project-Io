@@ -58,8 +58,10 @@ void cardinal_neighbours(int col, int row, int gw, int gh,
 // Pass 1 — seed placement
 // ---------------------------------------------------------------------------
 
-/// Attempt to place exactly `nation_count` seeds on non-ocean tiles, each at
-/// least `min_sep` grid distance from every previously placed seed.
+/// Attempt to place `seed_target` seeds on non-ocean tiles, each at
+/// least `min_sep` grid distance from every previously placed seed. Fewer are
+/// placed when the separation rule leaves no eligible land — the caller treats
+/// the returned size as authoritative.
 /// Habitable compositions (grassland, forest, wetland) are strongly preferred.
 /// Falls back to any land tile if the preferred pool is exhausted.
 ///
@@ -67,7 +69,7 @@ void cardinal_neighbours(int col, int row, int gw, int gh,
 std::vector<int> place_seeds(const std::vector<bool>& is_ocean,
                              const std::vector<terrain_composition>& comp,
                              int gw, int gh,
-                             int nation_count, int min_sep,
+                             int seed_target, int min_sep,
                              std::mt19937& rng)
 {
     const int total = gw * gh;
@@ -114,11 +116,11 @@ std::vector<int> place_seeds(const std::vector<bool>& is_ocean,
     }
 
     std::vector<int> seeds;
-    seeds.reserve(static_cast<std::size_t>(nation_count));
+    seeds.reserve(static_cast<std::size_t>(seed_target));
 
     for (int idx : candidates)
     {
-        if (static_cast<int>(seeds.size()) >= nation_count)
+        if (static_cast<int>(seeds.size()) >= seed_target)
             break;
 
         const int col = idx % gw;
@@ -399,11 +401,16 @@ void assign_orphan_islands(std::vector<int>& owner_map,
 // Pass 2c — light "in history" merges (BL-053)
 // ---------------------------------------------------------------------------
 
-/// Reduce the nation set from `seed_count` down to `target_count` by repeatedly
-/// absorbing the smallest nation into its largest cardinally-adjacent neighbour,
-/// then compacting owner indices into [0, final_count). This amplifies the size
-/// spread (rich-get-richer) and produces irregular, grown-looking borders — a
-/// light stand-in for "generated in history", not a historical simulation.
+/// Absorb every nation whose territory falls below `min_tiles` into its largest
+/// cardinally-adjacent neighbour — smallest first — then compact owner indices
+/// into [0, final_count). This amplifies the size spread (rich-get-richer) and
+/// produces irregular, grown-looking borders — a light stand-in for "generated
+/// in history", not a historical simulation.
+///
+/// The stopping condition is a **size floor, not a target count**: the loop ends
+/// when the smallest survivor clears `min_tiles` (or only one nation is left), so
+/// how many nations remain is a consequence of the landmass and its coastline
+/// shape rather than a pre-set number.
 ///
 /// Fully deterministic (no RNG): the smallest nation is chosen by tile count then
 /// lowest index; the absorbing neighbour by tile count then lowest index; an
@@ -412,8 +419,8 @@ void assign_orphan_islands(std::vector<int>& owner_map,
 /// tiles stay -1.
 ///
 /// @return the final nation count (distinct nations after compaction).
-int merge_small_nations(std::vector<int>& owner_map, int seed_count,
-                        int target_count, int gw, int gh)
+int merge_undersized_nations(std::vector<int>& owner_map, int seed_count,
+                             int min_tiles, int gw, int gh)
 {
     const int total = gw * gh;
 
@@ -430,7 +437,7 @@ int merge_small_nations(std::vector<int>& owner_map, int seed_count,
     for (int ni = 0; ni < seed_count; ++ni)
         if (count[static_cast<std::size_t>(ni)] > 0) { active[static_cast<std::size_t>(ni)] = true; ++distinct; }
 
-    while (distinct > target_count)
+    while (distinct > 1)
     {
         // Smallest active nation (tie: lowest index).
         int small = -1;
@@ -441,6 +448,10 @@ int merge_small_nations(std::vector<int>& owner_map, int seed_count,
                 small = ni;
         }
         if (small < 0) break;
+
+        // Size floor, not a target count: once the smallest survivor is viable,
+        // every survivor is, and the pass is done.
+        if (count[static_cast<std::size_t>(small)] >= min_tiles) break;
 
         // Largest active nation cardinally adjacent to `small` (tie: lowest index).
         int best = -1;
@@ -693,11 +704,27 @@ std::vector<entity_id> generate_nations(
             is_ocean[static_cast<std::size_t>(idx)] = true;
     }
 
+    // --- Seed budget: scaled to the habitable landmass, not taken as a target ---
+    // One seed per `land_tiles_per_seed` non-ocean tiles. A wetter or smaller body
+    // therefore starts with fewer nations than a dry, continental one — the count
+    // is downstream of the geography.
+    int land_tiles = 0;
+    for (int idx = 0; idx < total; ++idx)
+        if (!is_ocean[static_cast<std::size_t>(idx)])
+            ++land_tiles;
+
+    const int tiles_per_seed = params.land_tiles_per_seed > 0 ? params.land_tiles_per_seed : 1;
+    const int seed_target    = land_tiles > 0
+                             ? std::max(1, land_tiles / tiles_per_seed)
+                             : 0;
+    if (seed_target == 0)
+        return {};
+
     // --- Pass 1: seed placement ---
     std::mt19937 seed_rng(seed_seeds);
     const std::vector<int> seeds = place_seeds(
         is_ocean, comp, gw, gh,
-        params.nation_count, params.min_seed_separation,
+        seed_target, params.min_seed_separation,
         seed_rng);
 
     const int seed_count = static_cast<int>(seeds.size());
@@ -726,10 +753,12 @@ std::vector<entity_id> generate_nations(
     // --- Pass 2b: orphan-island assignment (claim water-disconnected land) ---
     assign_orphan_islands(owner_map, is_ocean, gw, gh);
 
-    // --- Pass 2c: light "in history" merges down to the target count (BL-053) ---
+    // --- Pass 2c: light "in history" merges — absorb anything below the size floor ---
+    // No target count: the loop stops when every survivor holds a viable territory,
+    // so the final nation count is whatever the landmass and coastline produce.
     int nation_count = seed_count;
-    if (params.merge_to > 0 && params.merge_to < seed_count)
-        nation_count = merge_small_nations(owner_map, seed_count, params.merge_to, gw, gh);
+    if (params.min_nation_tiles > 0)
+        nation_count = merge_undersized_nations(owner_map, seed_count, params.min_nation_tiles, gw, gh);
 
     // --- Allocate nation_component stubs (populated in Passes 3–5) ---
     std::vector<nation_component> nation_data(static_cast<std::size_t>(nation_count));

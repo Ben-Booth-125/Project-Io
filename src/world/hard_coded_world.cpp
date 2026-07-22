@@ -55,13 +55,6 @@ world make_hard_coded_world(world_params params)
     // bit-identical to the pre-BL-114 generation.
     const float deposit_scalar = deposit_scalar_for(params.abundance);
 
-    // Nation knob → Voronoi params. Preserve the over-seed/merge shape (BL-053 retune:
-    // 34 seeds merged to 24): merge to the requested count, pre-seed extra so the merge
-    // pass has real material to absorb (a wider gap gives stronger size variance).
-    // Clamped to a sane floor.
-    const int merge_to   = params.nation_count < 2 ? 2 : params.nation_count;
-    const int pre_seed_n = merge_to + 10;
-
     w.player_entity = w.create_entity();
 
     // -----------------------------------------------------------------------
@@ -145,18 +138,21 @@ world make_hard_coded_world(world_params params)
         },
         /*seed=*/params.seed ^ 0xE471001u, deposit_scalar);
 
-    // Kepler is the only body with a political layer in the prototype: 8–12
-    // nations placed over its land tiles. Selene/Cinder/Pallas stay unclaimed.
+    // Kepler is the only body with a political layer in the prototype; its nation
+    // count is derived, not authored. Selene/Cinder/Pallas stay unclaimed.
     // See docs/generation/NATION_GENERATION.md.
     // Population centres must be placed before generate_nations so that Pass 6
     // (substrate density) can reference them during nation territory assignment.
     generate_population_centres(w, kepler, /*seed=*/params.seed ^ 0x70701001u);
 
-    // BL-053: over-seed (34) with tighter separation, then merge down to 24 so the
-    // map reads as a varied, "grown" political layer — a few large powers, several
-    // mid, many small — rather than near-uniform Voronoi cells.
+    // The nation count is a CONSEQUENCE of Kepler's geography, not a target: seeds
+    // scale with its habitable land area and every nation below the minimum viable
+    // territory is absorbed into its largest neighbour (nation_params defaults —
+    // world/nation_generation.hpp). Only the separation is body-specific here: a
+    // tighter spacing than the default over-seeds the map, so the merge pass has
+    // real material to absorb and the layer reads as varied and "grown".
     generate_nations(w, kepler, kepler_tiles, 180, 84,
-        nation_params{ .nation_count = pre_seed_n, .min_seed_separation = 5, .merge_to = merge_to },
+        nation_params{ .min_seed_separation = 5 },
         /*seed=*/params.seed ^ 0x4A71012u);
 
     // Road network (BL-146): stamp each nation's road lattice onto tile.road_level,

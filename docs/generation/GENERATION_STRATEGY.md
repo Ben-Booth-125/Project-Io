@@ -66,8 +66,13 @@ The descriptor lives in the app, **not** the `world` struct, so it stays off the
 |---|---|---|
 | `seed` (`uint32_t`) | XOR-folded into each **existing per-body seed literal** (`params.seed ^ 0xC1D0001u`, …). Seed `0` yields the original literals, so the **default descriptor reproduces the legacy world bit-for-bit**. | cheap |
 | `abundance` (`sparse`/`lean`/`standard`) | A **deposit-density scalar** applied as a pure post-multiply in `generate_body_tiles` Pass 6 (`0.40` / `0.65` / `1.00`). Consumes no RNG, so `standard` (1.0) is bit-identical to the unscaled surface. | cheap, isolated |
-| `nation_count` (`int`) | The Voronoi **merge target** (`nation_params.merge_to`), with a few extra pre-merge seeds so the merge still has material (`pre_seed_n = merge_to + 4`). | moderate |
 | `body_count` (`int`) | **Reserved — phased to a follow-on.** The body set is still hand-authored prototype profiles (Cinder/Kepler/Selene/Pallas); a true count knob needs the generator to synthesise variable body profiles, which is out of BL-114's budget. The field exists so the descriptor is forward-shaped. | heaviest (deferred) |
+
+**There is no nation-count field.** The number of nations on the home body is a *consequence* of
+generation, not a descriptor input: seeds scale with habitable land area and every nation below a
+minimum viable territory is absorbed (`NATION_GENERATION.md` § Pass 1 / Pass 2c). The New World
+setup screen therefore has no nations slider — a world's political granularity is something the
+player discovers, not something they dial in.
 
 **Abundance honours the resource ceiling (above).** `standard` **is** the earth-like ceiling
 (1.0×); the other tiers step *down* (`lean` 0.65, `sparse` 0.40) — there is no tier above Earth.

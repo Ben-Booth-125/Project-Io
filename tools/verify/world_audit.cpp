@@ -7,6 +7,7 @@
 
 #include "world/components.hpp"
 #include "world/hard_coded_world.hpp"
+#include "world/nation_generation.hpp"
 #include "world/placement_rules.hpp"
 #include "world/world.hpp"
 
@@ -371,9 +372,13 @@ int main()
     std::printf("  BL-040 R2 rarity ordering (PGM %d < copper %d): %s\n",
                 pgm, copper, ordering_ok ? "PASS" : "FAIL");
 
-    // --- BL-053: country count + size-variance audit ---
+    // --- BL-053: size-floor + size-variance audit ---
     // Only Kepler generates nations, so w.nations is the Kepler political layer.
-    const int nation_n = static_cast<int>(w.nations.size());
+    // The nation COUNT is emergent (seeds scale with land area; every nation below
+    // the minimum viable territory is absorbed), so the load-bearing assertion is
+    // the floor itself, not a target count. The count band is a wide sanity guard.
+    const int floor_tiles = nation_params{}.min_nation_tiles;
+    const int nation_n    = static_cast<int>(w.nations.size());
     int min_tiles = -1, max_tiles = 0;
     for (const auto& [nid, nat] : w.nations)
     {
@@ -382,12 +387,17 @@ int main()
         if (t > max_tiles) max_tiles = t;
     }
     if (min_tiles < 0) min_tiles = 0;
-    const bool count_ok    = nation_n >= 20 && nation_n <= 28;
+    const bool floor_ok    = nation_n > 0 && min_tiles >= floor_tiles;
+    const bool count_ok    = nation_n >= 6 && nation_n <= 40;
     const bool variance_ok = min_tiles > 0 && max_tiles >= 3 * min_tiles;
-    std::printf("Nations: %d (min tiles %d, max tiles %d)\n", nation_n, min_tiles, max_tiles);
-    std::printf("  BL-053 R1 nation count in [20,28]: %s\n", count_ok ? "PASS" : "FAIL");
+    std::printf("Nations: %d (min tiles %d, max tiles %d; floor %d)\n",
+                nation_n, min_tiles, max_tiles, floor_tiles);
+    std::printf("  BL-053 R1 every nation clears the minimum viable territory (>= %d tiles): %s\n",
+                floor_tiles, floor_ok ? "PASS" : "FAIL");
     std::printf("  BL-053 R2 strong size variance (max >= 3x min): %s\n",
                 variance_ok ? "PASS" : "FAIL");
+    std::printf("  BL-053 R3 emergent nation count plausible ([6,40]): %s\n",
+                count_ok ? "PASS" : "FAIL");
 
     // --- BL-096: resource-carved market generation ---
     // Markets are population-anchored but resource-carved: a nation's territory is
@@ -433,6 +443,6 @@ int main()
     return (fw_frac >= 3.0f && bad == 0 && seed_bad == 0 && seam_bad == 0
             && unclaimed_land == 0 && holdings_bad == 0 && stockpile_ok
             && absent == 0 && ordering_ok
-            && count_ok && variance_ok
+            && floor_ok && variance_ok && count_ok
             && market_count_ok && cross_nation_ok && market_determinism_ok) ? 0 : 1;
 }

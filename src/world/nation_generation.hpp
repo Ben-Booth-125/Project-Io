@@ -16,23 +16,39 @@
 // ---------------------------------------------------------------------------
 
 /// Tunable parameters for a single nation generation run.
+///
+/// There is deliberately **no nation-count knob**: the number of nations is a
+/// *consequence* of the body's geography, not a target. Seeds scale with the
+/// habitable land area (`land_tiles_per_seed`) and the merge pass absorbs every
+/// nation that fails to clear a minimum viable territory (`min_nation_tiles`).
+/// A bigger, drier, or less fragmented homeworld therefore ends up with a
+/// different political map than a small, ocean-heavy one.
 struct nation_params
 {
-    /// Number of seeds to place on the body. Clamped internally to the number
-    /// of available land tiles, so it is safe to set higher than the land area.
-    /// With merge_to set, this is the pre-merge seed count (BL-053).
-    int nation_count = 10;
+    /// **Seed density** — one Pass-1 seed per this many habitable (non-ocean)
+    /// tiles on the body. The pre-merge seed count is `land_tiles / this`
+    /// (at least one on any body with land), so the seed budget grows and
+    /// shrinks with the landmass. Lower = more, tighter-packed seeds. A seed is
+    /// only a *candidate* core: most are absorbed by the merge pass below, so
+    /// this is deliberately far denser than the expected surviving count.
+    int land_tiles_per_seed = 80;
 
     /// Minimum grid-distance (Chebyshev, column-wrapped) between any two nation
-    /// seeds placed in Pass 1. Raise to spread nations further apart.
+    /// seeds placed in Pass 1. Raise to spread nations further apart. Acts as a
+    /// hard ceiling on how many seeds actually fit, whatever the density asks for.
     int min_seed_separation = 6;
 
-    /// Final nation count after the light "in history" merge pass (BL-053): the
-    /// smallest nations are absorbed into their largest adjacent neighbour until
-    /// this many remain, giving varied sizes and irregular, grown borders. 0
-    /// disables merging (nation_count nations are kept as-is). Ignored if >=
-    /// nation_count.
-    int merge_to = 0;
+    /// **Minimum viable territory**, in tiles. Pass 2c absorbs any nation holding
+    /// fewer tiles than this into its largest adjacent neighbour — smallest first
+    /// — and stops once every survivor clears the floor. The final nation count
+    /// falls out of that, rather than being counted down to a target. 0 disables
+    /// the merge pass entirely (every placed seed keeps its Voronoi cell).
+    ///
+    /// Set equal to `land_tiles_per_seed` by default, which reads as: a nation
+    /// must end up holding at least the land its own seed was budgeted. On Kepler
+    /// (~6,000 habitable tiles) that settles at roughly 17–21 nations; halve the
+    /// habitable area and the count roughly halves with it.
+    int min_nation_tiles = 80;
 };
 
 /// Generate nations over the tile map of one body and register all results in @p w.
