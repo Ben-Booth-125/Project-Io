@@ -75,13 +75,36 @@ unsettled — see BL-193.
 
 **Open items.**
 
-- **The render half of Ben's third item is not done.** Terrain still draws under the building glyph;
-  he asked for built tiles to be "fully swapped out", possibly with a per-building-type
-  "tile+building" render. Only the click-routing half landed.
-- **Nations as a consequence of generation is not started.** Ben settled the approach (size-floor
-  merge: seeds scale with habitable land, merging absorbs anything under a minimum viable
-  territory, the count falls out) but the work is untouched.
 - BL-193 carries the stacking economics.
+
+**Both remaining items then landed in parallel (two worktree agents, merged here).**
+
+- **Built-tile render swap.** A built tile now fills with an owner-coloured plate instead of its
+  terrain colour and carries a large silhouette; terrain no longer shows through around a small
+  glyph. Compositing is plate → lens tint → suitability → silhouette → emblem, so a lens the player
+  chose still reads on their own assets. BL-135's Population/Opportunity value-mark suppression
+  survives (verified). Plate colour sits behind one helper (`built_plate_colour`) so neutral or
+  type-coloured remains a one-function change.
+- **Nation count is now emergent.** `nation_params` loses `nation_count`/`merge_to` and gains
+  `land_tiles_per_seed` (seed budget = habitable land / 80) and `min_nation_tiles` (80). The merge
+  pass absorbs any nation under the floor instead of counting down to a target, preserving the
+  smallest-into-largest-neighbour mechanic that makes borders look grown. The main-menu slider is
+  gone and `world_params::nation_count` is deleted — confirmed off the serialisation seam
+  (`world_params` never enters the `world` struct; `options.cfg` persists display settings only).
+  Default world: 18 nations, 81–819 tiles. All 23 harnesses pass.
+
+**A tuning decision that needs Ben's eye.** `land_tiles_per_seed` was set to 80 partly to keep
+`road_generation_harness` passing: at 60 the default world produced 30 nations, no single nation
+held two City+ population centres, and highway tiles went 35 → 0. That is a constant chosen to
+protect a test rather than for a design reason, and it should be re-derived from what the highway
+tier is *for*. Related: highways are now genuinely seed-dependent (2 of 5 sampled seeds produce
+none), so that harness assertion is fragile by construction now that borders are emergent.
+
+**Verification-coverage gap found.** The render change PASSED every pre-existing canvas golden at
+0.02–0.09% differing: they all frame the whole body at ~4px per tile, far too small for a handful
+of tiles' entire fill to cross the 0.5% threshold. The suite was blind to how a built tile renders.
+`scripts/verify/built_tile_render.lua` closes it with four zoomed frames (plate, lens compositing,
+and the two value-mark suppression cases).
 
 ---
 

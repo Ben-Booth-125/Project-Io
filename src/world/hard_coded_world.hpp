@@ -19,10 +19,12 @@ enum class abundance_level : uint8_t { sparse, lean, standard };
 /// it lives in the app, not the `world` struct, so it stays off the serialisation seam.
 struct world_params
 {
-    uint32_t        seed         = 0;                         ///< Master seed, XOR-folded into each per-body seed. 0 reproduces the legacy world.
-    abundance_level abundance    = abundance_level::standard; ///< Deposit-density tier (standard = earth-like ceiling).
-    int             nation_count = 24;                        ///< Nations on the home body (the Voronoi merge target).
-    int             body_count   = 0;                         ///< Reserved — the body-count knob is PHASED to a follow-on (bodies are still hard-coded profiles).
+    uint32_t        seed       = 0;                         ///< Master seed, XOR-folded into each per-body seed. 0 reproduces the legacy world.
+    abundance_level abundance  = abundance_level::standard; ///< Deposit-density tier (standard = earth-like ceiling).
+    int             body_count = 0;                         ///< Reserved — the body-count knob is PHASED to a follow-on (bodies are still hard-coded profiles).
+    // Note: there is no nation-count knob. The number of nations on the home body is a
+    // *consequence* of its habitable land area and the minimum-viable-territory floor
+    // (nation_params in world/nation_generation.hpp), not a value the player pre-sets.
 
     /// What the player expressed on the New World wizard (BL-167). Preferences,
     /// not parameters: make_hard_coded_world resolves these against the seed —

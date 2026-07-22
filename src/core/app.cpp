@@ -1629,9 +1629,9 @@ void app::draw_main_menu()
         ImGui::RadioButton("Standard##ab", &ab, static_cast<int>(abundance_level::standard));
         wp.abundance = static_cast<abundance_level>(ab);
 
-        // Nations on the home body (the Voronoi merge target).
-        ImGui::SetNextItemWidth(280.0f);
-        ImGui::SliderInt("##nations", &wp.nation_count, 6, 30, "Nations: %d");
+        // No nation knob: the number of nations on the home body is a consequence of
+        // its landmass and the minimum-viable-territory floor, not a pre-set target
+        // (docs/generation/NATION_GENERATION.md § Pass 1 / Pass 2c).
 
         // Bodies — the count knob is phased to a later update; shown disabled so the
         // intent reads without implying it works yet.

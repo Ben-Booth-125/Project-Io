@@ -3719,6 +3719,141 @@
       "authority_doc": "docs/economy/PRODUCTION.md",
       "summary": "Several buildings may stand on one tile, capped by the tile's resource richness. The cap's shape landed with the building Selection element (placement_rules::stack_capacity, enforced via slot_full) but its constant is a placeholder and the economics are unsettled: stacked extraction sites currently each draw full nominal output from one shared reserve, multiplying output and depletion with no diminishing return. Settle output-sharing, the richness curve, and stack depletion.",
       "design": "**The rule Ben stated (2026-07-22).** \"Buildings can be stacked, so you can build up to a max defined by resource richness.\" A tile is not a single build slot: several extraction sites may work the same deposit, up to a ceiling the deposit itself sets. A rich seam supports a bigger operation than a thin one.\n\n**What already landed.** The building Selection element (same session) needed a \"how many more of this can I build here\" readout, so the *shape* of the rule was implemented to unblock it:\n\n- `placement_rules::stack_capacity(tile, type, target)` — extraction scales with the target's deposit richness at one site per `k_richness_per_site` (**provisional constant, 50.0**), minimum 1. Every other building type returns 1.\n- `placement_rules::buildings_on_tile(w, tile, type, target)` — current occupancy, matched per (type, target) so iron and petroleum stacks on one tile are separate stacks.\n- `can_place_in_world` now refuses a full stack with `slot_full`. Before this it had **no occupancy check at all**, so unlimited stacking was unintended behaviour rather than a design.\n- The panel readout and the placement gate call the same function, so the number shown and the number enforced cannot drift.\n\n**What is NOT settled — this item.** Three questions, none of which the placeholder answers:\n\n1. **Does a stacked site split one nominal output, or draw its own?** Today each site computes `base_rate x richness x workforce` independently (`run_extraction`), so N sites on one tile produce N times the output from one shared reserve. That is almost certainly wrong: it makes stacking a pure multiplier with no diminishing return, and the tile's `resource_remaining` drains N times as fast for no offsetting cost. The honest options are a shared nominal split across the stack, a diminishing per-site return, or a rising per-site cost.\n2. **What is the richness-to-capacity curve?** `richness / 50` is a placeholder chosen to put the 0-250 deposit band at 1-5 sites. It is not tuned and has no design rationale behind the number.\n3. **Does depletion behave differently under a stack?** The taper (`deposit_taper_ticks`) is computed per building against its own `nominal`. With several sites on one reserve each site sees the wrong taper band, and `exhausted` fires at different times for buildings sharing one deposit.\n\n**Also owed.** Non-extraction stacking is currently refused (capacity 1) purely because richness says nothing about how many refineries a tile hosts. Whether processing should stack on some other basis (land, workforce, road tier) is open.\n\n**Why it matters beyond the readout.** Stacking is the player's answer to \"I found a good tile\" — the intensive alternative to spreading out. If it is a flat multiplier it dominates every other choice; if it diminishes correctly it becomes a real trade-off against transport and land. That choice is the item."
+    },
+    {
+      "id": "BL-194",
+      "short_name": "SELECTION_CARD_FRAME",
+      "category": "UI",
+      "title": "Sticky detail card — the click-opened, canvas-confined card frame (selection's new home)",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 4,
+      "version_goal": "v0.1.1",
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-22",
+      "files": [
+        "src/ui/selection_card.hpp",
+        "src/ui/selection_card.cpp",
+        "src/ui/hover_card.hpp",
+        "src/ui/ui_state.hpp",
+        "src/ui/body_surface_canvas.cpp",
+        "src/core/app.cpp",
+        "docs/ui/TOOLTIP.md"
+      ],
+      "authority_doc": "docs/ui/TOOLTIP.md",
+      "summary": "Filed 2026-07-22 (design session, Ben). Grows the existing 200px dwell hover card into a second, larger, click-opened STICKY card that becomes the new home for the Selection element and the house style for all future tooltips. This item is the frame only: open/close, placement, dismissal, action hosting. Content move is BL-195; recursion is BL-196.",
+      "design": "**Settled 2026-07-22 (design session, Ben).** The existing 200 px hover card (`ui::draw_hover_card`, `src/ui/hover_card.hpp` — 20-frame dwell, content from `draw_hover_content`: title + ≤2 stat lines + 1 why-line) is **kept unchanged** as the lightweight glance. This item adds a **second, larger surface** beside it: a click-opened detail card that becomes the Selection element's new home (BL-195) and the house style for every future tooltip/explainer.\n\n**Trigger — click, not hover.** The big card opens on a **single click** on the canvas. Because single-click already *selects* (SELECTION.md § Click model), **selection and \"stuck\" collapse into the same state** — there is no separate stick gesture, no transient→stuck transition, and no new state machine. Double-click still navigates, unchanged.\n\n**The wheel is explicitly not involved.** An earlier sketch had wheel-driven progressive inflation. Rejected: the wheel is the canvas zoom (`verify.set_zoom`) and the mode conflict has no clean resolution. Canvas zoom keeps the wheel outright.\n\n**Binary states only.** Open or closed. No animation, no partial reveal, no interpolated geometry, no scaled text — ImGui has no per-window transform and scaled text is blurry, which is what drove the call. This removes the hardest part of the original sketch.\n\n**Dismissal.** An explicit `✕` on the card plus the **Esc** hotkey. Esc unwinds one level (BL-196), matching BL-070's precedent where an armed exit-confirm backs out before the menu closes.\n\n**Placement — canvas-confined.** Centred on the mouse where the card fits entirely inside the canvas rect; otherwise snapped to the nearest canvas corner. It must **never overlap existing chrome** (shell column, header, time panel, minimap) — the canvas is the only region it may cover. A card **not** spawned from the canvas (an explainer for a header or time-panel element, say) defaults to **screen centre** instead. One placement helper, two modes.\n\n**It carries actions.** Build/Manage-class buttons live in the card, routed through the existing `pending_*` world-mutation seam (`construction.pending_tile`, `ui_state::pending_survey_dispatch`) — the card holds a `const world&` like every other UI surface. This rules out `ImGui::BeginTooltip` as the primitive (tooltips accept no input); use a borderless ImGui window / popup, as `draw_hover_card` already does.\n\n**Scope of this item.** The frame only — open/close/place/dismiss and hosting caller-supplied content plus actions. Moving the Selection content in is **BL-195**; recursive drill-down is **BL-196**.\n\n**Verification.** `verify.hover_tile` and `verify.select_tile` already exist in the harness, so this surface can hold golden captures like any other. **Housekeeping:** a second, unrelated `draw_hover_card(ImDrawList*, ...)` exists at `src/ui/entity_summary.cpp:390` — resolve that name collision before adding a third card entry point."
+    },
+    {
+      "id": "BL-195",
+      "short_name": "SELECTION_INTO_CARD",
+      "category": "UI",
+      "title": "Move the Selection element wholesale into the sticky card; column becomes ledgers-only",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 4,
+      "version_goal": "v0.1.1",
+      "parked": false,
+      "requires": [
+        "BL-194"
+      ],
+      "blocked_on": [],
+      "written": "2026-07-22",
+      "files": [
+        "src/ui/selection_card.cpp",
+        "src/ui/selection_panel.cpp",
+        "src/ui/foldout_column.hpp",
+        "src/ui/nav_pane.cpp",
+        "src/core/app.cpp",
+        "docs/ui/SELECTION.md",
+        "docs/ui/LAYOUT.md",
+        "docs/ui/MENU.md"
+      ],
+      "authority_doc": "docs/ui/SELECTION.md",
+      "summary": "Filed 2026-07-22 (design session, Ben). The Selection info element leaves the shell fold-out column and moves wholesale into the BL-194 card. Explicitly a MOVE, not a redesign: whether BL-123's tile layout should be redrawn for the card is deferred to an either/or decision after Ben has played with the style. Frees the column to be ledgers-only.",
+      "design": "**Settled 2026-07-22 (design session, Ben).** The Selection info element moves **wholesale** out of the shell fold-out column and into the BL-194 card.\n\n**Move, do not redesign.** Ben's explicit call: relocate the existing content as-is. Whether the BL-123 tile layout (placeholder image → `[x, y]` caption → per-resource Tile-vs-P10 graphs → 2×2 action grid) should then be **redrawn** for the card's proportions is deliberately deferred — \"we will treat this as an either/or problem after I've had a chance to play with this style\". Do not take that decision inside this item.\n\n**Consequences.**\n\n- The fold-out column becomes **ledgers-only**. The mutual-exclusion rule (SELECTION.md § Layout, LAYOUT.md § Selection info element) — a new selection closes any open ledger to claim the column, selection state persists behind an open ledger and reappears when it closes — is **deleted outright**, not reworked. Selection no longer competes for the column, so the whole dance disappears.\n- The BL-124 `foldout_column_rect` sizing for the Selection panel goes away. The card sizes to its content, clamped to the canvas rect (BL-194).\n- **BL-123 SELECTION_ELEMENT_RESIZE is superseded in motive** — it existed to re-lay-out the wide action|facts content for the *narrow column*. Once the element is out of the column that pressure is gone. Do not close BL-123 until the play-test either/or above is settled; re-scope it rather than delete it.\n- The card becomes the house style for future tooltips and explainers (Ben, Q5).\n\n**Docs.** SELECTION.md takes the major edit — the element relocates, and § Layout & chrome plus the BL-124 column-sidebar prose are superseded. LAYOUT.md § Selection info element and § Ledger windows both change. MENU.md's broad-vs-targeted rule still holds, but its \"targeted → reached through the Selection info element\" clause needs rewording to name the card. TOOLTIP.md becomes the card family's authority — note that it currently and wrongly states nothing is implemented, which is stale as of BL-060/BL-020."
+    },
+    {
+      "id": "BL-196",
+      "short_name": "CARD_DRILLDOWN",
+      "category": "UI",
+      "title": "Recursive drill-down — elements inside a card open child cards, bounded by acyclicity",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 4,
+      "version_goal": "v0.1.1",
+      "parked": false,
+      "requires": [
+        "BL-194"
+      ],
+      "blocked_on": [],
+      "written": "2026-07-22",
+      "files": [
+        "src/ui/selection_card.cpp",
+        "src/ui/selection_card.hpp",
+        "src/ui/hover_content.hpp",
+        "src/ui/hover_content.cpp",
+        "src/ui/ui_state.hpp",
+        "docs/ui/TOOLTIP.md"
+      ],
+      "authority_doc": "docs/ui/TOOLTIP.md",
+      "summary": "Filed 2026-07-22 (design session, Ben). Elements inside a card are themselves clickable, opening a child card. Depth is bounded by ACYCLICITY (a path may not revisit an ancestor) rather than a fixed number, with a ~20-level hard cap purely as a backstop. Strict stack; siblings swap rather than stack; Esc unwinds one level.",
+      "design": "**Settled 2026-07-22 (design session, Ben).** Elements inside a card are themselves clickable and open a **child card** — the card is recursive.\n\n**Depth is bounded by acyclicity, not a fixed number.** Ben's call: \"we won't allow paths that are looping, otherwise it has to be explicit like 20 levels\". Keep a breadcrumb of the ancestor `(kind, entity_id)` pairs currently on the stack. A candidate child already present in that breadcrumb is **not offered** — the affordance simply is not drawn. No dead link, no error dialog. An explicit hard cap (~20 levels) sits behind that purely as a runaway backstop.\n\n**Stack semantics.** A strict stack. Clicking a **sibling** element **swaps** the current child rather than stacking a second card beside it — only one path is live at a time. `✕` and **Esc** unwind exactly **one** level; unwinding from the root closes the card entirely.\n\n**Primitive.** Nested `ImGui::BeginPopup` provides the stack and its unwind ordering natively; `ImGui::BeginTooltip` provides neither (and accepts no input, per BL-194). This is the concrete reason the primitive choice matters, recorded here so it is not relitigated at implementation time.\n\n**Content contract.** Child cards reuse the existing `draw_hover_content` dispatch (`src/ui/hover_content.hpp` — title + ≤2 stat lines + 1 why-line, keyed on entity kind × active lens) rather than growing a parallel builder family. This is the same shared-builder seam TOOLTIP.md already designed for. An element with **no registered builder offers no drill-down** — that is how the recursive set stays bounded and implementable rather than \"everything is clickable\".\n\n**Worked example (Ben, Q7).** From a tile card's Tile-vs-P10 resource graph, drilling into a resource opens a child card carrying the BL-197 chart: the body/world aggregate for that resource over time, with the tile's own series as a second line. The tile is an ancestor on that path, so the child card does not offer a drill-back into it."
+    },
+    {
+      "id": "BL-197",
+      "short_name": "CHART_CONTAINER",
+      "category": "UI",
+      "title": "Chart container — titled, legended, dual-axis time-series element for cards and ledgers",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 4,
+      "version_goal": "v0.1.1",
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-22",
+      "files": [
+        "src/ui/chart.hpp",
+        "src/ui/chart.cpp",
+        "src/ui/selection_card.cpp",
+        "src/ui/header_panel.cpp",
+        "src/ui/construction_panel.cpp",
+        "docs/ui/TOOLTIP.md"
+      ],
+      "authority_doc": "docs/ui/TOOLTIP.md",
+      "summary": "Filed 2026-07-22 (design session, Ben), specified from a Power BI reference screenshot. A reusable chart element the sticky card and any ledger can host: plain title, inline legend row, dual independent Y axes, hierarchical Year/Quarter X axis, optional log scale, hover crosshair. Carries one open call — hand-draw via ImDrawList vs adding ImPlot.",
+      "design": "**Settled 2026-07-22 from Ben's Power BI reference screenshot.** A reusable chart element the sticky card (BL-194/196) and any ledger can host. The reference shows, and the element must support:\n\n- A plain left-aligned **panel title**, with an **inline legend row** immediately beneath it — a coloured dot plus series name per series.\n- **Dual Y axes at independent scales**, each with its own axis label. The reference plots \"Sum of World Iron\" (bars, 0–100K, left axis) against \"Sum of Tile Iron\" (line, 50–100, right axis): the **aggregate is bars, the specific series is a line drawn over them**. That is exactly the aggregate-vs-tile comparison BL-198 feeds, and it is the reason dual axes are load-bearing rather than decorative — the two magnitudes differ by ~1000×.\n- A **hierarchical time X axis** — Quarter grouped under Year. This maps directly onto the quarterly economy tick and the `1960 Q1` calendar (`src/core/sim_loop.hpp`), so the axis is the econ-tick axis.\n- **Optional log scale** (the reference's second chart runs 100 / 1000 / 10000).\n- A **hover crosshair** with a per-series marker at the hovered X.\n\n**Do not copy from the reference:** its lower chart's X axis is out of chronological order (Q1 2001, Q1 2000, Q4 2001, Q4 2000 …) — a categorical-sort artifact of the source tool, not design intent. The axis is always chronological.\n\n**Open call — the plotting substrate (Ben's).** ImGui ships only `PlotLines` / `PlotHistogram`: no dual axis, no legend, no log scale, no crosshair. Two routes:\n\n(a) **Hand-draw via `ImDrawList`**, extending the precedent already set by BL-123's tile graphs (nice 1/2/5 axis-ceiling rounding, dotted gridlines, 0/ceiling/mid ticks) and the existing `PlotLines` call sites (`header_panel.cpp` sparkline, `construction_panel.cpp:332`). Matches the house style exactly; but dual-axis + log + crosshair + legend is a lot of chart code to own.\n\n(b) **Add ImPlot**, which provides all five features natively, integrates with ImGui directly, and is MIT-licensed; but it is a new dependency and its default styling needs theming to match the shell.\n\nRecommendation: **(b)** if the full dual-axis + log + crosshair set is genuinely wanted; **(a)** if the element can start as bars-plus-line on a single axis and grow. A dependency add touches `docs/tech/TECH_FOUNDATIONS.md`, so this is Ben's call and should be the **first task** of this item, not an implementation-time improvisation.\n\n**Build it against existing data first.** `m_balance_history` / `m_income_history` / `m_expenditure_history` (`src/core/app.hpp:211`) already exist as capped ring buffers, so the element can be proven and captured before BL-198 lands any new series."
+    },
+    {
+      "id": "BL-198",
+      "short_name": "RESOURCE_HISTORY_STORE",
+      "category": "Economy",
+      "title": "Resource time-series store — body aggregates always, per-tile series lazily on first drill-down",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "C",
+      "difficulty": 3,
+      "version_goal": "v0.1.1",
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-22",
+      "files": [
+        "src/core/app.hpp",
+        "src/core/app.cpp",
+        "src/ui/ui_state.hpp",
+        "src/ui/chart.cpp"
+      ],
+      "authority_doc": "docs/economy/RESOURCES.md",
+      "summary": "Filed 2026-07-22 (design session, Ben). BL-197's headline chart needs per-body-per-resource and per-tile-per-resource time series, neither of which exists — the only history in the build is the three corp-level balance/income/expenditure ring buffers on `app`. Follows that precedent (app-owned, capped, unserialised, outside the save seam) and makes the per-tile series LAZY to contain data growth.",
+      "design": "**Settled 2026-07-22 (design session, Ben).** BL-197's headline chart — an aggregate resource series with the selected tile's own series drawn over it — needs two time series that **do not exist**. Confirmed by inspection: the only history in the build is `m_balance_history` / `m_income_history` / `m_expenditure_history`, app-owned capped ring buffers (`src/core/app.hpp:211`, fed by `ui::push_capped`), and they are **corp-level only**.\n\n**Follow the existing precedent — app-owned, capped, unserialised.** Those three buffers live on `app`, not on `world`, so they sit **outside the save seam entirely**. Keeping the new series there too means **no save-format change and no determinism risk**: the history survives the session only. For a prototype analysis surface that is the right trade, and it keeps this item off the serialisation seam that would otherwise make it Full-mode-expensive.\n\n**Per-tile must be lazy.** Bodies × resources × ticks is cheap and can be recorded unconditionally. Tiles × resources × ticks is **not** — a body carries thousands of tiles, and ROADMAP's v0.1.0 done-definition names data growth as an explicit cut criterion (\"Performance and data growth hold\"). So:\n\n- **Body aggregates: recorded always**, one sample per economy tick, capped.\n- **Per-tile series: recorded only from the first time the player drills into that tile.** A tile's line therefore *starts* at the moment of first inspection rather than at campaign epoch.\n\n**Label the lazy start honestly.** A tile series that begins mid-chart must read as \"recording began here\", not as a resource that appeared from nothing. Do **not** back-fill or synthesise the missing prefix — an invented history in an analysis surface is worse than a short one.\n\n**Open note — aggregate scope.** Ben's Q7 phrasing said \"all of that resource on **body** vs time\"; the Power BI reference is captioned \"Sum of **World** Iron\". Whether the aggregate series is body-scoped, world-scoped, or a selectable scope on the chart is unsettled. Surface it as a scope selector on the chart if the choice is cheap; otherwise default to body (the tile's own parent) as the more decision-relevant comparison."
     }
   ]
 }

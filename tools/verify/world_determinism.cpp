@@ -78,9 +78,9 @@ int main()
 
     // --- R1: same seed + params is bit-identical across two builds ---
     const world_metrics a1 = measure(make_hard_coded_world(
-        world_params{ .seed = seed_a, .abundance = abundance_level::standard, .nation_count = 14 }));
+        world_params{ .seed = seed_a, .abundance = abundance_level::standard }));
     const world_metrics a2 = measure(make_hard_coded_world(
-        world_params{ .seed = seed_a, .abundance = abundance_level::standard, .nation_count = 14 }));
+        world_params{ .seed = seed_a, .abundance = abundance_level::standard }));
 
     check(a1 == a2, "R1 same seed+params -> bit-identical world (tiles/hist/deposits/nations/corps/entities)");
     std::printf("     seed %08X: %zu tiles, %zu nations, %zu corps, deposits=%.3f\n",
@@ -88,7 +88,7 @@ int main()
 
     // --- R1: a different seed produces a demonstrably different world ---
     const world_metrics b = measure(make_hard_coded_world(
-        world_params{ .seed = seed_b, .abundance = abundance_level::standard, .nation_count = 14 }));
+        world_params{ .seed = seed_b, .abundance = abundance_level::standard }));
     const bool seed_matters = (b.comp_hist != a1.comp_hist) || (b.deposit_total != a1.deposit_total);
     check(seed_matters, "R1 different seed -> different world (composition histogram or deposit total differs)");
     std::printf("     seed %08X: %zu tiles, deposits=%.3f (vs %.3f)\n",
@@ -96,9 +96,9 @@ int main()
 
     // --- R2: abundance scales deposits monotonically at a fixed seed ---
     const double d_sparse = measure(make_hard_coded_world(
-        world_params{ .seed = seed_a, .abundance = abundance_level::sparse, .nation_count = 14 })).deposit_total;
+        world_params{ .seed = seed_a, .abundance = abundance_level::sparse })).deposit_total;
     const double d_lean = measure(make_hard_coded_world(
-        world_params{ .seed = seed_a, .abundance = abundance_level::lean, .nation_count = 14 })).deposit_total;
+        world_params{ .seed = seed_a, .abundance = abundance_level::lean })).deposit_total;
     const double d_standard = a1.deposit_total; // standard at seed_a, measured above
 
     check(d_sparse < d_lean && d_lean < d_standard,
@@ -113,8 +113,8 @@ int main()
     // --- Sanity: the default descriptor equals seed 0 / standard (legacy world) ---
     const world_metrics dflt   = measure(make_hard_coded_world());
     const world_metrics zero_s = measure(make_hard_coded_world(
-        world_params{ .seed = 0, .abundance = abundance_level::standard, .nation_count = 24 }));
-    check(dflt == zero_s, "default make_hard_coded_world() == {seed 0, standard, 24 nations} (legacy world)");
+        world_params{ .seed = 0, .abundance = abundance_level::standard }));
+    check(dflt == zero_s, "default make_hard_coded_world() == {seed 0, standard} (legacy world)");
 
     std::printf("\n%s (%d failure%s)\n", failures == 0 ? "ALL PASS" : "FAILURES", failures,
                 failures == 1 ? "" : "s");
