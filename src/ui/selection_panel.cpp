@@ -1,5 +1,7 @@
 #include "selection_panel.hpp"
 
+#include "charts.hpp"
+
 #include "foldout_column.hpp" // shell fold-out column host (shared with the ledgers)
 #include "icons.hpp"
 #include "presentation.hpp"
@@ -9,7 +11,9 @@
 #include "world/building_profit.hpp" // per-building profitability estimate (BL-074)
 #include "world/economy_system.hpp" // economy_report (workforce cap, BL-069)
 #include "world/market_clearing.hpp"
-#include "world/placement_rules.hpp" // buildable-type validity for the build ledger (BL-162)
+#include "world/construction.hpp"    // demolish path (the building element's Demolish)
+#include "world/placement_rules.hpp" // buildable-type validity + stack capacity
+#include "world/recipe_registry.hpp" // recipe/economics lookups for the building element
 #include "world/survey_system.hpp"
 
 #include <imgui.h>
@@ -41,25 +45,9 @@ namespace {
 // The uniform base_rate/workforce scalars are dropped: they cancel in the tile-vs-benchmark
 // comparison, so this keeps the deposit-magnitude numbers Ben's mockup showed.
 
-// Round @p v up to a 'nice' axis ceiling (1 / 2 / 5 x a power of ten): 45->50,
-// 18->20, 130->200. Gives the bar a legible top gridline instead of a ragged max.
-float nice_ceil(float v)
-{
-    if (v <= 0.0f)
-        return 1.0f;
-    const float mag = std::pow(10.0f, std::floor(std::log10(v)));
-    const float n   = v / mag; // 1..10
-    const float step = (n <= 1.0f) ? 1.0f : (n <= 2.0f) ? 2.0f : (n <= 5.0f) ? 5.0f : 10.0f;
-    return step * mag;
-}
-
-// A faint dotted horizontal rule across a chart's gridline, drawn as short dashes
-// (ImDrawList has no native dashed line). Matches the mockup's dotted scale lines.
-void dotted_hline(ImDrawList* dl, float x0, float x1, float y, ImU32 col)
-{
-    for (float x = x0; x < x1; x += 6.0f)
-        dl->AddLine({x, y}, {std::min(x + 3.0f, x1), y}, col, 1.0f);
-}
+// nice_ceil and dotted_hline now live in ui/charts.hpp — every chart in the app
+// shares one implementation rather than imitating this one.
+using ui::charts::nice_ceil;
 
 // A tile's production for resource @p r: hazard-adjusted deposit richness (the two
 // tile-local factors of run_extraction's yield). Zero when the tile has no deposit.
@@ -96,46 +84,11 @@ void draw_production_chart(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
                            float tile_val, float pct_val, float ceiling,
                            ImU32 tile_col, ImU32 pct_col)
 {
-    constexpr float gutter = 40.0f; // room for a tick label
-    const float plot_x0 = mn.x + gutter;
-    const float y0 = mn.y, y1 = mx.y;
-    const ImU32 grid_col  = IM_COL32(120, 120, 120, 150);
-    const ImU32 label_col = IM_COL32(150, 150, 150, 255);
-
-    const auto y_of = [&](float v) { return y1 - (v / ceiling) * (y1 - y0); };
-
-    const auto tick = [&](float v) {
-        const float ty = y_of(v);
-        dotted_hline(dl, plot_x0, mx.x, ty, grid_col);
-        char buf[16];
-        std::snprintf(buf, sizeof buf, "%g", static_cast<double>(v));
-        const ImVec2 ts = ImGui::CalcTextSize(buf);
-        dl->AddText({plot_x0 - 6.0f - ts.x, ty - ts.y * 0.5f}, label_col, buf);
+    const ui::charts::bar bars[2] = {
+        { tile_val, tile_col, "Tile",    false },
+        { pct_val,  pct_col,  "Top 10%", false },
     };
-    tick(0.0f);
-    if (ceiling >= 100.0f)
-        tick(ceiling * 0.5f);
-    tick(ceiling);
-
-    // Clustered columns: the tile's production and the top-decile reference side by
-    // side, sharing the baseline so their heights read as a direct comparison.
-    constexpr float bar_w = 34.0f;
-    constexpr float gap   = 10.0f;
-    const float bar_x0 = plot_x0 + 6.0f;
-    const float bar_x1 = bar_x0 + bar_w + gap;
-    dl->AddRectFilled({bar_x0, y_of(tile_val)}, {bar_x0 + bar_w, y1}, tile_col); // this tile
-    dl->AddRectFilled({bar_x1, y_of(pct_val)},  {bar_x1 + bar_w, y1}, pct_col);  // top-decile reference
-
-    // Legend to the right of the columns: swatch + label + value, one row each.
-    const float lx = bar_x1 + bar_w + 14.0f;
-    const auto legend = [&](float ly, ImU32 col, const char* name, float val) {
-        dl->AddRectFilled({lx, ly + 2.0f}, {lx + 10.0f, ly + 12.0f}, col);
-        char buf[40];
-        std::snprintf(buf, sizeof buf, "%s %.1f", name, static_cast<double>(val));
-        dl->AddText({lx + 16.0f, ly}, IM_COL32(210, 210, 210, 255), buf);
-    };
-    legend(y0 + 2.0f,  tile_col, "Tile",     tile_val);
-    legend(y0 + 22.0f, pct_col,  "Top 10%",  pct_val);
+    ui::charts::draw_bars(dl, mn, mx, bars, 2, ceiling, "%.1f", 34.0f);
 }
 
 // --- Analog construction status (BL-095 task E) ------------------------------
@@ -674,9 +627,369 @@ void draw_tile_selection(const world& w, ui_state& ui)
     stub("Supply");
 }
 
+// --- The building Selection element (Ben's 2026-07-22 review) ----------------
+// The old card showed four numbers and a Net line, and nothing else — Ben's verdict
+// was that the screen is useless. The four questions it now answers, in his words:
+// how profitable is this building; what can I do to make it more profitable; how
+// many more of this can I build; how do I remove it and build something else.
+//
+// Output leads, not profit (his call). Profit is a consequence you read second; the
+// physical fact of what the thing is producing, and whether that is anywhere near
+// what it could produce, is what you act on.
+
+/// The primary output resource of a recipe — the argmax of its outputs. Tags a
+/// production method with a resource pip. (construction_panel.cpp keeps its own
+/// copy for the Buildings-tab combo; both are three lines over the same array.)
+resource_type primary_output_resource(const recipe& r)
+{
+    std::size_t best = 0;
+    float best_v = -1.0f;
+    for (std::size_t i = 0; i < resource_count; ++i)
+        if (r.outputs[i] > best_v) { best_v = r.outputs[i]; best = i; }
+    return static_cast<resource_type>(best);
+}
+
+/// Whether this building type produces anything on the economy tick. Ports,
+/// logistics hubs and launchpads are passive infrastructure — economy_system runs
+/// extraction and processing only, so the rest have no output, no recipe and no
+/// report row. Showing them an output figure would invent one (a port would read
+/// "0.0 Iron Ore / tick" purely because iron ore is the default target).
+bool produces_output(building_type t)
+{
+    return t == building_type::extraction_site ||
+           t == building_type::processing_facility;
+}
+
+/// The building's own report row from the last economy step, or nullptr if it did
+/// not appear (never ticked, or built since).
+const building_report* report_row_for(const economy_report& report, entity_id id)
+{
+    for (const building_report& br : report.buildings)
+        if (br.building == id)
+            return &br;
+    return nullptr;
+}
+
+/// Output the building would credit this tick at a 100 % workforce target with no
+/// labour contention — the ceiling its realised output is read against.
+///
+/// Derived from the same constants the economy tick uses (economy_system.cpp
+/// run_extraction / run_processing) rather than an independent guess, so the ratio
+/// means something: below 1 is contention, depletion taper, or a missing input;
+/// above 1 is a workforce target pushed past nominal.
+float output_ceiling(const world& w, const recipe_registry& reg,
+                     const building_component& b)
+{
+    const float base = reg.economics(b.type).base_rate;
+
+    if (b.type == building_type::extraction_site)
+    {
+        const auto tit = w.tiles.find(b.tile);
+        if (tit == w.tiles.end())
+            return 0.0f;
+        const tile_component& tc = tit->second;
+        const float richness = tc.resource_deposit[static_cast<std::size_t>(b.target_resource)];
+        return base * richness * b.workforce_assigned * (1.0f - tc.hazard_level);
+    }
+
+    if (b.type == building_type::processing_facility)
+    {
+        const recipe* rcp = reg.get_recipe(b.recipe);
+        if (rcp == nullptr)
+            return 0.0f;
+        // Report output_quantity sums a processor's outputs, so the ceiling has to
+        // be in the same units: batches at nominal x the units one batch yields.
+        float per_batch = 0.0f;
+        for (std::size_t i = 0; i < resource_count; ++i)
+            per_batch += rcp->outputs[i];
+        return base * b.workforce_assigned * per_batch;
+    }
+
+    return 0.0f; // ports / hubs are passive infrastructure — no L3 production
+}
+
+/// One-line verdict on what the building is doing, and why it isn't doing more.
+/// Returns the colour to print it in via @p col.
+const char* production_status(const building_component& b,
+                              const building_report* row, ImU32& col)
+{
+    if (b.decommissioned) { col = palette::neutral;  return "Idled - producing nothing"; }
+    if (row == nullptr)   { col = palette::neutral;  return "No data yet - run an economy tick"; }
+    if (row->exhausted)   { col = palette::negative; return "Deposit exhausted"; }
+    if (row->idle)        { col = palette::negative; return "Idle - unstaffed or misconfigured"; }
+    if (row->has_limiting)
+    {
+        col = palette::negative;
+        return "Input-limited";
+    }
+    col = palette::positive;
+    return "Active";
+}
+
+void draw_building_selection(world& w, const recipe_registry& reg,
+                             const economy_report& report, ui_state& ui)
+{
+    const entity_id sel = ui.selected_entity;
+    const auto bit = w.buildings.find(sel);
+    if (bit == w.buildings.end())
+    {
+        ImGui::TextDisabled("\xe2\x80\x94");
+        return;
+    }
+    building_component& b = bit->second;
+
+    const ImGuiStyle& style     = ImGui::GetStyle();
+    ImDrawList*       dl        = ImGui::GetWindowDrawList();
+    const float       content_w = ImGui::GetContentRegionAvail().x;
+    const float       frame_h   = ImGui::GetFrameHeight();
+
+    // ── Under construction: nothing to operate yet, so the build status IS the
+    //    panel. Showing dials for a building that does not exist yet is noise. ──
+    if (b.ticks_remaining > 0)
+    {
+        const float rate = construction_rate(w, reg, b.type, b.tile);
+        ImGui::TextColored(construction_status_colour(rate), "%s",
+                           construction_status(rate, b.ticks_remaining).c_str());
+        ImGui::Spacing();
+        ImGui::TextDisabled("Controls unlock when construction completes.");
+        return;
+    }
+
+    const building_report* row = report_row_for(report, sel);
+
+    // ── (1) Output & rate — the lead. Passive infrastructure has no output to
+    //    lead with, so it says what it is instead of printing a hollow zero. ──
+    if (!produces_output(b.type))
+    {
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::neutral),
+                           "Infrastructure - produces nothing directly");
+        ImGui::TextDisabled("It earns through what it enables, not what it makes.");
+    }
+    else
+    {
+        // What it makes: the extraction target, or the recipe's primary output.
+        resource_type made = b.target_resource;
+        if (b.type == building_type::processing_facility)
+            if (const recipe* rcp = reg.get_recipe(b.recipe); rcp != nullptr)
+                made = primary_output_resource(*rcp);
+
+        const float produced = (row != nullptr) ? row->output_quantity : 0.0f;
+        const float ceiling  = output_ceiling(w, reg, b);
+
+        // Big figure + resource pip, the one number worth reading at a glance.
+        const ImVec2 p   = ImGui::GetCursorScreenPos();
+        const float  pip = frame_h * 0.34f;
+        icons::resource(dl, {p.x + pip, p.y + frame_h * 0.5f}, pip, made);
+        ImGui::Dummy({pip * 2.0f + 6.0f, frame_h});
+        ImGui::SameLine();
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
+                           "%.1f %s / tick", produced, presentation_of(made).name);
+
+        // Rate against the uncontended nominal ceiling, as a bar plus its percentage.
+        if (ceiling > 0.0f)
+        {
+            const float frac = produced / ceiling;
+            const ImVec2 bp  = ImGui::GetCursorScreenPos();
+            const float  bh  = frame_h * 0.42f;
+            const float  bw  = content_w;
+            dl->AddRectFilled(bp, {bp.x + bw, bp.y + bh}, IM_COL32(52, 52, 58, 255), 2.0f);
+            // A target above 100 % can push past nominal, so the bar clamps at full
+            // while the printed percentage keeps telling the truth.
+            const float fill_frac = frac > 1.0f ? 1.0f : frac;
+            const ImU32 bar_col = (frac >= 0.98f) ? palette::positive
+                                : (frac >= 0.50f) ? palette::neutral
+                                                  : palette::negative;
+            dl->AddRectFilled(bp, {bp.x + bw * fill_frac, bp.y + bh}, bar_col, 2.0f);
+            ImGui::Dummy({bw, bh});
+            ImGui::TextDisabled("%.0f%% of nominal (%.1f)", frac * 100.0f, ceiling);
+        }
+
+        ImU32 scol = palette::neutral;
+        const char* status = production_status(b, row, scol);
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(scol), "%s", status);
+        // Name the binding input rather than just flagging that one exists — the
+        // whole point of the line is telling the player what to go fix.
+        if (row != nullptr && row->has_limiting && !b.decommissioned)
+        {
+            ImGui::SameLine();
+            ImGui::TextDisabled("(%s)", presentation_of(row->limiting_input).name);
+        }
+    }
+
+    ImGui::Spacing();
+    ImGui::Separator();
+
+    // ── (2) Profitability — the consequence. ──
+    draw_building_profit(w, reg, report, sel);
+
+    ImGui::Spacing();
+    ImGui::Separator();
+
+    // ── (3) Production method — the first lever on profitability. Nothing to
+    //    choose on a building that produces nothing, so the section is absent
+    //    rather than present-and-empty. ──
+    if (produces_output(b.type))
+    {
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Production method");
+        const int   n_recipes = reg.recipe_count(b.type);
+        const float pipr      = ImGui::GetFontSize() * 0.42f;
+        const auto  method_res = [&](int i) -> resource_type {
+            if (b.type == building_type::extraction_site) return b.target_resource;
+            return primary_output_resource(reg.recipe_at(b.type, i));
+        };
+
+        if (n_recipes >= 1)
+        {
+            b.active_recipe_index = std::clamp(b.active_recipe_index, 0, n_recipes - 1);
+            const recipe& cur     = reg.recipe_at(b.type, b.active_recipe_index);
+            const char*   preview = cur.name.empty() ? "-" : cur.name.c_str();
+
+            const ImVec2 gp = ImGui::GetCursorScreenPos();
+            icons::resource(dl, {gp.x + pipr, gp.y + frame_h * 0.5f}, pipr,
+                            method_res(b.active_recipe_index));
+            ImGui::Dummy({pipr * 2.0f + 6.0f, frame_h});
+            ImGui::SameLine();
+            ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+            if (ImGui::BeginCombo("##sel_method", preview))
+            {
+                ImDrawList* pdl = ImGui::GetWindowDrawList(); // the popup's own list
+                for (int i = 0; i < n_recipes; ++i)
+                {
+                    const recipe& ri  = reg.recipe_at(b.type, i);
+                    const bool    on  = (i == b.active_recipe_index);
+                    const ImVec2  ip  = ImGui::GetCursorScreenPos();
+                    const std::string lbl = std::string("     ") + (ri.name.empty() ? "-" : ri.name);
+                    if (ImGui::Selectable(lbl.c_str(), on))
+                    {
+                        b.active_recipe_index = i;
+                        b.recipe = reg.recipe_id(ri.name);
+                    }
+                    icons::resource(pdl, {ip.x + pipr + 2.0f,
+                                          ip.y + ImGui::GetTextLineHeight() * 0.5f},
+                                    pipr, method_res(i));
+                    if (on)
+                        ImGui::SetItemDefaultFocus();
+                }
+                ImGui::EndCombo();
+            }
+        }
+        else
+            ImGui::TextDisabled("Single method - nothing to switch");
+
+        ImGui::Spacing();
+    }
+
+    // ── (4) Workforce — the second lever. Auto (BL-181) owns the dial unless the
+    //    player takes it; moving the slider is itself the act of taking it. ──
+    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Workforce");
+    {
+        bool  autos = b.workforce_auto;
+        if (ImGui::Checkbox("Auto##sel_wf_auto", &autos))
+            b.workforce_auto = autos;
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Solve the target each tick for maximum profit.");
+
+        ImGui::SameLine();
+        ImGui::BeginDisabled(b.workforce_auto);
+        int target = b.workforce_target;
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+        if (ImGui::SliderInt("##sel_wf", &target, 0, 200, "%d%% of nominal"))
+        {
+            b.workforce_target = target;
+            b.workforce_auto   = false; // a manual move pins the dial
+        }
+        ImGui::EndDisabled();
+    }
+
+    ImGui::Spacing();
+    ImGui::Separator();
+
+    // ── (5) How many more of this can I build here (Ben's question C). Buildings
+    //    stack on a tile up to a ceiling the deposit sets — see
+    //    placement_rules::stack_capacity, which the placement gate reads too, so
+    //    this readout and what construction actually permits cannot drift. ──
+    {
+        const auto tit = w.tiles.find(b.tile);
+        if (tit != w.tiles.end())
+        {
+            const int cap  = placement_rules::stack_capacity(tit->second, b.type, b.target_resource);
+            const int here = placement_rules::buildings_on_tile(w, b.tile, b.type, b.target_resource);
+            const int more = (cap > here) ? cap - here : 0;
+
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "On this tile");
+            ImGui::Text("%d of %d", here, cap);
+            ImGui::SameLine();
+            if (more > 0)
+                ImGui::TextDisabled("- room for %d more", more);
+            else
+                ImGui::TextDisabled("- tile is at capacity");
+
+            ImGui::BeginDisabled(more <= 0);
+            if (ImGui::Button("Build another here", {content_w, frame_h * 1.4f}))
+            {
+                ui.construction.pending_tile   = b.tile;
+                ui.construction.pending_type   = b.type;
+                ui.construction.pending_target = b.target_resource;
+            }
+            ImGui::EndDisabled();
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip("The stack ceiling is provisional - the rule for how "
+                                  "richness sets it is not settled yet.");
+        }
+    }
+
+    ImGui::Spacing();
+
+    // ── (6) Stop / remove. Two different acts, kept visibly different: idling is
+    //    reversible and keeps the asset (wages stop, material upkeep continues);
+    //    demolition frees the tile and refunds nothing. Demolish therefore asks. ──
+    {
+        const float bw = (content_w - style.ItemSpacing.x) * 0.5f;
+
+        if (b.decommissioned)
+        {
+            if (ImGui::Button("Resume##sel_idle", {bw, frame_h * 1.4f}))
+                b.decommissioned = false;
+        }
+        else
+        {
+            if (ImGui::Button("Idle##sel_idle", {bw, frame_h * 1.4f}))
+                b.decommissioned = true;
+        }
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip(b.decommissioned
+                ? "Put it back to work."
+                : "Stop production and wages. Keeps the building and its tile.");
+
+        ImGui::SameLine();
+        if (ImGui::Button("Demolish##sel_demolish", {bw, frame_h * 1.4f}))
+            ImGui::OpenPopup("##sel_demolish_confirm");
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Remove it and free the tile. No refund.");
+
+        if (ImGui::BeginPopup("##sel_demolish_confirm"))
+        {
+            ImGui::TextUnformatted("Demolish this building?");
+            ImGui::TextDisabled("The tile is freed. The build cost is not returned.");
+            ImGui::Spacing();
+            if (ImGui::Button("Demolish", {110.0f, 0.0f}))
+            {
+                // Deferred: app executes it against the mutable world after the
+                // draw completes (erasing here would invalidate this iteration).
+                ui.construction.pending_demolish = sel;
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Cancel", {110.0f, 0.0f}))
+                ImGui::CloseCurrentPopup();
+            ImGui::EndPopup();
+        }
+    }
+}
+
 } // namespace
 
-void draw_selection_panel(const world& w, const recipe_registry& reg,
+void draw_selection_panel(world& w, const recipe_registry& reg,
                           const economy_report& report, ui_state& ui)
 {
     const selection_kind kind = selection_kind_of(w, ui.selected_entity);
@@ -755,6 +1068,16 @@ void draw_selection_panel(const world& w, const recipe_registry& reg,
     if (kind == selection_kind::tile)
     {
         draw_tile_selection(w, ui);
+        ImGui::End();
+        return;
+    }
+
+    // A selected player building likewise takes its own vertical layout (Ben's
+    // 2026-07-22 review: the old four-numbers card "is useless"). Rival buildings
+    // stay on the action|facts split — intel only, nothing to operate.
+    if (kind == selection_kind::building && is_player_owned(w, ui.selected_entity))
+    {
+        draw_building_selection(w, reg, report, ui);
         ImGui::End();
         return;
     }

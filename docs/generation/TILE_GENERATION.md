@@ -9,6 +9,14 @@ parameters fed into it, not from body-specific code paths.
 True procedural generation — randomised maps per campaign — is **deferred from
 the prototype**. See § Deferred.
 
+**Pipeline-shape convention (settled 2026-07-21, BL-051).** The six-pass core below stays fixed.
+Every generation extension — rivers ([[BL-170]]), the full-set deposit rarity scalar ([[BL-040]],
+shipped), future coastline/band smoothing, and body-level Planetology ([[PLANETOLOGY.md]],
+[[BL-167]]) — lands as its own **sibling pass**: a separate file/function invoked around
+`generate_body_tiles`, reading the shared `generation_record` rather than growing the six-pass
+function itself. Planetology in particular runs *before* this pipeline (its atmosphere output
+feeds this pipeline's solar-parameter input) — see `GENERATION_STRATEGY.md`.
+
 ---
 
 ## Design principles

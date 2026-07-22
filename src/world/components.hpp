@@ -37,11 +37,25 @@ enum class resource_type : uint8_t
     sand                  = 13, ///< Glass precursor; construction aggregate.
     clay                  = 14, ///< Ceramics and construction.
     peat                  = 15, ///< Pre-industrial fuel.
+    // --- Tier 1: endemic trade goods (the MERCANTILE value track, BL-191) ---
+    //
+    // These are Tier 1 raws like any other, but their value comes from a
+    // different place. An industrial good is worth something because it is
+    // USEFUL — coal burns, iron bears load. An endemic good is worth something
+    // because it only grows THERE: the biosphere evolved it in one region and
+    // nowhere else, so its price is a function of distance from where it grows.
+    //
+    // A body only carries the ones its own biosphere produced, and only in the
+    // band and sector it evolved in. See docs/economy/RESOURCES.md § Mercantile.
+    tobacco               = 16, ///< Temperate/subtropical grassland leaf crop.
+    spices                = 17, ///< Tropical wetland and forest aromatics.
+    coffee                = 18, ///< Subtropical highland forest bean.
+    furs                  = 19, ///< Subpolar and polar tundra pelts.
     // --- Tier 2: refined goods (prototype subset) ---
-    steel                 = 16, ///< Smelted from iron ore (+ coal).
-    refined_fuel          = 17, ///< Refined from petroleum.
-    food_rations          = 18, ///< Processed from agricultural produce.
-    count                 = 19
+    steel                 = 20, ///< Smelted from iron ore (+ coal).
+    refined_fuel          = 21, ///< Refined from petroleum.
+    food_rations          = 22, ///< Processed from agricultural produce.
+    count                 = 23
 };
 
 static constexpr std::size_t resource_count = static_cast<std::size_t>(resource_type::count);

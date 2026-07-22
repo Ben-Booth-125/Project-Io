@@ -30,18 +30,23 @@ namespace ui {
 /// by app against the mutable world). This is the contextual, per-tile entry to
 /// construction — distinct from the broad buildings overview, which earns a menu.
 ///
-/// @param w        Read-only world state (the content source).
+/// @param w        World state (the content source). Mutable because the building
+///                 element operates its building directly — production method,
+///                 workforce target, idle — the same way draw_construction_panel
+///                 does. Destructive acts still take the deferred pending-request
+///                 path (ui_state::construction), since erasing a building mid-draw
+///                 would invalidate the iteration that is drawing it.
 /// @param reg      Loaded registry — build costs for the build front door.
 /// @param report   Most recent economy step report — the Population lens reads its
-///                 body_habitability to show a population centre's workforce cap.
+///                 body_habitability to show a population centre's workforce cap;
+///                 the building element reads its per-building row for output/rate.
 /// @param ui       UI state; read for the selection, written by 'go to' (focus),
 ///                 the close button (hide), and the build front door (enqueue).
 ///
 /// The panel fills the shell fold-out column (foldout_column_rect); it takes no
-/// layout parameters. NOTE: the content still uses the wide-bottom-bar
-/// action|facts split — its re-lay-out for the narrower column is BL-123
-/// SELECTION_ELEMENT_RESIZE (Ben to mock).
-void draw_selection_panel(const world& w, const recipe_registry& reg,
+/// layout parameters. Tile and building selections take dedicated vertical layouts;
+/// the remaining kinds keep the older action|facts split.
+void draw_selection_panel(world& w, const recipe_registry& reg,
                           const economy_report& report, ui_state& ui);
 
 /// Draw the **tile construction ledger** (BL-162) — the tile-contextual surface that

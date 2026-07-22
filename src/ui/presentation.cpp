@@ -37,6 +37,13 @@ constexpr resource_presentation resource_table[resource_count] = {
     { "Sand",              "Snd", IM_COL32(214, 196, 140, 255) }, // light sand
     { "Clay",              "Cly", IM_COL32(178, 130, 100, 255) }, // earthy clay
     { "Peat",              "Pt",  IM_COL32(110,  86,  64, 255) }, // dark peat brown
+    // --- Tier 1: endemic trade goods (mercantile track) ---
+    // Warmer, more saturated hues than the industrial raws, so a market strip
+    // reads at a glance as "this is the cargo people get rich on".
+    { "Tobacco",           "Tob", IM_COL32(176, 138,  74, 255) }, // cured leaf gold-brown
+    { "Spices",            "Spc", IM_COL32(206, 106,  52, 255) }, // paprika orange-red
+    { "Coffee",            "Cof", IM_COL32(120,  74,  52, 255) }, // roasted bean brown
+    { "Furs",              "Fur", IM_COL32(198, 178, 152, 255) }, // pale pelt cream
     // --- Tier 2: refined goods (prototype subset) ---
     { "Steel",             "Stl", IM_COL32(150, 165, 185, 255) }, // blue-grey alloy
     { "Refined Fuel",      "Fuel",IM_COL32(210, 160,  80, 255) }, // amber fuel

@@ -3,6 +3,8 @@
 #include "market_clearing.hpp" // market_for_tile
 #include "placement_rules.hpp"
 
+#include <algorithm> // std::find (asset-list removal in demolish_building)
+
 construction_result construct_building(world& w, const recipe_registry& reg,
                                        entity_id corp, entity_id tile,
                                        building_type type, resource_type target,
@@ -105,6 +107,31 @@ construction_result construct_building(world& w, const recipe_registry& reg,
 
     out_building = bld_id;
     return construction_result::placed;
+}
+
+bool demolish_building(world& w, entity_id corp, entity_id building)
+{
+    const auto bld_it = w.buildings.find(building);
+    if (bld_it == w.buildings.end())
+        return false;
+
+    const auto corp_it = w.corporations.find(corp);
+    if (corp_it == w.corporations.end())
+        return false;
+
+    // Ownership is the corp's `assets` list (world.hpp § Ownership accessors —
+    // there is no reverse index). Not finding the id there means this corp does
+    // not own the building, which is also the refusal condition.
+    corporation_component& cc = corp_it->second;
+    const auto asset_it = std::find(cc.assets.begin(), cc.assets.end(), building);
+    if (asset_it == cc.assets.end())
+        return false;
+
+    cc.assets.erase(asset_it);
+    w.buildings.erase(bld_it);
+    w.stockpiles.erase(building); // no-op if the building never had one
+
+    return true;
 }
 
 construction_result place_road(world& w, const recipe_registry& reg,

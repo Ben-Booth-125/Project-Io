@@ -937,6 +937,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         auto tile_it = w.tiles.find(bld.tile);
         if (tile_it != w.tiles.end() && tile_it->second.body == state.active_body)
         {
+            // Lowest building id wins the tile. w.buildings is an unordered_map, so a
+            // plain last-writer-wins assignment would let its iteration order pick the
+            // representative — fine while a tile holds one building, not once they
+            // stack. Lowest-id is stable across frames and across runs.
+            const auto prev = tile_to_bld.find(bld.tile);
+            if (prev != tile_to_bld.end() && prev->second <= bld_id)
+                continue;
             built_tiles[bld.tile] = bld.type;
             tile_to_bld[bld.tile] = bld_id;
         }
@@ -2186,10 +2193,20 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             }
         }
 
+        // A built tile resolves to its BUILDING across the whole hex, not just inside
+        // the glyph's radius: once a tile carries an installation, the installation is
+        // what is there. The tile beneath it is no longer separately reachable.
+        entity_id tile_bld = null_entity;
+        if (hovered_tile != null_entity)
+            if (const auto tb = tile_to_bld.find(hovered_tile); tb != tile_to_bld.end())
+                tile_bld = tb->second;
+
         if (bld_hover != null_entity)
             hover_eid = bld_hover;
         else if (mkt_hover != null_entity)
             hover_eid = mkt_hover;
+        else if (tile_bld != null_entity)
+            hover_eid = tile_bld;
         else
             hover_eid = hovered_tile;
 
@@ -2255,7 +2272,18 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             else if (mkt_hit != null_entity)
                 marker_hit = mkt_hit;
 
-            state.selected_entity = (marker_hit != null_entity) ? marker_hit : hovered_tile;
+            // Falling through to the tile means the click missed every marker glyph.
+            // On a BUILT tile that still selects the building: the whole hex belongs to
+            // the installation, so the tile element is unreachable there (Ben's
+            // 2026-07-22 call). The tile element is the prospecting view for UNBUILT
+            // ground — routing a built tile to it offers a Construct button that the
+            // placement rules then refuse, which is the bug this closes.
+            entity_id fallback = hovered_tile;
+            if (hovered_tile != null_entity)
+                if (const auto tb = tile_to_bld.find(hovered_tile); tb != tile_to_bld.end())
+                    fallback = tb->second;
+
+            state.selected_entity = (marker_hit != null_entity) ? marker_hit : fallback;
             // A fresh click is an explicit select gesture: re-show the panel even
             // when it re-selects the same entity the player had dismissed (close
             // hides, does not destroy — SELECTION.md).

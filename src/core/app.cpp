@@ -9,6 +9,7 @@
 
 #include "ui/body_surface_canvas.hpp"
 #include "ui/canvas_command.hpp"
+#include "ui/charts.hpp"
 #include "ui/circumplanetary_canvas.hpp"
 #include "ui/construction_panel.hpp"
 #include "ui/balance_ledger.hpp"
@@ -275,9 +276,10 @@ int app::run()
 
     m_lua.load("scripts/init.lua");
 
-    // Open on the main menu — the deliberate entry point. The world, economy, and
-    // sim clock are not built until the player picks "New Game" (start_new_game),
-    // so nothing simulates behind the menu and the clock starts when play does.
+    // Open on the main menu — the deliberate entry point. "New Game" only opens the
+    // New World wizard; the world, economy and sim clock are not built until the
+    // player finishes it (start_new_game), so nothing simulates behind either screen
+    // and the clock starts when play does.
     m_screen = app_screen::menu;
 
     bool running = true;
@@ -285,8 +287,10 @@ int app::run()
     {
         process_events(running);
 
-        // On the menu, nothing simulates — just pump events and draw the menu.
-        if (m_screen == app_screen::menu)
+        // Nothing simulates on the menu or the staged generation screen — just pump
+        // events and draw. The sim clock is rebased when the generation screen hands
+        // over, so time spent reading it never lands as elapsed in-game days.
+        if (m_screen != app_screen::in_game)
         {
             render();
             continue;
@@ -337,6 +341,37 @@ int app::run()
     return 0;
 }
 
+void app::open_new_world_wizard()
+{
+    // Nothing is generated yet — the wizard runs on a throwaway preview and only
+    // commits when the player reaches its last round and presses "Begin".
+    m_wiz_round = 0;
+    m_wiz_dirty = true;
+    m_screen    = app_screen::generating;
+}
+
+void app::refresh_wizard_preview()
+{
+    // Preferences are not parameters, so they are resolved against the seed FIRST.
+    // The resolution rejects and rerolls internally until the homeworld clears the
+    // strict Earth-like floor, which is why the preview is always a world the
+    // campaign could actually start on — and why it also reports what that cost
+    // (resolved_world::attempts), which the round surfaces rather than hides.
+    m_wiz_resolved = resolve_preferences(m_pending_world_params.preferences,
+                                         m_pending_world_params.seed);
+    preview_system(m_wiz_resolved.params, m_wiz_resolved.home_orbit_au,
+                   m_pending_world_params.seed, m_wiz_preview);
+
+    // The Spend chart needs the endowment BEFORE the industrial drawdown. Drawdown
+    // is the chain's last act and consumes no randomness, so a second run with the
+    // dial at zero is the same world minus its industrial history — exactly the
+    // "before" reference the hollow bars want.
+    planetology_params undrawn = m_wiz_resolved.params;
+    undrawn.drawdown = 0.0f;
+    preview_system(undrawn, m_wiz_resolved.home_orbit_au,
+                   m_pending_world_params.seed, m_wiz_undrawn);
+}
+
 void app::start_new_game()
 {
     // Reset the sim clock so the campaign starts now, not at app construction —
@@ -367,6 +402,17 @@ void app::start_new_game()
     }
     for (int t = 0; t < pre_game_ticks; ++t)
         step_economy();
+
+    // Rebase the clock one last time. sim_loop measures from construction, so without
+    // this the wall-clock cost of building the world and running the warm start would
+    // land as elapsed in-game days on the first frame of play.
+    {
+        const int speed = m_sim_loop.speed();
+        m_sim_loop = sim_loop();
+        m_sim_loop.set_speed(speed);
+        m_last_orbit_days = 0.0;
+        m_last_survey_day = 0;
+    }
 
     m_screen = app_screen::in_game;
 }
@@ -448,7 +494,13 @@ void app::step_economy()
 void app::setup_world(world_params params)
 {
     m_active_world_params = params;          // remember the descriptor the live world was built from
-    m_world = make_hard_coded_world(params);
+
+    // Capture the Planetology report alongside the world (BL-167). This is the one
+    // call site, so filling it here gives both run() and run_verify() a report to
+    // show without a second generation pass. It is presentation data only — the app
+    // holds it, the `world` struct never sees it.
+    m_generation_report = generation_report{};
+    m_world = make_hard_coded_world(params, &m_generation_report);
 
     // Set the initial solar zoom so the default view covers roughly 5 AU.
     // The auto-fit scale at zoom 1 shows max_radius_au; dividing it by 5 zooms
@@ -644,6 +696,45 @@ int app::run_verify(const std::string& script_path, bool bless)
         m_screen = on ? app_screen::menu : app_screen::in_game;
     });
 
+    // Enter (or leave) the BL-167 New World wizard so a script can capture it. It
+    // opens on the LAST round, fully populated: the wizard is a walk, and a frame
+    // taken part-way along it depends on which preferences a script happened to have
+    // set. The final round is the only one that closes the whole chain, so it is the
+    // one that diffs stably against a golden.
+    // Rebuild the world on a specific seed.
+    //
+    // Some checks need a world with a particular PROPERTY, not just any world —
+    // recipe_workforce.lua needs the player to own a processing facility, which
+    // corporation generation only produces on some seeds. Pinning the seed makes
+    // such a check deterministic and honest, rather than silently skipping when
+    // the default world happens not to oblige.
+    //
+    // Use sparingly: a check that pins a seed is testing one world, so anything
+    // that should hold for EVERY world belongs in a headless harness instead.
+    v.set_function("new_world", [this](unsigned seed) {
+        world_params p = m_active_world_params;
+        p.seed = static_cast<uint32_t>(seed);
+        setup_world(p);
+        load_economy();
+    });
+
+    v.set_function("show_generation", [this](bool on) {
+        m_screen    = on ? app_screen::generating : app_screen::in_game;
+        m_wiz_round = wizard_round_count - 1;
+        m_wiz_dirty = true;
+    });
+
+    // Park the wizard on a specific ROUND (0-2) so a visual check can capture each
+    // one. Clamped by draw_generation_screen, so an out-of-range index is harmless —
+    // the name is kept for the scripts that already call it. Every round is a stable
+    // capture: the wizard is driven by the preferences and the seed, not by
+    // wall-clock, so there is no animation to race.
+    v.set_function("generation_stage", [this](int round) {
+        m_screen    = app_screen::generating;
+        m_wiz_round = round;
+        m_wiz_dirty = true;
+    });
+
     v.set_function("show_panel", [this](const std::string& name, bool open) {
         if (name == "economy")           m_ui.show_economy_panel = open;
         else if (name == "construction") m_ui.show_construction_panel = open;
@@ -725,6 +816,43 @@ int app::run_verify(const std::string& script_path, bool bless)
         }
         SDL_Log("verify.build_first_valid: no valid unoccupied tile on active body");
         return std::string("no_valid_tile");
+    });
+
+    // Build the armed type on a SPECIFIC tile (col, row) of the active body, through
+    // the same construct_building path as build_first_valid, and select the result.
+    //
+    // build_first_valid takes the first valid tile anywhere on the body, which is
+    // fine for proving placement works but not for staging a *running* building:
+    // construction is material-gated, so a site on a tile whose local market is dry
+    // stays paused forever however many ticks the script runs. Choosing the tile lets
+    // a check build where the market can actually supply it.
+    v.set_function("build_at", [this](int col, int row) -> std::string {
+        for (const auto& [tid, tc] : m_world.tiles)
+        {
+            if (tc.body != m_ui.active_body || tc.grid_x != col || tc.grid_y != row)
+                continue;
+            entity_id built = null_entity;
+            const construction_result r = construct_building(
+                m_world, m_registry, m_world.player_entity, tid,
+                m_ui.construction.type, m_ui.construction.target, built);
+            const char* name =
+                r == construction_result::placed                 ? "placed" :
+                r == construction_result::invalid_tile           ? "invalid_tile" :
+                r == construction_result::insufficient_funds     ? "insufficient_funds" :
+                r == construction_result::no_corp                ? "no_corp" :
+                r == construction_result::no_tile                ? "no_tile" :
+                r == construction_result::slot_occupied          ? "slot_occupied" :
+                r == construction_result::insufficient_materials ? "insufficient_materials" : "failed";
+            if (r == construction_result::placed)
+            {
+                m_ui.selected_entity      = built;
+                m_ui.selection_hidden_for = null_entity;
+            }
+            SDL_Log("verify.build_at: %s at tile (%d,%d)", name, col, row);
+            return std::string(name);
+        }
+        SDL_Log("verify.build_at: no tile (%d,%d) on the active body", col, row);
+        return std::string("no_tile");
     });
 
     // Assertion primitive (verify harness): on a false condition, bump the failure
@@ -1008,6 +1136,11 @@ int app::run_verify(const std::string& script_path, bool bless)
                 rec["body"]   = static_cast<unsigned>(tile_it->second.body);
                 rec["x"]      = tile_it->second.grid_x;
                 rec["y"]      = tile_it->second.grid_y;
+                // Type name, so a script can pick the building it actually wants to
+                // stage (an extraction site rather than whichever asset happens to
+                // come first) instead of hard-coding grid coordinates that a
+                // generation change silently invalidates.
+                rec["type"]   = ui::building_type_name(bld_it->second.type);
                 out[++idx]    = rec;
             }
         }
@@ -1356,8 +1489,9 @@ void app::handle_key_down(const SDL_KeyboardEvent& key)
         return;
     }
 
-    // No game bindings while on the main menu — there is no world to navigate.
-    if (m_screen == app_screen::menu)
+    // No game bindings on the menu or the generation screen — there is nothing to
+    // navigate yet (the generation screen carries its own two buttons).
+    if (m_screen != app_screen::in_game)
         return;
 
     // Esc toggles the in-app system menu (BL-070) — cheap keyboard parity with the
@@ -1457,8 +1591,9 @@ void app::draw_main_menu()
         ImGui::Dummy({0.0f, 18.0f});
 
         // --- New World setup (BL-114). Every widget edits m_pending_world_params,
-        //     which start_new_game() consumes; each carries a unique ##id so it never
-        //     collides with the centred buttons below. ---
+        //     which the wizard continues to edit and start_new_game() finally
+        //     consumes; each carries a unique ##id so it never collides with the
+        //     centred buttons below. ---
         world_params& wp = m_pending_world_params;
         ImGui::SeparatorText("New World");
 
@@ -1508,14 +1643,922 @@ void app::draw_main_menu()
         if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
             ImGui::SetTooltip("A variable body count is coming in a later update.");
 
+        // The Planetology knobs (BL-167) used to sit here as six sliders. They now
+        // live in the New World wizard, one decision per chain stage, where each is
+        // taken against a chart of the system as it stands — a slider whose effect
+        // you cannot see is a slider you cannot judge.
+        {
+            ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 280.0f);
+            ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 145, 255));
+            ImGui::TextUnformatted("The world's character is chosen during generation.");
+            ImGui::PopStyleColor();
+            ImGui::PopTextWrapPos();
+        }
+
         ImGui::Dummy({0.0f, 12.0f});
 
         const ImVec2 btn = {280.0f, 40.0f};
         if (ImGui::Button("New Game", btn))
-            start_new_game();
+            open_new_world_wizard();
         ImGui::Dummy({0.0f, 6.0f});
         if (ImGui::Button("Quit", btn))
             m_quit_requested = true;
+    }
+    ImGui::End();
+}
+
+// ---------------------------------------------------------------------------
+// The New World wizard (BL-167)
+//
+// THREE rounds, not ten stages. The chain still has ten links and the player is
+// still shown every one of them — each round stacks its stages' charts and
+// explanations into one scroll — but the decisions are batched into three
+// thematic groups. Ben's call (2026-07-22): "we don't need so many rounds, it's
+// just too slow - try to batch them together thematically."
+//
+// What the player sets is a PREFERENCE, not a parameter: a named lean per axis
+// ("Dimmer", "Metal-rich"), resolved against the seed by resolve_preferences. No
+// raw generated value is editable, and none is printed in the decision area — the
+// charts above it show what the roll actually produced, which is the only honest
+// feedback there is. "If you have preferences you can find them, but really you
+// don't get full customization. Just a step more detail than a seeded world."
+//
+// NOTHING IS GENERATED HERE. resolve_preferences and preview_system run the whole
+// chain over the prototype body set whenever a control moves; both are pure,
+// throwaway, and never touch m_world. The world is built once, from the finished
+// preferences, when the player presses "Begin" at the last round (start_new_game).
+//
+// Rounds are causal: rerolling round A re-draws B and C downstream. That is
+// correct — the chain is causal too — and it is why Back is a plain revision with
+// no per-round snapshot to keep.
+//
+// Charts are drawn with ui::charts — the primitives extracted from the tile
+// selection graphs — so the wizard and the in-game surfaces share one visual
+// language by construction rather than by imitation.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+/// The paragraph shown at each stage: the actual chemistry, in the plainest words
+/// that stay true. A player should leave the wizard knowing WHY the gates sit
+/// where they do, not just which control moved which bar.
+const char* stage_explainer(chain_stage s)
+{
+    switch (s)
+    {
+        case chain_stage::system: return
+            "Everything heavier than helium is supernova debris, so one nebula hands the "
+            "same metallicity to every body it forms. Stellar mass fixes luminosity, and "
+            "with it where liquid water is possible at all.";
+        case chain_stage::accretion: return
+            "Mass sets radius, and the two together set escape velocity. That single "
+            "number decides what a body can hold on to for the next four billion years, "
+            "so it is chosen here and never revisited.";
+        case chain_stage::air: return
+            "A body keeps its air if gravity beats sunlight. Escape velocity to the "
+            "fourth power over instellation separates every world with an atmosphere "
+            "from every world without. No magnetic field required.";
+        case chain_stage::engine: return
+            "Radiogenic heat is made in the mantle and lost through the surface, so the "
+            "interior clock runs on volume over area. A hot interior keeps plates moving, "
+            "and plate margins are where copper concentrates.";
+        case chain_stage::water: return
+            "Liquid water has an irreversible failure on each side of it: a runaway "
+            "greenhouse above, an ice-albedo lock below. The band between them is narrow, "
+            "and neither edge lets a world back.";
+        case chain_stage::spark: return
+            "Abiogenesis has happened once, here, at a sample size of one - so its "
+            "probability is unconstrained by orders of magnitude. The prototype fires it "
+            "wherever the chemistry allows, which is a design choice, not a measurement.";
+        case chain_stage::breath: return
+            "Photosynthesis and respiration are exact inverses, so a biosphere only "
+            "leaves free oxygen behind when carbon is buried out of contact with it. "
+            "Until then dissolved iron absorbs every molecule.";
+        case chain_stage::green: return
+            "About ninety percent of Earth's coal comes from one climatic window: everwet "
+            "equatorial mires over subsiding basins. The cause is climate and tectonics, "
+            "not anything about the plants themselves.";
+        case chain_stage::legacy: return
+            "Fossil resources key off the biosphere's PEAK and survive its extinction; "
+            "living resources key off what is alive now and die with it. That split is "
+            "what leaves a dead world still worth mining.";
+        case chain_stage::spend: return
+            "A richer world industrialises earlier, so it is further drawn down when you "
+            "arrive. The ore is still in the ground; the cheap ore is not. This is the "
+            "generated reason a corporation goes to space.";
+        default: return "";
+    }
+}
+
+/// One round of the wizard: a thematic run of chain stages, charted together and
+/// closed by the preferences that shape them. A round's stages are contiguous
+/// links of the chain, so the span is just a first/last pair.
+struct wizard_round
+{
+    const char* name;     ///< The large header.
+    const char* question; ///< What the round settles, in one line.
+    chain_stage first;    ///< Inclusive.
+    chain_stage last;     ///< Inclusive.
+};
+
+/// The A / B / C grouping — the chain's own shape: what kind of world is this,
+/// what happened on it, and what did you walk into. Caller clamps the index.
+const wizard_round& wizard_round_at(int r)
+{
+    static const wizard_round rounds[3] = {
+        { "The System",  "What kind of world is this, and what is it made of?",
+          chain_stage::system, chain_stage::engine },
+        { "Life",        "What happened on it, and what did that leave in the rocks?",
+          chain_stage::water,  chain_stage::green  },
+        { "Inheritance", "What did the era before you already take?",
+          chain_stage::legacy, chain_stage::spend  },
+    };
+    return rounds[r];
+}
+
+/// How many preference rows a round owns, and how many dim caption lines sit under
+/// them. Both feed the height reserved for the decision block, which is pinned to
+/// the bottom so the charts get everything left over.
+int round_pref_count(int r) { return (r == 0) ? 4 : (r == 1) ? 3 : 1; }
+int round_note_lines(int r) { return (r == 1) ? 3 : 1; } ///< B carries the iron/coal caption.
+
+/// One preference row: a name, then four segmented options with `Any` first.
+///
+/// Named leans only, and deliberately no number anywhere. A lean narrows the range
+/// the seed is sampled from; it never pins a value. The moment a player can read
+/// `1.0342` off this screen it is a settings form again rather than a preference,
+/// which is the whole distinction the wizard is built on.
+///
+/// @return true when the player moved it, so the caller can mark the preview dirty.
+bool lean_row(const char* id, const char* label, lean& value,
+              const char* low, const char* mid, const char* high)
+{
+    static constexpr lean order[4] = { lean::any, lean::low, lean::mid, lean::high };
+    const char* names[4] = { "Any", low, mid, high };
+
+    // PushID scopes the four buttons to this row, so two rows sharing an option
+    // name ("Balanced" appears under both Ocean and Oxygen) never collide.
+    ImGui::PushID(id);
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(label);
+
+    bool changed = false;
+    for (int i = 0; i < 4; ++i)
+    {
+        ImGui::SameLine(i == 0 ? 170.0f : 0.0f);
+        int v = static_cast<int>(value);
+        if (ImGui::RadioButton(names[i], &v, static_cast<int>(order[i])))
+        {
+            value   = order[i];
+            changed = true;
+        }
+    }
+    ImGui::PopID();
+    return changed;
+}
+
+} // namespace
+
+void app::draw_generation_screen()
+{
+    const ImVec2      disp  = ImGui::GetIO().DisplaySize;
+    const ImGuiStyle& style = ImGui::GetStyle();
+
+    // One reroll counter per round; the wizard and the resolver have to agree on
+    // how many rounds there are.
+    static_assert(sizeof(world_preferences::roll)
+                      == sizeof(uint32_t) * static_cast<std::size_t>(wizard_round_count),
+                  "world_preferences::roll must carry one counter per wizard round");
+
+    // Clamp first — Back/Continue and verify.generation_stage all write this.
+    if (m_wiz_round < 0)                   m_wiz_round = 0;
+    if (m_wiz_round >= wizard_round_count) m_wiz_round = wizard_round_count - 1;
+
+    // Recompute only when a control moved. Resolution plus the chain is cheap but
+    // not free, and a cached preview keeps the charts still while the player reads
+    // them — a chart that twitches every frame cannot be read at all.
+    if (m_wiz_dirty || m_wiz_preview.empty())
+    {
+        refresh_wizard_preview();
+        m_wiz_dirty = false;
+    }
+    if (m_wiz_preview.empty())
+        return; // defensive: the preview is the wizard's only data source
+
+    const wizard_round& wr       = wizard_round_at(m_wiz_round);
+    const int           n_bodies = std::min(static_cast<int>(m_wiz_preview.size()),
+                                            prototype_body_count());
+
+    // The homeworld is the subject of every single-body chart. Located by its
+    // authored flag rather than by position, so the body list can be reordered.
+    int home = 0;
+    for (int i = 0; i < n_bodies; ++i)
+        if (prototype_body(i).is_homeworld) { home = i; break; }
+    const planetology_state& hs = m_wiz_preview[static_cast<std::size_t>(home)];
+    const planetology_state& hu = (static_cast<std::size_t>(home) < m_wiz_undrawn.size())
+                                ? m_wiz_undrawn[static_cast<std::size_t>(home)] : hs;
+
+    constexpr ImU32 col_bright = IM_COL32(225, 230, 240, 255);
+    constexpr ImU32 col_dim    = IM_COL32(120, 128, 145, 255);
+    constexpr ImU32 col_gate   = IM_COL32(220, 170,  90, 255); // a gate reads amber, not as a gridline
+    constexpr ImU32 col_home   = IM_COL32(150, 235, 160, 255); // homeworld, in the tile graphs' subject green
+
+    // One colour per body, so a body keeps its identity across every chart.
+    static constexpr ImU32 k_body_cols[4] = {
+        IM_COL32(150, 160, 190, 255), IM_COL32(190, 175, 140, 255),
+        IM_COL32(170, 140, 190, 255), IM_COL32(140, 185, 205, 255),
+    };
+    auto body_colour = [&](int i) -> ImU32 {
+        return prototype_body(i).is_homeworld ? col_home : k_body_cols[i & 3];
+    };
+
+    // Scratch column buffer. Every chart draws immediately inside chart_row, so one
+    // buffer is enough and no bar outlives the call that filled it.
+    ui::charts::bar bars[8];
+
+    // One column per body, reading a single scalar off that body's chain state.
+    auto body_bars = [&](auto&& pick) -> std::size_t {
+        const int n = std::min(n_bodies, 8);
+        for (int i = 0; i < n; ++i)
+        {
+            bars[i].value  = pick(m_wiz_preview[static_cast<std::size_t>(i)]);
+            bars[i].colour = body_colour(i);
+            bars[i].label  = prototype_body(i).name;
+            bars[i].hollow = false;
+        }
+        return static_cast<std::size_t>(n);
+    };
+    auto bars_peak = [&](std::size_t n) {
+        float p = 0.0f;
+        for (std::size_t i = 0; i < n; ++i)
+            p = std::max(p, bars[i].value);
+        return p;
+    };
+    auto endow = [](const planetology_state& s, resource_type r) {
+        return s.endowment[static_cast<std::size_t>(r)];
+    };
+
+    // Columns from a resource list, skipping anything the body does not have at all.
+    // Names and colours come from presentation_of, so the wizard's endowment charts
+    // and the in-game ledgers agree on both.
+    auto resource_bars = [&](const planetology_state& s,
+                             const resource_type* list, std::size_t count) -> std::size_t {
+        std::size_t n = 0;
+        for (std::size_t i = 0; i < count && n < 8; ++i)
+        {
+            const float v = endow(s, list[i]);
+            if (v <= 0.0f)
+                continue;
+            const ui::resource_presentation& rp = ui::presentation_of(list[i]);
+            bars[n].value  = v;
+            bars[n].colour = rp.colour;
+            bars[n].label  = rp.name;
+            bars[n].hollow = false;
+            ++n;
+        }
+        return n;
+    };
+
+    // One dim, wrapping text helper — every subtitle and caption reads in the same
+    // colour as the menu's tagline. Declared out here so the per-stage sections can
+    // use it as well as the decision block.
+    auto dim_text = [&](const char* s) {
+        ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
+        ImGui::TextWrapped("%s", s);
+        ImGui::PopStyleColor();
+    };
+
+    // The same, wrapped to a readable measure instead of to the panel edge. The
+    // panel is as wide as the charts want, which is far too wide for prose.
+    auto dim_para = [&](const char* s) {
+        ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 820.0f);
+        ImGui::PushStyleColor(ImGuiCol_Text, col_dim);
+        ImGui::TextUnformatted(s);
+        ImGui::PopStyleColor();
+        ImGui::PopTextWrapPos();
+    };
+
+    // --- Chart cells ---
+    // Two charts sit side by side whenever the panel is wide enough. That is what
+    // keeps a round of four stages to roughly a screen and a half of scroll rather
+    // than three; batching the rounds is pointless if the reading cost just moves
+    // from clicks to scrolling. `cols` and `col_w` are measured once the chart
+    // region is known; `cell` tracks the column the next chart lands in.
+    int   cols  = 1;
+    float col_w = 0.0f;
+    int   cell  = 0; // 0 == the cursor is at the start of a chart line
+
+    // One bordered chart, laid out exactly like the tile-selection graphs: the
+    // header indents to the plot origin, the plot is reserved with a Dummy, and the
+    // body draws into the CHILD-LOCAL draw list so everything clips to the box.
+    // A @p span of 2 takes the whole line — for a chart that needs the room (eight
+    // clustered columns) or is the odd one out in its stage.
+    auto chart_row = [&](const char* id, const char* title, float h, int span, auto&& body) {
+        const bool full = (span >= cols);
+        if (cell != 0 && !full)
+            ImGui::SameLine(0.0f, style.ItemSpacing.x);
+        ImGui::BeginChild(id, {full ? 0.0f : col_w, ui::charts::chart_row_height(h)}, true,
+                          ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
+        ImDrawList* cdl = ImGui::GetWindowDrawList();
+        ImGui::Indent(ui::charts::gutter);
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(ui::palette::selection), "%s", title);
+        ImGui::Unindent(ui::charts::gutter);
+        const ImVec2 p  = ImGui::GetCursorScreenPos();
+        const float  cw = ImGui::GetContentRegionAvail().x;
+        ImGui::Dummy({cw, h});
+        body(cdl, p, ImVec2{p.x + cw, p.y + h});
+        ImGui::EndChild();
+        cell = full ? 0 : (cell + 1) % cols;
+    };
+
+    // Start the next chart on a fresh line. Called at every stage boundary, so one
+    // stage's plots never share a row with the next stage's.
+    auto chart_break = [&]() { cell = 0; };
+
+    // --- One chain stage, as a section inside its round ---
+    // Its name and the question it answers as the heading, the physics it encodes
+    // beneath, which bodies it killed, then its charts. The player still watches the
+    // chain work link by link — they have just stopped clicking between the links.
+    auto draw_stage = [&](chain_stage s) {
+        chart_break();
+
+        char head[160];
+        std::snprintf(head, sizeof head, "%s - %s", chain_stage_name(s), chain_stage_title(s));
+        ImGui::SeparatorText(head);
+        dim_para(stage_explainer(s));
+
+        // Which bodies this gate kills. The chain's interesting output is WHICH GATE
+        // A BODY DIED AT, so it is named at the gate and not only in the verdict.
+        {
+            std::string lost;
+            for (int i = 0; i < n_bodies; ++i)
+            {
+                if (m_wiz_preview[static_cast<std::size_t>(i)].died_at != s)
+                    continue;
+                if (!lost.empty())
+                    lost += ", ";
+                lost += prototype_body(i).name;
+            }
+            if (!lost.empty())
+                dim_para(("Lost at this gate: " + lost).c_str());
+        }
+        ImGui::Spacing();
+
+        switch (s)
+        {
+            case chain_stage::system:
+            {
+                const std::size_t n = body_bars([](const planetology_state& st) { return st.instellation; });
+                const float c = ui::charts::tight_ceil(std::max(bars_peak(n), 1.1f));
+                chart_row("##c_inst", "Instellation (S, Earth = 1)", 120.0f, 1,
+                          [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
+                    ui::charts::draw_bars(dl, mn, mx, bars, n, c, "%.2f");
+                    ui::charts::threshold_line(dl, mn, mx, 1.0512f, c, col_gate, "runaway greenhouse");
+                });
+
+                // The homeworld on its own axis. The two gates that decide whether the
+                // world you inherit can hold liquid water sit within a factor of three
+                // of each other, and they are unreadable on an axis stretched by an
+                // inner body taking six suns.
+                ui::charts::bar hb[1];
+                hb[0].value  = hs.instellation;
+                hb[0].colour = col_home;
+                hb[0].label  = prototype_body(home).name;
+                hb[0].hollow = false;
+                const float cc = std::max(2.0f, ui::charts::tight_ceil(hs.instellation));
+                chart_row("##c_corridor", "Homeworld corridor (S, Earth = 1)", 120.0f, 1,
+                          [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
+                    ui::charts::draw_bars(dl, mn, mx, hb, 1, cc, "%.2f");
+                    ui::charts::threshold_line(dl, mn, mx, 1.0512f, cc, col_gate, "runaway greenhouse");
+                    ui::charts::threshold_line(dl, mn, mx, 0.3438f, cc, col_gate, "freeze-out");
+                });
+                break;
+            }
+
+            case chain_stage::accretion:
+            {
+                const std::size_t n = body_bars([](const planetology_state& st) { return st.v_esc_kms; });
+                const float c = ui::charts::tight_ceil(bars_peak(n));
+                chart_row("##c_vesc", "Escape velocity (km/s)", 140.0f, 2,
+                          [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
+                    ui::charts::draw_bars(dl, mn, mx, bars, n, c, "%.2f");
+                });
+                break;
+            }
+
+            case chain_stage::air:
+            {
+                // The losers get their own scale. The shoreline spans three orders of
+                // magnitude, so the airless margin is invisible beside a body that
+                // cleared the gate seven times over - and the margin is the interesting
+                // part, because it says which failure was close. Gathered first because
+                // whether it exists decides how wide the chart above it should be.
+                ui::charts::bar sub[8];
+                std::size_t sn = 0;
+                for (int i = 0; i < n_bodies && sn < 8; ++i)
+                {
+                    const planetology_state& st = m_wiz_preview[static_cast<std::size_t>(i)];
+                    if (st.shore >= 1.5f)
+                        continue;
+                    sub[sn].value  = st.shore;
+                    sub[sn].colour = body_colour(i);
+                    sub[sn].label  = prototype_body(i).name;
+                    sub[sn].hollow = false;
+                    ++sn;
+                }
+
+                const std::size_t n = body_bars([](const planetology_state& st) { return st.shore; });
+                const float c = ui::charts::tight_ceil(std::max(bars_peak(n), 1.6f));
+                chart_row("##c_shore", "Retention shoreline (v_esc^4 / S, Mars = 1)",
+                          120.0f, sn > 0 ? 1 : 2,
+                          [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
+                    ui::charts::draw_bars(dl, mn, mx, bars, n, c, "%.2f");
+                    ui::charts::threshold_line(dl, mn, mx, 1.5f, c, col_gate, "retains air");
+                });
+
+                if (sn > 0)
+                {
+                    float peak = 0.0f;
+                    for (std::size_t i = 0; i < sn; ++i)
+                        peak = std::max(peak, sub[i].value);
+                    const float cs = ui::charts::tight_ceil(std::max(peak, 0.06f));
+                    chart_row("##c_shore_lo", "Below the shoreline (same axis, rescaled)", 120.0f, 1,
+                              [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
+                        ui::charts::draw_bars(dl, mn, mx, sub, sn, cs, "%.3f");
+                        ui::charts::threshold_line(dl, mn, mx, 0.05f, cs, col_gate, "airless below");
+                    });
+                }
+                break;
+            }
+
+            case chain_stage::engine:
+            {
+                const std::size_t n = body_bars([](const planetology_state& st) { return st.theta; });
+                // The ceiling is forced past the upper gate so both edges of the
+                // mobile-lid band render; a threshold above the axis top is dropped.
+                const float c = ui::charts::tight_ceil(std::max(bars_peak(n), 2.4f));
+                chart_row("##c_theta", "Interior heat budget (Earth now = 1)", 140.0f, 2,
+                          [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
+                    ui::charts::draw_bars(dl, mn, mx, bars, n, c, "%.2f");
+                    ui::charts::threshold_line(dl, mn, mx, 0.55f, c, col_gate, "mobile lid floor");
+                    ui::charts::threshold_line(dl, mn, mx, 2.20f, c, col_gate, "mobile lid ceiling");
+                });
+                break;
+            }
+
+            case chain_stage::water:
+            {
+                const std::size_t n = body_bars([](const planetology_state& st) { return st.surface_temp_k; });
+                const float c = ui::charts::tight_ceil(std::max(bars_peak(n), 400.0f));
+                chart_row("##c_temp", "Surface temperature (K)", 120.0f, 1,
+                          [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
+                    ui::charts::draw_bars(dl, mn, mx, bars, n, c, "%.0f");
+                    ui::charts::threshold_line(dl, mn, mx, 273.0f, c, col_gate, "water freezes");
+                    ui::charts::threshold_line(dl, mn, mx, 373.0f, c, col_gate, "water boils");
+                });
+
+                // The land/sea split the ocean lean actually produced - it is the
+                // generated water fraction, not the preference, that the tile pass reads.
+                ui::charts::bar wb[2];
+                wb[0].value  = hs.profile.water_fraction * 100.0f;
+                wb[0].colour = IM_COL32(90, 150, 210, 255);
+                wb[0].label  = "Ocean";
+                wb[0].hollow = false;
+                wb[1].value  = 100.0f - wb[0].value;
+                wb[1].colour = IM_COL32(150, 190, 120, 255);
+                wb[1].label  = "Land";
+                wb[1].hollow = false;
+                chart_row("##c_ocean", "Homeworld surface split", 120.0f, 1,
+                          [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
+                    ui::charts::draw_bars(dl, mn, mx, wb, 2, 100.0f, "%.0f%%");
+                });
+                break;
+            }
+
+            case chain_stage::spark:
+            {
+                // How far up the ladder each body got. Ordinal, so the ceiling is the
+                // top of the enum rather than a nice_ceil of the data.
+                const std::size_t n = body_bars([](const planetology_state& st) {
+                    return static_cast<float>(st.peak);
+                });
+                chart_row("##c_peak", "Peak biology reached (sterile 0 -> civilised 6)", 140.0f, 2,
+                          [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
+                    ui::charts::draw_bars(dl, mn, mx, bars, n, 6.0f, "%.0f");
+                });
+
+                std::string ladder;
+                for (int i = 0; i < n_bodies; ++i)
+                {
+                    if (!ladder.empty())
+                        ladder += "   ";
+                    ladder += prototype_body(i).name;
+                    ladder += ": ";
+                    ladder += life_stage_name(m_wiz_preview[static_cast<std::size_t>(i)].peak);
+                }
+                dim_para(ladder.c_str());
+                break;
+            }
+
+            case chain_stage::breath:
+            {
+                // The money chart: one lean, two resources, opposite directions. Iron
+                // wants a long ferruginous ocean; coal wants the land era that only
+                // starts once that ocean has closed.
+                static constexpr resource_type k_trade[] = {
+                    resource_type::iron_ore, resource_type::coal };
+                const std::size_t n = resource_bars(hs, k_trade, 2);
+                const float c = ui::charts::tight_ceil(std::max(bars_peak(n), 1.0f));
+                chart_row("##c_trade", "The iron / coal trade (homeworld endowment)", 120.0f, 1,
+                          [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
+                    ui::charts::draw_bars(dl, mn, mx, bars, n, c, "%.2f");
+                });
+
+                // The two windows those resources are actually measured from.
+                ui::charts::bar gb[2];
+                gb[0].value  = hs.ferruginous_gyr;
+                gb[0].colour = ui::presentation_of(resource_type::iron_ore).colour;
+                gb[0].label  = "Ferruginous ocean";
+                gb[0].hollow = false;
+                gb[1].value  = hs.marine_anoxia_gyr;
+                gb[1].colour = ui::presentation_of(resource_type::petroleum).colour;
+                gb[1].label  = "Marine anoxia";
+                gb[1].hollow = false;
+                const float cg = ui::charts::tight_ceil(std::max({gb[0].value, gb[1].value, 1.0f}));
+                chart_row("##c_windows", "Anoxic windows (Gyr)", 120.0f, 1,
+                          [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
+                    ui::charts::draw_bars(dl, mn, mx, gb, 2, cg, "%.2f");
+                });
+
+                dim_para("Iron is banded-iron deposits laid down while the ocean was still "
+                         "anoxic; coal needs the land biosphere that only follows once "
+                         "oxygen has won. Buying one spends the other.");
+                break;
+            }
+
+            case chain_stage::green:
+            {
+                static constexpr resource_type k_green[] = {
+                    resource_type::coal, resource_type::timber,
+                    resource_type::agricultural_produce };
+                const std::size_t n = resource_bars(hs, k_green, 3);
+                if (n > 0)
+                {
+                    const float c = ui::charts::tight_ceil(std::max(bars_peak(n), 1.0f));
+                    chart_row("##c_green", "What the land era leaves (homeworld endowment)", 120.0f, 1,
+                              [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
+                        ui::charts::draw_bars(dl, mn, mx, bars, n, c, "%.2f");
+                    });
+                }
+                else
+                {
+                    dim_para("No land biosphere - no coal, no timber, no crops.");
+                }
+
+                ui::charts::bar ab[1];
+                ab[0].value  = hs.arable_share * 100.0f;
+                ab[0].colour = ui::presentation_of(resource_type::agricultural_produce).colour;
+                ab[0].label  = "Arable";
+                ab[0].hollow = false;
+                const float ca = ui::charts::tight_ceil(std::max(ab[0].value, 10.0f));
+                chart_row("##c_arable", "Arable share of land", 120.0f, n > 0 ? 1 : 2,
+                          [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
+                    ui::charts::draw_bars(dl, mn, mx, ab, 1, ca, "%.0f%%");
+                });
+                break;
+            }
+
+            case chain_stage::legacy:
+            {
+                // The payoff. Every non-zero endowment the homeworld carries, split into
+                // three charts only because a single clustered chart's legend cannot
+                // stack sixteen rows inside one plot - the coverage is the full set.
+                static constexpr resource_type k_metals[] = {
+                    resource_type::iron_ore, resource_type::copper_ore,
+                    resource_type::rare_earth_ore, resource_type::iron_nickel_ore,
+                    resource_type::platinum_group_metals };
+                static constexpr resource_type k_carbon[] = {
+                    resource_type::coal, resource_type::petroleum, resource_type::peat,
+                    resource_type::timber, resource_type::agricultural_produce };
+                static constexpr resource_type k_bulk[] = {
+                    resource_type::stone, resource_type::silica, resource_type::sand,
+                    resource_type::clay, resource_type::regolith, resource_type::water };
+
+                const auto group = [&](const char* id, const char* title, float h, int span,
+                                       const resource_type* list, std::size_t count) {
+                    const std::size_t n = resource_bars(hs, list, count);
+                    if (n == 0)
+                        return;
+                    const float c = ui::charts::tight_ceil(std::max(bars_peak(n), 1.0f));
+                    chart_row(id, title, h, span, [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
+                        ui::charts::draw_bars(dl, mn, mx, bars, n, c, "%.2f");
+                    });
+                };
+                group("##c_metals", "Metals (homeworld endowment, 1.0 = Earth-typical)",
+                      120.0f, 1, k_metals, sizeof k_metals / sizeof k_metals[0]);
+                group("##c_carbon", "Carbon and living resources",
+                      120.0f, 1, k_carbon, sizeof k_carbon / sizeof k_carbon[0]);
+                // C -> D: what this biosphere evolved that grows nowhere else
+                // (BL-191). These do not live in `endowment` like the industrial
+                // raws — an endemic good has no global abundance to scale, only an
+                // origin — so they are charted from the endemic set itself.
+                if (!hs.endemics.empty())
+                {
+                    std::size_t n = 0;
+                    for (const endemic_good& e : hs.endemics)
+                    {
+                        if (n >= 8) break;
+                        const ui::resource_presentation& rp = ui::presentation_of(e.good);
+                        bars[n].value  = e.richness;
+                        bars[n].colour = rp.colour;
+                        bars[n].label  = rp.name;
+                        bars[n].hollow = false;
+                        ++n;
+                    }
+                    const float c = ui::charts::tight_ceil(std::max(bars_peak(n), 1.0f));
+                    chart_row("##c_endemic",
+                              "Endemic trade goods - worth more the further you carry them",
+                              130.0f, 2, [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
+                        ui::charts::draw_bars(dl, mn, mx, bars, n, c, "%.2f");
+                    });
+
+                    // Where each one grows. The band and region ARE the value, so
+                    // they are stated rather than left implicit in the bar.
+                    ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 145, 255));
+                    for (const endemic_good& e : hs.endemics)
+                    {
+                        const float mid = (e.lat_lo + e.lat_hi) * 0.5f;
+                        const char* band = mid < 0.25f ? "tropical"
+                                         : mid < 0.45f ? "subtropical"
+                                         : mid < 0.60f ? "temperate"
+                                         : "polar";
+                        ImGui::Text("%s grows only in one %s region - %.0f%% of the way round the globe.",
+                                    ui::presentation_of(e.good).name, band,
+                                    static_cast<double>(e.sector_centre * 100.0f));
+                    }
+                    ImGui::PopStyleColor();
+                }
+
+                group("##c_bulk",   "Sedimentary and bulk",
+                      130.0f, 2, k_bulk,   sizeof k_bulk   / sizeof k_bulk[0]);
+
+
+
+                // What each body has and lacks, in one line apiece — the reason to go
+                // anywhere other than home, stated before the campaign starts.
+                chart_break();
+                ImGui::Spacing();
+                static constexpr resource_type k_core[] = {
+                    resource_type::iron_ore, resource_type::coal, resource_type::petroleum,
+                    resource_type::copper_ore, resource_type::water,
+                    resource_type::agricultural_produce, resource_type::timber,
+                    resource_type::platinum_group_metals };
+                for (int i = 0; i < n_bodies; ++i)
+                {
+                    ImGui::PushID(i);
+                    const planetology_state& st = m_wiz_preview[static_cast<std::size_t>(i)];
+
+                    ImGui::PushStyleColor(ImGuiCol_Text, body_colour(i));
+                    ImGui::TextUnformatted(prototype_body(i).name);
+                    ImGui::PopStyleColor();
+                    ImGui::SameLine();
+                    ImGui::PushStyleColor(ImGuiCol_Text, col_bright);
+                    ImGui::TextUnformatted(archetype_name(st.archetype));
+                    ImGui::PopStyleColor();
+
+                    std::string rich, lacks;
+                    for (const resource_type rt : k_core)
+                    {
+                        const float v = endow(st, rt);
+                        const char* nm = ui::presentation_of(rt).name;
+                        if (v >= 1.3f)      { if (!rich.empty())  rich  += ", "; rich  += nm; }
+                        else if (v <= 0.0f) { if (!lacks.empty()) lacks += ", "; lacks += nm; }
+                    }
+                    std::string strip;
+                    if (!rich.empty())  strip  = "Rich: " + rich;
+                    if (!lacks.empty()) strip += (strip.empty() ? "" : "   ") + std::string("Lacks: ") + lacks;
+                    if (strip.empty())  strip  = "Nothing exceptional either way.";
+                    dim_para(strip.c_str());
+
+                    ImGui::PopID();
+                }
+                break;
+            }
+
+            case chain_stage::spend:
+            {
+                // Before / after, clustered in pairs: the hollow column is the endowment
+                // the chain formed, the filled one is what is left after a prior
+                // industrial era took the cheap half of it.
+                static constexpr resource_type k_spend[] = {
+                    resource_type::coal, resource_type::petroleum,
+                    resource_type::iron_ore, resource_type::copper_ore };
+                ui::charts::bar sb[8];
+                char            sl[8][32];
+                std::size_t     sn   = 0;
+                float           peak = 0.0f;
+                for (const resource_type rt : k_spend)
+                {
+                    const ui::resource_presentation& rp = ui::presentation_of(rt);
+                    const float before = endow(hu, rt);
+                    const float after  = endow(hs, rt);
+                    std::snprintf(sl[sn], sizeof sl[sn], "%s formed", rp.abbrev);
+                    sb[sn].value = before; sb[sn].colour = rp.colour;
+                    sb[sn].label = sl[sn]; sb[sn].hollow = true;  ++sn;
+                    std::snprintf(sl[sn], sizeof sl[sn], "%s left", rp.abbrev);
+                    sb[sn].value = after;  sb[sn].colour = rp.colour;
+                    sb[sn].label = sl[sn]; sb[sn].hollow = false; ++sn;
+                    peak = std::max(peak, before);
+                }
+                const float c = ui::charts::tight_ceil(std::max(peak, 1.0f));
+                chart_row("##c_spend", "Formed against left (homeworld endowment)", 175.0f, 2,
+                          [&](ImDrawList* dl, ImVec2 mn, ImVec2 mx) {
+                    ui::charts::draw_bars(dl, mn, mx, sb, sn, c, "%.2f");
+                });
+                dim_para("The hollow column is what the chain formed; the filled one is what "
+                         "is left. Nothing was destroyed - the accessible half was already "
+                         "mined, which is why the next tonne has to come from somewhere else.");
+                break;
+            }
+
+            default:
+                break;
+        }
+
+        chart_break();
+    };
+
+    // A wide centred surface — this is the first thing a player sees, so it takes
+    // the screen rather than the menu's 280px column. Same borderless,
+    // background-less idiom as draw_main_menu; the render clear colour is the backdrop.
+    const float panel_w = std::min(disp.x - 96.0f, 1180.0f);
+    const float panel_h = std::max(420.0f, disp.y - 96.0f);
+    ImGui::SetNextWindowPos({disp.x * 0.5f, disp.y * 0.5f}, ImGuiCond_Always, {0.5f, 0.5f});
+    ImGui::SetNextWindowSize({panel_w, panel_h}, ImGuiCond_Always);
+    constexpr ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
+        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse |
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoBackground;
+    if (ImGui::Begin("##generation", nullptr, flags))
+    {
+        char buf[256];
+
+        // ── (a) Header: the round name large, what it settles beneath, progress right ──
+        {
+            ImDrawList*  dl    = ImGui::GetWindowDrawList();
+            const float  big   = ImGui::GetFontSize() * 1.7f;
+            const ImVec2 p     = ImGui::GetCursorScreenPos();
+            const float  avail = ImGui::GetContentRegionAvail().x;
+
+            // The atlas carries a single size, so the title is scaled through the
+            // draw list rather than by swapping fonts (there is no second font).
+            dl->AddText(ImGui::GetFont(), big, p, col_bright, wr.name);
+
+            std::snprintf(buf, sizeof buf, "Round %d of %d", m_wiz_round + 1, wizard_round_count);
+            const ImVec2 ts = ImGui::CalcTextSize(buf);
+            dl->AddText({p.x + avail - ts.x, p.y + (big - ts.y) * 0.5f}, col_dim, buf);
+
+            ImGui::Dummy({avail, big + 2.0f});
+        }
+        dim_text(wr.question);
+
+        // Three pips, the current one lit: past rounds filled dim, future ones hollow.
+        {
+            ImDrawList*  dl = ImGui::GetWindowDrawList();
+            const ImVec2 p  = ImGui::GetCursorScreenPos();
+            constexpr float pip = 10.0f, gap = 6.0f;
+            for (int i = 0; i < wizard_round_count; ++i)
+            {
+                const ImVec2 a{p.x + static_cast<float>(i) * (pip + gap), p.y + 4.0f};
+                const ImVec2 b{a.x + pip, a.y + pip};
+                if (i == m_wiz_round)     dl->AddRectFilled(a, b, col_bright);
+                else if (i < m_wiz_round) dl->AddRectFilled(a, b, col_dim);
+                else                      dl->AddRect(a, b, col_dim);
+            }
+            ImGui::Dummy({static_cast<float>(wizard_round_count) * (pip + gap), pip + 8.0f});
+        }
+        ImGui::Separator();
+
+        // ── (b) The round's stages, charted. Sized to leave the preference block and
+        //    the footer pinned below, so the controls never scroll away from the
+        //    charts they act on. ──
+        const float frame_h  = ImGui::GetFrameHeight();
+        const float line_h   = ImGui::GetTextLineHeightWithSpacing();
+        const float decide_h = static_cast<float>(round_pref_count(m_wiz_round))
+                                   * (frame_h + style.ItemSpacing.y)
+                             + line_h * static_cast<float>(round_note_lines(m_wiz_round)
+                                                           + (m_wiz_resolved.gave_up ? 2 : 0))
+                             + style.ItemSpacing.y * 3.0f;
+        const float footer_h = 34.0f + style.ItemSpacing.y * 2.0f;
+        ImGui::BeginChild("##wiz_charts", {0.0f, -(decide_h + footer_h)}, false,
+                          ImGuiWindowFlags_NoBackground);
+
+        // Column metric for the chart cells, measured once the region (and its
+        // scrollbar, if any) is known. A narrow display falls back to one column.
+        {
+            const float avail = ImGui::GetContentRegionAvail().x;
+            cols  = (avail >= 780.0f) ? 2 : 1;
+            col_w = std::floor((avail - style.ItemSpacing.x * static_cast<float>(cols - 1))
+                               / static_cast<float>(cols)) - 1.0f;
+        }
+
+        for (int s = static_cast<int>(wr.first); s <= static_cast<int>(wr.last); ++s)
+            draw_stage(static_cast<chain_stage>(s));
+
+        ImGui::EndChild();
+
+        // ── (c) The round's preferences. Named leans and nothing else: no value from
+        //    the resolved params is printed or editable here, because the charts above
+        //    already show what the roll produced and that is the honest feedback. ──
+        world_preferences& pf = m_pending_world_params.preferences;
+        ImGui::Separator();
+
+        switch (m_wiz_round)
+        {
+            case 0:
+                if (lean_row("star", "Star", pf.star,
+                             "Dimmer", "Sun-like", "Brighter"))                      m_wiz_dirty = true;
+                if (lean_row("size", "World", pf.world_size,
+                             "Small", "Earth-like", "Large"))                        m_wiz_dirty = true;
+                if (lean_row("interior", "Interior", pf.interior,
+                             "Old and cold", "Moderate", "Young and vigorous"))      m_wiz_dirty = true;
+                if (lean_row("metal", "Metal", pf.metal,
+                             "Metal-poor", "Normal", "Metal-rich"))                  m_wiz_dirty = true;
+                break;
+
+            case 1:
+                if (lean_row("ocean", "Ocean", pf.ocean,
+                             "Continental", "Balanced", "Oceanic"))                  m_wiz_dirty = true;
+                if (lean_row("oxygen", "Oxygen", pf.oxygen_story,
+                             "Oxygenated early", "Balanced", "Oxygenated late"))     m_wiz_dirty = true;
+                // The one trade worth spelling out: a single choice moves two resources
+                // in opposite directions, with every gate still passed either way.
+                dim_text("Oxygenated early -> coal-rich and iron-lean; oxygenated late -> "
+                         "iron-rich and coal-lean.");
+                if (lean_row("coal", "Coal basins", pf.coal_basins,
+                             "Seasonal", "Mixed", "Everwet"))                        m_wiz_dirty = true;
+                break;
+
+            case 2:
+                if (lean_row("drawdown", "Drawdown", pf.drawdown,
+                             "Barely touched", "Worked", "Stripped"))                m_wiz_dirty = true;
+                break;
+
+            default:
+                break;
+        }
+
+        // The reroll cost, told rather than hidden. Resolution rejects and re-draws
+        // until the homeworld clears the strict Earth-like floor; how many draws that
+        // took is a true thing about the preferences just set, and a narrow set of
+        // leans is meant to feel like one.
+        if (m_wiz_resolved.gave_up)
+        {
+            dim_text("These preferences have almost no viable region - no draw cleared the "
+                     "Earth-like floor, so this is the closest world found. Loosen one of "
+                     "them, or reroll.");
+        }
+        else if (m_wiz_resolved.attempts > 1)
+        {
+            std::snprintf(buf, sizeof buf, "Found on attempt %u.",
+                          static_cast<unsigned>(m_wiz_resolved.attempts));
+            dim_text(buf);
+        }
+
+        // ── (d) Navigation. Reroll re-draws THIS round from a fresh number (and
+        //    everything downstream of it, because the chain is causal); Back is a plain
+        //    revision, since a round's leans feed its own gates and the ones after
+        //    them, never a chart the player has already been shown. ──
+        const ImVec2 btn  = {150.0f, 34.0f};
+        const bool   last = (m_wiz_round == wizard_round_count - 1);
+
+        // Back always steps out one level, and the level outside round 0 is the main
+        // menu — a wizard the player cannot leave is a trap (nothing is generated
+        // until "Begin", so leaving costs nothing). Preferences survive the trip, so
+        // re-entering resumes the same leans from round 0.
+        if (ImGui::Button("Back##wizback", btn))
+        {
+            if (m_wiz_round == 0)
+                m_screen = app_screen::menu;
+            else
+                --m_wiz_round;
+        }
+
+        ImGui::SameLine();
+        if (ImGui::Button("Reroll##wizroll", btn))
+        {
+            ++pf.roll[m_wiz_round];
+            m_wiz_dirty = true;
+        }
+
+        ImGui::SameLine(panel_w - style.WindowPadding.x - btn.x);
+        if (ImGui::Button(last ? "Begin##wizgo" : "Continue##wizgo", btn))
+        {
+            if (last)
+                start_new_game(); // the one and only generation call
+            else
+                ++m_wiz_round;
+        }
     }
     ImGui::End();
 }
@@ -1526,11 +2569,15 @@ void app::render()
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
 
-    // Main menu — drawn instead of the canvases when no game is loaded. Shares the
-    // Render/clear/capture tail below so the menu is capturable like any frame.
-    if (m_screen == app_screen::menu)
+    // Main menu and the staged generation screen — drawn instead of the canvases
+    // when play has not started. Both share the Render/clear/capture tail below, so
+    // either is capturable like any frame.
+    if (m_screen != app_screen::in_game)
     {
-        draw_main_menu();
+        if (m_screen == app_screen::generating)
+            draw_generation_screen();
+        else
+            draw_main_menu();
 
         ImGui::Render();
         SDL_SetRenderDrawColor(m_renderer, 15, 15, 20, 255);
@@ -1992,6 +3039,25 @@ void app::render()
                 m_ui.construction.last_message = "Road placement failed."; break;
         }
         m_ui.construction.pending_road_tile = null_entity; // consume the request
+    }
+
+    // Execute a demolition queued this frame by the building Selection element. The
+    // selection is cleared on success: the entity it pointed at no longer exists, and
+    // leaving it dangling would leave the panel resolving a dead id.
+    if (m_ui.construction.pending_demolish != null_entity)
+    {
+        const entity_id doomed = m_ui.construction.pending_demolish;
+        if (demolish_building(m_world, m_world.player_entity, doomed))
+        {
+            m_ui.construction.last_message = "Demolished.";
+            if (m_ui.selected_entity == doomed)
+                m_ui.selected_entity = null_entity;
+        }
+        else
+        {
+            m_ui.construction.last_message = "Couldn't demolish that.";
+        }
+        m_ui.construction.pending_demolish = null_entity; // consume the request
     }
 
     // Execute any survey dispatch queued this frame by the Selection-panel Survey

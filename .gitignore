@@ -50,5 +50,13 @@ screenshots/
 *.dll
 *.so
 
-# FetchContent cache lives inside build/ — covered above
+# FetchContent cache — normally inside build/ (covered above), but the local dev
+# setup points FETCHCONTENT_BASE_DIR at the repo root so a re-configure does not
+# re-download ~118 MB of SDL/Lua/sol2/ImGui sources.
+_deps_cache/
+
+# Local launch convenience scripts (machine-specific absolute paths).
+_run.bat
+
 .claude/worktrees/
+tools/session/.timer_state

@@ -5,16 +5,23 @@ per-subject generation docs together — and the home of the **economic premise*
 campaign setup derives from. Each subject below has its own authoritative doc; this one
 summarises how they relate and records the cross-doc decisions that no single one owns.
 
-The four subject docs:
+The subject docs:
 
+- **`PLANETOLOGY.md`** (BL-167, post-v0.1.0, design-owed on the doc itself — see below) — the
+  body-level history pass: generated atmosphere/chemistry and a simulated abiogenesis/evolution
+  history, ahead of tile generation, in the spirit of Shadow Empire's Planetology phase.
 - **`TILE_GENERATION.md`** — the procedural tile pipeline (terrain, ocean, deposits) per body.
 - **`NATION_GENERATION.md`** — Voronoi territory placement and nation profiles over the tile map.
 - **`CORPORATION_GENERATION.md`** — corporation placement, focus, holdings, and finance.
 - **`GENERATION_LEDGER.md`** — the design-only tuning surface that explains *why* a tile generated as it did.
 
-Generation runs **tiles → nations → corporations** (deposits exist before territory is
-drawn over them; territory exists before corporations are placed within it). All passes are
-**deterministic** from the campaign seed.
+Generation runs **planetology → tiles → nations → corporations** (a body's atmosphere/history
+precedes its terrain; deposits exist before territory is drawn over them; territory exists
+before corporations are placed within it). All passes are **deterministic** from the campaign
+seed. Within the tile-generation layer, the six-pass core stays fixed and every extension
+(rivers, deposits, coastline refinement, and PLANETOLOGY.md's own future body-level pass) lands
+as a **sibling pass** reading the shared `generation_record` rather than growing the core pipeline
+(settled 2026-07-21, BL-051).
 
 ---
 

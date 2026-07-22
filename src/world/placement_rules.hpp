@@ -151,4 +151,43 @@ bool is_coastal(const world& w, entity_id tile_id);
 placement_result can_place_in_world(const world& w, entity_id tile_id,
                                     building_type type, resource_type target);
 
+// ---------------------------------------------------------------------------
+// Building stacks (Ben's 2026-07-22 call: "buildings can be stacked, so you can
+// build up to a max defined by resource richness")
+// ---------------------------------------------------------------------------
+// A tile is not a single build slot. Several extraction sites may work the same
+// deposit, up to a ceiling the deposit itself sets — a rich seam supports a
+// bigger operation than a thin one.
+//
+// PROVISIONAL RULE. The shape ("richness sets the ceiling") is settled; the
+// constant below is not, and the wider question this hangs off — whether stacked
+// sites split one nominal output or each draw their own, and how depletion
+// behaves across a stack — is an open design item. Both the placement gate and
+// the building panel's "how many more" readout call `stack_capacity`, so
+// settling the rule means changing this one function.
+
+/// Sites of @p type (and @p target, for extraction) that @p tc can carry at once.
+///
+/// Extraction scales with the target resource's deposit richness — one site per
+/// `k_richness_per_site` of deposit, at least one wherever a deposit exists at
+/// all. Every other building type returns 1: richness says nothing about how many
+/// refineries a tile can host, so stacking them is not yet a rule.
+///
+/// @param tc     The candidate tile.
+/// @param type   Building type.
+/// @param target Extraction target (ignored for non-extraction types).
+/// @return       Maximum simultaneous buildings of that kind on the tile (>= 1).
+int stack_capacity(const tile_component& tc, building_type type, resource_type target);
+
+/// Count buildings of @p type (and @p target, for extraction) already standing on
+/// @p tile_id. The current occupancy that `stack_capacity` is the ceiling for.
+///
+/// @param w       Read-only world state.
+/// @param tile_id Tile to count on.
+/// @param type    Building type to match.
+/// @param target  Extraction target to match (ignored for non-extraction types).
+/// @return        Number of matching buildings on the tile.
+int buildings_on_tile(const world& w, entity_id tile_id,
+                      building_type type, resource_type target);
+
 } // namespace placement_rules

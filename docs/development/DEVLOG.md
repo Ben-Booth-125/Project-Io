@@ -4,6 +4,295 @@ Entries are newest-first. Each entry covers one development session and records 
 
 Entries that correspond to a tagged snapshot in `backups/` carry an explicit **version** marker in their heading (e.g. *version 0.0.2*) and a **Backup** line naming the snapshot path. These are the rollback points: to revert, restore the named `backups/vX.Y.Z/` tree over `src/`.
 
+Every entry also carries a **Runtime** line: wall-clock session length, plus mode (Light/Full,
+refinement/delivery/design/etc.). This builds a record of how long similar tasks take, so future
+sessions can be scoped and paced with less waste.
+
+---
+
+## Session — Wizard back-out, built-tile routing, the building Selection element (BL-193) (2026-07-22)
+
+**Runtime.** Not recorded. Light → Full (the third item earned it).
+
+**Context.** Ben brought three "minor improvements": the New Game wizard had no way back to the
+main menu; the nation count should be a consequence of generation rather than a pre-set target;
+and built tiles should stop behaving like tiles — no terrain showing through, no navigating to the
+tile element, and a building Selection element that is currently "useless". He asked to be Q&A'd on
+the last one rather than given a guess.
+
+**What landed.**
+
+- **Wizard Back.** Round 0's Back was disabled; it now returns to the main menu. Nothing is
+  generated until "Begin", so leaving costs nothing, and preferences survive the trip.
+- **Built-tile routing** (`body_surface_canvas.cpp`). Hover and click on a built hex resolve to the
+  *building* across the whole tile, not just inside the marker glyph's radius. This is the bug Ben
+  had raised several times: routing a built tile to the tile element offered a Construct button the
+  placement rules then refused. Also made the per-tile building representative deterministic
+  (lowest id) — last-writer-wins over an `unordered_map` was fine for one building per tile and is
+  not once they stack.
+- **The building Selection element** (`selection_panel.cpp`). Rebuilt as a vertical layout against
+  Ben's four questions: how profitable is it, what can I do about that, how many more can I build
+  here, how do I remove it. Output leads (his call), then a rate bar, status, profit, production
+  method, workforce, stack readout, and Idle / Demolish.
+- **`demolish_building`** (`construction.cpp`). Did not exist — `decommissioned` only ever *idled* a
+  building in place. Idle and Demolish are now distinct controls; demolition frees the tile and
+  refunds nothing.
+- **Building stacks** (`placement_rules.cpp`, BL-193 raised). `can_place_in_world` had **no
+  occupancy check at all**, so stacking was unlimited and unintended. Added `stack_capacity` /
+  `buildings_on_tile`, enforced via `slot_full`, and read by the panel's "N of M" so the number
+  shown and the number enforced share one function.
+- **Harness.** `verify.buildings()` now reports `type`; new `verify.build_at(col, row)`; new
+  `scripts/verify/building_element.lua` covering the producing, infrastructure, and
+  under-construction shapes of the element.
+
+**In-session decisions.**
+
+**Output leads, not profit.** Ben's call. Profit is a consequence you read second; what the thing
+is physically producing, and how far that is from what it could produce, is what you act on. The
+rate ceiling is derived from the same constants `run_extraction` / `run_processing` use rather than
+an independent estimate, so "200% of nominal" is the BL-181 auto-solver genuinely pushing past
+nominal, not a display artefact.
+
+**Passive infrastructure says so.** The first cut printed "0.0 Iron Ore / tick" for a Port, purely
+because `target_resource` defaults to iron ore. A port has no output; the panel now says that
+instead of inventing a zero.
+
+**The stack cap constant is provisional and labelled as such.** The *shape* Ben stated (richness
+sets the ceiling) is settled; `richness / 50` is not, and the economics behind it are genuinely
+unsettled — see BL-193.
+
+**Things found while working.**
+
+- `building_profit.lua` has been passing on an **empty column** since it was written. It selects a
+  building at (70,38); the player corp has none there, so nothing was selected and the golden
+  captured a blank panel. The check never tested what its comment claims.
+- **The player corporation starts with one building — a Port.** No extraction, no processing, so
+  the new check has to construct a producing building before it can capture one. Related to BL-192's
+  case 2 (the ~25%-of-seeds processing facility), but more severe than that item records.
+- Construction is material-gated on the **local** market, so a site placed on a dry market stalls
+  permanently — 60 ticks did not move one. This is why `build_at` exists: `build_first_valid` takes
+  the first valid tile anywhere, which is not necessarily one a market can supply.
+
+**Open items.**
+
+- **The render half of Ben's third item is not done.** Terrain still draws under the building glyph;
+  he asked for built tiles to be "fully swapped out", possibly with a per-building-type
+  "tile+building" render. Only the click-routing half landed.
+- **Nations as a consequence of generation is not started.** Ben settled the approach (size-floor
+  merge: seeds scale with habitable land, merging absorbs anything under a minimum viable
+  territory, the count falls out) but the work is untouched.
+- BL-193 carries the stacking economics.
+
+---
+
+## Session — Planetology: the A→B→C→D chain, the New World wizard, endemic trade (BL-167, BL-191) (2026-07-21/22)
+
+**Runtime.** Not recorded (timer still conflates idle — see the previous entry). Full mode,
+research + delivery.
+
+**Context.** Ben asked first for R&D — "a rough chemical understanding of how generation would get
+from A) Input solar system to B) Life to C) Civilisation. Always human, always carbon based" — then
+for it to be built, then for the one-shot flow to become a per-stage wizard with charts.
+
+**The R&D pass.** 13 research domains, each adversarially fact-checked, synthesised into
+`docs/generation/PLANETOLOGY.md` § The chain: ten gated stages, each a threshold test rather than a
+simulation, each emitting one dated history line. The **B→C joint** — usually the hand-waved one —
+came out concrete: a biosphere physically manufactures the industrial base (banded iron, petroleum,
+coal, bauxite, supergene copper, soil), so "no life, no coal" is a mechanism, not a label. The
+**homeworld rule** settled as *constrain the inputs, never the gates*.
+
+**Ben's calls this session.** (1) *"One planet with life is much better for what I'm imagining"* —
+which closes the dead-code worry: most of the archetype ladder being unreachable in a four-body set
+is the intended shape, not a gap. (2) The one-shot flow becomes a **wizard, one decision per
+stage**, "so the user sees how the process works", presented with charts in the tile-selection idiom.
+
+**What landed.**
+- `src/world/planetology.{hpp,cpp}` — the chain as a sibling pass (BL-051's convention), run before
+  `generate_body_tiles`. It now **derives the `body_profile`** that used to be four authored
+  literals: **23 of 24 fields reproduce exactly**, Kepler bit-identical. The one divergence is
+  Cinder's `geological_activity` (authored `high`, derives `low` — Mercury is genuinely dead).
+- Two tile-pipeline hooks, both null-safe so the pre-BL-167 surface is reproducible bit-for-bit: a
+  **biotic composition mask** in Pass 4 (with `composition_abiotic` mirroring the biotic branch's
+  RNG consumption draw-for-draw) and the **per-resource endowment multiply** in Pass 6.
+- `src/ui/charts.{hpp,cpp}` — chart primitives **extracted** from the tile-selection graphs so both
+  surfaces share one implementation. Verified pixel-neutral: the tile golden's diff is identical to
+  the number measured before the refactor.
+- The **New World wizard** (`app.cpp`) — ten stages, each with an explainer, live charts of the
+  system as it currently stands, and that stage's decision. **Air and Legacy carry no knob** and say
+  so; inventing one would have been padding.
+- Four new decision points beyond the original six: `home_mass`, `radiogenic`, `abiogenesis_ease`,
+  `coal_climate`. `radiogenic` is deliberately split from `metallicity` — U/Th come from r-process
+  events, so a metal-rich system need not be a geologically live one.
+
+**Verification — `tools/verify/planetology_harness.cpp`** (auto-registered CTest). R6 is the one
+that matters for the wizard: **a decision at stage N never rewrites the history of a stage before
+N**, which is what makes Back/Continue safe. Asserted for all seven knobs, not assumed.
+
+**The harness paid for itself before the feature was ever seen**, catching five real defects:
+Selene's tidal term overflowed to ~3e11 (raw AU fed into an a^-7.5 exponent), Cinder was mis-banded a
+whole temperature class by a wet-planet albedo on bare rock, Selene grew clay it cannot have (polar
+ice is not aqueous alteration), Pallas reported 0 K by exiting before instellation was computed, and
+the iron endowment saturated its clamp so both ends of the oxygenation dial returned the same number.
+
+**Left open.** The **biotic terrain mask is dormant** — it only bites on a world that has an
+atmosphere yet never reached land, and Kepler is the only atmospheric body and always lives. Built,
+unit-tested against a synthetic case, and correct; it simply has no body to fire on. Also unresolved:
+`deposit_scalar` (BL-114) ownership vs the endowment, the resource-list expansion (limestone has the
+strongest case), and spatial ore provinces. See PLANETOLOGY.md § Open calls.
+
+### Continued 2026-07-22 — the homeworld recalibrated, and C → D
+
+**Ben's problem: generated Earths read as *forced*.** They were: the homeworld was guaranteed by
+clamping its inputs to a hand-picked box, i.e. a box drawn around an answer already known. His calls:
+keep the floor **strict**, and handle a miss by **rejecting and rerolling** rather than clamping, so
+no value is ever silently overridden.
+
+**Measured before fixing** (`tools/verify/planetology_sweep.cpp`), which found a modelling error
+rather than a tuning problem: **the homeworld's orbit was pinned at 1 AU while the star's mass
+varied.** Luminosity goes as M^3.5, so a 0.6–1.5 M☉ star swings instellation across 0.17–4.1 against
+a viable window near 0.34–1.05 — **two thirds of all draws died at the Water gate**, half as Ovens.
+A homeworld sits in its star's habitable zone by construction, not by luck. Deriving the orbit took
+acceptance from **0.9% to 77.4%** (110 draws to 1.29).
+
+Variety survives the strict floor — coal ×6.99, petroleum ×3.22, copper ×2.72, iron ×1.82 across
+accepted worlds. Surface temperature pinned to ×1.04 is *correct*: that is the carbonate thermostat.
+
+**The wizard became pseudo-random, in three rounds.** Ben: *"if you have preferences you can find
+them, but really you don't get full customization"* and *"we don't need so many rounds, it's just too
+slow."* Ten screens became three on the chain's own A → B → C shape; eight sliders became **named
+leans** (`Any / Dimmer / Sun-like / Brighter`) with no number shown or editable; each round has its
+own **reroll**. Per-lean cost is measured so no preference is a dead end — the worst,
+`interior = old and cold`, costs 2.57 draws, and that cost is physically honest.
+
+**C → D — endemic trade goods (BL-191).** Ben: *"markets trade the same essential goods... resources
+such as tobacco should be generated, giving essential profit margins for trading based on
+geopolitical distance."* A fourth resource **value track**: B → C makes the industrial base (value
+from utility), C → D makes the mercantile base (value from *geography*). Four goods — tobacco,
+spices, coffee, furs — generated by the biosphere, each bound to a latitude band **and a longitude
+sector**. The sector is what makes them endemic rather than merely climatic.
+
+**Pricing needed no engine change:** `market_component::base_price` was already per-market. Measured
+on a built world: tobacco ×3.34, spices ×2.03, **coffee ×4.67** — and the scarcest good commands the
+widest margin *emergently* (coffee had 30 source tiles against tobacco's 179). Distance is physical
+for now; Ben's call is that "geopolitical" earns its meaning when diplomacy lands.
+
+**Two failures worth recording honestly — neither papered over.**
+
+`road_generation_harness` broke: the highway tier needs two City-scale centres to land *adjacent*, so
+rolling the homeworld's ocean fraction reshuffled population placement. Verified rather than assumed
+— highways appear on **3 of 8 seeds**, so the check was seed-fragile and now asserts the tier is
+*reachable*. Had no seed produced one, it would still be failing.
+
+`recipe_workforce.lua` (US-007) broke on a real assertion: the player no longer opened with a
+processing facility to steer. Measured at **3 of 12 seeds** (harness R11). Fixed by adding a
+`verify.new_world(seed)` binding so a check can pin a world with the property it needs, rather than
+by weakening the assertion — the script's own comment says to "fail loudly rather than silently
+pass", and that intent was kept.
+
+**Both deferred as [[BL-192]]** (design-owed, parked, F): generation produces a gameplay-relevant
+affordance only in a minority of worlds — ~37% of worlds have no highway, ~75% of campaigns open with
+no building whose production the player can steer. Pre-existing behaviour of population/road/corp
+generation, surfaced by measurement rather than caused by this work. The design question — guarantee
+it, raise the probability, or design around it — is Ben's, and option (a) is exactly the "forced"
+clamping he rejected for the homeworld, so it needs the same scrutiny.
+
+**Visual goldens re-blessed (all 61 scripts, 165 files).** Not blessed blind: the diffs were
+inspected first, including `market_ledger` as the highest-value check on the 19 -> 23 resource-count
+change. Note `scripts/verify/bless_all.sh` runs under `set -e`, so a failing script silently aborts
+the loop and everything alphabetically after it goes un-blessed — worth knowing.
+
+`build_check.bat` fixed: it pointed at `C:\\Claude\\Project-Io\\build`. Now derives the build
+directory from `%~dp0`, so relocating the repo cannot break it again.
+
+All 23 CTest targets pass; 0 golden and 0 expect failures across all 61 verify scripts.
+
+**Found in passing, not fixed here.** The committed visual goldens are **stale on `main`** —
+`selection_tile_layout.png` predates BL-181 by six days, so it fails ~4.75% for reasons unrelated to
+this work. Flagged as its own task rather than blessed away inside this change. `build_check.bat`
+also still points at `C:\Claude\Project-Io\build`.
+
+---
+
+## Session — Sprint 1 procgen review: BL-040 correction, BL-051/132 settle, Planetology (BL-167) reframed (2026-07-21)
+
+**Runtime.** Not recorded reliably — the timer spanned a session interruption/idle gap
+(`tools/session/timer.js` measures wall-clock only, no idle/active distinction; a stop after a
+long gap read 9h46m and was discarded rather than logged as if it were focused work). Noted here
+as a real limitation of the current timer tool, not fixed this session.
+
+**Context.** Ben named Sprint 1's goal as "finalizing v1 of procedural generation" (SPRINTS.md) —
+broader than the immediate rivers/food cluster. Widened the design pass to the surveyed procgen
+backlog: BL-040, BL-051, BL-132, BL-167.
+
+**BL-040 — bookkeeping correction, no new design.** Found already **shipped**: `tile_generation.cpp`
+carries the full seeded-rarity-scalar deposit pass (`rare_rng` stream) exactly as designed, and
+RESOURCES.md documents it as implemented, guarded by the `world_audit` harness. The backlog entry
+had simply never been flipped off `design-owed` after landing. Corrected to `complete`.
+
+**BL-051 — pipeline-shape decision.** Settled the architecture question the rivers work (BL-170)
+implicitly raised: the six-pass `generate_body_tiles` core stays fixed; every future generation
+concern (coastline smoothing, deposits, Planetology) lands as its own **sibling pass** reading the
+shared `generation_record`, rather than growing the core pipeline. This is now the standing
+convention, documented in TILE_GENERATION.md. Flipped to `designed` (the buildable cosmetic half is
+promote-ready; the speculative tectonics/orbital half stays parked within it).
+
+**BL-132 — cleared to designed.** Its blocker (BL-096) shipped since filing; fixed the
+population→trade-flow-proxy→corp-carving sequencing explicitly. Flipped to `designed`.
+
+**BL-167 — reframed as Planetology, un-parked, raised to priority B.** Ben's vision: model initial
+atmosphere via basic chemistry, and a simulated abiogenesis/evolution history — explicitly modelled
+on **Shadow Empire**'s (VR Designs/Slitherine) Planetology → Geology → Evolution generation phases,
+where life's emergence measurably alters atmospheric composition. Ben: "this is going to be the
+first thing a player sees, so it has to impress them." Researched Shadow Empire's model via web
+search to ground the design. New authority doc **`docs/generation/PLANETOLOGY.md`** created
+(design-owed on the doc's own detail — chemistry fidelity, evolution-abstraction shape, and
+presentation surface are flagged open for a follow-up pass). Cross-referenced from
+GENERATION_STRATEGY.md (now: planetology → tiles → nations → corporations) and TILE_GENERATION.md,
+and added to CLAUDE.md's document map.
+
+**Not yet done.** The rivers (BL-170) and hydroponics/fishing (BL-166/168) *build* — two worktree
+agents were dispatched, interrupted by a session restart, and resumed; their actual landing status
+is still open as of this entry.
+
+---
+
+## Session — Design settle (redo): rivers as edges + coastal cluster (BL-166/168/170; BL-188/189 filed) (2026-07-21)
+
+**Runtime.** 1m 50s (round 1, later redone) + 10m 15s (round 2, final) — Light, design-only Q&A,
+no code.
+
+**Context.** Ben wanted to work procedural generation this session; nothing in that space was
+promote-ready, so we settled the three open design-owed items that touch it: BL-170
+(rivers/freshwater), BL-166 (agriculture split), BL-168 (coastal fishing). **Round 1's settle was
+wrong** — Ben: "I wasn't thinking, I actually have a different vision for them" — and asked for a
+full Q&A redo. Round 2 below is what actually landed; round 1's tile-flag/Era-1/shared-good-only
+framing is superseded.
+
+**Settled (final).**
+- **BL-170 (rivers) — edge feature, not a tile flag.** A river borders **exactly two tiles**, never
+  occupies one (a lake would be the distinct tile-occupying feature — out of scope). Generation
+  still traces downhill over the height field, but now walks the tile **edge graph**; storage is a
+  per-tile bitmask of which of its 6 hex sides border a river. **Mechanic: cheaper logistics, not
+  adjacency** — Ben's framing, "logistics is always point-based... has to cross a tile": a tile
+  bordering a river gets a discount on the existing per-tile road traversal cost, stacking with
+  the road-tier curve. **Direction is mechanical** — downstream crossing is cheaper than upstream
+  — rendered (art call, Ben's for now) as a shade gradient, darker blue upstream. Water-adjacency
+  for farming survives as a secondary consequence, not the primary mechanic. Still no new resource.
+- **BL-166 (agriculture) — re-gated to habitability/terrain, not Era 1.** The Hydroponics Bay is
+  valid on **any tile lacking terrestrial farming affinities** (arable land, water/river adjacency,
+  climate), on any body, any era — not an off-world/space-tech unlock. Decoupled from ERAS.md
+  entirely. Still produces the same Agricultural produce good as terrestrial farming; design-only.
+- **BL-168 (fishing) — kept narrow, coastal identity spun off.** Ben's coastal vision was bigger
+  than fishing (ports/sea trade, coastal defense); rather than widen BL-168, those went to two new
+  items keyed to its coastal-adjacency predicate: **BL-188** (Ports/sea trade — a distinct sea
+  logistics mode) and **BL-189** (Coastal defense — parked stub note, priority F). BL-168 itself
+  stays a Fishing Wharf producing the shared Agricultural produce good, coastal-adjacency as a
+  runtime neighbor check (any of 6 hex neighbours is ocean). Design-only.
+
+All three flip `design-owed` → `designed`; BL-188/BL-189 filed fresh (ids allocated via
+`node tools/session/next_id.js`, next-safe BL-188). None promoted to REFINED.md — still blocked on
+a food consumer / render demand that doesn't exist yet.
+
 ---
 
 ## Session — Corporate borders: BL-182 recorded + visual reach slice (BL-183) (2026-07-18)

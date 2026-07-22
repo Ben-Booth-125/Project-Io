@@ -185,7 +185,49 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
         }
     }
 
+    // Stack ceiling: a tile carries several sites working one deposit, but not
+    // without limit. Checked last — a full stack is the least interesting reason
+    // to refuse, and the terrain reasons above teach the player more.
+    if (buildings_on_tile(w, tile_id, type, target)
+        >= stack_capacity(tc_it->second, type, target))
+        return placement_reason::slot_full;
+
     return placement_reason::ok;
+}
+
+// --- Building stacks (see the header for the provisional-rule note) -----------
+
+/// Deposit richness that buys one additional extraction site. Deposits generate in
+/// the 0-250 band (tile_generation.cpp § generate_deposits), so this puts a thin
+/// seam at 1 site and the richest tiles at 4-5. PROVISIONAL — the value is a
+/// placeholder for a settled rule, not a tuned figure.
+constexpr float k_richness_per_site = 50.0f;
+
+int stack_capacity(const tile_component& tc, building_type type, resource_type target)
+{
+    if (type != building_type::extraction_site)
+        return 1;
+
+    const float richness = tc.resource_deposit[static_cast<std::size_t>(target)];
+    const int   cap      = static_cast<int>(richness / k_richness_per_site);
+    return cap < 1 ? 1 : cap;
+}
+
+int buildings_on_tile(const world& w, entity_id tile_id,
+                      building_type type, resource_type target)
+{
+    int n = 0;
+    for (const auto& [bid, bc] : w.buildings)
+    {
+        if (bc.tile != tile_id || bc.type != type)
+            continue;
+        // Extraction stacks are per-target: three iron sites and one petroleum site
+        // on one tile are two separate stacks against two separate deposits.
+        if (type == building_type::extraction_site && bc.target_resource != target)
+            continue;
+        ++n;
+    }
+    return n;
 }
 
 } // namespace placement_rules

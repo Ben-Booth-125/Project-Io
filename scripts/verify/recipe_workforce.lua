@@ -9,6 +9,12 @@
 -- ("'Recipe honoured next tick' is golden-verified; workforce cap is headless").
 -- Run: ProjectIo --verify scripts/verify/recipe_workforce.lua
 
+-- Pin a seed whose corporation generation gives the PLAYER a processing facility.
+-- Only some worlds do (measured at 3 of 12 seeds by planetology_harness R11, which
+-- guards that such seeds keep existing), and this check needs a real building to
+-- steer rather than a skip. The default world stopped supplying one when BL-167
+-- began rolling the homeworld's parameters from the seed.
+verify.new_world(0x3C6EF362)
 verify.goto_surface("home")
 
 -- Find the player's first processing facility — the building type that carries a

@@ -9,7 +9,9 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstddef>
+#include <cstdio>
 #include <initializer_list>
 #include <map>
 #include <random>
@@ -46,7 +48,7 @@ float deposit_scalar_for(abundance_level a)
 
 } // namespace
 
-world make_hard_coded_world(world_params params)
+world make_hard_coded_world(world_params params, generation_report* report)
 {
     world w;
 
@@ -54,6 +56,43 @@ world make_hard_coded_world(world_params params)
     // At the default `standard` tier this is 1.0f, so a default-params world is
     // bit-identical to the pre-BL-114 generation.
     const float deposit_scalar = deposit_scalar_for(params.abundance);
+
+    // ---------------------------------------------------------------------
+    // Planetology (BL-167). A body-level sibling pass that runs BEFORE the
+    // six-pass tile pipeline and DERIVES each body_profile that used to be a
+    // hand-authored literal here. It also produces the per-resource endowment
+    // the deposit pass multiplies by, and the readable history the generation
+    // screen reveals. Architecture per BL-051: a sibling pass, not a change to
+    // the six-pass core. See docs/generation/PLANETOLOGY.md.
+    // ---------------------------------------------------------------------
+    // Resolve the player's PREFERENCES into the parameters generation runs on.
+    // This is where reject-and-reroll happens: the draw repeats, with the attempt
+    // index folded in, until the homeworld clears the strict Earth-like floor. It
+    // stays a pure function of (preferences, seed).
+    const resolved_world rw = resolve_preferences(params.preferences, params.seed);
+
+    if (report)
+    {
+        report->preferences   = params.preferences;
+        report->params        = rw.params;
+        report->home_orbit_au = rw.home_orbit_au;
+        report->attempts      = rw.attempts;
+        report->bodies.clear();
+        report->stage_lines.clear();
+    }
+    // Index into the shared prototype body set (planetology.hpp). The wizard's
+    // live preview walks the same list with the same seeds and the same derived
+    // orbit, so the charts a player decided against describe exactly this world.
+    auto plan = [&](int proto_index) {
+        body_inputs in = prototype_body(proto_index);
+        if (in.is_homeworld)
+            in.orbit_au = rw.home_orbit_au;
+        planetology_state st = run_planetology(
+            in, rw.params, params.seed ^ prototype_body_seed(proto_index));
+        if (report)
+            report->bodies.push_back(generation_report::body_entry{ in.name, st });
+        return st;
+    };
 
     // Nation knob → Voronoi params. Preserve the over-seed/merge shape (BL-053 retune:
     // 34 seeds merged to 24): merge to the requested count, pre-seed extra so the merge
@@ -102,16 +141,10 @@ world make_hard_coded_world(world_params params)
         .grid_height                          = 84,
     };
 
-    generate_body_tiles(w, cinder, 180, 84,
-        body_profile{
-            .temperature    = temperature_class::scorching,
-            .atmosphere     = atmosphere_class::none,
-            .hydrology      = hydrological_state::none,
-            .geology        = geological_activity::high,
-            .water_fraction = 0.0f,
-            .bias           = composition_bias::standard,
-        },
-        /*seed=*/params.seed ^ 0xC1D0001u, deposit_scalar);
+    // Mercury-analogue physical facts; everything else is derived by the chain.
+    const planetology_state cinder_pl = plan(0);
+    generate_body_tiles(w, cinder, 180, 84, cinder_pl.profile,
+        /*seed=*/params.seed ^ 0xC1D0001u, deposit_scalar, &cinder_pl);
 
     // -----------------------------------------------------------------------
     // Kepler — temperate home planet (Earth analogue, ~1.0 AU)
@@ -124,9 +157,11 @@ world make_hard_coded_world(world_params params)
         .name                                 = "Kepler",
         .type                                 = body_type::planet,
         .parent                               = null_entity,
-        .orbital_radius_au                    = 1.00f,
+        // The homeworld orbits where its star can keep it wet, so this is derived
+        // rather than authored (a dimmer star pulls the homeworld inward).
+        .orbital_radius_au                    = rw.home_orbit_au,
         .orbital_angle_rad                    = 1.05f,
-        .orbital_angular_velocity_rad_per_day = kepler_angular_velocity(1.00f),
+        .orbital_angular_velocity_rad_per_day = kepler_angular_velocity(rw.home_orbit_au),
         .grid_width                           = 180,
         .grid_height                          = 84,
     };
@@ -134,16 +169,13 @@ world make_hard_coded_world(world_params params)
     // Kepler is the corporation's home planet — the game opens on its surface.
     w.home_body = kepler;
 
-    auto kepler_tiles = generate_body_tiles(w, kepler, 180, 84,
-        body_profile{
-            .temperature    = temperature_class::temperate,
-            .atmosphere     = atmosphere_class::thick,
-            .hydrology      = hydrological_state::liquid,
-            .geology        = geological_activity::moderate,
-            .water_fraction = 0.60f,
-            .bias           = composition_bias::standard,
-        },
-        /*seed=*/params.seed ^ 0xE471001u, deposit_scalar);
+    // The homeworld. Its inputs sit inside the corridor where the identical
+    // unmodified chain succeeds — the guarantee is on the INPUTS, never on the
+    // gates (PLANETOLOGY.md § The homeworld rule). Every gate still runs, still
+    // records its margin, and still writes its line.
+    const planetology_state kepler_pl = plan(1);
+    auto kepler_tiles = generate_body_tiles(w, kepler, 180, 84, kepler_pl.profile,
+        /*seed=*/params.seed ^ 0xE471001u, deposit_scalar, &kepler_pl);
 
     // Kepler is the only body with a political layer in the prototype: 8–12
     // nations placed over its land tiles. Selene/Cinder/Pallas stay unclaimed.
@@ -292,6 +324,67 @@ world make_hard_coded_world(world_params params)
             mc.price = mc.base_price;
             w.markets[w.create_entity()] = mc;
         }
+
+        // ------------------------------------------------------------------
+        // C -> D: endemic goods are priced BY DISTANCE FROM WHERE THEY GROW
+        // (BL-191). This is the whole mercantile mechanic, and it needs no
+        // change to the clearing engine: market_component::base_price is already
+        // per-market and authored here, so a good is simply cheap at its origin
+        // and dear far from it. Supply and demand then push around that base as
+        // they do for every other resource.
+        //
+        // Distance is physical for now. "Geopolitical" earns its meaning when
+        // diplomacy and AI behaviour land (Ben, 2026-07-22) — at which point the
+        // multiplier below gains a political term rather than being replaced.
+        // ------------------------------------------------------------------
+        if (!kepler_pl.endemics.empty() && !w.markets.empty())
+        {
+            constexpr float source_price   = 1.5f;  ///< Cheap where it grows.
+            constexpr float distance_gain  = 7.0f;  ///< Multiplier across the globe.
+            constexpr int   gw = 180, gh = 84;
+            const float half_diag = std::sqrt(static_cast<float>((gw / 2) * (gw / 2) + gh * gh));
+
+            for (const endemic_good& e : kepler_pl.endemics)
+            {
+                const std::size_t ri = static_cast<std::size_t>(e.good);
+
+                // Where it actually grows. Gathered once per good, in ascending
+                // tile id, so the scan order is deterministic.
+                std::vector<std::pair<int, int>> sources;
+                for (const auto& [tid, tc] : w.tiles)
+                    if (tc.body == kepler && tc.resource_deposit[ri] > 0.0f)
+                        sources.emplace_back(tc.grid_x, tc.grid_y);
+                if (sources.empty())
+                    continue; // this world never evolved it; nothing to price
+
+                for (auto& [mid, mc] : w.markets)
+                {
+                    if (mc.body != kepler)
+                        continue;
+
+                    // An unanchored market has no location, so it prices at the
+                    // midpoint rather than pretending to a distance it does not have.
+                    float norm = 0.5f;
+                    const auto tit = w.tiles.find(mc.centre_tile);
+                    if (tit != w.tiles.end())
+                    {
+                        float best = half_diag;
+                        for (const auto& [sx, sy] : sources)
+                        {
+                            int dc = std::abs(tit->second.grid_x - sx);
+                            if (dc > gw / 2) dc = gw - dc; // the surface wraps
+                            const int dr = std::abs(tit->second.grid_y - sy);
+                            const float d = std::sqrt(static_cast<float>(dc * dc + dr * dr));
+                            best = std::min(best, d);
+                        }
+                        norm = std::min(1.0f, best / half_diag);
+                    }
+
+                    mc.base_price[ri] = source_price * (1.0f + distance_gain * norm);
+                    mc.price[ri]      = mc.base_price[ri];
+                }
+            }
+        }
     }
 
     // Corporations: 6–10 actors registered in the generated nations, including
@@ -327,16 +420,12 @@ world make_hard_coded_world(world_params params)
         .grid_height                          = 42,
     };
 
-    generate_body_tiles(w, selene, 90, 42,
-        body_profile{
-            .temperature    = temperature_class::cold,
-            .atmosphere     = atmosphere_class::none,
-            .hydrology      = hydrological_state::polar_frozen,
-            .geology        = geological_activity::none,
-            .water_fraction = 0.0f,
-            .bias           = composition_bias::standard,
-        },
-        /*seed=*/params.seed ^ 0x5E1E001u, deposit_scalar);
+    // Luna-analogue. orbit_au is its distance from the STAR (it shares Kepler's
+    // instellation); parent_orbit_au is its distance from Kepler, which is what
+    // drives the tidal term.
+    const planetology_state selene_pl = plan(2);
+    generate_body_tiles(w, selene, 90, 42, selene_pl.profile,
+        /*seed=*/params.seed ^ 0x5E1E001u, deposit_scalar, &selene_pl);
 
     // -----------------------------------------------------------------------
     // Asteroid belt — a band beyond Kepler. The belt itself is not a body; it
@@ -372,18 +461,85 @@ world make_hard_coded_world(world_params params)
             .grid_height                          = 14,
         };
 
-        // Metallic asteroid: mostly metallic surface with rocky minority and
-        // scattered craters; no organics, no water.
-        generate_body_tiles(w, id, 30, 14,
-            body_profile{
-                .temperature    = temperature_class::cold,
-                .atmosphere     = atmosphere_class::none,
-                .hydrology      = hydrological_state::none,
-                .geology        = geological_activity::none,
-                .water_fraction = 0.0f,
-                .bias           = composition_bias::metallic,
-            },
-            params.seed ^ a.seed, deposit_scalar);
+        // Differentiated on 26-Al heat, then stripped: the core_fragment branch
+        // exits the chain at accretion and the whole object becomes the deposit.
+        const planetology_state ast_pl = plan(3);
+        generate_body_tiles(w, id, 30, 14, ast_pl.profile,
+            params.seed ^ a.seed, deposit_scalar, &ast_pl);
+    }
+
+    // ---------------------------------------------------------------------
+    // Per-stage system summary for the generation screen. Counts across the
+    // bodies the chain just ran, so each revealed stage says what it actually
+    // did system-wide rather than restating the design.
+    // ---------------------------------------------------------------------
+    if (report)
+    {
+        const auto& bs = report->bodies;
+        auto count_if_stage = [&](life_stage min) {
+            int n = 0;
+            for (const auto& b : bs) if (b.state.peak >= min) ++n;
+            return n;
+        };
+        auto named = [&](life_stage min) {
+            std::string out;
+            for (const auto& b : bs)
+                if (b.state.peak >= min) { if (!out.empty()) out += ", "; out += b.name; }
+            return out.empty() ? std::string("none") : out;
+        };
+        char buf[256];
+        const planetology_params& pp = rw.params;
+
+        std::snprintf(buf, sizeof buf,
+            "Helios: %.2f solar masses, %.2f Gyr old, metallicity %.2fx solar.",
+            static_cast<double>(pp.star_mass), static_cast<double>(pp.system_age_gyr),
+            static_cast<double>(pp.metallicity));
+        report->stage_lines.emplace_back(buf);
+
+        std::snprintf(buf, sizeof buf, "%d bodies condensed from one disc.",
+                      static_cast<int>(bs.size()));
+        report->stage_lines.emplace_back(buf);
+
+        int with_air = 0;
+        for (const auto& b : bs)
+            if (b.state.profile.atmosphere >= atmosphere_class::moderate) ++with_air;
+        std::snprintf(buf, sizeof buf, "%d of %d held an atmosphere. The rest are exposed rock.",
+                      with_air, static_cast<int>(bs.size()));
+        report->stage_lines.emplace_back(buf);
+
+        int mobile = 0;
+        for (const auto& b : bs) if (b.state.mobile_lid) ++mobile;
+        std::snprintf(buf, sizeof buf,
+            "%d running a mobile lid. No subduction elsewhere means no porphyry copper.", mobile);
+        report->stage_lines.emplace_back(buf);
+
+        int wet = 0;
+        for (const auto& b : bs)
+            if (b.state.profile.hydrology == hydrological_state::liquid) ++wet;
+        std::snprintf(buf, sizeof buf, "Liquid surface water on %d world%s.",
+                      wet, wet == 1 ? "" : "s");
+        report->stage_lines.emplace_back(buf);
+
+        std::snprintf(buf, sizeof buf, "Life took hold on: %s.", named(life_stage::microbial).c_str());
+        report->stage_lines.emplace_back(buf);
+
+        std::snprintf(buf, sizeof buf, "%d world%s accumulated free oxygen.",
+                      count_if_stage(life_stage::oxygenated),
+                      count_if_stage(life_stage::oxygenated) == 1 ? "" : "s");
+        report->stage_lines.emplace_back(buf);
+
+        std::snprintf(buf, sizeof buf, "Land greened on: %s.", named(life_stage::land).c_str());
+        report->stage_lines.emplace_back(buf);
+
+        std::snprintf(buf, sizeof buf,
+            "Fossil carbon on %d; unweathered surface ore on the dead ones.",
+            count_if_stage(life_stage::oxygenated));
+        report->stage_lines.emplace_back(buf);
+
+        std::snprintf(buf, sizeof buf,
+            "%.0f%% of the accessible homeworld endowment is already gone.",
+            static_cast<double>(pp.drawdown * 100.0f));
+        report->stage_lines.emplace_back(buf);
     }
 
     return w;

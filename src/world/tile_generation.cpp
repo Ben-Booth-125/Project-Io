@@ -1,5 +1,7 @@
 #include "tile_generation.hpp"
 
+#include "planetology.hpp"
+
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -279,6 +281,45 @@ terrain_composition pick_weighted3(std::mt19937& rng,
     if (r < wa)      return a;
     if (r < wa + wb) return b;
     return c;
+}
+
+// The abiotic partner of the same (band, moisture) cell, for a world that HELD an
+// atmosphere but whose biosphere never reached land (BL-167).
+//
+// Deliberately not a substitution table applied after the fact: tundra's abiotic
+// partner is rocky, not icy, so a blanket "replace tundra with icy" would repaint
+// every subpolar band. Each cell falls back to its own inorganic member instead —
+// rocky in the cool bands, barren in the warm ones.
+//
+// Mirrors composition_atmospheric's RNG consumption draw-for-draw, so the two
+// branches stay stream-aligned and switching between them cannot shift any
+// downstream pass.
+terrain_composition composition_abiotic(lat_band band, float moisture, std::mt19937& rng)
+{
+    using tc = terrain_composition;
+    const int mc = moisture_column(moisture);
+    switch (band)
+    {
+        case lat_band::polar:
+            return tc::icy;
+        case lat_band::subpolar:
+            if (mc == 0) return tc::rocky;
+            if (mc == 1) return pick_60_40(rng, tc::rocky, tc::rocky);
+            return tc::rocky;
+        case lat_band::temperate:
+            if (mc == 0) return pick_60_40(rng, tc::barren, tc::rocky);
+            if (mc == 1) return pick_60_40(rng, tc::rocky, tc::barren);
+            return pick_60_40(rng, tc::rocky, tc::barren);
+        case lat_band::subtropical:
+            if (mc == 0) return tc::barren;
+            if (mc == 1) return pick_60_40(rng, tc::barren, tc::rocky);
+            return pick_60_40(rng, tc::barren, tc::rocky);
+        case lat_band::tropical:
+            if (mc == 0) return tc::barren;
+            if (mc == 1) return tc::barren;
+            return pick_60_40(rng, tc::barren, tc::rocky);
+    }
+    return tc::barren;
 }
 
 // Atmosphere-present composition from the (band, moisture) table. Only reached on
@@ -731,6 +772,7 @@ std::vector<entity_id> generate_body_tiles(
     const body_profile& profile,
     uint32_t seed,
     float deposit_scalar,
+    const planetology_state* pl,
     generation_record* record)
 {
     const int total = gw * gh;
@@ -825,6 +867,10 @@ std::vector<entity_id> generate_body_tiles(
     const bool  airless = profile.atmosphere == atmosphere_class::none
                        || profile.atmosphere == atmosphere_class::thin;
     const float volc_p  = volcanic_probability(profile.geology);
+    // BL-167: a world whose biosphere never reached land cannot carry grassland,
+    // forest, wetland or tundra. This one condition is what makes a dead world
+    // LOOK dead on the canvas rather than merely reading poorer in a ledger.
+    const bool  biotic  = (pl == nullptr) || pl->stage >= life_stage::land;
     std::uniform_real_distribution<float> u01(0.0f, 1.0f);
 
     for (int idx = 0; idx < total; ++idx)
@@ -866,7 +912,8 @@ std::vector<entity_id> generate_body_tiles(
             if (volcanic_band && volc_p > 0.0f && u01(comp_rng) < volc_p)
                 c = terrain_composition::volcanic;
             else
-                c = composition_atmospheric(b, moisture[idx], comp_rng);
+                c = biotic ? composition_atmospheric(b, moisture[idx], comp_rng)
+                           : composition_abiotic(b, moisture[idx], comp_rng);
         }
 
         comp[idx] = c;
@@ -926,6 +973,69 @@ std::vector<entity_id> generate_body_tiles(
             for (std::size_t r = 0; r < resource_count; ++r)
                 if (deposits[r] > 0.0f)
                     deposits[r] *= deposit_scalar;
+
+            // BL-167: the Planetology endowment. Same pure post-multiply shape as
+            // deposit_scalar above — it draws no RNG, so a null planetology state
+            // reproduces the unscaled surface bit-for-bit. This is where "no life,
+            // no coal" actually lands: a channel at 0.0 removes the resource
+            // outright rather than merely thinning it.
+            if (pl)
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    if (deposits[r] > 0.0f)
+                        deposits[r] *= pl->endowment[r];
+
+            // C -> D: endemic trade goods (BL-191). Unlike the endowment above
+            // this ADDS a deposit rather than scaling one, because an endemic good
+            // has no base distribution to scale — it exists only where it evolved.
+            //
+            // A tile qualifies only if it is inside the good's latitude band AND
+            // its longitude sector AND carries a composition the crop can grow on.
+            // The sector test is what makes it endemic rather than merely
+            // climatic, and it wraps, since the surface does.
+            if (pl && !pl->endemics.empty() && !is_ocean[idx])
+            {
+                const float lat = std::fabs(static_cast<float>(row) / static_cast<float>(gh - 1) - 0.5f) * 2.0f;
+                const float lon = static_cast<float>(col) / static_cast<float>(gw);
+
+                for (const endemic_good& e : pl->endemics)
+                {
+                    if (lat < e.lat_lo || lat > e.lat_hi)
+                        continue;
+
+                    // Wrapped angular separation from the origin region's centre.
+                    float d = std::fabs(lon - e.sector_centre);
+                    if (d > 0.5f) d = 1.0f - d;
+                    if (d > e.sector_width * 0.5f)
+                        continue;
+
+                    // Composition the crop actually grows on. All of these are
+                    // biotic, so they only exist on a world that reached a land
+                    // biosphere in the first place — which is the same gate the
+                    // endemic set itself sits behind.
+                    const terrain_composition c = comp[idx];
+                    bool suitable = false;
+                    switch (e.good)
+                    {
+                        case resource_type::tobacco: suitable = (c == terrain_composition::grassland); break;
+                        case resource_type::spices:  suitable = (c == terrain_composition::wetland
+                                                             || c == terrain_composition::forest); break;
+                        case resource_type::coffee:  suitable = (c == terrain_composition::forest); break;
+                        case resource_type::furs:    suitable = (c == terrain_composition::tundra); break;
+                        default: break;
+                    }
+                    if (!suitable)
+                        continue;
+
+                    // Densest at the heart of the range, thinning toward its edge —
+                    // so a origin region has a centre worth holding rather than a
+                    // hard border.
+                    const float falloff = 1.0f - (d / std::max(e.sector_width * 0.5f, 1e-4f));
+                    std::uniform_real_distribution<float> u(0.0f, 1.0f);
+                    const float amount = (30.0f + 90.0f * u(tile_rng)) * e.richness * falloff;
+                    if (amount > 1.0f)
+                        deposits[static_cast<std::size_t>(e.good)] = amount * deposit_scalar;
+                }
+            }
 
             // Seed the finite extraction reserve from richness. Richness stays the
             // rate multiplier; the reserve is what depletion (economy_system.cpp)
