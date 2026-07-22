@@ -25,6 +25,7 @@
 #include "ui/overlay.hpp"
 #include "ui/presentation.hpp"
 #include "ui/profile_panel.hpp"
+#include "ui/selection_card.hpp"
 #include "ui/selection_panel.hpp"
 #include "ui/solar_system_canvas.hpp"
 #include "ui/tech_tree_panel.hpp"
@@ -1069,6 +1070,12 @@ int app::run_verify(const std::string& script_path, bool bless)
         for (const auto& [tid, tc] : m_world.tiles)
             if (tc.body == m_ui.active_body && tc.grid_x == col && tc.grid_y == row)
             { m_ui.selected_entity = tid; m_ui.selection_hidden_for = null_entity; break; }
+    });
+    v.set_function("dismiss_selection", [this]() {
+        // Test hook for the sticky card's dismiss path (BL-194) — the x button
+        // and Esc both hide the current selection this same way; no key-event
+        // injection exists in the headless harness, so this is the equivalent.
+        m_ui.selection_hidden_for = m_ui.selected_entity;
     });
     v.set_function("select_building", [this](int col, int row) {
         for (const auto& [bid, bc] : m_world.buildings)
@@ -2951,6 +2958,13 @@ void app::render()
                                 prior_rank, m_ui, m_ui.show_balance_ledger);
     }
     ui::draw_corporation_panel(m_world, m_ui, m_ui.show_corporation_panel);
+
+    // Sticky detail card (BL-194) — click-opened, canvas-confined; coexists
+    // with the fold-out Selection element below (BL-195 relocates that
+    // content here) and the transient hover card. Drawn after the other
+    // chrome so it z-orders on top of it; disp is the primary canvas rect
+    // (always the full window here).
+    ui::draw_selection_card(m_world, m_ui, {0.0f, 0.0f}, disp);
 
     // Selection info element — docked in the shell fold-out column, mutually exclusive
     // with the ledgers (SELECTION.md). While a ledger owns the column the Selection is

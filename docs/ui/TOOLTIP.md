@@ -228,6 +228,25 @@ figures, complementing the deeper, persistent ledgers.
 
 ---
 
+## The sticky detail card (BL-194, landed 2026-07-22)
+
+A second, larger surface beside the transient hover card above: a **click-opened**
+detail card, `ui::draw_selection_card` (`src/ui/selection_card.{hpp,cpp}`). Single-click
+already *selects* (SELECTION.md), so opening the card piggybacks on that state rather
+than adding a parallel one — it is open exactly when
+`ui.selected_entity != null_entity && ui.selected_entity != ui.selection_hidden_for`.
+Dismissing (the card's `x`, or Esc) sets `selection_hidden_for`, the same hide-not-destroy
+mechanism the fold-out Selection element already used.
+
+Binary open/closed only — no animation, no partial reveal (ImGui has no per-window
+transform, and scaled text is blurry). The mouse wheel stays canvas zoom, uninvolved.
+Positioned at the shared ledger-family spawn anchor (`ledger_window_spawn`, clear of the
+shell column and profile chrome), drawn after the other chrome so it z-orders on top.
+
+Content is currently the shared `draw_hover_content` dispatch — a placeholder until
+BL-195 relocates the full Selection element's content here (superseding the fold-out
+column's copy) and BL-196 makes that content recursively clickable into child cards.
+
 ## Prototype / deferred notes
 
 - Convoy/route hover entities are designed-for here but land with logistics

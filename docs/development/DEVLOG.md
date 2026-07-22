@@ -10,6 +10,44 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## Session — Sticky detail card foundation (BL-194), batch cluster opened (2026-07-22)
+
+**Runtime.** ~1h. Full (Batch Delivery, item-spanning requirement + REFINED promotion run for
+the whole 5-item cluster before implementing).
+
+**Context.** Ben asked to batch-deliver the latest backlog cluster: BL-194–198, a v0.1.1 UI epic
+(design-session-settled the same day) replacing the fold-out Selection element with a click-opened,
+canvas-confined "sticky card" that becomes recursively drillable and can host the new dual-axis
+chart element.
+
+**What landed.** BL-194 only — the card frame foundation the other four items build on:
+
+- New `ui::draw_selection_card` (`src/ui/selection_card.{hpp,cpp}`). Open state piggybacks on the
+  existing `selected_entity`/`selection_hidden_for` pair rather than adding a parallel state machine
+  (single-click already selects, per SELECTION.md). Dismiss (✕ or Esc) reuses the existing
+  hide-not-destroy mechanism.
+- Positioned at the shared ledger-family spawn anchor (`ledger_window_spawn`) so it clears the
+  shell column / profile / header chrome the same way the ledgers do; drawn after that chrome in
+  `app.cpp` so it z-orders on top (an earlier attempt drawing it mid-frame was silently occluded —
+  worth remembering: ImGui window stacking follows `Begin()` call order, and a fixed-position window
+  drawn early can end up underneath later chrome even with no logical relationship to it).
+- A second bug on the way to green: `ImGuiWindowFlags_AlwaysAutoResize` combined with
+  `SetNextWindowSizeConstraints` + `SetNextWindowSize({w, 0})` produced a silently zero-sized,
+  invisible window — switched to an explicit fixed size instead.
+- Content for now is the shared `draw_hover_content` dispatch (placeholder — BL-195 relocates the
+  full Selection element's content here).
+- Test hook: `verify.dismiss_selection()` (no key-injection exists in the headless harness, so this
+  drives the same hide path Esc/✕ take). New `scripts/verify/sticky_card.lua`, 3/3 captures correct.
+
+**Batch state.** Requirements (5 groups) and REFINED.md tasks (A–E) were written for the whole
+cluster up front, per Batch Delivery. Only task A (BL-194) executed and committed this session —
+B (BL-195, move Selection in), C (BL-196, recursive drill-down), D (BL-197, dual-axis chart), and
+E (BL-198, time-series store) are promote-ready but unstarted; each is a substantial (~3h) slice
+in its own right (B alone touches a 1300-line file). Paused deliberately rather than rushed — see
+REFINED.md's "Resume here" note. Full CTest 23/23 green throughout, determinism intact.
+
+---
+
 ## Session — Wizard back-out, built-tile routing, the building Selection element (BL-193) (2026-07-22)
 
 **Runtime.** Not recorded. Light → Full (the third item earned it).

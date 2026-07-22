@@ -5740,7 +5740,56 @@
       "rows": [
         { "id": "R1", "status": "pending", "requirement": "ITEM-SPANNING (visual): under the Corporation lens on a body with rival corporations, each RIVAL corporation's holdings on the active body render an HQ-projected border — a reach ring centred on that corp's HQ (the holding nearest its holdings centroid) plus an hq star, both in the corp's identity colour, with ring radius = holdings extent + a fixed projected range; the player corp is excluded (its border stays the always-on BL-085 home ring, so no double ring/star); the layer draws only under the Corporation lens, is cylinder-seam-wrapped, and mutates no world state.", "verification": ["visual"], "result_metric": "", "notes": "body_surface_canvas.cpp new block after the BL-085 home-presence block, gated on overlay_mode::corporation; scripts/verify/corporate_reach.lua captures a wide multi-corp view + a player-HQ frame. Static cold review PASSED (compiles-by-inspection, standing invariants, geometry). PENDING because the visual harness could not run in-session: the SDL3 FetchContent download is blocked by egress policy (403) so no local build, and CI (build.yml) does not run the visual-verify tier (deferred BL-057). CI build.yml will confirm the compile; the rendered frame needs an eyeball on a build-capable machine." }
       ]
+    },
+    {
+      "brief": "sticky-detail-card",
+      "batch": "2026-07-22-sticky-card",
+      "title": "BL-194 — Sticky detail card: the click-opened, canvas-confined card frame (selection's new home)",
+      "status": "complete",
+      "promoted_from": "backlog.json STICKY-DETAIL-CARD",
+      "rows": [
+        { "id": "R1", "status": "complete", "requirement": "ITEM-SPANNING (visual): a single click on a canvas entity opens a click-opened detail card (binary open/closed, no animation) that persists until dismissed via the ✕ button or Esc; the card is confined within the canvas rect, drawn beside the unchanged 200px hover card, and coexists with (does not replace) hover/dwell glance behaviour; double-click still navigates unchanged; the mouse wheel remains canvas zoom, uninvolved in the card.", "verification": ["visual"], "result_metric": "", "notes": "New src/ui/selection_card.{hpp,cpp}, wired into app.cpp (drawn after the other chrome so it z-orders on top; positioned at the shared ledger_window_spawn anchor, clear of the shell column/profile/header chrome). Content is the shared draw_hover_content dispatch as a placeholder (BL-195 relocates the full Selection element here). scripts/verify/sticky_card.lua: 3/3 captures correct (open, dismissed via the new verify.dismiss_selection() test hook, reselect reopens). Full CTest 23/23 green." }
+      ]
+    },
+    {
+      "brief": "sticky-card-selection-move",
+      "batch": "2026-07-22-sticky-card",
+      "title": "BL-195 — Move the Selection element wholesale into the sticky card; column becomes ledgers-only",
+      "status": "pending",
+      "promoted_from": "backlog.json STICKY-CARD-SELECTION-MOVE",
+      "rows": [
+        { "id": "R1", "status": "pending", "requirement": "ITEM-SPANNING (visual): the existing Selection info element (tile image, [x,y] caption, per-resource tile-vs-P10 graphs, 2x2 action grid) now renders unmodified-in-content inside the BL-194 sticky card instead of the fold-out column; the fold-out column no longer shows Selection content (ledgers-only) and the selection/ledger mutual-exclusion dance is gone — opening a ledger no longer contests with an open selection.", "verification": ["visual"], "result_metric": "", "notes": "Not started — promote-ready. Moves selection_panel.cpp draw calls to be hosted by selection_card.cpp; foldout_column.hpp loses the Selection slot. See REFINED.md task B." }
+      ]
+    },
+    {
+      "brief": "sticky-card-drilldown",
+      "batch": "2026-07-22-sticky-card",
+      "title": "BL-196 — Recursive drill-down: elements inside a card open child cards, bounded by acyclicity",
+      "status": "pending",
+      "promoted_from": "backlog.json STICKY-CARD-DRILLDOWN",
+      "rows": [
+        { "id": "R1", "status": "pending", "requirement": "ITEM-SPANNING (visual): a clickable element inside an open card opens a child card (via nested ImGui::BeginPopup) reusing draw_hover_content; clicking a sibling swaps the current child rather than stacking; a candidate child already on the ancestor (kind,entity_id) breadcrumb is not offered (no dead link); Esc/close unwinds exactly one level, unwinding from the root closes the card entirely; a ~20-level hard cap exists purely as a runaway backstop.", "verification": ["visual"], "result_metric": "", "notes": "Not started — promote-ready, depends on BL-194 (landed). See REFINED.md task C." }
+      ]
+    },
+    {
+      "brief": "chart-container",
+      "batch": "2026-07-22-sticky-card",
+      "title": "BL-197 — Chart container: titled, legended, dual-axis time-series element for cards and ledgers",
+      "status": "pending",
+      "promoted_from": "backlog.json CHART-CONTAINER",
+      "rows": [
+        { "id": "R1", "status": "pending", "requirement": "ITEM-SPANNING (visual): a reusable chart element renders a left-aligned title, an inline dot+name legend row, dual independently-scaled Y axes (aggregate as bars on the left axis, a specific series as a line on the right axis), a hierarchical Quarter-under-Year X axis matching the econ-tick calendar, optional log scale, and a hover crosshair with a per-series marker; the X axis is always chronological.", "verification": ["visual"], "result_metric": "", "notes": "Not started — promote-ready, independent root. New src/ui/chart.{hpp,cpp} (distinct from the existing bar-only src/ui/charts.hpp). See REFINED.md task D." }
+      ]
+    },
+    {
+      "brief": "resource-timeseries-store",
+      "batch": "2026-07-22-sticky-card",
+      "title": "BL-198 — Resource time-series store: body aggregates always, per-tile series lazily on first drill-down",
+      "status": "pending",
+      "promoted_from": "backlog.json RESOURCE-TIMESERIES-STORE",
+      "rows": [
+        { "id": "R1", "status": "pending", "requirement": "app-owned (not world-owned, unserialised) capped ring buffers record one body-level resource-aggregate sample per economy tick unconditionally for every body x tracked resource; a per-tile resource series begins recording only from the tick a player first drills into that tile, and its exposed series is honestly labelled as starting at that tick rather than campaign epoch.", "verification": ["headless"], "result_metric": "", "notes": "Not started — promote-ready, independent root. src/core/app.{hpp,cpp} (new buffers alongside m_balance_history). See REFINED.md task E." }
+      ]
     }
-
   ]
 }
