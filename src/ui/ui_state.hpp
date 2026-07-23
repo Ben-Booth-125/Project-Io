@@ -219,7 +219,17 @@ struct ui_state
 
     // --- hover-card state (BL-060) ---
     entity_id hovered_entity = null_entity; ///< Entity the cursor rested on last frame; used to detect stable hover.
-    int       hover_ticks    = 0;           ///< Consecutive frames of stable hover over hovered_entity; resets on entity change.
+    int       hover_ticks    = 0;           ///< Consecutive frames of stable hover over hovered_entity; resets on entity change. Governs the transient glance (draw_hover_card).
+
+    // --- dwell-to-open state (BL-200) ---
+    // A second opener for the sticky detail card, alongside the click: holding the
+    // pointer STILL over an entity fills a bar at the cursor and then opens the card.
+    // Distinct from hover_ticks — this timer advances only while the mouse is still
+    // (movement past kDwellJitterPx resets it), which is the anti-bombardment gate
+    // that keeps a pointer sweep across the tile grid from auto-opening. See
+    // hover_card.hpp, body_surface_canvas.cpp, docs/ui/SELECTION.md.
+    ImVec2 dwell_anchor { -1.0f, -1.0f }; ///< Pointer position where the current stillness began; reset when the pointer moves beyond the jitter radius.
+    int    dwell_ticks  = 0;              ///< Consecutive still frames over hovered_entity; drives the dwell-to-open bar and auto-open.
 
     // --- sticky detail card (BL-194/195) ---
     // The click-opened card (selection_card.cpp) freezes at the click position and

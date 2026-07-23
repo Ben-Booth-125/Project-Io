@@ -56,6 +56,18 @@ two gestures, applied uniformly across all three canvases:
 The 'go to' button on the panel is exactly equivalent to a double-click on the
 current selection.
 
+**Dwell-to-open — a second opener (BL-200, Planetary surface).** Alongside the
+single-click, holding the pointer **still** over an entity fills a thin progress
+bar in the transient hover tooltip and then opens the card on that entity — the
+same open a click there produces (`selected_entity` set, `card_anchor` frozen at
+the pointer). The click still opens **instantly**; dwell is an *addition*, not a
+replacement (Ben, 2026-07-23). The timer advances only while the pointer is still
+— any real movement resets it — so a sweep across the tile grid never auto-opens
+(the anti-bombardment gate). Scoped to the Planetary surface, where the tile
+density makes the gate matter and the hover infrastructure already lives; the
+other canvases keep click-only. The dwell bar belongs to the hover tooltip, never
+to the opened card's header. See `hover_card.hpp`, `body_surface_canvas.cpp`.
+
 This is a deliberate behavioural change: a single click no longer descends the
 zoom ladder. CANVASES.md and the minimap ascend gesture are updated to match.
 (Minimap ascend stays a single click — the minimap has no selection semantics.)

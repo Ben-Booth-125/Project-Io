@@ -80,6 +80,13 @@ The card has **no chrome** — no title bar, no close button, no 'go to'. It is
 transient and self-dismissing; any action belongs to the click that follows, not
 the hover.
 
+**Dwell-to-open bar (BL-200).** The one exception to "no action here" is a thin
+progress bar at the foot of the card that fills while the pointer holds **still**,
+then opens the sticky detail card on the hovered entity (SELECTION.md § Click
+model). It is a *pre-open indicator*, deliberately hosted by this transient
+tooltip rather than the opened card's header (Ben, 2026-07-23), and shows only
+mid-dwell (strictly between empty and full). See `hover_card.{hpp,cpp}`.
+
 ---
 
 ## What it serves

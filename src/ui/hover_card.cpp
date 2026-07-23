@@ -5,7 +5,8 @@
 namespace ui {
 
 void draw_hover_card(ImVec2 cursor, int hover_ticks,
-                     const std::function<void()>& content)
+                     const std::function<void()>& content,
+                     float dwell_fraction)
 {
     if (hover_ticks < kHoverDelay)
         return;
@@ -39,7 +40,20 @@ void draw_hover_card(ImVec2 cursor, int hover_ticks,
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,  { kPad, kPad });
 
     if (ImGui::Begin("##hover_card", nullptr, flags))
+    {
         content();
+
+        // Dwell-to-open indicator (BL-200): a thin bar that fills as the pointer
+        // holds still, signalling "keep holding to open the card". Shown only
+        // mid-dwell — not before it starts (0) and not once it completes (≥1, the
+        // frame the card opens). It lives here in the tooltip, never in the card
+        // header (Ben, 2026-07-23).
+        if (dwell_fraction > 0.0f && dwell_fraction < 1.0f)
+        {
+            ImGui::Spacing();
+            ImGui::ProgressBar(dwell_fraction, { -1.0f, 3.0f }, "");
+        }
+    }
     ImGui::End();
 
     ImGui::PopStyleVar(2);
