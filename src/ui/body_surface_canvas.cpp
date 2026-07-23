@@ -5,6 +5,7 @@
 #include "highlight.hpp"
 #include "hover_card.hpp"
 #include "hover_content.hpp"
+#include "hex_render.hpp"
 #include "icons.hpp"
 #include "market_ledger.hpp" // market_city_name (Market lens catchment key, BL-015)
 #include "nav_pane.hpp"
@@ -42,49 +43,9 @@ constexpr float kMinZoomHeadroom = 1.2f;  // at min zoom the viewport shows ~120
 constexpr float kMaxZoom         = 20.0f;
 constexpr float kMinZoom         = 1.0f / (kMinZoomHeadroom * kFitMargin); // ~0.877
 
-// Identity fill colour for a tile's composition. The single source of truth for
-// surface tinting; landform is conveyed by overlay glyphs (deferred), not hue.
-ImU32 terrain_colour(terrain_composition t)
-{
-    switch (t)
-    {
-        case terrain_composition::barren:    return IM_COL32(170, 145, 100, 255);
-        case terrain_composition::rocky:     return IM_COL32(112, 105,  95, 255);
-        case terrain_composition::volcanic:  return IM_COL32(135,  55,  28, 255);
-        case terrain_composition::icy:       return IM_COL32(200, 224, 236, 255);
-        case terrain_composition::tundra:    return IM_COL32(140, 140, 118, 255);
-        case terrain_composition::grassland: return IM_COL32( 96, 150,  72, 255);
-        case terrain_composition::forest:    return IM_COL32( 48, 102,  56, 255);
-        case terrain_composition::wetland:   return IM_COL32( 78, 120,  92, 255);
-        case terrain_composition::ocean:     return IM_COL32( 40,  80, 160, 255);
-        case terrain_composition::regolith:  return IM_COL32(138, 130, 120, 255);
-        case terrain_composition::metallic:  return IM_COL32(158, 150, 140, 255);
-    }
-    return IM_COL32( 60,  60,  60, 255);
-}
-
-/// Fills `out[6]` with the screen-space vertices of a pointy-top hexagon
-/// centred at (cx, cy) with circumradius r.
-void hex_vertices(ImVec2 out[6], float cx, float cy, float r)
-{
-    for (int i = 0; i < 6; ++i)
-    {
-        const float angle = kPi / 6.0f + kPi / 3.0f * static_cast<float>(i);
-        out[i] = { cx + r * std::cos(angle), cy + r * std::sin(angle) };
-    }
-}
-
-/// World-space centre of a hex at (col, row) in odd-r offset coordinates,
-/// relative to the grid top-left, using the given circumradius.
-ImVec2 hex_local_centre(int col, int row, float hex_size)
-{
-    const float col_step = kSqrt3 * hex_size;
-    const float row_step = 1.5f * hex_size;
-    return {
-        col_step * static_cast<float>(col) + ((row & 1) ? col_step * 0.5f : 0.0f),
-        row_step * static_cast<float>(row),
-    };
-}
+// terrain_colour, hex_vertices, and hex_local_centre now live in ui/hex_render.hpp
+// (shared with the sticky card's zoomed tile-neighbourhood view, BL-194) so both
+// surfaces draw from one terrain palette and one hex geometry rather than diverging.
 
 /// Per-channel linear blend of two opaque colours: result = a·(1−t) + b·t, alpha
 /// forced opaque. Used by the Resource lens to composite a deposit hue over terrain
@@ -2330,6 +2291,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // when it re-selects the same entity the player had dismissed (close
             // hides, does not destroy — SELECTION.md).
             state.selection_hidden_for = null_entity;
+            // Freeze the sticky card at the click position (BL-194): it centres here
+            // and stays put. Only meaningful when something was actually selected.
+            if (state.selected_entity != null_entity)
+                state.card_anchor = { mouse.x, mouse.y };
         }
         else if (hovered_tile != null_entity)
         {

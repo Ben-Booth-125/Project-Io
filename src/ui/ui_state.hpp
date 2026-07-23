@@ -221,6 +221,39 @@ struct ui_state
     entity_id hovered_entity = null_entity; ///< Entity the cursor rested on last frame; used to detect stable hover.
     int       hover_ticks    = 0;           ///< Consecutive frames of stable hover over hovered_entity; resets on entity change.
 
+    // --- sticky detail card (BL-194/195) ---
+    // The click-opened card (selection_card.cpp) freezes at the click position and
+    // centres there, clamped to the canvas. Captured at the canvas select-click; a
+    // programmatic selection (verify harness, post-build auto-select) leaves the
+    // sentinel {-1,-1}, which the card reads as "no anchor → centre on the canvas".
+    // Frozen (not the live mouse) so the card stays put once opened, per SELECTION.md.
+    ImVec2 card_anchor { -1.0f, -1.0f };
+
+    // --- sticky card recursive drill-down (BL-196) ---
+    // One drilled frame: a resource time-series view opened from a tile card's
+    // per-resource graph. The card shows a STACK of these over the root selection
+    // (empty = the root). Esc / the card's back button pop one; at the root a
+    // dismiss hides the card. Acyclic + depth-capped (see selection_panel.cpp).
+    struct card_drill
+    {
+        entity_id tile     = null_entity; ///< The tile whose resource series this frame plots.
+        int       resource = -1;          ///< Resource index (into resource_deposit[]).
+        int       scroll   = -1;          ///< Left edge (sample index) of the visible 8-quarter window; -1 = rightmost (most recent). Set by the chart's horizontal scrollbar.
+    };
+    std::vector<card_drill> card_stack;   ///< Drill frames over the root selection; empty = root.
+
+    /// Which deposited resource the tile card's bottom-third accordion currently
+    /// shows (Ben's 2026-07-23: page left/right through the tile's resources rather
+    /// than infinite-scroll). An index into the tile's *deposited* resources (not the
+    /// raw resource enum); clamped to that list each frame, reset to 0 on a new selection.
+    int card_resource_page = 0;
+
+    /// Per-frame request from the card: begin recording this tile's per-resource
+    /// deposit series (BL-198 lazy tracking). app drains it into its tracked-tile
+    /// set each frame; null_entity = no request. Idempotent — set while a resource
+    /// drill for the tile is open, so the tile stays tracked from first drill on.
+    entity_id card_track_tile = null_entity;
+
     // --- application-driven mouse (BL-061) ---
     // Canvases read this instead of ImGui::GetIO().MousePos so the cursor
     // position can be suppressed or overridden by the verify harness.

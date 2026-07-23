@@ -25,6 +25,7 @@
 #include "ui/overlay.hpp"
 #include "ui/presentation.hpp"
 #include "ui/profile_panel.hpp"
+#include "ui/selection.hpp"
 #include "ui/selection_card.hpp"
 #include "ui/selection_panel.hpp"
 #include "ui/solar_system_canvas.hpp"
@@ -488,6 +489,50 @@ void app::step_economy()
             ui::push_capped(mh[r].price,  mc.price[r]);
             ui::push_capped(mh[r].supply, mc.supply[r]);
             ui::push_capped(mh[r].demand, mc.demand[r]);
+        }
+    }
+
+    // Resource-deposit time series (BL-198): the aggregate (Σ remaining deposit per
+    // body per resource) every tick; a tracked tile's own series lazily, from the
+    // first drill-down into it. All share the sample-day axis (X), capped in
+    // lockstep. One pass over the tiles accumulates the body totals and snapshots
+    // any tracked tile — O(tiles·resources)/tick, the same order as the econ step.
+    {
+        // Drain the card's lazy-tracking request (a tile whose resource drill is
+        // open) so the tile starts recording THIS tick, aligned to today's sample.
+        if (m_ui.card_track_tile != null_entity)
+        {
+            m_tracked_tiles.insert(m_ui.card_track_tile);
+            m_ui.card_track_tile = null_entity;
+        }
+
+        // Date the sample by its quarter index (econ ticks are quarterly). This
+        // equals day_tick in live play but also advances when the verify harness
+        // steps the economy without turning the sim clock, so the Year/Quarter axis
+        // always progresses. See m_resource_sample_index.
+        ui::push_capped(m_resource_hist_days,
+                        m_resource_sample_index * static_cast<std::uint64_t>(sim_loop::econ_tick_days));
+        ++m_resource_sample_index;
+
+        std::unordered_map<entity_id, std::array<float, resource_count>> body_sum;
+        for (const auto& [tid, tc] : m_world.tiles)
+        {
+            auto& acc = body_sum[tc.body];
+            for (std::size_t r = 0; r < resource_count; ++r)
+                acc[r] += tc.resource_deposit[r];
+
+            if (m_tracked_tiles.count(tid))
+            {
+                auto& th = m_tile_resource_hist[tid];
+                for (std::size_t r = 0; r < resource_count; ++r)
+                    ui::push_capped(th[r], tc.resource_deposit[r]);
+            }
+        }
+        for (const auto& [bid, acc] : body_sum)
+        {
+            auto& bh = m_body_resource_hist[bid];
+            for (std::size_t r = 0; r < resource_count; ++r)
+                ui::push_capped(bh[r], acc[r]);
         }
     }
 }
@@ -1077,6 +1122,30 @@ int app::run_verify(const std::string& script_path, bool bless)
         // injection exists in the headless harness, so this is the equivalent.
         m_ui.selection_hidden_for = m_ui.selected_entity;
     });
+    v.set_function("card_drill", [this]() {
+        // Drive the sticky card's resource drill-down (BL-196) for the currently
+        // selected tile — the equivalent of clicking a resource graph, since no
+        // click injection exists headless. Drills the tile's first deposited
+        // resource and requests lazy tracking of it (BL-198). Returns the resource
+        // index drilled, or -1 if the selection is not a deposit-bearing tile.
+        const entity_id sel = m_ui.selected_entity;
+        const auto tit = m_world.tiles.find(sel);
+        if (tit == m_world.tiles.end())
+            return -1;
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (tit->second.resource_deposit[r] > 0.0f)
+            {
+                m_ui.card_stack.push_back({sel, static_cast<int>(r)});
+                m_ui.card_track_tile = sel;
+                // Acknowledge the selection so render()'s "new selection resets the
+                // drill" does not wipe the stack we just pushed. In live play the
+                // drill click happens frames after the select, so prev is already
+                // current; the harness sets both in one gap, so sync it here.
+                m_prev_selection = sel;
+                return static_cast<int>(r);
+            }
+        return -1;
+    });
     v.set_function("select_building", [this](int col, int row) {
         for (const auto& [bid, bc] : m_world.buildings)
         {
@@ -1503,14 +1572,28 @@ void app::handle_key_down(const SDL_KeyboardEvent& key)
 
     // Esc toggles the in-app system menu (BL-070) — cheap keyboard parity with the
     // corner gear button. Handled before the ImGui keyboard guard so it works even
-    // while the popup (or another panel) holds focus. An armed exit-confirm backs
-    // out first, so Esc cancels the "Really quit?" rather than closing the menu.
+    // while the popup (or another panel) holds focus. Precedence, highest first: an
+    // armed exit-confirm backs out; an open system menu closes; an open sticky
+    // detail card unwinds one drill level, then hides (BL-194/196 — Esc reaches the
+    // menu only once the card is fully closed, so a single press never both closes
+    // the card and opens the menu); otherwise the menu opens.
     if (key.scancode == SDL_SCANCODE_ESCAPE)
     {
+        // Mirror the card's own draw gate exactly (selection_card.cpp): a valid,
+        // non-dismissed selection whose kind actually resolves — so Esc never acts
+        // on an invisible card.
+        const bool card_open = m_ui.selected_entity != null_entity &&
+                               m_ui.selected_entity != m_ui.selection_hidden_for &&
+                               ui::selection_kind_of(m_world, m_ui.selected_entity) !=
+                                   ui::selection_kind::none;
         if (m_ui.confirm_exit_pending)
             m_ui.confirm_exit_pending = false;
         else if (m_ui.show_system_menu)
             m_ui.show_system_menu = false;
+        else if (card_open && !m_ui.card_stack.empty())
+            m_ui.card_stack.pop_back();                       // unwind one drill level
+        else if (card_open)
+            m_ui.selection_hidden_for = m_ui.selected_entity; // hide, not destroy
         else
             m_ui.show_system_menu = true;
         return;
@@ -2935,6 +3018,8 @@ void app::render()
         if (m_ui.selected_entity != null_entity &&
             m_ui.selected_entity != m_ui.selection_hidden_for)
             ui::close_all_panels(m_ui); // new selection takes the column
+        m_ui.card_stack.clear();        // a new selection resets any drill-down (BL-196)
+        m_ui.card_resource_page = 0;    // ...and its resource accordion page
         m_prev_selection = m_ui.selected_entity;
     }
 
@@ -2959,36 +3044,39 @@ void app::render()
     }
     ui::draw_corporation_panel(m_world, m_ui, m_ui.show_corporation_panel);
 
-    // Sticky detail card (BL-194) — click-opened, canvas-confined; coexists
-    // with the fold-out Selection element below (BL-195 relocates that
-    // content here) and the transient hover card. Drawn after the other
-    // chrome so it z-orders on top of it; disp is the primary canvas rect
-    // (always the full window here).
-    ui::draw_selection_card(m_world, m_ui, {0.0f, 0.0f}, disp);
+    // Sticky detail card (BL-194/195) — click-opened, canvas-confined; the SOLE
+    // home of the Selection content now (the former fold-out Selection panel is
+    // gone; the shell column is ledgers-only). Coexists with the transient hover
+    // card. Drawn after the other chrome so it z-orders on top of it. Confined to
+    // the free canvas rect — clear of the shell column (left), the header (top),
+    // and the right chrome column (time panel / minimap) — so it never overlaps
+    // chrome (SELECTION.md § Placement).
+    {
+        const float  col_w        = ui::shell_column_width(disp.x);
+        const float  right_edge   = disp.x - margin - mm_w; // left edge of the right chrome column
+        const ImVec2 card_origin  = { col_w, ui::profile_panel_height };
+        const ImVec2 card_region  = { std::max(0.0f, right_edge - col_w),
+                                      std::max(0.0f, disp.y - ui::profile_panel_height) };
+        const ui::resource_history_view rhist{ &m_body_resource_hist,
+                                               &m_tile_resource_hist,
+                                               &m_resource_hist_days };
+        ui::draw_selection_card(m_world, m_registry, m_last_econ_report, rhist, m_ui,
+                                card_origin, card_region);
+    }
 
-    // Selection info element — docked in the shell fold-out column, mutually exclusive
-    // with the ledgers (SELECTION.md). While a ledger owns the column the Selection is
-    // not drawn (the ledger wins the shared slot); selection state persists behind it,
-    // so closing the ledger reveals it again. The new-selection close ran above, before
-    // the ledgers drew.
-    // The fold-out column, when no nav ledger owns it, shows either the tile
-    // construction ledger (BL-162, when the player opened it from a tile) or the
-    // Selection element. The build ledger only applies to a selected tile.
+    // The shell fold-out column is ledgers-only (BL-195). The one contextual, per-
+    // tile surface it still hosts is the tile construction ledger (BL-162), opened
+    // from the card's "Construct Buildings" button; it draws only when no nav ledger
+    // owns the column and the selection is a tile.
     if (!ui::any_panel_open(m_ui))
     {
-        const entity_id sel        = m_ui.selected_entity;
+        const entity_id sel         = m_ui.selected_entity;
         const bool      sel_is_tile = sel != null_entity && m_world.tiles.count(sel) > 0;
 
-        // The tile-scoped Manage ledger was retired (Ben's 2026-07-15 review) — the
-        // fold-out column now shows either the tile construction ledger (when opened
-        // from a tile) or the Selection element.
         if (m_ui.show_build_ledger && sel_is_tile)
             ui::draw_construction_ledger(m_world, m_registry, m_ui);
         else
-        {
             m_ui.show_build_ledger = false; // not a tile → no build ledger
-            ui::draw_selection_panel(m_world, m_registry, m_last_econ_report, m_ui);
-        }
     }
 
     // Execute any construction request queued this frame by the build front door

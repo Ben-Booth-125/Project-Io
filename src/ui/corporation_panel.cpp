@@ -74,6 +74,7 @@ void draw_corporation_panel(const world& w, ui_state& s, bool& open)
                     ImGuiSelectableFlags_SpanAllColumns))
             {
                 s.selected_entity = id;
+                s.card_anchor     = {-1.0f, -1.0f}; // non-canvas selection → centre the card (BL-194)
             }
 
             ImGui::TableSetColumnIndex(1);

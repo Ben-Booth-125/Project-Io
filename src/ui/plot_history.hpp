@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <unordered_map>
 #include <vector>
 
@@ -28,6 +29,15 @@ inline void push_capped(std::vector<float>& series, float v)
         series.erase(series.begin());
 }
 
+/// push_capped for the shared sample-day axis (BL-198): the in-game day of each
+/// resource-history sample, kept in lockstep with the series it dates.
+inline void push_capped(std::vector<std::uint64_t>& series, std::uint64_t v)
+{
+    series.push_back(v);
+    if (series.size() > plot_history_cap)
+        series.erase(series.begin());
+}
+
 /// Per-resource price / supply / demand time series for one market.
 struct resource_plot_series
 {
@@ -39,6 +49,28 @@ struct resource_plot_series
 /// Market history: one resource_plot_series per resource type, keyed by market entity_id.
 using market_plot_history =
     std::unordered_map<entity_id, std::array<resource_plot_series, resource_count>>;
+
+/// Remaining-deposit time series, one capped vector per resource type
+/// (oldest→newest). The unit is `tile_component::resource_deposit[r]` — the
+/// resource stock — summed per body for the aggregate, or a single tile's own.
+using resource_deposit_series = std::array<std::vector<float>, resource_count>;
+
+/// Resource-deposit history keyed by entity (BL-198): a **body** id for the
+/// always-recorded aggregate (Σ deposit over the body's tiles), or a **tile** id
+/// for the lazily-recorded per-tile series. Both advance one sample per econ
+/// tick, sharing one sample-day axis so a body's bars and a tile's line plot on
+/// the same X.
+using resource_history = std::unordered_map<entity_id, resource_deposit_series>;
+
+/// Read-only bundle handed to the sticky card's resource drill-down so it can
+/// plot the aggregate-vs-tile chart without app exposing its raw members. Any
+/// pointer may be null (no data yet).
+struct resource_history_view
+{
+    const resource_history*           body = nullptr; ///< body id → per-resource aggregate series.
+    const resource_history*           tile = nullptr; ///< tile id → per-resource series (tracked tiles only).
+    const std::vector<std::uint64_t>* days = nullptr; ///< in-game day per sample; the chart's shared X axis.
+};
 
 /// Draw an ImGui::PlotLines for series with auto y-range (flat-line guarded) and
 /// an optional colour pushed around the call.

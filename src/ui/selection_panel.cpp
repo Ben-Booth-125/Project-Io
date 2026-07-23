@@ -3,6 +3,7 @@
 #include "charts.hpp"
 
 #include "foldout_column.hpp" // shell fold-out column host (shared with the ledgers)
+#include "hex_render.hpp"      // draw_tile_neighbourhood — the card's zoomed tile view
 #include "icons.hpp"
 #include "presentation.hpp"
 #include "selection.hpp"
@@ -505,7 +506,64 @@ void draw_selection_facts(const world& w, const recipe_registry& reg,
 // action / facts) until they get their own mockups. Construct Buildings stubs onto
 // the existing Construction panel (the dedicated tile-construction panel is owed);
 // History and Supply are drawn but not yet wired.
-void draw_tile_selection(const world& w, ui_state& ui)
+// --- Tile-card action-strip glyphs -------------------------------------------
+// Compact glyphs for the right-hand icon strip (Ben's 2026-07-23 layout). Drawn
+// centred at @p c within radius @p r, matching the (dl, centre, r, colour) contract
+// the ui::icons vocabulary uses. Construct/Manage/History are drawn here; Supply
+// reuses ui::icons::supply. Kept local for now; promote to ui::icons if they stick.
+constexpr float kTwoPiLocal = 6.2831853f;
+
+void glyph_hammer(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
+{
+    dl->AddRectFilled({c.x - r * 0.55f, c.y - r * 0.7f}, {c.x + r * 0.7f, c.y - r * 0.28f}, col, 1.5f);
+    dl->AddLine({c.x - r * 0.05f, c.y - r * 0.35f}, {c.x - r * 0.45f, c.y + r * 0.75f}, col, 2.2f);
+}
+
+void glyph_gear(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
+{
+    for (int i = 0; i < 8; ++i)
+    {
+        const float a = kTwoPiLocal * static_cast<float>(i) / 8.0f;
+        const ImVec2 d{std::cos(a), std::sin(a)};
+        dl->AddLine({c.x + d.x * r * 0.42f, c.y + d.y * r * 0.42f},
+                    {c.x + d.x * r * 0.72f, c.y + d.y * r * 0.72f}, col, 2.0f);
+    }
+    dl->AddCircle(c, r * 0.42f, col, 14, 2.0f);
+    dl->AddCircleFilled(c, r * 0.16f, col);
+}
+
+void glyph_clock(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
+{
+    dl->AddCircle(c, r * 0.72f, col, 18, 2.0f);
+    dl->AddLine(c, {c.x, c.y - r * 0.5f}, col, 2.0f);
+    dl->AddLine(c, {c.x + r * 0.42f, c.y + r * 0.08f}, col, 2.0f);
+}
+
+// A square icon button: an ImGui::Button frame with a glyph drawn over it and a
+// hover tooltip (Ben's call: icons, text only on hover). Disabled buttons dim the
+// glyph and show the reason. Returns true only on an enabled click.
+bool tile_icon_button(const char* id, ImVec2 sz, bool enabled, const char* tip,
+                      void (*glyph)(ImDrawList*, ImVec2, float, ImU32))
+{
+    ImGui::BeginDisabled(!enabled);
+    const ImVec2 p       = ImGui::GetCursorScreenPos();
+    const bool   clicked = ImGui::Button(id, sz);
+    ImGui::EndDisabled();
+    const ImU32 gcol = enabled ? IM_COL32(215, 215, 220, 255) : IM_COL32(110, 110, 116, 255);
+    glyph(ImGui::GetWindowDrawList(), {p.x + sz.x * 0.5f, p.y + sz.y * 0.5f},
+          std::min(sz.x, sz.y) * 0.5f, gcol);
+    if (ImGui::IsItemHovered() && tip)
+        ImGui::SetTooltip("%s", tip);
+    return clicked && enabled;
+}
+
+// The tile card (Ben's 2026-07-23 layout). Three regions: a header (icon + Tile
+// [x,y] + close); a middle band split into a zoomed hex-neighbourhood render (left)
+// and a thin vertical icon action strip (right); and a bottom third holding the
+// per-resource production graphs (each click-drillable into its time series, BL-196).
+// The zoomed render is the point — the card now SHOWS the tile it floats over, so it
+// no longer merely obscures it.
+void draw_tile_selection(world& w, ui_state& ui)
 {
     const entity_id sel = ui.selected_entity;
     const auto tit = w.tiles.find(sel);
@@ -514,117 +572,161 @@ void draw_tile_selection(const world& w, ui_state& ui)
         ImGui::TextDisabled("\xe2\x80\x94");
         return;
     }
-    const tile_component& tile = tit->second;
-    const ImGuiStyle&     style = ImGui::GetStyle();
-    ImDrawList*           dl    = ImGui::GetWindowDrawList();
+    const tile_component& tile   = tit->second;
+    const ImGuiStyle&     style  = ImGui::GetStyle();
+    ImDrawList*           dl     = ImGui::GetWindowDrawList();
+    const float           avail  = ImGui::GetContentRegionAvail().x;
+    const float           frame_h = ImGui::GetFrameHeight();
 
-    const auto centred = [&](ImVec2 mn, ImVec2 mx, const char* s, ImU32 col) {
-        const ImVec2 ts = ImGui::CalcTextSize(s);
-        dl->AddText({(mn.x + mx.x - ts.x) * 0.5f, (mn.y + mx.y - ts.y) * 0.5f}, col, s);
-    };
-
-    const float content_w = ImGui::GetContentRegionAvail().x;
-
-    // ── Placeholder image (fixed top) ──
+    // ── Header: [icon] Tile [x, y] ............................ [x] ──
     {
-        const float img_h = content_w * 0.28f;
-        const ImVec2 p = ImGui::GetCursorScreenPos();
-        const ImVec2 mx = {p.x + content_w, p.y + img_h};
-        dl->AddRectFilled(p, mx, IM_COL32(72, 72, 72, 255), 3.0f);
-        dl->AddRect(p, mx, IM_COL32(110, 110, 110, 255), 3.0f);
-        centred(p, mx, "PLACEHOLDER IMAGE", IM_COL32(180, 180, 180, 255));
-        ImGui::Dummy({content_w, img_h});
+        const ImVec2 hc = ImGui::GetCursorScreenPos();
+        const float  ir = frame_h * 0.40f;
+        draw_selection_icon(w, dl, selection_kind::tile, sel,
+                            {hc.x + ir, hc.y + frame_h * 0.5f}, ir);
+        ImGui::SetCursorScreenPos({hc.x + ir * 2.0f + style.ItemSpacing.x, hc.y});
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
+                           "Tile [%d, %d]", tile.grid_x, tile.grid_y);
+        ImGui::SameLine(avail - frame_h);
+        if (ImGui::Button("x", {frame_h, frame_h}))
+            ui.selection_hidden_for = sel;
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("Close");
     }
-    // ── [x, y] coordinate caption strip ──
+    ImGui::Separator();
+
+    // Reserve the bottom third for the resource graphs; the middle band takes the rest.
+    const float total_h  = ImGui::GetContentRegionAvail().y;
+    const float bottom_h = std::max(96.0f, total_h * 0.34f);
+    const float mid_h    = std::max(80.0f, total_h - bottom_h - style.ItemSpacing.y);
+
+    // ── Middle band: zoomed hex neighbourhood (left) + icon action strip (right) ──
+    const float strip_w = frame_h * 1.45f;
+    const float hex_w   = std::max(60.0f, avail - strip_w - style.ItemSpacing.x);
     {
-        const float cap_h = ImGui::GetFrameHeight();
-        const ImVec2 p = ImGui::GetCursorScreenPos();
-        const ImVec2 mx = {p.x + content_w, p.y + cap_h};
-        dl->AddRectFilled(p, mx, IM_COL32(55, 55, 55, 255), 2.0f);
-        char buf[32];
-        std::snprintf(buf, sizeof buf, "[%d, %d]", tile.grid_x, tile.grid_y);
-        centred(p, mx, buf, IM_COL32(200, 200, 200, 255));
-        ImGui::Dummy({content_w, cap_h});
+        const ImVec2 p  = ImGui::GetCursorScreenPos();
+        const ImVec2 mx = {p.x + hex_w, p.y + mid_h};
+        dl->AddRectFilled(p, mx, IM_COL32(16, 18, 24, 255), 3.0f);
+        draw_tile_neighbourhood(dl, w, sel, p, {hex_w, mid_h}, /*radius=*/2);
+        dl->AddRect(p, mx, IM_COL32(90, 90, 100, 255), 3.0f);
+        ImGui::Dummy({hex_w, mid_h});
     }
-    ImGui::Spacing();
+    ImGui::SameLine();
+    {
+        ImGui::BeginChild("##tile_strip", {strip_w, mid_h}, false,
+                          ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
+        const float bsz  = strip_w;
+        const ImVec2 sz  = {bsz, bsz};
 
-    // Reserve the 2x2 button grid at the bottom; the bar list fills the space between.
-    const float frame_h = ImGui::GetFrameHeight();
-    const float btn_h   = frame_h * 2.2f;
-    const float grid_h  = btn_h * 2.0f + style.ItemSpacing.y;
-    float bars_h = ImGui::GetContentRegionAvail().y - grid_h - style.ItemSpacing.y * 2.0f;
-    if (bars_h < 60.0f)
-        bars_h = 60.0f;
+        // Construct — opens the tile construction ledger (BL-162).
+        if (tile_icon_button("##act_construct", sz, /*enabled=*/true,
+                             "Construct buildings", glyph_hammer))
+            ui.show_build_ledger = true;
 
-    // ── Production graphs: one bordered container per deposited resource, each a
-    // clustered column pair (tile production vs the top-decile reference). The list ALWAYS
-    // carries a vertical scrollbar — a tile can hold more resources than fit — so the
-    // player can scroll through every one. ──
-    constexpr float chart_h = 80.0f;
-    const float row_h = frame_h + chart_h + style.ItemSpacing.y + style.WindowPadding.y * 2.0f + 4.0f;
+        // Manage — enabled only when a building occupies this tile; selecting it
+        // switches the card to the building layout next frame.
+        entity_id bld_here = null_entity;
+        for (const auto& [bid, bc] : w.buildings)
+            if (bc.tile == sel) { bld_here = bid; break; }
+        if (tile_icon_button("##act_manage", sz, bld_here != null_entity,
+                             bld_here != null_entity ? "Manage building" : "No building here",
+                             glyph_gear) &&
+            bld_here != null_entity)
+        {
+            ui.selected_entity      = bld_here;
+            ui.selection_hidden_for = null_entity;
+        }
+
+        // History / Supply — drawn for layout completeness, not yet wired.
+        tile_icon_button("##act_history", sz, /*enabled=*/false,
+                         "History (not yet available)", glyph_clock);
+        if (ImGui::Button("##act_supply", sz)) { /* stub */ }
+        {
+            const ImVec2 sp = ImGui::GetItemRectMin();
+            ui::icons::supply(ImGui::GetWindowDrawList(),
+                              {sp.x + bsz * 0.5f, sp.y + bsz * 0.5f}, bsz * 0.5f,
+                              IM_COL32(110, 110, 116, 255));
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Supply (not yet available)");
+        }
+        ImGui::EndChild();
+    }
+
+    // ── Bottom third: resource ACCORDION — one graph at a time, paged ‹ › ──
+    // (Ben's 2026-07-23: page through the tile's resources rather than infinite-scroll.)
     constexpr ImU32 tile_col = IM_COL32(150, 235, 160, 255); // this tile's production (green)
     constexpr ImU32 p90_col  = IM_COL32(150, 160, 190, 255); // top-decile reference (muted)
-    constexpr float gutter   = 40.0f;                        // == draw_production_chart gutter
 
-    ImGui::BeginChild("##tile_graphs", {content_w, bars_h}, false,
-                      ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysVerticalScrollbar);
-    bool any_deposit = false;
+    // The tile's deposited resources, in enum order.
+    std::vector<std::size_t> deposits;
     for (std::size_t r = 0; r < resource_count; ++r)
+        if (tile.resource_deposit[r] > 0.0f)
+            deposits.push_back(r);
+
+    ImGui::BeginChild("##tile_accordion", {avail, bottom_h}, false,
+                      ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
+    if (deposits.empty())
     {
-        if (tile.resource_deposit[r] <= 0.0f)
-            continue;
-        any_deposit = true;
+        ImGui::TextDisabled("No deposits");
+    }
+    else
+    {
+        int&              page = ui.card_resource_page;
+        const int         n    = static_cast<int>(deposits.size());
+        page = std::clamp(page, 0, n - 1);
+        const std::size_t r    = deposits[static_cast<std::size_t>(page)];
         const resource_presentation& rp = presentation_of(static_cast<resource_type>(r));
 
-        // Each graph + its header live in one bordered container, so the header reads
-        // as that graph's title rather than floating above the list.
-        ImGui::BeginChild(rp.name, {0.0f, row_h}, true,
-                          ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
-        ImDrawList* cdl = ImGui::GetWindowDrawList(); // child-local: clips to this box
+        // Pager row: ‹  Resource (i/N)  ›
+        const float aw = ImGui::GetContentRegionAvail().x;
+        ImGui::BeginDisabled(page == 0);
+        if (ImGui::ArrowButton("##res_prev", ImGuiDir_Left)) --page;
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered() && page > 0)
+            ImGui::SetTooltip("Previous resource");
 
+        char hdr[64];
+        std::snprintf(hdr, sizeof hdr, "%s  (%d/%d)", rp.name, page + 1, n);
+        const float name_w = ImGui::CalcTextSize(hdr).x;
+        ImGui::SameLine(std::max(frame_h + style.ItemSpacing.x, (aw - name_w) * 0.5f));
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", hdr);
+
+        ImGui::SameLine(aw - frame_h);
+        ImGui::BeginDisabled(page == n - 1);
+        if (ImGui::ArrowButton("##res_next", ImGuiDir_Right)) ++page;
+        ImGui::EndDisabled();
+        if (ImGui::IsItemHovered() && page < n - 1)
+            ImGui::SetTooltip("Next resource");
+
+        // The single current resource's graph, filling the rest of the band. Clicking
+        // it drills into its time series (BL-196). A descriptive tooltip explains what
+        // the two bars are — not just "<resource> over time".
         const float a       = tile_production(tile, r);
         const float p90     = top_decile_production(w, r);
         const float peak    = std::max(a, p90);
         const float ceiling = nice_ceil(peak > 0.0f ? peak : 1.0f);
 
-        // Header indented to the plot origin, so the name sits above its bar.
-        ImGui::Indent(gutter);
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", rp.name);
-        ImGui::Unindent(gutter);
-
+        ImGui::Spacing();
         const ImVec2 p  = ImGui::GetCursorScreenPos();
         const float  cw = ImGui::GetContentRegionAvail().x;
-        ImGui::Dummy({cw, chart_h});
-        draw_production_chart(cdl, p, {p.x + cw, p.y + chart_h}, a, p90, ceiling,
-                              tile_col, p90_col);
-        ImGui::EndChild();
-        ImGui::Spacing();
-    }
-    if (!any_deposit)
-        ImGui::TextDisabled("No deposits");
-    ImGui::EndChild();
-
-    // ── Action buttons ──
-    // This element is the *unbuilt-tile* prospecting view (Ben's 2026-07-15 review):
-    // its job is "is this tile worth building on?", so Construct is the primary action
-    // and leads full-width. The tile-scoped Manage front door is gone — a built tile's
-    // management is reached elsewhere, not from the prospecting element.
-    const float bw  = (content_w - style.ItemSpacing.x) * 0.5f;
-    const ImVec2 bsz = {bw, btn_h};
-
-    if (ImGui::Button("Construct\nBuildings", {content_w, btn_h}))
-        ui.show_build_ledger = true; // opens the tile construction ledger (BL-162)
-
-    // History / Supply: drawn for layout completeness, wired to nothing yet
-    // (BL-123 § stubs). The tooltip keeps the no-op honest rather than silent.
-    const auto stub = [&](const char* label) {
-        ImGui::Button(label, bsz);
+        const float  gh = std::max(48.0f, ImGui::GetContentRegionAvail().y - 4.0f);
+        if (ImGui::InvisibleButton("##res_chart", {cw, gh}))
+        {
+            const bool dup = !ui.card_stack.empty() &&
+                             ui.card_stack.back().tile == sel &&
+                             ui.card_stack.back().resource == static_cast<int>(r);
+            if (!dup && ui.card_stack.size() < 20)
+                ui.card_stack.push_back({sel, static_cast<int>(r)});
+            ui.card_track_tile = sel;
+        }
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Not yet available");
-    };
-    stub("History");
-    ImGui::SameLine();
-    stub("Supply");
+            ImGui::SetTooltip("%s: this tile yields %.1f vs %.1f for a top-10%% tile.\n"
+                              "Click for its history over time.",
+                              rp.name, static_cast<double>(a), static_cast<double>(p90));
+        draw_production_chart(ImGui::GetWindowDrawList(), p, {p.x + cw, p.y + gh},
+                              a, p90, ceiling, tile_col, p90_col);
+    }
+    ImGui::EndChild();
 }
 
 // --- The building Selection element (Ben's 2026-07-22 review) ----------------
@@ -989,45 +1091,33 @@ void draw_building_selection(world& w, const recipe_registry& reg,
 
 } // namespace
 
-void draw_selection_panel(world& w, const recipe_registry& reg,
-                          const economy_report& report, ui_state& ui)
+void draw_selection_content(world& w, const recipe_registry& reg,
+                            const economy_report& report, ui_state& ui)
 {
     const selection_kind kind = selection_kind_of(w, ui.selected_entity);
 
-    // Hidden when nothing valid is selected, or when the player dismissed this
-    // exact selection (close hides until the next selection re-shows it).
+    // Nothing valid selected — draw nothing. (The card frame owns the open/hidden
+    // gate on selection_hidden_for; this content function only draws the entity.)
     if (kind == selection_kind::none)
         return;
-    if (ui.selected_entity == ui.selection_hidden_for)
+
+    // A selected tile owns its WHOLE card layout, header included (Ben's 2026-07-23
+    // three-region design: header / zoomed hex neighbourhood + action strip / graphs),
+    // so it is dispatched before the generic header the other kinds share.
+    if (kind == selection_kind::tile)
+    {
+        draw_tile_selection(w, ui);
         return;
+    }
 
-    // --- Layout ---
-    // The Selection element now fills the shell fold-out column (foldout_column_rect),
-    // the same slot the ledgers use, and is mutually exclusive with them (app closes
-    // any open ledger on a new selection and gates this draw on !any_panel_open).
-    // NOTE: the content below still uses the wide-bottom-bar action|facts split;
-    // its re-lay-out for this narrower, taller column is BL-123 (Ben to mock).
-    const foldout_rect r       = foldout_column_rect();
-    const float        bar_w   = r.w;
-    const float        frame_h = ImGui::GetFrameHeight();
-    const ImGuiStyle&  style   = ImGui::GetStyle();
-
-    ImGui::SetNextWindowPos({r.x, r.y}, ImGuiCond_Always);
-    ImGui::SetNextWindowSize({r.w, r.h}, ImGuiCond_Always);
-    ImGui::SetNextWindowBgAlpha(0.90f);
-    constexpr ImGuiWindowFlags flags =
-        ImGuiWindowFlags_NoTitleBar            |
-        ImGuiWindowFlags_NoResize              |
-        ImGuiWindowFlags_NoMove                |
-        ImGuiWindowFlags_NoCollapse            |
-        ImGuiWindowFlags_NoNav                 |
-        ImGuiWindowFlags_NoBringToFrontOnFocus |
-        ImGuiWindowFlags_NoScrollbar           |
-        ImGuiWindowFlags_NoScrollWithMouse     |
-        ImGuiWindowFlags_NoSavedSettings;
-    ImGui::Begin("##selection_info", nullptr, flags);
-
-    ImDrawList* dl = ImGui::GetWindowDrawList();
+    // Frame-agnostic: this draws into whatever window the caller opened (the sticky
+    // card, BL-195). Width comes from the live content region, not a fixed column —
+    // so the same content renders in a card of any width. The header + per-kind
+    // dispatch below is unchanged from the former fold-out Selection panel.
+    const float       bar_w   = ImGui::GetContentRegionAvail().x;
+    const float       frame_h = ImGui::GetFrameHeight();
+    const ImGuiStyle& style   = ImGui::GetStyle();
+    ImDrawList*       dl      = ImGui::GetWindowDrawList();
 
     // ── Header: [icon] Name · type ............................. [>] [x] ──
     {
@@ -1048,8 +1138,11 @@ void draw_selection_panel(world& w, const recipe_registry& reg,
             ImGui::TextDisabled("%s", kname);
         }
 
+        // Right-align the two chrome buttons at the content region's right edge.
+        // bar_w is the available content width (padding already excluded), so the
+        // offset is measured from the content-left, no WindowPadding term needed.
         const float btn = frame_h;
-        ImGui::SameLine(bar_w - style.WindowPadding.x - 2.0f * btn - style.ItemSpacing.x);
+        ImGui::SameLine(bar_w - 2.0f * btn - style.ItemSpacing.x);
         if (ImGui::Button(">", {btn, btn}))
             focus_on_entity(w, ui, ui.selected_entity);
         if (ImGui::IsItemHovered())
@@ -1063,27 +1156,17 @@ void draw_selection_panel(world& w, const recipe_registry& reg,
 
     ImGui::Separator();
 
-    // A selected tile takes the dedicated vertical layout (BL-123, Ben's mockup);
-    // the other kinds keep the action|facts split until they get their own mockups.
-    if (kind == selection_kind::tile)
-    {
-        draw_tile_selection(w, ui);
-        ImGui::End();
-        return;
-    }
-
-    // A selected player building likewise takes its own vertical layout (Ben's
-    // 2026-07-22 review: the old four-numbers card "is useless"). Rival buildings
-    // stay on the action|facts split — intel only, nothing to operate.
+    // A selected player building takes its own vertical layout (Ben's 2026-07-22
+    // review: the old four-numbers card "is useless"). Rival buildings stay on the
+    // action|facts split — intel only, nothing to operate.
     if (kind == selection_kind::building && is_player_owned(w, ui.selected_entity))
     {
         draw_building_selection(w, reg, report, ui);
-        ImGui::End();
         return;
     }
 
     // ── Action (left, dominant) │ Facts (right, muted) ──
-    const float content_w = bar_w - style.WindowPadding.x * 2.0f;
+    const float content_w = bar_w;
     const float action_w  = (content_w - style.ItemSpacing.x) * 0.58f;
 
     // Two fill-height columns: action leads at a fixed split, facts to its right.
@@ -1106,8 +1189,6 @@ void draw_selection_panel(world& w, const recipe_registry& reg,
     draw_selection_facts(w, reg, report, ui, kind);
     ImGui::PopTextWrapPos();
     ImGui::EndChild();
-
-    ImGui::End();
 }
 
 // The tile construction ledger (BL-162): the tile-contextual surface that actually

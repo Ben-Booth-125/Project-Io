@@ -18,6 +18,7 @@
 #include <deque>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 /// Top-level application object. Owns the SDL window and renderer, orchestrates
@@ -213,6 +214,17 @@ private:
     std::vector<float> m_expenditure_history; ///< Recent player expenditure per econ tick (auto-buys + wages + maintenance); feeds economy panel graph.
     ui::market_plot_history m_market_history; ///< Price / supply / demand history per market, per resource; feeds market ledger graphs.
     std::deque<std::unordered_map<entity_id, int>> m_building_rank_hist; ///< Player-building profit rankings (entity→rank), one snapshot per econ tick, last 5 kept; the oldest is ~4 ticks (a year) back, feeding the Budget ledger's rank-change column (BL-171).
+
+    // Resource-deposit time series (BL-198) — app-owned, capped, UNSERIALISED (like
+    // the balance history: outside the save seam, so no format change and no
+    // determinism risk; survives the session only). Feeds the sticky card's
+    // resource drill-down chart (BL-196/197). The body aggregate is recorded every
+    // econ tick; a tile's own series only from the first drill-down into it (lazy).
+    ui::resource_history          m_body_resource_hist;  ///< Σ remaining deposit per body per resource, one sample/tick (always).
+    ui::resource_history          m_tile_resource_hist;  ///< Remaining deposit per tile per resource, recorded only for tracked (drilled) tiles.
+    std::unordered_set<entity_id> m_tracked_tiles;       ///< Tiles whose per-tile series is being recorded (seeded by card drill-downs).
+    std::vector<std::uint64_t>    m_resource_hist_days;  ///< In-game day per resource-history sample; the chart's shared X axis (capped in lockstep).
+    std::uint64_t                 m_resource_sample_index = 0; ///< Monotonic count of resource-history samples taken. Each econ tick is a quarter, so sample i is dated i·econ_tick_days — equal to day_tick in live play (econ ticks are quarterly) but also progressing when the harness steps the economy without the sim clock.
     entity_id   m_prev_selection = null_entity; ///< selected_entity last frame; a change to a new selection closes any open ledger so the Selection element takes the shared fold-out column.
 
     bool        m_show_help        = false;   ///< Toggle for the F1 key-binding cheat-sheet overlay.
