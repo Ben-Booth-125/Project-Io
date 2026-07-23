@@ -152,17 +152,21 @@ corporation (not just the player) a readable tile tint. See also the BL-085 home
 drawn only on the player's home body, which is a further, distinct layer of the same identity
 chrome.
 
-**Corporate reach (BL-182, visual slice — shipped).** Beyond tinting *held tiles*, the lens now
-draws each **rival** corporation's **HQ-projected border**: a **reach ring** centred on that corp's
-HQ (the holding nearest its holdings centroid on the active body) plus an `hq` star, in the corp's
-identity colour, with radius = the holdings extent plus a fixed projected range. This extends the
-identity language of the always-on player-only home ring/HQ star (BL-085) to rivals, so
+**Corporate reach (BL-182, visual slice — shipped; foundation BL-201).** Beyond tinting *held
+tiles*, the lens draws each **rival** corporation's **HQ-projected border**: a **reach ring**
+centred on that corp's HQ plus an `hq` star, in the corp's identity colour. As of BL-201 the ring
+reads the corp's **persisted** seat + range (`corporation_component::hq_building` /
+`influence_range`, designated at generation — CORPORATION_GENERATION.md § Pass 3b), not a
+render-time recompute; the ring radius is `influence_range · hex_size · zoom`. The player's border
+and every rival's are now drawn through **one shared `draw_corp_border` path**, each on that corp's
+**home body** (the single-home model; branch offices on other bodies are deferred). This extends
+the identity language of the always-on player-only home ring/HQ star (BL-085) to rivals, so
 corporations read as having **borders too** — the corporation-side counterpart to the Country
-lens's national borders. The player's own border stays the always-on home ring (BL-085), so the
-reach layer excludes the player to avoid a double-draw. This layer is **render-only chrome** — it
-gates nothing. The full *gameplay* mechanic (range that actually gates operations, multi-HQ
-building via advancement, the tall/wide axis, law/tech levers) and its open questions stay
-deferred in `docs/development/backlog.json` (BL-182). See `scripts/verify/corporate_reach.lua`.
+lens's national borders. The player's own border stays always-on; the rival layer shows under this
+lens (no double-draw of the player). This layer is **render-only chrome** — it gates nothing. The
+full *gameplay* mechanic (range that gates operations, the national origin gate, multi-HQ building
+via advancement, the tall/wide axis, law/tech levers) stays deferred in
+`docs/development/backlog.json` (BL-182). See `scripts/verify/corporate_reach.lua`.
 
 ---
 

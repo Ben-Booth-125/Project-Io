@@ -5800,6 +5800,17 @@
       "rows": [
         { "id": "R1", "status": "pending", "requirement": "ITEM-SPANNING (visual): on the Planetary surface, holding the pointer still over a hoverable entity fills a thin progress bar inside the transient hover tooltip at the cursor; when it completes the sticky detail card opens on that entity (selected_entity set, card_anchor frozen at the pointer) exactly as a click there would. A left-click still opens the card instantly. Moving the pointer beyond a small jitter radius resets the dwell timer (so sweeping the tile grid never auto-opens). The bar shows only while dwelling (0 < fraction < 1) and never appears in the opened card's header. Dwell is suppressed in construction mode and when the card is already open for that entity.", "verification": ["visual"], "result_metric": "", "notes": "Built 2026-07-23. Static-reviewed. NOTE: the headless verify harness drives selection directly (select_tile/dismiss_selection) and has no per-frame mouse/hover injection, so the dwell path cannot be exercised by sticky_card.lua; live verification of the dwell feel is owed on a build-capable machine (SDL FetchContent 403 blocks in-session build). Click path unchanged. Same verification posture as BL-183." }
       ]
+    },
+    {
+      "brief": "corporate-border-foundation",
+      "batch": "2026-07-23-corporate-border-foundation",
+      "title": "BL-201 — Corporate border data-model foundation: persisted HQ + influence range, border render off real data",
+      "status": "completed",
+      "promoted_from": "backlog.json BL-201 CORPORATE_BORDER_FOUNDATION",
+      "rows": [
+        { "id": "R1", "status": "completed", "requirement": "HEADLESS: every corporation with holdings on its home body is assigned an hq_building that is one of its OWN buildings sited on the home body, and a strictly positive influence_range; the designation is a deterministic function of generation (identical hq_building + influence_range across two make_hard_coded_world() runs). A corp with no home-body holdings keeps {null_entity, 0}.", "verification": ["headless"], "result_metric": "world_audit: BL-182 R1 PASS (8 corps, 0 without a valid HQ); BL-182 R2 PASS (0 mismatched across two generations); all pre-existing world_audit checks still PASS; exit 0.", "notes": "Verified in-session via verifier-headless on tools/verify/world_audit.cpp (BL-182 R1/R2 added). Compiled with cl /std:c++20 after fixing the stale README source list (added city_names/planetology/road_generation/logistics TUs)." },
+        { "id": "R2", "status": "pending", "requirement": "VISUAL: on the Planetary surface the corporate border is drawn from the persisted HQ + influence_range (not a render-time recompute) — the player's always-on home ring/HQ star on the home body, and every rival corp's ring/HQ star under the Corporation lens on that corp's home body — via one shared draw_corp_border path. The ring radius = influence_range * hex_size * zoom, cylinder-seam wrapped.", "verification": ["visual"], "result_metric": "", "notes": "Owed — the GUI build is blocked in-session (SDL FetchContent egress 403). Also flagged for Ben's eyeball: (1) the ring no longer grows as the player builds outward (range fixed at generation); (2) a single projected-range constant now sizes both player and rival rings. Same visual-verification posture as BL-183." }
+      ]
     }
   ]
 }

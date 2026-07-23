@@ -32,7 +32,8 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\world_audit.cpp ^
    src\world\world.cpp src\world\tile_generation.cpp src\world\nation_generation.cpp ^
    src\world\corporation_generation.cpp src\world\placement_rules.cpp ^
    src\world\population_generation.cpp src\world\hard_coded_world.cpp ^
-   src\world\orbital_system.cpp /Fe:world_audit.exe
+   src\world\orbital_system.cpp src\world\city_names.cpp src\world\planetology.cpp ^
+   src\world\road_generation.cpp src\world\logistics.cpp /Fe:world_audit.exe
 .\world_audit.exe
 
 :: Layer 4 player construction — construct_building validation, build-cost spend,

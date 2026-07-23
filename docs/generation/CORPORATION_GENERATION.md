@@ -96,6 +96,20 @@ not a broad presence across the nation.
 Placement is collision-checked against already-placed assets from other corporations.
 No two corporations begin on the same tile.
 
+### Pass 3b — HQ designation & border range (BL-201)
+
+Immediately after placement, each corporation is assigned a **HQ** and an **influence
+range** — the data-model foundation of the corporate border (BL-182). The HQ is the
+corp's **seat**: the holding nearest its holdings centroid on the home body. The range
+is the furthest holding's distance from that HQ plus a **fixed projected reach**, in
+**unit-hex distance** (`hex_size = 1`), so a renderer obtains pixels by
+`influence_range · hex_size · zoom`. Both are stored on `corporation_component`
+(`hq_building`, `influence_range`) and are a pure, deterministic function of the placed
+holdings; a corp with no home-body holdings keeps `{null_entity, 0}` (no border). This
+is **render-only** — the border drives the Corporation-lens chrome (LENSES.md) but gates
+nothing until the deferred BL-182 operate-gate lands. Audited by `world_audit`
+(BL-182 R1/R2).
+
 ### Pass 4 — Financial profile
 
 Each corporation receives starting capital drawn from a seeded range. A tunable
@@ -156,6 +170,14 @@ extensible via laws and technology. It **generalises** the player-only home-clus
 (BL-085; the seed of this) into a real ranged border for every corporation on the **Corporation**
 lens. Deferred with corporation-system behaviour (post-v0.1.0); full design and open questions live
 in `docs/development/backlog.json` (BL-182).
+
+> **Data-model foundation landed (BL-201, 2026-07-23).** The persisted HQ + influence
+> range (Pass 3b above) and the border render-off-real-data are built; the border now
+> reads from generation rather than a render-time recompute. What stays deferred in
+> BL-182: the **operate-gate** (border restricts where a corp can build), the **national
+> origin gate** (corps start home-nation-confined; international reach for 1–2 great
+> powers, tech-gated), **branch offices** on non-home bodies, the **cost-field** range
+> shape, and the **tall/wide advancement curve**.
 
 **Building tiers / levels.** A level/tier axis for buildings — **distinct from production
 methods (recipes)**. A specialist's footprint may be characterised as much by the *tier* of its

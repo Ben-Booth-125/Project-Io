@@ -1951,140 +1951,75 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
     }
 
-    // Home presence (BL-085): on the player's home body, draw a ring enclosing the
-    // holdings cluster ("my region") and an HQ star on the building nearest the
-    // cluster centroid ("my origin"). Always-on identity chrome that composes with
-    // (does not duplicate) the per-tile ownership outline already drawn above; the
-    // camera-focus + ownership-accent halves shipped earlier (start-framing QOL).
-    if (state.active_body == w.home_body && w.home_body != null_entity)
+    // Corporate borders (BL-182 foundation). A corp's border now reads from its
+    // PERSISTED seat + range (corporation_component::hq_building / influence_range,
+    // designated deterministically at generation), replacing the render-time
+    // centroid+hull recompute the player home-ring (BL-085) and rival reach slice
+    // (BL-183) each open-coded. influence_range is unit-hex distance (hex_size = 1),
+    // so the pixel radius is range * hex_size * zoom — matching hex_local_centre
+    // exactly. Drawn on the corp's HOME body only (the single-home model; branch
+    // offices on other bodies are deferred with the full BL-182 mechanic). Still
+    // render-only: the border gates nothing until the deferred operate-gate lands.
+    //
+    // OWED EYEBALL (no in-session build; SDL FetchContent 403): the range is fixed
+    // at generation, so the ring no longer grows as the player builds outward, and a
+    // single projected-range constant now sizes both player and rival rings. Both are
+    // deliberate foundation choices, flagged for a play-test look.
+    auto draw_corp_border = [&](entity_id corp_id, const corporation_component& cc,
+                                unsigned edge_alpha)
     {
-        std::vector<std::pair<entity_id, ImVec2>> mine; // player building tile -> local centre
-        for (const auto& [tid, corp] : tile_to_corp)
+        if (cc.hq_building == null_entity || cc.influence_range <= 0.0f)
+            return;
+        const auto b = w.buildings.find(cc.hq_building);
+        if (b == w.buildings.end())
+            return;
+        const auto t = w.tiles.find(b->second.tile);
+        if (t == w.tiles.end() || t->second.body != state.active_body)
+            return;
+
+        const ImU32  accent = corp_identity(corp_id);
+        const ImU32  edge   = (accent & 0x00FFFFFFu) | (edge_alpha << 24);
+        const ImVec2 hq_lc  = hex_local_centre(t->second.grid_x, t->second.grid_y, hex_size);
+        const ImVec2 hq_s   = to_screen(hq_lc);
+        const float  ring_r = cc.influence_range * hex_size * zoom;
+        const float  hq_r   = std::max(4.0f, draw_r * 0.5f);
+
+        const int k_min = (period_px > 0.0f)
+            ? static_cast<int>(std::ceil((visible_left  - hq_s.x - ring_r) / period_px)) : 0;
+        const int k_max = (period_px > 0.0f)
+            ? static_cast<int>(std::floor((visible_right - hq_s.x + ring_r) / period_px)) : 0;
+        for (int k = k_min; k <= k_max; ++k)
         {
-            if (corp != w.player_entity)
-                continue;
-            const auto til = w.tiles.find(tid);
-            if (til == w.tiles.end() || til->second.body != state.active_body)
-                continue;
-            mine.emplace_back(tid, hex_local_centre(til->second.grid_x, til->second.grid_y, hex_size));
+            const float off = static_cast<float>(k) * period_px;
+            dl->AddCircle({ hq_s.x + off, hq_s.y }, ring_r, edge, 0, 2.5f);
+            icons::hq(dl, { hq_s.x + off, hq_s.y }, hq_r, accent);
         }
-        if (!mine.empty())
-        {
-            ImVec2 cen{ 0.0f, 0.0f };
-            for (const auto& [tid, lc] : mine) { cen.x += lc.x; cen.y += lc.y; }
-            cen.x /= static_cast<float>(mine.size());
-            cen.y /= static_cast<float>(mine.size());
+    };
 
-            float max_d = 0.0f;
-            entity_id hq_tile = mine.front().first;
-            float hq_best = std::numeric_limits<float>::max();
-            for (const auto& [tid, lc] : mine)
-            {
-                const float dx = lc.x - cen.x, dy = lc.y - cen.y;
-                const float d = std::sqrt(dx * dx + dy * dy);
-                max_d = std::max(max_d, d);
-                if (d < hq_best) { hq_best = d; hq_tile = tid; }
-            }
-
-            const ImU32 accent = corp_identity(w.player_entity);
-            const ImVec2 cen_s = to_screen(cen);
-            const float ring_r = (max_d + hex_size * 0.9f) * zoom;
-
-            // HQ local centre for the pip.
-            ImVec2 hq_lc = cen;
-            for (const auto& [tid, lc] : mine) if (tid == hq_tile) { hq_lc = lc; break; }
-            const ImVec2 hq_s = to_screen(hq_lc);
-            const float hq_r = std::max(4.0f, draw_r * 0.5f);
-
-            const int k_min = (period_px > 0.0f)
-                ? static_cast<int>(std::ceil((visible_left  - cen_s.x - ring_r) / period_px)) : 0;
-            const int k_max = (period_px > 0.0f)
-                ? static_cast<int>(std::floor((visible_right - cen_s.x + ring_r) / period_px)) : 0;
-            for (int k = k_min; k <= k_max; ++k)
-            {
-                const float off = static_cast<float>(k) * period_px;
-                // "My region" ring — soft translucent fill + a crisp player-colour edge.
-                dl->AddCircle({ cen_s.x + off, cen_s.y }, ring_r,
-                              IM_COL32(80, 150, 230, 120), 0, 2.5f);
-                // HQ star at the origin building.
-                icons::hq(dl, { hq_s.x + off, hq_s.y }, hq_r, accent);
-            }
-        }
+    // The player's border is always-on identity chrome (BL-085 lineage), drawn on the
+    // player's home body regardless of the active lens.
+    if (state.active_body == w.home_body && w.player_entity != null_entity)
+    {
+        const auto pc = w.corporations.find(w.player_entity);
+        if (pc != w.corporations.end())
+            draw_corp_border(w.player_entity, pc->second, 140u);
     }
 
-    // Corporate reach (BL-182, visual slice): under the Corporation lens, draw each
-    // rival corporation's HQ-projected border on the active body — an HQ star on the
-    // holding nearest that corp's holdings centroid (its "seat"), and a reach ring
-    // centred on that HQ whose radius is the holdings extent plus a fixed projected
-    // range. This extends the identity language of the always-on, player-only home
-    // ring/HQ star (BL-085 block above) to every *rival* corp, so corporations read as
-    // having borders too — the corporation-side counterpart to the Country lens's
-    // national borders. The player's own border stays the always-on home ring above,
-    // so it is skipped here (no double-draw). Render-only identity chrome: it gates
-    // nothing and mutates no state. The full gameplay mechanic (range that actually
-    // gates operations, multi-HQ building, the tall/wide axis, law/tech levers) stays
-    // deferred in BL-182.
-    if (state.overlay == overlay_mode::corporation && !w.corporations.empty())
+    // Rival borders (BL-183 lineage): under the Corporation lens, every rival corp's
+    // border reads from the same persisted seat + range via the shared lambda above,
+    // so corporations read as having borders too — the corporation-side counterpart
+    // to the Country lens's national borders. The player's own border is the
+    // always-on chrome above (excluded here, no double-draw). Each rival's border is
+    // drawn on its OWN home body (draw_corp_border gates on the seat's body), so a
+    // rival only shows a ring when its home body is the one on screen. Still
+    // render-only; the operate-gating mechanic stays deferred (BL-182, post-v0.1.0).
+    if (state.overlay == overlay_mode::corporation)
     {
-        // Group the active body's corporate tiles by owner (the player's own border is
-        // the always-on home ring above, so exclude it here).
-        std::unordered_map<entity_id, std::vector<ImVec2>> by_corp;
-        for (const auto& [tid, corp] : tile_to_corp)
+        for (const auto& [corp_id, cc] : w.corporations)
         {
-            if (corp == w.player_entity)
+            if (corp_id == w.player_entity)
                 continue;
-            const auto til = w.tiles.find(tid);
-            if (til == w.tiles.end() || til->second.body != state.active_body)
-                continue;
-            by_corp[corp].push_back(
-                hex_local_centre(til->second.grid_x, til->second.grid_y, hex_size));
-        }
-
-        // A fixed projected range beyond the holdings hull, in tile units — the "some
-        // range" an HQ provides even for a single-holding corp. Purely presentational.
-        constexpr float hq_reach_tiles = 2.5f;
-
-        for (const auto& [corp, centres] : by_corp)
-        {
-            ImVec2 cen{ 0.0f, 0.0f };
-            for (const ImVec2& lc : centres) { cen.x += lc.x; cen.y += lc.y; }
-            cen.x /= static_cast<float>(centres.size());
-            cen.y /= static_cast<float>(centres.size());
-
-            // HQ = the holding nearest the centroid ("the seat").
-            ImVec2 hq_lc = centres.front();
-            float hq_best = std::numeric_limits<float>::max();
-            for (const ImVec2& lc : centres)
-            {
-                const float dx = lc.x - cen.x, dy = lc.y - cen.y;
-                const float d = dx * dx + dy * dy;
-                if (d < hq_best) { hq_best = d; hq_lc = lc; }
-            }
-
-            // Reach radius: HQ-to-furthest-holding extent plus the projected range.
-            float max_d = 0.0f;
-            for (const ImVec2& lc : centres)
-            {
-                const float dx = lc.x - hq_lc.x, dy = lc.y - hq_lc.y;
-                max_d = std::max(max_d, std::sqrt(dx * dx + dy * dy));
-            }
-            const float reach_r = (max_d + hex_size * hq_reach_tiles) * zoom;
-
-            const ImU32 accent = corp_identity(corp);
-            const ImU32 edge   = (accent & 0x00FFFFFFu) | (150u << 24); // corp colour, translucent edge
-            const ImVec2 hq_s  = to_screen(hq_lc);
-            const float hq_r   = std::max(4.0f, draw_r * 0.5f);
-
-            const int k_min = (period_px > 0.0f)
-                ? static_cast<int>(std::ceil((visible_left  - hq_s.x - reach_r) / period_px)) : 0;
-            const int k_max = (period_px > 0.0f)
-                ? static_cast<int>(std::floor((visible_right - hq_s.x + reach_r) / period_px)) : 0;
-            for (int k = k_min; k <= k_max; ++k)
-            {
-                const float off = static_cast<float>(k) * period_px;
-                dl->AddCircle({ hq_s.x + off, hq_s.y }, reach_r, edge, 0, 2.0f);
-                icons::hq(dl, { hq_s.x + off, hq_s.y }, hq_r, accent);
-            }
+            draw_corp_border(corp_id, cc, 150u);
         }
     }
 

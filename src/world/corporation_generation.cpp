@@ -4,7 +4,9 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <cstdint>
+#include <limits>
 #include <random>
 #include <string>
 #include <unordered_set>
@@ -677,6 +679,81 @@ std::string make_corp_name(const std::string& home_nation_name, std::mt19937& rn
     }
 }
 
+/// Odd-r offset (col,row) -> unit-hex local centre (hex_size = 1). Mirrors
+/// `ui::hex_local_centre` (src/ui/hex_render.cpp): sqrt(3) column step, 1.5 row
+/// step, odd rows shifted half a column. Kept here so a generated influence_range
+/// is in the *same* metric the border renderer measures — the pixel radius is then
+/// `influence_range * hex_size * zoom` and matches exactly. Duplicated (2 lines) to
+/// keep the world layer free of a UI dependency; the constants must stay in step.
+std::pair<float, float> hex_unit_centre(int col, int row)
+{
+    constexpr float kSqrt3 = 1.7320508075688772f;
+    const float x = kSqrt3 * static_cast<float>(col)
+                  + ((row & 1) ? kSqrt3 * 0.5f : 0.0f);
+    const float y = 1.5f * static_cast<float>(row);
+    return { x, y };
+}
+
+/// Designate a corporation's HQ (seat) and HQ-projected border range from its
+/// holdings on the home body (BL-182 foundation). The HQ is the holding nearest the
+/// holdings centroid; the range is the furthest holding's distance from that HQ plus
+/// a fixed projected reach, all in unit-hex distance. A corp with no holdings on the
+/// home body yields {null_entity, 0} — no border. Deterministic: pure function of the
+/// placed holdings, so it adds no non-determinism.
+struct hq_designation { entity_id building = null_entity; float range = 0.0f; };
+
+hq_designation designate_hq(const world& w, const std::vector<entity_id>& assets,
+                            entity_id home_body)
+{
+    // The projected reach an HQ provides beyond its holdings hull — the "some range"
+    // even a single-holding corp has. In unit-hex distance (tiles). One constant now
+    // sizes both player and rival borders (was two ad-hoc render constants).
+    constexpr float kProjectedReachUnits = 2.5f;
+
+    if (home_body == null_entity)
+        return {};
+
+    std::vector<std::pair<entity_id, std::pair<float, float>>> pts; // building -> unit centre
+    pts.reserve(assets.size());
+    for (entity_id bid : assets)
+    {
+        const auto b = w.buildings.find(bid);
+        if (b == w.buildings.end())
+            continue;
+        const auto t = w.tiles.find(b->second.tile);
+        if (t == w.tiles.end() || t->second.body != home_body)
+            continue;
+        pts.emplace_back(bid, hex_unit_centre(t->second.grid_x, t->second.grid_y));
+    }
+    if (pts.empty())
+        return {};
+
+    float cx = 0.0f, cy = 0.0f;
+    for (const auto& p : pts) { cx += p.second.first; cy += p.second.second; }
+    cx /= static_cast<float>(pts.size());
+    cy /= static_cast<float>(pts.size());
+
+    // HQ = the holding nearest the centroid (the "seat").
+    entity_id             hq   = pts.front().first;
+    std::pair<float, float> hq_c = pts.front().second;
+    float best = std::numeric_limits<float>::max();
+    for (const auto& p : pts)
+    {
+        const float dx = p.second.first - cx, dy = p.second.second - cy;
+        const float d2 = dx * dx + dy * dy;
+        if (d2 < best) { best = d2; hq = p.first; hq_c = p.second; }
+    }
+
+    // Range = furthest holding from the HQ + the fixed projected reach.
+    float max_d = 0.0f;
+    for (const auto& p : pts)
+    {
+        const float dx = p.second.first - hq_c.first, dy = p.second.second - hq_c.second;
+        max_d = std::max(max_d, std::sqrt(dx * dx + dy * dy));
+    }
+    return { hq, max_d + kProjectedReachUnits };
+}
+
 } // namespace
 
 // ---------------------------------------------------------------------------
@@ -851,6 +928,14 @@ std::vector<entity_id> generate_corporations(
         // Home body resolved before the assets vector is moved into the component.
         const entity_id home_body =
             corp_home_body(w, corp_assets[static_cast<std::size_t>(c)]);
+
+        // HQ + border range (BL-182 foundation): designate the seat and its
+        // HQ-projected range from the holdings on the home body, before the assets
+        // vector is moved out. Deterministic — pure function of the placed holdings.
+        const hq_designation hq = designate_hq(
+            w, corp_assets[static_cast<std::size_t>(c)], home_body);
+        cc.hq_building     = hq.building;
+        cc.influence_range = hq.range;
 
         cc.assets = std::move(corp_assets[static_cast<std::size_t>(c)]);
 

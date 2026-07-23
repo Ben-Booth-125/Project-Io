@@ -469,6 +469,19 @@ struct corporation_component
     /// Populated by Pass 3 (starting asset placement); each entry has a
     /// building_component and a stockpile_component in the world.
     std::vector<entity_id> assets;
+
+    /// Corporate border foundation (BL-182). The **HQ** is the corp's seat — the
+    /// holding nearest its holdings centroid on the home body, designated at
+    /// generation (Pass 3b) — and **influence_range** is the radius of its
+    /// HQ-projected border in *unit-hex* distance (hex_size = 1), so a renderer
+    /// obtains pixels by `influence_range * hex_size * zoom`, matching
+    /// `ui::hex_local_centre`'s geometry exactly. Together they let every corp draw
+    /// a border off real data rather than a render-time recompute. A corp with no
+    /// holdings on its home body keeps `{null_entity, 0}` — no border. **Render-only
+    /// today**: the border gates nothing until the deferred BL-182 operate-gate
+    /// lands (post-v0.1.0). See docs/generation/CORPORATION_GENERATION.md, LENSES.md.
+    entity_id hq_building     = null_entity;
+    float     influence_range = 0.0f;
 };
 
 // ---------------------------------------------------------------------------

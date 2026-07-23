@@ -440,9 +440,57 @@ int main()
     std::printf("  BL-096 R4 same seed reproduces the market map: %s\n",
                 market_determinism_ok ? "PASS" : "FAIL");
 
+    // --- BL-182 (corporate border foundation): every corp with holdings on its home
+    // body is assigned an HQ that is one of its OWN buildings, sited on the home body,
+    // and a positive influence_range; and the designation is deterministic across two
+    // generations (same seed -> same HQ entity + range). Render-only chrome, but the
+    // data model must be sound. ---
+    int hq_checked = 0, hq_bad = 0;
+    for (const auto& [cid, corp] : w.corporations)
+    {
+        if (corp.assets.empty()) continue;            // no holdings -> no HQ (fine)
+        const entity_id hb = home_body_of(corp);
+        if (hb == null_entity) continue;              // already reported by the stockpile audit
+        ++hq_checked;
+        const bool is_own = std::find(corp.assets.begin(), corp.assets.end(),
+                                      corp.hq_building) != corp.assets.end();
+        const auto bit = w.buildings.find(corp.hq_building);
+        bool on_home = false;
+        if (bit != w.buildings.end())
+        {
+            const auto t = w.tiles.find(bit->second.tile);
+            on_home = (t != w.tiles.end() && t->second.body == hb);
+        }
+        if (corp.hq_building == null_entity || !is_own || !on_home
+            || corp.influence_range <= 0.0f)
+        {
+            ++hq_bad;
+            std::printf("  BAD: corp=%u hq=%u own=%d on_home=%d range=%.3f\n",
+                        static_cast<unsigned>(cid), static_cast<unsigned>(corp.hq_building),
+                        is_own ? 1 : 0, on_home ? 1 : 0, corp.influence_range);
+        }
+    }
+    std::printf("Corp HQs: %d corps with home holdings, %d without a valid HQ\n",
+                hq_checked, hq_bad);
+    std::printf("  BL-182 R1 every home-holding corp has a valid HQ + positive range: %s\n",
+                hq_bad == 0 ? "PASS" : "FAIL");
+
+    int hq_det_bad = 0;
+    for (const auto& [cid, corp] : w.corporations)
+    {
+        const auto it2 = w2.corporations.find(cid);
+        if (it2 == w2.corporations.end()) { ++hq_det_bad; continue; }
+        if (corp.hq_building != it2->second.hq_building
+            || corp.influence_range != it2->second.influence_range)
+            ++hq_det_bad;
+    }
+    std::printf("  BL-182 R2 HQ designation identical across two generations (%d mismatched): %s\n",
+                hq_det_bad, hq_det_bad == 0 ? "PASS" : "FAIL");
+
     return (fw_frac >= 3.0f && bad == 0 && seed_bad == 0 && seam_bad == 0
             && unclaimed_land == 0 && holdings_bad == 0 && stockpile_ok
             && absent == 0 && ordering_ok
             && floor_ok && variance_ok && count_ok
-            && market_count_ok && cross_nation_ok && market_determinism_ok) ? 0 : 1;
+            && market_count_ok && cross_nation_ok && market_determinism_ok
+            && hq_bad == 0 && hq_det_bad == 0) ? 0 : 1;
 }
