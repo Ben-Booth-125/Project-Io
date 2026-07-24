@@ -120,8 +120,6 @@ std::array<float, resource_count> processor_reservation(
 {
     std::array<float, resource_count> reserve = {};
     const corporation_component& cc = w.corporations.at(corp);
-    const float batches_full_per_workforce =
-        reg.economics(building_type::processing_facility).base_rate;
 
     for (const entity_id bid : cc.assets)
     {
@@ -129,7 +127,11 @@ std::array<float, resource_count> processor_reservation(
         if (bit == w.buildings.end())
             continue;
         const building_component& b = bit->second;
-        if (b.type != building_type::processing_facility)
+        // BL-166/BL-168: Hydroponics Bay and Fishing Wharf are processing-style buildings
+        // too — reserve their recipe inputs the same way, at their OWN base_rate.
+        if (b.type != building_type::processing_facility &&
+            b.type != building_type::hydroponics_bay &&
+            b.type != building_type::fishing_wharf)
             continue;
 
         const auto tit = w.tiles.find(b.tile);
@@ -140,6 +142,7 @@ std::array<float, resource_count> processor_reservation(
         if (!rcp)
             continue;
 
+        const float batches_full_per_workforce = reg.economics(b.type).base_rate;
         const float batches = batches_full_per_workforce * b.workforce_assigned;
         for (std::size_t r = 0; r < resource_count; ++r)
             reserve[r] += rcp->inputs[r] * batches;

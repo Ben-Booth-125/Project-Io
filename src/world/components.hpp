@@ -97,6 +97,8 @@ enum class building_type : uint8_t
     port                = 3,
     launchpad           = 4, ///< Space-launch facility; gates space-mode convoy dispatch.
     inland_logistics_hub = 5, ///< BL-149: land-mode logistics node; its tile discounts intra-body haul cost (like a city).
+    hydroponics_bay      = 6, ///< BL-166: controlled-environment agriculture; a processing-style recipe (refined inputs -> agricultural_produce), valid wherever the terrestrial Farm's terrain/habitability predicate would reject (no terrestrial farming affinity). Not era-gated.
+    fishing_wharf        = 7, ///< BL-168: coastal fishing; a processing-style recipe producing agricultural_produce, valid only on coastal tiles (runtime hex-neighbour ocean-adjacency check, see placement_rules::is_coastal).
 };
 
 /// Sentinel `building_component.recipe` value meaning "no processing recipe is

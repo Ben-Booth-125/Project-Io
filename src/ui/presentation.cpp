@@ -126,6 +126,8 @@ const char* building_type_name(building_type t)
         case building_type::port:                 return "Port";
         case building_type::launchpad:            return "Launchpad";
         case building_type::inland_logistics_hub: return "Inland Logistics Hub"; // BL-149
+        case building_type::hydroponics_bay:      return "Hydroponics Bay"; // BL-166
+        case building_type::fishing_wharf:        return "Fishing Wharf"; // BL-168
     }
     return "None";
 }

@@ -34,6 +34,29 @@ recipes = {
         inputs  = { agricultural_produce = 2.0 },
         outputs = { food_rations = 1.0 },
     },
+
+    -- id 3 — Hydroponics Bay (BL-166): controlled-environment agriculture. Consumes
+    -- refined inputs instead of terrain affinity — water (life-support/irrigation) and
+    -- steel (structural good, the built growing racks/enclosure) stand in for the
+    -- design's "energy, water, structural goods" triad; no distinct "energy" resource_type
+    -- exists in the model (components.hpp resource_type enum), so water + steel are the
+    -- closest fit among the resources actually defined. Feeds the same Food Processor
+    -- chain as terrestrial Farm output, unchanged.
+    {
+        name    = "hydroponics_produce",
+        inputs  = { water = 1.0, steel = 0.5 },
+        outputs = { agricultural_produce = 1.0 },
+    },
+
+    -- id 4 — Fishing Wharf (BL-168): coastal fishing. Zero-input recipe — the simplest
+    -- fit per the settled design (an extraction-like draw on the surrounding coastal
+    -- waters, not a market-bought reagent); run_processing's degenerate no-input path
+    -- runs it at a full batch whenever staffed.
+    {
+        name    = "fishing_produce",
+        inputs  = {},
+        outputs = { agricultural_produce = 1.0 },
+    },
 }
 
 print(string.format("[Lua] recipes.lua loaded  recipe_count=%d", #recipes))

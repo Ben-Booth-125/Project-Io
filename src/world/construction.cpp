@@ -95,6 +95,16 @@ construction_result construct_building(world& w, const recipe_registry& reg,
         // player reconfigures it via building management. Mirrors app::load_economy.
         bc.recipe = reg.recipe_id("steel");
     }
+    else if (type == building_type::hydroponics_bay)
+    {
+        // BL-166: single fixed recipe, not player-switchable (unlike processing_facility).
+        bc.recipe = reg.recipe_id("hydroponics_produce");
+    }
+    else if (type == building_type::fishing_wharf)
+    {
+        // BL-168: single fixed recipe, not player-switchable.
+        bc.recipe = reg.recipe_id("fishing_produce");
+    }
 
     w.buildings[bld_id]  = bc;
     w.stockpiles[bld_id] = stockpile_component{};

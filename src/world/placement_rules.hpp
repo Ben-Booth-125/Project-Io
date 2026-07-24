@@ -40,6 +40,7 @@ enum class placement_reason : uint8_t
     slot_full,         ///< A per-type build cap is reached (reserved, generic).
     no_tile,           ///< Tile entity does not exist (defensive; mirrors construction_result::no_tile).
     already_road,      ///< Road placement onto a tile that already carries a road (BL-147).
+    has_farm_affinity, ///< BL-166: Hydroponics Bay rejected — the tile already carries terrestrial farming affinity (Farm's own predicate would succeed here).
 };
 
 /// Human-readable one-line explanation for a placement reason, for surfacing on
@@ -132,6 +133,13 @@ placement_result can_place(const tile_component& tc, building_type type, resourc
 /// @param tile_id The tile to test.
 /// @return        True if any of the 6 hex neighbours is an ocean tile.
 bool is_coastal(const world& w, entity_id tile_id);
+
+/// True if this tile carries the terrestrial farming affinity — i.e. the Farm
+/// (extraction_site targeting agricultural_produce) placement predicate would
+/// succeed here (non-zero agricultural_produce deposit). BL-166: a Hydroponics
+/// Bay is valid on any tile where this is false — the logical inverse of Farm's
+/// own predicate, so the two never both trivially validate everywhere.
+bool has_terrestrial_farm_affinity(const tile_component& tc);
 
 /// Full placement check including world-level constraints (BL-043):
 ///  1. Tile-level can_place (ocean / deposit / terrain).

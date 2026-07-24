@@ -862,6 +862,12 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
     cands.push_back({building_type::port,                 resource_type::iron_ore, "Port"});
     cands.push_back({building_type::launchpad,            resource_type::iron_ore, "Launchpad"});
     cands.push_back({building_type::inland_logistics_hub, resource_type::iron_ore, "Inland Logistics Hub"}); // BL-149
+    // BL-166: valid wherever the terrestrial Farm predicate would reject (no farm affinity).
+    if (!placement_rules::has_terrestrial_farm_affinity(tile))
+        cands.push_back({building_type::hydroponics_bay, resource_type::iron_ore, "Hydroponics Bay"});
+    // BL-168: valid only on coastal tiles (runtime hex-neighbour check).
+    if (placement_rules::is_coastal(w, tile_id))
+        cands.push_back({building_type::fishing_wharf, resource_type::iron_ore, "Fishing Wharf"});
 
     constexpr float img   = 56.0f;
     const float     row_h = img + style.WindowPadding.y * 2.0f + 8.0f;

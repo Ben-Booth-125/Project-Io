@@ -19,6 +19,7 @@ const char* placement_reason_text(placement_reason r)
         case placement_reason::slot_full:         return "No build slot free here";
         case placement_reason::no_tile:           return "No such tile";
         case placement_reason::already_road:      return "This tile already has an equal or better road";
+        case placement_reason::has_farm_affinity: return "Terrestrial farming already viable here — Hydroponics Bay fills the gap Farm can't reach";
     }
     return "Cannot build here";
 }
@@ -100,14 +101,28 @@ placement_result can_place(const tile_component& tc, building_type type, resourc
                 return placement_reason::ok;
             return placement_reason::no_deposit;
 
+        case building_type::hydroponics_bay:
+            // BL-166: valid on any tile LACKING the terrestrial farming affinity — the
+            // logical inverse of Farm's own predicate (agricultural_produce deposit > 0),
+            // so the two aren't both trivially valid everywhere. Not gated by era/tech.
+            if (has_terrestrial_farm_affinity(tc))
+                return placement_reason::has_farm_affinity;
+            return placement_reason::ok;
+
         case building_type::processing_facility:
         case building_type::port:
         case building_type::inland_logistics_hub: // BL-149: any non-ocean land tile (the land-network node).
+        case building_type::fishing_wharf:        // BL-168: coastal-adjacency is a world-level check (is_coastal); see can_place_in_world.
         case building_type::none:
         default:
             // Any non-ocean land tile is valid for non-extraction buildings.
             return placement_reason::ok;
     }
+}
+
+bool has_terrestrial_farm_affinity(const tile_component& tc)
+{
+    return tc.resource_deposit[static_cast<std::size_t>(resource_type::agricultural_produce)] > 0.0f;
 }
 
 bool is_coastal(const world& w, entity_id tile_id)
@@ -166,8 +181,10 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
     if (const placement_result tile_ok = can_place(tc_it->second, type, target); !tile_ok)
         return tile_ok;
 
-    if (type == building_type::port)
+    if (type == building_type::port || type == building_type::fishing_wharf)
     {
+        // BL-168: Fishing Wharf reuses the same runtime hex-neighbour coastal predicate as
+        // Port — no stored per-tile coastal flag, per the settled design.
         if (!is_coastal(w, tile_id))
             return placement_reason::not_coastal;
     }

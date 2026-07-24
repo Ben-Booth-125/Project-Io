@@ -142,6 +142,8 @@ void recipe_registry::load_from_lua(lua_state& lua)
             { "port",                 building_type::port },
             { "launchpad",            building_type::launchpad },
             { "inland_logistics_hub", building_type::inland_logistics_hub }, // BL-149
+            { "hydroponics_bay",      building_type::hydroponics_bay },      // BL-166
+            { "fishing_wharf",        building_type::fishing_wharf },        // BL-168
         };
         for (const named_type& nt : types)
         {

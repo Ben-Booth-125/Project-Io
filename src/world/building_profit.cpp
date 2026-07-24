@@ -61,7 +61,9 @@ building_profit estimate_building_profit(const world& w, const recipe_registry& 
         // Extraction sells its whole output; no inputs.
         out.revenue = br->output_quantity * price(br->target_resource);
     }
-    else if (b.type == building_type::processing_facility)
+    else if (b.type == building_type::processing_facility ||
+             b.type == building_type::hydroponics_bay || // BL-166
+             b.type == building_type::fishing_wharf)     // BL-168
     {
         // Value the recipe's outputs and inputs at the number of runs implied by the
         // reported output (output_quantity is the summed output units this tick).

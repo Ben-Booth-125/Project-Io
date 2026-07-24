@@ -214,8 +214,9 @@ private:
     std::vector<recipe> m_recipes;
 
     /// Indexed by building_type (none / extraction_site / processing_facility / port /
-    /// launchpad / inland_logistics_hub — BL-149 bumped the count 5 → 6).
-    std::array<building_economics, 6> m_building_econ = {};
+    /// launchpad / inland_logistics_hub / hydroponics_bay / fishing_wharf — BL-149 bumped the
+    /// count 5 → 6; BL-166/BL-168 bumped it 6 → 8).
+    std::array<building_economics, 8> m_building_econ = {};
 
     float m_t_full = 1.0f;
     float m_t_idle = 0.2f;

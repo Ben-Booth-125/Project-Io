@@ -21,6 +21,17 @@ namespace {
 constexpr float deposit_taper_ticks = 8.0f;  ///< Output tapers over the last ~8 ticks of nominal yield.
 constexpr float deposit_min_taper   = 0.05f; ///< Below 5% of nominal the reserve reads as exhausted.
 
+/// True for building types that run a recipe through run_processing (BL-166/BL-168:
+/// Hydroponics Bay and Fishing Wharf are processing-style buildings — refined/baseline
+/// inputs -> agricultural_produce — sharing the same production path as
+/// processing_facility, just with their own building_economics and a fixed recipe).
+bool is_processing_like(building_type t)
+{
+    return t == building_type::processing_facility ||
+           t == building_type::hydroponics_bay ||
+           t == building_type::fishing_wharf;
+}
+
 /// Body that a building sits on (via its tile). null_entity if the tile is gone.
 entity_id building_body(const world& w, const building_component& b)
 {
@@ -129,8 +140,11 @@ building_report run_processing(world& w, const recipe_registry& reg,
     const recipe* rcp = reg.get_recipe(b.recipe);
     // Apply the player's workforce target (0–200 % of nominal capacity).
     const float wt_scalar    = std::clamp(b.workforce_target / 100.0f, 0.0f, 2.0f);
+    // BL-166/BL-168: Hydroponics Bay and Fishing Wharf are processing-style buildings that
+    // run through this same recipe path; each reads its OWN building_type's base_rate rather
+    // than hardcoding processing_facility's, so their economy.lua tuning takes effect.
     const float batches_full =
-        reg.economics(building_type::processing_facility).base_rate * effective_workforce * wt_scalar;
+        reg.economics(b.type).base_rate * effective_workforce * wt_scalar;
 
     if (body == null_entity || rcp == nullptr || batches_full <= 0.0f)
     {
@@ -291,7 +305,7 @@ int solve_workforce_target(const world& w, const recipe_registry& reg,
             const float q    = k * wts;
             revenue = q * price_of(ri, q - k * now); // supply delta vs this building's current output
         }
-        else if (b.type == building_type::processing_facility)
+        else if (is_processing_like(b.type))
         {
             if (const recipe* rcp = reg.get_recipe(b.recipe))
             {
@@ -489,7 +503,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
             if (b.ticks_remaining > 0)
                 continue; // still under construction — no labour demand yet
             if (b.type != building_type::extraction_site &&
-                b.type != building_type::processing_facility)
+                !is_processing_like(b.type))
                 continue; // ports and none demand no labour in L3
             const entity_id body = building_body(w, b);
             if (body != null_entity)
@@ -544,8 +558,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
             // here — after contention is computed (which reads workforce_assigned, not
             // the target) — so overwriting the target now is safe for this tick.
             if (corp == w.player_entity && b.workforce_auto &&
-                (b.type == building_type::extraction_site ||
-                 b.type == building_type::processing_facility))
+                (b.type == building_type::extraction_site || is_processing_like(b.type)))
                 b.workforce_target = solve_workforce_target(w, reg, b, contention_for(body));
 
             switch (b.type)
@@ -555,6 +568,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
                         run_extraction(w, reg, corp, building_id, b, contention_for(body)));
                     break;
                 case building_type::processing_facility:
+                case building_type::hydroponics_bay: // BL-166
+                case building_type::fishing_wharf:   // BL-168
                 {
                     const bool has_market = bodies_with_market.count(body) != 0;
                     report.buildings.push_back(

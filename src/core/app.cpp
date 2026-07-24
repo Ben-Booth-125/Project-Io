@@ -670,6 +670,8 @@ int app::run_verify(const std::string& script_path, bool bless)
             if (type == "extraction")      bt = building_type::extraction_site;
             else if (type == "processing") bt = building_type::processing_facility;
             else if (type == "port")       bt = building_type::port;
+            else if (type == "hydroponics") bt = building_type::hydroponics_bay; // BL-166
+            else if (type == "fishing")     bt = building_type::fishing_wharf;   // BL-168
             if (bt == building_type::none)
                 return;
             m_ui.construction.active = true;

@@ -85,6 +85,30 @@ economy = {
             build_duration_ticks = 3.0,
             resource_costs = { steel = 30.0 },
         },
+        -- BL-166: Hydroponics Bay — controlled-environment agriculture. A processing-style
+        -- building (recipe: water + steel -> agricultural_produce, see recipes.lua's
+        -- "hydroponics_produce") valid wherever the terrestrial Farm's placement predicate
+        -- would reject (no farm affinity), on any body/era — not gated by tech. Costlier per
+        -- batch than the Farm's free terrain extraction, reflecting the built structure.
+        hydroponics_bay = {
+            base_rate   = 6.0,
+            maintenance = 8.0,
+            base_wage   = 10.0,
+            build_cost  = 180.0,
+            build_duration_ticks = 3.0,
+            resource_costs = { steel = 20.0 },
+        },
+        -- BL-168: Fishing Wharf — coastal fishing. A processing-style building (recipe:
+        -- zero-input "fishing_produce" -> agricultural_produce, see recipes.lua) valid only on
+        -- coastal tiles (runtime hex-neighbour ocean-adjacency, placement_rules::is_coastal).
+        fishing_wharf = {
+            base_rate   = 8.0,
+            maintenance = 6.0,
+            base_wage   = 8.0,
+            build_cost  = 140.0,
+            build_duration_ticks = 2.0,
+            resource_costs = { steel = 15.0 },
+        },
     },
 
     -- Player-placeable roads, now a three-tier ladder (BL-172; BL-147 shipped a single tier). A
