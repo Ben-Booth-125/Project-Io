@@ -4,6 +4,7 @@
 #include "nation_generation.hpp"
 #include "orbital_system.hpp"
 #include "population_generation.hpp"
+#include "river_generation.hpp"
 #include "road_generation.hpp"
 #include "tile_generation.hpp"
 
@@ -134,6 +135,7 @@ world make_hard_coded_world(world_params params)
     // Kepler is the corporation's home planet — the game opens on its surface.
     w.home_body = kepler;
 
+    generation_record kepler_record;
     auto kepler_tiles = generate_body_tiles(w, kepler, 180, 84,
         body_profile{
             .temperature    = temperature_class::temperate,
@@ -143,7 +145,13 @@ world make_hard_coded_world(world_params params)
             .water_fraction = 0.60f,
             .bias           = composition_bias::standard,
         },
-        /*seed=*/params.seed ^ 0xE471001u, deposit_scalar);
+        /*seed=*/params.seed ^ 0xE471001u, deposit_scalar, &kepler_record);
+
+    // River network (BL-170): downhill trace over the Pass-1 height field just
+    // captured above, from high ground to ocean/basin, stamping tile.river_edges.
+    // Deterministic — a pure function of the height field and tile compositions,
+    // no RNG needed. Independent of nations/population, so it can run immediately.
+    generate_rivers(w, kepler, kepler_record);
 
     // Kepler is the only body with a political layer in the prototype: 8–12
     // nations placed over its land tiles. Selene/Cinder/Pallas stay unclaimed.

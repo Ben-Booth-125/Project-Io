@@ -33,6 +33,14 @@ float landform_logistics_cost(terrain_landform lf);
 /// core (roads arrive with BL-146); wired here so the follow-on needs no A* change.
 float road_traversal_multiplier(std::uint8_t road_level);
 
+/// Traversal-cost multiplier for river adjacency (BL-170). Stacks *multiplicatively*
+/// with road_traversal_multiplier (river-adjacent tiles benefit alongside any road
+/// discount, not instead of it). tile_traversal_cost is a single-tile (node) weight —
+/// it is not edge-aware, so this is an undirected flat discount, not a directional
+/// upstream/downstream one; directionality would need tile_traversal_cost reworked to
+/// take both endpoints (a larger A*-cost-model change, out of scope here).
+float river_traversal_multiplier(std::uint8_t river_edges);
+
 /// Per-body raster index (grid_y*grid_width + grid_x -> tile entity, null_entity for an
 /// absent cell), built and cached in world.body_tile_index on first use. Deterministic —
 /// a pure function of the body's tiles, independent of tiles-map iteration order. Returns

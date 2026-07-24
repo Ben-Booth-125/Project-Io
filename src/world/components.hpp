@@ -138,6 +138,15 @@ struct tile_component
     /// (road_traversal_multiplier: x0.67 / x0.50 / x0.40). Populated by BL-146/BL-172 road
     /// generation and BL-147/BL-172 player placement; 0 everywhere in the economic core.
     std::uint8_t road_level = 0;
+
+    /// River edge bitmask (BL-170). A river is an EDGE feature, never a tile
+    /// occupant: bit i (i in [0,6)) is set when this tile shares a traced river
+    /// edge with the hex-neighbour at index i (river_generation.cpp's
+    /// hex_neighbours convention, odd-r offset — see TILE_GENERATION.md § Rivers).
+    /// Set on BOTH tiles bordering the edge. Direction (upstream/downstream) is
+    /// not stored here — derive it by comparing the two tiles' generation-time
+    /// height where needed. 0 = no river-adjacent edge on this tile.
+    std::uint8_t river_edges = 0;
 };
 
 /// Background nation-owned economy baseline for one (nation, body) pair. Carries

@@ -26,7 +26,7 @@ float tile_traversal_cost(const tile_component& tc)
     const float base = (tc.composition == terrain_composition::ocean)
                            ? sea_leg_cost
                            : landform_logistics_cost(tc.landform);
-    return base * road_traversal_multiplier(tc.road_level);
+    return base * road_traversal_multiplier(tc.road_level) * river_traversal_multiplier(tc.river_edges);
 }
 
 /// Lowest-cost-first priority-queue entry (mirrors nation_generation's bfs_entry).
@@ -60,6 +60,16 @@ float road_traversal_multiplier(std::uint8_t road_level)
     // Each tier cuts the traversal cost; tier 0 = 1.0. 1/(1 + 0.5*tier): Track(1) ~0.67,
     // Road(2) 0.50, Highway(3) 0.40 — diminishing returns up the ladder (BL-172).
     return 1.0f / (1.0f + 0.5f * static_cast<float>(road_level));
+}
+
+float river_traversal_multiplier(std::uint8_t river_edges)
+{
+    // Flat, undirected discount (BL-170): a river-adjacent tile is cheaper to move
+    // through/along regardless of which bordered edge carries the river or which
+    // direction is travelled (see logistics.hpp doc comment for why this isn't
+    // directional yet). A modest discount, smaller than any road tier, so it reads
+    // as "freshwater helps a little everywhere" rather than replacing road-building.
+    return (river_edges != 0) ? 0.85f : 1.0f;
 }
 
 const std::vector<entity_id>& body_tile_grid(world& w, entity_id body)
