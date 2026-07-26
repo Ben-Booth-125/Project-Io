@@ -16,7 +16,7 @@
 #include "ui/corporation_panel.hpp"
 #include "ui/economy_panel.hpp"
 #include "ui/market_ledger.hpp"
-#include "ui/explorer_panel.hpp"
+#include "ui/chat_panel.hpp"
 #include "ui/fonts.hpp"
 #include "ui/format.hpp"
 #include "ui/header_panel.hpp"
@@ -452,6 +452,36 @@ void app::step_economy()
                  &m_last_econ_report.budgets);
     credit_arrived_convoys(m_world, static_cast<int>(m_sim_loop.day_tick()));
 
+    // Surface this tick's background-corp agency actions (BL-079) as Public
+    // comms lines (BL-205) — the chat is the AI-observability surface. Message
+    // text is a pure rendering of deterministic report events.
+    for (const agency_event& ev : m_last_econ_report.agency_events)
+    {
+        const auto bit = m_world.buildings.find(ev.building);
+        if (bit == m_world.buildings.end())
+            continue;
+        const building_component& b = bit->second;
+        std::string where;
+        if (const auto tit = m_world.tiles.find(b.tile); tit != m_world.tiles.end())
+            if (const auto boit = m_world.bodies.find(tit->second.body); boit != m_world.bodies.end())
+                where = std::string(" on ") + boit->second.name;
+
+        std::string text;
+        if (ev.what == agency_event::kind::recipe_switch)
+        {
+            const recipe* rc = m_registry.get_recipe(ev.new_recipe);
+            text = std::string("Switched ") + ui::building_type_name(b.type) + where +
+                   " to the " + (rc ? rc->name.c_str() : "?") + " recipe - output price floored.";
+        }
+        else
+        {
+            text = std::string("Idled ") + ui::building_type_name(b.type) + where +
+                   " - sustained losses.";
+        }
+        ui::chat_post(m_chat, static_cast<int>(m_sim_loop.day_tick()), ev.corp, 0,
+                      std::move(text));
+    }
+
     // Record player balance, income, and expenditure for the header sparkline and
     // economy panel graphs (BL-063).  All three are capped at plot_history_cap.
     {
@@ -547,6 +577,13 @@ void app::setup_world(world_params params)
     // holds it, the `world` struct never sees it.
     m_generation_report = generation_report{};
     m_world = make_hard_coded_world(params, &m_generation_report);
+
+    // Open the comms log with a deterministic epoch line (BL-205): the Public
+    // channel exists from campaign start, so the panel is never an empty shell.
+    m_chat = ui::chat_state{};
+    ui::chat_post(m_chat, 0, null_entity, 0,
+                  std::to_string(m_world.corporations.size()) +
+                      " corporations on the public channel.");
 
     // Set the initial solar zoom so the default view covers roughly 5 AU.
     // The auto-fit scale at zoom 1 shows max_radius_au; dividing it by 5 zooms
@@ -2996,14 +3033,16 @@ void app::render()
         ui::draw_header_panel(m_world, m_balance_history, header_left, header_right);
     }
 
-    // Explorer — right edge, between the time panel and the minimap.
+    // Comms chat log (BL-205, replaces the Explorer placeholder) — right edge,
+    // between the time panel and the minimap.
     {
         const float column_bottom = margin + time_h;
         const float exp_x         = mm_origin.x;
         const float exp_y         = column_bottom + margin;
         const float exp_w         = mm_w;
         const float exp_h         = (mm_origin.y - margin) - exp_y;
-        ui::draw_explorer_panel(exp_x, exp_y, exp_w, exp_h);
+        ui::draw_chat_panel(m_world, m_chat, static_cast<int>(m_sim_loop.day_tick()),
+                            exp_x, exp_y, exp_w, exp_h);
     }
 
     // Left navigation pane and the menus it opens. Starts below the profile.

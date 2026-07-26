@@ -15,9 +15,9 @@ The prototype UI is built with Dear ImGui (see TECH_FOUNDATIONS). Everything her
 ├──────────┬─────┤  — one top band, level tiles  │  speed ctl)  │
 │ Nav rail │     ├──────────────────────────────┼──────────────┤
 │ (icons)  │Fold-│                               │              │
-│ ▢        │out  │       Primary canvas          │   Explorer   │
-│ ▢        │col: │ (Solar / Circumplanetary /    │  (pinned     │
-│ ▢  …     │ledger                    Surface)   │   shortcuts) │
+│ ▢        │out  │       Primary canvas          │  Comms log   │
+│ ▢        │col: │ (Solar / Circumplanetary /    │  (channel    │
+│ ▢  …     │ledger                    Surface)   │    chat)     │
 │ ▦ (8)    │ OR  │                               │              │
 │ ▢  …     │Selec-│                    ┌─────────┬──────────────┐│
 │ ▢        │tion │                     │lens key │   Minimap    ││
@@ -30,9 +30,9 @@ The prototype UI is built with Dear ImGui (see TECH_FOUNDATIONS). Everything her
 Two layers compose the screen:
 
 - **Background** — the canvases, drawn edge-to-edge via the ImGui background draw list.
-- **Foreground** — the ImGui panels below (profile, header, nav pane, explorer, time column, minimap, ledger windows), drawn on top of the canvases.
+- **Foreground** — the ImGui panels below (profile, header, nav pane, comms log, time column, minimap, ledger windows), drawn on top of the canvases.
 
-The explorer is **not yet implemented** — it is specified here ahead of the work so the shell has a settled shape. Layer 2 ships the nav pane, canvases, time column, minimap, and the Tile Ledger window; the header (Layer 3 finalisation) and profile (`src/ui/profile_panel.cpp`) have since landed.
+The comms log (BL-205, 2026-07-26) occupies the band the Explorer placeholder reserved. Layer 2 ships the nav pane, canvases, time column, minimap, and the Tile Ledger window; the header (Layer 3 finalisation) and profile (`src/ui/profile_panel.cpp`) have since landed.
 
 ---
 
@@ -193,15 +193,12 @@ The clock has three layers — sim tick → day → economy tick — paced so th
 
 ---
 
-## Explorer — right, middle
-**Spec: `EXPLORER.md`**
+## Comms log — right, middle
+**Spec: `CHAT.md`**
 
-A panel on the right edge, below the time column and above the minimap. The explorer is the player's **pinning and quick-navigation** surface:
+A panel on the right edge, below the time column and above the minimap (`src/ui/chat_panel.cpp`). The channel-based **comms chat log** (BL-205): the Public channel plus arbitrary player-created corp groups, fed by deterministic sim events (the BL-079 agency reflexes today) and player messages.
 
-- The player can **pin** UI elements of interest — a unit, a body, a building, a market — and jump straight to them from a single list.
-- Acts as a working set of bookmarks across an otherwise large UI, so frequently-revisited things stay one click away.
-
-Not implemented in the prototype; specified here to reserve the region and the interaction.
+It replaced the Explorer placeholder (2026-07-26) — pinning was never wired; if it returns it will be a chat-adjacent affordance, not a reserved band. The diplomacy-as-communication principle behind the surface: `docs/ai/AI_OPPONENT.md` § 7.
 
 ---
 
@@ -361,7 +358,7 @@ These are **not implemented next** and have no dedicated spec yet. They are note
 
 ## Prototype / temporary notes
 
-- The explorer is specified but not yet implemented; profile and header are live.
+- The comms log (BL-205) is live in the right middle band; profile and header are live.
 - Nav slot layout (count, ordering, the slot-8 Tile Ledger) is placeholder.
 - Canvases are not yet inset clear of the chrome.
 - Popup elements (context menus, dialogs) are deferred.
@@ -382,4 +379,4 @@ These are **not implemented next** and have no dedicated spec yet. They are note
 | Planetary canvas | `PLANETARY.md` |
 | Minimap | `MINIMAP.md` |
 | Time column | `TIME_CONTROLS.md` |
-| Explorer | `EXPLORER.md` |
+| Comms log | `CHAT.md` |

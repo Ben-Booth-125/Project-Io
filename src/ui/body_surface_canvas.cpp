@@ -112,7 +112,7 @@ ImU32 production_colour(float ratio);
 
 /// Shared chrome for an on-canvas lens key: a rounded dark panel of @p box_w ×
 /// @p body_h at the left edge (inset past the nav rail), vertically centred —
-/// clear of the Selection panel, the header/Explorer, and the lens control strip.
+/// clear of the Selection panel, the header/comms log, and the lens control strip.
 /// Returns the inner top-left and the inner content width via @p out_x/@p out_y/
 /// @p out_w. Pure ImDrawList — no ImGui widget state.
 void begin_lens_key(ImDrawList* dl, ImVec2 anchor, float box_w,

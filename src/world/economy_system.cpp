@@ -758,6 +758,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
                             b.recipe              = reg.recipe_id(chosen.name);
                             b.active_recipe_index = best_i;
                             b.loss_streak         = 0; // give the new recipe a chance before idling
+                            report.agency_events.push_back(
+                                {corp, bid, agency_event::kind::recipe_switch, b.recipe});
                             continue;
                         }
                     }
@@ -769,7 +771,11 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
                 if (bp.has_data && bp.net() < 0.0f)
                 {
                     if (++b.loss_streak >= loss_streak_to_idle)
+                    {
                         b.decommissioned = true;
+                        report.agency_events.push_back(
+                            {corp, bid, agency_event::kind::idled, 0});
+                    }
                 }
                 else
                 {

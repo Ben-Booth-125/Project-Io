@@ -92,9 +92,13 @@ bool run_and_report_idled(int ticks)
 {
     scene s = make_scene();
     const recipe_registry reg = make_registry();
+    std::size_t idle_events = 0; // BL-205: agency actions must surface as report events
     for (int t = 1; t <= ticks; ++t)
     {
         const economy_report rep = run_economy_step(s.w, reg);
+        for (const agency_event& ev : rep.agency_events)
+            if (ev.what == agency_event::kind::idled && ev.building == s.bg_bld)
+                ++idle_events;
         const auto flows = clear_markets(s.w, reg, rep, {});
         apply_budget(s.w, reg, flows, rep.workforce_contention, nullptr);
     }
@@ -105,6 +109,8 @@ bool run_and_report_idled(int ticks)
     // Encode both facts into asserts by the caller; return bg_idled for determinism.
     check(bg_idled, "BL-079 R1: background corp idles its persistent loss-maker");
     check(!pl_idled, "BL-079 R1: the player's identical building is NEVER auto-idled");
+    check(idle_events == (bg_idled ? 1u : 0u),
+          "BL-205 R2: the idle action emits exactly one matching agency_event");
     return bg_idled;
 }
 

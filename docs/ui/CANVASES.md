@@ -142,8 +142,9 @@ resolves a **single** choice — the candidate nearest the cursor, with entity i
 breaking exact ties — so a tie highlights one entity, arbitrarily but stably,
 rather than several. A reusable **focus helper**
 (`src/ui/view_nav.hpp`) jumps the view to any entity — selecting it, choosing the
-rung that frames it, and centring that rung — for the opening view and the
-Explorer's "jump to".
+rung that frames it, and centring that rung — for the opening view (and any future
+jump-to affordance; the Explorer that first motivated it is superseded, see
+`EXPLORER.md`).
 
 `active_body` drives both lower rungs: the Circumplanetary view centres on
 `active_body`'s planet (the body itself if it orbits the star directly, or its

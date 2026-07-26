@@ -5811,6 +5811,33 @@
         { "id": "R1", "status": "completed", "requirement": "HEADLESS: every corporation with holdings on its home body is assigned an hq_building that is one of its OWN buildings sited on the home body, and a strictly positive influence_range; the designation is a deterministic function of generation (identical hq_building + influence_range across two make_hard_coded_world() runs). A corp with no home-body holdings keeps {null_entity, 0}.", "verification": ["headless"], "result_metric": "world_audit: BL-182 R1 PASS (8 corps, 0 without a valid HQ); BL-182 R2 PASS (0 mismatched across two generations); all pre-existing world_audit checks still PASS; exit 0.", "notes": "Verified in-session via verifier-headless on tools/verify/world_audit.cpp (BL-182 R1/R2 added). Compiled with cl /std:c++20 after fixing the stale README source list (added city_names/planetology/road_generation/logistics TUs)." },
         { "id": "R2", "status": "pending", "requirement": "VISUAL: on the Planetary surface the corporate border is drawn from the persisted HQ + influence_range (not a render-time recompute) — the player's always-on home ring/HQ star on the home body, and every rival corp's ring/HQ star under the Corporation lens on that corp's home body — via one shared draw_corp_border path. The ring radius = influence_range * hex_size * zoom, cylinder-seam wrapped.", "verification": ["visual"], "result_metric": "", "notes": "Owed — the GUI build is blocked in-session (SDL FetchContent egress 403). Also flagged for Ben's eyeball: (1) the ring no longer grows as the player builds outward (range fixed at generation); (2) a single projected-range constant now sizes both player and rival rings. Same visual-verification posture as BL-183." }
       ]
+    },
+    {
+      "brief": "corp-chat-log-slice1",
+      "batch": "2026-07-26-corp-chat-log",
+      "title": "BL-205 — Corp chat log slice 1: Explorer replaced by channel comms, agency-event feed",
+      "status": "completed",
+      "promoted_from": "backlog.json BL-205 CORP_CHAT_LOG",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "completed",
+          "requirement": "VISUAL: the comms chat panel renders in the Explorer's shell slot (right band, below the time column, above the minimap) with the COMMS header, the Public channel tab plus the + group-create affordance, the deterministic epoch system line (d0, corporation count), and the message input. The Explorer placeholder text is gone.",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "scripts/verify/chat_panel.lua — golden blessed 2026-07-26 (software renderer); panel renders all four elements after a 12-tick run."
+        },
+        {
+          "id": "R2",
+          "status": "completed",
+          "requirement": "HEADLESS: every BL-079 agency action emits exactly one matching agency_event on economy_report (idled event for the idled background building; none for the player corp), deterministic across identical runs.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "corp_agency_harness: BL-205 R2 PASS x2 runs + determinism PASS (2026-07-26)."
+        }
+      ]
     }
   ]
 }

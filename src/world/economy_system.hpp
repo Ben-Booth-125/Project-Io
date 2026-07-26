@@ -54,12 +54,34 @@ struct corp_budget
     float net() const { return income - expenditure - maintenance - wages - interest; }
 };
 
+/// One background-corp agency action taken this tick (the BL-079 reflexes). Pure
+/// derived data recorded alongside the action — recording changes nothing about
+/// the action itself, so determinism is untouched. Consumed by the chat feed
+/// (BL-205) and, later, the BL-202 decision log.
+struct agency_event
+{
+    enum class kind : uint8_t
+    {
+        recipe_switch, ///< A floored processor switched to a healthier recipe.
+        idled,         ///< A sustained loss-maker was decommissioned.
+    };
+
+    entity_id corp;
+    entity_id building;
+    kind      what;
+    uint16_t  new_recipe = 0; ///< recipe_switch only: the recipe switched to.
+};
+
 /// Result of one economy step: the per-building reports plus the auto-bought
 /// input shortfalls per (corp, body), which become market demand and corporate
 /// expenditure downstream (market_clearing.hpp / budget_system.hpp).
 struct economy_report
 {
     std::vector<building_report> buildings;
+
+    /// Background-corp agency actions taken this tick (BL-079), in the
+    /// deterministic order they were applied. See agency_event.
+    std::vector<agency_event> agency_events;
 
     /// Per (corporation, body): the input quantities a processor could not cover
     /// from its own pool and auto-bought from the market this tick. Resource-indexed.

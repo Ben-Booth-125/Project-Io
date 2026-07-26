@@ -63,7 +63,7 @@ void draw_market_price_strip(ImDrawList* dl, const world& w, entity_id anchor,
     const float body_h = pad + line_h + 3.0f +
                          static_cast<float>(rows.size()) * (line_h + 2.0f) + pad;
     // Left edge inset past the nav rail, vertically centred — clear of the Selection
-    // panel (top-left), the header (top-centre), and the Explorer/minimap (right).
+    // panel (top-left), the header (top-centre), and the comms log/minimap (right).
     const ImVec2 p0 = { origin.x + nav_pane_width + pad,
                         origin.y + std::max(pad, (size.y - body_h) * 0.5f) };
     const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
