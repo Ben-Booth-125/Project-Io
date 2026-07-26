@@ -6,10 +6,13 @@ document opens with the **state-of-the-art research** BL-199 mandates as its fir
 activity; the architecture proposal, data strategy, and follow-on backlog decomposition
 build on it.
 
-**Status.** SOTA map + shortlist + staged path + data strategy: drafted below (deep-research
-harness, 2026-07-23). **Still owed** before the standing-rule relaxation is *earned* (the rule
-still defers AI faction behaviour beyond the stub — see `.claude/rules/io-standing-rules.md`):
-Ben's acceptance of a target architecture, and decomposition into follow-on backlog items.
+**Status.** SOTA map + shortlist + staged path + data strategy: drafted 2026-07-23 (deep-research
+harness). **Architecture accepted by Ben 2026-07-26** (§ 5) — the A → B utility core is the
+target. The decision decomposition (§ 5), the corp-command seam + state export (§ 6), the
+communication/diplomacy principle (§ 7), and the follow-on decomposition (§ 8) landed the same
+session. The standing-rule relaxation is now earned **for the scoped path only**: AI-corp
+strategic actions via the corp-command seam (BL-202 onward); the player's corp stays untouched
+beyond the BL-181 workforce dial.
 
 **The goal (unchanged from BL-199).** A computer opponent of **roughly human skill** — a
 genuine rival across Io's loop (extraction, trade, later conflict), **beatable** by a decent
@@ -207,25 +210,134 @@ learning; do **not** ship resource cheats as a substitute for competence.
 
 ---
 
-## 5. Remaining BL-199 deliverables (owed)
+## 5. Accepted architecture — the decision decomposition (Ben, 2026-07-26)
 
-The research above covers BL-199's SOTA map, shortlist, data strategy, and staged path. Still to do
-before AI behaviour is built:
+Ben accepted the **A → B staged path** (scored utility over the BL-079 seam, then Victoria-3-style
+predictive spending). This section is the concrete decomposition the acceptance unlocks.
 
-1. **Ben's acceptance** of the target architecture (the A → B utility core is the recommendation).
-2. A concrete **decision decomposition** for Io's A-tier scorer: the exact candidate-action set, the
-   scoring terms per action, the hysteresis/action-budget model, and how it extends the BL-079
-   `run_economy_step` agency seam.
-3. The **compact state-export schema** (the JSON an out-of-process policy would read) — designed
-   now even if C/D are deferred, since it shapes A's internal state too.
-4. Decomposition into **follow-on backlog items** (the A scorer; the B predictive-spending/priority
-   model; the seed-set skill-regression harness), each targeting v0.2.0 per BL-199's version goal.
+### Cadence — where the AI thinks
 
-Only once (1)–(2) land does the standing-rule relaxation take effect for the corresponding scope.
+The AI evaluates at the **econ-tick boundary inside `run_economy_step`**, in the slot the BL-079
+agency block occupies today; that block folds in as the scorer's **reflex tier** (tier 0: recipe
+rescue, idle-a-loser — unchanged behaviour, now emitting commands). Strategic evaluation is
+**staggered**: corp `c` evaluates every `K` ticks at offset `id(c) % K` (Victoria-3's tick-task
+idea — bounded per-tick cost, fully deterministic).
+
+### The candidate-action set (legal primitives)
+
+The AI's verbs are exactly the player's, through the same validation — **no bypass, no cheats by
+construction**:
+
+| Verb | Engine seam | Notes |
+|---|---|---|
+| `build(type, tile, target, recipe)` | `construct_building` (placement_rules, build cost, `stack_capacity`) | The big decision; candidate sites bounded (below) |
+| `demolish(building)` | `demolish_building` | Rare; scored against salvage vs sustained loss |
+| `set_recipe(building, recipe)` | direct component write (BL-079 idiom) | Tier-0 rescue generalises to margin-chasing |
+| `set_workforce(building, target)` | `solve_workforce_target` (BL-181) | AI corps simply run `workforce_auto` on |
+| `idle(building)` / `resume` | `decommissioned` flag | Tier-0 loss-streak rule, now reversible |
+| `dispatch_convoy(src, dst, res, qty, mode)` | `dispatch_convoys` seam | Strategic hauls beyond the shortfall auto-dispatch |
+| `place_road(a, b, tier)` | `place_road` | Infrastructure investment; scored on route throughput |
+| `survey(body, region)` | survey_system | The AI pays for discovery like the player |
+| `set_exchange_policy` / `set_counterparty` | BL-160 / BL-161 once landed | The AI authors the same policy tables |
+
+**Candidate enumeration is bounded**: build sites come from **surveyed tiles the corp can see**
+(its own fog state), pre-filtered to the top-M by static suitability (terrain affinity × deposit
+richness), M small; recipes and dials enumerate per owned building; routes enumerate over
+known-body pairs. Bounded enumeration is what keeps the per-tick cost flat.
+
+### Scoring
+
+`score(action) = expected_net_per_tick / payback_ticks × strategy_weight`, terms computed from
+**existing functions only** (`estimate_building_profit`, placement affinities, live market prices,
+wage rate, logistics cost to nearest market, build-cost amortisation) — no new oracles. The
+`strategy_weight` biases toward the corp's generated **industrial focus** (specialist premise,
+CORPORATION_GENERATION.md), giving distinct-but-legible personalities for free. A **solvency
+gate** (cash − committed spend > reserve floor) vetoes any spend that breaks the floor; stage B
+replaces this crude floor with priority buckets + predictive spending.
+
+### Hysteresis & action budget
+
+- **Do-nothing bias**: a candidate must beat the incumbent (or doing nothing) by a relative
+  margin θ (~15%) — the anti-thrash rule.
+- **Cooldowns**: a building that changed recipe/workforce/state holds for C ticks; reversals ride
+  loss/gain streaks (the BL-079 `loss_streak` idiom, generalised).
+- **Budget**: per evaluation, at most **1 construction + a small number of dial changes** per
+  corp; total committed spend capped by the solvency gate.
+- **Determinism**: stable iteration (sorted `corp_ids`, stored asset order, tile-index order);
+  ties break on lowest entity id; the only randomness is a per-corp hash of the world seed used
+  as a fixed personality jitter on weights — constant per campaign, deterministic by construction.
 
 ---
 
-## 6. Citations
+## 6. The corp-command seam & state export (shared with multiplayer)
+
+The scorer does not mutate the world directly. It emits **`corp_command`** records —
+`{tick, corp, verb, args}` — applied at the tick boundary through the player-grade validation
+above. This is deliberate triple-duty:
+
+- **AI**: the command stream *is* the decision log. A ring buffer of commands + score rationale
+  (winning score vs runner-up) is the AI's legibility surface, its replay artifact, and the
+  skill-harness's input.
+- **Multiplayer**: `MULTIPLAYER_PRINCIPLES.md` § Preserve now #2 — lockstep exchanges exactly
+  this: small serialisable intents tagged with their tick. An AI corp is a local command source;
+  a network player is a remote one; the seam is identical. (`canvas_command` stays
+  navigation-only; `corp_command` is its sim-mutating sibling.)
+- **Out-of-process policies (C/D)**: an external policy consumes the state export and returns
+  commands — the same contract, across a process boundary.
+
+**State export (schema designed now, implemented with BL-202).** A compact, tick-tagged,
+per-corp JSON view that is **visibility-honest**: it contains only what that corp could see under
+the BL-068 rules and its own fog state — own buildings/pools/cash in full; public market
+prices/aggregates; rival *buildings* but not their internals; its own routes and survey state.
+The AI reads through the same information asymmetry the player does; anything else is the fog
+cheat the calibration research warns against. Version the schema from day one.
+
+---
+
+## 7. Communication & diplomacy — the chat principle (Ben, 2026-07-26)
+
+Ben's steer: **since every rival is AI, inter-corp coordination should happen in a communication
+medium, not hidden state.** Corps message **publicly or in private groups** to form plans;
+diplomacy is *legible messaging*, not behind-the-scenes flags. This is a better diplomacy
+principle than invisible opinion modifiers — and in multiplayer the same channels carry human
+players, so the medium is actor-agnostic.
+
+- **Surface**: a **chat log window replaces the Explorer placeholder** (right shell band, middle
+  slot — the Explorer's pinning concept was never wired and is superseded; LAYOUT.md updated).
+  Channels: **Public** (every corp), plus **arbitrary groups** (any subset of corps, created from
+  the panel). The player reads Public and any group they belong to.
+- **Stage A (now)**: messages are **templated, deterministic renderings of the decision log** —
+  the BL-079 reflex events today ("Meridian idled Ironworks — sustained losses"), the BL-202
+  command stream when it lands. The chat is the AI-observability surface first; personality
+  prose comes later.
+- **Stage C (later)**: the LLM planner speaks in-character in channels; AI↔AI private groups
+  form plans the player cannot read — which is principled, because the *medium* is uniform and a
+  future intelligence mechanic (Discovery-model extension) can expose intercepts as content.
+- **Determinism**: stage-A message text derives purely from deterministic events. Free-text LLM
+  chat arrives only under the C-route rules (out-of-process, coarse-grained, replay-logged).
+- **Player input**: a message box posts to the selected channel. It has **no mechanical effect
+  yet** — it is the hook the C-route consumes (the player negotiating with AI corps in language).
+
+---
+
+## 8. Follow-on decomposition (filed 2026-07-26)
+
+BL-199 closes with this decomposition; the build work is carried by:
+
+| Item | Carries | Requires |
+|---|---|---|
+| **BL-202** `CORP_AI_SCORED_UTILITY` | Stage A: the scorer, the corp-command seam + decision log, state-export implementation | — |
+| **BL-203** `CORP_AI_PREDICTIVE_SPENDING` | Stage B: strategy layer, priority buckets, spending forecast — the solvency answer | BL-202 |
+| **BL-204** `AI_SKILL_HARNESS` | Seed-set skill-regression harness (bot-vs-bot goldens: solvency, net-worth curves) + the tick-boundary **state hash** (doubles as the multiplayer desync primitive) | BL-202 |
+| **BL-205** `CORP_CHAT_LOG` | The § 7 surface: chat window replacing the Explorer, channels + groups, agency-event feed (first slice lands with the item's filing) | — |
+
+Economics the scorer prices, settled alongside (same session): **BL-153** (convoy freight
+premium) and **BL-193** (stack diminishing returns); **BL-160/161** confirmed as the AI's trade
+primitives (the AI authors the same policy objects via commands).
+
+---
+
+## 9. Citations
 
 Sources gathered by the deep-research harness (2026-07-23). Each supports the claim noted.
 
