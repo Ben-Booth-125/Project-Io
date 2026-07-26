@@ -10,7 +10,55 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Sticky detail card foundation (BL-194), batch cluster opened (2026-07-22)
+## Session — AI architecture accepted, comms chat log lands (BL-199 closed, BL-205 slice 1) (2026-07-26)
+
+**Runtime.** ~2h. Full (design session + one implementation slice; doc-heavy).
+
+**Context.** Ben's steer: work toward the AI opponent rapidly, treating AI and multiplayer as the
+same requirement (symmetric corp actors). Session agenda: survey the backlog for AI-relevant gaps
+(trade-essential + >B priority), then design and fill them; Opus codes the build items later.
+Mid-session Ben added the **chat principle**: since every rival is AI, inter-corp coordination
+should happen in a visible communication medium — "replace the 'favourite' [Explorer] window with
+a chat log; arbitrary groups can be made."
+
+**What landed.**
+
+- **BL-199 closed (SSS).** Ben accepted the A→B utility-core architecture. `docs/ai/AI_OPPONENT.md`
+  gained § 5 (decision decomposition: player-grade verb set, bounded enumeration, scoring formula,
+  hysteresis/action budget, staggered deterministic cadence over the BL-079 seam), § 6 (the
+  `corp_command` seam + visibility-honest state export — the shared AI/multiplayer/lockstep seam),
+  § 7 (diplomacy-as-communication), § 8 (decomposition). Follow-ons filed: **BL-202** (A scorer),
+  **BL-203** (B predictive spending), **BL-204** (skill harness + tick-boundary state hash),
+  **BL-205** (chat log).
+- **Companion economics settled** (drafted for Ben's ratification, flagged in the closing Q&A):
+  **BL-153** convoy pay — zero-sum freight premium (buyers fund it at clearing; no minted money);
+  **BL-193** stacking — diminishing per-site output (d = 0.8), shared-reserve taper against the
+  stack's combined nominal, cap stays richness/50. **BL-160/161** confirmed as the AI's trade
+  primitives (dated addenda). **BL-181** status reconciled to complete (solver landed 2026-07-15;
+  backlog had not been flipped).
+- **BL-205 slice 1 built.** `src/ui/chat_panel.{hpp,cpp}` replaces the never-wired Explorer
+  placeholder (`explorer_panel.{hpp,cpp}` removed): COMMS panel in the right shell band — Public
+  channel + arbitrary player-created groups (`+` popup), day-stamped messages in corp identity
+  colours, player input (no mechanical effect yet — the C-route hook). Fed by a new
+  `economy_report::agency_events` vector emitted by the BL-079 block (pure derived data;
+  determinism untouched). Epoch system line at campaign start so the panel is never empty.
+- **Verification.** `corp_agency_harness` extended: the idle action emits exactly one matching
+  `agency_event` (PASS, + determinism PASS). New `scripts/verify/chat_panel.lua` visual check,
+  golden blessed (software renderer). Requirements group `corp-chat-log-slice1` (R1 visual,
+  R2 headless) recorded completed.
+- **Docs.** `docs/ui/CHAT.md` new (surface authority); `EXPLORER.md` → supersession tombstone;
+  `LAYOUT.md` band + doc-map updated; `CANVASES.md` focus-helper note. Session tool:
+  `tools/backlog_view.js` — zero-dep Node renderer of backlog.json to a self-contained HTML
+  dashboard (`out/backlog_view.html`; top actionable priorities, filters, expandable design prose).
+
+**In-session decisions** (beyond the ratification-flagged BL-153/193 drafts): chat state is
+UI-side and unserialised in slice 1 (messages re-derive from deterministic events; groups
+session-local — serialisation joins BL-202 when commands become world state); message text is
+ASCII-only (UI font lacks em-dash/ellipsis glyphs); AI reads through the player's visibility
+model (no fog cheats) as a hard rule of the state export.
+
+**Open.** Ben's ratification of the BL-153/BL-193 drafted calls; whether to wrap
+`tools/backlog_view.js` as a skill; BL-202–204 await promotion (Opus build session).
 
 **Runtime.** ~1h. Full (Batch Delivery, item-spanning requirement + REFINED promotion run for
 the whole 5-item cluster before implementing).
