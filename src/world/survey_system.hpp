@@ -103,10 +103,15 @@ enum class survey_dispatch_result
 /// `hidden`. Idempotent — safe to call once after world construction.
 void init_survey_states(world& w);
 
-/// Dispatch a survey of `body` on behalf of the player corporation: validate state,
-/// debit the cost upfront, and arm the schedule (`phase = in_transit`). The mutation
+/// Dispatch a survey of `body`: validate state, debit the cost upfront from the
+/// paying corporation, and arm the schedule (`phase = in_transit`). The mutation
 /// is centralised here and called from app (the UI surfaces hold a const world).
-survey_dispatch_result dispatch_survey(world& w, entity_id body);
+/// `payer` defaults to the player corporation (null_entity → w.player_entity);
+/// the corp-command seam (BL-202) passes the acting AI corp so it pays for
+/// discovery like the player does. The survey *store* stays the single per-body
+/// world state either way (see corp_ai.hpp § fog design call).
+survey_dispatch_result dispatch_survey(world& w, entity_id body,
+                                       entity_id payer = null_entity);
 
 /// Advance every in-progress survey by `days` whole days: cross phase boundaries
 /// (in_transit → scanning → surveyed) and bump `regions_done` as scan-phase region

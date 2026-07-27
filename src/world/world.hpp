@@ -1,6 +1,7 @@
 #pragma once
 
 #include "components.hpp"
+#include "corp_command.hpp" // corp_decision_ring (BL-202 strategic decision log)
 
 #include <cstdint>
 #include <map>
@@ -161,6 +162,12 @@ struct world
     /// when road_level changes (road placement, BL-147). Keeps per-Tick per-lane A* off the
     /// dispatch hot path.
     std::map<std::tuple<entity_id, entity_id, entity_id>, logistics_path> astar_cost_cache;
+
+    /// Strategic AI decision log (BL-202): a fixed 256-entry ring of the most
+    /// recent corp commands + score rationale, in deterministic application
+    /// order. Derived observability (the chat feed / harness read it), not
+    /// save-format state — it does not join the serialisation seam.
+    corp_decision_ring ai_decisions;
 
     /// Stockpile pool for a (corporation, body) pair, inserting an empty pool on
     /// first access. The single point through which the economy systems read and
