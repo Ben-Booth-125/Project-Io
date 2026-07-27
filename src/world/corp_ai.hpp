@@ -5,6 +5,7 @@
 #include "entity.hpp"
 
 #include <cstdint>
+#include <iosfwd>
 #include <string>
 #include <vector>
 
@@ -110,3 +111,12 @@ struct corp_blackboard
 /// Build the visibility-honest blackboard for `corp` at `tick`. Pure read;
 /// deterministic ordering (subject-kind section, then entity id, then predicate).
 corp_blackboard export_corp_blackboard(const world& w, entity_id corp, int tick);
+
+/// Canonical string for a provenance tag ("own-asset", "public-market", ...).
+const char* fact_provenance_name(fact_provenance p);
+
+/// Serialise the blackboard as JSONL (BL-206): one fact per line
+/// `{"_v":1,"t":..,"subject":..,"predicate":"..","value":..,"confidence":..,
+/// "provenance":".."}` in the blackboard's deterministic order. Numeric
+/// formatting is fixed (%.9g) so same-seed runs are byte-identical.
+void to_jsonl(const corp_blackboard& bb, std::ostream& out);

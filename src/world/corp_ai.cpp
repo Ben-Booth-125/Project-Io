@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <ostream>
 
 namespace {
 
@@ -627,4 +628,38 @@ corp_blackboard export_corp_blackboard(const world& w, entity_id corp, int tick)
     }
 
     return bb;
+}
+
+// ---------------------------------------------------------------------------
+// JSONL serialisation (BL-206) — one writer, deterministic bytes.
+// ---------------------------------------------------------------------------
+
+const char* fact_provenance_name(fact_provenance p)
+{
+    switch (p)
+    {
+    case fact_provenance::own_asset:     return "own-asset";
+    case fact_provenance::public_market: return "public-market";
+    case fact_provenance::rival_visible: return "rival-visible";
+    case fact_provenance::survey:        return "survey";
+    case fact_provenance::route:         return "route";
+    }
+    return "unknown";
+}
+
+void to_jsonl(const corp_blackboard& bb, std::ostream& out)
+{
+    char buf[64];
+    for (const corp_fact& f : bb.facts)
+    {
+        out << "{\"_v\":" << bb._v
+            << ",\"t\":" << f.tick
+            << ",\"subject\":" << f.subject
+            << ",\"predicate\":\"" << f.predicate << '"';
+        std::snprintf(buf, sizeof buf, "%.9g", f.value);
+        out << ",\"value\":" << buf;
+        std::snprintf(buf, sizeof buf, "%.4g", static_cast<double>(f.confidence));
+        out << ",\"confidence\":" << buf
+            << ",\"provenance\":\"" << fact_provenance_name(f.provenance) << "\"}\n";
+    }
 }

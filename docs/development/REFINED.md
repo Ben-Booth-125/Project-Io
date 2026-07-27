@@ -36,6 +36,61 @@ focused agents, not a hard disjointness gate. Agents build and commit on their o
 worktree branch; the integrating session merges, builds, and verifies. See
 [`DELIVERY.md`](DELIVERY.md) § Sub-agents & worktrees for the authoritative model.
 
+## AI constituents batch (promoted from backlog.json § BL-202, BL-206, BL-207)
+
+Batch: 2026-07-27-ai-constituents. Requirements: requirements.json §
+corp-ai-scored-utility, blackboard-export, persona-counsel-slice1.
+Goal: land BL-207's prerequisites so agents can read the game — the corp-command
+seam + scorer (BL-202), the JSONL blackboard (BL-206), then the first counsel
+slice (BL-207 loader + mountain bench + Counsel channel).
+
+- [x] **A1 — corp_command seam.** `src/world/corp_command.{hpp,cpp}`: the
+  `{tick, corp, verb, args}` record, verb enum over the §5 table, and
+  `apply_corp_command` dispatching to the player-grade seams
+  (`construct_building`, `demolish_building`, recipe write, workforce target,
+  idle/resume, `place_road`, `dispatch_survey`). Expose `solve_workforce_target`
+  in `economy_system.hpp`. Rejections return a result, mutate nothing.
+- [x] **A2 — corp_ai scorer.** `src/world/corp_ai.{hpp,cpp}`: bounded candidate
+  enumeration (top-M sites by terrain affinity × deposit richness, per-building
+  dials, survey), `score = expected_net_per_tick / payback_ticks × strategy_weight`
+  from existing estimators, solvency gate, hysteresis (θ ≈ 15 %, cooldowns,
+  loss/gain streaks), budget (1 construction + few dials), staggered cadence
+  `id(c) % K`, per-corp seed-hash personality jitter. Decision-log ring buffer
+  (command + winning vs runner-up score).
+- [x] **A3 — integration.** `economy_system.cpp`: BL-079 block folds in as reflex
+  tier 0; strategic eval emits `corp_command`s applied at the tick boundary;
+  `agency_event` grows command kinds for the chat feed. Depends on A1, A2.
+- [x] **A4 — state export.** Per-corp visibility-honest export struct
+  (own full; market public; rival buildings not internals; survey/activity-gated
+  tile facts). Lives beside corp_ai; schema versioned. Depends on A3.
+- [x] **A5 — corp_ai_harness.** `tools/verify/corp_ai_harness.cpp` covering
+  BL-202 R1–R3. Depends on A1–A4.
+- [x] **B1 — blackboard JSONL.** `to_jsonl` on the export struct; `--export-blackboard
+  <corp|all> [--out <dir>]` in `src/main.cpp` (headless world, N warm-up econ
+  steps, `blackboard_<corp>_<tick>.jsonl`, `_v` stamp). Depends on A4.
+- [x] **B2 — blackboard_harness.** `tools/verify/blackboard_harness.cpp` covering
+  BL-206 R1–R3. Depends on B1.
+- [x] **C1 — persona packs (Lua).** `scripts/personas/{sun-tzu,amaterasu,krishna,
+  scales-of-maat}.lua` compiled by hand from the Pantheon seeds
+  (`C:/Users/benbo/Pantheon/data/personas/*.md`): each exposes
+  `extract(blackboard) → findings` and `phrase(finding) → text`; opinion records
+  in the codebook grammar; documented failure condition. Parallel-safe vs A.
+- [ ] **C2 — pack loader/runtime.** `src/scripting/persona_pack.{hpp,cpp}`:
+  sandboxed sol2 env (no io/os/package, no world pointer), fact-table marshalling,
+  fixed per-eval budget, opinion-record collection, scales-of-maat verdict
+  aggregation, bounded `strategy_weight` nudge, bench assignment at corp
+  generation (mountain bench first). Depends on A4/B1 fact schema + C1.
+- [ ] **C3 — Counsel channel.** Per-corp Counsel channel in `chat_state`;
+  phrase-bank counsel posts wired in `app.cpp` `step_economy`. Main-session
+  hotspot. Depends on C2.
+- [ ] **C4 — persona_counsel_harness.** `tools/verify/persona_counsel_harness.cpp`
+  covering BL-207 R1–R3 (two corps, strong-vs-weak precedent dilemma). Depends on C2.
+
+Parallelisation: roots A1+A2 (one worktree agent — same slice) and C1 (second
+agent, reads only Pantheon + the designed fact schema). A3–A5 follow in the A
+agent; B and C2–C4 sequential in the main session after A merges. Chat/app.cpp
+wiring stays in the main session.
+
 ## Sticky detail card cluster (promoted from backlog.json § BL-195, BL-196, BL-197, BL-198)
 
 Batch: 2026-07-22-sticky-card. Requirements: requirements.json §
