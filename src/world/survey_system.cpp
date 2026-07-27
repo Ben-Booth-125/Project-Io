@@ -110,7 +110,7 @@ void init_survey_states(world& w)
     }
 }
 
-survey_dispatch_result dispatch_survey(world& w, entity_id body)
+survey_dispatch_result dispatch_survey(world& w, entity_id body, entity_id payer)
 {
     const auto bit = w.bodies.find(body);
     if (bit == w.bodies.end()) return survey_dispatch_result::invalid;
@@ -119,7 +119,9 @@ survey_dispatch_result dispatch_survey(world& w, entity_id body)
     if (s.phase == survey_phase::surveyed)   return survey_dispatch_result::already_surveyed;
     if (s.phase != survey_phase::hidden)      return survey_dispatch_result::in_progress;
 
-    const auto pit = w.corporations.find(w.player_entity);
+    if (payer == null_entity)
+        payer = w.player_entity; // default: the player corp pays (pre-BL-202 behaviour)
+    const auto pit = w.corporations.find(payer);
     if (pit == w.corporations.end()) return survey_dispatch_result::invalid;
 
     const float cost = survey_cost(w, body);

@@ -2,6 +2,7 @@
 
 #include "budget_system.hpp"   // compute_building_opex, body_mean_habitability (BL-181 solver)
 #include "building_profit.hpp" // estimate_building_profit (BL-079 corp agency)
+#include "corp_ai.hpp"         // run_corp_strategic_step (BL-202 strategic tier)
 #include "market_clearing.hpp" // market_for_tile (BL-095 construction gate)
 #include "workforce.hpp"
 
@@ -245,6 +246,10 @@ float wf_target_price(float base, float supply, float demand)
     return std::clamp(target, base * wf_price_floor_mult, base * wf_price_ceil_mult);
 }
 
+} // namespace
+
+// Exported (BL-202): declared in economy_system.hpp so the strategic scorer
+// (corp_ai.cpp) reuses the one solver. The anonymous namespace re-opens below.
 int solve_workforce_target(const world& w, const recipe_registry& reg,
                            const building_component& b, float contention)
 {
@@ -313,6 +318,8 @@ int solve_workforce_target(const world& w, const recipe_registry& reg,
     }
     return best_wt;
 }
+
+namespace {
 
 // BL-095: pace each under-construction building against the local market's recent
 // supply of its materials, drawing + paying for them as it builds (pay-as-you-build).
@@ -784,6 +791,15 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
             }
         }
     }
+
+    // BL-202: strategic tier — the scored utility layer. Runs AFTER the BL-079
+    // reflex tier (tier 0, unchanged above): due non-player corps evaluate a
+    // bounded candidate set, emit corp_commands, and apply them through the
+    // player-grade seams (apply_corp_command). The tick source is
+    // w.current_day_tick, which drives the staggered cadence; callers (app's
+    // sim loop, the harnesses) maintain it per tick. The player corp is never
+    // evaluated or commanded (io-standing-rules.md).
+    run_corp_strategic_step(w, reg, report, w.current_day_tick);
 
     return report;
 }

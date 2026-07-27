@@ -98,6 +98,25 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\workforce_harness.cpp /Fe:workfo
 On Linux: `cmake --build build --target workforce_harness` or
 `g++ -std=c++20 -I src tools/verify/workforce_harness.cpp -o workforce_harness`.
 
+```bat
+:: Corp AI stage A (BL-202) — the corp-command seam (R1: seam-only mutation,
+:: rejected commands mutate nothing, byte-identical decision logs), the scored
+:: utility layer (R2: hysteresis, cooldown, action budget, solvency gate,
+:: player never commanded), and the visibility-honest state export (R3).
+:: Repo-root build_corp_ai.bat wraps this compile+run.
+cl /nologo /std:c++20 /EHsc /I src tools\verify\corp_ai_harness.cpp ^
+   src\world\world.cpp src\world\economy_system.cpp src\world\market_clearing.cpp ^
+   src\world\budget_system.cpp src\world\building_profit.cpp src\world\corp_ai.cpp ^
+   src\world\corp_command.cpp src\world\construction.cpp src\world\placement_rules.cpp ^
+   src\world\survey_system.cpp /Fe:corp_ai_harness.exe
+.\corp_ai_harness.exe
+```
+
+**BL-202 TU ripple:** `run_economy_step` now calls the strategic tier
+(`run_corp_strategic_step`), so ANY harness linking `economy_system.cpp` also
+needs `corp_ai.cpp corp_command.cpp construction.cpp placement_rules.cpp
+survey_system.cpp building_profit.cpp` — the older TU lists above predate this.
+
 Each exits non-zero on a failed assertion. The economy *panel* (the visual class)
 is verified separately via `ProjectIo --verify scripts/verify/economy_panel.lua`
 (the `verifier-visual` skill).

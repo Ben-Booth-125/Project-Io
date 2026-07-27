@@ -282,6 +282,13 @@ struct building_component
     /// idles a building whose streak passes a threshold); reset to 0 on any
     /// profitable tick. Never advanced for the player's own buildings.
     int  loss_streak = 0;
+
+    /// BL-202: strategic-scorer cooldown, in owning-corp evaluations. Set when
+    /// the scored utility layer touches this building (dial change / build);
+    /// while > 0 the building is not a dial candidate (the anti-thrash rule,
+    /// AI_OPPONENT.md § 5 Hysteresis). Decremented each evaluation of the
+    /// owning corp. Never set on player buildings.
+    int  ai_cooldown = 0;
 };
 
 /// Pooled resource quantities held by an entity.

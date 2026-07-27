@@ -62,14 +62,23 @@ struct agency_event
 {
     enum class kind : uint8_t
     {
-        recipe_switch, ///< A floored processor switched to a healthier recipe.
-        idled,         ///< A sustained loss-maker was decommissioned.
+        recipe_switch,     ///< A floored processor switched to a healthier recipe.
+        idled,             ///< A sustained loss-maker was decommissioned.
+        // --- BL-202 strategic-command kinds (the scored-utility layer) ---
+        built,             ///< A new building was placed (`tile` set; `building` is the new id).
+        demolished,        ///< An owned building was removed.
+        workforce_set,     ///< The workforce dial moved (`value` = new target, 0–200).
+        resumed,           ///< An idled building was brought back online.
+        road_placed,       ///< A road was laid (`tile` set; `value` = tier 1–3).
+        survey_dispatched, ///< A survey was dispatched (`building` unused; `tile` = body id).
     };
 
     entity_id corp;
     entity_id building;
     kind      what;
-    uint16_t  new_recipe = 0; ///< recipe_switch only: the recipe switched to.
+    uint16_t  new_recipe = 0;           ///< recipe_switch only: the recipe switched to.
+    entity_id tile       = null_entity; ///< built / road_placed: target tile; survey_dispatched: body.
+    int       value      = 0;           ///< workforce_set: new target; road_placed: tier.
 };
 
 /// Result of one economy step: the per-building reports plus the auto-bought
@@ -132,3 +141,11 @@ void inject_substrate_demand(world& w, const recipe_registry& reg);
 /// @param reg Loaded recipe/economy registry.
 /// @return    The step report (building states + auto-bought shortfalls).
 economy_report run_economy_step(world& w, const recipe_registry& reg);
+
+/// The BL-181 per-building workforce-dial solver: the workforce target (0–200,
+/// step 10) that maximises this building's estimated net this tick against the
+/// local market's price response. Exported (BL-202) so the strategic scorer can
+/// reuse it as the AI's `set_workforce` estimator — one solver, no drift.
+/// Deterministic; reads last tick's market state only.
+int solve_workforce_target(const world& w, const recipe_registry& reg,
+                           const building_component& b, float contention);
