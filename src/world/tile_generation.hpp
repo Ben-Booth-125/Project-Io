@@ -99,6 +99,11 @@ struct generation_record
 ///                on the canvas rather than merely reading poorer in a ledger.
 ///                Passing nullptr reproduces the pre-BL-167 surface bit-for-bit.
 /// @param record  Optional out-param; when non-null, receives the per-pass intermediates.
+/// @param continent_bias Optional per-tile height contribution from the Continents/Drift
+///                sibling pass (BL-210; src/world/continents.hpp), sized gw*gh. Added into
+///                Pass 1's heightmap before normalisation, so plate-boundary uplift/rift
+///                shapes the same terrain a pure-noise heightmap would otherwise produce.
+///                A null pointer reproduces the pre-BL-210 surface bit-for-bit.
 /// @return        Tile entity IDs in raster order (index = row * gw + col).
 std::vector<entity_id> generate_body_tiles(
     world& w,
@@ -108,7 +113,8 @@ std::vector<entity_id> generate_body_tiles(
     uint32_t seed,
     float deposit_scalar = 1.0f,
     const planetology_state* pl = nullptr,
-    generation_record* record = nullptr);
+    generation_record* record = nullptr,
+    const std::vector<float>* continent_bias = nullptr);
 
 /// Scan raster order and return the first @p n land (non-ocean) tile IDs. Used to
 /// pick building attachment points after a body's tiles are generated.

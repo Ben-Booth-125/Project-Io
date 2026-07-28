@@ -468,56 +468,84 @@ void app::step_economy()
                  &m_last_econ_report.budgets);
     credit_arrived_convoys(m_world, static_cast<int>(m_sim_loop.day_tick()));
 
-    // Surface this tick's background-corp agency actions (BL-079) as Public
-    // comms lines (BL-205) — the chat is the AI-observability surface. Message
-    // text is a pure rendering of deterministic report events.
-    for (const agency_event& ev : m_last_econ_report.agency_events)
+    // Surface this tick's background-corp agency actions (BL-079) as NATION-
+    // voiced Public comms lines (BL-212). A rival's internals stay private —
+    // the old per-corp, per-building text here broke DISCOVERY.md's already-
+    // settled competitor-visibility rule ("rival internals are private... a
+    // public AGGREGATE signal is the deliberate one"), the same shape as the
+    // market layer already follows. Only the corp's HOME NATION ever posts,
+    // phrased as its own first-person statement, and only the tick's single
+    // heaviest event per nation — never a full account of everything that
+    // happened underneath it.
     {
-        const auto bit = m_world.buildings.find(ev.building);
-        if (bit == m_world.buildings.end())
-            continue;
-        const building_component& b = bit->second;
-        std::string where;
-        if (const auto tit = m_world.tiles.find(b.tile); tit != m_world.tiles.end())
-            if (const auto boit = m_world.bodies.find(tit->second.body); boit != m_world.bodies.end())
-                where = std::string(" on ") + boit->second.name;
+        auto severity_of = [](agency_event::kind k) -> int {
+            switch (k)
+            {
+            case agency_event::kind::idled:            return 4;
+            case agency_event::kind::demolished:       return 4;
+            case agency_event::kind::built:             return 3;
+            case agency_event::kind::recipe_switch:     return 2;
+            case agency_event::kind::resumed:           return 2;
+            case agency_event::kind::road_placed:       return 1;
+            case agency_event::kind::workforce_set:     return 1;
+            case agency_event::kind::survey_dispatched: return 1;
+            }
+            return 0;
+        };
 
-        std::string text;
-        switch (ev.what)
+        std::unordered_map<entity_id, const agency_event*> best_per_nation;
+        for (const agency_event& ev : m_last_econ_report.agency_events)
         {
-        case agency_event::kind::recipe_switch:
+            const auto cit = m_world.corporations.find(ev.corp);
+            if (cit == m_world.corporations.end() || cit->second.home_nation == null_entity)
+                continue; // no home nation to speak on this corp's behalf
+            const entity_id nation = cit->second.home_nation;
+            const auto it = best_per_nation.find(nation);
+            if (it == best_per_nation.end() || severity_of(ev.what) > severity_of(it->second->what))
+                best_per_nation[nation] = &ev;
+        }
+
+        // Sorted ids so the post order is deterministic (unordered_map iteration
+        // order is not) — mirrors the sorted corp_ids pattern in the counsel
+        // block just below.
+        std::vector<entity_id> nation_ids;
+        nation_ids.reserve(best_per_nation.size());
+        for (const auto& [nid, ev] : best_per_nation)
+            nation_ids.push_back(nid);
+        std::sort(nation_ids.begin(), nation_ids.end());
+
+        for (const entity_id nid : nation_ids)
         {
-            const recipe* rc = m_registry.get_recipe(ev.new_recipe);
-            text = std::string("Switched ") + ui::building_type_name(b.type) + where +
-                   " to the " + (rc ? rc->name.c_str() : "?") + " recipe - output price floored.";
-            break;
+            std::string text;
+            switch (best_per_nation[nid]->what)
+            {
+            case agency_event::kind::recipe_switch:
+                text = "We are adjusting output priorities in a domestic processing sector.";
+                break;
+            case agency_event::kind::idled:
+                text = "We confirm an easing of activity in a strained sector.";
+                break;
+            case agency_event::kind::built:
+                text = "We welcome new private investment within our borders.";
+                break;
+            case agency_event::kind::demolished:
+                text = "We note the retirement of an aging facility.";
+                break;
+            case agency_event::kind::workforce_set:
+                text = "We are adjusting domestic labour allocation.";
+                break;
+            case agency_event::kind::resumed:
+                text = "We report resumed operations in a recovering sector.";
+                break;
+            case agency_event::kind::road_placed:
+                text = "We announce new infrastructure investment.";
+                break;
+            case agency_event::kind::survey_dispatched:
+                text = "We confirm new exploratory activity within our claims.";
+                break;
+            }
+            ui::chat_post(m_chat, static_cast<int>(m_sim_loop.day_tick()), nid, 0, std::move(text));
         }
-        case agency_event::kind::idled:
-            text = std::string("Idled ") + ui::building_type_name(b.type) + where +
-                   " - sustained losses.";
-            break;
-        case agency_event::kind::built:
-            text = std::string("Built a new ") + ui::building_type_name(b.type) + where + ".";
-            break;
-        case agency_event::kind::demolished:
-            text = std::string("Demolished ") + ui::building_type_name(b.type) + where + ".";
-            break;
-        case agency_event::kind::workforce_set:
-            text = std::string("Retargeted ") + ui::building_type_name(b.type) + where +
-                   "'s workforce to " + std::to_string(ev.value) + ".";
-            break;
-        case agency_event::kind::resumed:
-            text = std::string("Resumed ") + ui::building_type_name(b.type) + where + ".";
-            break;
-        case agency_event::kind::road_placed:
-            text = "Laid a tier-" + std::to_string(ev.value) + " road.";
-            break;
-        case agency_event::kind::survey_dispatched:
-            text = "Dispatched a survey.";
-            break;
-        }
-        ui::chat_post(m_chat, static_cast<int>(m_sim_loop.day_tick()), ev.corp, 0,
-                      std::move(text));
     }
 
     // Persona counsel (BL-207 slice 1): every corp due at this strategic-eval
@@ -669,10 +697,12 @@ void app::setup_world(world_params params)
 
     // Open the comms log with a deterministic epoch line (BL-205): the Public
     // channel exists from campaign start, so the panel is never an empty shell.
+    // BL-212: the channel is nation-voiced, so the epoch line counts nations,
+    // not the corporations operating quietly beneath them.
     m_chat = ui::chat_state{};
     ui::chat_post(m_chat, 0, null_entity, 0,
-                  std::to_string(m_world.corporations.size()) +
-                      " corporations on the public channel.");
+                  std::to_string(m_world.nations.size()) +
+                      " nations on the public channel.");
 
     // Set the initial solar zoom so the default view covers roughly 5 AU.
     // The auto-fit scale at zoom 1 shows max_radius_au; dividing it by 5 zooms
@@ -3151,7 +3181,7 @@ void app::render()
         m_prev_selection = m_ui.selected_entity;
     }
 
-    ui::draw_tile_inspector(m_world, m_ui, &m_ui.show_tile_ledger);
+    ui::draw_tile_inspector(m_world, m_ui, m_generation_report, &m_ui.show_tile_ledger);
     {
         const ui::player_plot_history phist{m_balance_history, m_income_history, m_expenditure_history};
         ui::draw_economy_panel(m_world, m_registry, m_last_econ_report, phist, m_ui, &m_ui.show_economy_panel);

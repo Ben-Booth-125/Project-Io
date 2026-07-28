@@ -124,6 +124,18 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\chemistry_tables_harness.cpp ^
 .\chemistry_tables_harness.exe
 ```
 
+```bat
+:: Continents/Drift (BL-210 first slice) — the plate-drift sibling pass. Asserts
+:: determinism (R1), mobile-lid plate count lands in [4,10] (R2), the stagnant-lid
+:: special case is one immobile plate with zero height bias (R3), convergent AND
+:: divergent boundaries both fire across a seed spread so the classifier isn't
+:: sign-biased (R4), and every emitted history line names its consequence (R5).
+:: Links planetology.cpp (reads mobile_lid/theta) + continents.cpp.
+cl /nologo /std:c++20 /EHsc /I src tools\verify\continents_harness.cpp ^
+   src\world\planetology.cpp src\world\continents.cpp /Fe:continents_harness.exe
+.\continents_harness.exe
+```
+
 **BL-202 TU ripple:** `run_economy_step` now calls the strategic tier
 (`run_corp_strategic_step`), so ANY harness linking `economy_system.cpp` also
 needs `corp_ai.cpp corp_command.cpp construction.cpp placement_rules.cpp

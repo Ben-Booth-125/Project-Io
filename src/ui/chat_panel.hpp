@@ -8,20 +8,26 @@
 namespace ui {
 
 /// One line in the comms log. `from == null_entity` marks a system line (epoch
-/// notices), rendered dimmed; otherwise `from` is the authoring corporation and
-/// the line carries its identity colour.
+/// notices), rendered dimmed. Otherwise `from` is either a NATION (BL-212: the
+/// only author the Public channel ever shows — see step_economy's nation-voiced
+/// aggregation) or a corporation (a Counsel channel, player-only), and the line
+/// carries that entity's identity colour. Rendering resolves which kind `from`
+/// is by trying the nation map first, then the corp map (see draw_chat_panel).
 struct chat_message
 {
     int         day;     ///< Sim day the message was posted (m_sim_loop.day_tick()).
-    entity_id   from;    ///< Authoring corp, or null_entity for a system line.
+    entity_id   from;    ///< Authoring nation or corp, or null_entity for a system line.
     int         channel; ///< Index into chat_state::channels.
     std::string text;
 };
 
-/// A comms channel. Channel 0 is always **Public** (every corporation; `members`
-/// empty). Further channels are player-created groups over an arbitrary corp
-/// subset (BL-205 — "arbitrary groups can be made"); the player is an implicit
-/// member of any group they create.
+/// A comms channel. Channel 0 is always **Public** (`members` empty) — as of
+/// BL-212 the only speakers ever posted there are NATIONS, never corporations,
+/// so a rival's internals never leak through comms (DISCOVERY.md's
+/// competitor-visibility rule). Further channels are player-created groups over
+/// an arbitrary corp subset (BL-205 — "arbitrary groups can be made"), plus the
+/// per-corp Counsel channels (BL-207); the player is an implicit member of any
+/// group they create.
 struct chat_channel
 {
     std::string            name;

@@ -86,6 +86,14 @@ in `tools/verify/README.md`.
   exp/log/pow in a gate path); and the S5e survival floor cuts through the Lost City band,
   45–90 °C (R12e). Links `chemistry_tables.cpp` only. CMake target
   `chemistry_tables_harness`.
+- **`continents_harness`** — Continents/Drift (BL-210 first slice): the plate-drift
+  sibling pass. Determinism (R1 — same seed identical, different seed different);
+  mobile-lid plate count lands in [4,10] (R2); the stagnant-lid special case is one
+  immobile plate with zero height bias everywhere (R3); convergent AND divergent
+  boundaries both fire across a seed spread, so the dot-product classifier isn't
+  sign-biased (R4); every emitted history line names its consequence, per
+  PLANETOLOGY.md's presentation rule (R5). Links `planetology.cpp` (reads
+  `mobile_lid`/`theta`) + `continents.cpp`. CMake target `continents_harness`.
 
 ## Running the whole suite (CTest — BL-104)
 

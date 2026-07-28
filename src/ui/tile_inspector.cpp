@@ -11,7 +11,8 @@
 
 namespace ui {
 
-void draw_tile_inspector(const world& w, const ui_state& s, bool* p_open)
+void draw_tile_inspector(const world& w, const ui_state& s,
+                         const generation_report& report, bool* p_open)
 {
     // Honour the open flag; when closed the window draws nothing at all.
     if (p_open && !*p_open)
@@ -79,6 +80,42 @@ void draw_tile_inspector(const world& w, const ui_state& s, bool* p_open)
         sel_body.orbital_radius_au,
         sel_body.grid_width,
         sel_body.grid_height);
+
+    ImGui::Separator();
+
+    // --- Generation history (BL-211): the oral-history biography ---
+    // GENERATION_LEDGER.md flagged this as an open item ("player-facing
+    // variant... out of scope") and MENU.md named this slot as its destination
+    // ("generation history, not a live event log"). The report is matched by
+    // NAME (generation_report::body_entry has no entity_id — bodies are
+    // authored once and never renamed, so name is a stable key here).
+    const generation_report::body_entry* entry = nullptr;
+    for (const auto& be : report.bodies)
+        if (be.name == sel_body.name) { entry = &be; break; }
+
+    if (ImGui::CollapsingHeader("Generation History", ImGuiTreeNodeFlags_DefaultOpen))
+    {
+        if (!entry || entry->state.history.empty())
+        {
+            ImGui::TextDisabled("No recorded history for this body.");
+        }
+        else
+        {
+            ImGui::TextDisabled("%s - %.2f Gya to present",
+                archetype_name(entry->state.archetype),
+                entry->state.history.empty() ? 0.0f : entry->state.history.front().gya);
+            for (const history_event& ev : entry->state.history)
+            {
+                ImGui::TextWrapped("%.2f Gya  %s", ev.gya, ev.event.c_str());
+                if (!ev.consequence.empty())
+                {
+                    ImGui::Indent();
+                    ImGui::TextDisabled("%s", ev.consequence.c_str());
+                    ImGui::Unindent();
+                }
+            }
+        }
+    }
 
     ImGui::Separator();
 

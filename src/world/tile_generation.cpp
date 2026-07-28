@@ -773,7 +773,8 @@ std::vector<entity_id> generate_body_tiles(
     uint32_t seed,
     float deposit_scalar,
     const planetology_state* pl,
-    generation_record* record)
+    generation_record* record,
+    const std::vector<float>* continent_bias)
 {
     const int total = gw * gh;
 
@@ -791,6 +792,17 @@ std::vector<entity_id> generate_body_tiles(
     for (int row = 0; row < gh; ++row)
         for (int col = 0; col < gw; ++col)
             height[col + row * gw] = fbm_cylinder(height_noise, col, row, gw, /*base_cycles=*/4.0f, /*octaves=*/5);
+
+    // Continents/Drift (BL-210): plate-boundary uplift/rift is a CONSEQUENCE of
+    // Planetology's S3 Engine output, added before normalisation so it shapes
+    // the same heightmap a pure-noise pass would otherwise produce, not a
+    // second competing terrain source.
+    if (continent_bias && continent_bias->size() == static_cast<std::size_t>(total))
+    {
+        for (int idx = 0; idx < total; ++idx)
+            height[static_cast<std::size_t>(idx)] += (*continent_bias)[static_cast<std::size_t>(idx)];
+    }
+
     normalise(height);
 
     // Moisture (Pass 3's second axis): independent of latitude.

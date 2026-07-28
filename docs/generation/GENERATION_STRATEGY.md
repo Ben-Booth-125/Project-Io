@@ -101,6 +101,34 @@ input to the staged-generation Tile Ledger ([[BL-100]]) as a tuning surface.
 
 ---
 
+## The oral-history pivot (BL-210, design-owed, post-v0.1.0)
+
+**Settled direction, 2026-07-28 (Ben):** generation is being reframed from four separate
+mechanisms into **one continuous simulated history**, extending BL-167's proven S0–S9 chain
+forward and backward:
+
+```
+S0 System → S1–S4 Continents (simulated plate drift/collision/rift, replaces the
+  mechanical 6-pass heightmap/noise pipeline) → S5–S8 Biosphere (existing BL-167 chain,
+  unchanged) → Settlement → Industrialisation → 1900s (replaces Voronoi nations +
+  authored corporation focus tables)
+```
+
+Mass extinctions (already narrated today) and new **historical-extinction** analogues
+(collapse, war) become **branch checkpoints**: the existing preference-lean mechanism
+(`PLANETOLOGY.md` § Preferences) extends to bias which branch fires, and the batch-sweep
+tool (`planetology_sweep.cpp`) generalises to explore lean × branch space across worlds —
+the mechanism for tuning target parameters and surfacing dead-end combinations.
+
+This directly closes the gap `PLANETOLOGY.md` § Known weaknesses names as the largest
+missing connection: *"the pass hands nothing to nation or corporation generation."* **Full
+architecture, rationale, and the per-doc open questions live in BL-210** (`backlog.json`) —
+this note exists so the pipeline ordering above is not read as settled fact until each
+subject doc (`TILE_GENERATION.md`, `NATION_GENERATION.md`, `CORPORATION_GENERATION.md`) has
+had its own design pass.
+
+---
+
 ## Open cross-doc items
 
 These are design questions that span more than one generation doc; each is also noted in the

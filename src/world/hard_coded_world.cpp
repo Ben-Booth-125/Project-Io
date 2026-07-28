@@ -1,5 +1,6 @@
 #include "hard_coded_world.hpp"
 
+#include "continents.hpp"
 #include "corporation_generation.hpp"
 #include "nation_generation.hpp"
 #include "orbital_system.hpp"
@@ -83,12 +84,24 @@ world make_hard_coded_world(world_params params, generation_report* report)
     // Index into the shared prototype body set (planetology.hpp). The wizard's
     // live preview walks the same list with the same seeds and the same derived
     // orbit, so the charts a player decided against describe exactly this world.
-    auto plan = [&](int proto_index) {
+    // Continents/Drift (BL-210 first slice): a sibling pass reading Engine's
+    // already-computed mobile_lid/theta, run BEFORE the tile pipeline. Its
+    // history merges into the body's biography (chain_stage::engine lines);
+    // its height bias feeds Pass 1 in place of pure noise. `plan` therefore
+    // needs the body's grid dims and an out-param for the bias.
+    auto plan = [&](int proto_index, int gw, int gh, std::vector<float>& bias_out) {
         body_inputs in = prototype_body(proto_index);
         if (in.is_homeworld)
             in.orbit_au = rw.home_orbit_au;
-        planetology_state st = run_planetology(
-            in, rw.params, params.seed ^ prototype_body_seed(proto_index));
+        const uint32_t body_seed = params.seed ^ prototype_body_seed(proto_index);
+        planetology_state st = run_planetology(in, rw.params, body_seed);
+
+        const continent_state cs = run_continents(st, gw, gh, body_seed ^ 0xC0117E57u);
+        st.history.insert(st.history.end(), cs.history.begin(), cs.history.end());
+        std::stable_sort(st.history.begin(), st.history.end(),
+            [](const history_event& a, const history_event& b) { return a.gya > b.gya; });
+        bias_out = cs.height_bias;
+
         if (report)
             report->bodies.push_back(generation_report::body_entry{ in.name, st });
         return st;
@@ -140,9 +153,10 @@ world make_hard_coded_world(world_params params, generation_report* report)
     };
 
     // Mercury-analogue physical facts; everything else is derived by the chain.
-    const planetology_state cinder_pl = plan(0);
+    std::vector<float> cinder_bias;
+    const planetology_state cinder_pl = plan(0, 180, 84, cinder_bias);
     generate_body_tiles(w, cinder, 180, 84, cinder_pl.profile,
-        /*seed=*/params.seed ^ 0xC1D0001u, deposit_scalar, &cinder_pl);
+        /*seed=*/params.seed ^ 0xC1D0001u, deposit_scalar, &cinder_pl, nullptr, &cinder_bias);
 
     // -----------------------------------------------------------------------
     // Kepler — temperate home planet (Earth analogue, ~1.0 AU)
@@ -171,9 +185,10 @@ world make_hard_coded_world(world_params params, generation_report* report)
     // unmodified chain succeeds — the guarantee is on the INPUTS, never on the
     // gates (PLANETOLOGY.md § The homeworld rule). Every gate still runs, still
     // records its margin, and still writes its line.
-    const planetology_state kepler_pl = plan(1);
+    std::vector<float> kepler_bias;
+    const planetology_state kepler_pl = plan(1, 180, 84, kepler_bias);
     auto kepler_tiles = generate_body_tiles(w, kepler, 180, 84, kepler_pl.profile,
-        /*seed=*/params.seed ^ 0xE471001u, deposit_scalar, &kepler_pl);
+        /*seed=*/params.seed ^ 0xE471001u, deposit_scalar, &kepler_pl, nullptr, &kepler_bias);
 
     // Kepler is the only body with a political layer in the prototype; its nation
     // count is derived, not authored. Selene/Cinder/Pallas stay unclaimed.
@@ -424,9 +439,10 @@ world make_hard_coded_world(world_params params, generation_report* report)
     // Luna-analogue. orbit_au is its distance from the STAR (it shares Kepler's
     // instellation); parent_orbit_au is its distance from Kepler, which is what
     // drives the tidal term.
-    const planetology_state selene_pl = plan(2);
+    std::vector<float> selene_bias;
+    const planetology_state selene_pl = plan(2, 90, 42, selene_bias);
     generate_body_tiles(w, selene, 90, 42, selene_pl.profile,
-        /*seed=*/params.seed ^ 0x5E1E001u, deposit_scalar, &selene_pl);
+        /*seed=*/params.seed ^ 0x5E1E001u, deposit_scalar, &selene_pl, nullptr, &selene_bias);
 
     // -----------------------------------------------------------------------
     // Asteroid belt — a band beyond Kepler. The belt itself is not a body; it
@@ -464,9 +480,10 @@ world make_hard_coded_world(world_params params, generation_report* report)
 
         // Differentiated on 26-Al heat, then stripped: the core_fragment branch
         // exits the chain at accretion and the whole object becomes the deposit.
-        const planetology_state ast_pl = plan(3);
+        std::vector<float> ast_bias;
+        const planetology_state ast_pl = plan(3, 30, 14, ast_bias);
         generate_body_tiles(w, id, 30, 14, ast_pl.profile,
-            params.seed ^ a.seed, deposit_scalar, &ast_pl);
+            params.seed ^ a.seed, deposit_scalar, &ast_pl, nullptr, &ast_bias);
     }
 
     // ---------------------------------------------------------------------

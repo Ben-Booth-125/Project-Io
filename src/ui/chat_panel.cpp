@@ -20,6 +20,25 @@ const char* corp_name(const world& w, entity_id corp)
     return it != w.corporations.end() ? it->second.name.c_str() : "(unknown)";
 }
 
+/// Display name for a chat_message author of EITHER kind (BL-212: Public is
+/// nation-authored, Counsel channels stay corp-authored) — tries the nation
+/// map first since only Public messages use it.
+const char* speaker_name(const world& w, entity_id from)
+{
+    if (const auto nit = w.nations.find(from); nit != w.nations.end())
+        return nit->second.name.c_str();
+    return corp_name(w, from);
+}
+
+/// Identity colour for a chat_message author of either kind, mirroring
+/// speaker_name's lookup order.
+ImU32 speaker_colour(const world& w, entity_id from, entity_id player)
+{
+    if (w.nations.find(from) != w.nations.end())
+        return palette::nation_colour(from);
+    return palette::corp_identity_colour(from, player);
+}
+
 } // namespace
 
 void chat_post(chat_state& chat, int day, entity_id from, int channel, std::string text)
@@ -131,8 +150,8 @@ void draw_chat_panel(const world& w, chat_state& chat, int day,
                 continue;
             }
             ImGui::PushStyleColor(ImGuiCol_Text,
-                                  palette::corp_identity_colour(m.from, w.player_entity));
-            ImGui::TextWrapped("d%d  %s:", m.day, corp_name(w, m.from));
+                                  speaker_colour(w, m.from, w.player_entity));
+            ImGui::TextWrapped("d%d  %s:", m.day, speaker_name(w, m.from));
             ImGui::PopStyleColor();
             ImGui::Indent();
             ImGui::TextWrapped("%s", m.text.c_str());

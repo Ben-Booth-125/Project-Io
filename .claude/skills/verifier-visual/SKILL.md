@@ -39,6 +39,15 @@ the "authorising a new check = naming it" convention:
   efficiency (the 0.6 cliff) plus the Selection panel population-centre read (scale /
   population / habitability / absolute workforce cap). Driver: `verify.select_tile`,
   `verify.population_centres()`.
+- **`continents_terrain.lua`** (BL-210 first slice) — Kepler's terrain now that Pass 1's
+  heightmap is biased by the Continents/Drift sibling pass instead of pure noise. Captures
+  plain terrain (landmass shape) and the Country lens (nation borders over it) at a
+  full-planet zoom. Driver: `verify.goto_surface`, `verify.set_zoom`, `verify.set_overlay`.
+- **`history_ledger_and_comms.lua`** (BL-211 + BL-212) — the History nav-rail slot's new
+  "Generation History" section (the oral-history biography, including Continents/Drift's
+  merged lines, given an in-game home for the first time) and the Public comms channel's
+  epoch line confirming it is now nation-voiced, not corporation-voiced. Driver:
+  `verify.goto_surface`, `verify.show_panel("tile", ...)`.
 
 ## Determinism: software renderer + headless display (read first)
 
