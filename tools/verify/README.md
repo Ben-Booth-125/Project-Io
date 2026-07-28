@@ -112,6 +112,18 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\corp_ai_harness.cpp ^
 .\corp_ai_harness.exe
 ```
 
+```bat
+:: Molecular vocabulary (BL-209) — the species/reaction dictionary the seven-gate
+:: abiogenesis chain is written against. Asserts the 8-byte molecular_event record
+:: shape, NO ORPHAN IDS (every process names a gate and resolves every species it
+:: references), names-never-ids, the table-driven RNA half-life curve, and that the
+:: S5e survival floor cuts through the Lost City band (45-90 C).
+:: Links chemistry_tables.cpp only — no world.cpp, no generation TUs.
+cl /nologo /std:c++20 /EHsc /I src tools\verify\chemistry_tables_harness.cpp ^
+   src\world\chemistry_tables.cpp /Fe:chemistry_tables_harness.exe
+.\chemistry_tables_harness.exe
+```
+
 **BL-202 TU ripple:** `run_economy_step` now calls the strategic tier
 (`run_corp_strategic_step`), so ANY harness linking `economy_system.cpp` also
 needs `corp_ai.cpp corp_command.cpp construction.cpp placement_rules.cpp

@@ -76,6 +76,16 @@ in `tools/verify/README.md`.
   or unordered_map iteration-order dependence in world generation — the standing determinism
   invariant. Links the generation TU superset (as `world_audit`). CMake target
   `determinism_harness`.
+- **`chemistry_tables_harness`** — Molecular vocabulary (BL-209): the species/reaction
+  dictionary the seven-gate abiogenesis chain is written against. `molecular_event` is
+  exactly 8 bytes (R12a — it is a save-format record, so a silent size change is a
+  compatibility break); **no orphan ids** (R12b — every process names a gate and resolves
+  every species it references; this is the key invariant, since ids and display names are
+  decoupled by design and nothing else catches table drift); names never ids (R12c); the
+  RNA half-life curve is monotone, clamped and table-driven (R12d — PLANETOLOGY.md bans
+  exp/log/pow in a gate path); and the S5e survival floor cuts through the Lost City band,
+  45–90 °C (R12e). Links `chemistry_tables.cpp` only. CMake target
+  `chemistry_tables_harness`.
 
 ## Running the whole suite (CTest — BL-104)
 
@@ -93,8 +103,10 @@ only when building outside the CMake tree.
 
 ## Procedure
 
-1. **Compile** from the repo root, after sourcing the VS BuildTools `vcvars64`
-   (`C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools\VC\Auxiliary\Build\vcvars64.bat`),
+1. **Compile** from the repo root, after sourcing the VS `vcvars64`
+   (`C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars64.bat`
+   — verified 2026-07-28; the old 2022 BuildTools path in this file was stale. From Git Bash
+   the quoting fails, so write a one-off `.bat` that `call`s vcvars then `cl`, and run that),
    with the harness's own source list (see `tools/verify/README.md`), e.g.:
    ```
    cl /nologo /std:c++20 /EHsc /I src tools\verify\econ_harness.cpp ^
