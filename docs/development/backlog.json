@@ -4170,6 +4170,37 @@
       ],
       "summary": "Imports the Pantheon persona system (external repo C:/Users/benbo/Pantheon: docs/persona-runtime.md is the architecture; data/personas/*.md the 25 voice seeds — 16 Faculty analysts + 9 Embassy diplomats; data/codebook.json v3 the move/verdict grammar). Runtime is LLM-free by construction: each persona compiles offline to a pack — phrase bank (voice), Lua extractors (blackboard facts → findings), policy weights (findings → opinion records + stance nudges), and a designed failure condition (each persona's documented blind spot, reachable by play — beatable through understanding, not handicap). Gives every AI corp a legible advisory cabinet whose counsel posts to the BL-205 chat, and a bounded diplomacy-flavoured bias into the BL-202 scorer. Pairs with §7 stage A (templated deterministic messages) and anticipates stage C without requiring it.",
       "design": "Packs are moddable data: scripts/personas/<id>.lua (sol2 host), each exposing extract(blackboard) → findings and phrase(finding) → text; opinion records follow the codebook grammar {p, m, on, c (≤140 chars), w 0-3, v?}. Pipeline at the §5 staggered strategic-eval boundary: corp blackboard (BL-206) → seated personas' extractors (fixed per-eval budget) → opinion records → verdict aggregation (scales-of-maat pack: SUFF/INSF/AMMIT/NOTYET/UNWG against a named baseline) → a bounded, transparent nudge on the BL-202 strategy_weight — counsel biases scoring, never bypasses validation (no new verbs, no fog access; the packs read ONLY the blackboard). Bench assignment at corporation generation: each corp seats one Embassy bench (hearth/banner/mountain) consistent with its industrial focus — distinct legible personalities for free (CORPORATION_GENERATION.md premise). Counsel messages render from phrase banks into a per-corp Counsel channel (chat_panel), fully deterministic — §7 stage A discipline. Fairness clauses inherited from persona-runtime.md: blackboard-only reads, fixed compute budget, seeded determinism, exploitability. FIRST SLICE: pack loader + the mountain bench (sun-tzu/amaterasu/krishna) + Counsel channel feed. Requirement (headless, tools/verify/persona_counsel_harness.cpp): two corps, same seed, an alignment dilemma (the strong-vs-weak precedent, Pantheon session 2026-07-26); assert (1) byte-identical opinion logs across two runs, (2) blackboard-only reads (no world pointer in the Lua env), (3) at least one inter-bench disagreement resolved by an explicit verdict record."
+    },
+    {
+      "parked": false,
+      "blocked_on": [],
+      "written": "2026-07-28",
+      "id": "BL-208",
+      "short_name": "WORLD_HISTORY_LOG",
+      "category": "Research",
+      "title": "World history log — an append-only narrative substrate replacing the per-eval blackboard snapshot (enables a past-history game mode)",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "C",
+      "difficulty": 5,
+      "version_goal": "v0.3.0",
+      "requires": [
+        "BL-167",
+        "BL-202",
+        "BL-206"
+      ],
+      "authority_doc": "docs/ai/AI_OPPONENT.md",
+      "files": [
+        "docs/ai/AI_OPPONENT.md",
+        "docs/generation/GENERATION_LEDGER.md",
+        "docs/generation/PLANETOLOGY.md",
+        "src/world/world.hpp",
+        "src/world/corp_ai.{hpp,cpp}",
+        "src/world/planetology.{hpp,cpp}",
+        "src/main.cpp"
+      ],
+      "summary": "Ben's pivot (2026-07-28), reacting to BL-206's snapshot-style blackboard export: re-deriving a fresh state summary from the world every time someone reads it is 'unnecessary and boring overhead.' Proposal: make the append-only EVENT LOG the source of truth from world generation onward, not a per-eval snapshot query. Concretely, the bones already exist and are scattered: corp_ai's decision ring (corp_decision_ring) is already an event log of AI commands; trade_routes (last_tick, convoy_count) is already history, not state; agency_event is already a live narrated feed; and PLANETOLOGY.md's per-body dated biography (S0-S9, already implemented under BL-167 - abiogenesis at S5 Spark, the oxygenation bottlenecks at S6 Breath, land colonisation at S7 Green) is already exactly 'how chemical life started and what evolution bottlenecks led to humans forming,' produced once at generation and never revisited. This item unifies those into one growing, replayable log spanning generation through simulation, with the corp_ai blackboard snapshot and the BL-206 JSONL export becoming a DERIVED VIEW over the log rather than an authored artifact. The payoff Ben named: a game can start reading the log from tick 0 instead of 'now,' which is most of what a 'play through the past' mode needs, close to free once the log is the substrate.",
+      "design": "NOT YET DESIGNED IN DETAIL - captured per Rule 0a (save now, detail later). Ben's explicit sequencing (2026-07-28): the abiogenesis/evolution-bottleneck history (BL-167/PLANETOLOGY.md S5-S8) must be solid BEFORE building the storytelling/log architecture on top of it - confirm/extend that chain first; do not treat it as a placeholder to fill in later. Open questions for the real design pass: (1) do persona/blackboard consumers keep querying a derived snapshot (recommended - cheapest, and the snapshot becomes disposable rather than authored), or move to reasoning over deltas since last read (more powerful, more stateful, larger rewrite of scripts/personas/*.lua's extract() contract); (2) what the log's storage shape is (per-body vs per-corp vs a single interleaved world log; append-only in memory only, or serialised - no serialiser exists in the repo today per PLANETOLOGY.md's own note); (3) how PLANETOLOGY.md's per-body dated lines (currently inline on body_component, 'no serialiser exists... constraint later') become the log's genesis chapter rather than a one-shot report string; (4) how a 'past' game mode actually plays - passive readback vs a played-through interstitial campaign; (5) reconciling with GENERATION_LEDGER.md's already-designed per-tile derivation breadcrumb, which is the same instinct (explain what happened and why) scoped to tuning rather than narrative. Read AI_OPPONENT.md S6 (state export), GENERATION_LEDGER.md, and PLANETOLOGY.md S Presentation before designing."
     }
   ]
 }
