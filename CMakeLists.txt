@@ -345,6 +345,24 @@ target_link_libraries(pregame_balance_harness PRIVATE lua54)
 target_compile_features(pregame_balance_harness PRIVATE cxx_std_20)
 target_compile_options(pregame_balance_harness PRIVATE ${IO_WARNING_FLAGS})
 
+# persona_counsel_harness (BL-207) needs a live sol2/Lua state too — it loads
+# the real scripts/personas/*.lua packs through src/scripting/persona_pack.cpp.
+# Same shape as pregame_balance_harness above: add back the sol2/Lua TU +
+# include dir + lua54 link; the `if(NOT TARGET ...)` guard in the foreach below
+# then skips it while the unconditional add_test still registers it.
+add_executable(persona_counsel_harness
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/persona_counsel_harness.cpp"
+    ${IO_WORLD_SOURCES}
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/persona_pack.cpp"
+)
+target_include_directories(persona_counsel_harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${sol2_src_SOURCE_DIR}/include"
+)
+target_link_libraries(persona_counsel_harness PRIVATE lua54)
+target_compile_features(persona_counsel_harness PRIVATE cxx_std_20)
+target_compile_options(persona_counsel_harness PRIVATE ${IO_WARNING_FLAGS})
+
 file(GLOB IO_VERIFY_HARNESSES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/*.cpp")
 foreach(harness_src ${IO_VERIFY_HARNESSES})
     get_filename_component(harness_name "${harness_src}" NAME_WE)

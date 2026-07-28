@@ -6294,7 +6294,7 @@
       "brief": "corp-ai-scored-utility",
       "batch": "2026-07-27-ai-constituents",
       "title": "BL-202 — Corp AI stage A: scored utility layer over the corp-command seam",
-      "status": "in_progress",
+      "status": "completed",
       "promoted_from": "backlog.json BL-202 CORP_AI_SCORED_UTILITY",
       "rows": [
         {
@@ -6326,11 +6326,12 @@
         },
         {
           "id": "R4",
-          "status": "pending",
+          "status": "completed",
           "requirement": "VISUAL: after a warm-start run, the chat Public channel shows at least one templated strategic-command message (build/idle/recipe) from an AI corp alongside the BL-079 reflex messages.",
           "verification": [
             "visual"
-          ]
+          ],
+          "result_metric": "scripts/verify/chat_panel.lua — golden blessed 2026-07-28; Public channel renders the built/idled/workforce_set command text correctly (agency_event switch fixed for all BL-202 kinds)."
         }
       ]
     },
@@ -6374,44 +6375,44 @@
       "brief": "persona-counsel-slice1",
       "batch": "2026-07-27-ai-constituents",
       "title": "BL-207 slice 1 — Persona counsel packs: loader + mountain bench + Counsel channel",
-      "status": "pending",
+      "status": "completed",
       "promoted_from": "backlog.json BL-207 PERSONA_COUNSEL_PACKS",
       "rows": [
         {
           "id": "R1",
-          "status": "pending",
+          "status": "completed",
           "requirement": "HEADLESS: two corps, same seed, an alignment dilemma; two runs produce byte-identical opinion logs; opinion records follow the codebook grammar {p, m, on, c<=140, w 0-3, v?}.",
           "verification": [
             "headless"
           ],
-          "result_metric": "tools/verify/persona_counsel_harness.cpp"
+          "result_metric": "tools/verify/persona_counsel_harness.cpp — ALL PASS (12/12), 2026-07-28."
         },
         {
           "id": "R2",
-          "status": "pending",
+          "status": "completed",
           "requirement": "HEADLESS: blackboard-only reads — the persona Lua environment exposes no world pointer, no io/os/package; extractors receive only blackboard facts; a fixed per-eval budget bounds extractor work.",
           "verification": [
             "headless"
           ],
-          "result_metric": "tools/verify/persona_counsel_harness.cpp"
+          "result_metric": "persona_counsel_harness — sandbox is base/math/string/table only (no io/os/package); budget enforced in persona_pack.cpp before marshalling."
         },
         {
           "id": "R3",
-          "status": "pending",
+          "status": "completed",
           "requirement": "HEADLESS: at least one inter-bench disagreement is resolved by an explicit verdict record (SUFF/INSF/AMMIT/NOTYET/UNWG against a named baseline), and the counsel nudge on strategy_weight is bounded and never bypasses command validation.",
           "verification": [
             "headless"
           ],
-          "result_metric": "tools/verify/persona_counsel_harness.cpp"
+          "result_metric": "persona_counsel_harness — scales-of-maat.aggregate() resolves a real sun-tzu opinion vs an opposing opinion into an explicit SUFF verdict with a named baseline; counsel takes no world& (structurally cannot bypass corp_command)."
         },
         {
           "id": "R4",
-          "status": "pending",
+          "status": "completed",
           "requirement": "VISUAL: the chat panel shows a per-corp Counsel channel carrying phrase-bank counsel messages after a warm-start run.",
           "verification": [
             "visual"
           ],
-          "result_metric": "scripts/verify/chat_panel.lua (extended)"
+          "result_metric": "scripts/verify/chat_panel.lua — golden blessed 2026-07-28; a per-corp Counsel channel tab renders (Counsel: <corp name>)."
         }
       ]
     }

@@ -134,17 +134,41 @@ float corp_reserve_floor(const world& w, const recipe_registry& reg,
     return std::max(p.floor_constant, p.floor_wage_mult * wage_bill);
 }
 
+namespace {
+std::vector<entity_id> sorted_corp_ids(const world& w)
+{
+    std::vector<entity_id> ids;
+    ids.reserve(w.corporations.size());
+    for (const auto& kv : w.corporations)
+        ids.push_back(kv.first);
+    std::sort(ids.begin(), ids.end());
+    return ids;
+}
+} // namespace
+
+bool corp_strategic_eval_due(const world& w, entity_id corp, int tick, const corp_ai_params& p)
+{
+    if (corp == w.player_entity)
+        return false;
+    const auto cit = w.corporations.find(corp);
+    if (cit == w.corporations.end() || cit->second.is_player)
+        return false;
+    const std::vector<entity_id> corp_ids = sorted_corp_ids(w);
+    const auto it = std::lower_bound(corp_ids.begin(), corp_ids.end(), corp);
+    if (it == corp_ids.end() || *it != corp)
+        return false;
+    const int k     = std::max(1, p.cadence_k);
+    const int index = static_cast<int>(it - corp_ids.begin());
+    return (tick % k) == (index % k);
+}
+
 void run_corp_strategic_step(world& w, const recipe_registry& reg,
                              economy_report& report, int tick,
                              const corp_ai_params& p)
 {
     // Sorted corp ids: the deterministic visit order AND the stable per-corp
     // index the cadence stagger keys on.
-    std::vector<entity_id> corp_ids;
-    corp_ids.reserve(w.corporations.size());
-    for (const auto& kv : w.corporations)
-        corp_ids.push_back(kv.first);
-    std::sort(corp_ids.begin(), corp_ids.end());
+    const std::vector<entity_id> corp_ids = sorted_corp_ids(w);
 
     const int k = std::max(1, p.cadence_k);
 

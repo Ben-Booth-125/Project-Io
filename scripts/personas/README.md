@@ -14,7 +14,8 @@ Required fields:
 - `phrase(finding_or_opinion)` → one in-voice line, selected deterministically (hash, never `math.random`).
 - `failure_condition` (string) — the persona's designed, play-reachable blind spot.
 
-Sandbox rules: no `io`, `os`, `package`, `require`, `math.random`, or clock reads. Packs read
+Sandbox rules: `base`/`math`/`string`/`table` only — no `io`, `os`, `package`, `require`,
+`math.random`, or clock reads. Packs read
 ONLY the blackboard passed in — never world state — and every function is a pure function of its inputs.
 Verdict packs (`scales-of-maat`) additionally expose `aggregate(opinions)` → verdict records
 `{v, on, baseline, c}` resolving inter-persona disagreement against a named baseline.

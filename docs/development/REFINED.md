@@ -36,7 +36,7 @@ focused agents, not a hard disjointness gate. Agents build and commit on their o
 worktree branch; the integrating session merges, builds, and verifies. See
 [`DELIVERY.md`](DELIVERY.md) § Sub-agents & worktrees for the authoritative model.
 
-## AI constituents batch (promoted from backlog.json § BL-202, BL-206, BL-207)
+## AI constituents batch (promoted from backlog.json § BL-202, BL-206, BL-207) — **COMPLETE**
 
 Batch: 2026-07-27-ai-constituents. Requirements: requirements.json §
 corp-ai-scored-utility, blackboard-export, persona-counsel-slice1.
@@ -75,15 +75,15 @@ slice (BL-207 loader + mountain bench + Counsel channel).
   (`C:/Users/benbo/Pantheon/data/personas/*.md`): each exposes
   `extract(blackboard) → findings` and `phrase(finding) → text`; opinion records
   in the codebook grammar; documented failure condition. Parallel-safe vs A.
-- [ ] **C2 — pack loader/runtime.** `src/scripting/persona_pack.{hpp,cpp}`:
+- [x] **C2 — pack loader/runtime.** `src/scripting/persona_pack.{hpp,cpp}`:
   sandboxed sol2 env (no io/os/package, no world pointer), fact-table marshalling,
   fixed per-eval budget, opinion-record collection, scales-of-maat verdict
   aggregation, bounded `strategy_weight` nudge, bench assignment at corp
   generation (mountain bench first). Depends on A4/B1 fact schema + C1.
-- [ ] **C3 — Counsel channel.** Per-corp Counsel channel in `chat_state`;
+- [x] **C3 — Counsel channel.** Per-corp Counsel channel in `chat_state`;
   phrase-bank counsel posts wired in `app.cpp` `step_economy`. Main-session
   hotspot. Depends on C2.
-- [ ] **C4 — persona_counsel_harness.** `tools/verify/persona_counsel_harness.cpp`
+- [x] **C4 — persona_counsel_harness.** `tools/verify/persona_counsel_harness.cpp`
   covering BL-207 R1–R3 (two corps, strong-vs-weak precedent dilemma). Depends on C2.
 
 Parallelisation: roots A1+A2 (one worktree agent — same slice) and C1 (second

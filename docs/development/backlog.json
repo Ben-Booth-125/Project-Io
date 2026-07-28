@@ -4016,7 +4016,7 @@
       "short_name": "CORP_AI_SCORED_UTILITY",
       "category": "Research",
       "title": "Corp AI stage A — scored utility layer over the agency seam, via the corp-command seam",
-      "status": "designed",
+      "status": "landed",
       "glyph": "✓",
       "priority": "S",
       "difficulty": 5,
@@ -4113,6 +4113,63 @@
       ],
       "summary": "Ben's call (2026-07-26): since every rival is AI, inter-corp coordination should happen in a communication medium, not hidden state - corps message publicly or in private groups to form plans; diplomacy is legible messaging (AI_OPPONENT.md §7). The surface: a chat log window replacing the Explorer placeholder (right shell band; pinning was never wired - superseded, not lost). Channels: Public (all corps) + arbitrary player-created groups (any corp subset). FIRST SLICE (landed with this filing, 2026-07-26): the window swap, channel tabs + group creation, and a deterministic agency-event feed - the BL-079 reflex actions (recipe rescue, idle-a-loser) post templated messages to Public via a new agency_event vector on economy_report, making the chat the AI-observability surface immediately. Player message input posts to the selected channel (no mechanical effect yet - the C-route hook). LATER: BL-202 command-stream messages; C-route in-character LLM chat; AI-AI private groups + intercept mechanics (Discovery extension).",
       "design": "Slice 1 model: chat state lives UI-side (app-owned ring buffer + channel/group defs; NOT serialised yet - messages re-derive from deterministic events, groups are session-local; serialisation joins the BL-202 landing when commands become world state). economy_report gains std::vector<agency_event> {corp, building, kind, detail} filled by the BL-079 block - pure derived data, no world mutation, determinism untouched. chat_panel.{hpp,cpp} replaces explorer_panel.{hpp,cpp} in the same shell slot (LAYOUT.md middle-right band). Toggle rule respected: the panel is a fixed shell element like the Explorer was, no rail slot. Requirement: visual check - chat panel renders with channel tabs and at least one agency message after a warm-start run."
+    },
+    {
+      "parked": false,
+      "blocked_on": [],
+      "written": "2026-07-26",
+      "id": "BL-206",
+      "short_name": "CORP_BLACKBOARD_EXPORT",
+      "category": "Development",
+      "title": "Corp blackboard export — dump the visibility-honest state export as versioned text facts",
+      "status": "landed",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 2,
+      "version_goal": "v0.2.0",
+      "requires": [
+        "BL-202"
+      ],
+      "authority_doc": "docs/ai/AI_OPPONENT.md",
+      "files": [
+        "src/main.cpp",
+        "src/world/world.hpp",
+        "src/world/world.cpp",
+        "tools/verify/blackboard_harness.cpp",
+        "docs/ai/AI_OPPONENT.md"
+      ],
+      "summary": "The bridge from sim to text (Ben, 2026-07-26: no good way yet to transform the code into text). A headless flag --export-blackboard <corp|all> [--out <dir>] dumps each corp's §6 visibility-honest state export as JSONL facts — one per line {t(tick), subject, predicate, value, confidence, provenance} — deterministic ordering, schema version stamped per file. Strictly a serialisation of the BL-202 export: no second visibility path exists; any divergence is by definition a fog leak. Consumers: the persona counsel packs (BL-207), the §2C out-of-process LLM planner, external analysis tooling (Pantheon repo).",
+      "design": "One writer, two call sites: the BL-202 per-corp export struct gains a to_jsonl(ostream&) that emits sorted (corp id, subject kind, entity id) fact lines; main.cpp wires the flag to run N warm-up ticks then dump per-corp files (blackboard_<corp>_<tick>.jsonl). Facts carry provenance (own-asset | public-market | rival-visible | survey | route) so consumers can weight by source. Schema version field _v from day one, bumped with the BL-202 export schema. Requirement (headless, tools/verify/blackboard_harness.cpp): (1) two same-seed runs produce byte-identical blackboards; (2) fairness assert — no rival internals (pools, cash, recipes) ever appear in another corp's file, checked against ground-truth world state; (3) a Known-but-unsurveyed body yields activity facts but no tile facts (the two fogs are independent, DISCOVERY.md). Authorise as a verifier-headless check per the tool-creation-is-skill-creation rule."
+    },
+    {
+      "parked": false,
+      "blocked_on": [],
+      "written": "2026-07-26",
+      "id": "BL-207",
+      "short_name": "PERSONA_COUNSEL_PACKS",
+      "category": "Politics",
+      "title": "Persona counsel packs — pre-seeded advisory personas over the corp blackboard (Pantheon import)",
+      "status": "in_progress",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 4,
+      "version_goal": "v0.2.0",
+      "requires": [
+        "BL-202",
+        "BL-205",
+        "BL-206"
+      ],
+      "authority_doc": "docs/ai/AI_OPPONENT.md",
+      "files": [
+        "scripts/personas/",
+        "src/scripting/",
+        "src/world/economy_system.cpp",
+        "src/ui/chat_panel.cpp",
+        "tools/verify/persona_counsel_harness.cpp",
+        "docs/ai/AI_OPPONENT.md"
+      ],
+      "summary": "Imports the Pantheon persona system (external repo C:/Users/benbo/Pantheon: docs/persona-runtime.md is the architecture; data/personas/*.md the 25 voice seeds — 16 Faculty analysts + 9 Embassy diplomats; data/codebook.json v3 the move/verdict grammar). Runtime is LLM-free by construction: each persona compiles offline to a pack — phrase bank (voice), Lua extractors (blackboard facts → findings), policy weights (findings → opinion records + stance nudges), and a designed failure condition (each persona's documented blind spot, reachable by play — beatable through understanding, not handicap). Gives every AI corp a legible advisory cabinet whose counsel posts to the BL-205 chat, and a bounded diplomacy-flavoured bias into the BL-202 scorer. Pairs with §7 stage A (templated deterministic messages) and anticipates stage C without requiring it.",
+      "design": "Packs are moddable data: scripts/personas/<id>.lua (sol2 host), each exposing extract(blackboard) → findings and phrase(finding) → text; opinion records follow the codebook grammar {p, m, on, c (≤140 chars), w 0-3, v?}. Pipeline at the §5 staggered strategic-eval boundary: corp blackboard (BL-206) → seated personas' extractors (fixed per-eval budget) → opinion records → verdict aggregation (scales-of-maat pack: SUFF/INSF/AMMIT/NOTYET/UNWG against a named baseline) → a bounded, transparent nudge on the BL-202 strategy_weight — counsel biases scoring, never bypasses validation (no new verbs, no fog access; the packs read ONLY the blackboard). Bench assignment at corporation generation: each corp seats one Embassy bench (hearth/banner/mountain) consistent with its industrial focus — distinct legible personalities for free (CORPORATION_GENERATION.md premise). Counsel messages render from phrase banks into a per-corp Counsel channel (chat_panel), fully deterministic — §7 stage A discipline. Fairness clauses inherited from persona-runtime.md: blackboard-only reads, fixed compute budget, seeded determinism, exploitability. FIRST SLICE: pack loader + the mountain bench (sun-tzu/amaterasu/krishna) + Counsel channel feed. Requirement (headless, tools/verify/persona_counsel_harness.cpp): two corps, same seed, an alignment dilemma (the strong-vs-weak precedent, Pantheon session 2026-07-26); assert (1) byte-identical opinion logs across two runs, (2) blackboard-only reads (no world pointer in the Lua env), (3) at least one inter-bench disagreement resolved by an explicit verdict record."
     }
   ]
 }

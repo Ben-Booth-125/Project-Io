@@ -34,6 +34,7 @@
 #include "ui/view_nav.hpp"
 #include "world/budget_system.hpp"
 #include "world/construction.hpp"
+#include "world/corp_ai.hpp"
 #include "world/placement_rules.hpp"
 #include "world/survey_system.hpp"
 #include "world/hard_coded_world.hpp"
@@ -438,6 +439,21 @@ void app::load_economy()
     for (auto& [id, b] : m_world.buildings)
         if (b.type == building_type::processing_facility && b.recipe == no_recipe)
             b.recipe = default_recipe;
+
+    // Seat the persona counsel mountain bench (BL-207 slice 1). Every non-player
+    // corp seats the same bench this slice (bench diversity by industrial focus
+    // is later polish); a load failure (missing/malformed pack) disables counsel
+    // rather than aborting the session — the chat's agency-event feed (BL-205)
+    // stands on its own regardless.
+    try
+    {
+        m_persona_bench = persona::load_bench();
+    }
+    catch (const std::exception& e)
+    {
+        std::fprintf(stderr, "ProjectIo: persona counsel packs disabled: %s\n", e.what());
+        m_persona_bench.clear();
+    }
 }
 
 void app::step_economy()
@@ -467,19 +483,92 @@ void app::step_economy()
                 where = std::string(" on ") + boit->second.name;
 
         std::string text;
-        if (ev.what == agency_event::kind::recipe_switch)
+        switch (ev.what)
+        {
+        case agency_event::kind::recipe_switch:
         {
             const recipe* rc = m_registry.get_recipe(ev.new_recipe);
             text = std::string("Switched ") + ui::building_type_name(b.type) + where +
                    " to the " + (rc ? rc->name.c_str() : "?") + " recipe - output price floored.";
+            break;
         }
-        else
-        {
+        case agency_event::kind::idled:
             text = std::string("Idled ") + ui::building_type_name(b.type) + where +
                    " - sustained losses.";
+            break;
+        case agency_event::kind::built:
+            text = std::string("Built a new ") + ui::building_type_name(b.type) + where + ".";
+            break;
+        case agency_event::kind::demolished:
+            text = std::string("Demolished ") + ui::building_type_name(b.type) + where + ".";
+            break;
+        case agency_event::kind::workforce_set:
+            text = std::string("Retargeted ") + ui::building_type_name(b.type) + where +
+                   "'s workforce to " + std::to_string(ev.value) + ".";
+            break;
+        case agency_event::kind::resumed:
+            text = std::string("Resumed ") + ui::building_type_name(b.type) + where + ".";
+            break;
+        case agency_event::kind::road_placed:
+            text = "Laid a tier-" + std::to_string(ev.value) + " road.";
+            break;
+        case agency_event::kind::survey_dispatched:
+            text = "Dispatched a survey.";
+            break;
         }
         ui::chat_post(m_chat, static_cast<int>(m_sim_loop.day_tick()), ev.corp, 0,
                       std::move(text));
+    }
+
+    // Persona counsel (BL-207 slice 1): every corp due at this strategic-eval
+    // boundary gets its seated bench's read of its own blackboard, posted to a
+    // per-corp Counsel channel (lazily created on first use). Counsel is
+    // advisory only — it never touches the world, only the chat log.
+    if (!m_persona_bench.empty())
+    {
+        const int tick = static_cast<int>(m_sim_loop.day_tick());
+        std::vector<entity_id> corp_ids;
+        corp_ids.reserve(m_world.corporations.size());
+        for (const auto& [id, cc] : m_world.corporations)
+            corp_ids.push_back(id);
+        std::sort(corp_ids.begin(), corp_ids.end());
+
+        for (const entity_id corp : corp_ids)
+        {
+            if (!corp_strategic_eval_due(m_world, corp, tick))
+                continue;
+
+            const corp_blackboard bb = export_corp_blackboard(m_world, corp, tick);
+            int channel = -1;
+            if (const auto it = m_counsel_channel.find(corp); it != m_counsel_channel.end())
+                channel = it->second;
+            else
+            {
+                ui::chat_channel ch;
+                const auto cnit = m_world.corporations.find(corp);
+                ch.name = std::string("Counsel: ")
+                        + (cnit != m_world.corporations.end() ? cnit->second.name : "(unknown)");
+                ch.members = { corp, m_world.player_entity };
+                m_chat.channels.push_back(std::move(ch));
+                channel = static_cast<int>(m_chat.channels.size()) - 1;
+                m_counsel_channel[corp] = channel;
+            }
+
+            for (const persona::pack& p : m_persona_bench)
+            {
+                if (p.is_verdict_bench())
+                    continue; // slice 1: renders the hunting benches' reads, not aggregated verdicts yet
+                const std::vector<persona::opinion_record> ops = p.evaluate(bb);
+                if (ops.empty())
+                    continue;
+                // Bound the chat to one line per pack per eval: the heaviest opinion.
+                const persona::opinion_record* top = &ops.front();
+                for (const auto& op : ops)
+                    if (op.w > top->w) top = &op;
+                ui::chat_post(m_chat, tick, corp, channel,
+                             p.id() + ": " + p.phrase_for(*top));
+            }
+        }
     }
 
     // Record player balance, income, and expenditure for the header sparkline and

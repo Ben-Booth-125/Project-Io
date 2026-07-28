@@ -11,6 +11,7 @@
 #include "world/world.hpp"
 
 #include "ui/canvas_command.hpp"
+#include "scripting/persona_pack.hpp"
 #include "ui/chat_panel.hpp"
 #include "ui/plot_history.hpp"
 #include "world/planetology.hpp"
@@ -210,6 +211,8 @@ private:
     tech_tree_registry m_tech_tree;      ///< BL-087 mock tech/quest tree, loaded from Lua at startup; F9 viewer only.
     economy_report  m_last_econ_report;  ///< Most recent economy-step report; read by the economy panel.
     ui::chat_state  m_chat;              ///< Comms log state (BL-205): channels, messages, drafts.
+    std::vector<persona::pack> m_persona_bench; ///< Seated mountain bench (BL-207 slice 1); empty if load_bench() failed.
+    std::unordered_map<entity_id, int> m_counsel_channel; ///< corp -> its lazily-created Counsel chat_channel index.
     uint64_t        m_last_econ_tick = 0; ///< econ_tick() at the previous step; drives the boundary detection in run().
     std::vector<float> m_balance_history;      ///< Recent player balances (one per econ tick, capped); feeds the header net + sparkline.
     std::vector<float> m_income_history;      ///< Recent player income per econ tick (market sales); feeds economy panel graph.

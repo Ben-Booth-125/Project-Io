@@ -53,6 +53,15 @@ float corp_reserve_floor(const world& w, const recipe_registry& reg,
 /// (personality_seed, corp id); constant for the whole campaign.
 float corp_personality_jitter(entity_id corp, uint64_t personality_seed);
 
+/// True when `corp` is due to evaluate at `tick` under the staggered cadence
+/// (sorted-corp-id index % cadence_k == tick % cadence_k) — the same schedule
+/// `run_corp_strategic_step` uses internally. Exposed so callers outside the
+/// scorer (e.g. the persona counsel layer, BL-207) can key their own bounded,
+/// per-eval work to the identical deterministic boundary without duplicating
+/// the corp-sort. Always false for the player corp.
+bool corp_strategic_eval_due(const world& w, entity_id corp, int tick,
+                             const corp_ai_params& p = {});
+
 /// Run the strategic evaluation for every due NON-player corp at `tick`,
 /// emit corp_commands, apply them through apply_corp_command, and record both
 /// the world's decision ring and the report's agency_events. The player's corp
