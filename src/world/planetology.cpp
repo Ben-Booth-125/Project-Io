@@ -361,6 +361,9 @@ const char* archetype_name(body_archetype a)
         case body_archetype::bake_out:       return "Bake-Out";
         case body_archetype::dead_rock:      return "Dead Rock";
         case body_archetype::core_fragment:  return "Core Fragment";
+        case body_archetype::silent_eden:      return "Silent Eden";
+        case body_archetype::rna_lock:         return "RNA Lock";
+        case body_archetype::ferrotroph_world: return "Ferrotroph World";
     }
     return "Unknown";
 }
@@ -395,6 +398,12 @@ const char* archetype_blurb(body_archetype a)
             return "Unweathered ore at the surface, and nothing that ever lived.";
         case body_archetype::core_fragment:
             return "Not a world - a single deposit. Differentiation already did the work.";
+        case body_archetype::silent_eden:
+            return "Oceans, continents, mild weather - and land you cannot farm.";
+        case body_archetype::rna_lock:
+            return "Alive, and permanently simple. The genome never got a ceiling lift.";
+        case body_archetype::ferrotroph_world:
+            return "It never learned to split water. Iron without end, oxygen never.";
     }
     return "";
 }

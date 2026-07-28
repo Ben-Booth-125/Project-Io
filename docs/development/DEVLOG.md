@@ -10,6 +10,66 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## Session — Chemical life: the seven-gate abiogenesis chain designed, vocabulary built (BL-209) (2026-07-28)
+
+**Runtime.** ~1h. Full (design session + foundation slice; design-heavy).
+
+**Context.** Ben's ask: refine the generation layer to log chemistry properly — "from chemical
+synthesis to RNA DNA" — persisted compactly, with canonical chemical names shown to anyone who
+pries into how generation works. Two Q&As were run before writing anything, per Rule 0a.
+
+**What landed.**
+
+- **BL-209 filed and designed** (`designed` ✓, C, difficulty 5, post-v0.1.0, requires BL-167 +
+  BL-208). The starting point was that **S5 Spark is currently one boolean** at
+  `planetology.cpp:780` emitting one history line — all the real chemistry sits in comments.
+  The item promotes it into seven independently-failing gates (Feedstock / Reductant /
+  Phosphorylation / Concentration / Replicator / Compartment / Code).
+- **The photosystem fork** is the design's highest-value piece: it converts PLANETOLOGY.md's own
+  *Known weaknesses* uncertainty — whether banded iron gates on life or on oxygen — from a constant
+  into a generated branch (anoxygenic photoferrotrophy vs the oxygenic Z-scheme, gated on manganese
+  for the Mn4CaO5 complex).
+- **Cross-stage coupling**, which is what makes the chain read as one causal system: S1's late
+  veneer now reaches forward twice, into S5a's impact-reducing atmosphere and S5c's schreibersite
+  phosphorus. That roll previously only touched platinum-group metals.
+- **Foundation code**, deliberately inert — `src/world/chemistry_tables.{hpp,cpp}`: 45 species,
+  26 reactions, an 8-byte fixed-width `molecular_event`, the venue/outcome/substage vocabulary,
+  and the RNA hydrolysis lookup. Nothing in `world/*` references it yet; the trace's *storage*
+  belongs to BL-208's append-only log, so the vocabulary can land ahead of it without wiring.
+- **Three archetypes appended** to `body_archetype` (13 → 16): Silent Eden, RNA Lock, Ferrotroph
+  World, with names and blurbs. Appended, never inserted — the ids are a save-format value.
+- **Verification.** New `tools/verify/chemistry_tables_harness.cpp` (auto-registers as a CTest via
+  the existing glob): R12a record shape, **R12b no orphan ids** (the key new invariant — ids and
+  display names are now decoupled by design, so nothing else catches table drift), R12c names never
+  ids, R12d the half-life curve, R12e the threshold biting inside the Lost City band. ALL PASS.
+  `planetology_harness` re-run for regression on the archetype edits: ALL PASS, no drift.
+
+**In-session decisions.**
+
+- **`life_stage` left untouched**, and a separate `abiogenesis_depth` enum added instead. Every
+  resource rule in the model is a `>=` test on `life_stage`; inserting new rungs would renumber it
+  and silently move those tests. Everything below `cellular` maps to `prebiotic`, so the economy is
+  unaffected while the history gains seven distinguishable endings.
+- **Hex is a display encoding, not storage.** Ben's compression instinct was right but lands on the
+  id/table split rather than on hex: an event stores ids, stoichiometry lives in a compiled-in
+  table, and hex text is ~2x binary. Both the inspector and any future player surface decode
+  through the same table, so names cannot drift from ids.
+- **The kinetic-network depth was rejected outright.** Arrhenius rates are pure exponentials in gate
+  paths, which PLANETOLOGY.md § Determinism & cost bans — so `rna_half_life_hours` is a 16-entry
+  table over 0–150 C with linear interpolation, on the precedent of the radiogenic decay bins.
+- **Harness group renumbered R9 → R12** — `planetology_harness` already uses R9–R11 for endemic goods.
+- **PLANETOLOGY.md deliberately not edited.** Per the authority-time-slice rule, the design lives in
+  the item until the work lands.
+
+**Open.** Manganese is not currently derived anywhere and S6b needs it (recommend a crustal-Mn
+scalar from metallicity × crustal reworking). S5f Compartment is the weakest gate on the
+name-the-decision test and is flagged as first to cut. Ferrotroph World may be indistinguishable
+from Mat World to a player — fold it if tuning cannot separate them. R4 and R5 will need
+re-baselining when the gates actually land. Whether to add `chemistry_tables_harness` to the
+`verifier-headless` skill's harness list needs Ben's authorisation.
+
+---
+
 ## Session — AI architecture accepted, comms chat log lands (BL-199 closed, BL-205 slice 1) (2026-07-26)
 
 **Runtime.** ~2h. Full (design session + one implementation slice; doc-heavy).

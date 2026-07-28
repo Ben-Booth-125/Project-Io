@@ -78,6 +78,37 @@ enum class body_archetype : uint8_t
     bake_out,       ///< Tidal runaway — resurfaced, volatile-stripped. Io.
     dead_rock,      ///< Never held air. Luna, Mercury.
     core_fragment,  ///< Differentiated then stripped. The object IS the ore body.
+
+    // --- Added by BL-209 (the molecular event trace) ------------------------
+    // APPENDED, never inserted: these ids are a save-format value and a
+    // determinism input, so existing archetypes must keep their numbers.
+    // None of the three is produced yet — the S5/S6 gates that reach them are
+    // the implementation work. See backlog.json § BL-209.
+    silent_eden,      ///< Died at S5c or S5e on an otherwise perfect world.
+    rna_lock,         ///< Died at S5g. Real life, permanently simple.
+    ferrotroph_world, ///< Died at S6b. Unbounded banded iron, and no oxygen ever.
+};
+
+/// How far the abiogenesis chain actually got, gate by gate.
+///
+/// A SEPARATE AXIS FROM `life_stage`, deliberately. `life_stage` is the
+/// ECONOMIC gate — every resource rule in the model is a `>=` test on it, and
+/// inserting new rungs would renumber it and silently move those tests. This
+/// enum answers a different question: not "what can this world grow?" but "how
+/// far did its chemistry climb before it stopped?".
+///
+/// Everything below `cellular` maps to `life_stage::prebiotic`, so the resource
+/// model is untouched while the history gains seven distinguishable endings.
+enum class abiogenesis_depth : uint8_t
+{
+    none = 0,      ///< No organic feedstock ever formed. S5a.
+    feedstock,     ///< HCN and formaldehyde present, no free energy. S5b.
+    reductant,     ///< Energy and gradient, no reactive phosphorus. S5c.
+    nucleotides,   ///< Monomers made, never concentrated enough to link. S5d.
+    polymers,      ///< Chains formed, nothing copied itself — or heat erased it. S5e.
+    replicators,   ///< Copying, but no compartment and so no individuality. S5f.
+    cellular,      ///< Cells, held under the RNA-world genome ceiling. S5g.
+    coded,         ///< DNA, proofreading, and a genome that can grow.
 };
 
 /// One dated line of a body's history. `event` is the left column (what
