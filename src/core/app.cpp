@@ -1273,13 +1273,13 @@ int app::run_verify(const std::string& script_path, bool bless)
             { m_ui.selected_entity = tid; m_ui.selection_hidden_for = null_entity; break; }
     });
     v.set_function("dismiss_selection", [this]() {
-        // Test hook for the sticky card's dismiss path (BL-194) — the x button
+        // Test hook for the Selection band's dismiss path (BL-194) — the x button
         // and Esc both hide the current selection this same way; no key-event
         // injection exists in the headless harness, so this is the equivalent.
         m_ui.selection_hidden_for = m_ui.selected_entity;
     });
     v.set_function("card_drill", [this]() {
-        // Drive the sticky card's resource drill-down (BL-196) for the currently
+        // Drive the Selection band's resource drill-down (BL-196) for the currently
         // selected tile — the equivalent of clicking a resource graph, since no
         // click injection exists headless. Drills the tile's first deposited
         // resource and requests lazy tracking of it (BL-198). Returns the resource
@@ -3167,15 +3167,13 @@ void app::render()
     // Left navigation pane and the menus it opens. Starts below the profile.
     ui::draw_nav_pane(m_ui, ui::profile_panel_height);
 
-    // A *new* entity selection closes any open fold-out ledger so the selection takes
-    // the column (SELECTION.md). Run BEFORE the ledgers draw this frame — otherwise a
-    // selection made while a ledger is open double-draws both (ledger, then selection
-    // after the close) for one frame, a visible ghost.
+    // A *new* entity selection no longer competes with the fold-out ledgers for
+    // screen space (BL-213 — the Selection band lives in its own fixed rect at
+    // the bottom of the screen, sandwiched between the shell column and the
+    // right chrome column), so selecting something leaves whatever ledger is
+    // open untouched. Only the drill-down stack still resets on a new selection.
     if (m_ui.selected_entity != m_prev_selection)
     {
-        if (m_ui.selected_entity != null_entity &&
-            m_ui.selected_entity != m_ui.selection_hidden_for)
-            ui::close_all_panels(m_ui); // new selection takes the column
         m_ui.card_stack.clear();        // a new selection resets any drill-down (BL-196)
         m_ui.card_resource_page = 0;    // ...and its resource accordion page
         m_prev_selection = m_ui.selected_entity;
@@ -3202,24 +3200,23 @@ void app::render()
     }
     ui::draw_corporation_panel(m_world, m_ui, m_ui.show_corporation_panel);
 
-    // Sticky detail card (BL-194/195) — click-opened, canvas-confined; the SOLE
-    // home of the Selection content now (the former fold-out Selection panel is
-    // gone; the shell column is ledgers-only). Coexists with the transient hover
-    // card. Drawn after the other chrome so it z-orders on top of it. Confined to
-    // the free canvas rect — clear of the shell column (left), the header (top),
-    // and the right chrome column (time panel / minimap) — so it never overlaps
-    // chrome (SELECTION.md § Placement).
+    // Selection band (BL-213 — supersedes the BL-194/195 Selection band) — a FIXED
+    // rect at the bottom of the screen, sandwiched between the shell column and
+    // the right chrome column, which both run the full screen height either
+    // side of it (Ben, 2026-07-28). It no longer follows the click position and
+    // no longer competes with the fold-out ledgers for the column. Drawn after
+    // the other chrome so it z-orders on top of it.
     {
-        const float  col_w        = ui::shell_column_width(disp.x);
-        const float  right_edge   = disp.x - margin - mm_w; // left edge of the right chrome column
-        const ImVec2 card_origin  = { col_w, ui::profile_panel_height };
-        const ImVec2 card_region  = { std::max(0.0f, right_edge - col_w),
-                                      std::max(0.0f, disp.y - ui::profile_panel_height) };
+        const float  col_w      = ui::shell_column_width(disp.x);
+        const float  right_edge = disp.x - margin - mm_w; // left edge of the right chrome column
+        const ImVec2 band_origin = { col_w, disp.y - ui::selection_band_height };
+        const ImVec2 band_size   = { std::max(0.0f, right_edge - col_w),
+                                     ui::selection_band_height };
         const ui::resource_history_view rhist{ &m_body_resource_hist,
                                                &m_tile_resource_hist,
                                                &m_resource_hist_days };
-        ui::draw_selection_card(m_world, m_registry, m_last_econ_report, rhist, m_ui,
-                                card_origin, card_region);
+        ui::draw_selection_band(m_world, m_registry, m_last_econ_report, rhist, m_ui,
+                                band_origin, band_size);
     }
 
     // The shell fold-out column is ledgers-only (BL-195). The one contextual, per-

@@ -14,21 +14,8 @@ namespace ui {
 
 namespace {
 
-constexpr float kCardWidth = 470.0f; ///< Fixed card width (px) — ~130% of the original 360 (Ben's 2026-07-23 call), so the hex neighbourhood + action strip breathe.
-constexpr float kCardMaxH  = 480.0f; ///< Height cap; the real height is min(this, room in the canvas rect).
-constexpr float kCardMinH  = 240.0f; ///< Below this the tile layout's bands (hex render + accordion) collide.
-constexpr float kPad       = 10.0f;
-constexpr float kRounding  = 6.0f;
-constexpr float kMargin    = 12.0f; ///< Clearance kept from every canvas edge.
-
-// Clamp @p v to [lo, hi], tolerating an inverted range (hi < lo) by pinning to lo —
-// a canvas rect narrower than the card can't satisfy both edges, so bias to the
-// origin (top-left) rather than produce a NaN-ish flip.
-float clamp_lo(float v, float lo, float hi)
-{
-    if (hi < lo) return lo;
-    return std::clamp(v, lo, hi);
-}
+constexpr float kPad      = 10.0f;
+constexpr float kRounding = 6.0f;
 
 // The drill-down view (BL-196): a resource time-series chart for the top stack
 // frame — the aggregate (its body's total of that resource) as columns on the left
@@ -171,14 +158,14 @@ void draw_resource_drill(const world& w, const resource_history_view& hist, ui_s
 
 } // namespace
 
-void draw_selection_card(world& w, const recipe_registry& reg,
+void draw_selection_band(world& w, const recipe_registry& reg,
                          const economy_report& report,
                          const resource_history_view& history, ui_state& ui,
-                         ImVec2 canvas_origin, ImVec2 canvas_size)
+                         ImVec2 band_origin, ImVec2 band_size)
 {
     // Open iff a valid entity is selected and this selection was not dismissed.
     // This is the whole open/closed model — "stuck" and "selected" are one state
-    // (SELECTION.md § Click model). The card owns the gate so the content function
+    // (SELECTION.md § Click model). The band owns the gate so the content function
     // itself never has to re-check selection_hidden_for.
     const entity_id sel = ui.selected_entity;
     if (sel == null_entity || sel == ui.selection_hidden_for)
@@ -186,36 +173,16 @@ void draw_selection_card(world& w, const recipe_registry& reg,
     if (selection_kind_of(w, sel) == selection_kind::none)
         return; // stale id — nothing to show
 
-    // ── Size ──
-    // The card is a fixed width and a height that fits the room the canvas rect
-    // leaves. A defined height is required: the tile layout reserves its action
-    // grid from GetContentRegionAvail().y, so an auto-resize window would collapse it.
-    const float card_w = std::min(kCardWidth, std::max(0.0f, canvas_size.x - 2.0f * kMargin));
-    const float room_h = canvas_size.y - 2.0f * kMargin;
-    const float card_h = std::clamp(kCardMaxH, kCardMinH, std::max(kCardMinH, room_h));
-
-    // ── Placement ──
-    // Freeze-centred on the click anchor, clamped so the whole card stays inside the
-    // canvas rect. The {-1,-1} sentinel (a programmatic selection with no click)
-    // centres the card on the canvas — the deterministic path for headless capture.
-    const bool   anchored = ui.card_anchor.x >= 0.0f && ui.card_anchor.y >= 0.0f;
-    const ImVec2 centre   = anchored
-        ? ui.card_anchor
-        : ImVec2{ canvas_origin.x + canvas_size.x * 0.5f,
-                  canvas_origin.y + canvas_size.y * 0.5f };
-
-    const float x_lo = canvas_origin.x + kMargin;
-    const float x_hi = canvas_origin.x + canvas_size.x - kMargin - card_w;
-    const float y_lo = canvas_origin.y + kMargin;
-    const float y_hi = canvas_origin.y + canvas_size.y - kMargin - card_h;
-    const ImVec2 pos = { clamp_lo(centre.x - card_w * 0.5f, x_lo, x_hi),
-                         clamp_lo(centre.y - card_h * 0.5f, y_lo, y_hi) };
-
-    ImGui::SetNextWindowPos(pos, ImGuiCond_Always);
-    ImGui::SetNextWindowSize({ card_w, card_h }, ImGuiCond_Always);
+    // ── Placement (BL-213) ──
+    // Fixed: fills the exact rect the caller computed (bottom band, between the
+    // shell column and the right chrome column). No click-anchoring, no
+    // clamping — the band is always the same rect regardless of where the
+    // selecting click landed.
+    ImGui::SetNextWindowPos(band_origin, ImGuiCond_Always);
+    ImGui::SetNextWindowSize(band_size, ImGuiCond_Always);
     ImGui::SetNextWindowBgAlpha(0.96f);
 
-    // Inputs are ALLOWED (unlike the transient hover card): the card hosts action
+    // Inputs are ALLOWED (unlike the transient hover card): the band hosts action
     // buttons routed through the deferred pending_* seams. No title bar / move /
     // resize / scroll — the content owns its own inner scroll regions.
     const ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar
@@ -231,7 +198,7 @@ void draw_selection_card(world& w, const recipe_registry& reg,
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, kRounding);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding,  { kPad, kPad });
 
-    if (ImGui::Begin("##selection_card", nullptr, flags))
+    if (ImGui::Begin("##selection_band", nullptr, flags))
     {
         // A non-empty drill stack shows the drilled view (a resource time-series
         // chart, BL-196) in place of the root selection content.
@@ -245,7 +212,7 @@ void draw_selection_card(world& w, const recipe_registry& reg,
     ImGui::PopStyleVar(2);
 
     // NB: Esc is handled by app.cpp (it must take precedence over the system-menu
-    // toggle, and unwind the drill stack one level in BL-196). The card does not
+    // toggle, and unwind the drill stack one level in BL-196). The band does not
     // consume Esc itself — doing so would double-fire with the app's SDL handler.
 }
 

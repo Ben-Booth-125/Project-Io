@@ -83,11 +83,12 @@ float top_decile_production(const world& w, std::size_t r)
 // ceiling spans the taller column.
 void draw_production_chart(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
                            float tile_val, float pct_val, float ceiling,
-                           ImU32 tile_col, ImU32 pct_col)
+                           ImU32 tile_col, ImU32 pct_col,
+                           const char* ref_label = "Top 10%")
 {
     const ui::charts::bar bars[2] = {
         { tile_val, tile_col, "Tile",    false },
-        { pct_val,  pct_col,  "Top 10%", false },
+        { pct_val,  pct_col,  ref_label, false },
     };
     ui::charts::draw_bars(dl, mn, mx, bars, 2, ceiling, "%.1f", 34.0f);
 }
@@ -539,6 +540,14 @@ void glyph_clock(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
     dl->AddLine(c, {c.x + r * 0.42f, c.y + r * 0.08f}, col, 2.0f);
 }
 
+// A faint dot — the neutral "nothing assigned yet" glyph for a reserved slot
+// in the 3x2 action grid (BL-213 follow-up, 2026-07-28: the grid grew from 4
+// actions to 6 slots; two have no action yet).
+void glyph_reserved(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
+{
+    dl->AddCircle(c, r * 0.30f, col, 12, 1.5f);
+}
+
 // A square icon button: an ImGui::Button frame with a glyph drawn over it and a
 // hover tooltip (Ben's call: icons, text only on hover). Disabled buttons dim the
 // glyph and show the reason. Returns true only on an enabled click.
@@ -595,98 +604,94 @@ void draw_tile_selection(world& w, ui_state& ui)
     }
     ImGui::Separator();
 
-    // Reserve the bottom third for the resource graphs; the middle band takes the rest.
+    // Three columns spanning the full band width (Ben, 2026-07-28): 1/4 for the
+    // zoomed hex neighbourhood, 1/2 for a paged metric ACCORDION (one titled
+    // graph at a time — every deposited resource, plus the tile's own
+    // habitability/hazard scalars, so there's more to see here than a single
+    // resource), and 1/4 for a bigger 3x2 action-button grid. Supersedes the
+    // earlier layout (hex+strip band over a full-width bottom accordion).
     const float total_h  = ImGui::GetContentRegionAvail().y;
-    const float bottom_h = std::max(96.0f, total_h * 0.34f);
-    const float mid_h    = std::max(80.0f, total_h - bottom_h - style.ItemSpacing.y);
+    const float spacing  = style.ItemSpacing.x;
+    const float left_w   = avail * 0.25f;
+    const float right_w  = avail * 0.25f;
+    const float center_w = std::max(80.0f, avail - left_w - right_w - 2.0f * spacing);
 
-    // ── Middle band: zoomed hex neighbourhood (left) + icon action strip (right) ──
-    const float strip_w = frame_h * 1.45f;
-    const float hex_w   = std::max(60.0f, avail - strip_w - style.ItemSpacing.x);
+    constexpr ImU32 tile_col = IM_COL32(150, 235, 160, 255); // this tile's value (green)
+    constexpr ImU32 ref_col  = IM_COL32(150, 160, 190, 255); // reference value (muted)
+
+    // ── Left quarter: zoomed hex neighbourhood ──
     {
         const ImVec2 p  = ImGui::GetCursorScreenPos();
-        const ImVec2 mx = {p.x + hex_w, p.y + mid_h};
+        const ImVec2 mx = {p.x + left_w, p.y + total_h};
         dl->AddRectFilled(p, mx, IM_COL32(16, 18, 24, 255), 3.0f);
-        draw_tile_neighbourhood(dl, w, sel, p, {hex_w, mid_h}, /*radius=*/2);
+        draw_tile_neighbourhood(dl, w, sel, p, {left_w, total_h}, /*radius=*/2);
         dl->AddRect(p, mx, IM_COL32(90, 90, 100, 255), 3.0f);
-        ImGui::Dummy({hex_w, mid_h});
+        ImGui::Dummy({left_w, total_h});
     }
     ImGui::SameLine();
+
+    // ── Centre half: paged metric accordion ──
+    // Pages: every deposited resource (tile production vs. the top-decile tile
+    // for that resource, as before), THEN the tile's own habitability and hazard
+    // (already tracked per-tile — tile_inspector.cpp's table carries the same
+    // two columns — vs. this body's average, so a barren tile still has
+    // something to page through). Atmospheric pollution and per-tile population
+    // are NOT modelled today (population lives on population centres, not
+    // arbitrary tiles), so they have no page here yet — noted, not faked.
     {
-        ImGui::BeginChild("##tile_strip", {strip_w, mid_h}, false,
+        struct metric_page
+        {
+            std::string label;
+            float       tile_val;
+            float       ref_val;
+            const char* ref_label;
+            float       ceiling;
+            int         resource_index; // -1 = not drillable (no time-series history kept)
+        };
+        std::vector<metric_page> pages;
+
+        std::vector<std::size_t> deposits;
+        for (std::size_t r = 0; r < resource_count; ++r)
+            if (tile.resource_deposit[r] > 0.0f)
+                deposits.push_back(r);
+        for (std::size_t r : deposits)
+        {
+            const float a   = tile_production(tile, r);
+            const float p90 = top_decile_production(w, r);
+            const resource_presentation& rp = presentation_of(static_cast<resource_type>(r));
+            pages.push_back({ rp.name, a, p90, "Top 10%",
+                              nice_ceil(std::max(a, p90) > 0.0f ? std::max(a, p90) : 1.0f),
+                              static_cast<int>(r) });
+        }
+        {
+            float sum_hab = 0.0f, sum_haz = 0.0f;
+            int   n = 0;
+            for (const auto& [id, t] : w.tiles)
+                if (t.body == tile.body) { sum_hab += t.habitability; sum_haz += t.hazard_level; ++n; }
+            const float avg_hab = n > 0 ? sum_hab / static_cast<float>(n) : 0.0f;
+            const float avg_haz = n > 0 ? sum_haz / static_cast<float>(n) : 0.0f;
+            pages.push_back({ "Habitability", tile.habitability, avg_hab, "Body avg", 1.0f, -1 });
+            pages.push_back({ "Hazard",       tile.hazard_level, avg_haz, "Body avg", 1.0f, -1 });
+        }
+
+        ImGui::BeginChild("##tile_accordion", {center_w, total_h}, true,
                           ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
-        const float bsz  = strip_w;
-        const ImVec2 sz  = {bsz, bsz};
 
-        // Construct — opens the tile construction ledger (BL-162).
-        if (tile_icon_button("##act_construct", sz, /*enabled=*/true,
-                             "Construct buildings", glyph_hammer))
-            ui.show_build_ledger = true;
-
-        // Manage — enabled only when a building occupies this tile; selecting it
-        // switches the card to the building layout next frame.
-        entity_id bld_here = null_entity;
-        for (const auto& [bid, bc] : w.buildings)
-            if (bc.tile == sel) { bld_here = bid; break; }
-        if (tile_icon_button("##act_manage", sz, bld_here != null_entity,
-                             bld_here != null_entity ? "Manage building" : "No building here",
-                             glyph_gear) &&
-            bld_here != null_entity)
-        {
-            ui.selected_entity      = bld_here;
-            ui.selection_hidden_for = null_entity;
-        }
-
-        // History / Supply — drawn for layout completeness, not yet wired.
-        tile_icon_button("##act_history", sz, /*enabled=*/false,
-                         "History (not yet available)", glyph_clock);
-        if (ImGui::Button("##act_supply", sz)) { /* stub */ }
-        {
-            const ImVec2 sp = ImGui::GetItemRectMin();
-            ui::icons::supply(ImGui::GetWindowDrawList(),
-                              {sp.x + bsz * 0.5f, sp.y + bsz * 0.5f}, bsz * 0.5f,
-                              IM_COL32(110, 110, 116, 255));
-            if (ImGui::IsItemHovered())
-                ImGui::SetTooltip("Supply (not yet available)");
-        }
-        ImGui::EndChild();
-    }
-
-    // ── Bottom third: resource ACCORDION — one graph at a time, paged ‹ › ──
-    // (Ben's 2026-07-23: page through the tile's resources rather than infinite-scroll.)
-    constexpr ImU32 tile_col = IM_COL32(150, 235, 160, 255); // this tile's production (green)
-    constexpr ImU32 p90_col  = IM_COL32(150, 160, 190, 255); // top-decile reference (muted)
-
-    // The tile's deposited resources, in enum order.
-    std::vector<std::size_t> deposits;
-    for (std::size_t r = 0; r < resource_count; ++r)
-        if (tile.resource_deposit[r] > 0.0f)
-            deposits.push_back(r);
-
-    ImGui::BeginChild("##tile_accordion", {avail, bottom_h}, false,
-                      ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
-    if (deposits.empty())
-    {
-        ImGui::TextDisabled("No deposits");
-    }
-    else
-    {
-        int&              page = ui.card_resource_page;
-        const int         n    = static_cast<int>(deposits.size());
+        int&      page = ui.card_resource_page;
+        const int n    = static_cast<int>(pages.size());
         page = std::clamp(page, 0, n - 1);
-        const std::size_t r    = deposits[static_cast<std::size_t>(page)];
-        const resource_presentation& rp = presentation_of(static_cast<resource_type>(r));
+        const metric_page& mp = pages[static_cast<std::size_t>(page)];
 
-        // Pager row: ‹  Resource (i/N)  ›
+        // Pager row: ‹  Metric (i/N)  ›
         const float aw = ImGui::GetContentRegionAvail().x;
         ImGui::BeginDisabled(page == 0);
         if (ImGui::ArrowButton("##res_prev", ImGuiDir_Left)) --page;
         ImGui::EndDisabled();
         if (ImGui::IsItemHovered() && page > 0)
-            ImGui::SetTooltip("Previous resource");
+            ImGui::SetTooltip("Previous");
 
         char hdr[64];
-        std::snprintf(hdr, sizeof hdr, "%s  (%d/%d)", rp.name, page + 1, n);
+        std::snprintf(hdr, sizeof hdr, "%s  (%d/%d)", mp.label.c_str(), page + 1, n);
         const float name_w = ImGui::CalcTextSize(hdr).x;
         ImGui::SameLine(std::max(frame_h + style.ItemSpacing.x, (aw - name_w) * 0.5f));
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", hdr);
@@ -696,37 +701,96 @@ void draw_tile_selection(world& w, ui_state& ui)
         if (ImGui::ArrowButton("##res_next", ImGuiDir_Right)) ++page;
         ImGui::EndDisabled();
         if (ImGui::IsItemHovered() && page < n - 1)
-            ImGui::SetTooltip("Next resource");
+            ImGui::SetTooltip("Next");
 
-        // The single current resource's graph, filling the rest of the band. Clicking
-        // it drills into its time series (BL-196). A descriptive tooltip explains what
-        // the two bars are — not just "<resource> over time".
-        const float a       = tile_production(tile, r);
-        const float p90     = top_decile_production(w, r);
-        const float peak    = std::max(a, p90);
-        const float ceiling = nice_ceil(peak > 0.0f ? peak : 1.0f);
-
+        // The current page's graph, filling the rest of the container. Deposited
+        // resources are click-drillable into their time series (BL-196);
+        // habitability/hazard are not — no per-tile history is tracked for them
+        // yet, so the click target is skipped rather than faked.
         ImGui::Spacing();
         const ImVec2 p  = ImGui::GetCursorScreenPos();
         const float  cw = ImGui::GetContentRegionAvail().x;
         const float  gh = std::max(48.0f, ImGui::GetContentRegionAvail().y - 4.0f);
-        if (ImGui::InvisibleButton("##res_chart", {cw, gh}))
+        const bool   drillable = mp.resource_index >= 0;
+        if (drillable)
         {
-            const bool dup = !ui.card_stack.empty() &&
-                             ui.card_stack.back().tile == sel &&
-                             ui.card_stack.back().resource == static_cast<int>(r);
-            if (!dup && ui.card_stack.size() < 20)
-                ui.card_stack.push_back({sel, static_cast<int>(r)});
-            ui.card_track_tile = sel;
+            if (ImGui::InvisibleButton("##res_chart", {cw, gh}))
+            {
+                const bool dup = !ui.card_stack.empty() &&
+                                 ui.card_stack.back().tile == sel &&
+                                 ui.card_stack.back().resource == mp.resource_index;
+                if (!dup && ui.card_stack.size() < 20)
+                    ui.card_stack.push_back({sel, mp.resource_index});
+                ui.card_track_tile = sel;
+            }
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s: this tile yields %.1f vs %.1f for a top-10%% tile.\n"
+                                  "Click for its history over time.",
+                                  mp.label.c_str(), static_cast<double>(mp.tile_val),
+                                  static_cast<double>(mp.ref_val));
         }
-        if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s: this tile yields %.1f vs %.1f for a top-10%% tile.\n"
-                              "Click for its history over time.",
-                              rp.name, static_cast<double>(a), static_cast<double>(p90));
+        else
+        {
+            ImGui::Dummy({cw, gh}); // reserve the same space; no drill-down yet
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("%s: %.2f vs %.2f %s.\nNo time-series history tracked for this yet.",
+                                  mp.label.c_str(), static_cast<double>(mp.tile_val),
+                                  static_cast<double>(mp.ref_val), mp.ref_label);
+        }
         draw_production_chart(ImGui::GetWindowDrawList(), p, {p.x + cw, p.y + gh},
-                              a, p90, ceiling, tile_col, p90_col);
+                              mp.tile_val, mp.ref_val, mp.ceiling, tile_col, ref_col,
+                              mp.ref_label);
+
+        ImGui::EndChild();
     }
-    ImGui::EndChild();
+    ImGui::SameLine();
+
+    // ── Right quarter: bigger 2x3 action-button grid (Ben, 2026-07-28 — up from
+    // a thin vertical icon strip; 2 columns x 3 rows rather than 3x2, since the
+    // quarter-width column is too narrow for 3 across to read as "bigger" —
+    // 2 wide gives chunkier buttons in the same slot count). Two slots are
+    // reserved: only four actions exist today (Construct, Manage, History,
+    // Supply), and the grid's shape should not have to change when a
+    // fifth/sixth lands. ──
+    {
+        ImGui::BeginChild("##tile_actions", {right_w, total_h}, false,
+                          ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
+        const float  bw  = (right_w - spacing) / 2.0f;
+        const float  bh  = (total_h - 2.0f * spacing) / 3.0f;
+        const ImVec2 bsz = {bw, bh};
+
+        // Construct — opens the tile construction ledger (BL-162).
+        if (tile_icon_button("##act_construct", bsz, /*enabled=*/true,
+                             "Construct buildings", glyph_hammer))
+            ui.show_build_ledger = true;
+        ImGui::SameLine();
+
+        // Manage — enabled only when a building occupies this tile; selecting it
+        // switches the band to the building layout next frame.
+        entity_id bld_here = null_entity;
+        for (const auto& [bid, bc] : w.buildings)
+            if (bc.tile == sel) { bld_here = bid; break; }
+        if (tile_icon_button("##act_manage", bsz, bld_here != null_entity,
+                             bld_here != null_entity ? "Manage building" : "No building here",
+                             glyph_gear) &&
+            bld_here != null_entity)
+        {
+            ui.selected_entity      = bld_here;
+            ui.selection_hidden_for = null_entity;
+        }
+
+        tile_icon_button("##act_history", bsz, /*enabled=*/false,
+                         "History (not yet available)", glyph_clock);
+        ImGui::SameLine();
+        tile_icon_button("##act_supply", bsz, /*enabled=*/false,
+                         "Supply (not yet available)", ui::icons::supply);
+
+        tile_icon_button("##act_reserved1", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
+        ImGui::SameLine();
+        tile_icon_button("##act_reserved2", bsz, /*enabled=*/false, "Reserved", glyph_reserved);
+
+        ImGui::EndChild();
+    }
 }
 
 // --- The building Selection element (Ben's 2026-07-22 review) ----------------

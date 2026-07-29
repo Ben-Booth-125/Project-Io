@@ -222,7 +222,7 @@ private:
 
     // Resource-deposit time series (BL-198) — app-owned, capped, UNSERIALISED (like
     // the balance history: outside the save seam, so no format change and no
-    // determinism risk; survives the session only). Feeds the sticky card's
+    // determinism risk; survives the session only). Feeds the Selection band's
     // resource drill-down chart (BL-196/197). The body aggregate is recorded every
     // econ tick; a tile's own series only from the first drill-down into it (lazy).
     ui::resource_history          m_body_resource_hist;  ///< Σ remaining deposit per body per resource, one sample/tick (always).

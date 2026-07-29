@@ -222,7 +222,7 @@ struct ui_state
     int       hover_ticks    = 0;           ///< Consecutive frames of stable hover over hovered_entity; resets on entity change. Governs the transient glance (draw_hover_card).
 
     // --- dwell-to-open state (BL-200) ---
-    // A second opener for the sticky detail card, alongside the click: holding the
+    // A second opener for the Selection band, alongside the click: holding the
     // pointer STILL over an entity fills a bar at the cursor and then opens the card.
     // Distinct from hover_ticks — this timer advances only while the mouse is still
     // (movement past kDwellJitterPx resets it), which is the anti-bombardment gate
@@ -231,15 +231,7 @@ struct ui_state
     ImVec2 dwell_anchor { -1.0f, -1.0f }; ///< Pointer position where the current stillness began; reset when the pointer moves beyond the jitter radius.
     int    dwell_ticks  = 0;              ///< Consecutive still frames over hovered_entity; drives the dwell-to-open bar and auto-open.
 
-    // --- sticky detail card (BL-194/195) ---
-    // The click-opened card (selection_card.cpp) freezes at the click position and
-    // centres there, clamped to the canvas. Captured at the canvas select-click; a
-    // programmatic selection (verify harness, post-build auto-select) leaves the
-    // sentinel {-1,-1}, which the card reads as "no anchor → centre on the canvas".
-    // Frozen (not the live mouse) so the card stays put once opened, per SELECTION.md.
-    ImVec2 card_anchor { -1.0f, -1.0f };
-
-    // --- sticky card recursive drill-down (BL-196) ---
+    // --- selection band recursive drill-down (BL-196) ---
     // One drilled frame: a resource time-series view opened from a tile card's
     // per-resource graph. The card shows a STACK of these over the root selection
     // (empty = the root). Esc / the card's back button pop one; at the root a

@@ -9,7 +9,7 @@
 // Shared hex-surface rendering primitives.
 //
 // The terrain palette and hex geometry the Planetary canvas draws with, lifted
-// out of body_surface_canvas.cpp so a second surface — the sticky detail card's
+// out of body_surface_canvas.cpp so a second surface — the Selection band's
 // zoomed tile-neighbourhood view (BL-194) — renders identical hexes rather than
 // a second palette that drifts from the canvas. The canvas includes this header
 // and no longer defines its own copies.

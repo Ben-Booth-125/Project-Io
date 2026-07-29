@@ -44,7 +44,7 @@ constexpr float kMaxZoom         = 20.0f;
 constexpr float kMinZoom         = 1.0f / (kMinZoomHeadroom * kFitMargin); // ~0.877
 
 // terrain_colour, hex_vertices, and hex_local_centre now live in ui/hex_render.hpp
-// (shared with the sticky card's zoomed tile-neighbourhood view, BL-194) so both
+// (shared with the Selection band's zoomed tile-neighbourhood view, BL-194) so both
 // surfaces draw from one terrain palette and one hex geometry rather than diverging.
 
 /// Per-channel linear blend of two opaque colours: result = a·(1−t) + b·t, alpha
@@ -2158,7 +2158,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             ++state.hover_ticks;
         }
 
-        // Dwell-to-open (BL-200). A second opener for the sticky card alongside the
+        // Dwell-to-open (BL-200). A second opener for the Selection band alongside the
         // click: this timer advances only while the pointer holds STILL over an
         // entity — any movement past the jitter radius resets it, so a sweep across
         // the tile grid never auto-opens (the anti-bombardment gate). hover_ticks
@@ -2209,7 +2209,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         {
             state.selected_entity      = hover_eid;
             state.selection_hidden_for = null_entity;
-            state.card_anchor          = { mouse.x, mouse.y };
             state.dwell_ticks          = 0; // consume, so it fires once per dwell
         }
     }
@@ -2274,10 +2273,6 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // when it re-selects the same entity the player had dismissed (close
             // hides, does not destroy — SELECTION.md).
             state.selection_hidden_for = null_entity;
-            // Freeze the sticky card at the click position (BL-194): it centres here
-            // and stays put. Only meaningful when something was actually selected.
-            if (state.selected_entity != null_entity)
-                state.card_anchor = { mouse.x, mouse.y };
         }
         else if (hovered_tile != null_entity)
         {

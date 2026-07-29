@@ -157,6 +157,7 @@ backlog**, or **B) implement now** (smoke-test, then ask before committing).
 | Backlog **metadata** (status, priority, sequencing, version goal, files) | `docs/development/backlog.json` | Queryable; the JSON wins over any prose/glyph. |
 | Backlog **design prose** for an open item | `docs/development/backlog.json` (`design` field) | Design authority *while the item is open*; `BACKLOG.md` holds legacy bodies not yet migrated. |
 | **Active worklist** (promoted tasks) | `docs/development/REFINED.md` | Transient; empty between work blocks. |
+| **Blocker triage** (items awaiting a UI/visual artifact from Ben) | `docs/development/review.json` | Companion to the backlog, not a replacement — see its own `_note`. |
 | **Player-intent coverage** (user stories) | `docs/development/user_stories.json` (view: `USER_STORIES.md`) | The second route — intent axis; companion to the backlog, consumed by BL-098's review. |
 | **Method** (lifecycle, depth verbs, batch, worktrees) | `docs/development/DELIVERY.md` | The long-form of this section. |
 | **Requirements** (data + history) | `docs/development/req/requirements.json` (policy `docs/development/req/REQUIREMENTS.md`) | |

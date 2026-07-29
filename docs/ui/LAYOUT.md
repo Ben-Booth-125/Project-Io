@@ -18,14 +18,17 @@ The prototype UI is built with Dear ImGui (see TECH_FOUNDATIONS). Everything her
 │ ▢        │out  │       Primary canvas          │  Comms log   │
 │ ▢        │col: │ (Solar / Circumplanetary /    │  (channel    │
 │ ▢  …     │ledger                    Surface)   │    chat)     │
-│ ▦ (8)    │ OR  │                               │              │
-│ ▢  …     │Selec-│                    ┌─────────┬──────────────┐│
-│ ▢        │tion │                     │lens key │   Minimap    ││
-│ ▢        │side-│                     │ (drawer)│ [lens bar]   ││
-│          │bar  │                     └─────────┤   (inactive  ││
-│          │     │                               │    canvas)   ││
-└──────────┴─────┴───────────────────────────────┴──────────────┘
+│ ▦ (9)    │     │  (shrinks vertically to clear ├──────────────┤
+│ ▢  …     │(runs│   the Selection band below)   │              │
+│ ▢        │full ├───────────────────────────────┤   Minimap    │
+│ ▢        │height├─ SELECTION BAND (fixed) ─────┤ [lens bar]   │
+│          │)    │  action/facts or tile layout  │  (runs full  │
+└──────────┴─────┴───────────────────────────────┴  height) ────┘
 ```
+
+The nav rail, fold-out column, and the right chrome column (comms + minimap) all run the
+**full screen height**; the Selection band (BL-213) is sandwiched between them at the
+bottom, in its own fixed rect — see *Selection band* below.
 
 Two layers compose the screen:
 
@@ -39,12 +42,14 @@ The comms log (BL-205, 2026-07-26) occupies the band the Explorer placeholder re
 ## The shell column (BL-122)
 
 Since **BL-122** the left edge is a single **permanent shell column** of width
-`W = clamp(round(0.272 · display_width), 480, 576)` px (`ui::shell_column_width`,
+`W = clamp(round(0.20 · display_width), 380, 460)` px (`ui::shell_column_width`,
 `src/ui/foldout_column.hpp`) — runtime-computed from the display so it stays legible
-across resolutions rather than a magic constant. The column was **widened ~1.6×** from its
-original `0.17·display_width` clamped `[300, 360]` so it can host the Selection element as a
-sidebar (below) alongside the ledgers; it now resolves to ~480 px at 1720 wide, ~522 px at
-1920. The column is reserved down the whole left edge:
+across resolutions rather than a magic constant. BL-122 originally **widened** the column
+~1.6× (to `[480, 576]`) so it could host the Selection element as a sidebar alongside the
+ledgers; **BL-213 (2026-07-28) narrowed it back down** to `[380, 460]` once Selection moved
+out to its own fixed bottom band (see *Selection band* below) and no longer needed room in
+this column at all — the freed width goes to the band instead. It now resolves to ~380 px at
+1720 wide, ~410 px at 1920. The column is reserved down the whole left edge:
 
 - The **identity tile** (profile) caps it at top, taking the full width `W`.
 - The narrow **icon nav rail** (56 px) runs down its left sub-edge.
@@ -137,41 +142,40 @@ from the minimap's left side (passed a `lens_key_anchor` from `app.cpp`). It was
 here from the canvas left edge, which also clears the now-widened shell column it would
 otherwise have overlapped. `LENSES.md` is the authoritative spec.
 
-## Selection info element — shell-column sidebar
+## Selection band — fixed bottom band
 **Spec: `SELECTION.md`**
 
-The Selection info element now lives **in the shell fold-out column as a sidebar**,
-filling `foldout_column_rect` — the same slot the ledgers use — rather than the old
-full-width bottom bar (the earlier BL-065 corner layout is gone). It is **mutually
-exclusive with the ledgers**: making a new entity selection closes any open ledger to
-take the column; while a ledger owns the column the Selection is not drawn; the selection
-state persists behind an open ledger and reappears when that ledger closes. It shows
-detail about the **current selection**, whatever entity the player last single-clicked.
+The Selection info element lives in a **fixed band at the bottom of the screen**
+(BL-213, 2026-07-28), sandwiched between the shell column (nav rail + fold-out ledger)
+and the right chrome column (comms + minimap) — both of which run the **full screen
+height** either side of it. This is the third shape the element has had: the original
+BL-065 full-width bottom bar, then the BL-124 shell-column sidebar (mutually exclusive
+with the ledgers), then this fixed band, which **retires click-anchoring** (the
+BL-194/195 "sticky card" that froze at the click position) in favour of always
+occupying the same rect. Ben's call: *"doing/building" menus need a fixed place at the
+bottom of the screen, not a widget that floats with the cursor.* It shows detail about
+the **current selection**, whatever entity the player last single-clicked, and — unlike
+every earlier shape — **does not close an open ledger**: the two no longer compete for
+the same space at all.
 
 It is an **action surface**, not a stat block: a header row
 (`[kind icon] Name · type` on the left, **go-to** `>` and **close** `x` buttons
-on the right) over two columns — a dominant **ACTION** column (~58% width, the
-kind's primary affordance) beside a narrower, muted **FACTS** column. Per
-selection kind: a **tile** offers *Build here* as the hero action beside its
-Thrives/Valid placement facts; a **body** offers *Dispatch Survey* or *Go to
-surface* beside its commercial-activity pulse; a **player-owned building**
-offers a *Manage building* button that routes into the construction panel
-beside its profitability readout; a **rival building** is intel-only — owner
-and location facts, production/stockpile shown as explicit private rows. The
-old undifferentiated stat-block polymorphism and the separate lens-supplement
-section are gone — the action/facts split *is* the per-kind content now.
-
-This content still uses the old **wide action | facts split**, sized for the former
-full-width bar; its re-lay-out for the narrower fold-out column is **owed as
-BL-123 SELECTION_ELEMENT_RESIZE** (Ben to mock), not yet designed here.
+on the right) over the kind's content. Per selection kind: a **tile** uses the
+purpose-built vertical layout (hex neighbourhood render + per-resource production
+chart + action icons, § SELECTION.md); other kinds (body, building, market,
+nation/corporation) use an action|facts split — a **body** offers *Dispatch Survey* or
+*Go to surface* beside its commercial-activity pulse; a **player-owned building**
+offers a *Manage building* button that routes into the construction panel beside its
+profitability readout; a **rival building** is intel-only — owner and location facts,
+production/stockpile shown as explicit private rows.
 
 The **go-to** button is equivalent to a double-click on the selection (routes
 through `ui::focus_on_entity` — navigates a canvas for spatial entities, opens a
-ledger for non-spatial ones); **close** hides the panel until the next
+ledger for non-spatial ones); **close** hides the band until the next
 selection. Unlike the fold-out ledgers it has **no nav-rail slot** — being
 selection-driven, **selecting an entity is the only way to open it.** It carries
 the click-model shared across all canvases: **single-click selects** (fills this
-panel, no view change), **double-click navigates**. See `SELECTION.md` and
+band, no view change), **double-click navigates**. See `SELECTION.md` and
 `CANVASES.md`.
 
 ## Time panel — top-right

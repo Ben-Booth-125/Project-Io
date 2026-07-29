@@ -462,7 +462,6 @@ void draw_buildings_tab(world& w, const recipe_registry& reg,
             if (ImGui::Selectable(row_label, selected, ImGuiSelectableFlags_SpanAllColumns))
             {
                 state.selected_entity = id;
-                state.card_anchor     = {-1.0f, -1.0f}; // non-canvas selection → centre the card (BL-194)
             }
 
             ImGui::TableSetColumnIndex(1);

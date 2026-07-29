@@ -62,7 +62,7 @@ using resource_deposit_series = std::array<std::vector<float>, resource_count>;
 /// the same X.
 using resource_history = std::unordered_map<entity_id, resource_deposit_series>;
 
-/// Read-only bundle handed to the sticky card's resource drill-down so it can
+/// Read-only bundle handed to the Selection band's resource drill-down so it can
 /// plot the aggregate-vs-tile chart without app exposing its raw members. Any
 /// pointer may be null (no data yet).
 struct resource_history_view

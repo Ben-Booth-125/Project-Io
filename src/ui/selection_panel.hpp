@@ -11,7 +11,7 @@ namespace ui {
 /// selection (ui_state::selected_entity), emitted into whatever window the caller
 /// has opened. This is **frame-agnostic**: it owns no window and takes no layout
 /// parameters, sizing itself from the live content region. Since BL-195 the sole
-/// caller is the **sticky detail card** (selection_card.cpp) — the former fold-out
+/// caller is the **Selection band** (selection_card.cpp) — the former fold-out
 /// Selection panel is gone, and the shell column is ledgers-only. See
 /// docs/ui/SELECTION.md, docs/ui/TOOLTIP.md.
 ///

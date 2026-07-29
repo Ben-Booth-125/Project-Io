@@ -1,0 +1,22 @@
+{
+  "_schema": "review/io-v1",
+  "_note": [
+    "Companion to backlog.json, NOT a replacement — a BLOCKER triage list.",
+    "",
+    "PURPOSE: items in here are blocked on something only Ben can produce —",
+    "typically a UI mockup / visual design pass done outside this tool (Power BI,",
+    "hand-sketched layout, an annotated screenshot markup). backlog.json's",
+    "'design-owed' status means a DESIGN CONVERSATION is owed (settled in prose,",
+    "here in chat); an item in review.json means a VISUAL/UI ARTIFACT is owed from",
+    "Ben specifically, and work cannot proceed without it.",
+    "",
+    "An item here should also exist in backlog.json (same id) — this file adds a",
+    "'blocked_on_mockup' note, it does not duplicate or override backlog.json's",
+    "metadata. When Ben supplies the artifact, promote the item's status in",
+    "backlog.json as normal and remove it from this file (or mark 'resolved').",
+    "",
+    "SEEDED 2026-07-28, EMPTY: Ben asked for this file to exist; which items",
+    "actually belong here is still his call, not populated yet."
+  ],
+  "items": []
+}

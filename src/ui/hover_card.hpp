@@ -9,7 +9,7 @@ namespace ui {
 inline constexpr int kHoverDelay = 20;
 
 /// Dwell-to-open (BL-200). Frames of pointer stillness over an entity before the
-/// sticky detail card auto-opens; the dwell bar fills across the span from
+/// Selection band auto-opens; the dwell bar fills across the span from
 /// kHoverDelay (glance is up) to here. A single feel tunable — flag for the owner.
 inline constexpr int kDwellOpenTicks = 48;
 

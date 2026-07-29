@@ -79,7 +79,7 @@ float chart_row_height(float chart_h);
 // ---------------------------------------------------------------------------
 // Dual-axis time-series chart (BL-197)
 //
-// A reusable time-series plot the sticky card and the ledgers can host: an
+// A reusable time-series plot the Selection band and the ledgers can host: an
 // inline legend row, up to two INDEPENDENT Y axes (so a ~100 000-scale aggregate
 // and a ~100-scale single series read on one chart, the Power BI reference Ben
 // gave), a hierarchical Year / Quarter X axis derived from each sample's in-game

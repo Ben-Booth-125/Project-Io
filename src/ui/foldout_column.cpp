@@ -9,12 +9,17 @@ namespace ui {
 
 float shell_column_width(float disp_x)
 {
-    // ~1.6x the original 0.17/[300,360] band (widened for the ledger + Selection
-    // content that now shares this column); still resolution-scaled. ~480 @1720,
-    // ~522 @1920.
-    float w = 0.272f * disp_x;
-    if (w < 480.0f) w = 480.0f;
-    if (w > 576.0f) w = 576.0f;
+    // Narrowed back down (BL-213, 2026-07-28): the BL-124 widening to
+    // ~1.6x/[480,576] was explicitly so this column could host the Selection
+    // element as a sidebar. Selection moved out to its own fixed bottom band
+    // (BL-213) and no longer lives here at all, so that justification is gone —
+    // Ben asked to widen the band, and the column no longer needs the extra
+    // width the ledgers alone were re-tuned for at a narrower size (LAYOUT.md's
+    // BL-081/111/117 legibility passes were themselves tuned against a ~244px
+    // effective content width, well inside this new range). ~380 @1720, ~410 @1920.
+    float w = 0.20f * disp_x;
+    if (w < 380.0f) w = 380.0f;
+    if (w > 460.0f) w = 460.0f;
     // Round to a whole pixel so the column edge (and everything anchored to it) lands
     // on a pixel boundary rather than blurring across two.
     return static_cast<float>(static_cast<int>(w + 0.5f));

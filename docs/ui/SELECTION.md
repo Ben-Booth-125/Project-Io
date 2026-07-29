@@ -104,32 +104,40 @@ non-spatial entities (nation, corporation) open the relevant ledger. For the
 prototype the spatial kinds (body, tile, building) are wired first; the rest are
 designed here and stubbed.
 
-### The tile element's layout (BL-123)
+### The tile element's layout (BL-123, reshaped BL-213)
 
 A selected **Tile** does **not** use the two-column action/facts split above — it takes a
-dedicated **vertical layout** (`draw_tile_selection`, `src/ui/selection_panel.cpp`), from Ben's
-mockup, top to bottom:
+dedicated layout (`draw_tile_selection`, `src/ui/selection_panel.cpp`). Since the band widened
+into three horizontal columns (Ben, 2026-07-28), the layout runs **left to right** rather than
+top to bottom:
 
-1. **Placeholder image** — a bordered grey box (a future tile portrait / terrain thumbnail;
-   literally a placeholder for the prototype).
-2. **`[x, y]` coordinate caption** — a slim strip beneath the image.
-3. **Production graphs** — one per resource deposited on the tile, each in its **own bordered
-   container** with its header (so the name reads as that graph's title, not a floating label). The
-   graph is a **stacked vertical bar** carrying two numbers: **Tile** — how much this tile produces
-   (bottom, green) — and **P10** — what the 10th-percentile tile produces for that resource (stacked
-   on top, muted), with a small legend naming each value. Comparing the Tile bar against the P10
-   reference tells the player *how effective this tile is for generation*. Axis ceiling spans the
-   stacked total (nice 1/2/5 rounding, dotted gridlines, `0`/ceiling ticks plus a mid tick when
-   ceiling ≥ 100). "Production" is the tile's **hazard-adjusted yield** — deposit richness ×
-   `(1 − hazard)`, the two tile-local factors of `run_extraction` (`economy_system.cpp`); the uniform
-   base-rate/workforce scalars cancel in the Tile-vs-P10 comparison. The list **always shows a vertical
-   scrollbar** (a tile can carry more resources than fit).
-4. **2×2 action button grid** — **Construct Buildings** (opens the **tile construction ledger**,
-   BL-162 — `draw_construction_ledger`, which lists the placeable building types for this tile and
-   actually builds; see below), **Manage Buildings**
-   (disabled unless a building occupies the tile; routes to the management panel), **History** and
-   **Supply** (drawn for layout completeness, **not yet wired** — History has no surface yet, and
-   real Supply routing is Layer-5-gated per LENSES.md).
+1. **Left quarter — zoomed hex neighbourhood.** A bordered render of the selected tile and its
+   immediate ring (`draw_tile_neighbourhood`, radius 2), the selected tile picked out — this is
+   the actual terrain render, not a placeholder image.
+2. **Centre half — a paged metric ACCORDION**, one titled graph at a time (‹ Name (i/N) ›
+   pager). Pages: every resource **deposited on the tile** (this tile's hazard-adjusted
+   production vs. the top-decile tile for that resource, a **clustered column pair** sharing a
+   baseline — "Tile" green, "Top 10%" muted, nice 1/2/5-rounded ceiling, dotted gridlines), THEN
+   the tile's own **Habitability** and **Hazard** scalars (vs. this body's average — "Body avg"
+   muted) so a barren tile still has something to page through. Only the deposited-resource pages
+   are click-drillable into a time-series history (BL-196); habitability/hazard have no
+   per-tile history tracked yet, so their chart is not a click target. Atmospheric pollution and
+   per-tile population are **not modelled** today (population lives on population centres, not
+   arbitrary tiles) and so have no page — a real content gap, not an oversight.
+3. **Right quarter — a 2×3 action button grid** (2 columns × 3 rows; tried 3×2 first but the
+   quarter-width column was too narrow for 3-across to read as "bigger" than the old icon strip —
+   2 wide gives chunkier buttons in the same 6-slot count): **Construct Buildings** (opens the
+   **tile construction ledger**, BL-162 — `draw_construction_ledger`, which lists the placeable
+   building types for this tile and actually builds; see below), **Manage Buildings** (disabled
+   unless a building occupies the tile; routes to the management panel), **History** and
+   **Supply** (not yet wired — History has no surface yet, real Supply routing is Layer-5-gated
+   per LENSES.md), plus **two reserved slots** so the grid's shape doesn't have to change when a
+   fifth/sixth action lands.
+
+The whole band widened to make room for this (`shell_column_width` narrowed from its BL-124
+~[480,576] range to ~[380,460] — see LAYOUT.md § The shell column; the BL-124 widening was
+explicitly to host the Selection sidebar, which no longer lives in that column at all since
+BL-213, so the extra width belongs to the band instead).
 
 This **supersedes**, for tiles: the tile's action/facts row in the table above; the *Build front
 door* and *affordance readout* subsections immediately below (their placement-suitability logic —
@@ -257,41 +265,49 @@ element stopped calling them.
 
 ## Layout & chrome
 
-- **Pinned**, not floating. It now lives in the **shell fold-out column as a sidebar** (BL-124):
-  it fills `foldout_column_rect` — the same right-of-canvas slot the ledgers occupy — rather than
-  the old full-width bottom bar (the BL-065 layout, now gone). It is **mutually exclusive with the
-  ledgers**: a new entity selection closes any open ledger to take the column; while a ledger owns
-  the column the Selection is **not drawn**; selection state persists behind an open ledger and the
-  element reappears when that ledger closes. Because the column widened (~1.6×) for this, it is a
-  tall narrow sidebar, not a wide corner panel.
-- **Content re-lay-out for the narrower column (BL-123 `SELECTION_ELEMENT_RESIZE`) — landed for the
-  tile.** The **tile** now uses the purpose-built vertical layout (§ The tile element's layout above,
-  from Ben's mockup) instead of the wide **action | facts** split. The remaining selection kinds
-  (body, building, market, nation/corp) still use the action|facts split described below and will get
-  their own vertical layouts as Ben mocks each — that residue is what remains of this item.
-- **Fills the fold-out column (BL-124).** Since the move into the column, `draw_selection_panel`
-  sizes to `foldout_column_rect` (`{r.w, r.h}`) — it fills the column from below the identity tile
-  to the bottom margin, exactly as a ledger does. This **replaced** the old BL-093 content-height
-  sizing (a per-kind `content_rows` count → text-line-unit height, clamped `[min_h, screen_h]`),
-  which was tuned for the free-floating bottom bar and no longer applies. How the content should use
-  that fixed column height — top-packed with overflow scrolling, or reflowed to fill — is part of
-  the owed **BL-123** relayout. The resolution-robustness BL-093 chased now lives in the column
-  geometry itself (`shell_column_width` is display-scaled; see
-  [DEVELOPMENT_PRACTICES.md § Display environment](../development/DEVELOPMENT_PRACTICES.md)).
+**Current shape (BL-213, 2026-07-28) — the Selection band.** The element lives in a **fixed
+band at the bottom of the screen**, sandwiched between the shell column (nav rail + fold-out
+ledger) and the right chrome column (comms log + minimap) — both of which run the **full
+screen height** either side of it. This superseded two earlier shapes in turn: the original
+BL-065 full-width bottom bar, then the BL-124 shell-column sidebar, then the BL-194/195
+**click-anchored "sticky card"** that froze at the click position and centred there (canvas-
+confined, clamped so it stayed on-screen). Ben's 2026-07-28 call retired the click-anchoring:
+*"menus that are to do with doing/building need space at the bottom of the screen, rather than
+floating with the cursor."* The band is now:
+
+- **Fixed, not click-anchored.** Always the same rect — `{shell_column_right, screen_bottom -
+  selection_band_height}` sized `{right_chrome_left − shell_column_right, selection_band_height}`
+  (`src/ui/selection_card.hpp`) — regardless of where the selecting click landed. The player's
+  eye never has to re-find it.
+- **Not mutually exclusive with the ledgers.** Because it no longer shares the shell column,
+  selecting an entity **leaves whatever fold-out ledger is open untouched** — both are visible
+  at once. (This reverses the BL-124 sidebar's rule, which closed the ledger on a new selection
+  because the two competed for the same column.)
+- **`selection_band_height` = 340px**, tuned so the tile layout's hex-neighbourhood render and
+  per-resource production chart (§ The tile element's layout below) fit without clipping — the
+  tallest per-kind content, and the floor every other kind's layout inherits.
+- **Content unchanged in kind.** `draw_selection_content` (selection_panel.cpp) is still the
+  shared per-kind dispatcher; only its container moved. The tile's vertical layout (hex render +
+  accordion, § below) and the action|facts split (other kinds) render exactly as before, just in
+  a wide-short band instead of a narrow-tall sidebar or a small floating card.
 - **Header row:** a small coloured **kind icon** (`draw_selection_icon` — circle for body,
   square for building, outlined square for tile, pentagon otherwise; a first pass ahead of a
   richer per-entity icon), then the title line (name · type), then a right-aligned **`[>]`**
   ('go to') button and **`[x]`** (close) button.
-- **Close hides, it does not destroy.** Closing sets the panel hidden; it
+- **Close hides, it does not destroy.** Closing sets the band hidden; it
   reappears on the next selection. There is no nav-rail entry to reopen it —
   selection is the only opener. Being selection-driven with no rail slot, the
   element is **not** governed by the universal toggle rule (any control whose
   active state is visible is a toggle): that rule toggles the rail's ledgers, not
-  this element. An open ledger claiming the column simply hides the Selection
-  (§ Layout above); it is not a toggle of the element itself.
+  this element.
 - **Empty / no-selection state:** when nothing is selected (fresh session, or
-  after clicking empty space) the panel is hidden. It is shown only while a
+  after clicking empty space) the band is hidden. It is shown only while a
   valid selection exists and has not been closed.
+
+**Click-through.** The band draws as an ordinary ImGui window over the canvas; ImGui's
+`WantCaptureMouse` flag (already how every other chrome window — nav rail, header, minimap —
+prevents the canvas from receiving clicks underneath it) covers the band the same way, so no
+special-case hit-testing was needed.
 
 ### Lens strip relocation (BL-093)
 
