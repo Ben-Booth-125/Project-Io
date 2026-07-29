@@ -4361,6 +4361,88 @@
       "authority_doc": "docs/ui/DISCOVERY.md",
       "summary": "DESIGN-OWED 2026-07-28 (Ben session, playtest follow-up). Ben's call: 'anonymise a lot of the chat log (only nations speak, and they pretend it is their own voice)' — the Public comms channel should never show an individual corporation's message; every public post is attributed to a NATION, voiced in the first person, standing in for whatever its registered corporations actually did. This is the EXACT SHAPE of the already-settled competitor-visibility rule (DISCOVERY.md: 'Rival internals are private... market supply/demand aggregates and prices are public — the deliberate signal. The player reasons over public signals, not handed over'), extended from the market channel to the comms channel. Today's Public channel opens with a placeholder epoch line only (BL-205, app.cpp:672-675: '<N> corporations on the public channel') — the real per-corp message generation is the corp_ai/persona-pack layer (BL-202/BL-207, persona::pack's in-voice claim/explanation strings), which currently has no notion of a nation-level mouthpiece at all.",
       "design": "NOT YET SETTLED. Open questions for its own design pass:\n\n## The pattern this extends\n\nDISCOVERY.md already settled the general shape: private detail (rival production/stockpiles) stays hidden; a public AGGREGATE signal (market prices/supply-demand) is what the player actually reasons over. This item is that same rule applied to comms instead of markets: corp-level chatter (whatever corp_ai/persona_pack generates per-corp today) becomes the PRIVATE layer; a nation-level statement is the only thing that ever reaches the Public channel, and it is phrased as if the nation itself is speaking, not reporting on a corporation.\n\n## What needs deciding\n\n1. **Aggregation rule.** When multiple corporations registered in the same nation act in a way that would generate a persona message, how does that collapse into ONE national statement? Loudest/most consequential action wins? A running digest? Does a quiet tick produce no national message at all (silence is fine — 'ledgers-start-closed' convention already used elsewhere)?\n2. **Voice source.** `persona::pack` already produces in-voice claim/explanation strings (<=140 chars) per persona — is a NATION now a persona (its `ideology`/`expansionism`/`economic_focus` from NATION_GENERATION.md Pass 4 become the voice), replacing or wrapping the corp-level persona? Note NATION_GENERATION.md Pass 4's ideology/expansionism are currently a random draw, not a consequence (the same gap BL-210's Nations rewrite is targeting) — this item may want to wait on that, or may motivate doing it sooner.\n3. **Does the underlying corp-level chatter still exist anywhere?** Fully deleted, or does it become the 'private' layer visible only to the corp's own player/rival-audit surfaces (symmetric with market private/public split)? If kept, where does a curious player ever see it (a corp dossier? nothing at all, matching 'rival internals are private... never appear')?\n4. **Interaction with the History Ledger (BL-211).** A nation's public voice is a live, ongoing signal; the History Ledger is retrospective generation record. Likely disjoint surfaces (comms = present-tense play, History = how-we-got-here), but worth confirming they don't want to be the same panel.\n5. **Beliefs dependency.** Out of scope here per this session's standing note ([[ben-generation-consequences-not-simulation]]) — Beliefs (Fable's) may eventually flavour a nation's voice, but this item should not block on it; a nation's voice can start from the existing ideology/expansionism/economic_focus attributes alone.\n\nRead DISCOVERY.md in full (especially the competitor-visibility rule this generalises), corp_ai.hpp/persona_pack.hpp (the existing per-corp voice mechanism), and NATION_GENERATION.md Pass 4 (today's ideology/expansionism draw) before starting this design pass."
+    },
+    {
+      "status": "design-owed",
+      "glyph": "~",
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-29",
+      "id": "BL-214",
+      "short_name": "DRILL_THROUGH_CONCEPT",
+      "category": "UI",
+      "priority": "A",
+      "difficulty": 4,
+      "version_goal": "v0.1.1",
+      "title": "Drill-through as a common concept - one progressive-disclosure idiom every dense surface obeys, so a compact read is the default and depth is asked for",
+      "authority_doc": "docs/ui/LAYOUT.md",
+      "files": [
+        "docs/ui/LAYOUT.md",
+        "docs/ui/SELECTION.md",
+        "docs/ui/ledgers/README.md",
+        "src/ui/tile_inspector.cpp",
+        "src/ui/selection_panel.cpp",
+        "src/ui/generation_charts.cpp",
+        "src/ui/charts.cpp"
+      ],
+      "summary": "Raised by Ben on seeing the BL-211 History ledger land (2026-07-29): 'This is fantastic... compact and readable. HOWEVER, for many people it would be information overload.' The History ledger is the case in point - three round tabs over ten stage accordions, each holding two to four charts plus two paragraphs of physics. It is legible because Ben already read that chain once in the wizard; a player who has not is handed a wall. The ask is NOT to cut the depth. It is to make drill-through a CONCEPT the whole UI shares - a compact top layer everywhere, depth reached by an explicit uniform gesture - rather than a per-surface decision each ledger re-invents.",
+      "design": "NOT YET DESIGNED - captured per Rule 0a, high priority, to be designed in its own pass.\n\n## The problem\n\nDepth keeps arriving as *more surface*, because every surface decides its own disclosure independently:\n- the History ledger (BL-211) opens on a stage explainer plus its charts;\n- the tile Selection band (BL-123) pages an accordion of every deposited resource;\n- the wizard (BL-167) shows ten stages of gates whether or not the player wants them;\n- the Corporation dashboard's four roll-ups \"click through into the relevant per-system ledger\" (MENU.md slot 1) - a fourth, different idiom.\n\nEach is individually defensible; together they are four answers to one question. A player learns the gesture once per surface instead of once.\n\n## What already exists to build on\n\n- **BL-196 (designed, v0.1.1)** - recursive drill-down: elements inside a card open CHILD cards, bounded by acyclicity. That is the *mechanism* for one family of surfaces. This item is the *concept* BL-196 should be an instance of, not a competitor to it - sequence them together, or fold BL-196 in.\n- **The card-drilldown UX notes (2026-07-23)** - affordance, breadcrumb, expand-not-replace. Those three are probably the concept's core rules already.\n- **LAYOUT.md's nine-container vocabulary (BL-141)** - the precedent for exactly this kind of closed-set answer. Drill-through wants the same treatment: a closed set of disclosure levels, not a spectrum.\n- **SELECTION.md's action|facts split plus its go-to** - the existing \"summary here, reference one hop away\" rule; the ledger family is its other half.\n\n## What needs deciding\n\n1. **How many levels, and what are they called?** A plausible three: GLANCE (a figure and its direction - the header, a card's fact line), READ (the compact composed view - what the History ledger's Chain tab is now), STUDY (the full derivation - explainers, per-tile breadcrumbs, the wizard's own framing). Is three right, and must every surface place itself on that ladder?\n2. **What is the uniform gesture?** Expand in place, a child card (BL-196), or a go-to into a deeper surface - and must the same gesture mean the same thing everywhere, or is the RULE only that each level advertises itself the same way?\n3. **What is the default level per surface, and is it remembered?** The History Chain currently opens the round's first stage expanded; the honest default is probably GLANCE everywhere, with the player's last chosen depth remembered per surface.\n4. **Does the wizard participate?** It is the one surface where full depth on first contact is arguably right - it IS \"the first thing a player sees\" (BL-167). If it is exempt, say so explicitly rather than by omission.\n5. **Text density is part of this.** The stage explainers are two paragraphs of real chemistry. At GLANCE they should probably not render at all rather than be truncated - which couples this item to BL-215 (wrap/precision) without being the same question.\n\n## Non-goals\n\nCutting content. Ben's framing is explicitly that the compact read is good and the depth is worth keeping - this is about WHEN the depth appears, not WHETHER."
+    },
+    {
+      "status": "design-owed",
+      "glyph": "~",
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-29",
+      "id": "BL-215",
+      "short_name": "TEXT_WRAP_RENDER_AUDIT",
+      "category": "UI",
+      "priority": "A",
+      "difficulty": 3,
+      "version_goal": "v0.1.1",
+      "title": "Render-precision audit - walk every UI element and confirm text wraps rather than clips, at the smallest supported display",
+      "authority_doc": "docs/ui/LAYOUT.md",
+      "files": [
+        "docs/ui/LAYOUT.md",
+        "src/ui/tile_inspector.cpp",
+        "src/ui/generation_charts.cpp",
+        "src/ui/charts.cpp",
+        "src/ui/selection_panel.cpp",
+        "src/ui/foldout_column.cpp",
+        "src/ui/header_panel.cpp",
+        "src/ui/chat_panel.cpp"
+      ],
+      "summary": "Raised by Ben 2026-07-29 alongside BL-211: 'the other mistake is that text does not wrap fully. We need to go through UI elements and double check things render with precision, leaving text to wrap on smaller monitors.' Concrete instances found while building the History ledger: chart TITLES clip mid-word in the fold-out column ('Metals (homeworld endowment, 1.0 ='); chart LEGEND rows clip their value ('Agricultural Produce 0'); the stage accordion header clipped its question until it was shortened to the stage name; the biography's consequence lines clipped until switched to TextWrapped. Each was fixed or dodged locally - this item is the systematic pass.",
+      "design": "NOT YET DESIGNED - captured per Rule 0a. High priority: this is a correctness class, not a polish class. Silent truncation of a load-bearing figure is ALREADY banned by LAYOUT.md's container vocabulary; the instances above are that ban being broken in practice.\n\n## Why it recurs\n\nLAYOUT.md section \"Container vocabulary\" (BL-141) already settles the rule: nine containers, each with exactly ONE text policy (wrap, or guaranteed-fit), and \"silent truncation is never acceptable\" for a load-bearing figure. What is missing is enforcement. Nothing checks that a widget honours its container's policy, so every new surface re-litigates it by eye - and gets it right at the width it was authored against, which is the developer's monitor.\n\n## Scope for the pass\n\n1. **Enumerate** every drawing site against LAYOUT.md's nine containers and record which policy each claims.\n2. **Test at the floor, not at the desk.** The shell column is width-derived (shell_column_width, ~380px at 1720 with a 380 floor); the smallest supported display should be STATED in DEVELOPMENT_PRACTICES (Display environment) and then actually captured, not assumed.\n3. **Fix by policy, not by shortening the string.** A clipped chart title wants a wrapping title or a measured box - not a shorter title, which loses information and drifts back the moment someone edits it.\n4. **charts.cpp is the worst offender and the best test case.** It hand-draws every label into a fixed screen-space box: titles, tick labels, legend rows and threshold captions all assume room they may not have. A narrow-host chart mode (legend BELOW the plot rather than beside it) is the likely fix, and would also unsqueeze the History ledger's plots.\n\n## Open questions\n\n- **What is the smallest supported display?** 1280x720 is the verify harness window and the options-menu floor preset - is that the contract?\n- **Can this be CHECKED rather than eyeballed?** A verify script capturing every panel at the floor resolution makes the pass repeatable; whether clipping can be detected automatically (vs. eyeballed per capture) is the interesting question. Per CLAUDE.md (Tool creation is skill creation), prefer the saved check over a one-time sweep.\n- **Relationship to BL-063 (accessibility / legibility baseline)** - overlapping remit; reconcile or merge before promoting."
+    },
+    {
+      "status": "design-owed",
+      "glyph": "~",
+      "parked": false,
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-07-29",
+      "id": "BL-216",
+      "short_name": "CHAT_BOTTOM_LEFT_PINNED_RIGHT",
+      "category": "UI",
+      "priority": "B",
+      "difficulty": 3,
+      "version_goal": "v0.1.1",
+      "title": "Shell re-plan - move the comms log to the bottom-left corner and give the freed centre-right band back to pinned items",
+      "authority_doc": "docs/ui/LAYOUT.md",
+      "files": [
+        "docs/ui/LAYOUT.md",
+        "docs/ui/CHAT.md",
+        "docs/ui/EXPLORER.md",
+        "src/core/app.cpp",
+        "src/ui/chat_panel.cpp",
+        "src/ui/foldout_column.cpp",
+        "src/ui/selection_card.hpp"
+      ],
+      "summary": "Raised by Ben 2026-07-29, immediately after BL-213 put the Selection band along the bottom: 'it could be worth moving the chat log to the bottom left corner. This will make it look a bit better with our selection element / menu both wanting that space. We can refactor the pinned items back to the centre right space.' Two moves in one: comms leaves the right chrome column for the bottom-left, and the band it vacates (right edge, between the time panel and the minimap) returns to PINNED ITEMS - the affordance the Explorer placeholder reserved before the comms log replaced it on 2026-07-26.",
+      "design": "NOT YET DESIGNED - captured per Rule 0a. Ben's phrasing is a direction, not a layout spec; the geometry must be settled WITH HIM before anything moves (see Open questions - do not guess the rect).\n\n## The observation behind it\n\nBL-213 put the Selection band along the bottom, between the full-height shell column and the full-height right chrome column. The bottom-left corner is now the junction of three things that all want it: the shell column's fold-out ledger (which runs to the bottom margin), the Selection band's left edge, and the nav rail. Ben's read is that the corner collects more attention than it earns, and that comms belongs there.\n\n## What the move buys\n\n- **Comms is ambient.** It is a read-when-you-notice-it surface (nation-voiced public chatter, BL-212), not a decision surface. The bottom-left is the right weight for it; the right edge - directly under the time panel, above the minimap - is prime space it does not need.\n- **Pinned items get a home again.** LAYOUT.md records that pinning \"was never wired; if it returns it will be a chat-adjacent affordance\". This reopens it: pinned items as a first-class centre-right surface (EXPLORER.md's original reservation), which is where a player would want a watched market / body / building parked while working elsewhere.\n\n## Open questions - ASK BEN, DO NOT GUESS\n\n1. **Does comms sit INSIDE the shell column (below the fold-out ledger), or in its own rect left of the Selection band?** These look alike in a sketch and are very different to build: the first shares the column's width and scroll; the second is a fourth region and pushes the Selection band's left edge right.\n2. **What happens to the fold-out ledger's height?** It runs to the bottom margin today. If comms takes the bottom-left, the ledger stops short - re-tuning every ledger's vertical budget (the BL-117 one-question-per-view splits were sized against the full column).\n3. **What ARE pinned items, concretely?** Never designed. A pinned entity is presumably a Selection-band content builder rendered in a persistent slot - the same per-kind dispatcher, hosted twice. How many pins, how one is added (a pin button on the band header beside go-to and close), and whether pins survive a session are all open.\n4. **Does the minimap move?** It anchors bottom-right today. If pinned items take the centre-right, the minimap and its lens bar keep the corner, but the right column's vertical budget splits three ways instead of two.\n\n## Sequencing\n\nBehind BL-215 (a layout re-plan landing before the wrap audit just gives the audit more to re-check), and probably behind BL-214, whose disclosure levels decide how much a pinned item shows."
     }
   ]
 }
