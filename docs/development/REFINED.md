@@ -91,48 +91,14 @@ agent, reads only Pantheon + the designed fact schema). A3–A5 follow in the A
 agent; B and C2–C4 sequential in the main session after A merges. Chat/app.cpp
 wiring stays in the main session.
 
-## Sticky detail card cluster (promoted from backlog.json § BL-195, BL-196, BL-197, BL-198)
+## Sticky detail card cluster (promoted from backlog.json § BL-195, BL-196, BL-197, BL-198) — **COMPLETE**
 
-Batch: 2026-07-22-sticky-card. Requirements: requirements.json §
-sticky-card-selection-move, sticky-card-drilldown, chart-container,
-resource-timeseries-store.
-
-> **Resume here.** BL-194 (task A, the card frame foundation) landed and
-> committed 2026-07-22 — `src/ui/selection_card.{hpp,cpp}`, wired into
-> `app.cpp` (drawn after the other chrome, positioned at `ledger_window_spawn`)
-> and reusing `draw_hover_content` as placeholder content. Verified via
-> `scripts/verify/sticky_card.lua` (3/3 captures) + full CTest 23/23. Tasks
-> B–E below are promote-ready against that landed frame; none started yet.
-
-~~**[4] A (BL-194) — Sticky detail card frame.** New `src/ui/selection_card.{hpp,cpp}`;
-  wires into `ui_state.hpp` (open/closed + target), `body_surface_canvas.cpp` (click
-  opens), `app.cpp` (draw call). Files: `src/ui/selection_card.hpp`,
-  `src/ui/selection_card.cpp`, `src/ui/ui_state.hpp`, `src/ui/body_surface_canvas.cpp`,
-  `src/core/app.cpp`. Deps: foundation. Satisfies: sticky-detail-card R1.~~ — **landed.**
-- **[4] B (BL-195) — Move Selection into the card.** Files: `src/ui/selection_card.cpp`,
-  `src/ui/selection_panel.cpp`, `src/ui/foldout_column.hpp`, `src/ui/nav_pane.cpp`,
-  `src/core/app.cpp`. Deps: A. Satisfies: sticky-card-selection-move R1.
-- **[4] C (BL-196) — Recursive drill-down.** Files: `src/ui/selection_card.{hpp,cpp}`,
-  `src/ui/hover_content.{hpp,cpp}`, `src/ui/ui_state.hpp`. Deps: A. Parallel-safe with
-  B (worktree-isolated; shares `selection_card.cpp`, merge in order A→B→C). Satisfies:
-  sticky-card-drilldown R1.
-- **[4] D (BL-197) — Dual-axis chart container.** New `src/ui/chart.{hpp,cpp}`. Files:
-  `src/ui/chart.hpp`, `src/ui/chart.cpp`, `src/ui/selection_card.cpp`,
-  `src/ui/header_panel.cpp`, `src/ui/construction_panel.cpp`. Deps: independent root
-  (consumes selection_card only for its own hosting slot — additive). Parallel-safe
-  with A/B/C/E. Satisfies: chart-container R1.
-- **[3] E (BL-198) — Resource time-series store.** Files: `src/core/app.hpp`,
-  `src/core/app.cpp`, `src/ui/ui_state.hpp`, `src/ui/chart.cpp`. Deps: independent
-  root; D consumes E's accessors for the headline chart. Parallel-safe with A/B/C.
-  Satisfies: resource-timeseries-store R1.
-
-Parallelisation note: A is foundation for B and C (must land and merge to `main`
-first). D and E are independent roots, buildable in parallel with A and with each
-other; D's final wiring of E's data into the headline chart happens after both land.
-Worktree isolation absorbs the shared-file overlap on `selection_card.cpp`
-(A writes it first, B/C/D layer on top) and `chart.cpp`/`app.cpp` (D/E). Fan-out:
-A alone first; then {B, C, D, E} concurrently in separate worktrees, merged in
-dependency order A(done)→B→C, and D→E independently, main session integrates all.
+Batch: 2026-07-22-sticky-card. All five tasks (A–E, i.e. BL-194/195/196/197/198) landed
+across commits 32389d3, 491d18a, fd97f81, d46e74f (2026-07-22/23) — this file was never
+updated to reflect it, leaving the group looking paused when it was actually done.
+Backlog audit (2026-07-29) corrected the backlog.json statuses; removing the stale task
+rows here for the same reason. See backlog.json's BL-195/196/197/198 `resolution` fields
+for the landing commits.
 
 ### Template
 
