@@ -116,6 +116,9 @@ The procedural corporation generation strategy: nation assignment, industrial fo
 **`docs/generation/GENERATION_LEDGER.md`**
 The Generation Ledger (design only) — a tuning/analysis surface that explains *why* a tile generated as it did, reading the per-pass intermediates exposed by `generate_body_tiles`'s optional `generation_record`. Covers the per-tile derivation breadcrumb (height/ocean → band/moisture → composition → landform → deposits), per-body histograms, the regenerate-on-demand (don't-persist) data lifetime, and surfacing as a Ledger window plus a Planetary field-overlay lens. Read before building the generation ledger or any heightmap/moisture/band overlay.
 
+**`docs/lore/HISTORY.md`**
+Design-owed authority for the **institutional history ladder** — why the campaign world of 1960 is market-based and non-hegemonic, as a seven-stage causal ladder (agrarian surplus → the enforceable promise / Charter Age → fragmentation-with-connectivity → capital disciplines the sovereign → the energy transition → the averted rupture → saturation). It picks up where `PLANETOLOGY.md` stops (the civilisation gate) and generates what `NATION_GENERATION.md` / `GENERATION_STRATEGY.md` currently assume. The ladder is **driven, not narrated** (Ben, 2026-07-30): it produces fragmentation, nation count, industrialisation timing and drawdown rather than describing an already-generated world. Promoted into **BL-220** (timestamp foundation), **BL-221** / **BL-222** / **BL-223** (the stages) and **BL-224** (the non-hegemony invariant). Read before any work on settlement, industrialisation, or the campaign premise's historical claims. **Stages 5–6 as written are superseded** — see BL-223.
+
 ---
 
 ## Delivery pipeline
