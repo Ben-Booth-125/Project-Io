@@ -150,6 +150,15 @@ struct ui_state
     /// relocated here from the Construction/Building panel).
     int  market_ledger_view = 0;
 
+    /// History ledger: 0=Story (the body's biography), 1=Chain (the generation
+    /// charts), 2=Tiles (the tile/building/market tables). BL-211.
+    int  history_view = 0;
+
+    /// Within the History ledger's Chain view, which chain round's stages are
+    /// listed (0..chain_round_count-1). Held here rather than as a function-local
+    /// static so a verify script can park the ledger on a given round.
+    int  history_round = 0;
+
     // --- application / system menu (BL-070) ---
     // The corner gear popup for session control (Pause/Resume, Exit Game). Opened
     // by the gear button and toggled by Esc; confirm_exit_pending arms the inline

@@ -18,11 +18,12 @@ namespace ui {
 /// function draws nothing. Reopen it from the navigation pane.
 ///
 /// @param w       Read-only reference to the current world state.
-/// @param s       Current canvas/nav state; used to seed the body selector default.
+/// @param s       Current canvas/nav state; seeds the body selector default and
+///                holds the ledger's view/round selection (BL-211).
 /// @param report  The Planetology/Continents-Drift generation report captured at
 ///                world-gen (app::m_generation_report) — the biography source.
 /// @param p_open  Open/closed flag. Cleared by the window's close button.
-void draw_tile_inspector(const world& w, const ui_state& s,
+void draw_tile_inspector(const world& w, ui_state& s,
                          const generation_report& report, bool* p_open);
 
 } // namespace ui

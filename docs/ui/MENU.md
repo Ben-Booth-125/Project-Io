@@ -111,6 +111,13 @@ Notes on the mapping:
     relates to the **Generation Ledger** (`../generation/GENERATION_LEDGER.md`) — likely the same
     rail surface. **Open note:** lengthen the pre-game generation phase and design how that
     history is *presented*; per-tile environment inspection moves to the tile Selection element.
+    **Built 2026-07-29 (BL-211):** the slot now splits into **Story / Chain / Tiles** — the
+    body's dated biography, the generation stage charts (one collapsing accordion per chain
+    stage, under the wizard's three round tabs), and the tile/building/market tables. The
+    charts come from `ui::generation_charts`, shared verbatim with the New World wizard, so
+    the plots a player decided a world on are the plots they can reopen mid-campaign.
+    **Still owed:** exploration-gating (the slot is ungated today) and the post-generation
+    *advisory* read.
   — **Construction / Buildings** (slot 6): **construction-in-progress only** — a build-queue /
     progress surface (what is being built, its cost and progress). Own-building *inventory* stays
     in the dashboard holdings roll-up; this slot is the *active construction* view (the

@@ -10,6 +10,150 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## Session — History ledger: the generation charts get a second home (BL-211) (2026-07-29)
+
+**Runtime.** ~1h. Full-lite (one extraction plus a container; no economy/save seam touched).
+
+**Context.** Ben's framing: "there are tons of interesting visuals about generation, but they get
+lost once the game is open." True literally — `draw_generation_screen`'s ~570 lines of per-stage
+plots (instellation with its two irreversible gates, the retention shoreline and its rescaled
+losers, the iron/coal trade, the endowment groups, formed-against-left) existed only on the
+wizard, a screen the player clicks through exactly once per campaign. His asked-for shape: compress
+them into a tabbed view of per-stage accordions.
+
+**What landed.**
+
+- **`src/ui/generation_charts.{hpp,cpp}`** — every stage chart, the stage explainers, and the
+  three-round table lifted out of `app.cpp` behind a `generation_chart_source` (bodies + which one
+  is home). The wizard and the ledger now call the same `draw_stage_charts`, so they agree by
+  construction rather than by imitation. `app.cpp` sheds ~540 lines.
+- **The History slot splits into Story / Chain / Tiles** (`tile_inspector.cpp`). Story is the
+  dated biography (unchanged, now wrapping its consequence lines); Chain is the wizard's three
+  rounds as a sub-strip, each stage a `CollapsingHeader` with only the round's first open; Tiles
+  is the tile/building/market tables the slot always carried.
+- **`generation_report::body_entry` gained `undrawn`** — the same body re-run with drawdown at
+  zero. The S9 chart's hollow "formed" columns need a before, and a loaded campaign has no live
+  preview to compute one from. Drawdown consumes no randomness, so this is the same world minus
+  its industrial history, not a second roll.
+- **View state moved into `ui_state`** (`history_view` / `history_round`) rather than function
+  statics, plus a **`verify.panel_view(panel, index)`** hook — so a capture can reach a ledger
+  sub-view without a click. `history_ledger_and_comms.lua` now walks six captures.
+- **Threshold captions right-align to the column band, not the box** (`charts.cpp`). The right of
+  a chart box belongs to the legend; in the fold-out column's ~300px the gate labels printed
+  straight over the legend rows. One shared `legend_w` now keeps bars and captions out of it.
+
+**Decisions taken in-session** (Ben said "build it now" without answering the two questions asked):
+
+- **Tiles kept, moved to their own tab** rather than left below the chain — the tables are a
+  different question from the history and were burying it.
+- **Chain charts every body side by side** (the wizard's comparison) and therefore hides the
+  per-body selector; Story and Tiles keep it. Both are cheap to reverse if the read is wrong.
+
+**Verified.** `history_ledger_and_comms.lua` (6 captures, eyeballed, blessed);
+`planetology_generation.lua` re-run for wizard regression — the only chart-region diff is the
+intended caption move, and the menu/home-surface diffs predate this session (the 2026-07-28
+continents commit never re-blessed them). All goldens re-blessed. `world_determinism`,
+`determinism_harness`, `world_audit`, `continents_harness` all PASS — the second `run_planetology`
+call does not perturb generation.
+
+**Left open.** Exploration-gating the History slot; the post-generation advisory read; nation/corp
+history sub-views (they need BL-210's remaining scope to emit anything); the per-tile derivation
+breadcrumb. In a ~300px column the chart legends eat most of the plot width — legible, but Ben
+should eyeball whether the narrow host wants its own chart mode.
+
+---
+
+## Session — Generation oral-history pivot; Selection band reshape (BL-210/211/212/213) (2026-07-28)
+
+**Runtime.** ~3h. Full (design + implementation across two separate threads: generation pivot,
+then a UI rework raised mid-session).
+
+**Context.** Ben opened with a large pivot: reframe generation as one continuous simulated oral
+history — "Solar system -> Atmosphere -> Continents/Drift -> Life in water -> Intelligent Life
+-> Extinction rounds -> Resource deposits -> Civilisation -> Beliefs -> Nations -> Corporations."
+Design was worked through in stages with Ben correcting course twice (extinction rounds are
+timing consequences, not random branches; Beliefs is Fable's, out of scope). Landed the first
+concrete slice, then Ben pivoted the session to a UI rework of the Selection element after seeing
+it live, discovering along the way that SELECTION.md/LAYOUT.md had drifted stale against the
+actual shipped code.
+
+**What landed.**
+
+- **BL-210 (umbrella, design-owed) filed** — the full architecture for the pivot: Continents
+  become a simulated plate-drift pass (not noise), Biosphere stays BL-167's proven chain
+  unchanged, a new Settlement->Industrialisation->1900s stage replaces Nations/Corporations'
+  mechanical generation, and extinction-class events become timing consequences (not random
+  branches) via the existing preference-lean mechanism. Nations/Corporations rewrite and the
+  batch-sweep tool are NOT built yet — still open.
+- **BL-210 first slice landed**: `src/world/continents.{hpp,cpp}`, a sibling pass reading
+  Planetology's `mobile_lid`/`theta` to derive plate count/drift/speed as consequences, Voronoi-
+  assigns tiles per plate, classifies boundaries convergent/divergent by dot product, and emits
+  dated `history_event` lines merged into the body's existing biography. Wired into
+  `generate_body_tiles` via an optional bias param (null preserves the old surface bit-for-bit).
+  `tools/verify/continents_harness.cpp` (5 requirement groups, all PASS). Bias magnitude had to
+  be tuned down 3x after the first pass pushed Kepler's forest+wetland fraction below
+  `world_audit`'s S2 threshold — a real regression caught before it shipped.
+- **BL-211 (History ledger) first slice**: the nav-rail's "History" slot (`tile_inspector.cpp`)
+  gained a "Generation History" section rendering a body's oral-history biography in-game for
+  the first time — Planetology's eight-line convention had nowhere to surface before this.
+- **BL-212 (nation-voiced comms), landed in full**: the Public channel's old per-corp/per-building
+  text was actually leaking rival internals — a standing violation of DISCOVERY.md's own
+  competitor-visibility rule. Rewrote `step_economy`'s agency-event loop to aggregate one
+  heaviest event per (nation, tick) and post it under the nation's identity, first-person,
+  anonymised. Fixed a real bug, not just a feature.
+- **BL-213 (Selection band), landed in full, then reshaped again same session**: retired the
+  BL-194/195 click-anchored "sticky card" for a FIXED band at the bottom of the screen, sandwiched
+  between the shell column and right chrome column (both now full screen height) — Ben's
+  complaint was that "doing/building" menus shouldn't float with the cursor. Selection no longer
+  closes an open ledger (the two used to compete for the shell column; now they don't compete at
+  all). Follow-up same session: the tile kind's internal layout reshaped to three columns (hex
+  view / paged metric accordion / action grid), the accordion widened to cover habitability and
+  hazard alongside deposits, the action grid corrected from a literal 3x2 (too narrow, read as
+  slivers) to 2x3 after asking Ben directly, and `shell_column_width` narrowed back down now that
+  Selection no longer needs room there — freeing real width for the band.
+- Both `SELECTION.md` and `LAYOUT.md` were found **stale against the shipped code** (still
+  describing the pre-BL-194 fold-out sidebar) and rewritten to match reality as part of this
+  session, not left to rot further.
+
+**In-session decisions / corrections.**
+
+- **Consequences, not simulation-as-dice.** Ben corrected an early framing where extinction
+  rounds were modelled as probabilistic branch checkpoints — they should only shift *timing*
+  along an otherwise-causal chain, matching every other stage in BL-167's chain. Saved as
+  standing feedback ([[ben-generation-consequences-not-simulation]]).
+- **Beliefs is out of scope** — Ben is developing that layer separately with Fable; treat it as
+  an external interface the pipeline will eventually consume, not something to design here.
+- **Imprecise instructions should be questioned, not guessed at.** "3 by 2 grid" turned out
+  ambiguous and the literal reading produced the opposite of "bigger" — Ben's explicit ask
+  afterward was to ask him rather than pick a reading and build it. New standing memory
+  ([[ben-imprecise-instruction-ask-dont-guess]]).
+- **Visual questions should come with a live launch**, not just headless captures — Ben wants to
+  be prompted visually. New standing memory ([[ben-wants-game-opened-after-visual-questions]]).
+- Committed and pushed as `b90ba10` (BL-210/211/212) and a follow-up uncommitted diff (BL-213 +
+  the tile-layout reshape) — the latter was staged but not committed by end of session.
+
+**Open items / where to pick up.**
+
+- **BL-210's Nations/Corporations rewrite is the biggest remaining piece** — territory/character/
+  wealth as consequences of a shared `regional_endowment` vector (arable share, the existing
+  endowment channels, river/coastal access, civilisation-gate timing) instead of Voronoi + random
+  `politics` draw. This is also what BL-212's nation "voice" should eventually key off instead of
+  generic per-kind phrasing.
+- **The checkpoint/lean hook-in** (a `volatility` preference shifting extinction timing) is
+  designed but not implemented — no code changes yet.
+- **The batch-sweep tool** (extending `planetology_sweep.cpp` to the whole pivot) hasn't been
+  started; this is the mechanism Ben actually asked for ("generate many worlds, to see what
+  targets are best") and is currently the least-built part of BL-210.
+- **BL-211 is a thin first slice** — no exploration gating, no nation/corp tabs (blocked on the
+  Nations rewrite above), no shared content builder with the tile-derivation breadcrumb
+  GENERATION_LEDGER.md already designs.
+- **Golden images** — three new visual checks this session (`continents_terrain.lua`,
+  `history_ledger_and_comms.lua`, `selection_band.lua`) are all capture-only; none blessed yet.
+- **BL-213's diff was not committed** by end of session — confirm with Ben before starting new
+  work on top of it.
+
+---
+
 ## Session — Chemical life: the seven-gate abiogenesis chain designed, vocabulary built (BL-209) (2026-07-28)
 
 **Runtime.** ~1h. Full (design session + foundation slice; design-heavy).

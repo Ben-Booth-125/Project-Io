@@ -46,6 +46,15 @@ struct generation_report
     {
         std::string       name;
         planetology_state state;
+
+        /// The same body with the industrial drawdown dialled to zero — what the
+        /// chain FORMED, before a prior era took the accessible half of it. Kept
+        /// alongside the real state so the History ledger can redraw the wizard's
+        /// formed-against-left chart, which otherwise has no "before" to point at
+        /// (the wizard computes it from a live second preview; a loaded campaign
+        /// has no preview to consult). Drawdown consumes no randomness, so this is
+        /// the same world minus its industrial history — not a second roll.
+        planetology_state undrawn;
     };
 
     world_preferences       preferences{}; ///< What the player asked for.

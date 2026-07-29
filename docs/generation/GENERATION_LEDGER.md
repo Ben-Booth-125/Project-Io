@@ -141,5 +141,13 @@ once as a tile-derivation builder and let the three callers wrap it.
   seed-grown; showing the seed points and their growth is a richer view than a flat
   landform field, but needs the seed positions captured in `generation_record` (not
   there today — a small additive field when the lens is built).
-- **Player-facing variant.** Whether any of this is ever surfaced to the player (a
-  "survey" readout of a tile) or stays a developer tool. Out of scope here.
+- **Player-facing variant — partly answered (BL-211, 2026-07-29).** The *chain* half is
+  now player-facing: the History nav-rail slot carries three views — **Story** (the body's
+  dated oral-history biography), **Chain** (the generation stage charts, one collapsing
+  accordion per chain stage, grouped by the wizard's three rounds), and **Tiles** (the
+  tile / building / market tables the slot always held). The charts are the New World
+  wizard's own plots, extracted into `src/ui/generation_charts.{hpp,cpp}` and redrawn from
+  the persisted `generation_report` — previously they existed only on the screen the player
+  clicks through once. What is *not* answered: the **per-tile derivation breadcrumb** and
+  the **field lenses** above are still developer-facing and unbuilt, and the History views
+  are **not yet exploration-gated** (MENU.md's History slot calls for that).

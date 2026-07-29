@@ -9,6 +9,11 @@
 
 namespace ui::charts {
 
+/// Width reserved on a chart's right for the swatch legend. The columns are kept
+/// out of it, and so are threshold captions — otherwise a gate label prints over
+/// the legend rows in any box narrow enough that the two meet.
+constexpr float legend_w = 190.0f;
+
 float nice_ceil(float v)
 {
     if (v <= 0.0f)
@@ -84,7 +89,6 @@ void draw_bars(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
     // against the left edge. A caller whose width is fixed by a mockup passes an
     // explicit bar_cap — the tile-selection graphs pass 34.0f, which is what keeps
     // them pixel-identical to the version this was extracted from.
-    constexpr float legend_w = 190.0f;
     constexpr float gap      = 10.0f;
     const float cap  = (bar_cap > 0.0f) ? bar_cap : 96.0f;
     const float band = std::max(60.0f, (mx.x - plot_x0) - legend_w);
@@ -420,7 +424,12 @@ void threshold_line(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
     if (caption && caption[0])
     {
         const ImVec2 ts = ImGui::CalcTextSize(caption);
-        dl->AddText({mx.x - ts.x - 2.0f, ty - ts.y - 1.0f}, colour, caption);
+        // Right-aligned to the COLUMN band, not the box: the right of the box is
+        // the legend's, and in a narrow host (the History ledger's fold-out) a
+        // box-aligned caption lands squarely on the legend rows. Same band
+        // draw_bars reserves, so the two agree by construction.
+        const float band_x1 = std::max(plot_x0 + 60.0f, mx.x - legend_w);
+        dl->AddText({band_x1 - ts.x - 2.0f, ty - ts.y - 1.0f}, colour, caption);
     }
 }
 

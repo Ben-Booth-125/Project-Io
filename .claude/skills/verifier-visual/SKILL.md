@@ -43,11 +43,13 @@ the "authorising a new check = naming it" convention:
   heightmap is biased by the Continents/Drift sibling pass instead of pure noise. Captures
   plain terrain (landmass shape) and the Country lens (nation borders over it) at a
   full-planet zoom. Driver: `verify.goto_surface`, `verify.set_zoom`, `verify.set_overlay`.
-- **`history_ledger_and_comms.lua`** (BL-211 + BL-212) — the History nav-rail slot's new
-  "Generation History" section (the oral-history biography, including Continents/Drift's
-  merged lines, given an in-game home for the first time) and the Public comms channel's
-  epoch line confirming it is now nation-voiced, not corporation-voiced. Driver:
-  `verify.goto_surface`, `verify.show_panel("tile", ...)`.
+- **`history_ledger_and_comms.lua`** (BL-211 + BL-212) — the History nav-rail slot's three
+  views: **Story** (the oral-history biography, including Continents/Drift's merged lines),
+  **Chain** (the wizard's generation stage charts redrawn from the persisted report, captured
+  for each of the three rounds), and **Tiles**; plus the Public comms channel's epoch line
+  confirming it is nation-voiced, not corporation-voiced. Drivers: `verify.goto_surface`,
+  `verify.show_panel("tile", ...)`, and `verify.panel_view("history"|"history_round", i)` —
+  the sub-view hook that lets a capture reach a ledger tab without a click.
 
 ## Determinism: software renderer + headless display (read first)
 

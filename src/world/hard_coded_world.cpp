@@ -103,7 +103,17 @@ world make_hard_coded_world(world_params params, generation_report* report)
         bias_out = cs.height_bias;
 
         if (report)
-            report->bodies.push_back(generation_report::body_entry{ in.name, st });
+        {
+            // The pre-drawdown twin, for the History ledger's formed-against-left
+            // chart. Drawdown is the chain's last act and consumes no randomness,
+            // so re-running with the dial at zero yields the same world minus its
+            // industrial history rather than a different roll. Continents are not
+            // re-run — the twin is read for its endowment only.
+            planetology_params undrawn = rw.params;
+            undrawn.drawdown = 0.0f;
+            report->bodies.push_back(generation_report::body_entry{
+                in.name, st, run_planetology(in, undrawn, body_seed) });
+        }
         return st;
     };
 
