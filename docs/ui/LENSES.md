@@ -15,7 +15,11 @@ Glyph shapes live in [ICONS.md](ICONS.md); identity colours live in
 [`presentation.hpp`](../../src/ui/presentation.hpp) (the `palette` namespace).
 
 > **Status.** All lenses are built except where a section names a gating
-> dependency. The **Lens & Legibility** batch (BL-013/052/019/017/009/018) settled
+> dependency. **BL-226** (2026-07-30) added the **Continent** lens — the
+> tectonic plates from BL-210's Continents/Drift pass, retained on the generation
+> report so the boundaries that shaped the terrain can be drawn back onto it. It
+> is the **eighth** glyph on the BL-093 strip, the first addition to that row of
+> seven. The **Lens & Legibility** batch (BL-013/052/019/017/009/018) settled
 > the curated single-select strip, renamed Faction → **Country**, reworked the
 > **Resource** lens to a flat contiguous-deposit fill, reworked **Scarcity** to a
 > per-market shortfall field, and added the **Opportunity** (net-margin) and
@@ -591,6 +595,70 @@ former nav-rail-inset left edge). The key landed in the 2026-07-04 reconciliatio
 **Interaction notes.** Planetary-only, single-select; the script runs `verify.econ_step(4)` so the
 substrate injection has settled before capture. Verified by `scripts/verify/industry_lens.lua`
 against blessed goldens (`industry_lens_full`, `industry_lens_zoom`).
+
+## Continent lens *(built 2026-07-30 — BL-226)*
+
+**On the strip as the eighth glyph.** The first addition to the BL-093 row of seven. It earns the
+slot rather than the keyboard-only shelf because it answers a question the player asks at *first
+sight* of a body — "why is the land shaped like that?" — which is exactly the moment they are
+looking at the strip.
+
+**Intent.** Show the **tectonic plates** the Continents/Drift pass (BL-210) drifted into place, and
+above all show **where they meet**. A plate interior is just a region; a plate *boundary* is where
+the mountain range, the rift and the porphyry copper came from. This is the lens that makes the
+generated history visible on the map rather than only readable in the biography.
+
+**Data definition (settled).** `run_continents` assigns every tile to a plate by wrapped Voronoi,
+then folds a per-tile height bias into Pass 1's heightmap — after which the plate that raised a tile
+is **unreadable from the finished terrain**. So the pass now returns its per-tile
+`continent_state::plate_id`, and `make_hard_coded_world` retains the whole `continent_state` on
+`generation_report::body_entry`. This is **presentation data**: the report never enters `world`, so
+the field stays off the serialisation seam (the same reasoning that keeps `world_params` in the app,
+BL-114). The canvas matches the active body to its report entry **by name**, the stable key the Tile
+Ledger's biography already uses. The pass's `history` lines are *moved* into the body biography and
+cleared, so those lines keep a single owner.
+
+Deriving the field instead by flood-filling contiguous land at render time was considered and
+rejected: it yields **landmasses, not plates**, so it can colour the continents but cannot explain
+them.
+
+**Rung.** Planetary only — plates are a per-tile surface field. Guarded behind
+`overlay_mode::continent` in
+[`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp).
+
+**Colour.** **Categorical**, not sequential: each plate takes a slot from a dedicated ten-colour
+table (`plate_colour`), composited over the terrain at opacity `0.80` — the lens is about the plate
+field, not the terrain beneath it. Boundary tiles (any of the four neighbours belongs to another
+plate; columns wrap, rows do not) then take a **separate white lift** at `0.45`.
+
+Two constraints the first draft got wrong and the final version encodes:
+
+- The boundary must read on a **different channel** from the plate colour. "The same colour, blended
+  harder" is not a visible difference — those boundaries vanished entirely on capture.
+- The palette must be genuinely **categorical**. Muted mineral tones chosen to avoid resembling the
+  nation wheel all landed at luminance ~100–130 with almost no hue spread, and collapsed into one
+  grey wash. The final table keeps the earthy cast that separates it from
+  `palette::nation_colour` — plates are *substrate*, not identity, and this must not read as a
+  second Country lens — but alternates light/dark so adjacent slots differ even in greyscale.
+
+**Glyph.** Two interlocking plates split by a diagonal seam (`icons::continent`; see
+[ICONS.md](ICONS.md)). The **seam** is the load-bearing shape: it distinguishes the glyph from the
+Country glyph's bordered territory and from any solid landmass blob, because what the lens shows is
+the boundary, not the area.
+
+**Legend.** Strip glyph highlight + tooltip (`overlay_mode_name` → "Continents (tectonic plates)"),
+plus an on-canvas key (`draw_continent_key`) at the usual flush-left-of-the-minimap anchor. Unlike
+the gradient keys it has no scale to explain — the tint is categorical — so it explains the one
+thing that is not self-evident: that the **pale** tiles are boundaries. It also reports the plate
+count, and degrades honestly: a body with no plate record says so, and a **stagnant-lid** body
+(`plate_count == 1`) says "one immobile plate" rather than drawing a meaningless single tint.
+
+**Interaction notes.** Planetary-only, single-select. Verified by
+`scripts/verify/continents_terrain.lua`, which captures the lens on **Kepler** and on **Selene** (the
+small-grid body — a different plate count and a tighter key layout). The check that matters is
+**correspondence**: the boundaries in the lens capture should line up with the ridges and coastlines
+in the plain-terrain capture from the same script, since that is what confirms the lens is showing
+the field the terrain was actually derived from.
 
 ## Placement-suitability surface *(BL-010 — not a strip lens)*
 

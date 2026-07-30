@@ -14,6 +14,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <initializer_list>
+#include <iterator>
 #include <map>
 #include <random>
 #include <utility>
@@ -96,8 +97,11 @@ world make_hard_coded_world(world_params params, generation_report* report)
         const uint32_t body_seed = params.seed ^ prototype_body_seed(proto_index);
         planetology_state st = run_planetology(in, rw.params, body_seed);
 
-        const continent_state cs = run_continents(st, gw, gh, body_seed ^ 0xC0117E57u);
-        st.history.insert(st.history.end(), cs.history.begin(), cs.history.end());
+        continent_state cs = run_continents(st, gw, gh, body_seed ^ 0xC0117E57u);
+        st.history.insert(st.history.end(),
+                          std::make_move_iterator(cs.history.begin()),
+                          std::make_move_iterator(cs.history.end()));
+        cs.history.clear(); // moved-from; the biography owns these lines now.
         std::stable_sort(st.history.begin(), st.history.end(),
             [](const history_event& a, const history_event& b) { return a.gya > b.gya; });
         bias_out = cs.height_bias;
@@ -112,7 +116,7 @@ world make_hard_coded_world(world_params params, generation_report* report)
             planetology_params undrawn = rw.params;
             undrawn.drawdown = 0.0f;
             report->bodies.push_back(generation_report::body_entry{
-                in.name, st, run_planetology(in, undrawn, body_seed) });
+                in.name, st, run_planetology(in, undrawn, body_seed), std::move(cs) });
         }
         return st;
     };

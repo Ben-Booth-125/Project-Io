@@ -165,6 +165,20 @@ void scarcity(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Fill colour of the silhouette.
 void industry(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw the Continent-lens glyph — two interlocking plates split by a jagged
+/// seam — in @p colour. For the overlay-lens control strip; reads as "the crust
+/// is in pieces, and this is where they meet", which is the lens's whole subject.
+/// The seam is the load-bearing shape: it distinguishes this from the Country
+/// glyph (a bordered territory) and from any solid landmass blob, because what
+/// the lens shows is the *boundary*, not the area. See LENSES.md § Continent
+/// lens (BL-226).
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Fill colour of both plates.
+void continent(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 /// Draw the History nav-rail glyph — an hourglass (a down-triangle over an
 /// up-triangle meeting at a waist) — in @p colour. Slot 9 previously drew the
 /// same @ref ledger glyph as the Budget slot, so the two were indistinguishable;

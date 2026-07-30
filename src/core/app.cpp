@@ -172,6 +172,7 @@ overlay_mode overlay_from_name(const std::string& s)
     if (s == "production")  return overlay_mode::production;
     if (s == "scarcity")    return overlay_mode::scarcity;
     if (s == "industry")    return overlay_mode::industry;
+    if (s == "continent")   return overlay_mode::continent;
     return overlay_mode::none;
 }
 
@@ -2419,7 +2420,8 @@ void app::render()
                 // a non-const world for the route-cached pathfinder, so it cannot live in
                 // the const-world draw. Derived VIEW state — no feedback into the sim.
                 ui::update_body_vision(m_world, m_ui, m_ui.sim_now_days);
-                ui::draw_body_surface_canvas(m_world, m_ui, m_registry, m_last_econ_report, {0.0f, 0.0f}, disp, primary_input,
+                ui::draw_body_surface_canvas(m_world, m_ui, m_registry, m_last_econ_report,
+                                             m_generation_report, {0.0f, 0.0f}, disp, primary_input,
                                              {mm_origin.x, mm_origin.y + mm_h * 0.5f});
                 ui::draw_circumplanetary_canvas(m_world, m_ui, inset_origin, inset_size, minimap_input, true);
                 {

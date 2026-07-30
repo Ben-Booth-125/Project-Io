@@ -1,5 +1,6 @@
 #pragma once
 
+#include "continents.hpp"
 #include "planetology.hpp"
 #include "world.hpp"
 
@@ -55,6 +56,15 @@ struct generation_report
         /// has no preview to consult). Drawdown consumes no randomness, so this is
         /// the same world minus its industrial history — not a second roll.
         planetology_state undrawn;
+
+        /// What the Continents/Drift pass computed for this body (BL-226). Its
+        /// `history` is empty here — those lines were moved into `state.history`
+        /// at generation, where the biography reads them; what is kept is the
+        /// plate set and the per-tile `plate_id`, which nothing else records.
+        /// The Continent lens is the consumer. Presentation data, like the rest
+        /// of this struct: it never enters `world`, so it stays off the
+        /// serialisation seam.
+        continent_state continents;
     };
 
     world_preferences       preferences{}; ///< What the player asked for.

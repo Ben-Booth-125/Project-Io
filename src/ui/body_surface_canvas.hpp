@@ -2,6 +2,7 @@
 
 #include "ui_state.hpp"
 #include "world/economy_system.hpp" // economy_report (Production lens)
+#include "world/hard_coded_world.hpp" // generation_report (Continent lens)
 #include "world/recipe_registry.hpp" // recipe_registry (Production / Opportunity lenses)
 #include "world/world.hpp"
 
@@ -26,6 +27,10 @@ namespace ui {
 ///                      Opportunity lenses to value outputs and recipes.
 /// @param report        Most recent economy-step report — the Production lens reads
 ///                      per-building output quantities from it.
+/// @param gen           The world's generation report (app::m_generation_report) — the
+///                      Continent lens reads the active body's retained plate field from
+///                      it. Presentation data, matched by body name (BL-226); the same
+///                      source the Tile Ledger's biography reads.
 /// @param origin        Top-left of the region, in screen pixels.
 /// @param size          Width and height of the region, in screen pixels.
 /// @param input_enabled When true, hover and click are processed. The caller
@@ -35,7 +40,8 @@ namespace ui {
 ///                      anchor.y. Pass the minimap's left edge + vertical centre so the
 ///                      key reads as a drawer folding out from the minimap.
 void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_registry& reg,
-                              const economy_report& report, ImVec2 origin, ImVec2 size,
+                              const economy_report& report, const generation_report& gen,
+                              ImVec2 origin, ImVec2 size,
                               bool input_enabled, ImVec2 lens_key_anchor);
 
 /// Refresh the intra-body vision model for state.active_body (BL-151/152/154). Rebuilds

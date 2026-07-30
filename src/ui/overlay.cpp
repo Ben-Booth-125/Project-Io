@@ -29,6 +29,7 @@ void draw_lens_icon(ImDrawList* dl, overlay_mode m, ImVec2 rect_min, ImVec2 rect
         case overlay_mode::production:  icons::production (dl, centre, r, colour); break;
         case overlay_mode::scarcity:    icons::scarcity   (dl, centre, r, colour); break;
         case overlay_mode::industry:    icons::industry   (dl, centre, r, colour); break;
+        case overlay_mode::continent:   icons::continent  (dl, centre, r, colour); break;
         // Reach/Supply-routes (BL-011/BL-014) reuse the existing convoy/supply
         // glyphs rather than adding new ones — dedicated glyphs are an open TODO
         // in ui::icons (src/ui/icons.{hpp,cpp}, out of this lens work's file
@@ -55,6 +56,7 @@ const char* overlay_mode_name(overlay_mode m)
         case overlay_mode::production:  return "Production intensity";
         case overlay_mode::scarcity:    return "Market scarcity";
         case overlay_mode::industry:    return "Industry density";
+        case overlay_mode::continent:   return "Continents (tectonic plates)";
         case overlay_mode::reach:         return "Reach (commercial connectivity)";
         case overlay_mode::supply_routes: return "Supply-routes graph";
         default:                        return "None";
@@ -75,6 +77,7 @@ const char* overlay_mode_short_name(overlay_mode m)
         case overlay_mode::production:  return "Production";
         case overlay_mode::scarcity:    return "Scarcity";
         case overlay_mode::industry:    return "Industry";
+        case overlay_mode::continent:   return "Continent";
         case overlay_mode::reach:         return "Reach";
         case overlay_mode::supply_routes: return "Supply routes";
         default:                        return "None";
@@ -94,10 +97,14 @@ void draw_overlay_controls(ui_state& ui, float x, float top_y, float w)
     // Supply-routes (BL-011/BL-014) join them off-strip too — they do not fit
     // the 240 px minimap bar this row now lives on. Single-select with a null state:
     // clicking the active lens clears to overlay_mode::none (toggle_overlay).
-    constexpr overlay_mode modes[7] = {
+    // BL-226 adds Continent as the eighth. It earns a strip slot rather than the
+    // keyboard-only shelf because it answers a question the player asks at first
+    // sight of a body ("why is the land shaped like that?"), which is exactly the
+    // moment they are looking at the strip.
+    constexpr overlay_mode modes[8] = {
         overlay_mode::corporation, overlay_mode::country, overlay_mode::resource,
         overlay_mode::market, overlay_mode::population, overlay_mode::opportunity,
-        overlay_mode::production };
+        overlay_mode::production, overlay_mode::continent };
 
     const float bar_h = ImGui::GetFrameHeight() + 6.0f;
     ImGui::SetNextWindowPos({x, top_y}, ImGuiCond_Always);

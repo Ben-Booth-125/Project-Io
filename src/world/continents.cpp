@@ -55,6 +55,9 @@ continent_state run_continents(const planetology_state& pl, int gw, int gh, uint
     continent_state out;
     const int total = gw * gh;
     out.height_bias.assign(static_cast<std::size_t>(total), 0.0f);
+    // Sized before the stagnant-lid early return so every consumer sees a
+    // full-length field: one immobile plate owns tile 0..n, hence all-zero.
+    out.plate_id.assign(static_cast<std::size_t>(total), 0);
 
     // --- Plate count: a CONSEQUENCE of Engine's already-computed budget, not
     //     an independent roll. A stagnant lid drifts as one immobile plate. ---
@@ -91,7 +94,7 @@ continent_state run_continents(const planetology_state& pl, int gw, int gh, uint
     }
 
     // --- Voronoi assignment: nearest plate per tile, wrapped in x. ---
-    std::vector<int> plate_id(static_cast<std::size_t>(total), 0);
+    std::vector<int>& plate_id = out.plate_id;
     for (int row = 0; row < gh; ++row)
     {
         for (int col = 0; col < gw; ++col)

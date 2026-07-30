@@ -120,6 +120,7 @@ glyphs above. The former slot 10 — a disabled square with no glyph *and* no to
 | **Production** | `production(…, colour)` | Filled upward-pointing triangle over a short baseline (output / throughput rising motif); distinct from the market bars and the scarcity hollow down-triangle | Caller fill | `overlay_mode::production` |
 | **Scarcity** | `scarcity(…, colour)` | Hollow downward-pointing triangle (empty / depleted motif; inverse of the filled resource pip) | Caller stroke | `overlay_mode::scarcity` |
 | **Industry** | `industry(…, colour)` | Factory silhouette — a filled body block with a two-tooth sawtooth roof and a left chimney rising above the roofline; distinct from the production up-triangle and the market bars (BL-084) | Caller fill | `overlay_mode::industry` |
+| **Continent** | `continent(…, colour)` | Two filled, deliberately asymmetric quads split by a diagonal **gap** — the seam is the shape that carries the meaning, and it is a gap rather than a drawn hairline so it survives at strip size. Reads "the crust is in pieces, and this is where they meet"; distinct from the Country shield (a bordered *territory*) and from any solid landmass blob, because the lens shows the *boundary*, not the area (BL-226) | Caller fill | `overlay_mode::continent` |
 
 In the strip ([`overlay.cpp`](../../src/ui/overlay.cpp), `draw_overlay_controls`)
 each lens is an invisible button with its glyph drawn over the rect; the active
@@ -169,8 +170,9 @@ firmed up (several feed the **lens-design** Brief):
 
 5. **The lens set is now complete.** The curated strip order is
    corporation / country / resource / market / population / **opportunity** /
-   **production** / scarcity / **industry** (Industry joined the strip with BL-084;
-   catalogued here 2026-07-04, its LENSES.md section still owed); the rest are
+   **production** / **continent** / scarcity / **industry** (Industry joined the
+   strip with BL-084; **Continent** joined it with BL-226, 2026-07-30, as the
+   eighth on-screen glyph); the rest are
    ratified in [LENSES.md](LENSES.md) and all are catalogued above (`supply`
    exists but is off the strip). Note `resource` is **overloaded**:
    `resource(…, resource_type)` is the identity-coloured *pip* (a diamond), while

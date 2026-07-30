@@ -269,6 +269,31 @@ void industry(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     dl->AddRectFilled({ centre.x - bw * 0.85f, centre.y - r }, { centre.x - bw * 0.5f, top }, colour);
 }
 
+void continent(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // Two plates split by a diagonal seam. Each plate is its own convex quad —
+    // the seam is the GAP between them, not a drawn line, so the "crust in
+    // pieces" reading survives at strip size where a hairline would vanish. The
+    // quads are deliberately not mirror images: an irregular pair reads as
+    // tectonic, a symmetric one reads as a button.
+    const ImVec2 left[4] = {
+        { centre.x - r,         centre.y - r * 0.90f },
+        { centre.x + r * 0.05f, centre.y - r * 0.70f },
+        { centre.x - r * 0.15f, centre.y + r * 0.90f },
+        { centre.x - r,         centre.y + r * 0.70f },
+    };
+    const ImVec2 right[4] = {
+        { centre.x + r * 0.30f, centre.y - r * 0.70f },
+        { centre.x + r,         centre.y - r * 0.90f },
+        { centre.x + r,         centre.y + r * 0.70f },
+        { centre.x + r * 0.10f, centre.y + r * 0.90f },
+    };
+    dl->AddConvexPolyFilled(left, 4, colour);
+    dl->AddPolyline(left, 4, outline, ImDrawFlags_Closed, 1.0f);
+    dl->AddConvexPolyFilled(right, 4, colour);
+    dl->AddPolyline(right, 4, outline, ImDrawFlags_Closed, 1.0f);
+}
+
 void history(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
 {
     // Hourglass: a down-triangle over an up-triangle meeting at a centre waist,
