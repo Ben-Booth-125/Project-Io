@@ -94,6 +94,47 @@ void draw_header_panel(const world& w,
     const ImVec2       item_spacing = ImGui::GetStyle().ItemSpacing;
     const float        spark_width  = 96.0f;
 
+    // BL-177 — the runway read: "how long until underwater". NET says the player
+    // is losing money; it does not say how much cushion is left, which is the
+    // half of the goal that lets them act before bankruptcy rather than discover
+    // it. BL-171 removed the old runway deliberately, so this re-homes it rather
+    // than reverting: it sits in the header beside the figures it is derived
+    // from, and is load-bearing (measured into used_width, never dropped).
+    //
+    // Deliberately NOT an "infinite quarters" reading when profitable — a runway
+    // only exists while burning. Growing/flat states say so in words.
+    // Shown only while it MEANS something — burning cash, or already under. When
+    // the balance is growing there is no runway to run out, and a "growing"
+    // reading would be noise competing with NET for scarce header width. This is
+    // also why it is not an "infinite quarters" reading: that number would be a
+    // lie dressed as a figure.
+    std::string runway_text;
+    std::string runway_tip;
+    bool        runway_urgent = false;
+    const bool  runway_meaningful = (balance < 0.0f) || (net < 0.0f);
+    if (balance < 0.0f)
+    {
+        runway_text   = "in debt";
+        runway_urgent = true;
+        runway_tip    = "Already underwater - interest accrues each quarter.\n"
+                        "Runway resumes once the balance is positive again.";
+    }
+    else if (net < 0.0f)
+    {
+        const int quarters = static_cast<int>(balance / -net);
+        char      buf[32];
+        std::snprintf(buf, sizeof(buf), "%dq", quarters);
+        runway_text = buf;
+        // Under two years of cushion is the point it needs acting on.
+        runway_urgent = quarters < 8;
+        char tip[192];
+        std::snprintf(tip, sizeof(tip),
+                      "About %d quarters of cushion: balance divided by the current\n"
+                      "quarterly loss. Assumes the burn holds steady - it moves as\n"
+                      "prices, wages and upkeep change.", quarters);
+        runway_tip = tip;
+    }
+
     float used_width = ImGui::CalcTextSize("BALANCE").x + item_spacing.x +
                        ImGui::CalcTextSize(fmt::credits(balance).c_str()).x + item_spacing.x +
                        ImGui::CalcTextSize("   |   STOCKPILE").x + item_spacing.x +
@@ -104,6 +145,35 @@ void draw_header_panel(const world& w,
     const float available   = ImGui::GetContentRegionAvail().x;
     bool        show_debt   = in_debt;
     bool        show_spark  = balance_history.size() >= 2;
+
+    // BL-177 runway fit, resolved BEFORE the decorative drops because the runway
+    // is load-bearing and they are not. Container 4 (LAYOUT.md) forbids silently
+    // truncating a header figure, so this degrades in three honest steps rather
+    // than letting the value run off the edge:
+    //   full   "   |   RUNWAY  12q"   - label and value
+    //   value  "   |   12q"           - label dropped, value kept (tooltip explains)
+    //   none                          - folded into the NET tooltip instead
+    const float runway_sep_w   = ImGui::CalcTextSize("   |   ").x;
+    const float runway_label_w = ImGui::CalcTextSize("RUNWAY").x + item_spacing.x;
+    const float runway_val_w   = ImGui::CalcTextSize(runway_text.c_str()).x;
+    bool show_runway       = runway_meaningful;
+    bool show_runway_label = false;
+    if (show_runway)
+    {
+        if (used_width + runway_sep_w + runway_label_w + runway_val_w <= available)
+        {
+            show_runway_label = true;
+            used_width += runway_sep_w + runway_label_w + runway_val_w;
+        }
+        else if (used_width + runway_sep_w + runway_val_w <= available)
+        {
+            used_width += runway_sep_w + runway_val_w;
+        }
+        else
+        {
+            show_runway = false; // no room at all — NET's tooltip carries it
+        }
+    }
 
     if (show_debt && used_width + item_spacing.x + ImGui::CalcTextSize(debt_text.c_str()).x > available)
         show_debt = false; // drop the debt flag first — the red number already carries the signal
@@ -151,6 +221,24 @@ void draw_header_panel(const world& w,
         const ImU32 col = value_colour(fmt::sign_of(net));
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(col), "%s", fmt::rate(net, "qtr").c_str());
     }
+    // NET carries the runway when there was no room to draw it (see the fit
+    // resolution above), so the fact is never simply lost.
+    if (runway_meaningful && !show_runway && ImGui::IsItemHovered())
+        ImGui::SetTooltip("%s", runway_tip.c_str());
+
+    // --- BL-177: runway — how long the balance lasts at the current burn ---
+    if (show_runway)
+    {
+        ImGui::SameLine();
+        ImGui::TextDisabled(show_runway_label ? "   |   RUNWAY" : "   |  ");
+        ImGui::SameLine();
+        const ImU32 col = runway_urgent ? palette::negative
+                                        : ImGui::GetColorU32(ImGuiCol_Text);
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(col), "%s", runway_text.c_str());
+        if (ImGui::IsItemHovered())
+            ImGui::SetTooltip("%s", runway_tip.c_str());
+    }
+
     if (show_spark)
     {
         ImGui::SameLine();

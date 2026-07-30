@@ -6,7 +6,9 @@
 // Build (from repo root, after sourcing vcvars64):
 //   cl /nologo /std:c++20 /EHsc /I src econ_harness.cpp ^
 //      src\world\world.cpp src\world\economy_system.cpp ^
-//      src\world\market_clearing.cpp src\world\budget_system.cpp /Fe:econ_harness.exe
+//      src\world\market_clearing.cpp src\world\budget_system.cpp ^
+//      /Fo:build_gen\verify\econ_harness\ /Fe:build_gen\verify\econ_harness.exe
+// Run: .\build_gen\verify\econ_harness.exe
 
 #include "world/budget_system.hpp"
 #include "world/components.hpp"

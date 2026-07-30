@@ -118,6 +118,45 @@ static const std::array<key_binding, 22> s_bindings = {{
 
 namespace {
 
+/// The speed tier's rate as a multiplier string ("0.25×" … "16×"), derived from
+/// `sim_loop::speed_multiplier` so the label can never drift from the curve it
+/// describes (BL-178). Returns "Paused" for tier 0.
+const char* speed_rate_label(int speed)
+{
+    switch (speed)
+    {
+    case 1:  return "0.25×";
+    case 2:  return "0.5×";
+    case 3:  return "1×";
+    case 4:  return "4×";
+    case 5:  return "16×";
+    default: return "Paused";
+    }
+}
+
+/// The speed tier's real-time cost of one economic quarter, as a compact human
+/// string (BL-178). Computed from the sim-loop constants rather than authored, so
+/// retuning `seconds_per_day_1x` or the multiplier curve updates the label:
+/// one quarter is `econ_tick_days` in-game days, and one in-game day costs
+/// `seconds_per_day_1x / multiplier` real seconds.
+const char* speed_quarter_label(int speed)
+{
+    const double mult = sim_loop::speed_multiplier(speed);
+    if (mult <= 0.0) return "—";
+
+    const double secs = (sim_loop::econ_tick_days * sim_loop::seconds_per_day_1x) / mult;
+
+    // Static buffers per tier: the caller treats the result as a stable literal,
+    // and there are only five tiers, so this stays trivially safe.
+    static char buf[sim_loop::max_speed + 1][24] = {};
+    char* out = buf[speed < 0 ? 0 : (speed > sim_loop::max_speed ? 0 : speed)];
+    if (secs < 60.0)
+        std::snprintf(out, 24, "~%ds", static_cast<int>(std::lround(secs)));
+    else
+        std::snprintf(out, 24, "~%dm", static_cast<int>(std::lround(secs / 60.0)));
+    return out;
+}
+
 /// Map a lens name (as used in the verify scripts) to its overlay_mode. Unknown
 /// names fall back to overlay_mode::none.
 overlay_mode overlay_from_name(const std::string& s)
@@ -771,6 +810,27 @@ void app::setup_world(world_params params)
                 m_ui.planetary_center_row     = static_cast<int>(sum_row / n);
                 m_ui.planetary_center_pending = true;
                 m_ui.planetary_zoom           = 11.0f;
+            }
+        }
+    }
+
+    // BL-174 strand 2 — a legible first move. The launch view framed who and where
+    // but suggested nothing to DO, and the Selection band is not drawn at all with
+    // nothing selected, so there was no surface on which to suggest anything.
+    // Seeding the selection to the HQ's tile gives the band something to show at
+    // launch: the player's own ground, with Construct primed on it (see
+    // draw_tile_selection). Derived entirely from world state — no tutorial flag,
+    // no timer, nothing persisted, and nothing that can go stale or lie.
+    {
+        const auto pit = m_world.corporations.find(m_world.player_entity);
+        if (pit != m_world.corporations.end())
+        {
+            const auto hq = m_world.buildings.find(pit->second.hq_building);
+            if (hq != m_world.buildings.end())
+            {
+                const auto tit = m_world.tiles.find(hq->second.tile);
+                if (tit != m_world.tiles.end() && tit->second.body == start_body)
+                    m_ui.selected_entity = hq->second.tile;
             }
         }
     }
@@ -2403,12 +2463,21 @@ void app::render()
     // resolution-scaled mm_h (the BL-093 anti-pattern): year + date lines, the thin
     // progress bar, and the speed-button row, plus the inter-row spacing.
     const float time_line_h    = ImGui::GetTextLineHeightWithSpacing();
-    const float time_prog_h    = 10.0f; // thin quarter-progress bar
+    // BL-178: the 10 px bar was easy to miss and carried no label. Tall enough to
+    // seat a centred overlay ("58 d to Q2"), which is what actually makes the
+    // next-resolution distance read.
+    const float time_prog_h    = ImGui::GetTextLineHeight() + 4.0f;
     const float time_spacing   = ImGui::GetStyle().ItemSpacing.y;
+    // BL-178: one always-visible line under the speed row naming the ACTIVE
+    // tier's real rate. A tooltip cannot be seen without hovering (the same
+    // critique BL-174 made of the nav rail), so the current speed's meaning is
+    // stated on screen; the per-button tooltips carry the full ladder.
+    const float time_rate_h    = ImGui::GetTextLineHeightWithSpacing();
     // Year + date now share one row (Ben's 2026-07-15 review), so the reclaimed
     // line height goes to a taller speed-button row rather than shrinking the panel.
     const float time_btn_h     = ImGui::GetFrameHeight() * 2.0f;
-    const float time_content_h = time_line_h + time_prog_h + time_btn_h + time_spacing * 2.0f;
+    const float time_content_h = time_line_h + time_prog_h + time_btn_h + time_rate_h
+                               + time_spacing * 3.0f;
     const float time_h         = time_content_h + ImGui::GetStyle().WindowPadding.y * 2.0f;
     {
         ImGui::SetNextWindowPos({disp.x - margin - tick_w, margin});
@@ -2436,8 +2505,20 @@ void app::render()
 
         // --- Quarter-progress bar: full width, so it aligns with the speed-control
         // row directly below it (the economy resolves on the quarter boundary).
-        ImGui::ProgressBar(ui::fmt::quarter_progress(day),
-                           {ImGui::GetContentRegionAvail().x, time_prog_h}, "");
+        // BL-178: the bar is now text-height and carries a centred overlay naming
+        // the distance to the next resolution, because "how close am I to the
+        // economy resolving" was the fact the bare bar failed to convey.
+        const float quarter_frac = ui::fmt::quarter_progress(day);
+        char         prog_label[32];
+        const int    days_left = static_cast<int>(
+            std::lround((1.0f - quarter_frac) * static_cast<float>(sim_loop::econ_tick_days)));
+        std::snprintf(prog_label, sizeof(prog_label), "%d d to Q%d",
+                      days_left, (date.quarter % 4) + 1);
+        ImGui::ProgressBar(quarter_frac,
+                           {ImGui::GetContentRegionAvail().x, time_prog_h}, prog_label);
+        ImGui::SetItemTooltip(
+            "Quarter progress. The economy resolves on the quarter boundary:\n"
+            "prices clear, production banks, and the budget settles.");
 
         // --- Speed controls: a full-width row of pause + speed-tier buttons, aligned
         // with the progress bar above. The active speed is highlighted. When running,
@@ -2491,9 +2572,39 @@ void app::render()
                 }
                 if (active)
                     ImGui::PopStyleColor();
+                // BL-178: name each tier's REAL rate on hover. The multipliers were
+                // already documented in the F1 hotkey sheet but never on the control
+                // itself, so the ladder was unreadable where the player uses it.
+                if (speeds[i] == 0)
+                    ImGui::SetItemTooltip("%s (Space)", m_sim_loop.paused() ? "Resume" : "Pause");
+                else
+                    ImGui::SetItemTooltip("Speed %s — %s\n%s per quarter (%d)",
+                                          labels[i],
+                                          speed_rate_label(speeds[i]),
+                                          speed_quarter_label(speeds[i]),
+                                          speeds[i]);
                 if (i + 1 < n)
                     ImGui::SameLine();
             }
+        }
+
+        // --- BL-178: the active tier's rate, always visible. Guaranteed-fit per
+        // LAYOUT.md container 5 (the time panel is authored to fit): the string is
+        // measured and only the compact form is drawn if the long one would not fit.
+        {
+            char rate[64];
+            if (m_sim_loop.paused())
+                std::snprintf(rate, sizeof(rate), "Paused");
+            else
+                std::snprintf(rate, sizeof(rate), "%s  ·  %s per quarter",
+                              speed_rate_label(m_sim_loop.speed()),
+                              speed_quarter_label(m_sim_loop.speed()));
+
+            const float avail = ImGui::GetContentRegionAvail().x;
+            if (!m_sim_loop.paused() && ImGui::CalcTextSize(rate).x > avail)
+                std::snprintf(rate, sizeof(rate), "%s",
+                              speed_rate_label(m_sim_loop.speed()));
+            ImGui::TextDisabled("%s", rate);
         }
 
         ImGui::End();

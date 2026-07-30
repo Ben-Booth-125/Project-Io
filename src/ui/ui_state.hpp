@@ -91,10 +91,26 @@ struct construction_state
     /// human string shown by the build UI ("Built.", "Can't afford it.", …).
     std::string   last_message;
 
-    /// Which bounded sub-view the Construction window shows (2026-07-06 tabbed
-    /// redesign — Build / Manage / Sell Orders are three different questions,
-    /// this is the nav selector between them). 0=Build, 1=Manage, 2=Sell Orders.
-    int           panel_view = 0;
+    /// Which bounded sub-view the Building window shows (2026-07-06 tabbed
+    /// redesign; slimmed to two by BL-143 when the Build front door moved to the
+    /// tile Selection element and Sell Orders moved to the Market Ledger).
+    /// **0 = Construction** (the queue: "what's building?"),
+    /// **1 = Buildings** ("what do I own?", plus the inline recipe/workforce
+    /// detail for the selected row).
+    ///
+    /// Defaults to **Buildings** (BL-176): the queue is empty most of the time,
+    /// so opening on it made the panel's front door an empty room, while the
+    /// player always owns buildings. The old default of 0 predates the BL-143
+    /// slim, when view 0 was the Build front door rather than a queue.
+    int           panel_view = 1;
+
+    /// Last building the panel auto-focused on (BL-176). The Buildings tab keys
+    /// its selected row off the shared `ui_state::selected_entity`, so selecting
+    /// a building anywhere already selects its row here; this field only tracks
+    /// the EDGE, so newly selecting a building snaps the panel to the Buildings
+    /// view once, without pinning it there every frame (which would stop the
+    /// player ever reaching the queue).
+    entity_id     panel_focus_building = null_entity;
 };
 
 /// Shared selection and view state for the three primary canvases.

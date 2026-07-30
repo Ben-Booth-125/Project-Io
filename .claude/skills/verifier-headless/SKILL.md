@@ -119,13 +119,33 @@ only when building outside the CMake tree.
    ```
    cl /nologo /std:c++20 /EHsc /I src tools\verify\econ_harness.cpp ^
       src\world\world.cpp src\world\economy_system.cpp ^
-      src\world\market_clearing.cpp src\world\budget_system.cpp /Fe:econ_harness.exe
+      src\world\market_clearing.cpp src\world\budget_system.cpp ^
+      /Fo:build_gen\verify\econ_harness\ /Fe:build_gen\verify\econ_harness.exe
    ```
    Keep harnesses **outside `src/`** — CMake `GLOB_RECURSE`s `src/*.cpp` into the
    real build.
+
+   **Build output goes under `build_gen\verify\` — never `%TEMP%`, never the repo root.**
+   Three rules, all load-bearing:
+   - Always pass **both** `/Fe:` (exe) and `/Fo:` (objects, trailing `\` required).
+     `cl` defaults both to the *current directory*, so omitting them scatters
+     `.obj` files across the tree.
+   - Use the harness's **full name** from **Available harnesses** above. No
+     abbreviations — a stray `hlh.exe` or `ct.exe` is unidentifiable weeks later
+     and reads as malware to a virus scanner.
+   - `%TEMP%` is banned as an output target. It is user-writable staging that AV
+     tools watch closely, so an unsigned exe there is exactly the shape of a
+     dropper — and excluding `%TEMP%` from a scanner to quieten that would blind
+     it to real threats. `build_gen/` gives Norton et al. one narrow, stable
+     exclusion path instead.
+
+   Nothing here dirties `git status`: `.gitignore` already covers `*.exe`, `*.obj`,
+   `*.pdb`, `build/` and `.claude/worktrees/`. Keeping artifacts in-tree costs
+   nothing and buys a scannable, self-describing location.
 2. **Run** the produced exe. From PowerShell a bare name fails (`9009`) when cwd
-   isn't on PATH — invoke as `& ".\econ_harness.exe"` or with an absolute path.
-   Each harness prints `PASS` / `FAIL` lines and exits non-zero on any failure.
+   isn't on PATH — invoke as `& ".\build_gen\verify\econ_harness.exe"` or with an
+   absolute path. Each harness prints `PASS` / `FAIL` lines and exits non-zero on
+   any failure.
 3. **Report** the assertion results against the requirement being checked; cite the
    harness name and the failing lines if any.
 

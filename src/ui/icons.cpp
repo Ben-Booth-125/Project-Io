@@ -269,6 +269,64 @@ void industry(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     dl->AddRectFilled({ centre.x - bw * 0.85f, centre.y - r }, { centre.x - bw * 0.5f, top }, colour);
 }
 
+void history(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // Hourglass: a down-triangle over an up-triangle meeting at a centre waist,
+    // with capped ends. Read as "time"; the meeting point is what distinguishes
+    // it from the scarcity and production single triangles.
+    const float hw = r * 0.72f;   // half-width at the capped ends
+    dl->AddLine({ centre.x - hw, centre.y - r }, { centre.x + hw, centre.y - r }, colour, 1.5f);
+    dl->AddLine({ centre.x - hw, centre.y + r }, { centre.x + hw, centre.y + r }, colour, 1.5f);
+    // The two tapers crossing at the waist.
+    dl->AddLine({ centre.x - hw, centre.y - r }, { centre.x, centre.y }, colour, 1.5f);
+    dl->AddLine({ centre.x + hw, centre.y - r }, { centre.x, centre.y }, colour, 1.5f);
+    dl->AddLine({ centre.x - hw, centre.y + r }, { centre.x, centre.y }, colour, 1.5f);
+    dl->AddLine({ centre.x + hw, centre.y + r }, { centre.x, centre.y }, colour, 1.5f);
+}
+
+void research(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // Branching tree: a stem rising from the bottom to a fork, then two
+    // diagonals out to capped terminal nodes. The only branching glyph in the
+    // vocabulary, so it reads as "tech tree" rather than an arrow or triangle.
+    const float fork_y = centre.y - r * 0.15f;
+    const float node_r = std::max(1.0f, r * 0.22f);
+    // Stem.
+    dl->AddLine({ centre.x, centre.y + r }, { centre.x, fork_y }, colour, 1.5f);
+    // Two branches out to their nodes.
+    const ImVec2 left  = { centre.x - r * 0.70f, centre.y - r * 0.75f };
+    const ImVec2 right = { centre.x + r * 0.70f, centre.y - r * 0.75f };
+    dl->AddLine({ centre.x, fork_y }, left,  colour, 1.5f);
+    dl->AddLine({ centre.x, fork_y }, right, colour, 1.5f);
+    dl->AddCircleFilled(left,  node_r, colour);
+    dl->AddCircleFilled(right, node_r, colour);
+}
+
+void strategy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // Pennant on a pole: a vertical staff with a filled right-triangle flag at
+    // its head, flying to the right. The flag hangs off the staff top rather
+    // than resting on a baseline, keeping it clear of the production triangle.
+    const float x = centre.x - r * 0.55f;
+    dl->AddLine({ x, centre.y - r }, { x, centre.y + r }, colour, 1.5f);
+    const ImVec2 v[3] = {
+        { x,                 centre.y - r },          // staff head
+        { centre.x + r,      centre.y - r * 0.45f },  // flag point
+        { x,                 centre.y + r * 0.10f },  // flag foot on the staff
+    };
+    dl->AddConvexPolyFilled(v, 3, colour);
+}
+
+void diplomacy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // Two overlapping circle outlines — two parties meeting. The overlap is the
+    // motif, so it never reads as the single market-centre circle.
+    const float cr  = r * 0.62f;
+    const float off = r * 0.38f;
+    dl->AddCircle({ centre.x - off, centre.y }, cr, colour, 0, 1.5f);
+    dl->AddCircle({ centre.x + off, centre.y }, cr, colour, 0, 1.5f);
+}
+
 void market_centre(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
 {
     // Circle outline.

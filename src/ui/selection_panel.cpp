@@ -760,8 +760,52 @@ void draw_tile_selection(world& w, ui_state& ui)
         const ImVec2 bsz = {bw, bh};
 
         // Construct — opens the tile construction ledger (BL-162).
-        if (tile_icon_button("##act_construct", bsz, /*enabled=*/true,
-                             "Construct buildings", glyph_hammer))
+        //
+        // BL-174 strand 2: two world-derived layers, no tutorial state.
+        //  - ENABLED only if something is actually placeable here. It was
+        //    hard-coded true, so clicking an ocean tile opened a ledger of
+        //    nothing but red refusals — the front door opening onto a wall.
+        //  - PRIMED (accent ring) when the player has nothing under
+        //    construction anywhere, which is the honest reading of "you have
+        //    capital and nothing on the way". True at launch, extinguishes
+        //    itself the moment a build starts, returns when it becomes true
+        //    again. No timer, no flag, no dismissal to persist.
+        bool any_placeable = false;
+        for (const resource_type er : placement_rules::k_extractable)
+            if (tile.resource_deposit[static_cast<std::size_t>(er)] > 0.0f &&
+                placement_rules::can_place_in_world(w, sel, building_type::extraction_site, er).ok())
+            { any_placeable = true; break; }
+        if (!any_placeable)
+        {
+            for (const building_type bt : {building_type::processing_facility,
+                                           building_type::port,
+                                           building_type::launchpad,
+                                           building_type::inland_logistics_hub})
+                if (placement_rules::can_place_in_world(w, sel, bt, resource_type::iron_ore).ok())
+                { any_placeable = true; break; }
+        }
+
+        bool building_underway = false;
+        if (const auto pit = w.corporations.find(w.player_entity); pit != w.corporations.end())
+            for (entity_id bid : pit->second.assets)
+                if (const auto bit = w.buildings.find(bid);
+                    bit != w.buildings.end() && bit->second.ticks_remaining > 0)
+                { building_underway = true; break; }
+
+        const bool primed = any_placeable && !building_underway;
+        if (primed)
+        {
+            const ImVec2 pmin = ImGui::GetCursorScreenPos();
+            ImGui::GetWindowDrawList()->AddRect(
+                {pmin.x - 2.0f, pmin.y - 2.0f}, {pmin.x + bsz.x + 2.0f, pmin.y + bsz.y + 2.0f},
+                palette::selection, 4.0f, 0, 2.0f);
+        }
+        if (tile_icon_button("##act_construct", bsz, any_placeable,
+                             any_placeable
+                                 ? (primed ? "Construct buildings - nothing under way"
+                                           : "Construct buildings")
+                                 : "Nothing can be built on this tile",
+                             glyph_hammer))
             ui.show_build_ledger = true;
         ImGui::SameLine();
 
@@ -1065,6 +1109,42 @@ void draw_building_selection(world& w, const recipe_registry& reg,
             b.workforce_auto   = false; // a manual move pins the dial
         }
         ImGui::EndDisabled();
+
+        // ── BL-179: the habitability→workforce reason, where the player decides.
+        //    The slider says what was ASKED for; this says what the body actually
+        //    ALLOWS, and why. The chain is target → assigned → x contention →
+        //    effective, and contention is set by the corp's labour demand against
+        //    a pool that habitability sizes (POPULATION.md § Workforce model).
+        //    Phrasing comes from the shared ui::fmt::labour_contention helper, so
+        //    this and the Economy panel's staffing table are the same ceiling in
+        //    the same words - the "one consistent story" BL-179 requires.
+        const auto tile_it = w.tiles.find(b.tile);
+        if (tile_it != w.tiles.end())
+        {
+            const entity_id body = tile_it->second.body;
+            const entity_id corp = owner_corp_of(w, sel);
+            const auto      cit  = report.workforce_contention.find({corp, body});
+            const float     scal = (cit != report.workforce_contention.end()) ? cit->second : 1.0f;
+            const std::string shortfall = fmt::labour_contention(scal);
+
+            if (!shortfall.empty())
+            {
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative),
+                                   "Body allows %s", shortfall.c_str());
+                const auto hit = report.body_habitability.find(body);
+                if (hit != report.body_habitability.end())
+                {
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("- habitability %.2f", hit->second);
+                }
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(
+                        "Your labour demand on this body exceeds the workforce pool,\n"
+                        "so every building you own here is throttled by the same\n"
+                        "fraction. The pool is sized by population and habitability -\n"
+                        "raising the target asks for labour that is not there.");
+            }
+        }
     }
 
     ImGui::Spacing();

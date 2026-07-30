@@ -112,4 +112,19 @@ calendar_date date_from_day(uint64_t day_tick);
 /// @return         Progress through the quarter, clamped to [0, 1).
 float quarter_progress(uint64_t day_tick);
 
+/// The labour-contention read for a (corp, body) workforce scalar — the single
+/// phrasing every surface uses, so the same ceiling seen from the Economy panel,
+/// the Selection element and the hover card cannot drift in either its number or
+/// its words (BL-179).
+///
+/// `scalar` is `economy_report::workforce_contention`: `min(1, supply/demand)`
+/// for the corp's labour demand on that body. At or above 1.0 the corp's demand
+/// fits the body's pool and the function returns an empty string — there is no
+/// shortfall to report, and printing "100%" would invite the player to hunt for
+/// a problem that is not there.
+///
+/// @param scalar Workforce contention scalar for the (corp, body).
+/// @return       e.g. "84% (labour short)", or "" when labour is uncontended.
+std::string labour_contention(float scalar);
+
 } // namespace ui::fmt

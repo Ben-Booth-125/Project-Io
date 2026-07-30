@@ -1,9 +1,9 @@
 corp_id,name,focus,home_nation,balance,starting_capital,since_start,buildings
-30314,"Faros-YelenKalen International",Trade,"YaralFaruron",2373.61,0,2373.61,1
-30315,"Exoar-Exoex Enterprises",Extraction,"WoreDoranyn Federation",27701.2,0,27701.2,3
-30316,"Corix Industries",Extraction,"Iron ZanuFariTarethor",23138,0,23138,3
-30317,"Calyx Industries",Trade,"CalaLunelar Protectorate",2498.86,0,2498.86,1
-30318,"FararAthar Holdings",Extraction,"OriArelZanelix Principality",24381.5,0,24381.5,4
-30319,"CalonIntus-PaxisAthen Ventures",Processing,"UlithKoruOrithia March",2338.37,0,2338.37,2
-30320,"Genom Systems",Trade,"MelethWorirUlael Reach",2231.33,0,2231.33,1
-30321,"Terel-Coron Holdings",Processing,"MelanJalirArenor Expanse",2437.29,0,2437.29,2
+30312,"Faros-YelenKalen International",Trade,"CalaLunelar Protectorate",144069,0,144069,16
+30313,"Exoar-Exoex Enterprises",Extraction,"MelethWorirUlael Reach",51900.9,0,51900.9,3
+30314,"Corix Industries",Extraction,"YareArais",35928,0,35928,3
+30315,"Calyx Industries",Processing,"MelenUluel Compact",3683.8,0,3683.8,2
+30316,"FararAthar Holdings",Processing,"HelethMeluCaloera Commonwealth",148526,0,148526,18
+30317,"CalonIntus-PaxisAthen Ventures",Processing,"MelethWorirUlael Reach",4456.65,0,4456.65,2
+30318,"Genom Systems",Trade,"CalaLunelar Protectorate",2097.14,0,2097.14,1
+30319,"Terel-Coron Holdings",Processing,"Central HelathDoruZanion",7173.3,0,7173.3,2

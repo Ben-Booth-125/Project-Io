@@ -5,9 +5,11 @@
 // Build (from repo root, after sourcing vcvars64):
 //   cl /nologo /std:c++20 /EHsc /I src tools\verify\trade_routes_harness.cpp ^
 //      src\world\world.cpp src\world\supply_system.cpp ^
-//      src\world\market_clearing.cpp /Fe:trade_routes_harness.exe
+//      src\world\market_clearing.cpp ^
+//      /Fo:build_gen\verify\trade_routes_harness\ ^
+//      /Fe:build_gen\verify\trade_routes_harness.exe
 // Run:
-//   .\trade_routes_harness.exe
+//   .\build_gen\verify\trade_routes_harness.exe
 //
 // Registered as the `trade_routes_harness` CMake target (verifier-headless skill).
 

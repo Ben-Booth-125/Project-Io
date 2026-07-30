@@ -6,7 +6,9 @@
 // Build (from repo root, after sourcing vcvars64):
 //   cl /nologo /std:c++20 /EHsc /I src tools\verify\construction_harness.cpp ^
 //      src\world\world.cpp src\world\construction.cpp src\world\placement_rules.cpp ^
-//      /Fe:construction_harness.exe
+//      /Fo:build_gen\verify\construction_harness\ ^
+//      /Fe:build_gen\verify\construction_harness.exe
+// Run: .\build_gen\verify\construction_harness.exe
 
 #include "world/components.hpp"
 #include "world/construction.hpp"

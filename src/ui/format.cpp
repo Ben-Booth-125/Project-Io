@@ -145,4 +145,13 @@ float quarter_progress(uint64_t day_tick)
     return static_cast<float>(day_of_quarter) / static_cast<float>(days_per_quarter);
 }
 
+std::string labour_contention(float scalar)
+{
+    if (scalar >= 1.0f)
+        return {};
+    char buf[48];
+    std::snprintf(buf, sizeof(buf), "%.0f%% (labour short)", scalar * 100.0f);
+    return buf;
+}
+
 } // namespace ui::fmt
