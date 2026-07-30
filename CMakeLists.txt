@@ -173,25 +173,21 @@ if(WIN32)
 endif()
 
 # ---------------------------------------------------------------------------
-# Headless economy bankruptcy calibration harness (no SDL / Lua / ImGui)
+# econ_bankruptcy is NOT declared here — it is built by the generic harness
+# batch at the foot of this file, against the whole ${IO_WORLD_SOURCES} superset.
+#
+# It used to carry a hand-picked source list, and that list rotted: every time
+# economy_system.cpp gained a cross-TU call, this target had to be patched to
+# match. It was patched once for BL-079 (estimate_building_profit) and then NOT
+# patched for BL-202, which added run_corp_strategic_step — so the target failed
+# to link with an undefined reference, and because the `if(NOT TARGET ...)` guard
+# in the batch below skips any target already declared, the self-maintaining path
+# could not rescue it.
+#
+# Found 2026-07-30 by the first full `cmake --build` on Linux; Windows never
+# caught it because the day-to-day loop builds the ProjectIo target alone. The
+# other hand-declared harnesses above the batch carry the same latent hazard.
 # ---------------------------------------------------------------------------
-# Links only the SDL/Lua-free world translation units, mirroring the manual
-# build documented in tools/verify/README.md and run_harness.bat.
-add_executable(econ_bankruptcy
-    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/econ_bankruptcy.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/economy_system.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/market_clearing.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/budget_system.cpp"
-    # BL-079: economy_system's scoped-agency pass calls estimate_building_profit.
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/building_profit.cpp"
-)
-
-target_include_directories(econ_bankruptcy PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/src"
-)
-
-target_compile_features(econ_bankruptcy PRIVATE cxx_std_20)
 
 # ---------------------------------------------------------------------------
 # Headless survey-system harness (BL-067; no SDL / Lua / ImGui)
