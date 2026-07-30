@@ -116,7 +116,7 @@ void draw_profit_chart(ImDrawList* dl, ImVec2 mn, ImVec2 mx, const std::vector<f
 // row. The active tier is highlighted green; the arrows step it, the numerals select
 // it. Interactive so the control reads as real, but it has NO economic effect yet —
 // the Tax/Wages mechanics are owed to BL-155 (a tooltip says so).
-void draw_tier_control(const char* label, int& tier)
+void draw_tier_control(const char* label, int& tier, const char* what_it_does)
 {
     // Scope the button IDs to this control — both tiers draw the same labels
     // ("-"/"I".."V"/"+"), so without a per-control ID they collide (ImGui warns).
@@ -136,9 +136,14 @@ void draw_tier_control(const char* label, int& tier)
     const float total   = count * bw + (count - 1) * spacing;
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, (avail - total) * 0.5f));
 
-    const auto note = [] {
+    // BL-177 secondary: the levers were present but their effect unexplained —
+    // the tooltip said only "not yet wired", which names the state without ever
+    // saying what the lever is FOR. Now it leads with the effect and keeps the
+    // honest caveat second.
+    const auto note = [what_it_does] {
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Policy lever - not yet wired (BL-155)");
+            ImGui::SetTooltip("%s\n\nRaising a tier moves it up, lowering it down.\n"
+                              "Not yet wired to the economy (BL-155).", what_it_does);
     };
 
     if (ImGui::Button("-", {bw, bw})) tier = std::max(1, tier - 1);
@@ -240,9 +245,17 @@ void draw_balance_ledger(const world& w, const recipe_registry& reg,
     ImGui::Spacing();
 
     // --- Policy levers (stubbed UI, mechanics owed to BL-155). ---
-    draw_tier_control("Taxes", ui.budget_tax_tier);
+    // BL-177: one visible line names the pair's state, so "these do nothing yet"
+    // is readable without hovering; each lever's tooltip says what it is for.
+    draw_tier_control("Taxes", ui.budget_tax_tier,
+                      "The share of your revenue taken by the host nation.\n"
+                      "A lower tier keeps more margin but costs standing with the nation.");
     ImGui::Spacing();
-    draw_tier_control("Wages", ui.budget_wage_tier);
+    draw_tier_control("Wages", ui.budget_wage_tier,
+                      "What you pay your workforce, per head.\n"
+                      "A higher tier costs more but competes harder for scarce labour.");
+    ImGui::Spacing();
+    ImGui::TextDisabled("Policy levers - not yet wired (BL-155)");
     ImGui::Spacing();
 
     // --- Assets. ---
