@@ -760,8 +760,52 @@ void draw_tile_selection(world& w, ui_state& ui)
         const ImVec2 bsz = {bw, bh};
 
         // Construct — opens the tile construction ledger (BL-162).
-        if (tile_icon_button("##act_construct", bsz, /*enabled=*/true,
-                             "Construct buildings", glyph_hammer))
+        //
+        // BL-174 strand 2: two world-derived layers, no tutorial state.
+        //  - ENABLED only if something is actually placeable here. It was
+        //    hard-coded true, so clicking an ocean tile opened a ledger of
+        //    nothing but red refusals — the front door opening onto a wall.
+        //  - PRIMED (accent ring) when the player has nothing under
+        //    construction anywhere, which is the honest reading of "you have
+        //    capital and nothing on the way". True at launch, extinguishes
+        //    itself the moment a build starts, returns when it becomes true
+        //    again. No timer, no flag, no dismissal to persist.
+        bool any_placeable = false;
+        for (const resource_type er : placement_rules::k_extractable)
+            if (tile.resource_deposit[static_cast<std::size_t>(er)] > 0.0f &&
+                placement_rules::can_place_in_world(w, sel, building_type::extraction_site, er).ok())
+            { any_placeable = true; break; }
+        if (!any_placeable)
+        {
+            for (const building_type bt : {building_type::processing_facility,
+                                           building_type::port,
+                                           building_type::launchpad,
+                                           building_type::inland_logistics_hub})
+                if (placement_rules::can_place_in_world(w, sel, bt, resource_type::iron_ore).ok())
+                { any_placeable = true; break; }
+        }
+
+        bool building_underway = false;
+        if (const auto pit = w.corporations.find(w.player_entity); pit != w.corporations.end())
+            for (entity_id bid : pit->second.assets)
+                if (const auto bit = w.buildings.find(bid);
+                    bit != w.buildings.end() && bit->second.ticks_remaining > 0)
+                { building_underway = true; break; }
+
+        const bool primed = any_placeable && !building_underway;
+        if (primed)
+        {
+            const ImVec2 pmin = ImGui::GetCursorScreenPos();
+            ImGui::GetWindowDrawList()->AddRect(
+                {pmin.x - 2.0f, pmin.y - 2.0f}, {pmin.x + bsz.x + 2.0f, pmin.y + bsz.y + 2.0f},
+                palette::selection, 4.0f, 0, 2.0f);
+        }
+        if (tile_icon_button("##act_construct", bsz, any_placeable,
+                             any_placeable
+                                 ? (primed ? "Construct buildings - nothing under way"
+                                           : "Construct buildings")
+                                 : "Nothing can be built on this tile",
+                             glyph_hammer))
             ui.show_build_ledger = true;
         ImGui::SameLine();
 

@@ -814,6 +814,27 @@ void app::setup_world(world_params params)
         }
     }
 
+    // BL-174 strand 2 — a legible first move. The launch view framed who and where
+    // but suggested nothing to DO, and the Selection band is not drawn at all with
+    // nothing selected, so there was no surface on which to suggest anything.
+    // Seeding the selection to the HQ's tile gives the band something to show at
+    // launch: the player's own ground, with Construct primed on it (see
+    // draw_tile_selection). Derived entirely from world state — no tutorial flag,
+    // no timer, nothing persisted, and nothing that can go stale or lie.
+    {
+        const auto pit = m_world.corporations.find(m_world.player_entity);
+        if (pit != m_world.corporations.end())
+        {
+            const auto hq = m_world.buildings.find(pit->second.hq_building);
+            if (hq != m_world.buildings.end())
+            {
+                const auto tit = m_world.tiles.find(hq->second.tile);
+                if (tit != m_world.tiles.end() && tit->second.body == start_body)
+                    m_ui.selected_entity = hq->second.tile;
+            }
+        }
+    }
+
     // Open on plain terrain — no lens imposed at campaign start. A click only ever
     // updates the Selection element; it never re-skins the canvas, so the canvas
     // should likewise start unskinned and let the player pick a lens deliberately
