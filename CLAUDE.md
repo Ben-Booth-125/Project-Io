@@ -9,6 +9,13 @@ Read the documents below before responding to any request. They are the authorit
 Keep responses terse: **max 2 sentences per paragraph**, **max 15 words per clause**. Break longer
 thoughts into more (short) paragraphs rather than longer ones.
 
+**Never refer to a backlog item by bare id.** A bare `BL-229` forces Ben to go and look it up
+(his words, 2026-07-30: "it takes me a while to decipher what BL-229 refers to"). Always pair the
+id with a short human handle — `BL-229 (building selection)` — in prose, headings, lists and
+status summaries alike. Every item in `backlog.json` carries a `short_name` for exactly this;
+use it, or a plainer few-word gloss where the `short_name` is itself cryptic. Commit messages and
+code comments are the one exception: there the surrounding text already supplies the context.
+
 ---
 
 ## Documents
@@ -148,6 +155,13 @@ Every non-trivial task states its **mode**:
 - **Full (earned).** Work whose coordination cost it repays — touches the economy / save-format /
   integration seam, spans more than ~2 files of real logic, or carries determinism risk. Run the
   Delivery lifecycle below.
+
+**Rule 0b — ambiguous measurements: report the current numbers first.** When a sizing or layout
+request has more than one reading ("a bit smaller", "3/5 the size" — of the width, the height, or
+both?), do **not** guess and do **not** ask an open question. State the **exact current
+measurements with units** for every element in scope — and what they are derived from — then ask.
+Ben can say what he was picturing far faster against real numbers than against prose. Pair this
+with the existing rule to **open the live app** whenever asking him to weigh in on visuals.
 
 **Rule 0a — ad-hoc ideas.** When the user raises an unscoped idea with no explicit "do it now",
 offer two options **before acting**, without first asking clarifying questions: **A) save to the

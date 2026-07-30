@@ -4761,6 +4761,100 @@
       "authority_doc": "docs/development/backlog.json",
       "summary": "The one runtime mechanic docs/lore/HISTORY.md asks for: Stage 3 (\"capital disciplines the sovereign\") argues nations respect corporate property in 1960 because their ancestors that confiscated were outcompeted - so seizure must exist and must COST the seizer in sentiment and credit access. Progressive loss rather than a lose screen, mirroring the historical norm that sovereigns squeezed companies far more often than they destroyed them. Seizure is named as a loss vector in CONCEPT.md:41 and CORPORATION_GENERATION.md:21 but exists NOWHERE in src/. FILED 2026-07-30 (Ben: \"file it, parked for Laws/Politics\") so the claim is not lost; parked because nation behaviour is deferred by standing rule.",
       "design": "DESIGN-OWED, filed 2026-07-30 from the docs/lore/HISTORY.md review. Parked deliberately - this is recorded so the ladder's single runtime claim survives, not queued.\n\n## The claim\n\nHISTORY.md Stage 3, § Game-mechanical echo: *\"Asset seizure exists but is costly to the seizing nation (sentiment, credit access). Progressive loss instead of a lose screen mirrors the historical norm: sovereigns squeezed companies far more often than they destroyed them.\"*\n\nThis is the mechanical consequence of the stage's lesson - if confiscation were free, the generated history that produced commitment-bound sovereigns would be contradicted by the runtime every time a nation seized something.\n\n## Current state of the build\n\n- `CONCEPT.md:41` - *\"Losing ground, going bankrupt, or having assets seized are impactful and progressive forms of defeat\"*, and § Bankruptcy and seizure names financial collapse and military takeover as the two loss vectors.\n- `CORPORATION_GENERATION.md:21` - a home nation may *\"seize the corporation's domestic assets\"*.\n- `src/` - **nothing.** No seizure, no sentiment, no credit access, no nation-initiated action of any kind on player assets. Nation behaviour beyond the data-model minimum is prohibited by standing rule; the only sanctioned exceptions are BL-079's narrow per-building corp agency and BL-181's workforce dial.\n\nSo this is not a gap in an existing mechanic; it is a mechanic that does not exist yet, with a design constraint attached in advance.\n\n## Why parked, and what it waits on\n\n| Requires | Why |\n|---|---|\n| **BL-155** Laws & policy surface (design-owed, v0.1.2) | seizure is a policy act and needs a law surface to be taken from |\n| **BL-158** Politics data-model stub (design-owed, v0.1.5) | sentiment has to live somewhere |\n| **BL-094** nation-as-strategic-actor (designed, parked, v0.2.0) | under the nation identity the player can be the SEIZER as well as the seized, which is the whole reason the cost matters - a cost only ever paid by AI nations is invisible |\n\nBL-094 is the important one. A seizure mechanic designed while the player is purely a corporation is a mechanic the player only ever suffers. Designed after the pivot, it is a lever with a price - which is what Stage 3 is actually about.\n\n## What the design pass owes\n\n1. What sentiment IS - whose opinion, tracked at what grain (nation-to-nation, nation-to-corp, market-level), and what it changes. Anything it does not change is deleted, not tuned.\n2. What \"credit access\" means against the existing budget system (`src/world/budget_system.*`) - a rate, a ceiling, or a refusal.\n3. Whether the cost is symmetrical (standing rule: symmetrical rules, and under BL-094 the player is the same kind of entity as its rivals).\n4. Whether BL-222 Stage 3's generated per-nation commitment character sets each nation's STARTING sentiment and credit standing - it should, or the generated history hands nothing to the runtime and the stage is decorative.\n\nDo not promote ahead of BL-155 and BL-158. Read docs/lore/HISTORY.md Stage 3, CONCEPT.md § Bankruptcy and seizure, and BL-094 before designing."
+    },
+    {
+      "id": "BL-226",
+      "short_name": "CONTINENT_LENS",
+      "category": "Canvas",
+      "title": "Continent lens — put the tectonic plates back on the map",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "C",
+      "difficulty": 1,
+      "parked": false,
+      "version_goal": "v0.1.0",
+      "requires": [
+        "BL-210"
+      ],
+      "blocked_on": [],
+      "written": "2026-07-30",
+      "files": [
+        "src/world/continents.{hpp,cpp}",
+        "src/world/hard_coded_world.{hpp,cpp}",
+        "src/ui/ui_state.hpp",
+        "src/ui/overlay.cpp",
+        "src/ui/icons.{hpp,cpp}",
+        "src/ui/body_surface_canvas.{hpp,cpp}",
+        "src/core/app.cpp",
+        "docs/ui/LENSES.md",
+        "docs/ui/ICONS.md",
+        "scripts/verify/continents_terrain.lua"
+      ],
+      "authority_doc": "docs/ui/LENSES.md",
+      "summary": "A tenth strip lens showing the tectonic plates from BL-210's Continents/Drift pass: per-plate categorical tint plus a pale lift on every tile that touches another plate. Low-friction by design — the lens shell is the settled nine-lens pattern (enum + glyph + tint branch + key), and the only real work is DATA RETENTION: run_continents computed a per-tile Voronoi plate assignment, folded its height bias into Pass 1's heightmap, and then dropped it, so by the time a tile exists the plate that raised it is unreadable from the terrain. Fix is to return the plate field and retain it on the generation report (presentation data, off the serialisation seam), not to re-derive or persist it.",
+      "design": "SETTLED 2026-07-30 (Ben session). Ben chose option B (return + retain the plate field) over A (flood-fill contiguous landmasses at render time) and C (persist continent_state to the save).\n\nWHY B. A shows LANDMASSES, not plates — it can colour the continents but cannot explain them, because the thing worth showing is the BOUNDARY (where the mountain range, the rift and the porphyry copper came from), and a boundary is invisible once the height bias has been folded into the heightmap. C buys nothing over B and touches the save format for presentation data.\n\nTHE DATA PATH.\n1. continent_state gains `std::vector<int> plate_id` (row*gw+col). The Voronoi loop already computed this in a local; it is now written to the out-param. Sized before the stagnant-lid early return so every consumer sees a full-length field (all-zero = one immobile plate).\n2. generation_report::body_entry gains `continent_state continents`. Its `history` is MOVED into state.history at generation as before and then cleared, so the biography stays the single owner of those lines and nothing is stored twice. The report is presentation data the app holds for the session — it never enters `world`, so this stays off the serialisation seam (same reasoning as world_params, BL-114).\n3. draw_body_surface_canvas takes `const generation_report&` and matches the active body by NAME — the same stable key the Tile Ledger's biography already uses (body_entry carries no entity_id).\nA missing entry or a size mismatch leaves the pointer null: the lens then draws plain terrain and its key says 'No plate record' rather than inventing plates.\n\nTHE RENDER. Plate tint at 0.80 (this lens is about the plate field, not the terrain under it) with a separate white lift at 0.45 on any tile whose 4-neighbourhood crosses a plate — columns wrap, rows do not. The boundary MUST read on a different channel from the plate colour: the first draft used 'the same colour, blended harder' and the boundaries were invisible on capture.\n\nTHE PALETTE. A dedicated table, not palette::nation_colour — plates are substrate, not identity, and borrowing the vivid nation wheel would make this read as a second Country lens. But it must still be CATEGORICAL: the first draft's muted mineral tones (all luminance ~100-130, tiny hue spread) collapsed into one grey wash on capture and the lens could not tell one plate from the next. Final table keeps the earthy cast but alternates light/dark so adjacent slots differ even in greyscale. Ten slots covers run_continents' 4..10 clamp.\n\nSTRIP SLOT. Added as the EIGHTH on-strip lens rather than the keyboard-only shelf: it answers a question the player asks at first sight of a body ('why is the land shaped like that?'), which is the moment they are looking at the strip. Confirmed to fit the 240px minimap bar on capture.\n\nVERIFICATION. scripts/verify/continents_terrain.lua gains continent-lens captures on Kepler and Selene (the small-grid body, which also exercises a differing plate count and the key's layout). The plate boundaries in the lens capture should line up with the ridges and coastlines in the plain-terrain capture from the same script — that correspondence IS the check that the lens is showing the field the terrain was derived from.\n\nOPEN. The lens key is occluded by the Tile Ledger when that panel is open, since the key hangs off the minimap's left edge — this is pre-existing behaviour shared by every lens key, not specific to this item, but it was noticed here and is worth its own item."
+    },
+    {
+      "id": "BL-227",
+      "short_name": "COMMS_DOCK_BOTTOM_LEFT",
+      "category": "UI",
+      "title": "Comms docks bottom-left at the Selection band height, shortening the menu and ledgers",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 2,
+      "version_goal": "v0.1.1",
+      "written": "2026-07-30",
+      "files": [
+        "src/core/app.cpp",
+        "src/ui/foldout_column.cpp",
+        "src/ui/foldout_column.hpp",
+        "docs/ui/LAYOUT.md"
+      ],
+      "authority_doc": "docs/ui/LAYOUT.md",
+      "summary": "Move the comms log from the right chrome column to the bottom-left, at the Selection band's exact height, so the bottom of the screen is one strip.",
+      "design": "**Ben, 2026-07-30.** \"Introducing the chat log in the bottom left, and ensuring that it is the same height as the selection panel. This means the menu and ledgers will always be shorter too.\"\n\nLanded. Comms moved from the right chrome column (between the time panel and the minimap) to a dock sharing the Selection band's top edge and exact height, so the bottom of the screen reads as ONE horizontal strip: `[comms][selection band]`. `foldout_column_rect()` now stops at the dock's top edge, which is what makes every menu and ledger permanently shorter.\n\n**Measured constraint (recorded, not a preference).** The dock takes the fold-out column's x-range, NOT the full shell column, so the icon rail keeps full height and runs past it. Spanning the rail would leave `720 - 92 - 340 = 288` px for nine ~44 px slots plus spacing (~428 px needed) at the 1280x720 floor, clipping two. See `ui::comms_dock_rect`.\n\n**Freed space.** The right column's middle band returns to canvas. BL-216's pinned-items proposal for that band is NOT built and remains open."
+    },
+    {
+      "id": "BL-228",
+      "short_name": "HOVER_FREEZE_RETIRE_DWELL",
+      "category": "UI",
+      "title": "Hover freezes a card until the cursor exits its bounds; hovering no longer opens the Selection band",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 2,
+      "version_goal": "v0.1.1",
+      "written": "2026-07-30",
+      "files": [
+        "src/ui/hover_card.cpp",
+        "src/ui/hover_card.hpp",
+        "src/ui/body_surface_canvas.cpp",
+        "src/ui/ui_state.hpp",
+        "scripts/verify/hover_freeze.lua"
+      ],
+      "authority_doc": "docs/ui/SELECTION.md",
+      "summary": "Retire BL-200 dwell-to-open. Hovering freezes a tooltip in place until the pointer leaves its bounds; only a click opens the Selection band.",
+      "design": "**Ben, 2026-07-30.** \"Retire the hover opening selection panel part. Hovering should just freeze a tooltip until the user's cursor exits tooltip bounds.\"\n\nLanded, superseding **BL-200** (dwell-to-open) entirely — its stillness timer, jitter gate, progress bar and auto-fire are all removed. Opening the Selection band is the click's job alone again: one gesture, one meaning.\n\nAfter the existing 20-frame glance delay the card **freezes** at the position that summoned it, keeps showing the entity it was summoned for, and persists until the pointer leaves its rect inflated by `kHoverCardExitPadPx` (26 px). That pad is load-bearing: the card draws 18 px ABOVE its anchor, so the summoning cursor starts outside the rect and the card would otherwise dismiss itself on its first frame.\n\n**Harness addition.** `verify.frames(n)` renders N frames without capturing. `capture()` composits exactly one frame, so no script could previously reach a 20-frame hover delay — hover had no saved check at all. New check: `scripts/verify/hover_freeze.lua` (summoned / pinned after nudge / dismissed on exit)."
+    },
+    {
+      "id": "BL-229",
+      "short_name": "BUILDING_SELECTION_TILE_FORMAT",
+      "category": "UI",
+      "title": "Building selection element - reshape to the tile Selection three-column format",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "B",
+      "difficulty": 3,
+      "version_goal": "v0.1.1",
+      "written": "2026-07-30",
+      "files": [
+        "src/ui/selection_panel.cpp",
+        "docs/ui/SELECTION.md"
+      ],
+      "authority_doc": "docs/ui/SELECTION.md",
+      "summary": "Rebuild the building Selection element to follow the tile element's three-column layout. Ben to design.",
+      "design": "**Opened for Ben to design, 2026-07-30, at his request:** \"another thing to open for me to design is selection of buildings. We do want this to follow the same format as our tile selection.\"\n\n**DESIGN OWED — do not guess the layout.** Ben designs this one; the tile element's proportions came from his mockup and this is its sibling.\n\n### The reference (what \"same format\" means)\nThe tile element (`draw_tile_selection`, BL-123 reshaped BL-213) runs **left to right** in three columns:\n1. **Left quarter** — zoomed hex neighbourhood (`draw_tile_neighbourhood`, radius 2), selected tile picked out.\n2. **Centre half** — a paged metric **accordion**, one titled graph at a time with a `< Name (i/N) >` pager.\n3. **Right quarter** — a **2x3 action button grid** (Construct / Manage / History / Supply + two reserved).\n\n### What the building element is today\n`draw_building_selection` is a **vertical stack**, not three columns: output lead (\"701.4 Agricultural Produce / tick\" + a % of nominal bar + status), a Profitability block (Revenue / Inputs / Wages / Maint / Net), Production method (recipe combo), Workforce (Auto checkbox + target slider + the BL-179 \"Body allows 84% (labour short) - habitability 0.40\" line), then \"On this tile\" (stack capacity) and Demolish.\n\n### The open questions for Ben\n1. **What occupies the left quarter?** The tile's hex neighbourhood is a natural analogue (the building's surroundings), but the building already has an identity/emblem header. Same render, or something else?\n2. **What pages through the centre accordion?** Candidates: output over time, profitability components, workforce history, input-supply adequacy. The tile element pages one graph per deposited resource — the building's equivalent list is not obvious and needs Ben's call.\n3. **Where do the two LEVERS go?** Recipe combo and workforce slider are controls, not facts, and the tile element's right quarter is buttons only. Do they take the right column (making it controls rather than actions), or sit under the accordion?\n4. **Does the 2x3 action grid apply?** A building's actions are fewer (Manage is redundant when already selected; Demolish is one). What fills six slots?\n5. **Rival buildings** show \"Competitor building - intel only\" under BL-068. How does that degrade in a three-column layout — empty columns, or a distinct narrower form?\n\nSequence with **BL-214** (drill-through disclosure levels), which decides how much any card shows before asking."
     }
   ]
 }
