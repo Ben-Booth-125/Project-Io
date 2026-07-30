@@ -10,6 +10,91 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## Session — v0.1.0 legibility batch: the five cut-blockers, and four items designed (2026-07-30)
+
+**Runtime.** ~5h 30m. Full (ultracode; two design workflows over 20 agents, then five items built,
+verified and merged). Ben delegated all design calls and stepped away after answering three
+scoping questions.
+
+**Context.** "Use the roadmap as a clear picture of where we are headed, and provide authoritative
+answers to the questions... act on my behalf." Target: the six `design-owed` v0.1.0 cut-blockers
+(BL-162/174/176/177/178/179) plus the v0.1.1 legibility trio (BL-214/215/216), deepest-first.
+
+**Two filed premises were stale, and the code had already moved past them.** This was the session's
+most useful finding, and it narrowed two items sharply:
+
+- **BL-162** was filed as "the construction front door is broken - the panel cannot build".
+  `SELECTION.md` (BL-123, reshaped BL-213 - newer than the backlog prose) records that
+  `draw_construction_ledger` already lists placeable types with full cost, reason-coded validity
+  and a working `construction.pending_tile` enqueue. Only the expected-profit chart is owed.
+- **BL-176** was filed as "the recipe/workforce controls are one step past where the player looks".
+  They are on the building Selection element, put there by Ben's 2026-07-22 review. What the
+  walkthrough actually hit was "Controls unlock when construction completes" - correct behaviour.
+  The real defect was just the panel's default view.
+
+Authority time-slicing works, but only if the reader checks the authority doc *before* the backlog
+prose. Worth remembering when an item has sat open across several minors.
+
+**What landed (all five built, verified, merged to local main).**
+
+- **BL-174 - orient legibility.** Confirmed by evidence that the blank rail slots were genuine, not
+  a software-renderer artifact: wired glyphs render crisply in the *same* capture. Four reserved
+  slots drew one identical placeholder square; slot 9 duplicated slot 2's ledger glyph; slot 6's
+  `building(processing_facility)` square was slot 1's corporation seal at rail size. Added
+  `history`/`research`/`strategy`/`diplomacy` glyphs, moved slot 6 to `industry`, dropped the
+  uninterpretable slot 10, gave the open slot an accent-lit glyph (the lens strip's idiom), and made
+  the tooltips actually wrap - container 8 *claimed* "tooltips wrap" but `SetItemTooltip` never does.
+  Strand 2 seeds the launch selection to the HQ tile and primes the Construct action, both derived
+  from world state - no tutorial flag, nothing persisted, nothing that can go stale.
+- **BL-178 - time controls.** Progress bar is text-height with a "90 d to Q2" overlay; tiers carry
+  truthful rates *derived* from `speed_multiplier`/`seconds_per_day_1x`/`econ_tick_days`, so a label
+  cannot drift into lying. An always-visible line names the active tier's rate.
+- **BL-177 - the runway.** A RUNWAY header segment, shown only while burning - "infinite quarters"
+  when profitable would be a lie dressed as a figure. The first cut *clipped* at 1280; caught in
+  capture and fixed by measuring into the header's drop discipline, not by shortening the string.
+- **BL-176 - building management.** Panel defaults to Buildings; edge-triggered snap on selecting a
+  building. Ratifies SELECTION.md's existing division of labour rather than overturning it.
+- **BL-179 - workforce legibility.** "Body allows 84% (labour short) - habitability 0.40" under the
+  workforce slider. The one-story constraint was met structurally: the phrasing moved into a shared
+  `ui::fmt::labour_contention` that the Economy panel now calls too, so the two cannot drift.
+
+**Designed, not built** (full prose in `backlog.json`, each with an auditable "Decisions taken on
+Ben's behalf" section): **BL-162** (needs a new `estimate_prospective_profit` - the existing
+estimator cannot evaluate a hypothetical building - plus a `charts::draw_value_bar` primitive),
+**BL-214** (disclosure levels), **BL-215** (1280x720 stated as the floor; a machine-checkable
+overflow detector preferred over an eyeball sweep), **BL-216** (comms **rails** at 1280x720 rather
+than docking - measured, only 556 px of band budget, so it degrades honestly instead of clamping).
+
+**Decisions taken on Ben's behalf.** Recorded per item in `backlog.json`. The load-bearing ones:
+BL-174 strand 2 chose the highlighted starter action over a dismissible hint (which would need a
+tenth container and a notion of "dismissed" that cannot persist - there is no save/load, so every
+reload is a new campaign) and over a header objective (which presupposes a goal system that does
+not exist). BL-177 shows the runway only when it means something. BL-215 fixes 1280x720 as the
+contract.
+
+**Left open / owed.**
+
+- **BL-162, BL-214, BL-215, BL-216** are `designed` and promote-ready; none is built.
+- **A visual eyeball is owed on all five landed items** - they are verified by capture, not by Ben.
+- **Golden diffing has a sensitivity floor.** The nav-rail change diffs 0.23%, under the 0.5%
+  fail threshold - golden comparison cannot see nav-rail-scale regressions. Relevant to BL-215's
+  "can this be checked rather than eyeballed" question.
+- **`econ_harness` WF.R4 fails on main and has for some time** ("wages paid on effective workforce",
+  got 15.5 want 44.0). Not touched this session; confirmed identical on branch and main by building
+  both the same way. Worth an item.
+- **Goldens and `docs/ui/mockdata/*.csv` were both stale** before this session (13-31% drift, from
+  BL-211/212/213 landing). Both re-blessed. A bless is cheap; letting drift accumulate makes every
+  later diff unreadable.
+
+**Runtime pacing signal.** The two design workflows cost ~4h wall-clock and ~3.9M subagent tokens
+and were the session's bottleneck - the first was killed mid-flight by an interrupt and had to be
+relaunched. Implementation of all five items took ~1h once designs existed. Design-by-fan-out pays
+for hard, genuinely-open questions (BL-216's geometry, BL-215's checkability) but is poor value for
+items whose answer is already in the code - three of the six were settled faster by reading the
+source directly. Prefer: read first, fan out only on what reading cannot settle.
+
+---
+
 ## Session — History ledger: the generation charts get a second home (BL-211) (2026-07-29)
 
 **Runtime.** ~1h. Full-lite (one extraction plus a container; no economy/save seam touched).
