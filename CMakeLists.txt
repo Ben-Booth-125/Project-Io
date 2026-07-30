@@ -278,28 +278,12 @@ target_compile_features(commercial_fog_harness PRIVATE cxx_std_20)
 # placement-rules seam); recipe_registry.cpp (the Lua loader) is intentionally
 # NOT linked — the harness hand-builds a coarse reference registry via the
 # header's inline setters.
-add_executable(corp_terrain_matrix
-    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/corp_terrain_matrix.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/hard_coded_world.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/tile_generation.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/planetology.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/continents.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/nation_generation.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/population_generation.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/city_names.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/corporation_generation.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/road_generation.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/logistics.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/orbital_system.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/placement_rules.cpp"
-)
-
-target_include_directories(corp_terrain_matrix PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/src"
-)
-
-target_compile_features(corp_terrain_matrix PRIVATE cxx_std_20)
+# corp_terrain_matrix is NOT declared here either - the same rot as
+# econ_bankruptcy. Its hand-picked list linked hard_coded_world.cpp but not
+# history_ladder.cpp, so BL-221 broke it the moment the ladder was wired in -
+# exactly as the econ_bankruptcy commit predicted the remaining hand-declared
+# targets would break. The generic batch at the foot of this file builds it
+# against the whole ${IO_WORLD_SOURCES} superset, which cannot drift this way.
 
 # ---------------------------------------------------------------------------
 # CTest wiring (BL-104) — one test per tools/verify/*.cpp, one local command

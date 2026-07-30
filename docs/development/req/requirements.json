@@ -6469,6 +6469,69 @@
           "result_metric": "scripts/verify/history_ledger_and_comms.lua — 6/6 goldens PASS, but coverage is PARTIAL and the 0.0000% diff is misleading: every visible line is >= 1 Gya, the one band where old and new formats are byte-identical. The sub-Gyr bands are clipped below the panel fold and the verify API has no scroll driver. Follow-up task raised."
         }
       ]
+    },
+    {
+      "brief": "history-ladder-prenational",
+      "batch": "2026-07-30-generation-frontier",
+      "title": "BL-221 — the pre-national history ladder (HISTORY.md Stages 0-2)",
+      "status": "completed",
+      "promoted_from": "backlog.json BL-221 HISTORY_LADDER_PRENATIONAL",
+      "rows": [
+        {
+          "id": "H1",
+          "status": "completed",
+          "requirement": "HEADLESS: the ladder is a pure function of (seed, tiles) — the same world generated twice yields an identical biography, including every ladder line.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "tools/verify/history_ladder_harness.cpp H1 — PASS; determinism_harness 23/23 PASS."
+        },
+        {
+          "id": "H2",
+          "status": "completed",
+          "requirement": "HEADLESS: the ladder DRIVES the political map rather than narrating it — a fragmented state must produce different nation_params than a unifiable one, in the stated direction, and the modulation must stay inside its bounds at both extremes.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "H2 — 6 assertions PASS. Kepler nation count moved 14 -> 43 as a consequence."
+        },
+        {
+          "id": "H3",
+          "status": "completed",
+          "requirement": "HEADLESS: the causal chain holds — cradle count feeds fragmentation, and fragmentation reaches the political map, so the stages are a ladder rather than independent dice.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "H3 — PASS."
+        },
+        {
+          "id": "H4",
+          "status": "completed",
+          "requirement": "HEADLESS: every ladder line carries its consequence (PLANETOLOGY.md § Presentation), is dated inside recorded history, and sorts into the biography oldest-first with the stages strictly ordered.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "H4 — 4 assertions PASS. Kepler: -3843 granary cities / 1376 Charter Act / 1586 Great Accord."
+        },
+        {
+          "id": "H5",
+          "status": "completed",
+          "requirement": "HEADLESS: failure cases are output, not defects — a world below a land biosphere emits no ladder and no padding, and Stage 2 reports a hegemon rather than hiding one.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "H5 — PASS, with an honest gap recorded: across 12 seeds all produced the accord and none a hegemon, so the failure branch is written but unreached. Tuning target for BL-219."
+        },
+        {
+          "id": "H6",
+          "status": "pending",
+          "requirement": "VISUAL: the ladder lines render in the History ledger biography alongside the deep-time lines.",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "NOT RUN. The ledger clips below the fold and the verify API has no scroll driver — the same blind spot BL-220 raised; a follow-up task is open for it."
+        }
+      ]
     }
   ]
 }

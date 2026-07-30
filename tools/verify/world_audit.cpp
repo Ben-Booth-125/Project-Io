@@ -377,7 +377,22 @@ int main()
     // The nation COUNT is emergent (seeds scale with land area; every nation below
     // the minimum viable territory is absorbed), so the load-bearing assertion is
     // the floor itself, not a target count. The count band is a wide sanity guard.
-    const int floor_tiles = nation_params{}.min_nation_tiles;
+    //
+    // REPOINTED 2026-07-30 (BL-221, Ben's call). The history ladder now DERIVES
+    // the merge floor and the seed density from generated fragmentation, so
+    // `nation_params{}.min_nation_tiles` is no longer the floor the generator
+    // actually used — it is only the base the ladder modulates. Asserting the
+    // old literal would test a constant that no longer exists.
+    //
+    // What IS still guaranteed by construction is the clamp in
+    // nation_params_from_ladder: the derived floor can never fall below half the
+    // base. So that is what R1 asserts — the generator's real invariant, not a
+    // band widened to accommodate a failure. Kepler moved 14 -> 43 nations, which
+    // is roughly the ~45 docs/lore/HISTORY.md asserts; Ben's direction was to let
+    // culturally distinct polities emerge here and let a later war/consolidation
+    // stage narrow the count, rather than tuning the ladder to fit this file.
+    const int floor_base  = nation_params{}.min_nation_tiles;
+    const int floor_tiles = floor_base / 2;
     const int nation_n    = static_cast<int>(w.nations.size());
     int min_tiles = -1, max_tiles = 0;
     for (const auto& [nid, nat] : w.nations)
@@ -388,15 +403,18 @@ int main()
     }
     if (min_tiles < 0) min_tiles = 0;
     const bool floor_ok    = nation_n > 0 && min_tiles >= floor_tiles;
-    const bool count_ok    = nation_n >= 6 && nation_n <= 40;
+    // Ceiling raised 40 -> 90 for the same reason. This is a RUNAWAY guard, not
+    // a target: it still catches a ladder bug that seeds hundreds of polities,
+    // while leaving room for the emergent count the premise wants.
+    const bool count_ok    = nation_n >= 6 && nation_n <= 90;
     const bool variance_ok = min_tiles > 0 && max_tiles >= 3 * min_tiles;
     std::printf("Nations: %d (min tiles %d, max tiles %d; floor %d)\n",
                 nation_n, min_tiles, max_tiles, floor_tiles);
-    std::printf("  BL-053 R1 every nation clears the minimum viable territory (>= %d tiles): %s\n",
-                floor_tiles, floor_ok ? "PASS" : "FAIL");
+    std::printf("  BL-053 R1 every nation clears the ladder's guaranteed floor (>= %d tiles, half of base %d): %s\n",
+                floor_tiles, floor_base, floor_ok ? "PASS" : "FAIL");
     std::printf("  BL-053 R2 strong size variance (max >= 3x min): %s\n",
                 variance_ok ? "PASS" : "FAIL");
-    std::printf("  BL-053 R3 emergent nation count plausible ([6,40]): %s\n",
+    std::printf("  BL-053 R3 emergent nation count inside the runaway guard ([6,90]): %s\n",
                 count_ok ? "PASS" : "FAIL");
 
     // --- BL-096: resource-carved market generation ---

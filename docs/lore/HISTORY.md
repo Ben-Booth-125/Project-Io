@@ -26,6 +26,10 @@ ore accessibility) should bend the story per seed.
 Stages are ordered and causal: each consumes the output of the one before. The planetology
 gate chain hands off at Stage 0. Era 0 gameplay begins at the top of the ladder.
 
+> **Stages 0–2 are BUILT** (BL-221, landed 2026-07-30) — `src/world/history_ladder.{hpp,cpp}`,
+> verified by `tools/verify/history_ladder_harness.cpp` (H1–H5). Stages 3–6 remain design only.
+> See § Implementation, below, for what the code actually does and what it stands in for.
+
 ### Stage 0 — Agrarian surplus (hand-off from planetology)
 
 **What happens.** Surplus food → dense settlements → division of labour → strangers who must
@@ -72,6 +76,57 @@ explains why 1960-Kepler is more multipolar than 1960-Earth.
 read the final nation count back into the narrative: more nations → earlier and harder
 Stages 3–4.
 History line: `"YYYY: The {range} Peace — {n} realms confirm mutual borders."`
+
+---
+
+## Implementation — Stages 0–2 *(BL-221, landed 2026-07-30)*
+
+`src/world/history_ladder.{hpp,cpp}`, a sibling pass that runs after the tile pipeline and
+**interleaves with** nation generation:
+
+```
+generate_body_tiles                 terrain exists
+run_history_ladder            ->    cradles, fragmentation, Stage 0's line
+nation_params_from_ladder     ->    fragmentation DRIVES the seed budget
+generate_nations                    polities grow
+record_institutional_history  ->    Stages 1-2, which need the outcome
+```
+
+Two entry points rather than one, because the Charter Act names a nation and the border accord
+counts them — neither exists until the political pass has run.
+
+**It drives, it does not narrate** (Ben, 2026-07-30). Stage 0's cradle count and Stage 2's
+fragmentation are computed *before* the political map and shape it: a fragmented world seeds
+more densely and lets smaller nations survive the merge. Retiring Voronoi outright is BL-218's;
+this is the honest hook until then. Asserted, not assumed — harness group H2.
+
+**Nation count: 14 → 43.** Settled by Ben, 2026-07-30: *"Ignore the previous assertions. We will
+simulate war to narrow down the count if needed. Just let naturally different cultures emerge
+here."* That effectively meets this document's own "~45 nations" claim, which BL-224 had flagged
+as an unowned 3× gap — but note it was met by **letting cultures emerge**, with consolidation
+deferred to a future war/conflict stage, *not* by tuning to hit 45. `world_audit`'s BL-053 R1/R3
+were repointed accordingly: R1 now asserts the ladder's construction guarantee (the derived floor
+can never fall below half the base) instead of a literal that is no longer constant, and R3's
+ceiling became a runaway guard rather than a target.
+
+**Substituted inputs, named rather than faked.** Two designed inputs do not exist in `src/` yet:
+river connectivity (BL-170) and domesticable clades (BL-217). Stage 0 scores cradles from arable
+terrain, landform, habitability, coastal access and the biosphere's generated `endemics` instead.
+Both items **refine** this score when they land rather than replacing it, so nothing needs
+rewiring. `agrarian_score` marks exactly where each missing term slots in.
+
+**Determinism.** Fresh stage tags (`0x5A11` / `0xC4A7` / `0xF2A6` — none collides, and
+PLANETOLOGY.md's warning about `0x4A71012u` being folded twice still stands). All scoring is
+integer with an explicit tie-break by tile index; the cradle argmax keeps the lowest index on a
+tie. No transcendentals, and the nation walk is over a sorted key list rather than raw
+`unordered_map` order.
+
+**Known tuning gap, honestly recorded.** Across a 12-seed spread every world produced the
+multipolar accord and none produced a hegemon, so Stage 2's failure branch is currently written
+but unreached. Ben asked to *see* failure cases, so this is a tuning target for BL-219's sweep,
+not a defect to hide — the harness prints the split every run.
+
+---
 
 ### Stage 3 — Capital disciplines the sovereign
 

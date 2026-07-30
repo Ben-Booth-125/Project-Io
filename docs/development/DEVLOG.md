@@ -10,6 +10,72 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## Session — BL-221 (pre-national ladder): the first stage that shapes the political map (2026-07-30)
+
+**Runtime.** ~1h 15m. Full (new generation pass, drives nation generation, new harness).
+
+**What landed.** `docs/lore/HISTORY.md` Stages 0–2 as `src/world/history_ladder.{hpp,cpp}` — a
+sibling pass that **interleaves** with nation generation rather than preceding it:
+`run_history_ladder` (cradles, fragmentation, Stage 0's line) → `nation_params_from_ladder` →
+`generate_nations` → `record_institutional_history` (Stages 1–2). Two entry points, because the
+Charter Act names a nation and the border accord counts them.
+
+**It drives, and that is asserted rather than claimed.** Harness group H2 pins that a fragmented
+ladder state seeds more densely, lets smaller nations survive the merge, pushes neighbours further
+apart, stays inside its bounds at both extremes, and leaves the caller's defaults alone when no
+cradles formed. Kepler's biography now reads:
+
+```
+ -3843  First granary cities in the northern western floodplain.   -> 11 cradles -> fragmentation 81%
+  1376  The {nation} Charter Act - first perpetual company registered.
+  1586  The Great Accord - 44 realms confirm mutual borders.       -> no hegemon
+```
+
+**Nation count 14 → 43, and the decision was Ben's, not mine.** The item hit exactly the call
+BL-224 says to flag rather than settle silently. Both options were **measured first** and put to
+him against real numbers — seeds-only gave 27 nations and passed every existing check;
+seeds-plus-floor gave 43 and cost two `world_audit` updates. His answer:
+
+> "Ignore the previous assertions. We will simulate war to narrow down the count if needed. Just
+> let naturally different cultures emerge here."
+
+So 43 it is, which effectively meets this project's own "~45 nations" premise — but by *letting
+cultures emerge*, with consolidation deferred to a future war stage, not by tuning to hit 45.
+
+**The two `world_audit` assertions were repointed, not weakened.** R1 asserted `>= 80` tiles, a
+literal that stopped being constant the moment the ladder derived the merge floor. It now asserts
+the ladder's *construction guarantee* — the derived floor can never fall below half the base —
+which is still true by construction and still catches degenerate output. R3's ceiling became a
+runaway guard rather than a target. Worth being explicit that this is the distinction between
+updating a stale assertion and widening a band to hide a failure.
+
+**Scope was cut honestly at the top.** Two of Stage 0's designed inputs don't exist: river
+connectivity (BL-170) and domesticable clades (BL-217), both designed-but-unbuilt. Rather than
+approximate them silently, `agrarian_score` names exactly where each missing term slots in, and
+the substitutes (arable terrain, landform, habitability, coastal access, the generated `endemics`)
+are refinable rather than replaceable — nothing needs rewiring when those items land.
+
+**The CMake hazard flagged an hour earlier fired on schedule.** `corp_terrain_matrix` was a second
+hand-declared target whose source list didn't include `history_ladder.cpp`, so it broke the moment
+the ladder was wired in — exactly what the `econ_bankruptcy` commit predicted the remaining
+hand-declared targets would do. Removed the same way. Five such targets remain.
+
+**Smart App Control blocked the new harness on Windows**, so it was built and run in WSL under the
+rule established this session. First time that rule paid out, and it paid immediately.
+
+**Left open / owed.**
+
+- **Stage 2's failure branch is written but unreached.** Across a 12-seed spread every world
+  produced the multipolar accord and none a hegemon. Ben asked to *see* failure cases, so this is
+  a tuning target for BL-219's sweep, not a defect — the harness prints the split every run.
+- **Nation names read badly at this count** — "The JalenJalaon March", "XenithHelonTarithath". A
+  pre-existing naming artifact that 43 nations makes far more visible than 14 did.
+- **No visual check.** The ladder lines land in the biography the History ledger clips below the
+  fold — the same blind spot BL-220 raised, and the open scroll-driver task covers both.
+- **BL-222 (industrial ladder) is now unblocked** on BL-221, though it still wants BL-218.
+
+---
+
 ## Session — BL-220 (dated history timestamps): the foundation under the HISTORY.md ladder (2026-07-30)
 
 **Runtime.** ~50m. Full (touches the generation seam, five files plus the harness).

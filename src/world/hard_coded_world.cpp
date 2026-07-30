@@ -2,6 +2,7 @@
 
 #include "continents.hpp"
 #include "corporation_generation.hpp"
+#include "history_ladder.hpp"
 #include "nation_generation.hpp"
 #include "orbital_system.hpp"
 #include "population_generation.hpp"
@@ -218,9 +219,37 @@ world make_hard_coded_world(world_params params, generation_report* report)
     // world/nation_generation.hpp). Only the separation is body-specific here: a
     // tighter spacing than the default over-seeds the map, so the merge pass has
     // real material to absorb and the layer reads as varied and "grown".
+    // The pre-national history ladder (BL-221, docs/lore/HISTORY.md Stages 0-2).
+    // Runs BEFORE generate_nations because it DRIVES it: Stage 0 counts the
+    // independent agrarian cradles the land supported, Stage 2 prices conquest
+    // against exit, and nation_params_from_ladder turns that into the seed
+    // budget the Voronoi pass grows from. The ladder does not narrate a map it
+    // was handed — it is upstream of the map (Ben, 2026-07-30).
+    history_ladder_state kepler_hist =
+        run_history_ladder(kepler_pl, w, kepler_tiles, 180, 84,
+                           /*seed=*/params.seed ^ 0x5A11EDu);
+
     generate_nations(w, kepler, kepler_tiles, 180, 84,
-        nation_params{ .min_seed_separation = 5 },
+        nation_params_from_ladder(kepler_hist, nation_params{ .min_seed_separation = 5 }),
         /*seed=*/params.seed ^ 0x4A71012u);
+
+    // Stages 1-2 can only be written now: the Charter Act names a nation and
+    // the border accord counts them, and neither existed a moment ago. The
+    // lines then merge into Kepler's biography, which the History ledger reads.
+    record_institutional_history(kepler_hist, w, kepler, kepler_tiles, 180);
+    if (report)
+    {
+        for (generation_report::body_entry& be : report->bodies)
+        {
+            if (be.name != "Kepler") continue;
+            be.state.history.insert(be.state.history.end(),
+                                    kepler_hist.history.begin(), kepler_hist.history.end());
+            std::stable_sort(be.state.history.begin(), be.state.history.end(),
+                [](const history_event& a, const history_event& b)
+                { return a.years_before_epoch > b.years_before_epoch; });
+            break;
+        }
+    }
 
     // Road network (BL-146): stamp each nation's road lattice onto tile.road_level,
     // after nations + population centres exist. Deterministic; no seed of its own —
