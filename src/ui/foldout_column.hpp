@@ -18,6 +18,35 @@ struct foldout_rect { float x, y, w, h; };
 /// panel splits (BL-117..121) rather than leaving them optional.
 float shell_column_width(float disp_x);
 
+/// Width and height (px) of the minimap box in the bottom-right chrome corner.
+/// Lives here, with the rest of the screen geometry, because the bottom strip's
+/// height is DERIVED from it (see `selection_band_height`) — when the two were
+/// independent numbers they silently drifted out of alignment above a 1200px
+/// minimum display dimension, which is exactly the discordance the bottom row
+/// was reported for (Ben, 2026-07-30).
+///
+/// `mm_w = max(336, 0.28 * min(disp_x, disp_y))`, `mm_h = 0.75 * mm_w` (the 4:3
+/// ratio of the original 240x180 default). 336x252 at every display whose
+/// smaller dimension is <= 1200.
+float minimap_width(float disp_x, float disp_y);
+float minimap_height(float disp_x, float disp_y);
+
+/// Margin (px) between the minimap box and the screen edges. The bottom strip is
+/// flush to the bottom, so this is the amount the strip's top edge must sit BELOW
+/// the minimap's to make the two align.
+inline constexpr float chrome_margin = 8.0f;
+
+/// Height (px) of the bottom strip — the Selection band and the comms dock, which
+/// share it by design (BL-213/BL-227).
+///
+/// Derived so the strip's top edge lands exactly on the minimap's top edge, making
+/// the screen's bottom row read as ONE band across the full width: the strip is
+/// flush to the bottom while the minimap floats `chrome_margin` above it, so the
+/// strip is that much taller. Was a flat 340px until 2026-07-30, which overhung the
+/// minimap by 80px at 1720x1080 and left the row looking, in Ben's words,
+/// discordant — with the main canvas practically blocked.
+float selection_band_height(float disp_x, float disp_y);
+
 /// Screen rect of the fold-out panel body — the region a ledger draws into when its
 /// nav slot is active. Sits to the RIGHT of the icon rail (`[nav_pane_width, W]`) and
 /// runs from just below the identity tile to the bottom margin. It is entirely left of

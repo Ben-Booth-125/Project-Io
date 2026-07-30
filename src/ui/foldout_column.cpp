@@ -26,6 +26,24 @@ float shell_column_width(float disp_x)
     return static_cast<float>(static_cast<int>(w + 0.5f));
 }
 
+float minimap_width(float disp_x, float disp_y)
+{
+    const float by_display = 0.28f * ((disp_x < disp_y) ? disp_x : disp_y);
+    return (by_display > 336.0f) ? by_display : 336.0f;
+}
+
+float minimap_height(float disp_x, float disp_y)
+{
+    return minimap_width(disp_x, disp_y) * 0.75f;
+}
+
+float selection_band_height(float disp_x, float disp_y)
+{
+    // Top edge flush with the minimap's: the minimap floats `chrome_margin` off
+    // the bottom, the strip does not, so the strip is exactly that much taller.
+    return minimap_height(disp_x, disp_y) + chrome_margin;
+}
+
 foldout_rect foldout_column_rect()
 {
     const ImVec2 disp = ImGui::GetIO().DisplaySize;
@@ -38,7 +56,7 @@ foldout_rect foldout_column_rect()
         //    The dock owns the bottom-left tile of the screen's bottom strip, so
         //    every menu and ledger in this column is now permanently shorter by
         //    exactly the Selection band's height. Ben's call, 2026-07-30.
-        std::max(0.0f, disp.y - profile_panel_height - selection_band_height),
+        std::max(0.0f, disp.y - profile_panel_height - selection_band_height(disp.x, disp.y)),
     };
 }
 
@@ -46,11 +64,18 @@ foldout_rect comms_dock_rect()
 {
     const ImVec2 disp = ImGui::GetIO().DisplaySize;
     const float  W    = shell_column_width(disp.x);
+    const float  h    = selection_band_height(disp.x, disp.y);
+    // Three quarters of the fold-out column's width (Ben, 2026-07-30). Comms is
+    // ambient chatter, not a decision surface, so it does not need to hold the
+    // full column width down here — the quarter it gives back goes to the
+    // Selection band, which starts at this dock's right edge rather than at the
+    // shell column edge, so the bottom strip stays SOLID with no canvas sliver
+    // punched between the two.
     return {
         nav_pane_width,                            // x: right of the icon rail
-        disp.y - selection_band_height,            // y: shares the Selection band's top edge
-        W - nav_pane_width,                        // w: rail edge -> column edge
-        selection_band_height,                     // h: identical to the band, by design
+        disp.y - h,                                // y: shares the Selection band's top edge
+        (W - nav_pane_width) * 0.75f,              // w: three quarters of the column
+        h,                                         // h: identical to the band, by design
     };
 }
 

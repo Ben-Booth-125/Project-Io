@@ -10,11 +10,10 @@
 
 namespace ui {
 
-/// Fixed height (px) of the Selection band (BL-213) at the bottom of the screen,
-/// between the shell column and the right chrome column. Tuned to fit the tile
-/// layout's hex render + accordion (the tallest per-kind content) without
-/// wasting canvas height on kinds that need less.
-inline constexpr float selection_band_height = 340.0f;
+// The band's height moved to foldout_column.hpp (2026-07-30) and became a
+// function of the display: it is now DERIVED from the minimap height so the
+// bottom strip's top edge aligns with the minimap's. See
+// `ui::selection_band_height(disp_x, disp_y)`.
 
 /// The Selection band (BL-213 — supersedes the BL-194/195 click-anchored card) —
 /// a FIXED bottom band, sandwiched between the shell column and the right chrome

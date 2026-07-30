@@ -2356,8 +2356,11 @@ void app::render()
     ImGuiIO&     io     = ImGui::GetIO();
     const ImVec2 disp   = io.DisplaySize;
     constexpr float margin = 8.0f;
-    const float  mm_w   = std::max(336.0f, 0.28f * std::min(disp.x, disp.y)); // ~1.4x the old 240/0.20 band — legible on larger displays
-    const float  mm_h   = mm_w * 0.75f; // keep the 4:3 ratio of the 240x180 default
+    // Single source of truth (foldout_column.hpp): the bottom strip's height is
+    // derived from mm_h so the two stay aligned, which they cannot do if this
+    // formula is also written out here.
+    const float  mm_w   = ui::minimap_width(disp.x, disp.y);
+    const float  mm_h   = ui::minimap_height(disp.x, disp.y);
     const ImVec2 mm_origin = {disp.x - margin - mm_w, disp.y - margin - mm_h};
 
     // --- Primary canvases (Layer 2) — the zoom ladder ---
@@ -2765,11 +2768,16 @@ void app::render()
     // no longer competes with the fold-out ledgers for the column. Drawn after
     // the other chrome so it z-orders on top of it.
     {
-        const float  col_w      = ui::shell_column_width(disp.x);
-        const float  right_edge = disp.x - margin - mm_w; // left edge of the right chrome column
-        const ImVec2 band_origin = { col_w, disp.y - ui::selection_band_height };
-        const ImVec2 band_size   = { std::max(0.0f, right_edge - col_w),
-                                     ui::selection_band_height };
+        // The band starts at the COMMS DOCK's right edge, not the shell column
+        // edge: the dock narrowed to 3/4 of the column (2026-07-30) and the band
+        // takes the quarter it gave back, so the bottom strip stays solid rather
+        // than showing a canvas sliver between the two.
+        const ui::foldout_rect comms      = ui::comms_dock_rect();
+        const float            band_left  = comms.x + comms.w;
+        const float            right_edge = disp.x - margin - mm_w; // left edge of the right chrome column
+        const float            band_h     = ui::selection_band_height(disp.x, disp.y);
+        const ImVec2 band_origin = { band_left, disp.y - band_h };
+        const ImVec2 band_size   = { std::max(0.0f, right_edge - band_left), band_h };
         const ui::resource_history_view rhist{ &m_body_resource_hist,
                                                &m_tile_resource_hist,
                                                &m_resource_hist_days };
