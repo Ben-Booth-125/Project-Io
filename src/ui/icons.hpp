@@ -165,6 +165,57 @@ void scarcity(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Fill colour of the silhouette.
 void industry(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw the History nav-rail glyph — an hourglass (a down-triangle over an
+/// up-triangle meeting at a waist) — in @p colour. Slot 9 previously drew the
+/// same @ref ledger glyph as the Budget slot, so the two were indistinguishable;
+/// the joined pair is unmistakably "time" and collides with neither the hollow
+/// scarcity down-triangle nor the filled production up-triangle, because it is
+/// the meeting of the two that reads. See ICONS.md § Nav-rail affordances (BL-174).
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Stroke colour of both triangles.
+void history(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
+/// Draw the Research nav-rail glyph — an upward branching tree (a stem that
+/// splits into two diagonals, each capped with a terminal node) — in @p colour.
+/// Reads as "tech tree / lines of enquiry"; nothing else in the vocabulary
+/// branches, so it stays distinct from the production up-triangle and the
+/// market bars. Reserved-slot glyph, drawn dim. See ICONS.md § Nav-rail
+/// affordances (BL-174).
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Stroke colour of the stem, branches and nodes.
+void research(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
+/// Draw the Corp. Strategy nav-rail glyph — a pennant on a pole (a vertical
+/// staff with a filled right-triangle flag at its head) — in @p colour. Reads
+/// as "a planted objective"; the flag hangs off the staff's top rather than
+/// sitting on a baseline, which keeps it distinct from the production
+/// up-triangle. Reserved-slot glyph, drawn dim. See ICONS.md § Nav-rail
+/// affordances (BL-174).
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Stroke colour of the staff and fill of the pennant.
+void strategy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
+/// Draw the Diplomacy nav-rail glyph — two overlapping circle outlines (a
+/// two-parties-meeting motif) — in @p colour. Distinct from the single
+/// market-centre circle and the concentric activity pulse because the overlap
+/// is the point. Reserved-slot glyph, drawn dim. See ICONS.md § Nav-rail
+/// affordances (BL-174).
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph pair, screen pixels.
+/// @param colour Stroke colour of both outlines.
+void diplomacy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 /// Draw a market-centre marker — a small circle with a centred cross (+) — in
 /// @p colour. Distinct from the building square/diamond/triangle glyphs and the
 /// unit chevron. Used as an on-canvas selectable marker for market entities

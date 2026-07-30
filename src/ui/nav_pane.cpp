@@ -48,11 +48,15 @@ void draw_nav_pane(ui_state& state, float top_offset)
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{6.0f, 8.0f});
     ImGui::Begin("##nav_pane", nullptr, flags);
 
-    // Nine slots from MENU.md § Menu set and ordering (slot 10 is a spare placeholder).
-    // Slots 1–9 match the MENU.md curated sequence; live slots toggle their panel;
-    // placeholder slots (Research, Workforce, Corp Strategy, Diplomacy, History) are
-    // disabled — a neutral glyph keeps them legible.
-    constexpr int tab_count = 10;
+    // Nine slots from MENU.md § Menu set and ordering. Slots 1–9 match the
+    // MENU.md curated sequence; live slots toggle their panel; reserved slots
+    // (Workforce, Research, Corp. Strategy, Diplomacy) are disabled but each
+    // carries its OWN glyph so the rail teaches the shape of the game rather
+    // than showing a row of identical blanks (BL-174).
+    //
+    // BL-174 dropped the former slot 10 — a disabled placeholder with no glyph
+    // and no tooltip, so it was pure noise a new player could not interpret.
+    constexpr int tab_count = 9;
 
     // Square slots; Selectable treats a nonzero size as literal, so derive the
     // rail width explicitly rather than passing -1.
@@ -132,15 +136,15 @@ void draw_nav_pane(ui_state& state, float top_offset)
             }
             ImGui::SetItemTooltip("History");
             break;
-        default: // Slot 10 — spare placeholder
-            ImGui::BeginDisabled();
-            ImGui::Selectable(id, false, 0, {slot_size, slot_size});
-            ImGui::EndDisabled();
+        default: // Unreachable — tab_count is 9 and every slot is handled above.
             break;
         }
 
-        // Glyph centred on the slot: a table for the wired ledger, a neutral
-        // Glyph centred on the slot.
+        // Glyph centred on the slot. Every slot draws its OWN glyph (BL-174):
+        // live slots in the bright stroke, reserved slots in the dim one so
+        // "not yet available" is carried by colour while the shape still says
+        // WHICH system the slot is for. The tooltips ("Research (coming)", …)
+        // already named them; the glyphs now agree.
         const ImVec2 centre = {p0.x + slot_size * 0.5f, p0.y + slot_size * 0.5f};
         const float  r      = slot_size * 0.30f;
         const ImU32  live   = IM_COL32(225, 228, 235, 255);
@@ -149,9 +153,13 @@ void draw_nav_pane(ui_state& state, float top_offset)
         {
         case 1: icons::corporation(dl, centre, r, live); break;
         case 2: icons::ledger(dl, centre, r, live);      break;
+        case 3: icons::population(dl, centre, r, dim);   break;  // Workforce (reserved)
+        case 4: icons::research(dl, centre, r, dim);     break;  // Research (reserved)
         case 5: icons::market(dl, centre, r, live);      break;
         case 6: icons::building(dl, centre, r, building_type::processing_facility, live); break;
-        case 9: icons::ledger(dl, centre, r, live);      break;
+        case 7: icons::strategy(dl, centre, r, dim);     break;  // Corp. Strategy (reserved)
+        case 8: icons::diplomacy(dl, centre, r, dim);    break;  // Diplomacy (reserved)
+        case 9: icons::history(dl, centre, r, live);      break;
         default: icons::placeholder(dl, centre, r, dim); break;
         }
     }

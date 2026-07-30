@@ -90,7 +90,21 @@ silhouette reads the building **type** and the fill reads **who owns it**.
 | Glyph | Function | Shape | Colour | Used by |
 |---|---|---|---|---|
 | **Ledger** | `ledger(…, colour)` | Ruled-table outline (box + two rules) | Caller stroke | Nav rail — slots that open a ledger window |
-| **Placeholder** | `placeholder(…, colour)` | Hollow rounded square | Caller stroke | Nav rail — reserved/unassigned slots |
+| **Placeholder** | `placeholder(…, colour)` | Hollow rounded square | Caller stroke | Nav rail — fallback only; **no slot draws it since BL-174** (see below) |
+| **History** | `history(…, colour)` | Hourglass — a down-taper over an up-taper meeting at a centre waist, both ends capped; the *meeting* is what distinguishes it from the scarcity and production single triangles | Caller stroke | Nav rail slot 9 (History). Replaced a second `ledger` glyph, which made slot 9 indistinguishable from slot 2 (Budget) |
+| **Research** | `research(…, colour)` | Branching tree — a stem rising to a fork, then two diagonals out to filled terminal nodes; the only branching glyph in the vocabulary | Caller stroke | Nav rail slot 4 (Research) — **reserved slot**, drawn dim |
+| **Strategy** | `strategy(…, colour)` | Pennant on a pole — a vertical staff with a filled right-triangle flag at its head; the flag hangs off the staff top rather than resting on a baseline, so it stays clear of the production up-triangle | Caller stroke + fill | Nav rail slot 7 (Corp. Strategy) — **reserved slot**, drawn dim |
+| **Diplomacy** | `diplomacy(…, colour)` | Two overlapping circle outlines — a two-parties-meeting motif; the overlap is the point, so it never reads as the single market-centre circle or the concentric activity pulse | Caller stroke | Nav rail slot 8 (Diplomacy) — **reserved slot**, drawn dim |
+
+**Nav-rail legibility rule (BL-174).** Every rail slot draws its **own** glyph — the shape says
+*which system the slot is for*, and **colour alone** carries availability (the bright stroke for a
+live slot, the dim stroke for a reserved one). Before BL-174 the four reserved slots (Workforce,
+Research, Corp. Strategy, Diplomacy) all drew the same hollow `placeholder` square, so a new player
+saw a column of identical blanks and could not tell what any of them was for; the tooltips already
+named them ("Research (coming)", …), but a tooltip cannot be seen without hovering, and never
+appears in a capture. Workforce reuses the existing `population` figure; the other three got the
+glyphs above. The former slot 10 — a disabled square with no glyph *and* no tooltip — was
+**removed**, since nothing about it was interpretable. Reserved slots stay `BeginDisabled`.
 
 ### 3. Map-lens glyphs — the overlay control strip
 
