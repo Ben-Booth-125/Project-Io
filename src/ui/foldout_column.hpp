@@ -73,6 +73,29 @@ foldout_rect comms_dock_rect();
 /// return (false when fully clipped). Pair with foldout_end().
 bool foldout_begin(const char* name);
 
+/// Verify-only: park a fold-out ledger's vertical scroll at `fraction` of its
+/// scrollable extent (0 = top, 1 = foot), by ImGui window name — the same string
+/// passed to `foldout_begin` ("Tile Ledger", "Market Ledger", "Economy", ...).
+/// Driven from Lua via `verify.scroll_panel` (src/core/app.cpp).
+///
+/// Why this exists: a capture composits one frame of the panel as laid out, so any
+/// content the column CLIPS is invisible to a golden — the Generation History
+/// biography showed its first ~8 lines and a regression below the fold would have
+/// diffed at 0.0000%. This is the hook that lets a script capture the rest.
+///
+/// **Sticky, and it lands on the FOLLOWING frame** — ImGui resolves a scroll target
+/// inside `Begin`, before this call runs, and the fraction resolves against the
+/// previous frame's content height. So a script must render at least one more frame
+/// before capturing (`verify.frames(2)`), and equally must render a frame after
+/// resetting to 0 or the next capture inherits the old scroll. Passing an empty name
+/// clears the request; only one panel can be parked at a time, which is all a linear
+/// verify script needs.
+///
+/// Scrolls the ledger WINDOW. A panel that nests its own `BeginChild` scroller
+/// (Market Ledger's `##price_scroll`) is not reached by this — that needs its own
+/// hook, and none is claimed here.
+void foldout_request_scroll(const char* window_name, float fraction);
+
 /// End a foldout_begin() window. Must be called once per foldout_begin() — including
 /// the early-out path where foldout_begin() returned false — matching the
 /// ImGui::Begin/End contract.

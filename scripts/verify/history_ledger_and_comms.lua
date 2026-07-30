@@ -8,7 +8,23 @@ verify.goto_surface("Kepler")
 verify.show_panel("tile", true)
 
 verify.panel_view("history", 0)
+verify.scroll_panel("history", 0.0)
 verify.capture("history_story_kepler")
+
+-- The column clips the biography after ~8 lines, so the head capture above can
+-- only ever prove the OLDEST events render. Park the scroll at the foot and take
+-- a second Story capture: the late history — the recent-epoch events, and
+-- whatever date formatting they carry — now has a golden of its own.
+-- frames(2) because the scroll resolves against the previous frame's extent.
+verify.scroll_panel("history", 1.0)
+verify.frames(2)
+verify.capture("history_story_kepler_foot")
+-- Back to the top, and left parked there: clearing the request would merely stop
+-- setting the scroll, leaving the window still at the foot for later captures.
+-- frames(1) because the request lands on the following frame, and the Chain
+-- captures below would otherwise inherit the foot scroll and come out blank.
+verify.scroll_panel("history", 0.0)
+verify.frames(1)
 
 verify.panel_view("history", 1)
 for round = 0, 2 do

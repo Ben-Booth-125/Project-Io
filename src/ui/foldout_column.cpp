@@ -6,6 +6,8 @@
 
 #include <imgui.h>
 
+#include <string>
+
 namespace ui {
 
 float shell_column_width(float disp_x)
@@ -79,6 +81,20 @@ foldout_rect comms_dock_rect()
     };
 }
 
+namespace {
+// The single pending verify scroll request (see foldout_request_scroll). File-static
+// rather than a ui_state field: it is a harness affordance owned by the window host,
+// and no game code reads or writes it.
+std::string g_scroll_window;
+float       g_scroll_fraction = 0.0f;
+} // namespace
+
+void foldout_request_scroll(const char* window_name, float fraction)
+{
+    g_scroll_window   = (window_name != nullptr) ? window_name : "";
+    g_scroll_fraction = (fraction < 0.0f) ? 0.0f : ((fraction > 1.0f) ? 1.0f : fraction);
+}
+
 bool foldout_begin(const char* name)
 {
     const foldout_rect r = foldout_column_rect();
@@ -93,7 +109,15 @@ bool foldout_begin(const char* name)
         ImGuiWindowFlags_NoBringToFrontOnFocus |
         ImGuiWindowFlags_NoSavedSettings;
 
-    return ImGui::Begin(name, nullptr, flags);
+    const bool open = ImGui::Begin(name, nullptr, flags);
+
+    // Apply a pending verify scroll. GetScrollMaxY() here is derived from the
+    // PREVIOUS frame's content size, which is why the request is sticky — the first
+    // frame after a view change still reports the old extent (often 0).
+    if (open && !g_scroll_window.empty() && g_scroll_window == name)
+        ImGui::SetScrollY(g_scroll_fraction * ImGui::GetScrollMaxY());
+
+    return open;
 }
 
 void foldout_end()
