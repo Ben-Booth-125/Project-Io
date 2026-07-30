@@ -2697,16 +2697,19 @@ void app::render()
         ui::draw_header_panel(m_world, m_balance_history, header_left, header_right);
     }
 
-    // Comms chat log (BL-205, replaces the Explorer placeholder) — right edge,
-    // between the time panel and the minimap.
+    // Comms chat log (BL-205) — BL-227 re-homed it from the right chrome column
+    // (where it sat between the time panel and the minimap) to the BOTTOM-LEFT,
+    // sharing the Selection band's top edge and exact height so the bottom of the
+    // screen reads as one horizontal strip: [comms][selection band].
+    //
+    // Comms is ambient — nation-voiced public chatter you read when you notice it
+    // (BL-212), not a decision surface — so it does not need the prime right-edge
+    // space directly under the time panel. The fold-out column shortens to clear
+    // it, which is why every menu and ledger is now permanently shorter.
     {
-        const float column_bottom = margin + time_h;
-        const float exp_x         = mm_origin.x;
-        const float exp_y         = column_bottom + margin;
-        const float exp_w         = mm_w;
-        const float exp_h         = (mm_origin.y - margin) - exp_y;
+        const ui::foldout_rect c = ui::comms_dock_rect();
         ui::draw_chat_panel(m_world, m_chat, static_cast<int>(m_sim_loop.day_tick()),
-                            exp_x, exp_y, exp_w, exp_h);
+                            c.x, c.y, c.w, c.h);
     }
 
     // Left navigation pane and the menus it opens. Starts below the profile.

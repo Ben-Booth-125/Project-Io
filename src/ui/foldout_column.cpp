@@ -2,6 +2,7 @@
 
 #include "nav_pane.hpp"      // nav_pane_width
 #include "profile_panel.hpp" // profile_panel_height
+#include "selection_card.hpp" // selection_band_height (the comms dock shares it)
 
 #include <imgui.h>
 
@@ -33,10 +34,23 @@ foldout_rect foldout_column_rect()
         nav_pane_width,                       // x: right of the icon rail
         profile_panel_height,                 // y: below the identity tile
         W - nav_pane_width,                   // w: rail edge -> column edge
-        disp.y - profile_panel_height,        // h: to the bottom edge — flush with the
-                                              //    nav rail (same top and bottom, so the
-                                              //    menu and its fold-out items are equal
-                                              //    height, no gap below the ledger)
+        // h: down to the TOP OF THE COMMS DOCK, not the bottom margin (BL-227).
+        //    The dock owns the bottom-left tile of the screen's bottom strip, so
+        //    every menu and ledger in this column is now permanently shorter by
+        //    exactly the Selection band's height. Ben's call, 2026-07-30.
+        std::max(0.0f, disp.y - profile_panel_height - selection_band_height),
+    };
+}
+
+foldout_rect comms_dock_rect()
+{
+    const ImVec2 disp = ImGui::GetIO().DisplaySize;
+    const float  W    = shell_column_width(disp.x);
+    return {
+        nav_pane_width,                            // x: right of the icon rail
+        disp.y - selection_band_height,            // y: shares the Selection band's top edge
+        W - nav_pane_width,                        // w: rail edge -> column edge
+        selection_band_height,                     // h: identical to the band, by design
     };
 }
 
