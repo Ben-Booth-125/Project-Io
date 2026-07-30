@@ -86,7 +86,7 @@ continent_state run_continents(const planetology_state& pl, int gw, int gh, uint
     if (plate_count == 1)
     {
         out.history.push_back(history_event{
-            4.50f, chain_stage::engine,
+            years_from_gya(4.50f), chain_stage::engine,
             "Interior locked into a single stagnant plate.",
             "-> no subduction, no porphyry copper; terrain reflects only impact and volcanic history"
         });
@@ -185,7 +185,7 @@ continent_state run_continents(const planetology_state& pl, int gw, int gh, uint
             const float gya = 0.3f + er.unit() * 3.8f;
 
             events.push_back(history_event{
-                gya, chain_stage::engine,
+                years_from_gya(gya), chain_stage::engine,
                 convergent ? "Two plates collided along a long-lived boundary."
                            : "A boundary pulled apart into a spreading rift.",
                 convergent ? "-> mountain range and arc magmatism; porphyry copper where it persists"
@@ -218,8 +218,13 @@ continent_state run_continents(const planetology_state& pl, int gw, int gh, uint
     }
 
     // Chronological (oldest first), matching the biography's dated-line convention.
-    std::sort(events.begin(), events.end(),
-              [](const history_event& x, const history_event& y) { return x.gya > y.gya; });
+    // stable_sort, not sort: two boundaries can hash to the same year, and
+    // std::sort leaves tied elements in an unspecified order — a determinism
+    // hazard the float key merely made unlikely rather than impossible. The
+    // preserved order is the plate-pair key walk above, which is deterministic.
+    std::stable_sort(events.begin(), events.end(),
+                     [](const history_event& x, const history_event& y)
+                     { return x.years_before_epoch > y.years_before_epoch; });
     out.history = std::move(events);
 
     return out;

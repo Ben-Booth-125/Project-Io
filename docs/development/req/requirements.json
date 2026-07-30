@@ -6415,6 +6415,60 @@
           "result_metric": "scripts/verify/chat_panel.lua — golden blessed 2026-07-28; a per-corp Counsel channel tab renders (Counsel: <corp name>)."
         }
       ]
+    },
+    {
+      "brief": "history-dated-epochs",
+      "batch": "2026-07-30-generation-frontier",
+      "title": "BL-220 — a historical-epoch timestamp for the oral history log",
+      "status": "completed",
+      "promoted_from": "backlog.json BL-220 HISTORY_EVENT_DATED_EPOCHS",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "completed",
+          "requirement": "HEADLESS: history_event carries an integer year before the 1960 campaign epoch; years_from_gya and years_from_calendar_year convert correctly, including the round-half-up path and its negative branch.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "tools/verify/planetology_harness.cpp R14 — ALL PASS, 2026-07-30."
+        },
+        {
+          "id": "R2",
+          "status": "completed",
+          "requirement": "HEADLESS: format_history_date picks its unit from magnitude across all five bands (Gya / Mya / interval / calendar year / now), asserted at BOTH EDGES of every band, and never renders a future date as a bare negative.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "tools/verify/planetology_harness.cpp R14 — 34 assertions, ALL PASS. Caught a real out-of-band \"1000 Mya\" defect at 999,999,999 that band-interior assertions had missed."
+        },
+        {
+          "id": "R3",
+          "status": "completed",
+          "requirement": "HEADLESS: the biography is totally ordered oldest-first, and a historical line interleaves into the same list between deep time and the epoch — the property BL-221/BL-222 build on.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "tools/verify/planetology_harness.cpp R14 — ALL PASS."
+        },
+        {
+          "id": "R4",
+          "status": "completed",
+          "requirement": "HEADLESS: generation stays deterministic — the twice-generated world is identical, and planetology R1 now compares timestamps exactly rather than only history length.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "determinism_harness 23/23, world_audit 19/19, planetology_harness 101/101 — all PASS, 2026-07-30. continents_harness went green pre-review but could not be re-confirmed (Smart App Control blocked the binary); continents.cpp is byte-identical to that run."
+        },
+        {
+          "id": "R5",
+          "status": "partial",
+          "requirement": "VISUAL: the History ledger renders each date in the correct unit for its magnitude.",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "scripts/verify/history_ledger_and_comms.lua — 6/6 goldens PASS, but coverage is PARTIAL and the 0.0000% diff is misleading: every visible line is >= 1 Gya, the one band where old and new formats are byte-identical. The sub-Gyr bands are clipped below the panel fold and the verify API has no scroll driver. Follow-up task raised."
+        }
+      ]
     }
   ]
 }

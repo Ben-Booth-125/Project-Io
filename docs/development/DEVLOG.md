@@ -10,6 +10,120 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## Session — BL-220 (dated history timestamps): the foundation under the HISTORY.md ladder (2026-07-30)
+
+**Runtime.** ~50m. Full (touches the generation seam, five files plus the harness).
+
+**Context.** Continue the BL-210 oral-history pivot; re-verify the roadmap against `backlog.json`,
+then take the build frontier. Recommended order: BL-220 first, since BL-221/BL-222 and the History
+ledger's historical dates all sit on it.
+
+**Roadmap audit.** The handed-over status matched `backlog.json` exactly — no drift. One correction
+worth stating: BL-220 formally lists **BL-208 (world-history log)** in `requires`, but its own design
+says it is "cheap enough to land alone" and must land *before* any historical stage emits a line.
+BL-208 is still `design-owed`, and BL-220 is a mechanical change to a struct that exists today, so
+the dependency was treated as nominal.
+
+**What landed.** `history_event::gya` (float) → `years_before_epoch` (`int64_t`), a signed year count
+back from the 1960 campaign epoch, with `years_from_gya` / `years_from_calendar_year` constructors and
+a magnitude-picking `format_history_date` — Gya / Mya / "11,650 years ago" / calendar year / "now".
+
+**The blast radius was one line, by design.** Deep-time stages still *date* in Gya, because that is
+how their chemistry is argued; the `say` lambda in `run_planetology` narrows the conversion in one
+place, so all ~50 emitter call sites were untouched. Three consumers changed (the two sorts, the
+ledger, the harness).
+
+**Two defects found in passing, both in the *old* code:**
+
+- `continents.cpp` sorted the biography with `std::sort`. Tied elements are left in an unspecified
+  order, so with an integer key that is a live determinism hazard — the float key merely made ties
+  unlikely rather than impossible. Promoted to `std::stable_sort`, matching `hard_coded_world.cpp`.
+- `planetology_harness`'s `same()` compared `history.size()` but never the timestamps, so R1 could
+  not have caught a nondeterministic date at all. Now compares them exactly.
+
+**A claim in the filed design did not survive checking, and the record is corrected.** BL-220 argued
+that float would make *"two events centuries apart compare EQUAL"*. That is overstated: float32
+carries ~7 significant digits at any exponent, so 1687 and 1688 stored directly as Gya compare
+unequal and round-trip intact. The change stands on the two *real* defects — the ledger's `%.2f Gya`
+rendered every historical date as `0.00 Gya`, and any date derived near the epoch from a deep-time
+baseline dies to cancellation (`4.5f - 273yr` **is** `4.5f`), which is exactly how the ladder will
+compute dates. R14 asserts the display defect rather than the claimed one, and both `PLANETOLOGY.md`
+and the header comment now record the correction rather than repeating the original reasoning.
+
+**Residual calls settled.** (1) `int64_t` years, not a fixed-point pair — no serialiser exists, and
+integers sort exactly. (2) **One `chain_stage` enum**: the ladder's stages join it in causal position
+(after `legacy`, before `spend`), with a seam reserved ahead of settlement for a pre-settlement
+narrative stage. The consequence is documented because it inverts a rule elsewhere in the same file —
+`chain_stage` is *inserted into*, where `body_archetype` is *append-only* — and that is only safe
+while no serialiser exists.
+
+**Verification.** New harness group **R14** (R12 is reserved by BL-209, R13 by BL-217) covers the
+conversions, all five format bands, total oldest-first ordering, and a historical line interleaving
+between deep time and the epoch — the property BL-221/BL-222 build on, asserted before anything
+relies on it. Regression set green: `determinism_harness`, `world_audit`, `planetology_harness`,
+`continents_harness`, plus the `history_ledger_and_comms` golden.
+
+**Two of my own assertions failed first, and both were worth the failure.** The 12 kyr human/deep-time
+boundary put the design's own example (11,650) on the wrong side — moved to 10 kyr, the conventional
+Neolithic start, which satisfies both the example and the ladder's actual lines. And "a historical
+line sorts last" was simply wrong: Kepler's S9 drawdown line is dated *at* the epoch, so a 1602
+charter is properly older than it. The assertion now claims what is true — it lands *between* the
+two regimes.
+
+**An adversarial review pass (author ≠ reviewer) found six real defects in my own first cut, and the
+two worst were tests that could not fail.** Recorded because the failure mode is instructive: I had
+asserted the *middle* of every format band and no boundary at all.
+
+- **An out-of-band unit.** The band was chosen from the magnitude but the Myr rounding applied after,
+  so 999,999,999 fell through the Gyr threshold, took the Myr branch and rounded *up* to `"1000 Mya"`
+  — a unit the table never promises. Reachable in real generation: `continents.cpp` draws its
+  boundary dates uniformly over [0.3, 4.1) Gya. Fixed by rounding to Myr *before* picking the unit.
+- **A vacuous assertion carrying the item's headline justification.** "The old float format rendered
+  distinct historical dates identically" formatted two float literals with a hard-coded `%.2f Gya`
+  *inside the harness*. It exercised no production code — the entire change could be reverted and it
+  would still pass, while reading like the regression was pinned. Replaced with an assertion through
+  the real function.
+- **A conversion assertion that did not exercise its own rounding.** `years_from_gya(4.50f)` uses an
+  exactly-representable value, so `+ 0.5` could have been deleted with the suite green, and the
+  negative branch was never executed at all. Worse, its name claimed *exactness*, which is false:
+  `2.4f` lands ~95 years off a round 2.4 Gya. Harmless (deterministic, and invisible at 0.01 Gyr
+  display resolution) but not exact, so the harness now prints the drift as evidence and both the
+  assertion name and `PLANETOLOGY.md` say "deterministic, not exact".
+- **Unsigned negatives in the deep-time bands.** `-252000000` rendered `"-252 Mya"`. Not hypothetical:
+  the water gate emits `age - 1.2f` against an age clamped only at 1.0 Gyr, so a low `system_age_gyr`
+  already reaches it. Now renders `"252 Myr hence"`; `INT64_MIN` is special-cased (negating it is UB).
+- **An out-of-bounds read in the failure path.** `mixed[at - 1]` guarded `at < size()` but not
+  `at == 0` — and `check()` records a FAIL without aborting, so the harness would have indexed with
+  `(size_t)-1` in exactly the regression it exists to diagnose.
+
+R14 grew from 17 assertions to 34, now pinning both edges of every band.
+
+**Left open / owed.**
+
+- **The visual check has a blind spot, and the golden's 0.0000% diff is misleading.** Every line
+  visible in `history_story_kepler` is ≥ 1 Gya, and for that band the old and new formats are
+  byte-identical; the lines that would actually differ (`567 Mya`, `now`) are clipped below the panel
+  fold. The verify API has no scroll driver, so they cannot be reached from a script. R14 covers the
+  formatter exhaustively at the unit level, but the *visual* path for four of five bands is
+  uncovered. Flagged as a follow-up task.
+- **`continents_harness` could not be re-confirmed after the review fixes** — Windows **Device Guard**
+  began blocking that one binary mid-session (`"blocked by your organization's Device Guard policy"`),
+  from `build\` and from `build_gen\verify\` alike, while `planetology_harness`, `determinism_harness`,
+  `world_audit` and `ProjectIo.exe` all still run. It went green *with every `continents.cpp` change
+  already in place* earlier in the session, and `continents.cpp` is byte-identical to that run — the
+  post-review edits were confined to `format_history_date` and the harness file, neither of which
+  continents_harness asserts on. So the evidence stands, but a re-run does not exist. **Worth an item
+  if it recurs**; it makes the logic tier unrunnable on this machine.
+- **The mythic-era seam is not yet reached.** `chain_stage` and the timestamp are deliberately wide
+  enough to admit a pre-settlement narrative stage; the pipeline has not arrived there.
+- **`build_app.bat` cannot self-heal a corrupted generated makefile.** SDL3's `SDL_uclibc` target lost
+  its `depend` rule mid-session (`NMAKE U1073`) and the script only runs `nmake`, never re-invokes
+  CMake, so every retry failed identically. Fixed by forcing `cmake -S . -B build`. A `--regen` flag
+  would have saved the diagnosis.
+- BL-221 (pre-national ladder) is now unblocked on its timestamp dependency.
+
+---
+
 ## Session — v0.1.0 legibility batch: the five cut-blockers, and four items designed (2026-07-30)
 
 **Runtime.** ~5h 30m. Full (ultracode; two design workflows over 20 agents, then five items built,

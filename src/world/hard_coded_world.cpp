@@ -103,7 +103,8 @@ world make_hard_coded_world(world_params params, generation_report* report)
                           std::make_move_iterator(cs.history.end()));
         cs.history.clear(); // moved-from; the biography owns these lines now.
         std::stable_sort(st.history.begin(), st.history.end(),
-            [](const history_event& a, const history_event& b) { return a.gya > b.gya; });
+            [](const history_event& a, const history_event& b)
+            { return a.years_before_epoch > b.years_before_epoch; });
         bias_out = cs.height_bias;
 
         if (report)

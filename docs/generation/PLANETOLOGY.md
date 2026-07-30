@@ -506,6 +506,66 @@ Five things make this work, each cheap:
    for an eon in the middle (*"and then nothing much for a billion years"* is a better beat than a
    gap), crowded and consequential at the end.
 
+### Dating a line — one field, both regimes *(BL-220, landed 2026-07-30)*
+
+A biography line is timestamped by **`history_event::years_before_epoch`, a signed integer count of
+years back from the campaign epoch** (1 January 1960 — `campaign_epoch_year`, mirrored by
+`ui::fmt::campaign_epoch_year` and cross-checked by a `static_assert` in `tile_inspector.cpp`).
+
+It replaced a `float gya` for two reasons. **Display:** 1450 CE is 5.1e-7 Gya, so the ledger's
+`%.2f Gya` rendered every historical date as `0.00 Gya` — the whole of recorded history collapsed
+onto one string. **Arithmetic:** any date derived near the epoch from a deep-time baseline dies to
+cancellation, since `4.5f - 273yr` is exactly `4.5f`, and the historical ladder computes dates that
+way constantly. Integers also sort exactly and tie-break deterministically, which matters because a
+timestamp that participates in sorting is effectively a gate path (§ Determinism & cost).
+
+> Correcting a claim in BL-220 as filed: it also argued that float would make *"two events centuries
+> apart compare equal"*. That is overstated — float32 carries ~7 significant digits at any exponent,
+> so 1687 and 1688 stored directly as Gya do compare unequal and round-trip intact. The conclusion
+> stands on display and cancellation; the stated mechanism did not.
+
+**One field, not two**, because deep time and recorded history sort into a *single* ordered
+biography — that list is the whole presentation model, and a second field would mean the ledger
+could not sort its own lines. `format_history_date` picks the unit from the magnitude, which is
+rule 5 ("do not linearise deep time") made mechanical:
+
+| Magnitude | Reads as |
+|---|---|
+| ≥ 1 Gyr | `4.50 Gya` |
+| ≥ 1 Myr | `252 Mya` |
+| ≥ 10 kyr | `11,650 years ago` |
+| within 10 kyr | `1687`, `-3200` |
+| 0 | `now` |
+
+The 10 kyr boundary is the conventional start of the Neolithic: older is a **climate** event and
+reads as an interval, younger is a **human** one and reads as a calendar year. It is a judgement
+call rather than a physical constant, and the one number here worth revisiting — set it too late and
+a Younger-Dryas line claims a calendar year it has no business having; too early and a granary-cities
+line reads as a bare interval.
+
+Build a timestamp with `years_from_gya` (deep-time stages still date in Gya, because that is how
+their chemistry is argued) or `years_from_calendar_year` (the historical ladder's entry point);
+render it with `format_history_date`, never by hand.
+
+`years_from_gya` is **deterministic but not exact**, and the difference is worth stating: float32
+carries ~7 significant digits at any exponent, so `2.4f` lands about 95 years off a round 2.4 Gya.
+That is invisible at a display resolution of 0.01 Gyr and it reproduces bit-for-bit, which is all the
+model requires — but it is not exactness, so no assertion or doc line should claim it. Dates that
+must be exact (every historical line) come in through `years_from_calendar_year`, which is integer
+end to end. `planetology_harness` **R14** pins the
+conversions, every format band, total oldest-first ordering, and that a historical line interleaves
+correctly between deep time and the epoch.
+
+**One `chain_stage` enum too**, for the same reason (BL-220 residual call 2, settled here). The
+stages of the historical ladder (`docs/lore/HISTORY.md`, landing as BL-221/BL-222) join `chain_stage`
+rather than running a parallel enum — a second one would leave the ledger unable to sort its own
+lines. Their causal position is **after `legacy`** (S8 leaves the endowment) and **before `spend`**
+(S9 draws it down, which is what industrialisation *does*), with a seam reserved ahead of settlement
+for a pre-settlement narrative stage. Note the consequence: `chain_stage` is **ordered by chain
+position and inserted into, not appended to** — the opposite of `body_archetype`'s append-only rule —
+because gates and R6 both compare stages with `>=`. That is safe only while no serialiser exists; if
+one lands, this enum needs a stable wire mapping before anything else is inserted.
+
 **The diagnostic test, applied ruthlessly: for every generated value, name the decision it changes.
 Anything that fails is deleted, not tuned.** That test is what removes the magnetic dynamo, D/H
 enrichment, salinity, per-species Jeans parameters and fifteen of nineteen deposit multipliers. It is
@@ -698,7 +758,9 @@ absorbs it rather than the model hiding it.
 
 ### Verification
 
-`tools/verify/planetology_harness.cpp`, auto-registered as a CTest. Seven requirement groups:
+`tools/verify/planetology_harness.cpp`, auto-registered as a CTest. The groups this doc owns (the
+harness also carries R9–R11, which belong to the endemic-goods and market items, and reserves R12
+for BL-209's molecular trace and R13 for BL-217's rarity bands):
 
 | | Asserts |
 |---|---|
@@ -710,6 +772,7 @@ absorbs it rather than the model hiding it.
 | R6 | **Wizard stability** — a decision at stage N never rewrites the history of a stage before N |
 | R7 | Every new knob demonstrably moves its own outcome |
 | R8 | **Preferences and reroll** — resolution is pure in (preferences, seed); a reroll redraws its own round and leaves earlier ones alone; **every** resolved homeworld clears the strict floor across 400 preference combinations; a dimmer star pulls the orbit inward |
+| R14 | **The dated timestamp** (BL-220) — the conversions from Gya and from a calendar year, every display band *and both edges of every band*, total oldest-first ordering, and a historical line interleaving between deep time and the epoch |
 
 R6 is what makes the wizard's Back/Continue safe, and R8 is what makes the rejection sampling a
 generator rather than a slot machine. Both are asserted, not assumed.
