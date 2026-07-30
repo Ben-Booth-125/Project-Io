@@ -528,6 +528,22 @@ void draw_construction_panel(world& w,
     // bottom-left Selection element is gone — the column sits entirely left of Selection.
     ui::foldout_begin("Building");
 
+    // BL-176 — land on the building's controls, not an empty queue. Selecting a
+    // building (on the canvas, or via the tile element's Manage action) snaps the
+    // panel to the Buildings view, whose inline detail carries that building's
+    // recipe and workforce controls. Edge-triggered on the selection changing, so
+    // the player can still switch to the queue and stay there.
+    if (state.selected_entity != state.construction.panel_focus_building)
+    {
+        state.construction.panel_focus_building = state.selected_entity;
+        if (state.selected_entity != null_entity &&
+            w.buildings.find(state.selected_entity) != w.buildings.end() &&
+            is_player_owned(w, state.selected_entity))
+        {
+            state.construction.panel_view = 1;
+        }
+    }
+
     int& view = state.construction.panel_view;
     ui::nav_button("Construction", 0, view, p_open);
     ImGui::SameLine();
