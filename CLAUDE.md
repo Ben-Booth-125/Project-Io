@@ -265,7 +265,14 @@ per-command mapping table. The allow-list covers routine read/build/git/worktree
 `git clean`) outright. This is the lighter model adopted from Project-Fulcrum's process, and the
 allow/deny split is **confirmed**.
 
-When in doubt, tighten an allow rule rather than broaden it. The per-harness exe allows (`econ_harness`, `world_audit`,
-etc.) stay narrow because they are specific binaries; add a new harness's exe before it runs
-prompt-free. `deny` takes precedence over `allow`, so a denied command is blocked even if an
-allow rule would match.
+When in doubt, tighten an allow rule rather than broaden it. `deny` takes precedence over `allow`,
+so a denied command is blocked even if an allow rule would match.
+
+Verify-harness exes are covered by one path-scoped rule, `Bash(& ".\build_gen*)`, rather than a
+per-harness entry each. This replaces the old per-binary allows (`econ_harness`, `world_audit`,
+etc.), which assumed a repo-root `/Fe:` and are now removed. The rule stays narrow by being
+anchored to a **directory**: `verifier-headless` builds every harness to
+`build_gen\verify\<full_harness_name>.exe`, so a new harness runs prompt-free without editing
+this file. `%TEMP%` is banned as a harness output target — see that skill's Procedure § for why
+(unsigned exes in user-writable staging are indistinguishable from a dropper, and whitelisting
+`%TEMP%` in a virus scanner to work around it would defeat the scanner).

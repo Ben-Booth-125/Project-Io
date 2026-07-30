@@ -15,9 +15,9 @@
 //      src\world\population_generation.cpp src\world\hard_coded_world.cpp ^
 //      src\world\orbital_system.cpp src\world\economy_system.cpp ^
 //      src\world\market_clearing.cpp src\world\budget_system.cpp ^
-//      /Fe:population_mvp.exe
+//      /Fo:build_gen\verify\population_mvp\ /Fe:build_gen\verify\population_mvp.exe
 // Run:
-//   .\population_mvp.exe
+//   .\build_gen\verify\population_mvp.exe
 //
 // Note: recipe_registry.cpp is NOT linked -- it depends on Lua. The registry
 // is used inline-only (set_thresholds / set_economics / add_recipe are in header).
