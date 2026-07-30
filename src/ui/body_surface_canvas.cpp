@@ -2158,58 +2158,55 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             ++state.hover_ticks;
         }
 
-        // Dwell-to-open (BL-200). A second opener for the Selection band alongside the
-        // click: this timer advances only while the pointer holds STILL over an
-        // entity — any movement past the jitter radius resets it, so a sweep across
-        // the tile grid never auto-opens (the anti-bombardment gate). hover_ticks
-        // (above) governs the transient glance; dwell_ticks governs the auto-open.
-        const float ddx   = mouse.x - state.dwell_anchor.x;
-        const float ddy   = mouse.y - state.dwell_anchor.y;
-        const bool  moved = (ddx * ddx + ddy * ddy) > kDwellJitterPx * kDwellJitterPx;
-        if (moved || hover_eid == null_entity)
+        // Freeze-on-hover (BL-228, retires BL-200's dwell-to-open).
+        //
+        // Hovering no longer OPENS the Selection band. Opening is the click's job
+        // alone again — one gesture, one meaning — and dwell-to-open's auto-fire,
+        // its stillness timer and its progress bar are all gone with it.
+        //
+        // What hover does now: once the glance delay elapses the card FREEZES at
+        // the pointer position that summoned it and stops following the cursor. It
+        // stays there, showing the entity it was summoned for, until the pointer
+        // leaves its bounds. That makes it readable (a card that slides cannot be
+        // read to the end of a line) and gives it a deliberate dismissal.
+        if (state.hover_card_entity != null_entity)
         {
-            state.dwell_anchor = { mouse.x, mouse.y };
-            state.dwell_ticks  = 0;
-        }
-        else
-        {
-            ++state.dwell_ticks;
-        }
+            // A card is up: dismiss it only when the pointer leaves its rect. The
+            // pad spans the gap between the anchor and the card drawn above it, so
+            // the card does not dismiss itself the frame it appears.
+            const bool inside =
+                mouse.x >= state.hover_card_min.x - kHoverCardExitPadPx &&
+                mouse.x <= state.hover_card_max.x + kHoverCardExitPadPx &&
+                mouse.y >= state.hover_card_min.y - kHoverCardExitPadPx &&
+                mouse.y <= state.hover_card_max.y + kHoverCardExitPadPx;
 
-        // The card is already open for this entity when it is the live selection and
-        // not hidden — no dwell bar and no re-fire while it stays open.
-        const bool card_open_here = hover_eid != null_entity &&
-                                    state.selected_entity == hover_eid &&
-                                    state.selection_hidden_for != hover_eid;
-
-        // The dwell bar fills across [kHoverDelay, kDwellOpenTicks]: it starts once
-        // the glance is up and completes as the card opens. Zeroed when the card is
-        // already open here (nothing to signal).
-        float dwell_fraction = 0.0f;
-        if (hover_eid != null_entity && !card_open_here && kDwellOpenTicks > kHoverDelay)
-            dwell_fraction = std::clamp(
-                static_cast<float>(state.dwell_ticks - kHoverDelay) /
-                    static_cast<float>(kDwellOpenTicks - kHoverDelay),
-                0.0f, 1.0f);
-
-        if (hover_eid != null_entity)
-        {
-            draw_hover_card(mouse, state.hover_ticks, [&]() {
-                draw_hover_content(w, state, hover_eid);
-            }, dwell_fraction);
+            // Also drop it if its subject stopped existing under a world change.
+            if (!inside)
+                state.hover_card_entity = null_entity;
         }
 
-        // Auto-open on a completed dwell — the pointer-driven twin of the click
-        // path (Ben, 2026-07-23: click still opens instantly; dwell is the addition;
-        // both converge on the same open). Suppressed in construction mode (a dwell
-        // must not retarget the Selection element mid-placement) and when the card
-        // is already open here.
-        if (hover_eid != null_entity && !state.construction.active && !card_open_here &&
-            state.dwell_ticks >= kDwellOpenTicks)
+        // Summon a new frozen card once the glance delay is met over an entity —
+        // but never while one is already up (it owns the pointer until dismissed),
+        // and never mid-placement, where a floating card would sit over the ghost.
+        if (state.hover_card_entity == null_entity &&
+            hover_eid != null_entity &&
+            !state.construction.active &&
+            state.hover_ticks >= kHoverDelay)
         {
-            state.selected_entity      = hover_eid;
-            state.selection_hidden_for = null_entity;
-            state.dwell_ticks          = 0; // consume, so it fires once per dwell
+            state.hover_card_entity = hover_eid;
+            state.hover_card_anchor = { mouse.x, mouse.y };
+            // Seed the rect around the anchor so the first frame's hit-test (which
+            // runs before the card has ever been drawn) cannot dismiss it early.
+            state.hover_card_min = { mouse.x, mouse.y };
+            state.hover_card_max = { mouse.x, mouse.y };
+        }
+
+        if (state.hover_card_entity != null_entity)
+        {
+            const entity_id card_eid = state.hover_card_entity;
+            draw_hover_card(state.hover_card_anchor, [&]() {
+                draw_hover_content(w, state, card_eid);
+            }, &state.hover_card_min, &state.hover_card_max);
         }
     }
 

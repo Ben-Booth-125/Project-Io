@@ -21,9 +21,11 @@ inline constexpr float selection_band_height = 340.0f;
 /// column, that is the sole home of the Selection content. It no longer follows
 /// the click position (Ben, 2026-07-28: "doing/building" menus need a fixed
 /// place at the bottom of the screen, not a widget that floats with the
-/// cursor). Distinct from the transient 200px hover card (hover_card.hpp), which
-/// is unchanged and keeps serving the dwell-triggered glance. See
-/// docs/ui/TOOLTIP.md, docs/ui/SELECTION.md.
+/// cursor). Distinct from the 200px hover card (hover_card.hpp), which serves the
+/// glance only: since BL-228 that card FREEZES where it was summoned and is
+/// dismissed by leaving its bounds, and it no longer opens this band — clicking
+/// is once again the only thing that does. See docs/ui/TOOLTIP.md,
+/// docs/ui/SELECTION.md.
 ///
 /// **State model.** A single click already *selects* (SELECTION.md), so the band
 /// is open exactly when

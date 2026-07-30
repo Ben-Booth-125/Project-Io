@@ -8,33 +8,33 @@ namespace ui {
 /// Frames of stable hover required before the card appears (BL-060).
 inline constexpr int kHoverDelay = 20;
 
-/// Dwell-to-open (BL-200). Frames of pointer stillness over an entity before the
-/// Selection band auto-opens; the dwell bar fills across the span from
-/// kHoverDelay (glance is up) to here. A single feel tunable — flag for the owner.
-inline constexpr int kDwellOpenTicks = 48;
+/// How far outside the card's own rect the pointer may stray before the frozen
+/// card is dismissed (BL-228). The card is drawn *above* the cursor with an
+/// 18 px gap, so the cursor that summoned it starts outside the rect; this pad
+/// spans that gap and leaves a forgiving margin for the trip up into the card.
+/// Without it the card would dismiss itself the instant it appeared.
+inline constexpr float kHoverCardExitPadPx = 26.0f;
 
-/// Dwell-to-open (BL-200). Pointer movement beyond this many pixels resets the
-/// dwell timer — the anti-bombardment gate that keeps a sweep from auto-opening.
-inline constexpr float kDwellJitterPx = 4.0f;
-
-/// Render a transient floating hover card near `cursor` when `hover_ticks`
-/// has reached `kHoverDelay`. The card is a semi-opaque ImGui child window
-/// (no title bar, 4 px rounding, max width 200 px) positioned just above the
-/// cursor. `content` is called inside the window to render the body. When
-/// `hover_ticks < kHoverDelay` the call is a no-op.
+/// Render the floating hover card at `anchor` and report the rect it occupied.
 ///
-/// When `dwell_fraction` is strictly between 0 and 1, a thin dwell-to-open
-/// progress bar (BL-200) is drawn at the foot of the card — the pre-open
-/// indicator that fills as the pointer holds still. At 0 or ≥ 1 no bar is drawn
-/// (nothing to signal, or the card is about to open). The bar lives here, in the
-/// transient tooltip, never in the opened card's header (Ben, 2026-07-23).
+/// The card is a semi-opaque ImGui window (no title bar, 4 px rounding, max
+/// width 200 px) positioned just above `anchor`. `content` is called inside the
+/// window to render the body.
 ///
-/// @param cursor         Current mouse position in screen pixels.
-/// @param hover_ticks    Frames the cursor has rested over the same entity.
-/// @param content        Caller-supplied content renderer (ImGui calls only).
-/// @param dwell_fraction Dwell-to-open progress in [0,1]; the bar shows only on (0,1).
-void draw_hover_card(ImVec2 cursor, int hover_ticks,
+/// **The card is FROZEN (BL-228).** The caller passes the position the card was
+/// summoned at, not the live cursor, so it does not slide around while it is
+/// being read; the caller dismisses it once the pointer leaves the reported rect
+/// inflated by `kHoverCardExitPadPx`. Hovering no longer OPENS the Selection
+/// band — that is the click's job alone. This retires BL-200's dwell-to-open
+/// and the dwell progress bar that advertised it.
+///
+/// @param anchor   Screen position the card is pinned to (where it was summoned).
+/// @param content  Caller-supplied content renderer (ImGui calls only).
+/// @param out_min  Receives the card's top-left in screen pixels, if non-null.
+/// @param out_max  Receives the card's bottom-right in screen pixels, if non-null.
+void draw_hover_card(ImVec2 anchor,
                      const std::function<void()>& content,
-                     float dwell_fraction = 0.0f);
+                     ImVec2* out_min = nullptr,
+                     ImVec2* out_max = nullptr);
 
 } // namespace ui

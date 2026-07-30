@@ -246,15 +246,16 @@ struct ui_state
     entity_id hovered_entity = null_entity; ///< Entity the cursor rested on last frame; used to detect stable hover.
     int       hover_ticks    = 0;           ///< Consecutive frames of stable hover over hovered_entity; resets on entity change. Governs the transient glance (draw_hover_card).
 
-    // --- dwell-to-open state (BL-200) ---
-    // A second opener for the Selection band, alongside the click: holding the
-    // pointer STILL over an entity fills a bar at the cursor and then opens the card.
-    // Distinct from hover_ticks — this timer advances only while the mouse is still
-    // (movement past kDwellJitterPx resets it), which is the anti-bombardment gate
-    // that keeps a pointer sweep across the tile grid from auto-opening. See
-    // hover_card.hpp, body_surface_canvas.cpp, docs/ui/SELECTION.md.
-    ImVec2 dwell_anchor { -1.0f, -1.0f }; ///< Pointer position where the current stillness began; reset when the pointer moves beyond the jitter radius.
-    int    dwell_ticks  = 0;              ///< Consecutive still frames over hovered_entity; drives the dwell-to-open bar and auto-open.
+    // --- frozen hover card (BL-228, retires BL-200 dwell-to-open) ---
+    // Hovering no longer OPENS anything. Once the glance delay elapses the card
+    // freezes: it stops following the pointer and stays put until the cursor
+    // leaves its bounds, so the player can read it (and read a long line to its
+    // end) without the card sliding away. Opening the Selection band is once
+    // again the click's job alone — one gesture, one meaning.
+    entity_id hover_card_entity = null_entity;   ///< Subject of the frozen card; null_entity = no card up.
+    ImVec2    hover_card_anchor { -1.0f, -1.0f }; ///< Pointer position the card froze at; it is drawn here every frame after.
+    ImVec2    hover_card_min    { 0.0f, 0.0f };   ///< Last drawn card rect (screen px) — hit-tested next frame to decide dismissal.
+    ImVec2    hover_card_max    { 0.0f, 0.0f };
 
     // --- selection band recursive drill-down (BL-196) ---
     // One drilled frame: a resource time-series view opened from a tile card's
