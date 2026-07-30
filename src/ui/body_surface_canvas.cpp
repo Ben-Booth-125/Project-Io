@@ -2301,48 +2301,74 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             ++state.hover_ticks;
         }
 
-        // Freeze-on-hover (BL-228, retires BL-200's dwell-to-open).
+        // Glance-then-stick hover (BL-228/230, retires BL-200's dwell-to-open).
         //
         // Hovering no longer OPENS the Selection band. Opening is the click's job
-        // alone again — one gesture, one meaning — and dwell-to-open's auto-fire,
-        // its stillness timer and its progress bar are all gone with it.
+        // alone — one gesture, one meaning.
         //
-        // What hover does now: once the glance delay elapses the card FREEZES at
-        // the pointer position that summoned it and stops following the cursor. It
-        // stays there, showing the entity it was summoned for, until the pointer
-        // leaves its bounds. That makes it readable (a card that slides cannot be
-        // read to the end of a line) and gives it a deliberate dismissal.
-        if (state.hover_card_entity != null_entity)
+        // What hover does now, in two phases: past kHoverAppearDelay the card
+        // appears as a GLANCE and tracks the live cursor like an ordinary
+        // tooltip, so it does not yet own the pointer. Past kHoverStickDelay it
+        // STICKS — freezes at its current position, stops following the cursor,
+        // and stays up until the pointer leaves its bounds. That makes a long
+        // line readable (it cannot slide away mid-read) while still letting a
+        // player who is only passing through dismiss it by moving on normally.
+        if (state.hover_card_entity != null_entity && state.hover_card_stuck)
         {
-            // A card is up: dismiss it only when the pointer leaves its rect. The
-            // pad spans the gap between the anchor and the card drawn above it, so
-            // the card does not dismiss itself the frame it appears.
+            // Stuck: dismiss only when the pointer leaves the rect. The pad spans
+            // the gap between the anchor and the card drawn above it, so the
+            // card does not dismiss itself the frame it freezes.
             const bool inside =
                 mouse.x >= state.hover_card_min.x - kHoverCardExitPadPx &&
                 mouse.x <= state.hover_card_max.x + kHoverCardExitPadPx &&
                 mouse.y >= state.hover_card_min.y - kHoverCardExitPadPx &&
                 mouse.y <= state.hover_card_max.y + kHoverCardExitPadPx;
 
-            // Also drop it if its subject stopped existing under a world change.
             if (!inside)
+            {
+                state.hover_card_entity = null_entity;
+                state.hover_card_stuck  = false;
+            }
+        }
+        else if (state.hover_card_entity != null_entity)
+        {
+            // Glancing: the card is not yet stuck, so it lives only as long as
+            // the cursor keeps hovering the same entity that summoned it.
+            if (hover_eid != state.hover_card_entity)
                 state.hover_card_entity = null_entity;
         }
 
-        // Summon a new frozen card once the glance delay is met over an entity —
-        // but never while one is already up (it owns the pointer until dismissed),
-        // and never mid-placement, where a floating card would sit over the ghost.
+        // Summon a new glance card once the appear delay is met over an entity —
+        // but never while one is already up (a glance or stuck card owns the slot
+        // until dismissed), and never mid-placement, where a floating card would
+        // sit over the ghost.
         if (state.hover_card_entity == null_entity &&
             hover_eid != null_entity &&
             !state.construction.active &&
-            state.hover_ticks >= kHoverDelay)
+            state.hover_ticks >= kHoverAppearDelay)
         {
             state.hover_card_entity = hover_eid;
+            state.hover_card_stuck  = false;
+        }
+
+        // Promote glance -> stuck once the stick delay elapses, freezing the
+        // card at its current (live-cursor) position.
+        if (state.hover_card_entity != null_entity &&
+            !state.hover_card_stuck &&
+            state.hover_ticks >= kHoverStickDelay)
+        {
+            state.hover_card_stuck  = true;
             state.hover_card_anchor = { mouse.x, mouse.y };
             // Seed the rect around the anchor so the first frame's hit-test (which
-            // runs before the card has ever been drawn) cannot dismiss it early.
+            // runs before the card has been drawn at this position) cannot
+            // dismiss it early.
             state.hover_card_min = { mouse.x, mouse.y };
             state.hover_card_max = { mouse.x, mouse.y };
         }
+
+        // While glancing (not yet stuck), the card tracks the live cursor.
+        if (state.hover_card_entity != null_entity && !state.hover_card_stuck)
+            state.hover_card_anchor = { mouse.x, mouse.y };
 
         if (state.hover_card_entity != null_entity)
         {

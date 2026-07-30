@@ -4855,6 +4855,21 @@
       "authority_doc": "docs/ui/SELECTION.md",
       "summary": "Rebuild the building Selection element to follow the tile element's three-column layout. Ben to design.",
       "design": "**Opened for Ben to design, 2026-07-30, at his request:** \"another thing to open for me to design is selection of buildings. We do want this to follow the same format as our tile selection.\"\n\n**DESIGN OWED — do not guess the layout.** Ben designs this one; the tile element's proportions came from his mockup and this is its sibling.\n\n### The reference (what \"same format\" means)\nThe tile element (`draw_tile_selection`, BL-123 reshaped BL-213) runs **left to right** in three columns:\n1. **Left quarter** — zoomed hex neighbourhood (`draw_tile_neighbourhood`, radius 2), selected tile picked out.\n2. **Centre half** — a paged metric **accordion**, one titled graph at a time with a `< Name (i/N) >` pager.\n3. **Right quarter** — a **2x3 action button grid** (Construct / Manage / History / Supply + two reserved).\n\n### What the building element is today\n`draw_building_selection` is a **vertical stack**, not three columns: output lead (\"701.4 Agricultural Produce / tick\" + a % of nominal bar + status), a Profitability block (Revenue / Inputs / Wages / Maint / Net), Production method (recipe combo), Workforce (Auto checkbox + target slider + the BL-179 \"Body allows 84% (labour short) - habitability 0.40\" line), then \"On this tile\" (stack capacity) and Demolish.\n\n### The open questions for Ben\n1. **What occupies the left quarter?** The tile's hex neighbourhood is a natural analogue (the building's surroundings), but the building already has an identity/emblem header. Same render, or something else?\n2. **What pages through the centre accordion?** Candidates: output over time, profitability components, workforce history, input-supply adequacy. The tile element pages one graph per deposited resource — the building's equivalent list is not obvious and needs Ben's call.\n3. **Where do the two LEVERS go?** Recipe combo and workforce slider are controls, not facts, and the tile element's right quarter is buttons only. Do they take the right column (making it controls rather than actions), or sit under the accordion?\n4. **Does the 2x3 action grid apply?** A building's actions are fewer (Manage is redundant when already selected; Demolish is one). What fills six slots?\n5. **Rival buildings** show \"Competitor building - intel only\" under BL-068. How does that degrade in a three-column layout — empty columns, or a distinct narrower form?\n\nSequence with **BL-214** (drill-through disclosure levels), which decides how much any card shows before asking."
+    },
+    {
+      "id": "BL-230",
+      "short_name": "HOVER_CARD_GLANCE_THEN_STICK",
+      "status": "landed",
+      "priority": "B",
+      "version_goal": "v0.1.1",
+      "files": [
+        "src/ui/hover_card.hpp",
+        "src/ui/hover_card.cpp",
+        "src/ui/ui_state.hpp",
+        "src/ui/body_surface_canvas.cpp",
+        "scripts/verify/hover_freeze.lua"
+      ],
+      "design": "Ben (2026-07-30): \"make sure tooltips do not stick when initially open, and take 1/2 a second before they appear, then 2 seconds before they stick. From cursor pov they are behind tiles until they stick, but from a rendering pov they are always in front.\"\n\n**Landed.** Splits BL-228's single freeze-on-summon hover card into two phases: a GLANCE (kHoverAppearDelay = 30 frames @ 60 Hz = 0.5 s) that tracks the live cursor like an ordinary tooltip, then a STUCK freeze (kHoverStickDelay = 150 frames total = 2.5 s, i.e. 2 s after appearing) that stops tracking and is dismissed only once the pointer leaves its bounds + the existing exit pad. The window keeps ImGuiWindowFlags_NoInputs and the Tooltip flag throughout both phases, so it always draws above every other window (rendering pov) but never captures the pointer (cursor pov) — canvas hover/click always resolves to whatever tile or marker is beneath it, in either phase; nothing new was needed here since NoInputs already gave that property.\n\nscripts/verify/hover_freeze.lua rewritten from 3 to 5 captures to exercise both phases (glance-appears, glance-tracks-cursor, stuck, pinned-after-nudge-while-stuck, dismissed-on-exit); goldens re-blessed."
     }
   ]
 }

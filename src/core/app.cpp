@@ -919,10 +919,11 @@ int app::run_verify(const std::string& script_path, bool bless)
     });
     v.set_function("capture", [this](const std::string& name) { capture_frame(name); });
     // Render N frames WITHOUT capturing (BL-228). capture() composits exactly one
-    // frame, so any UI gated on elapsed frames — the hover-card delay (kHoverDelay
-    // = 20), and anything animated — could never be reached from a script, which
-    // is why hover behaviour had no saved check at all. Deterministic: the sim
-    // stays paused, so these are pure presentation frames.
+    // frame, so any UI gated on elapsed frames — the hover-card delays
+    // (kHoverAppearDelay = 30, kHoverStickDelay = 150), and anything animated —
+    // could never be reached from a script, which is why hover behaviour had no
+    // saved check at all. Deterministic: the sim stays paused, so these are pure
+    // presentation frames.
     v.set_function("frames", [this](sol::optional<int> n) {
         const int count = std::max(1, n.value_or(1));
         for (int i = 0; i < count; ++i)
