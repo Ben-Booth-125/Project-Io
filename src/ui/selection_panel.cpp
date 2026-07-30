@@ -1065,6 +1065,42 @@ void draw_building_selection(world& w, const recipe_registry& reg,
             b.workforce_auto   = false; // a manual move pins the dial
         }
         ImGui::EndDisabled();
+
+        // ── BL-179: the habitability→workforce reason, where the player decides.
+        //    The slider says what was ASKED for; this says what the body actually
+        //    ALLOWS, and why. The chain is target → assigned → x contention →
+        //    effective, and contention is set by the corp's labour demand against
+        //    a pool that habitability sizes (POPULATION.md § Workforce model).
+        //    Phrasing comes from the shared ui::fmt::labour_contention helper, so
+        //    this and the Economy panel's staffing table are the same ceiling in
+        //    the same words - the "one consistent story" BL-179 requires.
+        const auto tile_it = w.tiles.find(b.tile);
+        if (tile_it != w.tiles.end())
+        {
+            const entity_id body = tile_it->second.body;
+            const entity_id corp = owner_corp_of(w, sel);
+            const auto      cit  = report.workforce_contention.find({corp, body});
+            const float     scal = (cit != report.workforce_contention.end()) ? cit->second : 1.0f;
+            const std::string shortfall = fmt::labour_contention(scal);
+
+            if (!shortfall.empty())
+            {
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative),
+                                   "Body allows %s", shortfall.c_str());
+                const auto hit = report.body_habitability.find(body);
+                if (hit != report.body_habitability.end())
+                {
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("- habitability %.2f", hit->second);
+                }
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip(
+                        "Your labour demand on this body exceeds the workforce pool,\n"
+                        "so every building you own here is throttled by the same\n"
+                        "fraction. The pool is sized by population and habitability -\n"
+                        "raising the target asks for labour that is not there.");
+            }
+        }
     }
 
     ImGui::Spacing();
