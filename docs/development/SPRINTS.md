@@ -119,3 +119,98 @@ factual from git log + backlog.json, amend freely*).
   when the goal changes, not just when it lands.
 - *(Carried note: session Runtime tracking hit a real gap this sprint — the wall-clock timer
   conflated an idle/interruption gap with work time; worth fixing before relying on it.)*
+
+---
+
+## Sprint 2 — BL-210 decomposition: the Nations/Corporations history rewrite (opened 2026-07-31)
+
+**Goal.** Take BL-210's umbrella pivot (design-owed, difficulty 5, "the biggest remaining piece"
+per DEVLOG 2026-07-28) from one unactionable mega-item to a sequenced set of promote-ready design
+passes — this is also the first sprint to deliberately practice the Design depth verb
+(DELIVERY.md § Depth verbs) rather than jumping straight to code.
+
+**Why this over the v0.1.2–v0.1.5 stubs.** Ben's ask was to decompose the diplomacy/war/tech/legal
+placeholders (BL-155/156/157/158). Investigation first: those four are all `design-owed` against
+the *current* nation model (Voronoi BFS + a random politics draw), and BL-210 is already
+mid-rewrite of exactly that model into a simulated settlement/industrialisation history. Designing
+Laws/Politics against nations that are about to stop being Voronoi blobs risks rework. Ben chose
+(2026-07-31) to sequence BL-210 first; the four stubs resume once nations have real history to hang
+policy/military/politics off.
+
+**Planned — this sprint's decomposition (done 2026-07-31).**
+- Split BL-210's three still-open subject-doc passes into their own sequenced items, since a
+  difficulty-5 item should break down (DELIVERY.md § Priority, difficulty & version goal) rather
+  than stay flat:
+  - **BL-217** — checkpoint/branch data model (where branch state lives; how a lean biases which
+    branch fires at a checkpoint, extending BL-167's preferences mechanism). No dependency beyond
+    the already-shipped BL-167. Difficulty 3.
+  - **BL-218** — Nations rewrite: territory/political-character/wealth as *outputs* of a simulated
+    settlement → industrialisation → 1900s history, replacing Voronoi BFS + random politics draw.
+    Requires BL-217. DEVLOG's named "biggest remaining piece". Difficulty 4.
+  - **BL-219** — Corporations rewrite: industrial focus as an emergent consequence of the home
+    nation's settlement history, replacing the authored focus table. Requires BL-218. Difficulty 3.
+  - BL-210 itself stays open as the umbrella closing condition (all three built, plus the
+    batch-sweep extension and authority-doc propagation into TILE_GENERATION/NATION_GENERATION/
+    CORPORATION_GENERATION).
+
+**Not yet in scope this sprint.** Actually *settling* BL-217/218/219's open questions (each still
+needs a real design conversation — see each item's `design` field) or touching any `src/`. This
+sprint's goal was decomposition only (the Design depth verb's first half); running BL-217's design
+conversation is the natural Sprint 3 candidate once Ben is ready to work through its open questions.
+
+**Retro** — *pending, fill in once BL-217's design conversation happens or Sprint 2 is otherwise
+closed out.*
+
+---
+
+## Sprints 3–5 (committed 2026-07-31) — re-sequenced: skilled NL agents for stress-testing via simulated play
+
+**Ben's steer, same session as Sprint 2's close:** systems get proven by simulating play, so the
+next three sprints put agent skill ahead of the BL-217 design conversation Sprint 2 flagged as
+"natural next." BL-210/BL-217–219 stay queued, not dropped — they resume after.
+
+**Why this doesn't need new design work (token-sparing).** `AI_OPPONENT.md` already carries a
+Ben-accepted architecture (§5, 2026-07-26) and a filed follow-on decomposition (§8): BL-202 (Stage
+A scorer, **complete**) → BL-203 (Stage B predictive spending — the "skilled" half) and BL-204 (bot-
+vs-bot skill-regression harness — the literal simulated-play stress test) → BL-205 (chat/diplomacy
+surface) → BL-207 (persona counsel packs). All four are already `designed` (promote-ready) — this
+is execution, not another design pass, which is the cheap path.
+
+### Sprint 3 — Stage B + the skill harness (BL-203, BL-204)
+
+**Goal.** Make the corp AI actually skilled (predictive spending replacing the crude solvency
+floor) and give it a regression harness that *is* simulated play: seed-set bot-vs-bot goldens
+(solvency, net-worth curves) plus the tick-boundary state hash (doubles as the multiplayer desync
+primitive, AI_OPPONENT.md §8). Both require only BL-202 (complete) — no blocking dependency.
+
+**Planned.** BL-203 (diff 4), BL-204 (diff 3). Promote together — BL-204's goldens are the natural
+acceptance check for BL-203's behaviour change, so building them in the same batch is cheaper than
+sequencing.
+
+### Sprint 4 — the communication surface (BL-205)
+
+**Goal.** Land the § 7 chat principle: a channel-based message surface (Public + arbitrary groups)
+replacing the Explorer placeholder, carrying Stage-A templated decision-log messages now and
+becoming the medium personas (BL-207) and, later, a free-text LLM planner (Stage C) speak through.
+`designed`, no dependency — could in principle run before Sprint 3, sequenced after only to keep
+one theme per sprint.
+
+**Planned.** BL-205 (diff 3).
+
+### Sprint 5 — persona audit + naming the natural-language tier (BL-207 + new item)
+
+**Goal.** Two threads. First, reconcile a likely stale status: REFINED.md's 2026-07-27 "AI
+constituents batch" already logged BL-207 R1–R3 as covered (persona packs C1, loader/runtime C2,
+Counsel channel C3, `persona_counsel_harness` C4) and marked the batch **COMPLETE**, but
+`backlog.json` still carries BL-207 as `designed`, not `complete` — verify against the harness and
+flip the status if the earlier landing checks out, rather than re-building already-shipped work.
+Second: file the still-unitemized **Stage C** — the out-of-process LLM planner that speaks
+in-character in channels (AI_OPPONENT.md §2 Area C, §7 Stage C) — as a `design-owed` item. This is
+the actual "skilled natural language agent" tier Ben is pointing at; A/B (BL-202/203) and the chat
+medium (BL-205) are the scaffolding it needs to stand on, which is why it lands last, not first.
+
+**Planned.** BL-207 audit (diff 1–2), file Stage-C item (diff 1, design-owed, no build).
+
+**Not yet in scope.** Actually promoting Sprint 3 into REFINED.md task groups + `requirements.json`
+— that collision-mapping step happens at the start of Sprint 3 itself (DELIVERY.md: built fresh at
+promotion, not frozen ahead of time), not in this planning pass.
