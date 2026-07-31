@@ -101,6 +101,29 @@ dispatching by landform (the third multi-parameter case, alongside `building` an
 | **Crater** | `landform(…, crater, colour)` | A flattened bowl — a wide, low ellipse with a raised near rim arc inside its lower half. The squashed aspect is load-bearing: it is deliberately **not** concentric circles (the `activity` pulse) nor a circle-plus-cross (the `market_centre`) | Caller stroke | As above |
 | **Rift** | `landform(…, rift, colour)` | A single jagged fissure running top to bottom — the only zigzag in the vocabulary, so it cannot be read as a chevron (which meets at one point) or as the canyon's paired rims | Caller stroke | As above |
 
+**Contiguous runs are bridged into one marker (BL-232).** A tile with a same-landform
+cardinal neighbour draws `landform_span(…)` toward each such neighbour instead of its centred
+glyph — this tile's half of the shared edge, from centre to edge-midpoint, so the neighbour's
+half meets it exactly and a run reads as **one** feature. This is BL-172's road span/symmetry
+idiom reused wholesale, including its survey-fog behaviour (a masked neighbour draws nothing)
+and its centre-cap role, which the lone tile's centred glyph now plays.
+
+| Span | Shape | Echoes |
+|---|---|---|
+| **Mountain** | One peak per half-edge, all deflecting to the canonical side — a tile-to-tile span reads as two summits, a three-tile run as four | the twin-peak glyph |
+| **Rift** | A jagged crack crossing its own axis at higher frequency, thinner stroke — the only span that crosses its axis, so it never reads as a ridge | the fissure glyph |
+| **Canyon** | Two straight parallel rims with the gorge between | the paired-rim glyph |
+
+**Crater never spans** — a basin is a blob, not a line, and its bowl glyph already says so.
+Two constraints the implementation encodes: the waveform's perpendicular is **canonicalised**
+rather than derived from the direction of travel, or the two halves of one span would deflect to
+opposite sides and meet in a kink; and roads use this exact geometry in warm tan, so the spans
+must stay non-smooth and take the contrasting ink or the map gains two look-alike span families.
+
+An earlier mountain profile put *two* spikes in each half. At four per span the teeth were fine
+enough that a cluster read as a jagged **outline** rather than a ridge — the one thing bridging
+exists to fix — so the profile was cut to a single peak per half-edge.
+
 **Plains, highland and valley draw nothing.** They are the common ground — plains and
 valley alone measure ~95 % of land tiles (`world_audit` § S3) — and are carried by the
 **relief tint** (`ui::landform_relief`), not by a glyph. Putting an icon on nearly every

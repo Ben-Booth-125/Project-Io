@@ -54,3 +54,49 @@ verify.capture("landform_cinder_lens_continent")
 
 verify.set_overlay("country")
 verify.capture("landform_cinder_lens_country")
+
+-- BL-232: spanning markers, and the tooltip that makes the glyph vocabulary
+-- learnable. A run of contiguous mountains draws ONE chain of peaks rather than a
+-- repeated icon per tile; a lone tile keeps its centred glyph, the same role the
+-- road's centre cap plays.
+--
+-- Coordinates come from world_audit § S4's exemplar readout, not from eyeballing a
+-- screenshot — if a generation change moves these runs, the harness prints the new
+-- ones instead of these captures quietly becoming pictures of empty ground.
+verify.goto_surface("Kepler")
+verify.set_overlay("none")
+
+-- Mountain run at [89,10] vs the lone mountain at [76,12]: the span-vs-cap contrast
+-- is the whole point of the item, so both are framed tight enough to compare.
+verify.center_tile(89, 10, 6)
+verify.capture("landform_span_mountain_run")
+
+verify.center_tile(76, 12, 6)
+verify.capture("landform_span_mountain_lone")
+
+-- Rift at [157,42] — the strongest contiguity of the three (81% connected) and the
+-- one whose real-world referent most obviously IS a line.
+verify.center_tile(157, 42, 6)
+verify.capture("landform_span_rift_run")
+
+-- Canyon at [143,38] — the marginal case: 50% isolated, 24 tiles system-wide, so
+-- half its glyphs stay caps and the spanning read is thin. Captured so that
+-- thinness is on the record rather than assumed away.
+verify.center_tile(143, 38, 6)
+verify.capture("landform_span_canyon_run")
+
+-- THE TOOLTIP (Ben, on delivery: "there is no easy way for a player to know what is
+-- what"). Every tile hover named the composition and never the landform, so the
+-- glyphs had no label anywhere short of clicking through to the Selection panel.
+-- Hovering the mountain run should now name it AND give its real consequence.
+-- capture() composits a single frame, and the hover card is gated on
+-- kHoverAppearDelay = 30 frames (BL-230's glance-then-stick), so the cursor must sit
+-- still for a while before the card exists. verify.frames (BL-228) is what makes that
+-- reachable from a script; without it the capture shows only the hover ring.
+verify.hover_tile(89, 10)
+verify.frames(40)
+verify.capture("landform_tooltip_mountain")
+
+verify.hover_tile(157, 42)
+verify.frames(40)
+verify.capture("landform_tooltip_rift")

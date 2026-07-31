@@ -1617,7 +1617,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // Landform relief (BL-231). Composited HERE — after every lens tint and the
         // suitability wash — because composition owns hue and the lenses composite over
         // that hue at 0.6–0.80 alpha; relief folded into the base fill would be buried
-        // exactly when a lens is active. Landform drives build cost (×1.0–×2.0), hazard,
+        // exactly when a lens is active. Landform drives movement cost (×1.0–×2.0), hazard,
         // habitability and mineral richness, and that cost applies whether or not a lens
         // is on, so this is always-on terrain chrome rather than an overlay_mode.
         //
@@ -1875,7 +1875,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // Landform glyph (BL-231): the categorical half of the landform channel.
             // Only the four DRAMATIC landforms draw — mountain, canyon, crater, rift —
             // measured at ≤1.5 % of land tiles each (world_audit § S3) and each carrying
-            // a build cost of ×1.3 or worse, so this is the set where an invisible
+            // a movement cost of ×1.3 or worse, so this is the set where an invisible
             // surprise is expensive. Plains, highland and valley draw nothing; between
             // them plains and valley are ~95 % of land, and an icon on nearly every tile
             // would be far denser than any other glyph family.
@@ -1885,10 +1885,66 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // lenses, which claim the hex centre for their own mark below (BL-135). Ink
             // contrasts against the finished fill, so the glyph reads over any terrain
             // hue and any lens tint composited on top of it.
+            //
+            // BRIDGING (BL-232): a run of three mountains should read as ONE range, not
+            // three identical icons, so a tile with a same-landform cardinal neighbour
+            // draws SPANS instead of its centred glyph — this tile's half of each shared
+            // edge, exactly as BL-172's roads do, so the neighbour's half meets it at the
+            // midpoint with no cross-tile state and the survey fog clips it cleanly.
+            // Measured (world_audit § S4): 71 % of mountain and 81 % of rift tiles have
+            // such a neighbour, and modal run length is 2-3. Crater never spans — a basin
+            // is a blob, not a line. The all-four-neighbours "filled interior" case that
+            // was designed alongside this was CANCELLED on the same measurement: not one
+            // tile in the system has four, so it would have been dead code on every seed.
             if (!built && state.overlay != overlay_mode::population &&
                 state.overlay != overlay_mode::opportunity)
-                icons::landform(dl, {cx, cy}, std::max(3.0f, draw_r * 0.44f),
-                                tile.landform, contrast_ink(fill));
+            {
+                const ImU32 ink = contrast_ink(fill);
+                bool        spanned = false;
+
+                if (icons::landform_spans(tile.landform))
+                {
+                    const float amp   = std::max(1.5f, draw_r * 0.20f);
+                    const float thick = std::max(1.0f, draw_r * 0.13f);
+
+                    static const int card_off[4][2] = {{+1, 0}, {-1, 0}, {0, +1}, {0, -1}};
+                    for (int n = 0; n < 4; ++n)
+                    {
+                        const int nrow = tile.grid_y + card_off[n][1];
+                        if (nrow < 0 || nrow >= gh)
+                            continue;
+                        const int raw_col = tile.grid_x + card_off[n][0];
+                        int ncol = raw_col % gw;
+                        if (ncol < 0)
+                            ncol += gw;
+
+                        const auto nb_it = tile_at.find(static_cast<long long>(nrow) * gw + ncol);
+                        if (nb_it == tile_at.end())
+                            continue;
+                        const auto nb_tile_it = w.tiles.find(nb_it->second);
+                        if (nb_tile_it == w.tiles.end()
+                            || nb_tile_it->second.landform != tile.landform)
+                            continue;
+                        if (!survey_tile_visible(body.survey, gw, gh, ncol, nrow))
+                            continue;
+
+                        ImVec2 nb_sc = to_screen(hex_local_centre(ncol, nrow, hex_size));
+                        nb_sc.x += static_cast<float>(k) * period_px;
+                        if (raw_col >= gw)    nb_sc.x += period_px; // east across the seam
+                        else if (raw_col < 0) nb_sc.x -= period_px; // west across the seam
+
+                        const ImVec2 mid = {(cx + nb_sc.x) * 0.5f, (cy + nb_sc.y) * 0.5f};
+                        icons::landform_span(dl, {cx, cy}, mid, amp, thick, tile.landform, ink);
+                        spanned = true;
+                    }
+                }
+
+                // The lone tile keeps its centred glyph — the same role the road's centre
+                // cap plays, and needed by 29 % of mountain and 50 % of canyon tiles.
+                if (!spanned)
+                    icons::landform(dl, {cx, cy}, std::max(3.0f, draw_r * 0.44f),
+                                    tile.landform, ink);
+            }
 
             // Value-lens tile marks (BL-135): Workforce (Population lens) and
             // Opportunity replace their old full-tile tint with a per-tile red→green

@@ -205,6 +205,40 @@ void continent(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Stroke colour.
 void landform(ImDrawList* dl, ImVec2 centre, float r, terrain_landform lf, ImU32 colour);
 
+/// True when @p lf is a **linear** landform whose contiguous runs should be bridged
+/// into one spanning marker rather than drawn as a repeated per-tile glyph (BL-232).
+/// Mountain, rift and canyon are lines; crater is a basin — a blob, not a line — so it
+/// always keeps its centred glyph.
+bool landform_spans(terrain_landform lf);
+
+/// Draw **one half** of a spanning landform ridge: from a tile centre @p from to
+/// @p mid, the midpoint of the edge it shares with a same-landform neighbour (BL-232).
+///
+/// This is BL-172's road span/symmetry idiom applied to terrain. Each tile draws only
+/// its own half, so the neighbour's half meets this one exactly at @p mid — one
+/// continuous marker, identical whichever tile is "from", needing no cross-tile state,
+/// and clipping cleanly against the survey fog because a masked neighbour simply draws
+/// nothing.
+///
+/// Each landform's span echoes the silhouette of its own centred glyph, so a run and a
+/// lone tile read as the same feature: mountain draws **peaked teeth**, rift a **jagged
+/// crack**, canyon **two parallel rims**. The waveform's perpendicular is canonicalised
+/// (never derived from the direction of travel alone), so two halves meeting at @p mid
+/// deflect to the *same* side instead of mirroring into a kink.
+///
+/// Roads use this exact geometry in warm tan, so these must not read as roads: the
+/// caller supplies a contrasting ink and the shapes are deliberately non-smooth.
+///
+/// @param dl     Draw list to render into.
+/// @param from   Tile centre, screen pixels.
+/// @param mid    Shared-edge midpoint, screen pixels.
+/// @param amp    Waveform amplitude, screen pixels (a fraction of the hex radius).
+/// @param thick  Stroke thickness, screen pixels.
+/// @param lf     Landform to depict; a non-spanning landform draws nothing.
+/// @param colour Stroke colour.
+void landform_span(ImDrawList* dl, ImVec2 from, ImVec2 mid, float amp, float thick,
+                   terrain_landform lf, ImU32 colour);
+
 /// Draw the History nav-rail glyph — an hourglass (a down-triangle over an
 /// up-triangle meeting at a waist) — in @p colour. Slot 9 previously drew the
 /// same @ref ledger glyph as the Budget slot, so the two were indistinguishable;

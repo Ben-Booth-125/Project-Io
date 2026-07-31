@@ -6577,6 +6577,42 @@
           "result_metric": "PASS. Plains stays the untouched baseline; highland lifts (visible on landform_kepler_relief) and valley sinks (visible on landform_cinder_zoom/wide — Kepler has no valley at all, which is why the dry body is captured). The tint modulates luminance within a composition rather than crossing into another composition band, so it reads as elevation, not as a terrain-type change."
         }
       ]
+    },
+    {
+      "brief": "landform-spanning-markers",
+      "batch": "2026-07-31-landform-render",
+      "title": "BL-232 — bridge contiguous landform runs, and name the glyphs in the tooltip",
+      "status": "completed",
+      "promoted_from": "backlog.json BL-232 LANDFORM_SPANNING_MARKERS",
+      "rows": [
+        {
+          "id": "S1",
+          "status": "completed",
+          "requirement": "HEADLESS: contiguity is MEASURED before the render is built — world_audit reports, per linear landform, the share of tiles with 0 / 1 / 2+ same-landform cardinal neighbours and the fully-interior share, so a case that cannot fire is found before it is written.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "world_audit § S4 — PASS. mountain 142 tiles (isolated 28.9 / end 52.8 / in-run 18.3 / interior 0.0); rift 16 (18.8 / 56.2 / 25.0 / 0.0); canyon 24 (50.0 / 33.3 / 16.7 / 0.0). Interior 0.0% across all three cancelled the filled-interior case."
+        },
+        {
+          "id": "S2",
+          "status": "completed",
+          "requirement": "VISUAL: a contiguous run reads as ONE feature rather than a repeated icon, and a lone tile still reads as that landform — the span-vs-cap contrast must be legible side by side.",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "landform_span_mountain_run vs landform_span_mountain_lone: the run draws a continuous double-peak wave across the shared edge, the lone tile its centred twin-peak glyph. landform_span_rift_run shows one unbroken fissure across ~3 tiles. landform_span_canyon_run captured to keep its thinness (50% isolated) on the record."
+        },
+        {
+          "id": "S3",
+          "status": "completed",
+          "requirement": "VISUAL: the glyph vocabulary is LEARNABLE — hovering a tile names its landform and states a consequence, without the player having to click through to the Selection panel.",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "landform_tooltip_mountain / landform_tooltip_rift — PASS. Cards read \"Rocky · Mountain / Habitability: 13% / Convoys pay ×2.00 to cross\" and \"Barren · Rift / … / ×1.60\". Needed verify.frames(40) for BL-230's appear delay. The cost line deliberately says movement, not build cost — no build path reads landform."
+        }
+      ]
     }
   ]
 }

@@ -147,6 +147,8 @@ int main()
     {
         const int lfi = static_cast<int>(lf);
         int n0 = 0, n1 = 0, n2plus = 0, interior = 0, tiles = 0;
+        entity_id ex_run_body = null_entity, ex_lone_body = null_entity;
+        int ex_run_col = 0, ex_run_row = 0, ex_lone_col = 0, ex_lone_row = 0;
         for (const auto& [bid, raster] : body_lf)
         {
             const auto bc = w.bodies.find(bid);
@@ -174,11 +176,39 @@ int main()
                     else if (same == 1) ++n1;
                     else                ++n2plus;
                     if (same == 4)      ++interior;
+
+                    // Prefer the home body for the exemplars — that is the surface a
+                    // verify capture opens on without a survey reveal.
+                    const bool home = (bid == w.home_body);
+                    if (same >= 1 && (ex_run_body == null_entity
+                                      || (home && ex_run_body != w.home_body)))
+                    { ex_run_body = bid; ex_run_col = col; ex_run_row = row; }
+                    if (same == 0 && (ex_lone_body == null_entity
+                                      || (home && ex_lone_body != w.home_body)))
+                    { ex_lone_body = bid; ex_lone_col = col; ex_lone_row = row; }
                 }
         }
         const float pc = tiles ? 100.0f / tiles : 0.0f;
         std::printf("  %-9s %5d tiles | isolated %.1f%%  end-of-run %.1f%%  in-run(2+) %.1f%%  interior %.1f%%\n",
                     kLandformName[lfi], tiles, n0 * pc, n1 * pc, n2plus * pc, interior * pc);
+        // Exemplar coordinates for scripts/verify/landform_relief.lua, which needs a
+        // real spanning run and a real lone tile to point the cursor at. Printed rather
+        // than eyeballed off a screenshot so a generation change that moves them shows
+        // up here instead of silently turning a capture into a picture of empty ground.
+        if (ex_run_body != null_entity)
+        {
+            const auto eb = w.bodies.find(ex_run_body);
+            std::printf("      exemplar run  : %s [%d,%d]\n",
+                        eb == w.bodies.end() ? "?" : eb->second.name.c_str(),
+                        ex_run_col, ex_run_row);
+        }
+        if (ex_lone_body != null_entity)
+        {
+            const auto eb = w.bodies.find(ex_lone_body);
+            std::printf("      exemplar lone : %s [%d,%d]\n",
+                        eb == w.bodies.end() ? "?" : eb->second.name.c_str(),
+                        ex_lone_col, ex_lone_row);
+        }
     }
 
     // --- S1: extraction asset placement audit ---

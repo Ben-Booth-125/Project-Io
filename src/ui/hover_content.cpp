@@ -3,6 +3,7 @@
 #include "icons.hpp"
 #include "presentation.hpp"
 #include "world/components.hpp"
+#include "world/logistics.hpp" // landform_logistics_cost — the landform's real cost (BL-232)
 #include "world/workforce.hpp"
 
 #include <imgui.h>
@@ -11,6 +12,22 @@ namespace ui {
 
 namespace {
 
+// Terrain header shared by every tile hover (BL-231/BL-232). Composition names the
+// HUE, landform names the GLYPH — and until now no tile hover mentioned landform at
+// all, in any variant. That left the on-canvas landform glyphs and relief with no
+// label anywhere the player naturally looks: the Selection panel named the landform,
+// but reaching it takes a click, and a glyph vocabulary you can only learn by
+// selecting each tile in turn is not learnable. Plains is the untouched baseline in
+// both channels, so it stays unnamed rather than adding a word that says nothing.
+void hover_terrain_header(const tile_component& tile)
+{
+    if (tile.landform == terrain_landform::plains)
+        ImGui::TextUnformatted(composition_name(tile.composition));
+    else
+        ImGui::Text("%s \xc2\xb7 %s", composition_name(tile.composition),
+                    landform_name(tile.landform));
+}
+
 // --- Exemplar 1: tile × resource lens -------------------------------------------
 
 void hover_tile_resource(const tile_component& tile, resource_type res)
@@ -18,7 +35,7 @@ void hover_tile_resource(const tile_component& tile, resource_type res)
     const resource_presentation& rp = presentation_of(res);
 
     // Title: composition terrain name.
-    ImGui::TextUnformatted(composition_name(tile.composition));
+    hover_terrain_header(tile);
 
     // Stat line: deposit richness for the selected resource.
     const float dep = tile.resource_deposit[static_cast<std::size_t>(res)];
@@ -36,12 +53,32 @@ void hover_tile_resource(const tile_component& tile, resource_type res)
         ImGui::TextDisabled("Rich deposit — high yield");
 }
 
-// Fallback tile content (plain canvas or non-resource lens).
+// Fallback tile content (plain canvas or non-resource lens). This is the variant the
+// player sees when simply looking at the map with no lens up, so it is where the
+// landform glyph gets explained rather than merely named.
 void hover_tile_default(const tile_component& tile)
 {
-    ImGui::TextUnformatted(composition_name(tile.composition));
+    hover_terrain_header(tile);
     ImGui::Text("Habitability: %.0f%%",
                 static_cast<double>(tile.habitability) * 100.0);
+
+    // The consequence, not just the name. Movement cost is the landform's real
+    // mechanical effect — the multiplier the intra-body A* actually pays
+    // (landform_logistics_cost, the canonical table). Deliberately NOT called a build
+    // cost: TILES.md lists this same table as a "build cost modifier", but no build
+    // path reads it, so saying so here would teach the player something untrue.
+    //
+    // Latin-1 only in this string. The font is loaded with ImGui's default glyph
+    // range, so anything above U+00FF renders as "?" — which is why the 26 existing
+    // "\xe2\x80\x94" em-dashes across the UI currently draw as question marks. The
+    // middle dot (U+00B7) and multiplication sign (U+00D7) are inside the range and
+    // do render.
+    if (tile.landform != terrain_landform::plains)
+    {
+        ImGui::Spacing();
+        ImGui::TextDisabled("Convoys pay \xc3\x97%.2f to cross",
+                            static_cast<double>(landform_logistics_cost(tile.landform)));
+    }
 }
 
 // --- BL-069: tile × population lens — quick workforce tell ----------------------
@@ -51,7 +88,7 @@ void hover_tile_default(const tile_component& tile)
 // the lens tint or the sim.
 void hover_tile_population(const world& w, const tile_component& tile)
 {
-    ImGui::TextUnformatted(composition_name(tile.composition));
+    hover_terrain_header(tile);
     ImGui::Text("Habitability: %.0f%%",
                 static_cast<double>(tile.habitability) * 100.0);
 

@@ -159,7 +159,7 @@ navigation pane; the canvases do not touch it.
 A tile's character has two axes ([TILES.md](../economy/TILES.md)), and the Planetary
 canvas draws them on **two separate channels**. Both are **always-on chrome**, not an
 `overlay_mode`: terrain identity is not something the player opts into, and landform's
-build-cost multiplier applies whether or not a lens is active.
+movement-cost multiplier applies whether or not a lens is active.
 
 | Axis | Channel | Source |
 |---|---|---|
@@ -182,10 +182,26 @@ it. Plains and valley alone are ~95 % of land tiles, while every dramatic landfo
   ordinal scale (mountain highest → canyon lowest). Deliberately subtle: it must read as
   light on terrain, never as a change of composition.
 - **Dramatic landforms — glyph.** Mountain, canyon, crater and rift each draw a stroke-only
-  silhouette ([ICONS.md](ICONS.md) § Landform). These are the ≤ 1.5 % set whose build cost
+  silhouette ([ICONS.md](ICONS.md) § Landform). These are the ≤ 1.5 % set whose movement cost
   is ×1.3 or worse, so an invisible surprise there is expensive. A glyph on *every* tile
   would be far denser than any other glyph family and would fight the building silhouette
   for the hex centre.
+
+**Contiguous runs are bridged (BL-232).** A run of the same linear landform draws as **one**
+spanning marker rather than the same glyph repeated per tile — mountain as a chain of peaks, rift
+as one continuous fissure, canyon as paired rims — reusing BL-172's road span/symmetry idiom (each
+tile draws its own half of the shared edge, so halves meet at the midpoint with no cross-tile state
+and the survey fog clips cleanly). A lone tile keeps its centred glyph, the role the road's centre
+cap plays. Crater never spans. Contiguity was measured before the render was built (`world_audit`
+§ S4): 71% of mountain and 81% of rift tiles have such a neighbour, so bridging fires on the
+majority — while **no** tile in the system has all four, which cancelled the designed
+"filled interior" case before it was written.
+
+**The glyphs are named where the player looks.** Every tile hover card states
+`composition · landform` and, on the plain canvas, the landform's movement cost. Before BL-232 the
+hover named only the composition, so the glyph vocabulary could be learned only by clicking each
+tile through to the Selection panel — which is not learning. Plains stays unnamed: it is the
+untouched baseline in both channels.
 
 **Suppression rules.** The glyph is skipped on a **built** tile (which already carries an
 enlarged silhouette plus a corp emblem tag, and whose cost is already spent — elevation

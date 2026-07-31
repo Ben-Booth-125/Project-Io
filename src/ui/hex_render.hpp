@@ -28,7 +28,8 @@ ImU32 terrain_colour(terrain_composition t);
 /// Composite a **relief** shade for @p lf over @p base — the landform channel's
 /// half that covers the common ground (BL-231).
 ///
-/// Landform drives build cost (×1.0–×2.0), hazard, habitability and mineral richness,
+/// Landform drives movement cost (×1.0–×2.0 via landform_logistics_cost), hazard,
+/// habitability and mineral richness,
 /// but never reached the screen: `terrain_colour` keys on composition alone. Measurement
 /// (world_audit § S3) settled the shape of the fix — the mix is ~95 % plains + valley with
 /// every dramatic landform ≤ 1.5 %, so there is no continuous gradient worth contouring.

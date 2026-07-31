@@ -390,6 +390,84 @@ void landform(ImDrawList* dl, ImVec2 centre, float r, terrain_landform lf, ImU32
     }
 }
 
+bool landform_spans(terrain_landform lf)
+{
+    return lf == terrain_landform::mountain
+        || lf == terrain_landform::rift
+        || lf == terrain_landform::canyon;
+}
+
+void landform_span(ImDrawList* dl, ImVec2 from, ImVec2 mid, float amp, float thick,
+                   terrain_landform lf, ImU32 colour)
+{
+    if (!landform_spans(lf))
+        return;
+
+    const float dx  = mid.x - from.x;
+    const float dy  = mid.y - from.y;
+    const float len = std::sqrt(dx * dx + dy * dy);
+    if (len < 0.5f)
+        return;
+
+    // Canonical perpendicular. Deriving it from the direction of travel alone would
+    // point it opposite ways for the two halves of one span — they would deflect to
+    // opposite sides and meet in a kink instead of forming a continuous wave. Forcing
+    // a deterministic side (up on screen; leftward for a vertical run) makes both
+    // halves agree without either tile knowing about the other.
+    float px = -dy / len;
+    float py =  dx / len;
+    if (py > 0.0f || (py == 0.0f && px > 0.0f)) { px = -px; py = -py; }
+
+    // Sample the half-span at fixed parameters, offset perpendicular by the profile.
+    // Both ends sit at zero offset so the halves join flush at `mid` and at the centre.
+    auto stroke = [&](const float* offs, int n, float t_thick) {
+        ImVec2 pts[6];
+        for (int i = 0; i < n; ++i)
+        {
+            const float t = static_cast<float>(i) / static_cast<float>(n - 1);
+            const float o = offs[i] * amp;
+            pts[i] = { from.x + dx * t + px * o, from.y + dy * t + py * o };
+        }
+        dl->AddPolyline(pts, n, colour, ImDrawFlags_None, t_thick);
+    };
+
+    switch (lf)
+    {
+        case terrain_landform::mountain:
+        {
+            // ONE peak per half-edge, so a tile-to-tile span reads as two summits and a
+            // three-tile run as four — a row of peaks, which is how a range is drawn on
+            // a map. An earlier profile put two spikes in each half; at four per span the
+            // teeth were fine enough that a cluster read as a jagged OUTLINE rather than
+            // a ridge, which is the one thing bridging was meant to fix.
+            static const float teeth[3] = { 0.0f, 1.0f, 0.0f };
+            stroke(teeth, 3, thick);
+            break;
+        }
+        case terrain_landform::rift:
+        {
+            // A jagged crack: alternating deflection at higher frequency and a thinner
+            // stroke, echoing the lone tile's fissure. The only span that crosses its
+            // own axis, so it never reads as a ridge.
+            static const float crack[4] = { 0.0f, 0.85f, -0.85f, 0.0f };
+            stroke(crack, 4, thick * 0.8f);
+            break;
+        }
+        case terrain_landform::canyon:
+        {
+            // Two straight parallel rims with the gorge between them — the lone tile's
+            // paired-rim glyph, extended along the run.
+            static const float rim_hi[2] = {  1.0f,  1.0f };
+            static const float rim_lo[2] = { -1.0f, -1.0f };
+            stroke(rim_hi, 2, thick * 0.8f);
+            stroke(rim_lo, 2, thick * 0.8f);
+            break;
+        }
+        default:
+            break;
+    }
+}
+
 void history(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
 {
     // Hourglass: a down-triangle over an up-triangle meeting at a centre waist,

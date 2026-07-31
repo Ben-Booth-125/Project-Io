@@ -179,4 +179,16 @@ The prototype bodies are generated against the full model by the six-pass pipeli
 | Canyon | 0.1% | 0.4% | ×1.5 |
 | Rift | 0.1% | 0.3% | ×1.6 |
 
+**Runs are bridged, not repeated (BL-232, 2026-07-31).** A contiguous run of the same linear landform draws as **one** spanning marker rather than the same glyph stamped on each tile — mountain as a chain of peaks, rift as one continuous fissure, canyon as paired rims. Crater never spans; a basin is a blob, not a line. A lone tile keeps its centred glyph. Contiguity was measured first (`world_audit` § S4): 71% of mountain and 81% of rift tiles have a same-landform cardinal neighbour and modal run length is 2–3, so bridging fires on the majority; **no** tile anywhere has all four, so the designed "filled interior" case was cancelled before it was written. The **hover card** now names the landform in every variant and states its cost, so the glyph vocabulary is learnable without clicking through to the Selection panel.
+
+> **Discrepancy: the "Build cost modifier" column above is not implemented (recorded 2026-07-31, BL-232).**
+> No construction or placement path reads landform. The identical multiplier table
+> (×1.0 / ×1.25 / ×2.0 / ×1.5 / ×1.1 / ×1.3 / ×1.6) *is* implemented, but as
+> `landform_logistics_cost` (`src/world/logistics.cpp`) — the **traversal** cost the intra-body A*
+> pays. What landform verifiably drives today is movement cost, hazard, habitability and deposit
+> richness; build cost is design intent that was never wired. The hover card deliberately says
+> "convoys pay ×N to cross" rather than naming a build cost, so the UI does not teach the player
+> something untrue. **Whether landform should also modify build cost is a design call, not a bug
+> fix** — it belongs with the tile-generation/economy refinements, not with a rendering item.
+
 **Open tuning question raised by that measurement: Kepler generates no valley tiles at all.** Valley is assigned to unclaimed non-ocean ground below the height threshold (Pass 5), but on a wet body the ocean has already taken everything that low — so the ×1.1 fertile landform is unreachable on exactly the bodies where river valleys should be most characteristic. Dry bodies carry 20–27% valley. This is self-consistent rather than a defect, but it is a generation-tuning question, not a rendering one; it belongs with the tile-generation refinements (BL-051).
