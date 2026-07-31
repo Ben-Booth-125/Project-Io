@@ -22,8 +22,8 @@
 // half of "graphical (hexes) + textual (fully recorded)" that every
 // oral-history stage must carry (Ben, 2026-07-28).
 //
-// Design authority: docs/generation/GENERATION_STRATEGY.md § The oral-history
-// pivot; full architecture in backlog.json BL-210.
+// Design authority: docs/generation/CONTINENTS.md; full architecture in
+// backlog.json BL-210.
 // ---------------------------------------------------------------------------
 
 /// One drifting plate. Position and drift are on the tile grid's own axes so

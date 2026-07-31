@@ -13,7 +13,7 @@
 /// selected entity — name, type, and the headline fields for its kind. They emit
 /// *content only* (no window, no tooltip frame), so a caller can place the block
 /// inside whatever frame it owns: the pinned Selection info element, a Tile
-/// Ledger row, or the future hover card's tooltip. The frame differs per caller;
+/// Ledger row, or the hover card (hover_card.hpp). The frame differs per caller;
 /// the content does not.
 ///
 /// They lean on the existing presentation layer (presentation.hpp names, identity
@@ -81,15 +81,5 @@ void draw_nation_summary(const world& w, entity_id id);
 /// @param w  Read-only world state.
 /// @param id Entity id expected in @p w.corporations.
 void draw_corporation_summary(const world& w, entity_id id);
-
-/// Wraps the per-entity summary builders in a tooltip card (BeginTooltip/EndTooltip).
-/// Dispatches to the appropriate builder based on @p eid's entity kind. No-op when
-/// @p eid is null_entity or does not resolve to a known kind.
-///
-/// @param dl  Active background draw list (forwarded to canvas-aware builders).
-/// @param w   Read-only world state.
-/// @param s   Current canvas/nav state (forwarded to canvas-aware builders).
-/// @param eid Entity to describe inside the tooltip.
-void draw_hover_card(ImDrawList* dl, const world& w, const ui_state& s, entity_id eid);
 
 } // namespace ui
