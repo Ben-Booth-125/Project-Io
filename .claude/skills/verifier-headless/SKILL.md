@@ -86,6 +86,23 @@ in `tools/verify/README.md`.
   exp/log/pow in a gate path); and the S5e survival floor cuts through the Lost City band,
   45–90 °C (R12e). Links `chemistry_tables.cpp` only. CMake target
   `chemistry_tables_harness`.
+- **`ai_skill_harness`** — AI skill-regression instrument (BL-204,
+  docs/ai/AI_OPPONENT.md § 3): freezes a 5-seed benchmark set (`world_params.seed`
+  0-4, spanning the generator's body/terrain/market diversity), runs 300 ticks of
+  the real bot-vs-bot economy loop per seed (BL-202's strategic tier already
+  commands every non-player corp), and asserts four metrics per seed against
+  disposable golden bands — net-worth curve (final + minimum), solvency (ticks
+  any AI corp balance sampled below zero), survival (fraction of AI corps still
+  fielding an active building), and action counts by `corp_verb` (the thrash
+  detector). Also proves `world::state_hash` (the BL-204 tick-boundary FNV-1a
+  checksum) is identical across two same-seed runs and differs across two
+  different seeds — the harness's own determinism primitive, and the future
+  multiplayer lockstep desync detector's first exercise. Hand-builds a
+  `recipe_registry` (mirrors `scripts/economy.lua` / `recipes.lua`); links the
+  generation TU superset (as `world_audit`/`corp_terrain_matrix`) plus
+  `corp_ai.cpp`/`corp_command.cpp`/`construction.cpp`/`survey_system.cpp`/
+  `supply_system.cpp`/`building_profit.cpp`. CMake target `ai_skill_harness`
+  (picked up by the generic glob below — no CMakeLists entry needed).
 - **`continents_harness`** — Continents/Drift (BL-210 first slice): the plate-drift
   sibling pass. Determinism (R1 — same seed identical, different seed different);
   mobile-lid plate count lands in [4,10] (R2); the stagnant-lid special case is one
