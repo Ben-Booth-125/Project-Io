@@ -10,6 +10,54 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## Session — BL-214/BL-247/BL-248 (drill-through UI): narrow-by-default disclosure design, and a mid-session tree wipe (2026-07-31)
+
+**Runtime.** ~2h. Full (design session — four parallel HTML exemplars, two rounds of live
+design revision, a mid-session data-loss incident and recovery, three backlog items).
+
+**Where it came from.** Ben's ask: the game's charts are individually excellent but
+collectively overwhelming ("information overload"), and he wanted exemplars of a narrower,
+recursive/drill-down data-presentation pattern. Two mechanics already existed for exactly this
+— BL-214 (drill-through, designed but not built) and BL-196 (recursive card-drill, already
+shipped) — so the exemplars were grounded in those rather than inventing a competing pattern.
+
+**What was built.** Four standalone HTML/CSS/JS exemplars at `build_UI_example_1` through `_4`
+(throwaway design mockups, outside `src/`, never wired into the real game): the Selection band
+and History Ledger (the two real surfaces BL-214 already names), a from-scratch Corporation
+dashboard exploration, and a question-driven "Ask" panel that Ben reviewed and then explicitly
+rejected as too close to a leading tutorial.
+
+Two rounds of live design iteration followed, each captured back into the backlog rather than
+left in the exemplars alone:
+- **BL-214 amended** — the original three-tier Glance/Read/Study stepper is superseded by a
+  strictly binary fold model (one line by default, a chevron to a true full-screen mode-switch,
+  not an in-place grow).
+- **BL-247 filed** — a per-chart "why this chart" log (a closed-by-default Answers/Because
+  note), explicitly NOT the pre-written Q&A pattern from example 4, which Ben rejected as
+  over-helpful ("tutorials should never tell a player what they should be asking").
+- **BL-248 filed** — promotes MENU.md's long-unbuilt Slot 1 (Corporation dashboard) into a
+  buildable item, flagging rather than resolving that the exemplar's four roll-ups don't match
+  MENU.md's settled MVP set.
+
+**The incident.** Mid-session, a concurrent session (Ben's own, working in this same checkout
+rather than an isolated worktree) landed its own commits and merges on this branch, including a
+`reset` that wiped every uncommitted change in the shared working tree — both examples 3 & 4
+(never read into context, so unrecoverable byte-for-byte) and the in-progress backlog edits.
+Recovered via a leftover `git stash` that happened to snapshot the backlog.json edits mid-loss
+(reapplied cleanly), this session's own conversation record for examples 1 & 2 (restored
+verbatim), and a from-scratch rebuild for examples 3 & 4 (functionally verified against the
+same mechanics, not byte-identical to what Ben first reviewed).
+
+**Left open.** BL-248's roll-up-set discrepancy needs Ben's call before that item is promoted.
+A `git stash` ("wip before Sprint3 merge") is still sitting in this repo, unexamined beyond the
+two pieces this session needed from it — worth a look before it's dropped or reapplied. Two
+`worktree-agent-*` branches from the concurrent session's merges are still present locally and
+likely safe to delete once confirmed merged. If another session runs concurrently with this
+repo again, it should use an isolated `git worktree` rather than this same checkout — this
+session's incident is the concrete cost of not doing that.
+
+---
+
 ## Session — BL-190 (food demand): population demand was erased before pricing — ordering fix (2026-07-31)
 
 **Runtime.** ~30m. Full-lite (economy seam, but one coherent fix: two world files, two harnesses, no REFINED promotion).
