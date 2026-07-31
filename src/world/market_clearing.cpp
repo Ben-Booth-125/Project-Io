@@ -210,6 +210,29 @@ entity_id market_for_tile(const world& w, entity_id tile)
     return nearest_market(w, it->second, tit->second);
 }
 
+void inject_population_demand(world& w)
+{
+    // BL-190: each population centre adds a stub demand of 1 unit of
+    // agricultural_produce per scale level into its catchment market. Lives
+    // here (not run_economy_step) so it lands after clear_markets' demand
+    // reset — injected earlier in the tick it was erased before pricing
+    // (2026-07-31 ordering fix).
+    // stub: replace with food_rations demand when the processing pipeline
+    // connects food production end-to-end (food_rations requires agricultural
+    // produce → processing_facility recipe, deferred).
+    const std::size_t ri = static_cast<std::size_t>(resource_type::agricultural_produce);
+    for (const auto& [centre_id, pcc] : w.population_centres)
+    {
+        const auto tile_it = w.population_centre_tile.find(centre_id);
+        if (tile_it == w.population_centre_tile.end())
+            continue;
+        const entity_id mid = market_for_tile(w, tile_it->second);
+        if (mid == null_entity)
+            continue;
+        w.markets.at(mid).demand[ri] += static_cast<float>(pcc.scale);
+    }
+}
+
 std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     world& w,
     const recipe_registry& reg,
@@ -231,6 +254,10 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // to the order-book quantities, not erased by it. (BL-078: reads last tick's
     // cleared price for the demand elasticity.)
     inject_substrate_demand(w, reg);
+
+    // Population food demand (BL-190) — likewise additive after the reset, so
+    // the population's pull reaches price resolution.
+    inject_population_demand(w);
 
     // A (corp, body, resource) the player has a standing sell order for is under
     // manual control: the auto-surplus path yields it so the player's floor-priced

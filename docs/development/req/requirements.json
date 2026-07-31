@@ -6613,6 +6613,30 @@
           "result_metric": "landform_tooltip_mountain / landform_tooltip_rift — PASS. Cards read \"Rocky · Mountain / Habitability: 13% / Convoys pay ×2.00 to cross\" and \"Barren · Rift / … / ×1.60\". Needed verify.frames(40) for BL-230's appear delay. The cost line deliberately says movement, not build cost — no build path reads landform."
         }
       ]
+    },
+    {
+      "brief": "population-demand-ordering",
+      "title": "Population demand survives market clearing (BL-190 ordering fix)",
+      "difficulty": 1,
+      "importance": "high",
+      "evaluated_difficulty": 1,
+      "status": "complete",
+      "resolved": "2026-07-31",
+      "resolution": "Complete. The population agricultural_produce demand stub, previously written by run_economy_step and erased by clear_markets' per-tick demand reset the same tick (never priced), now lives in inject_population_demand (market_clearing.cpp), called from clear_markets after the reset alongside the BL-078 substrate injection. Routing upgraded from first-market-on-body to market_for_tile catchment (BL-096 multi-market bodies). population_demand_harness: 4/4 PASS; population_mvp (R4 + growth updated to call clear_markets): 11/11 PASS.",
+      "promoted_from": "BL-190 (food demand) — 2026-07-31 doc-sweep wrinkle",
+      "batch": null,
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: the population food-demand pull (BL-190) reaches price resolution — it is injected after clear_markets' demand reset, not erased by it, and each centre routes to its catchment market.",
+          "verification": [
+            "headless: tools/verify/population_demand_harness.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "R1 unit routing PASS; R2 cleared demand == summed centre scale (41.0 on Kepler) PASS; R3 pre-seeded 999/market erased while injection lands PASS; exit 0",
+          "notes": "Also re-ran population_mvp (11/11 PASS) after updating its R4/growth tests to the new tick pair."
+        }
+      ]
     }
   ]
 }

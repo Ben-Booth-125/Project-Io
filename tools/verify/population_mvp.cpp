@@ -1,7 +1,9 @@
 // Headless harness for population-static-mvp (BL-047) and workforce-pool-step2
 // (BL-042). Verifies without SDL / Lua / ImGui:
 //   R3: generate_population_centres seeds centres on Kepler
-//   R4: market demand for agricultural_produce is non-zero after run_economy_step
+//   R4: market demand for agricultural_produce is non-zero after the tick pair
+//       run_economy_step + clear_markets (the BL-190 population injection lives
+//       in clear_markets, after its demand reset)
 //   R5: agglomeration -- larger population scale drives more workforce supply
 //       (verified via workforce_contention scalar on identical buildings)
 // workforce-pool-step2:
@@ -86,12 +88,15 @@ static void test_population_on_kepler()
     check(has_town_plus > 0, "at least one centre scale >= 2 (Town+)");
 
     // -------------------------------------------------------------------------
-    // R4: market demand for agricultural_produce is non-zero after run_economy_step
+    // R4: market demand for agricultural_produce is non-zero after the full tick
+    // pair. The population injection lives in clear_markets (after its demand
+    // reset — BL-190 ordering fix), so the econ step alone no longer shows it.
     // -------------------------------------------------------------------------
-    std::printf("--- R4: agricultural demand non-zero after econ step ---\n");
+    std::printf("--- R4: agricultural demand non-zero after econ step + clearing ---\n");
 
-    recipe_registry reg; // empty -- demand pass runs unconditionally
-    run_economy_step(w, reg);
+    recipe_registry reg; // empty -- population injection runs unconditionally
+    const economy_report report = run_economy_step(w, reg);
+    clear_markets(w, reg, report);
 
     bool found_demand = false;
     for (const auto& kv : w.markets)
@@ -102,7 +107,7 @@ static void test_population_on_kepler()
         const float demand = mc.demand[ri(resource_type::agricultural_produce)];
         std::printf("  Kepler agricultural_produce demand: %.1f\n", demand);
         check(demand > 0.0f,
-              "Kepler market.demand[agricultural_produce] > 0 after econ step");
+              "Kepler market.demand[agricultural_produce] > 0 after econ step + clearing");
         found_demand = true;
         break;
     }
@@ -400,18 +405,21 @@ static void test_population_growth()
 
     recipe_registry reg;
 
-    // Run 210 ticks. Before each tick, satisfy food supply = demand to meet
-    // the 50% food condition. Demand = pcc.scale * 1 per tick (from pop demand pass).
-    // Growth threshold for scale 1->2 is 200 ticks.
+    // Run 210 ticks. Before each tick, satisfy food supply = demand to keep the
+    // met-supply gate satisfied. (With this empty registry the demand basket is
+    // all-zero, so the gate is trivially met regardless — the supply dance is
+    // belt-and-braces against a future non-empty basket.) The population demand
+    // itself is injected by clear_markets (BL-190 ordering fix), not the econ
+    // step. Growth threshold for scale 1->2 is 200 ticks.
     for (int t = 0; t < 210; ++t)
     {
         // Set food supply to match last tick's demand (or enough to be >= 50%).
         market_component& mc = w.markets.at(mkt);
         const std::size_t food_idx = static_cast<std::size_t>(resource_type::agricultural_produce);
         mc.supply[food_idx] = mc.demand[food_idx] > 0.0f ? mc.demand[food_idx] : 1.0f;
-        mc.demand[food_idx] = 0.0f; // reset demand; run_economy_step will re-add it
 
-        run_economy_step(w, reg);
+        const economy_report rep = run_economy_step(w, reg);
+        clear_markets(w, reg, rep);
     }
 
     const population_centre_component& pcc_after = w.population_centres.at(pop);

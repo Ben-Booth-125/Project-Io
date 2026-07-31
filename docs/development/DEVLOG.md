@@ -10,6 +10,36 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## Session — BL-190 (food demand): population demand was erased before pricing — ordering fix (2026-07-31)
+
+**Runtime.** ~30m. Full-lite (economy seam, but one coherent fix: two world files, two harnesses, no REFINED promotion).
+
+**Where it came from.** The 2026-07-31 doc sweep spotted a code wrinkle: `run_economy_step` wrote
+the population `agricultural_produce` demand stub straight into market demand, but `clear_markets`
+zero-resets demand before accumulating its own. The population signal was erased the same tick and
+never reached price resolution.
+
+That contradicted BL-190 (food demand)'s settled design, which calls the stub "a real, live market
+signal today" — the consumer BL-166 (Hydroponics Bay) and BL-168 (Fishing Wharf) sell into. It was
+a signal in the component for part of a tick, never a priced one.
+
+**The fix follows the BL-078 (nation substrate) precedent exactly.** The injection moved into
+`clear_markets`, after the reset, as `inject_population_demand` (`market_clearing.cpp`) — the same
+additive-after-reset slot the substrate injection already occupies. Routing upgraded from
+first-market-in-map-order to the `market_for_tile` catchment, matching the BL-096 multi-market
+model.
+
+**Verification.** New `tools/verify/population_demand_harness.cpp` (registered in the
+verifier-headless skill + README): unit routing, demand-survives-clearing (cleared demand ==
+summed centre scale, 41.0 on Kepler), and the ordering contract itself (pre-seeded stale demand
+erased while the injection lands). 4/4 PASS. `population_mvp` updated — its R4 asserted demand
+after the econ step alone, which the fix makes false by design — and re-passes 11/11.
+
+**Left open.** The doc-sweep session's `docs/economy/MARKETS.md` (which records the wrinkle) exists
+on no branch yet; its wrinkle note should flip to "fixed 2026-07-31" when it lands. The
+`food_rations` swap-in stays future work per BL-190.
+---
+
 ## Session — Doc-truth sweep: every authority doc reconciled with the shipped code (2026-07-31)
 
 **Runtime.** ~2h. Full (batch: four audit agents, then seven parallel rewrite agents + main-session
