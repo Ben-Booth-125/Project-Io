@@ -1,42 +1,82 @@
 # Tile Ledger (History) — design Q&A
 
-> **⚠ DEFERRED — migration not yet done.** This surface is still a **FLOATING** ImGui window (`ImGui::Begin("Tile Ledger", …)` with the shared `ledger_window_spawn`/`ledger_window_size` chrome). The BL-119 audit is complete but it has **not** been migrated into the fold-out column host, and does **not** yet use `foldout_begin`/`foldout_end` or `nav_button` tabs. This doc is here for completeness — everything below marked *(proposed)* describes the target migrated shape, not current code.
+> **✓ LANDED (BL-211, 2026-07-29).** The migration this doc once proposed is done: the surface
+> is docked in the shell fold-out column (`ui::foldout_begin("Tile Ledger")`/`foldout_end`,
+> BL-122/BL-144), not a floating ImGui window, and it now splits into three top-level views —
+> **Story / Chain / Tiles** — via `nav_button` tabs (`src/ui/tile_inspector.cpp`, `view_id`). See
+> `MENU.md` § slot 9 for the rail-level framing. Everything below is rewritten to describe the
+> **current, landed shape**; nothing here is *(proposed)* any more.
 
-> **Working design doc** for the ledger-mockup pass (Power BI). Strawman answers — Ben revises.
-> Menu slot: `rail slot 9 "History"` · Source: `src/ui/tile_inspector.cpp` · Mock table(s): `buildings.csv`, `markets.csv`, (tile-field data: NONE exported) · Related: `BL-119` (audit), `BL-122` (column host), `BL-078/079` (stockpile drain)
-> Host: shell fold-out column (BL-122), ~480px @1720 *(target — not yet migrated)*.
+> Menu slot: `rail slot 9 "History"` · Source: `src/ui/tile_inspector.cpp` · Related: `BL-119`
+> (audit), `BL-122`/`BL-144` (column host), `BL-211` (Story/Chain/Tiles split).
+> Host: shell fold-out column, docked (BL-122/BL-144).
 
 ## 1. Top question — the one thing this answers at first glance
-**"What is on this body's surface, tile by tile?"** The current window is a per-body ground-truth dump: pick a body from the `Body` combo, and the main table lists every tile as one row (X, Y, composition, landform, hazard, habitability, then one deposit column per resource — 6 + `resource_count` columns). Secondary questions it already answers below the table: **"what have I built here and how staffed is it?"** (Buildings section: type, `[x,y]`, workforce %) and **"what does this body's market look like?"** (Market section: supply/demand/price/base per resource). The name "History" on the rail slot is aspirational — the code today is a *current-state* tile inspector, not a history/timeline.
+**"How did this body get to be what it is?"** — the three tabs answer three related but distinct
+questions in one column: *Story* ("what happened here?" — the oral-history biography drawn from
+`generation_report::body_entry::state.history`), *Chain* ("how did the generation chain arrive at
+this?" — the wizard's own stage charts, redrawn from the persisted report, grouped System / Life /
+Legacy), and *Tiles* ("what did the chain leave on the ground?" — the per-tile ground-truth table,
+plus the buildings and market sections stacked below it). The rail slot's "History" name is now
+earned by *Story* and *Chain*; *Tiles* stays a current-state inspector nested inside the same
+surface.
 
 ## 2. Sub-levels — views & default
-The floating window is currently a single scroll of three stacked sections. When migrated into the one-question-per-view column, it splits *(proposed)*:
 
 | View | Answers (one question) | Content |
 |---|---|---|
-| **Tiles** | What terrain & deposits does this body have? | The tile table: X, Y, composition, landform, hazard, habitability, per-resource deposit (`—` when zero) |
-| **Buildings** | What have I built here and how staffed? | Per-building bullets: `building_type_name`, `[x,y]`, `workforce_assigned` % |
-| **Market** | What clears on this body right now? | Supply / demand / price (coloured by move vs base) / base price, per resource, with identity swatch |
+| **Story** | What happened here, in order? | Dated biography lines (`format_history_date` + event text), each with an optional wrapped consequence line underneath. |
+| **Chain** | How did the generation chain arrive at this body? | The wizard's stage charts, re-rendered from the persisted `generation_report`, grouped into three rounds (**System / Life / Legacy**) via a second `nav_button` strip; one collapsing accordion per stage, only the round's first stage open by default. |
+| **Tiles** | What terrain, buildings, and market does this body have right now? | The tile table (X, Y, composition, landform, hazard, habitability, per-resource deposit), then a **Buildings** section (type, `[x,y]`, workforce %) and a **Market** section (supply/demand/price/base per resource with identity swatch) stacked below it. |
 
-**Default on open:** *Tiles* (the body's ground truth is the point of the surface).
-**Cross-cutting selectors (NOT views, exempt from toggle rule):** the **Body** combo. It defaults to `s.active_body` when that's a non-star surface body, else the lowest-id body.
+**Default view:** whatever `s.history_view` was last left on (persisted in `ui_state` so a verify
+script can park it) — there is no forced default-to-Story on every open.
+**Cross-cutting selector (NOT a view, exempt from the toggle rule):** the **Body** combo, shown on
+*Story* and *Tiles* only — *Chain* hides it because that view compares every body side by side, so
+per-body selection doesn't apply. It defaults to `s.active_body` when that's a non-star surface
+body, else the lowest-id body.
 
-**Caveat for Ben:** the Market view here **duplicates the standalone Market ledger's question** and violates the one-question-per-surface taxonomy. Recommend the migrated Tile Ledger **drop Market entirely** (it exists here only because this window predates the Market ledger — the section's own comment calls itself "the functional specification for the production market ledger"). That leaves a clean two-view Tiles/Buildings surface, both genuinely per-tile/per-body.
+**Resolved, not cut:** the Market section still lives inside *Tiles*, stacked under Buildings —
+the BL-211 migration did **not** act on this doc's old recommendation to drop it. It still
+duplicates the standalone Market Ledger's question; that overlap is accepted as shipped, not
+revisited here.
 
 ## 3. Lens on open
-**Arm `resource`** *(proposed, default)* — the tile deposit columns are exactly what the resource field-overlay paints, so opening History and seeing the deposits lit on-canvas is the natural pairing. If the migrated surface follows the active sub-view: **Tiles → `resource`**, **Buildings → `production`** (built extractors/processors are the production lens's subject). Market view (if kept) → `market`. Per Ben's "opening a menu usually should arm a lens," yes — fixed `resource` is the safe default; follow-the-view is the richer option.
+Not wired. No code in `tile_inspector.cpp` arms an `overlay_mode` on open or on view switch — the
+`resource`-on-open idea this doc floated was never implemented. **Open** — no authority resolves
+this; LENSES.md does not document a menu-triggered arm for slot 9.
 
 ## 4. Data — live vs plumbing gaps
-- **Live today (world state, no mock needed):** the whole surface reads directly off `w.tiles`, `w.buildings`, `w.markets` per selected body — tile fields, building workforce, and market arrays are all live `tile_component` / `building_component` / `market_component` reads. This surface is the *most* live of the ledger family; it needs no CSV to function in-app.
-- **Mock tables for the Power BI mockup:** `buildings.csv` (has `building_id, body_name, type, output, active, exhausted` — but **no workforce %/ tile coordinate**, so the mockup can't reproduce the `[x,y] workforce %` line) and `markets.csv` (per-body supply/demand/price/base — carries the **5x body_id-inflation caveat**; a Market view in the mockup will over-count until a `market_id`/region column is added to the exporter).
-- **GAP — no tile-field export.** There is **no `tiles.csv`** in the mock set. The entire primary Tiles view (composition/landform/hazard/habitability/deposits) has **no plumbing to Power BI** — Ben cannot mock the main table from CSV today. If the mockup pass needs it, a `tiles.csv` exporter (one row per tile, columns mirroring the table) is a **new plumbing item**.
-- **GAP — "History" implies a timeline that doesn't exist.** No per-tile time-series is captured anywhere (`player_timeseries.csv` is corp-level balance/income only). A true tile *history* (deposit depletion over ticks, build events) would be entirely new capture.
+- **Live today (world state, no mock needed):** the whole surface reads directly off `w.tiles`,
+  `w.buildings`, `w.markets`, and the persisted `generation_report` per selected body — tile
+  fields, building workforce, market arrays, and the history/chain data are all live reads. This
+  surface is the *most* live of the ledger family; it needs no CSV to function in-app.
+- **Mock tables for the Power BI mockup:** `buildings.csv` (has `building_id, body_name, type,
+  output, active, exhausted` — but **no workforce % / tile coordinate**, so the mockup can't
+  reproduce the `[x,y] workforce %` line) and `markets.csv` (per-body supply/demand/price/base —
+  carries the **5x body_id-inflation caveat**; a Market section in the mockup will over-count
+  until a `market_id`/region column is added to the exporter).
+- **GAP — no tile-field export.** There is **no `tiles.csv`** in the mock set. The Tiles view's
+  primary table (composition/landform/hazard/habitability/deposits) has **no plumbing to Power
+  BI** — Ben cannot mock the main table from CSV today. A `tiles.csv` exporter (one row per tile,
+  columns mirroring the table) remains a **new plumbing item** if the mockup pass needs it.
+- **No gap on history/chain data:** unlike the earlier draft of this doc, Story and Chain are
+  **not** speculative — both read real, already-captured generation data (`body_entry.state`), so
+  there is no missing time-series capture to call out here.
 
 ## 5. Close / toggle semantics
-Once migrated: the rail slot-9 icon toggles the ledger open/closed; re-clicking the **currently-active sub-view tab CLOSES the ledger** (not collapse-to-overview). The **Body** combo is a cross-cutting selector, not a view — switching bodies never closes anything. As a ledger it is **mutually exclusive with the Selection element** in the shared column: opening History closes an open Selection; a new entity selection closes History. **Today** (still floating) none of this applies — it has an ImGui title-bar close button (`p_open`) and coexists with everything.
+The rail slot-9 icon toggles the ledger open/closed; re-clicking the **currently-active sub-view
+tab CLOSES the ledger** (`nav_button` passing `p_open`), not collapse-to-overview — standard
+toggle-rule behaviour (`io-standing-rules.md` § Toggle rule). The **Body** combo is a
+cross-cutting selector, not a view — switching bodies never closes anything. As a docked ledger it
+shares the shell fold-out column with the other rail slots and the Selection element, so opening
+History closes whatever else occupied that column.
 
 ## Open questions for Ben
-- **Drop the Market view?** It duplicates the standalone Market ledger's question and breaks one-question-per-surface. Recommend cutting it, leaving a clean Tiles/Buildings surface — confirm, or keep a stripped body-market glance here?
-- **What does "History" actually mean for slot 9?** The code is a *current-state* inspector, not a timeline. Rename the slot to match the current tile-inspector behaviour, or commit to building real per-tile history capture (a new time-series exporter) to earn the name?
-- **`resource` fixed vs follow-the-view lens?** Fixed `resource` on open is simplest; follow-the-view gives Buildings→`production`. Which pairing?
-- **Is a `tiles.csv` exporter in scope for this mockup pass?** Without it the primary table can't be mocked in Power BI — worth the plumbing, or mock the tile table from hand-stubbed rows for now?
+- **Drop the Market section from Tiles?** It still duplicates the standalone Market Ledger's
+  question and breaks one-question-per-surface — the BL-211 migration shipped without acting on
+  this. Worth a follow-up cut, or is the overlap acceptable long-term?
+- **Arm a lens on open?** No `overlay_mode` is wired today. Fixed `resource` on open, follow-the-view
+  (Tiles→`resource`), or leave it unwired — which, if any, is worth building?
+- **Is a `tiles.csv` exporter in scope for a future mockup pass?** Without it the primary table
+  can't be mocked in Power BI.
