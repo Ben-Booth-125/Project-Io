@@ -75,6 +75,25 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\population_mvp.cpp ^
    src\world\market_clearing.cpp src\world\budget_system.cpp ^
    /Fo:build_gen\verify\population_mvp\ /Fe:build_gen\verify\population_mvp.exe
 .\build_gen\verify\population_mvp.exe
+
+:: Population demand ordering (BL-190 fix, 2026-07-31) — inject_population_demand
+:: unit routing (R1); the demand survives clear_markets' per-tick reset into the
+:: cleared state price resolution reads (R2); stale pre-clearing demand is erased
+:: while the injection lands (R3). Links the full SDL/Lua-free world superset
+:: (every src\world\*.cpp except recipe_registry.cpp and tech_tree.cpp).
+:: (List current as of 2026-07-31; if it drifts, mirror CMakeLists' IO_WORLD_SOURCES glob.)
+cl /nologo /std:c++20 /EHsc /I src tools\verify\population_demand_harness.cpp ^
+   src\world\budget_system.cpp src\world\building_profit.cpp src\world\chemistry_tables.cpp ^
+   src\world\city_names.cpp src\world\construction.cpp src\world\continents.cpp ^
+   src\world\corp_ai.cpp src\world\corp_command.cpp src\world\corporation_generation.cpp ^
+   src\world\economy_system.cpp src\world\hard_coded_world.cpp src\world\history_ladder.cpp ^
+   src\world\logistics.cpp src\world\market_clearing.cpp src\world\nation_generation.cpp ^
+   src\world\orbital_system.cpp src\world\placement_rules.cpp src\world\planetology.cpp ^
+   src\world\population_generation.cpp src\world\road_generation.cpp src\world\supply_system.cpp ^
+   src\world\survey_system.cpp src\world\terrain_combat.cpp src\world\tile_generation.cpp ^
+   src\world\world.cpp ^
+   /Fo:build_gen\verify\population_demand_harness\ /Fe:build_gen\verify\population_demand_harness.exe
+.\build_gen\verify\population_demand_harness.exe
 ```
 
 ```bat

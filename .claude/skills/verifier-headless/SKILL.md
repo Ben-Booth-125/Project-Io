@@ -86,6 +86,14 @@ in `tools/verify/README.md`.
   exp/log/pow in a gate path); and the S5e survival floor cuts through the Lost City band,
   45–90 °C (R12e). Links `chemistry_tables.cpp` only. CMake target
   `chemistry_tables_harness`.
+- **`population_demand_harness`** — BL-190 population-demand ordering fix (2026-07-31):
+  `inject_population_demand` routes each centre's agricultural_produce demand (1 × scale)
+  to its catchment market (R1); the demand survives `clear_markets`' per-tick reset into
+  the cleared state price resolution reads (R2); stale demand written before clearing is
+  erased while the injection still lands (R3 — the ordering contract that was previously
+  broken: the econ-step stub was zeroed the same tick, never priced). Links the SDL/Lua-free
+  world superset (glob minus `recipe_registry`/`tech_tree`). CMake target
+  `population_demand_harness`.
 - **`continents_harness`** — Continents/Drift (BL-210 first slice): the plate-drift
   sibling pass. Determinism (R1 — same seed identical, different seed different);
   mobile-lid plate count lands in [4,10] (R2); the stagnant-lid special case is one
