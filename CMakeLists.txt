@@ -291,7 +291,8 @@ target_compile_features(commercial_fog_harness PRIVATE cxx_std_20)
 # The harnesses above keep their hand-tuned minimal link sets. This block then
 # (a) builds every REMAINING tools/verify/*.cpp not already declared — linking
 # the SDL/Lua/ImGui-free world superset (every src/world/*.cpp EXCEPT
-# recipe_registry.cpp and tech_tree.cpp, the TUs that pull sol2/Lua), mirroring the CI headless
+# recipe_registry.cpp, tech_tree.cpp, and world_gen_config.cpp, the TUs that pull
+# sol2/Lua), mirroring the CI headless
 # loop in .github/workflows/build.yml so CMake and CI stay in lockstep and a new
 # harness is picked up automatically — and (b) registers ALL harnesses
 # (hand-listed + globbed) as CTest tests. Run the whole logic tier with
@@ -300,7 +301,7 @@ target_compile_features(commercial_fog_harness PRIVATE cxx_std_20)
 enable_testing()
 
 file(GLOB IO_WORLD_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/world/*.cpp")
-list(FILTER IO_WORLD_SOURCES EXCLUDE REGEX "(recipe_registry|tech_tree)\\.cpp$")
+list(FILTER IO_WORLD_SOURCES EXCLUDE REGEX "(recipe_registry|tech_tree|world_gen_config)\\.cpp$")
 
 # pregame_balance_harness is the one harness that genuinely needs a live Lua
 # state: it constructs a `lua_state`, loads scripts/economy.lua + recipes.lua,

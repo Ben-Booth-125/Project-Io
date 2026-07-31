@@ -735,8 +735,16 @@ void app::setup_world(world_params params)
     // call site, so filling it here gives both run() and run_verify() a report to
     // show without a second generation pass. It is presentation data only — the app
     // holds it, the `world` struct never sees it.
+    // World-gen balance values (BL-236): loaded here, ahead of load_economy's
+    // recipes/economy pass, since make_hard_coded_world runs before it. A missing
+    // or malformed world_gen.lua throws (BL-110's protected-call-throws-on-error
+    // rule), so a broken mod script fails loudly rather than silently reverting.
+    world_gen_config gen_cfg;
+    m_lua.load("scripts/world_gen.lua");
+    gen_cfg.load_from_lua(m_lua);
+
     m_generation_report = generation_report{};
-    m_world = make_hard_coded_world(params, &m_generation_report);
+    m_world = make_hard_coded_world(params, &m_generation_report, gen_cfg);
 
     // Open the comms log with a deterministic epoch line (BL-205): the Public
     // channel exists from campaign start, so the panel is never an empty shell.

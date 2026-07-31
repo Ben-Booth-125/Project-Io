@@ -2,6 +2,7 @@
 
 #include "continents.hpp"
 #include "corporation_generation.hpp"
+#include "creeds.hpp"
 #include "history_ladder.hpp"
 #include "nation_generation.hpp"
 #include "orbital_system.hpp"
@@ -23,42 +24,32 @@
 
 namespace {
 
-// Build a resource-indexed array from a short list of (resource, value) pairs,
-// leaving every unlisted resource at zero. Keeps the market authoring readable
-// now that resource_count spans the full economy enum.
-std::array<float, resource_count> resource_array(
-    std::initializer_list<std::pair<resource_type, float>> entries)
-{
-    std::array<float, resource_count> a{};
-    for (const auto& [res, value] : entries)
-        a[static_cast<std::size_t>(res)] = value;
-    return a;
-}
-
 // Map an abundance tier to the deposit multiplier passed to generate_body_tiles.
 // Earth-like `standard` is the ceiling (1.0×); leaner tiers step down (never up).
-// See GENERATION_STRATEGY.md § The resource ceiling.
-float deposit_scalar_for(abundance_level a)
+// See GENERATION_STRATEGY.md § The resource ceiling. Values authored in
+// scripts/world_gen.lua (world_gen.deposit_scalar), BL-236.
+float deposit_scalar_for(abundance_level a, const world_gen_config& cfg)
 {
     switch (a)
     {
-        case abundance_level::sparse:   return 0.40f;
-        case abundance_level::lean:     return 0.65f;
-        case abundance_level::standard: return 1.00f;
+        case abundance_level::sparse:   return cfg.deposit_scalar[0];
+        case abundance_level::lean:     return cfg.deposit_scalar[1];
+        case abundance_level::standard: return cfg.deposit_scalar[2];
     }
-    return 1.00f;
+    return cfg.deposit_scalar[2];
 }
 
 } // namespace
 
-world make_hard_coded_world(world_params params, generation_report* report)
+world make_hard_coded_world(world_params params, generation_report* report,
+                            const world_gen_config& gen_cfg)
 {
     world w;
 
     // The resource-abundance multiplier every body's deposit pass is scaled by.
     // At the default `standard` tier this is 1.0f, so a default-params world is
     // bit-identical to the pre-BL-114 generation.
-    const float deposit_scalar = deposit_scalar_for(params.abundance);
+    const float deposit_scalar = deposit_scalar_for(params.abundance, gen_cfg);
 
     // ---------------------------------------------------------------------
     // Planetology (BL-167). A body-level sibling pass that runs BEFORE the
@@ -229,6 +220,16 @@ world make_hard_coded_world(world_params params, generation_report* report)
         run_history_ladder(kepler_pl, w, kepler_tiles, 180, 84,
                            /*seed=*/params.seed ^ 0x5A11EDu);
 
+    // Creeds (BL-235, docs/lore/CREEDS.md): one pantheon per cradle-culture,
+    // each in its own generated tongue. Runs BEFORE generate_nations because
+    // its tribal-conflict stage DRIVES the map the same way the ladder does:
+    // won wars weld cradles together and lower fragmentation_q before
+    // nation_params_from_ladder reads it into the seed budget.
+    creed_state kepler_creeds =
+        run_creeds(kepler_pl, kepler_hist, w, kepler_tiles, 180, 84,
+                   /*seed=*/params.seed ^ 0xC4EED5u);
+    record_tribal_conflict(kepler_creeds, kepler_hist, /*seed=*/params.seed ^ 0xC4EED5u);
+
     generate_nations(w, kepler, kepler_tiles, 180, 84,
         nation_params_from_ladder(kepler_hist, nation_params{ .min_seed_separation = 5 }),
         /*seed=*/params.seed ^ 0x4A71012u);
@@ -237,6 +238,17 @@ world make_hard_coded_world(world_params params, generation_report* report)
     // the border accord counts them, and neither existed a moment ago. The
     // lines then merge into Kepler's biography, which the History ledger reads.
     record_institutional_history(kepler_hist, w, kepler, kepler_tiles, 180);
+
+    // Globalisation closes the generated story: the common tongue line is the
+    // hinge from the creeds' native record to the campaign epoch — rendered in
+    // the player's language (English for now; Ben, 2026-07-31). The creed
+    // lines then merge into the same ladder history the report reads.
+    record_globalisation(kepler_creeds, w, kepler);
+    kepler_hist.history.insert(kepler_hist.history.end(),
+                               std::make_move_iterator(kepler_creeds.history.begin()),
+                               std::make_move_iterator(kepler_creeds.history.end()));
+    kepler_creeds.history.clear(); // moved-from; the ladder owns the lines now.
+
     if (report)
     {
         for (generation_report::body_entry& be : report->bodies)
@@ -293,13 +305,7 @@ world make_hard_coded_world(world_params params, generation_report* report)
     {
         const market_component kepler_market_template{
             .body       = kepler,
-            .base_price = resource_array({ {resource_type::iron_ore,               2.5f},
-                                           {resource_type::petroleum,              3.5f},
-                                           {resource_type::water,                  1.5f},
-                                           {resource_type::agricultural_produce,   3.0f},
-                                           {resource_type::steel,                  8.0f},
-                                           {resource_type::refined_fuel,          10.0f},
-                                           {resource_type::food_rations,           6.0f} }),
+            .base_price = gen_cfg.kepler_base_price,
         };
 
         // Per-nation tradeable-resource concentration = mean raw-deposit richness
@@ -310,8 +316,8 @@ world make_hard_coded_world(world_params params, generation_report* report)
                                                       resource_type::petroleum,
                                                       resource_type::water,
                                                       resource_type::agricultural_produce };
-        constexpr float rich_factor   = 1.30f; // concentration >= mean × this → fracture (gate 2)
-        constexpr float barren_factor = 0.70f; // concentration <  mean × this → fold    (gate 4)
+        const float rich_factor   = gen_cfg.market_carving.rich_factor;   // concentration >= mean × this → fracture (gate 2)
+        const float barren_factor = gen_cfg.market_carving.barren_factor; // concentration <  mean × this → fold    (gate 4)
 
         std::map<entity_id, float> concentration; // std::map → ascending id (deterministic)
         for (const auto& [nid, nc] : w.nations)
@@ -399,8 +405,8 @@ world make_hard_coded_world(world_params params, generation_report* report)
         // ------------------------------------------------------------------
         if (!kepler_pl.endemics.empty() && !w.markets.empty())
         {
-            constexpr float source_price   = 1.5f;  ///< Cheap where it grows.
-            constexpr float distance_gain  = 7.0f;  ///< Multiplier across the globe.
+            const float source_price   = gen_cfg.endemic.source_price;  ///< Cheap where it grows.
+            const float distance_gain  = gen_cfg.endemic.distance_gain; ///< Multiplier across the globe.
             constexpr int   gw = 180, gh = 84;
             const float half_diag = std::sqrt(static_cast<float>((gw / 2) * (gw / 2) + gh * gh));
 
@@ -451,7 +457,7 @@ world make_hard_coded_world(world_params params, generation_report* report)
     // the player's (which sets w.player_entity). Runs after the nations exist and
     // after the pre-authored Kepler installations are in w.buildings, so corporate
     // asset placement collision-avoids those tiles. See CORPORATION_GENERATION.md.
-    generate_corporations(w, corporation_params{ .corporation_count = 8 },
+    generate_corporations(w, corporation_params{ .corporation_count = gen_cfg.corporation_count },
         /*seed=*/params.seed ^ 0x4A71012u);
 
     // Player unit stub on Kepler.

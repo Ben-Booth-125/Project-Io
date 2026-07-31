@@ -3,6 +3,7 @@
 #include "continents.hpp"
 #include "planetology.hpp"
 #include "world.hpp"
+#include "world_gen_config.hpp"
 
 #include <cstdint>
 #include <string>
@@ -96,5 +97,8 @@ struct generation_report
 /// @param report Optional out-param; when non-null, receives the per-body Planetology
 ///               results and the per-stage summaries the generation screen reveals.
 ///               The common path passes nullptr and pays nothing.
+/// @param gen_cfg Balance values authored in scripts/world_gen.lua (BL-236). Defaulted
+///               so a headless caller that never touches Lua reproduces the same world.
 /// @return A fully populated world ready to drive the simulation.
-world make_hard_coded_world(world_params params = {}, generation_report* report = nullptr);
+world make_hard_coded_world(world_params params = {}, generation_report* report = nullptr,
+                            const world_gen_config& gen_cfg = {});
