@@ -4,8 +4,8 @@ The milestone map from the current state through the **v0.1.0** prototype cut an
 **expanded prototype** (v0.1.x → v0.3.0). This document is **forward-facing and lean**: it names
 the version sequence, the *theme* of each minor, and the done-definition for the prototype cut. It
 deliberately does **not** enumerate individual items — that lives in the backlog
-([`backlog.json`](backlog.json) metadata + [`BACKLOG.md`](BACKLOG.md) design prose) and the active
-worklist [`REFINED.md`](REFINED.md). The roadmap sits *above* both: it says which theme each minor
+([`backlog.json`](backlog.json), metadata + design prose; [`BACKLOG.md`](BACKLOG.md) is a legacy
+drain) and the active worklist [`REFINED.md`](REFINED.md). The roadmap sits *above* both: it says which theme each minor
 carries; the backlog and worklist say what work realises it.
 
 **v0.1.0 validates the economy loop only** — its scope and exclusions (Conflict, Research, Policy,
@@ -32,16 +32,17 @@ where one is likely.
 
 ---
 
-## Where we are — v0.0.8
+## Where we are — v0.0.9 shipped, v0.1.0 in progress
 
-*Cut 2026-07-04, theme: **Discovery & intelligence**.* The interactive economy loop is
-mechanically complete and now has its missing strategic dimension — information asymmetry:
+*Latest tag `v0.0.9`, cut 2026-07-05; the v0.1.0 work is landing on `main` (status 2026-07-31).*
+The interactive economy loop is mechanically complete, legible, and discovery-gated:
 
 - **Layer 0–2** — SDL3 + fixed-timestep simulation + economy tick + sol2; the core data
   model; the Solar / Circumplanetary / Planetary canvases with the minimap zoom ladder.
-- **World generation (v0.0.3)** — procedural tiles (two-axis terrain), nations (14 Voronoi
-  BFS countries with weighted sizes and history-pass merges), and corporations (asset
-  placement, financial profile).
+- **World generation (v0.0.3)** — procedural tiles (two-axis terrain), nations (Voronoi
+  BFS countries with weighted sizes and history-pass merges — 14 at v0.0.3, **43** on the
+  default seed since BL-221 (pre-national ladder) landed 2026-07-30), and corporations
+  (asset placement, financial profile).
 - **Layer 3 economy (v0.0.4)** — extraction → processing → per-`(corp, body)` stockpile →
   per-body market with supply/demand **price resolution** → budget; finite **deposit
   depletion**; warm-start; player balance in the header.
@@ -65,8 +66,8 @@ mechanically complete and now has its missing strategic dimension — informatio
   primary, Windows CI).
 
 The economy is now *interactive and legible*: discovery is gated, competitor intelligence is
-appropriately scoped, and the budget is itemised. The gap left is narrower — a handful of open
-polish items and the final quality audit. Closing that drives the remaining road to v0.1.0.
+appropriately scoped, and the budget is itemised. What remains before the cut is the v0.1.0
+terrain strand and the quality audit — see § v0.1.0 below.
 
 **v0.0.8 — Discovery & intelligence (cut 2026-07-04).** Gave the economy its missing strategic
 dimension — information asymmetry — across three focused strands, all landed: a **survey
@@ -84,26 +85,43 @@ discovery model — both fogs, the visibility rule, and their surfacing — is n
 its authority is [`../ui/DISCOVERY.md`](../ui/DISCOVERY.md), not this roadmap or the backlog.
 Per-item detail is in `DEVLOG.md`.
 
+**v0.0.9 — Budget clarity + polish (cut 2026-07-05).** The remaining legibility rough edges
+cleared ahead of the v0.1.0 audit: the in-app system menu (BL-070), the economy-ledger and
+construction-panel legibility bugs (BL-081/082), the corp-emblem glyph family (BL-090), and the
+hover-card activity line (one of the two BL-089 activity-fog deferrals). Per-item record in
+`DEVLOG.md`.
+
+**v0.1.0 — in progress (status 2026-07-31).** Landed on `main` since the tag: **roads &
+planetary logistics** (BL-146–149, complete 2026-07-10 — the generated per-nation lattice with
+three road tiers, cities as free logistics hubs, the inland logistics-hub building; built ahead
+of the cut rather than waiting for the v0.1.1 slot first planned for it); the **2026-07-08
+lens/UI review batch** (BL-133–145 + BL-150, all complete); the **legibility cut-blockers**
+(BL-174, BL-176–179, merged 2026-07-30); the **landform render** (BL-231) and its **spanning
+markers** (BL-232), both landed; a first cut of the **continent lens** (BL-226, landed
+2026-07-30 — the item itself stays open); and the opening of the generation/history arc
+(BL-167 planetology chain complete; BL-220/221 history-ladder foundations — post-v0.1.0-themed
+work that landed early). What remains toward the cut is named under § v0.1.0 below.
+
 ---
 
 ## The arc from here
 
 The map no longer ends at the prototype cut. Ben's **2026-07-09 refocus** extends it: **v0.1.0**
 still cuts the economy-loop prototype; then the **v0.1.x** band lays groundwork for an *expanded
-prototype*, **v0.2.0** refocuses who the player is, and **v0.3.0** brings the political layer and
-the filter system online. The v0.0.6–v0.0.8 themes have shipped, and *v0.0.9 — Budget clarity +
-polish* was cut 2026-07-05 (in-app system menu BL-070, the ledger/panel legibility bugs
-BL-081/082, the corp-emblem glyph family BL-090, one BL-089 deferral; per-item record in
-`DEVLOG.md` and § Near-term publish plan).
+prototype*, **v0.2.0** carries the AI opponent (the player refocus is intended for the same era
+but not yet versioned — see § v0.2.0), and **v0.3.0** brings the political layer and the filter
+system online. The v0.0.x themes have all shipped; the roll-up is § Where we are, the per-item
+record `DEVLOG.md`.
 
 ### v0.1.0 — Quality audit + legibility polish + cut
 
-*Theme: make it read cleanly, prove it holds up, then ship.* The prototype cut carries two strands.
-First, a **legibility polish batch** — the 2026-07-08 lens/UI review (BL-133–145, BL-150): a
-Country-lens legend, red→green per-tile value marks, containerised text (wrap-or-fit, never
-truncate), a tile-detail ledger, a player-only budget view, and the compact time panel. Second,
-the **quality audit** — three instruments, then the cut. *(Roads and planetary logistics, once
-queued for this cut, now open v0.1.1.)*
+*Theme: make it read cleanly, prove it holds up, then ship.* The legibility strands have landed —
+the 2026-07-08 lens/UI review batch, the legibility cut-blockers, and roads with them (§ Where we
+are). The live cut set (`version_goal: v0.1.0`, status 2026-07-31) is the **terrain/landform
+strand** plus two owed surfaces: BL-231/232 (landform render + spanning markers — landed),
+BL-226 (continent lens — first cut landed 2026-07-30, item open), BL-233 (terrain combat
+modifiers — owed), BL-234 (font glyph range — owed), and BL-162 (tile construction panel —
+owed). Then the **quality audit** — three instruments — and the cut.
 
 **Audit instruments** — no new systems:
 
@@ -128,12 +146,16 @@ layer land on positioned ground rather than a greenfield. v0.1.1 is a concrete b
 rest of the band (v0.1.2–v0.1.5) is deliberately design-forward — each now has a placeholder
 `design-owed` item that firms into real design as it is reached.
 
-- **v0.1.1 — Roads & planetary logistics.** BL-146–149: a generated per-nation road lattice with
-  A\* cost integration, planetary road rendering + player-placeable infrastructure, cities as free
-  logistics hubs (agglomeration discount), and the inland logistics-hub building. The one concrete
-  build minor; it also retires the "roads are an invisible tile attribute" concern.
-- **v0.1.2 — Laws** (**BL-155**). First pass at the law / policy surface — what a law *is* as a
-  data object and how it gates or modifies economic (and later political) behaviour. Design + stub.
+- **v0.1.1 — Shell & legibility follow-through.** *(Re-themed 2026-07-31: roads — BL-146–149 —
+  landed complete ahead of the v0.1.0 cut, retiring the "roads are an invisible tile attribute"
+  concern; § Where we are.)* The live set is shell and read-surface work: the road tier legend
+  (BL-184) and road fog dimming (BL-185), building stack capacity (BL-193), the drill-through
+  disclosure idiom (BL-214), the text-wrap render audit (BL-215), chat pinning (BL-216), and the
+  building-selection tile format (BL-229); the hover glance-then-stick (BL-230) is already
+  landed. Still the concrete build minor.
+- **v0.1.2 — Laws** (**BL-155** law/policy surface design, **BL-186** laws ledger UI). First pass
+  at the law / policy surface — what a law *is* as a data object, how it gates or modifies
+  economic (and later political) behaviour, and its ledger surface. Design + stub.
 - **v0.1.3 — Techs** (**BL-156**). Early design toward the tech / quest system — the condition-set
   gate model (gate = quest = tech) that BL-087 reframed and the v0.3.0 filter system formalises.
   Design only; precursor to BL-087.
@@ -144,15 +166,25 @@ rest of the band (v0.1.2–v0.1.5) is deliberately design-forward — each now h
   the v0.2.0 nation actor to have something to own, deferring the working system to v0.3.0. The
   band's last minor before the refocus.
 
-### v0.2.0 — The refocus (nation as the strategic actor)
+### v0.2.0 — The AI opponent (versioned), and the refocus (intended, unversioned)
 
-*Theme: change who the player is.* The player pivots from **corporation** to **nation** as the
-strategic actor — owning research, military, and intelligence — while the corporation stays the
-**economic** actor, prototyped as a single chartered corp (= today's player corp) so the v0.0.x
-economy loop survives intact underneath and the nation is a thin strategic layer above it
-(**BL-094**, settled 2026-07-04). This is the hinge from *economy sandbox* toward *grand strategy*:
-the laws / techs / military / politics stubbed across v0.1.x now hang off an actor that can own
-them.
+*Versioned theme: the AI opponent.* The backlog's live v0.2.0 set is the corp-AI arc: stage A —
+the deterministic scored-utility layer over the corp-command seam — already landed (BL-202,
+complete; `src/world/corp_ai.hpp`). Queued: BL-203 (predictive spending), BL-204 (AI skill
+harness), BL-205 (corp chat log), BL-207 (persona counsel packs), and the trade-policy pair
+BL-160/161 (auto-exchange policy, counterparty allow/deny).
+
+*Intended theme, not yet versioned: the refocus — change who the player is.* The player pivots
+from **corporation** to **nation** as the strategic actor — owning research, military, and
+intelligence — while the corporation stays the **economic** actor, prototyped as a single
+chartered corp (= today's player corp) so the v0.0.x economy loop survives intact underneath and
+the nation is a thin strategic layer above it (**BL-094**, settled 2026-07-04). This is the hinge
+from *economy sandbox* toward *grand strategy*: the laws / techs / military / politics stubbed
+across v0.1.x now hang off an actor that can own them.
+
+**Open sequencing question (2026-07-31).** BL-094 (player-nation pivot) carries no version goal
+in the backlog; the versioned v0.2.0 set is the AI opponent. Whether the pivot shares v0.2.0
+with the AI set or takes its own minor is Ben's call, not yet made.
 
 ### v0.3.0 — Politics + the filter system
 
@@ -193,7 +225,7 @@ and earn their own done-definitions as they firm up. v0.1.0 is cut when all of t
   pulled forward from v0.0.9 — BL-072/073/074.)*
 - The **read surfaces** — the ledger family, hover cards, trend plots, and the lens strip —
   make stockpiles, markets, balances, workforce, and construction legible at a glance. *(Mostly
-  shipped v0.0.7–8; remaining rough edges tracked in v0.0.9.)*
+  shipped v0.0.7–8; the remaining rough edges cleared in v0.0.9.)*
 - The build is **green** and the loop is **verified** (headless economy/generation harnesses
   and visual capture checks).
 - **Performance and data growth hold** (the v0.1.0 audit): frame and econ-tick budgets met,
@@ -206,107 +238,16 @@ milestone that says so.
 
 ---
 
-## Near-term publish plan — sequencing the unblocked backlog
+## Sequencing — live in SPRINTS.md and REFINED.md
 
-The milestone map above is **theme-level** and deliberately item-free. This section is the
-**operational layer beneath it**: how the *currently-unblocked* items in [`BACKLOG.md`](BACKLOG.md)
-are sliced into work sessions and delivered. It names items (which the map above does not) but
-**does not duplicate their design** — each item's detail stays in the backlog; this is only the
-*sequencing*. Treat it as the standing reference a session opens with, and update the slice list
-as sessions complete. *(If it churns enough to feel out of place inside the lean roadmap, graduate
-it to its own `PUBLISH_PLAN.md` and cross-link — for now it lives here so there is one place to
-look.)*
+*Superseded 2026-07-31.* The ~100-line publish plan that lived here (last updated 2026-07-04)
+is retired: everything it sequenced — the v0.0.6–v0.0.8 sessions and the v0.0.9 polish batch —
+was delivered in full (per-item record in `DEVLOG.md`; roll-up in § Where we are). Its two
+boundary-queued holdouts resolved too: planetary logistics (BL-077) and the economy-dynamism
+pair (BL-078/079) shipped, and BL-011 (reach/logistics lens) — listed there as parked — is
+complete.
 
-### Batch Delivery is a strategy, not a code-sprint
-
-A **Batch Delivery** ([`../GLOSSARY.md`](../GLOSSARY.md)) is the whole *process* of moving many
-items from intent to committed code — **collision mapping, checkpoints, and session boundaries
-included** — not just "write a lot of code." Its load-bearing parts:
-
-- **Barrier semantics** — the set advances breadth-first; every item clears a Delivery step
-  before any starts the next (DELIVERY.md § Batch Delivery).
-- **Collision mapping** — the file write-sets that decide what can fan out and what stays serial
-  (built *per session*, not frozen here — see below).
-- **Session boundaries as checkpoints** — a large set is **paused** at a clean, resumable
-  boundary rather than forced to complete (REFINED.md § Pausing a task group). The slices below
-  *are* those boundaries.
-
-### Cross-cutting rules (read once, apply every session)
-
-- **Golden-image diffing is live (landed Session 1).** The F3 golden-image Brief shipped first,
-  as planned, so every `visual` check is now automated pass/fail against a blessed golden rather
-  than eyeball-only — the real lever against silent bugs. Author a `scripts/verify/*.lua` and
-  bless a golden for each new visual requirement (via the `verifier-visual` skill); re-bless when
-  a Brief deliberately changes a captured surface.
-- **Build per commit, not per wave.** One commit per Brief already means a green tree at each
-  commit. The only *extra* build worth inserting is right after editing a shared/integration file
-  (`app.cpp`, `ui_state.hpp`, `overlay.cpp`). A green build proves it *links*, not that it is
-  *correct* — correctness rides on the requirement verification, not the compiler.
-- **Fan-out is rare here.** Most unblocked work is UI and **collides on shared files**, so it
-  serialises in the main session. The DEVLOG bears this out: even the disjoint 8-Brief Layer 3 set
-  ran sequentially. Reach for sub-agents only where file scopes are genuinely disjoint (the
-  world-gen fixes; the self-contained harness).
-- **Hotspot files** (perennial collision points — plan around them, keep single-writer in the
-  main session): `body_surface_canvas.cpp` (border + Resource lens + Market lens + hover-card),
-  `icons.{hpp,cpp}` (every icon Brief), `app.cpp`, `ui_state.hpp`, `overlay.cpp`.
-
-### The sessions
-
-*Updated 2026-07-04.* The v0.0.6, v0.0.7, and v0.0.8 themes are fully delivered; see DEVLOG for
-the per-session record. *(BL-064/BL-065 references anywhere upstream of this point refer to items
-renumbered on merge — BL-067/068 supersede them, to avoid a cross-branch collision.)*
-
-*v0.0.8 is delivered in full* — see § Where we are above for the item roll-up, `DEVLOG.md` for the
-per-session record, and [`../ui/DISCOVERY.md`](../ui/DISCOVERY.md) for the landed discovery-model
-design.
-
-**v0.0.9 — Budget clarity + polish — the polish batch is delivered (2026-07-05).** The five
-promote-ready items landed in one batch: **BL-070** in-app system menu (corner gear popup:
-Pause/Resume + Exit with confirm, Esc parity), **BL-081** economy-ledger legibility (widened
-balances, per-building table dropped, sibling tables un-cramped), **BL-082** construction panel no
-longer occluding the Selection element during placement, **BL-090** the corp-emblem glyph family
-(player + rivals, on card / selection / markers / hover), and **1 of 2 BL-089 deferrals** (the
-hover-card body activity line). Still open toward the cut: the **BL-089 proximity-glimpse** deferral
-(held back — save-seam/determinism cost disproportionate to a polish minor; re-assess at the v0.1.0
-boundary) and **BL-008** (reassessed — no further work). The delivered set is recorded per-item in
-`DEVLOG.md`; what follows is the pre-delivery frame, retained for the boundary-queued items.
-
-With the budget strands already shipped early, v0.0.9 was a **lighter polish minor**: no single
-theme, but a set of open items worth clearing before the v0.1.0 audit. Grouped by what they're
-*for*, not a task list:
-
-- **Reachability & chrome.** An in-app system menu (BL-070, `design-owed`) for Exit/pause without
-  the keyboard.
-- **Legibility bugs.** Cramped economy-ledger cells (BL-081) and the construction panel occluding
-  the Selection/Tile panel during placement (BL-082) — both `design-owed`, both regressions
-  against the legibility bar v0.0.8 just raised.
-- **Discovery fog follow-through.** The two deferrals BL-089 explicitly named at landing rather
-  than re-opening the item: a refined proximity-glimpse illumination and a hover-card activity
-  line. Small, scoped, and already speced in BL-089's own design note.
-- **Time-control reassessment** (BL-008) — the countdown/speed-curve work shipped inside v0.0.8;
-  this is the checkpoint to decide whether anything further earns a slot.
-- **Corp-emblem promotion** (BL-090, `designed`) — lift the geometric emblem into a shared glyph
-  family used consistently across map and selection markers.
-
-**Queued toward the v0.0.9/v0.1.0 boundary, not this minor's scope:** planetary logistics
-(BL-077, `designed` — terrain-weighted routing, roads & hubs, a larger vertical slice), the two
-economy-dynamism items (BL-078 inert product market, BL-079 boom-bust vs. steady processing with
-no competitive feedback — both `design-owed`), and the Era-1 tech/quest design gate (BL-087,
-`design-owed`). Each either still needs a design settle or is large enough to warrant its own
-assessment once the polish pass above clears.
-
-### Out of scope for this plan (gated — do not pull in)
-
-- **Design-owed (`~`) parked items**: BL-011 (Reach/logistics lens), BL-051 (tile-gen deep
-  models), BL-054 (nation behaviour) — each needs a design settle before promotion.
-- **Post-prototype**: Conflict, Research, Policy, Diplomacy beyond data-model stub; v0.2
-  resource-generation scarcity / full deposit authoring; rival corp AI beyond passive stub.
-
-### Collision maps: built per session, not frozen here
-
-A deliberate choice. This plan records the **durable** facts — the slices, their order, and the
-**hotspot files** — but **not** the fine-grained per-task collision table. That table is a derived
-artifact that goes stale the moment a file is restructured or an item re-scoped, so it is **built
-fresh at promotion** in REFINED.md (§ Dividing work across agents, step 1), where it is actually
-consumed. A session reads the hotspot list here, then maps its own slice. Documenting the full map
-here would only rot; documenting the hotspots is what carries between sessions.
+Live sequencing no longer belongs in the roadmap. The weekly goal/retro rhythm is
+[`SPRINTS.md`](SPRINTS.md), the active worklist is [`REFINED.md`](REFINED.md), and the method
+(Batch Delivery, collision maps, worktrees) is [`DELIVERY.md`](DELIVERY.md). This document
+stays theme-level.

@@ -1,14 +1,21 @@
-# Project Io — Generation Ledger (design)
+# Project Io — Generation Ledger
 
 A tuning-and-analysis surface that explains **why a tile generated as it did**. It
 reads the per-pass intermediates of the deterministic tile-generation pipeline and
 presents them as a per-tile derivation breadcrumb and per-body summaries. Its
-audience is the developer tuning the procedural passes, not (yet) the player.
+audience is the developer tuning the procedural passes — plus, since BL-211, the
+player through the History slot's Chain view.
 
 Design authority for the generator it inspects: [`TILE_GENERATION.md`](TILE_GENERATION.md)
 (the six-pass pipeline and the `generation_record` hook). This document is the
-design authority for the ledger itself; it is **design only** — nothing here is
-built yet.
+design authority for the ledger itself. **Build status (updated 2026-07-31)** —
+no longer all-design:
+
+| Piece | Status |
+|---|---|
+| **Chain half — player-facing** (History slot: Story / Chain / Tiles views; stage charts redrawn from the persisted `generation_report`) | **Built** (BL-211, landed 2026-07-29 — `src/ui/generation_charts.{hpp,cpp}`) |
+| **Field lenses** (heightmap / moisture / band painted over the Planetary canvas) | **Partial substrate** — the `generation_record` seam exists and is filled on demand; no lens built |
+| **Per-tile derivation breadcrumb + per-body summary ledger** | **Unbuilt** — design only, below |
 
 **Player-facing relation — the History slot.** The nav rail's **History** slot
 ([`../ui/MENU.md`](../ui/MENU.md) § Menu set and ordering, slot 9) is the *player-facing*
@@ -43,6 +50,16 @@ Composition, landform, and deposits are not in the record because they are alrea
 the player sees. The ledger therefore joins the *record* (intermediate fields) with
 the *tiles* (final fields) to tell the whole story height → ocean → band/moisture →
 composition → landform → deposits.
+
+**Two record gaps the breadcrumb will hit** *(noted 2026-07-31)*. Since the record
+was designed, two contributions entered the pipeline that it does **not** capture:
+the **continent height bias** added into Pass 1 before normalisation
+(`run_continents` — `CONTINENTS.md`), and the **planetology endowment post-multiply
+plus endemic-good additions** in Pass 6 (BL-167 / BL-191 — `TILE_GENERATION.md`
+§ Post-multiplies). A breadcrumb built from today's record would show a heightmap
+that already contains the plate bias without attributing it, and deposits that
+disagree with the rolled magnitudes. Small additive fields when the breadcrumb is
+built; named here so it is not a surprise then.
 
 ---
 

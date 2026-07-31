@@ -80,6 +80,7 @@ Glyphs fall into three families by role.
 | **HQ** | `hq(…, colour)` | Ringed eight-point star — a diamond overlaid with an axis-aligned square, enclosed by a ring, with a dark centre dot so it reads against a same-colour ownership fill | Caller `colour` (the player identity colour) | The player's HQ/origin building, Planetary canvas (BL-085, folding BL-092) |
 | **Corp emblem** | `corp_emblem(…, shape, fill)` | One of six geometric primitives (circle / square / triangle / diamond / hexagon / pentagon) chosen by `shape`; names *whose* an entity is, not *what* it is | Caller `fill` — the corp's identity colour (`palette::corp_identity_colour(corp, player)`); `shape` from `palette::corp_emblem_shape(corp)` | Faction-identity emblem (BL-090): the identity card portrait, the Selection-panel header (corporation + owned/rival building), a small identity tag beside each building marker (player **and** rival) on the Planetary canvas, and the rival hover card. The shared promotion of the former profile-card-only `draw_corp_emblem` |
 | **Activity** | `activity(…, colour)` | Concentric pulse — a filled core ringed by a signal ring (commercial-beacon motif; deliberately distinct from the survey magnifier and the unknown "?") | Caller `colour` — per activity tier (`palette::activity_known` / `activity_stale` / `activity_visible`) | Commercial-activity fog badge, Solar canvas — lower-left of the body, offset from the survey badge's upper-right so the two fogs read apart (BL-089; see [DISCOVERY.md](DISCOVERY.md)) |
+| **Value mark** | `value_mark(…, colour)` | Single filled dot | Caller fill — the caller's red→green ramp sample (`ryg_colour`) | Per-tile magnitude mark for the Workforce (Population) and Opportunity lenses (BL-135, landed 2026-07-09): drawn on every buildable tile while either lens is active, replacing both the old full-tile tint and, on occupied tiles, the building glyph. See LENSES.md § Population / § Opportunity |
 
 On the Planetary canvas the **building** glyph's `fill` now encodes the *owning
 corporation* (player corp = corp slot 0; rivals a hashed slot), so the
@@ -219,13 +220,15 @@ firmed up (several feed the **lens-design** Brief):
    conventions: `building`/`country`/`corporation`/`unit`/`pip` → `colour` is fill;
    `supply`/`market`/`ledger`/`placeholder`/resource-lens → stroke.
 
-5. **The lens set is now complete.** The curated strip order is
+5. **The lens set is now complete.** The curated on-screen strip order is
    corporation / country / resource / market / population / **opportunity** /
-   **production** / **continent** / scarcity / **industry** (Industry joined the
-   strip with BL-084; **Continent** joined it with BL-226, 2026-07-30, as the
-   eighth on-screen glyph); the rest are
-   ratified in [LENSES.md](LENSES.md) and all are catalogued above (`supply`
-   exists but is off the strip). Note `resource` is **overloaded**:
+   **production** / **continent** (**Continent** joined with BL-226, 2026-07-30,
+   as the eighth on-screen glyph); scarcity and **industry** are keyboard-cycle
+   only (trimmed off the strip by BL-093 — Industry the same day BL-084 shipped
+   it). The set is ratified in [LENSES.md](LENSES.md) and all are catalogued
+   above (`supply` exists but is off the strip; Reach and Supply-routes reuse
+   the `convoy`/`supply` glyphs — dedicated glyphs are an open TODO,
+   `overlay.cpp` note, BL-011/BL-014). Note `resource` is **overloaded**:
    `resource(…, resource_type)` is the identity-coloured *pip* (a diamond), while
    `resource(…, ImU32)` is the *lens* glyph (the strata motif) — same name,
    disambiguated by the final argument type and by context (strip vs. canvas pip).

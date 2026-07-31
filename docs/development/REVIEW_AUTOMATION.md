@@ -143,6 +143,14 @@ gh alias set shipit '!gh pr review --approve "$1" && gh pr merge --squash --auto
 
 ## Project-Io anchors
 
+> **Current reality (2026-07-31).** The pipeline above is the method; most of it is not live here.
+> Branch protection is impossible on this plan — BL-105 (main merge gate) recorded the HTTP 403 on
+> 2026-07-05 (private repo, free plan) — so merges are **local and direct to `main`**, never
+> through a PR. The last PR was #25 (2026-07-19); the PR-triggered `claude-review.yml` has not
+> fired since (its last run was on PR #24's branch, 2026-07-18). The **live** review gate is the
+> `verifier-review` skill (DELIVERY step 4a) plus the requirements ledger
+> (`req/requirements.json`); the generic method below stays as the target state, not the practice.
+
 - **Standing rules** the reviewer must enforce: `.claude/rules/io-standing-rules.md`
   (determinism, no tile data to Lua, no unprotected sol2, flat-binary serialisation, AI a
   data-model stub) and the lifecycle in `docs/development/DELIVERY.md`.

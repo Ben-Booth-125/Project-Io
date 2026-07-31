@@ -81,9 +81,17 @@ A story's **coverage** is its *served-state* — whether the goal has a working 
 
 ## Coverage map
 
-*Legacy-feature pass, 2026-07-05 — 12 stories across all seven prototype clusters, every story
-requirement-linked.* This baselines the shipped player-facing features. Secondary stories and the
-coverage-audit tool are the next passes.
+*Legacy-feature pass, 2026-07-05, plus US-013 (2026-07-11) — 13 stories across all seven prototype
+clusters, every story requirement-linked.* This baselines the shipped player-facing features.
+Secondary stories and the coverage-audit tool are the next passes.
+
+> **Gap-note (2026-07-31, doc sweep — for BL-098, the UX user-story review).** Five landed
+> player-facing surfaces have **no story trace**: the comms dock (BL-227), hover glance-then-stick
+> (BL-230), the continent lens (BL-226), the landform render + spanning markers (BL-231/232), and
+> the New World wizard (BL-167). Candidates for the `orient` / `find` clusters. And the `contest`
+> cluster — "post-prototype, unpopulated" above — now has **landed code** (`terrain_combat`,
+> BL-233's measurement) and deserves a `planned` story. Authoring the stories is design work, not
+> a doc fix; feed this list into BL-098's review.
 
 | Cluster | Stories |
 |---|---|
@@ -113,8 +121,9 @@ story actually has something to run (a brief with golden/visual/headless verific
 
 **Run the automated set:** `node tools/session/story_check.js --commands` prints the concrete
 `ProjectIo --verify scripts/verify/*.lua` invocations per `auto`/`mixed` story (dispatch each via the
-`verifier-visual` / `verifier-headless` skills). On this Windows box, heed the golden-mismatch caveat
-(pre-v0.0.8 goldens are Linux-blessed — verify by eye, don't blanket re-bless).
+`verifier-visual` / `verifier-headless` skills). *(Caveat retired 2026-07-31: the old
+"Linux-blessed goldens, don't blanket re-bless" warning is dead — Windows is the working baseline
+since the 2026-07-30 bulk re-blesses; see DEVELOPMENT_PRACTICES § Golden staleness.)*
 
 **Relationship to the golden harness — not a second copy.** The goldens (`scripts/verify/*.lua`) and
 headless harnesses (`tools/verify/*.cpp`) already form a per-*surface* / per-*feature* regression net.
@@ -272,7 +281,11 @@ the walkthrough, and known friction. Requirement slugs are `req/requirements.jso
 - **dead traces** — a `traces.backlog` id or `requirements` brief slug that doesn't exist;
 - **unroutable / untestable** — a non-`planned` story missing surfaces, backlog, or requirement links;
 - **dishonest mode** — an `auto`/`mixed` story whose linked briefs carry no runnable verification;
-- **reverse coverage (info)** — shipped player-facing backlog items in **no** story (candidates to cover — currently BL-015/020/055/056/062/065/080/091/093).
+- **reverse coverage (info)** — shipped player-facing backlog items in **no** story (candidates to
+  cover). Don't trust a pasted snapshot — **re-run `node tools/session/story_check.js`** for the
+  live list. *(Run 2026-07-31: 69 items in no story — the old nine-id snapshot that sat here was an
+  order of magnitude stale. Otherwise clean: 13 stories, every trace routes, every `auto`/`mixed`
+  story has something to run.)*
 
 `--commands` prints the concrete `ProjectIo --verify …` invocations for the `auto`/`mixed` set. Wire
 it into the Delivery close step next to `backlog_lint`.

@@ -8,10 +8,10 @@ This document is a placeholder to be expanded; the notes below record current un
 
 ## Structure
 
-- A vertical strip of **ten square icon slots**.
-- Each slot shows a **vector glyph** (`src/ui/icons.hpp`) instead of a worded label; the menu name is shown in a hover tooltip. The rail is deliberately narrow — the profile above keeps its own (wider) `profile_panel_width` rather than matching the rail.
-- Each slot toggles a panel open/closed; the active slot is highlighted.
-- Opened menus appear as **floating, movable, closable ImGui ledger windows** over the canvas area (they do not dock into the pane). Closing a window with its **✕** is equivalent to toggling the slot off.
+- A vertical strip of **nine square icon slots** (`nav_pane.cpp`; BL-174 dropped the glyph-less tenth). **Five are live** — Corporation overview, Budget, Market Ledger, Construction, History; **four are reserved** — Workforce, Research, Corp. Strategy, Diplomacy — disabled, but each carrying its own dimmed glyph so the rail teaches the shape of the game rather than showing a row of identical blanks (BL-174, nav-rail legibility).
+- Each slot shows a **vector glyph** (`src/ui/icons.hpp`) instead of a worded label; the slot's name plus a one-line blurb is shown in a wrapping hover tooltip (BL-174). The rail is deliberately narrow — the profile above keeps its own (wider) `profile_panel_width` rather than matching the rail.
+- Each slot toggles a panel open/closed; the open slot lights its glyph in the selection accent — the same idiom as the minimap lens bar, so the two icon strips read as one vocabulary.
+- Opened menus **fold out into the shell column** to the rail's right (`foldout_begin`, `src/ui/foldout_column.hpp` — see `LAYOUT.md` § Ledger windows). **Nothing floats and there is no ✕**: closing is the toggle — re-click the slot, re-click the active sub-view tab (BL-126 toggle rule), or open another slot (accordion, `close_all_panels`).
 
 ### Policy: ledgers start closed
 
@@ -31,16 +31,18 @@ slot.** A targeted action — building on *one* tile, inspecting *one* market li
 
 The test when deciding whether a new surface earns a slot: *is this a broad overview, or a
 targeted action?* Broad → a ledger with a slot. Targeted → the Selection element / a popup,
-no slot. This keeps the ten slots scaling with the *systems* the game has, not with the number
+no slot. This keeps the nine slots scaling with the *systems* the game has, not with the number
 of things a player can do to a single entity — e.g. the per-tile "build here" flow lives in the
 tile Selection element, while the broad **buildings overview** is what earns the construction
 slot (see `docs/development/BACKLOG.md` § Ledger / § Selection info element).
 
-## Layer 2 state
+## Superseded: Layer 2 state
 
-- Only one slot is wired: the **Tile Ledger** (a ruled-table glyph), parked at slot 8. It opens the Tile Ledger window — body selector, per-tile table, building list, and market readout.
-- The other nine slots are reserved, **disabled placeholders** (a neutral hollow-square glyph).
-- Slot glyphs and placement are **temporary** — the real per-menu icons follow once the menu set is defined; menu design is deprioritised while canvas work takes priority.
+> **Superseded by BL-174 (nav-rail legibility, landed).** The Layer 2 rail wired only the
+> Tile Ledger at slot 8, with nine disabled hollow-square placeholders and glyphs framed
+> as temporary. The rail is now the nine-slot, five-live, per-slot-glyph strip described
+> under § Structure; the Tile Ledger's content lives under the **History** slot (slot 9,
+> BL-211 — Story / Chain / Tiles) and docks in the fold-out column like everything else.
 
 ## Menu set and ordering (2026-06-15)
 
@@ -48,8 +50,9 @@ The slots are derived from the game systems (`docs/SYSTEMS.md`), filtered throug
 **menus-are-broad-ledgers** rule above: each slot is a broad overview surface, never a targeted
 action. The **settled order is the curated player-facing sequence below** (2026-06-15, [C1] — a
 deliberate gameplay order, not strict SYSTEMS.md tier order). It is a **nine-slot rail**:
-Exploration drops off the rail (it routes to the Explorer surface, `EXPLORER.md`, rather than
-opening a ledger). The `tier-idx` column records each slot's position in the SYSTEMS.md tier
+Exploration drops off the rail. (It originally routed to the Explorer surface — **superseded
+2026-07-26 by BL-205 (corp chat log)**; `EXPLORER.md` is retired and the comms surface is
+`CHAT.md`.) The `tier-idx` column records each slot's position in the SYSTEMS.md tier
 list, so the curation is auditable.
 
 | # | Slot | tier-idx | System / source |
@@ -74,8 +77,8 @@ Notes on the mapping:
   exists; Conflict has no broad ledger yet. The rail scales with *systems that have a broad
   surface*, per the menus-are-broad-ledgers rule.
 - **Slot 1 — Corporation overview dashboard (design settled 2026-06-15, [B3]).** A top-level
-  roll-up opened as a **floating window** (consistent with the ledger family; no permanent chrome
-  cost). The MVP surfaces four roll-ups: **balance + last-tick delta**, a **holdings roll-up**
+  roll-up opened as a **floating window** at the time of the design — like the whole family it
+  now folds out into the shell column (2026-07-31 note). The MVP surfaces four roll-ups: **balance + last-tick delta**, a **holdings roll-up**
   (building count / bodies present — this is where the player reads *their own* buildings; see
   the buildings note below), **workforce contention**, and **alerts** (idle buildings, unsold
   output, negative cashflow — note this introduces an *alert* concept). A **fuller dashboard
@@ -143,8 +146,11 @@ control the player reaches without knowing a hotkey. **Landed in v0.0.9** (`src/
 - **Keyboard parity.** **Esc** toggles the same popup (handled ahead of the ImGui keyboard guard so
   it works while the popup or another panel holds focus); an armed exit-confirm backs out first, so
   Esc cancels the confirm before it closes the menu.
-- **Reserved home.** New/Restart, a title screen, and **Save/Load** (once serialisation is
-  player-exposed) are the named follow-ons for this popup — it is the reserved session-control home.
+- **Reserved home.** New/Restart and **Save/Load** (once serialisation is player-exposed) are the
+  named follow-ons for this popup — it is the reserved session-control home. The **title screen
+  has since landed** as the app's main menu (the `app_screen` entry flow — main menu → New World
+  wizard → in-game; see `STARTUP.md`, 2026-07-31); routing this popup's Exit/Restart back to it
+  is the remaining join.
 
 ## Application / system menu — display options (BL-076)
 
@@ -166,13 +172,16 @@ Separate from the nav-rail ledgers above (per-system overviews) and from the in-
 
 ## Open questions
 
-- Whether all menus open floating windows, or some become docked/persistent panels.
-- Relationship to the explorer (`EXPLORER.md`) — the pane is fixed navigation; the explorer is
-  curated navigation. **Exploration is off the rail** (slot dropped) and routes to the Explorer
-  surface rather than opening a ledger.
+- ~~Whether all menus open floating windows, or some become docked/persistent panels.~~
+  **Answered:** all dock — every ledger folds out into the shell column (BL-122; the Tile
+  Ledger followed). No floating ledgers remain.
+- ~~Relationship to the explorer (`EXPLORER.md`).~~ **Superseded 2026-07-26 (BL-205, corp
+  chat log):** the Explorer is retired; the comms surface (`CHAT.md`) took its place, and
+  exploration stays off the rail.
 
 ## Related
 
+- `STARTUP.md` — the app's entry screens (main menu → New World wizard → in-game).
 - `LAYOUT.md` — placement in the shell.
-- `CANVASES.md` — the Tile Ledger (slot 8) reads from the selected body/tile.
-- `EXPLORER.md` — the other primary navigation surface.
+- `CANVASES.md` — the History ledger's Tiles view (slot 9) reads from the selected body/tile.
+- `CHAT.md` — the comms surface that superseded the Explorer (BL-205).

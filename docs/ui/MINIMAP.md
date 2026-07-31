@@ -101,7 +101,7 @@ itself, this time as a compact glyph bar rather than the old mode-bar dots
 │   [ inset canvas ]      │   ← the zoom-out neighbour, drawn at reduced scale
 │                         │
 ├─────────────────────────┤
-│ [Co][Ctr][Rs][Mk][Pop][Op][Pr] │ ← lens mode bar: 7 glyph buttons + selector popup
+│ [Co][Ctr][Rs][Mk][Pop][Op][Pr][Cn] │ ← lens mode bar: 8 glyph buttons
 └─────────────────────────┘
 ```
 
@@ -133,25 +133,31 @@ earlier "moved off the minimap" note below — the minimap box is now three
 tiers: **title bar** (top) → **inset canvas** (middle) → **lens mode bar**
 (bottom).
 
-The bar is a single row of **7 lens glyphs**: **Corp, Country, Resource,
-Market, Population, Opportunity, Production** — single-select with a null
-state (clicking the active glyph clears the lens). This is a curated subset of
-the full lens family in [LENSES.md](LENSES.md); **Scarcity** and **Industry**
-are keyboard-cycle only (joining **Supply**, which was already off any visible
-strip pending Layer-5 supply-route rendering), reflecting that the 7-wide bar
-is what fits the minimap's width. A **resource/good selector** — needed by the
-Resource and Market lenses — is a **popup button** on the bar rather than an
-inline combo; the old 140 px inline combo did not fit alongside the glyphs.
+The bar is a single row of **8 lens glyphs**: **Corp, Country, Resource,
+Market, Population, Opportunity, Production, Continent** — single-select with a
+null state (clicking the active glyph clears the lens). The eighth glyph is
+BL-226 (continent lens, 2026-07-30), the first addition to BL-093's row of
+seven. This is a curated subset of the full lens family in
+[LENSES.md](LENSES.md); **Scarcity** and **Industry** are keyboard-cycle only,
+joining **Supply**, **Reach** and **Supply-routes** off the strip (Layer 5 has
+since shipped — the off-strip status is now purely a width call, not a data
+gate). The **resource/good selector** — needed by the Resource, Market and
+Scarcity lenses — was briefly a popup button on this bar; **BL-134**
+(2026-07-09) moved it into the **on-canvas lens legend** (see below), so the
+bar carries glyphs only.
 
-The overlay itself is the building block in `src/ui/overlay.hpp` (an overlay
-draw pass over each canvas, keyed by `ui_state::overlay`); the bar is
-`draw_overlay_controls(ui, x, top_y, w)` in the same header, called from the
-minimap block in `src/core/app.cpp` rather than from a standalone bottom-left
-window. Until later layers add overlay data the draw pass renders nothing —
-the active lens is named by the bar, not an on-canvas chip. (The zoom-ladder
-navigation lives in the body / minimap clicks described above, **not** in
-these controls.) See [SELECTION.md](SELECTION.md) for the paired change to the
-Selection element that shipped alongside this relocation in BL-093.
+The bar is `draw_overlay_controls(ui, x, top_y, w)` in `src/ui/overlay.hpp`,
+called from the minimap block in `src/core/app.cpp` rather than from a
+standalone bottom-left window. The lens *rendering* lives inside each canvas's
+own draw pass, keyed by `ui_state::overlay` (`body_surface_canvas.cpp` and
+friends) — `overlay.cpp`'s `draw_canvas_overlay` hook itself still renders
+nothing and remains an unused extension point (corrected 2026-07-31; the old
+"renders nothing until later layers" reading is now false of the lenses, true
+only of that hook). The active lens is named by the bar's glyph highlight +
+tooltip, not an on-canvas chip. (The zoom-ladder navigation lives in the
+body / minimap clicks described above, **not** in these controls.) See
+[SELECTION.md](SELECTION.md) for the paired change to the Selection element
+that shipped alongside this relocation in BL-093.
 
 ### Lens legend (folds out from the minimap's left edge)
 
@@ -162,7 +168,10 @@ right edge meets the minimap's left edge and it is vertically centred on the
 minimap, so it reads as a drawer folding out from the minimap's left side. `app.cpp`
 passes the render pass a `lens_key_anchor` derived from the minimap rect. This also
 clears the widened Selection / ledger fold-out column the legend would otherwise
-have overlapped.
+have overlapped. Since BL-134 (2026-07-09) the legend also hosts the shared
+**resource/good selector** for the Resource / Market / Scarcity lenses
+(`draw_lens_resource_combo`, `body_surface_canvas.cpp`) — it is no longer on the
+lens bar.
 
 ---
 
@@ -200,6 +209,11 @@ Unchanged from `CANVASES.md` (authoritative there), with the chrome accounted fo
 - Anchored bottom-right with an 8 px margin.
 - In-canvas labels/title suppressed below ~320 px on the shorter edge; the chrome
   title bar and lens mode bar are exempt (always shown).
+- **Coupling (2026-07-31 note):** the bottom strip's `selection_band_height` is
+  **derived from the minimap height** — `minimap_height + chrome_margin` in
+  `foldout_column.cpp` — so the Selection band and comms dock (BL-227) top-align
+  with the minimap by construction. A future minimap sizing change ripples into
+  the whole bottom strip; do not break this derivation by hard-coding either side.
 
 ---
 
@@ -227,10 +241,10 @@ canvas holds the primary slot; the minimap always renders the default framing.
 
 ## Open questions
 
-- **Lens bar width ceiling.** The 7-glyph bar already fills the minimap's width
-  at the default `mm_w`; adding an eighth on-screen lens (or promoting Scarcity
-  / Industry back off keyboard-cycle) needs either a wider minimap or a
-  second row.
+- **Lens bar width ceiling — answered (2026-07-30, BL-226).** The eighth glyph
+  (Continent) fit the existing bar without widening the minimap or adding a
+  second row; goldens re-blessed. A *ninth* on-screen lens would reopen the
+  question.
 - **Circumplanetary framing** for a planet with many vs. zero moons — how much
   local space to show, and at what scale, is for `CIRCUMPLANETARY.md`.
 - **Overlays.** Once supply routes / units land on the canvases, does the minimap
@@ -244,6 +258,6 @@ canvas holds the primary slot; the minimap always renders the default framing.
 - `SOLAR.md`, `CIRCUMPLANETARY.md`, `PLANETARY.md` — the three rungs.
 - `LAYOUT.md` — placement in the shell.
 - `LENSES.md` — the full lens family, each mode's surface and key; the minimap
-  bar surfaces a 7-lens curated subset of it.
+  bar surfaces an 8-lens curated subset of it (BL-226 added Continent).
 - `SELECTION.md` — the Selection element redesign (BL-093) that shipped
   alongside this relocation.

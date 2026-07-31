@@ -14,9 +14,8 @@ was (see § Removed: the stat-block polymorphism below); full per-entity detail
 lives in the Tile Ledger, Market Ledger, Balance Ledger, etc., one 'go to' away.
 
 See also: [LAYOUT.md](LAYOUT.md) (where it sits in the shell), [CANVASES.md](CANVASES.md)
-(the click model it revises), the deferred hover-card item in
-`docs/development/BACKLOG.md`, and `src/ui/view_nav.hpp` (`focus_on_entity`, the
-'go to' target).
+(the click model it revises), [TOOLTIP.md](TOOLTIP.md) (the hover card — built), and
+`src/ui/view_nav.hpp` (`focus_on_entity`, the 'go to' target).
 
 ---
 
@@ -29,7 +28,7 @@ focused, and selected at once.
 | State | Meaning | Lifetime | Drives | Backing |
 |---|---|---|---|---|
 | **Active** | The navigation **anchor** — which body/tile the canvas rungs are framed around. | Persists until you navigate. | Which Circumplanetary/Planetary rung renders, and around what. | `ui_state.active_body`, `ui_state.active_tile` (existing). |
-| **Focus** | The entity **under the pointer** right now. | Transient, per-frame. | The hover tooltip / hover card (see [`TOOLTIP.md`](TOOLTIP.md)). | Per-frame `hovered_*` locals today (not stored); a future `focus` field when the hover card lands. |
+| **Focus** | The entity **under the pointer** right now. | Transient, per-frame. | The hover tooltip / hover card (see [`TOOLTIP.md`](TOOLTIP.md)). | **Stored** since the hover card landed: `ui_state.hovered_entity` + `hover_ticks` (stable-hover detection), plus the `hover_card_*` fields (subject, glance/stuck phase, anchor, last rect). |
 | **Selection** | The entity the player **single-clicked** to inspect. | Persists until you select something else (or clear). | The Selection info element's contents and its 'go to' target. | **New:** `ui_state.selected_entity`. |
 
 Key consequence: **Selection is distinct from Active.** Selecting a body in the
@@ -56,17 +55,19 @@ two gestures, applied uniformly across all three canvases:
 The 'go to' button on the panel is exactly equivalent to a double-click on the
 current selection.
 
-**Dwell-to-open — a second opener (BL-200, Planetary surface).** Alongside the
-single-click, holding the pointer **still** over an entity fills a thin progress
-bar in the transient hover tooltip and then opens the card on that entity — the
-same open a click there produces (`selected_entity` set, `card_anchor` frozen at
-the pointer). The click still opens **instantly**; dwell is an *addition*, not a
-replacement (Ben, 2026-07-23). The timer advances only while the pointer is still
-— any real movement resets it — so a sweep across the tile grid never auto-opens
-(the anti-bombardment gate). Scoped to the Planetary surface, where the tile
-density makes the gate matter and the hover infrastructure already lives; the
-other canvases keep click-only. The dwell bar belongs to the hover tooltip, never
-to the opened card's header. See `hover_card.hpp`, `body_surface_canvas.cpp`.
+> **Superseded — dwell-to-open RETIRED (2026-07-30, BL-228/BL-230).** BL-200's
+> second opener — holding the pointer still filled a progress bar in the hover
+> tooltip and then opened the Selection surface — is removed. Hovering never
+> opens the Selection band; **clicking is the only opener** — one gesture, one
+> meaning (`hover_card.hpp`'s header comment is the code-side record). Hover
+> now drives only the two-phase glance→stick card, TOOLTIP.md § The landed
+> model. The original design, for the record: alongside the single-click,
+> holding the pointer **still** over an entity filled a thin progress bar in
+> the transient hover tooltip and then opened the card on that entity — the
+> same open a click there produces. The click still opened instantly; dwell was
+> an *addition*, not a replacement (Ben, 2026-07-23), scoped to the Planetary
+> surface, the dwell bar hosted by the hover tooltip, never the opened card's
+> header.
 
 This is a deliberate behavioural change: a single click no longer descends the
 zoom ladder. CANVASES.md and the minimap ascend gesture are updated to match.
@@ -154,6 +155,12 @@ action/facts form until they get their own mockups.
 > **expected-profit** chart BL-162 calls for; today's images are placeholders.
 
 ### The tile element's action is the build front door *(superseded for tiles by BL-123 — see above; retained as the design of the owed tile-construction panel)*
+
+> The "owed tile-construction panel" this and the next subsection point at is now owned by
+> **BL-162 (tile construction panel)** — still open; its first pass, `draw_construction_ledger`,
+> landed (the blockquote above). The nav-rail Building ledger's own slimming to
+> Construction/Buildings tabs (BL-143, building ledger redesign) landed separately and does not
+> absorb this per-tile logic.
 
 The **Tile** selection's hero action is **"Build here"** — the player's primary construction
 entry point (`draw_build_front_door`). It lists the building types placeable on the selected
@@ -266,26 +273,32 @@ element stopped calling them.
 ## Layout & chrome
 
 **Current shape (BL-213, 2026-07-28) — the Selection band.** The element lives in a **fixed
-band at the bottom of the screen**, sandwiched between the shell column (nav rail + fold-out
-ledger) and the right chrome column (comms log + minimap) — both of which run the **full
-screen height** either side of it. This superseded two earlier shapes in turn: the original
+band at the bottom of the screen**. Its left neighbour is the **comms dock** (BL-227,
+2026-07-30 — the comms log moved from the right column to the bottom-left tile of this same
+strip, `comms_dock_rect` in `src/ui/foldout_column.{hpp,cpp}`); its right neighbour is the
+right chrome column (time panel + minimap). Dock and band share one top edge and one height,
+so the screen's bottom row reads as a single solid strip. This superseded two earlier shapes in turn: the original
 BL-065 full-width bottom bar, then the BL-124 shell-column sidebar, then the BL-194/195
 **click-anchored "sticky card"** that froze at the click position and centred there (canvas-
 confined, clamped so it stayed on-screen). Ben's 2026-07-28 call retired the click-anchoring:
 *"menus that are to do with doing/building need space at the bottom of the screen, rather than
 floating with the cursor."* The band is now:
 
-- **Fixed, not click-anchored.** Always the same rect — `{shell_column_right, screen_bottom -
-  selection_band_height}` sized `{right_chrome_left − shell_column_right, selection_band_height}`
-  (`src/ui/selection_card.hpp`) — regardless of where the selecting click landed. The player's
-  eye never has to re-find it.
+- **Fixed, not click-anchored.** Always the same rect — left edge at the **comms dock's right
+  edge** (the dock takes three quarters of the fold-out column's width; the band takes the
+  quarter it gives back, BL-227), right edge at the right chrome column, bottom-anchored at
+  `selection_band_height` tall (`app.cpp`'s band block; the frame is
+  `src/ui/selection_card.{hpp,cpp}`) — regardless of where the selecting click landed. The
+  player's eye never has to re-find it.
 - **Not mutually exclusive with the ledgers.** Because it no longer shares the shell column,
   selecting an entity **leaves whatever fold-out ledger is open untouched** — both are visible
   at once. (This reverses the BL-124 sidebar's rule, which closed the ledger on a new selection
   because the two competed for the same column.)
-- **`selection_band_height` = 340px**, tuned so the tile layout's hex-neighbourhood render and
-  per-resource production chart (§ The tile element's layout below) fit without clipping — the
-  tallest per-kind content, and the floor every other kind's layout inherits.
+- **Height is display-derived, not a constant** (2026-07-30). `selection_band_height(disp_x,
+  disp_y)` = minimap height + `chrome_margin` (`src/ui/foldout_column.{hpp,cpp}`), so the
+  band's top edge lands exactly on the minimap's and the bottom row reads as one band. The
+  flat 340 px it replaced overhung the minimap by 80 px at 1720×1080 — "discordant", Ben's
+  word — with the main canvas practically blocked.
 - **Content unchanged in kind.** `draw_selection_content` (selection_panel.cpp) is still the
   shared per-kind dispatcher; only its container moved. The tile's vertical layout (hex render +
   accordion, § below) and the action|facts split (other kinds) render exactly as before, just in
@@ -316,12 +329,13 @@ lives beneath the Selection element — it moved onto the **minimap**, reprising
 location. A lens mode bar now occupies the bottom row of the minimap box (chrome fill drawn in
 `app.cpp`'s minimap block; the interactive glyph row is `draw_overlay_controls(ui, x, top_y, w)`
 positioned over it), leaving the Selection element the full height it needs. The strip itself
-also trimmed from 9 lenses to a single row of **7**: Corporation, Country, Resource, Market,
-Population, Opportunity, Production. **Scarcity** and **Industry** dropped off the on-screen row
-(joining **Supply**) and are keyboard-cycle only — 9 glyphs did not fit the 240px minimap width.
-The Resource/Market/Scarcity resource-selector, formerly a 140px inline combo, is now a compact
-popup button opened from the bar (`draw_lens_selector`). Full detail: [LENSES.md](LENSES.md),
-[MINIMAP.md](MINIMAP.md).
+also trimmed from 9 lenses to a single row — **eight** since BL-226 (Continent lens) joined
+the original seven: Corporation, Country, Resource, Market, Population, Opportunity,
+Production, Continent. **Scarcity** and **Industry** stay off the on-screen row (joining
+**Supply**, **Reach**, and **Supply-routes**) as keyboard-cycle only — the minimap bar does
+not fit them all. The Resource/Market/Scarcity resource-selector, formerly a 140px inline
+combo, moved again: it now lives in the **on-canvas lens legend** (BL-134, lens selector in
+legend), not on the bar. Full detail: [LENSES.md](LENSES.md), [MINIMAP.md](MINIMAP.md).
 
 ---
 
@@ -357,7 +371,7 @@ ledger are the *same* decision — the lens that validates the entity also route
 | **Corporation** | the owning **corporation** of the hovered tile/building | Balance Ledger |
 | **Resource** | the hovered tile's **deposit** | Tile Ledger (deposit detail) |
 | **Market** | the body's **market** / listing | Market Ledger |
-| **Faction** | the owning **nation** | Nation ledger |
+| **Country** *(was Faction)* | the owning **nation** | Nation ledger |
 | **Supply** *(Layer 5)* | the **route / stockpile** under the pointer | (Supply surface, when it exists) |
 
 This couples the Selection element's Focus state to the lens system (LENSES.md) and the ledger

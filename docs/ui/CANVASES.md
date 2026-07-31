@@ -34,12 +34,14 @@ chrome** — tiered population-centre conurbation markers, sized by scale and la
 The game window is divided into two regions:
 
 - **Primary region** — the majority of the window. The active canvas fills this space.
-- **Minimap region** — a fixed inset in the bottom-right corner, framed by its own chrome (a title bar above). The neighbouring canvas renders in the inset beneath it. (The overlay-lens toggles that once sat in a mode bar below the inset now live in a bottom-left overlay control strip.)
+- **Minimap region** — a fixed inset in the bottom-right corner, framed by its own chrome (a title bar above, and the **lens mode bar** along its bottom edge — BL-093 moved the overlay-lens toggles onto the minimap itself; see `MINIMAP.md` / `LENSES.md`). The neighbouring canvas renders in the inset beneath it.
 
-**Default state.** The game opens on the **corporation's home planet** (Kepler in
-the hard-coded world): the Planetary screen is primary with the home body
-selected, and the minimap shows that planet's Circumplanetary view. The opening
-rung is the surface, not the system — the player starts looking at home.
+**Default state.** The app opens on the **main menu**, not a canvas: main menu →
+New World wizard → "Begin" hands over to `in_game` (the `app_screen` flow —
+see [STARTUP.md](STARTUP.md)). The **first in-game view** is then the
+**corporation's home planet**: the Planetary screen is primary with the home
+body selected, and the minimap shows that planet's Circumplanetary view. The
+opening rung is the surface, not the system — the player starts looking at home.
 
 ---
 
@@ -111,27 +113,15 @@ showing the game name rather than a canvas.
 
 ## Shared selection / view state
 
-A small struct in `src/ui/ui_state.hpp`, held by `app`:
-
-```cpp
-enum class canvas_level { solar, circumplanetary, planetary };
-enum class overlay_mode { none, supply, market, faction };
-
-struct ui_state
-{
-    entity_id    active_body   = null_entity;            // drives the lower rungs
-    entity_id    active_tile   = null_entity;            // set by tile click; consumed by later layers
-    canvas_level primary_level = canvas_level::solar;    // which rung fills the window
-    overlay_mode overlay       = overlay_mode::none;     // active overlay lens; toggled by the bottom overlay control strip (defaults to none — the plain canvas)
-
-    bool show_tile_ledger = false;                       // owned by the nav pane, not the canvases
-
-    // per-canvas pan/zoom (primary only; the minimap always shows default framing)
-    float solar_zoom, solar_pan_x, solar_pan_y;
-    float circum_zoom, circum_pan_x, circum_pan_y;
-    float planetary_zoom, planetary_pan_x, planetary_pan_y;
-};
-```
+The shared struct is `ui_state` in `src/ui/ui_state.hpp` — the code is the
+reference; no snippet is mirrored here (an earlier copy drifted badly). The
+load-bearing members for the canvases: the `active_body` / `active_tile`
+navigation anchors, `selected_entity` (the Selection state, SELECTION.md),
+`primary_level` (`canvas_level` — which rung fills the window), `overlay`
+(`overlay_mode` — **fourteen** values: `none` plus thirteen lenses, LENSES.md;
+the early `faction` mode was renamed **`country`**), and per-canvas pan/zoom.
+The struct has since grown hover-card, construction, vision, and drill-down
+state — see the header itself.
 
 Selection, hover, and pinning are drawn through a shared **highlight convention**
 (`src/ui/highlight.hpp`) so they read the same on every canvas: white for the
@@ -155,6 +145,11 @@ navigation pane; the canvases do not touch it.
 ---
 
 ## Terrain channels — composition and landform (BL-231)
+
+This section is the **shared-ladder spec** for the landform render — it lives here, not
+in PLANETARY.md, because the implementation is `hex_render` and serves two surfaces (the
+canvas and the Selection band's neighbourhood view); PLANETARY.md § Layers points back
+here (2026-07-31).
 
 A tile's character has two axes ([TILES.md](../economy/TILES.md)), and the Planetary
 canvas draws them on **two separate channels**. Both are **always-on chrome**, not an
@@ -254,12 +249,14 @@ function still draws unconditionally; it just skips hover/click handling when
 
 ## What is deferred
 
-Economic and military data (supply routes, faction presence, convoy paths) are
-added in later layers as overlay **lenses** on these canvases. The overlay
-*mechanism* now exists as a building block — an overlay draw pass over each
-canvas (`src/ui/overlay.hpp`), an `overlay_mode` value in `ui_state`, and a
-bottom-left **overlay control strip** (`draw_overlay_controls`) wired to toggle
-it (a default lens is active on load). Until those layers supply data, the draw
-pass renders nothing — the active lens is named by the control strip, not an
-on-canvas chip; the lens geometry (Layer 5 supply routes first) hangs off the
-same pass.
+Little, on the lens front: **twelve of the thirteen lenses render today** —
+Corporation, Country, Resource, Market, Population, Opportunity, Production,
+Scarcity, Industry, Reach, Continent, and Supply-routes all draw real geometry
+in the Planetary canvas's draw pass (`body_surface_canvas.cpp`, keyed on
+`ui_state::overlay`; catalogued in LENSES.md). Only the original **Supply**
+lens remains gated, on Layer-5 supply-route rendering. The lens *controls* are
+the eight-glyph mode bar on the minimap (`draw_overlay_controls`,
+`src/ui/overlay.cpp`) plus keyboard cycling; no lens is active on load — the
+canvas opens unskinned. The vestigial `draw_canvas_overlay` pass in
+`overlay.cpp` still renders nothing — the lens geometry grew inside the canvas
+draw functions instead, which is where per-tile compositing had to happen.

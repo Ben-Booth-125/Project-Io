@@ -5,9 +5,9 @@ infrastructure, trade goods, and eventually project power off-world. At campaign
 all corporations — including the player's — are generated procedurally and are present
 from turn one.
 
-Corporation system behaviour (trading decisions, expansion logic, diplomatic posture) is
-**an open item and deferred from the prototype**. This document covers the generation
-strategy and data model.
+This document covers the generation strategy and data model. Corporation *behaviour* is no
+longer wholly deferred — see § Prototype scope for what has landed (BL-202, corp AI) and
+`docs/ai/AI_OPPONENT.md` for the behaviour model itself.
 
 ---
 
@@ -124,6 +124,26 @@ history** — warm stockpile pools and a balance already moved by production, wa
 rather than the seeded capital alone. The headless `--verify` path stays deterministically
 cold (no pre-game ticks) so generation audits remain reproducible.
 
+### Pass 4b — Starting stockpile (BL-116, complete)
+
+Each corporation is also seeded an **opening resource stockpile** on its home body
+(`generate_starting_stockpile`, `corporation_generation.cpp`), so build / production / trade
+have materials from turn one rather than an empty pool warmed only by the pre-game ticks.
+Generated, not fixed (replaces the BL-115 flat give):
+
+- **Per-focus weights** over the seven-resource prototype subset, reading as "who holds what
+  at the gate": extraction hoards the raws it mines (e.g. iron ore ×2.0 against trade's
+  ×0.5); processing pairs feedstock with refined output; trade carries finished goods and
+  thinner raws.
+- **Magnitude scales with the financial profile**: base 100 units × weight × a capital
+  scalar (`capital / base_capital`, clamped to **[0.5, 2.0]** so the wealth spread stays
+  sane).
+- **A seeded per-resource jitter ×[0.85, 1.15]** varies each campaign without disturbing the
+  focus ordering. Deterministic: one draw per prototype resource in fixed order, so every
+  corp advances the stream identically.
+
+A corp that placed no holdings (a deposit-poor nation) has no home body and gets no pool.
+
 ### Pass 5 — Naming
 
 Each corporation receives a generated name from a corporate naming template bank.
@@ -145,16 +165,32 @@ industrial focus, starting capital, home nation political context) and can cherr
 the final stage of generation: accepting a generated corporation, re-rolling it within
 the same nation, or selecting a different nation to generate a corp within. This flow is
 **deferred from the prototype**. For now, a corporation is simply marked as the player's
-at generation time.
+at generation time. The natural home for it is the **New World wizard** (BL-167 —
+`PLANETOLOGY.md` § Preferences, not parameters), which already walks generation in staged
+rounds with per-round rerolls; a corporation round would slot after round C. Note also
+BL-094 (player-nation pivot, designed) — if the player identity shifts to
+nation-with-chartered-corps, this screen's subject changes with it.
 
 ---
 
 ## Prototype scope
 
-The prototype does not implement faction behaviour. Corporations are generated, hold
-assets, and exist as data — but they take no autonomous economic or strategic actions.
-The simulation runs for the player only. This is a deliberate deferral; the generation
-data model is designed so that AI behaviour can be added without restructuring it.
+> **Superseded (2026-07-31).** This section used to claim corporations take no autonomous
+> actions and the simulation runs for the player only. No longer true, in two landed steps:
+> **BL-079 (local agency, landed 2026-07-07)** — narrow, deterministic per-building actions
+> (idle a loss-maker, switch a floored recipe, throttle a depleting extractor); and
+> **BL-202 (corp AI scored utility, landed 2026-07-28)** — `src/world/corp_ai.cpp`, a
+> deterministic scored-utility strategy layer that surveys, builds, and spends against real
+> market prices. The behaviour model's authority is **`docs/ai/AI_OPPONENT.md`**, not this
+> doc.
+>
+> What generation still does **not** seed: any behavioural state. No sentiment values, no
+> diplomatic posture, no strategic plans or goals are generated — the AI derives its
+> decisions each tick from the world state (holdings, prices, survey fog). Generation's
+> contract is unchanged: place the assets, set the finances, and let behaviour read them.
+
+The generation data model was designed so AI behaviour could be added without restructuring
+it; BL-202 confirmed that held.
 
 ---
 

@@ -117,7 +117,8 @@ same subject differently:
   aimed at (`"v0.0.9"`), the next one (`"v0.1.0"`), or `"post-v0.1.0"` for anything beyond the
   prototype's remaining arc. Read `ROADMAP.md` for the live version sequence and each minor's
   theme before naming one — an item's `version_goal` should match a theme it actually serves, not
-  just the nearest open minor. It is a goal, not a promise: re-rate it at re-sequencing the same
+  just the nearest open minor; `backlog.json`'s `version_goal` fields win on any conflict with
+  ROADMAP prose. It is a goal, not a promise: re-rate it at re-sequencing the same
   way priority gets re-rated, rather than treating the first guess as fixed. Legacy items authored
   before this policy are not backfilled.
 
@@ -183,8 +184,12 @@ large); for a `design-owed` item, **Design** is the implied first step.
    contradiction between `backlog.json`, `requirements.json`, `BACKLOG.md` and `REFINED.md` — fix it
    before committing). The linter is the machine check that "landed the code, skipped the bookkeeping"
    can no longer pass silently; it exists because a 2026-07-04 currency audit found ~30 such loose
-   ends. *(Node is not installed on the Windows dev box as of 2026-07-04 — the lint runs on the Linux
-   dev box / CI; see BL-057/058.)*
+   ends.
+
+   **Commit-format scope (recorded 2026-07-31).** The `Tasks:`/`Requirements:` trailer applies to
+   **Full-mode item deliveries**; Light, measurement, and filing commits carry a plain descriptive
+   body — matching actual practice (e.g. the BL-233 terrain-combat measurement and the
+   BL-233/234 filing commits).
 
 ### The symbol-level dependency contract (`provides` / `consumes`)
 

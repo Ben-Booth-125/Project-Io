@@ -4965,7 +4965,7 @@
             "build: ProjectIo links with the menu block"
           ],
           "result_metric": "App builds+links green; interactive menu not captured in a saved visual script this pass.",
-          "notes": "Follow-on: author scripts/verify/new_world_setup.lua and run verifier-visual. Load-bearing determinism guarantee is covered headlessly by R1/R2."
+          "notes": "Follow-on: author scripts/verify/new_world_setup.lua and run verifier-visual. Load-bearing determinism guarantee is covered headlessly by R1/R2. Noted 2026-07-31 (doc sweep): the menu this row describes was superseded by the BL-167 New World wizard, so the capture can no longer be authored as written; left pending as an honest record — the wizard surface is BL-167 territory."
         }
       ]
     },

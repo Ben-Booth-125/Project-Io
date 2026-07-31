@@ -10,6 +10,22 @@ from a hand-picked input box to a measured, strict floor with reject-and-reroll 
 § Implementation. What remains open is listed in § Open calls; those are still Ben's and are not
 settled.
 
+**Contents** *(status per section, 2026-07-31)*:
+
+| Section | Status |
+|---|---|
+| Why this exists | settled |
+| The chain — A → B → C (S0–S7) | settled |
+| S8 Legacy / S9 Spend | settled |
+| The homeworld rule | settled |
+| Archetypes | settled |
+| Mapping history onto Io's resource list | settled |
+| Presentation (biography, dated lines) | settled |
+| Determinism & cost | settled |
+| Implementation (incl. Continents, preferences, verification) | settled |
+| Open calls | open (3, 4, 7, 8, 10 remain) |
+| Known weaknesses | recorded — one half-closed 2026-07-30 |
+
 ---
 
 ## Why this exists
@@ -579,7 +595,8 @@ the only defence against a feature that is technically deep and experientially i
 (`splitmix64(mix(seed, body_id, STAGE_TAG))`), not one sequential stream — this is the single most
 valuable determinism decision available and it is free: retuning the retention gate in S2 cannot
 silently re-roll every deposit in S8. Allocate fresh XOR constants; note `0x4A71012u` is already
-folded twice in `hard_coded_world.cpp` (nations at :160, corporations at :302).
+folded twice in `hard_coded_world.cpp` (the `generate_nations` and `generate_corporations`
+seed folds).
 
 **Two portability hazards the standing rule does not currently name:**
 
@@ -592,7 +609,7 @@ folded twice in `hard_coded_world.cpp` (nations at :160, corporations at :302).
   shoreline as an integer power.
 
 **Iteration order.** `world.bodies` is `std::unordered_map`; the pass must walk an explicit sorted
-list, as `hard_coded_world.cpp:256` already does for `centre_ids`.
+list, as `hard_coded_world.cpp`'s market seeding already does for `centre_ids`.
 
 **Compute is a non-issue** — ~90 flops and ~20 hashes per body, once, at generation. It should not be
 quoted as a virtue.
@@ -629,6 +646,13 @@ the previous authored values, **23 of 24 fields reproduce exactly** — Kepler i
 so the homeworld surface is unchanged. The single divergence is **Cinder's `geological_activity`,
 authored `high`, derived `low`**: Mercury is genuinely geologically dead, and the authored value was
 flavour. It costs Cinder some mountain and rift cluster seeds.
+
+**The Continents/Drift sibling pass now runs between S3 and the tiles** (landed 2026-07-28,
+BL-210 first slice — `run_continents`, `src/world/continents.cpp`, authority `CONTINENTS.md`).
+It reads Engine's already-computed `mobile_lid`/`theta` — plate count, drift speed, everything a
+consequence, nothing an independent roll — feeds a per-tile height bias into tile Pass 1, and
+appends dated `chain_stage::engine` lines to the body's biography (collision → *"porphyry copper
+where it persists"*; a stagnant lid drifts as one immobile plate).
 
 **Two hooks into the tile pipeline**, both taking an optional `const planetology_state*` so a null
 state reproduces the pre-BL-167 surface bit-for-bit:
@@ -818,16 +842,22 @@ case in the harness. This is expected — one living world is the intended shape
    ore is province-scale — the Hamersley is *one* basin, a handful of tiles at any resolution. 2–5
    seeded province records would be the single biggest legibility gain available, but it is a genuine
    new Pass 6 concept.
-5. **`deposit_scalar` ownership.** BL-114's per-body abundance multiplier already exists with the same
-   semantics this pass claims. Two independent levers multiplying makes sparse/lean/standard
-   uninterpretable. **Must be settled before implementation, not discovered at merge.**
+5. ~~**`deposit_scalar` ownership.**~~ **Settled in implementation (marked resolved 2026-07-31):**
+   the two levers are **two sequential pure post-multiplies** in tile Pass 6 — BL-114's
+   `deposit_scalar` first, then this pass's per-resource `endowment` — and neither draws RNG, so
+   each is bit-exact at its identity value and sparse/lean/standard stays interpretable as a
+   flat tier over whatever the endowment shaped. See `generate_body_tiles`
+   (`tile_generation.cpp`) and `TILE_GENERATION.md` § Post-multiplies. Original concern kept:
+   BL-114's per-body abundance multiplier already exists with the same semantics this pass
+   claims; two independent levers multiplying risked making the tiers uninterpretable.
 6. ~~**Do the four authored bodies become derived?**~~ **Settled — option (a) shipped:** authored
    inputs, derived outputs, with the old values as regression assertions. 23 of 24 fields reproduce;
    Cinder's geology is the one divergence. Original options kept: (a) authored inputs / derived outputs, with today's
    values as regression assertions — cheapest, turns the four bodies into free tests; (b) accept
    divergence and re-baseline every capture; (c) generate history and endowment only, leave profiles
    hand-written. *Note the real regression risk:* Selene's `polar_frozen` + `cold` is load-bearing in a
-   documented `tile_generation.cpp:222` comment, and a naive derivation would classify it temperate.
+   documented comment in `band_for_row` (`tile_generation.cpp`), and a naive derivation would
+   classify it temperate.
 7. **Survey-gated or always visible?** `DISCOVERY.md`'s geographic fog means a body starts with only
    type, orbit and grid size known. Gating the timeline behind the survey gives the discovery system a
    real payload and makes the first impression a *sequence* — but the homeworld must show its full
@@ -872,11 +902,13 @@ Recorded so nobody later mistakes design choices for derived physics.
   sampled. For a seeded generator, that measurement *is* part of the deliverable.
 - **The depletion inversion is a design assertion dressed as a finding.** Historically suggestive, but
   the constants are free parameters chosen for tension.
-- **The pass hands nothing to nation or corporation generation.** Generation runs planetology → tiles
-  → nations → corporations, and arable share, river connectivity, fossil geography and ore provinces
-  are exactly what should seed Voronoi nation placement and corporate industrial focus. As designed,
-  nation generation keeps deriving its resource profile by summing tile deposits, unaware the world
-  has a biography. **This is the largest missing connection and it is not a small follow-on.**
+- **The pass hands nothing to nation or corporation generation — now half-closed (2026-07-30,
+  BL-221 pre-national ladder).** The nation half is closed: `run_history_ladder` consumes the
+  planetology state (`life_stage` peak, `arable_share`, `endemics`) and
+  `nation_params_from_ladder` drives the seed budget from it, so the political map now knows the
+  world has a biography (`NATION_GENERATION.md` § Pass 0). The **corporation half stays open**:
+  corporate focus and asset mix still read nothing from the chain — that connection belongs to
+  BL-210 (oral-history pivot, design-owed).
 - **Shadow Empire's own cautionary bug is only half-fixed.** Its life→oil rule with no life→ore
   counterweight produces a documented, still-current imbalance ("oil is always abundant to an extreme,
   metal is always extremely rare"). BIF supplies the counterweight — but the BIF window *closes* on
@@ -887,8 +919,11 @@ Recorded so nobody later mistakes design choices for derived physics.
 
 ## Relationship to other docs
 
-- **`TILE_GENERATION.md`** — Planetology's output replaces the currently-authored `atmosphere_class`
-  input to the six-pass pipeline. It also **adds** a composition mask in Pass 4 and gates in Pass 6.
+- **`TILE_GENERATION.md`** — Planetology's output *is* the `body_profile` input to the six-pass
+  pipeline (derived, no longer authored). It also **adds** a composition mask in Pass 4 and the
+  endowment post-multiply in Pass 6.
+- **`CONTINENTS.md`** — the plate-drift sibling pass between S3 Engine and the tiles; consumes
+  `mobile_lid`/`theta`, appends `chain_stage::engine` biography lines (see § Implementation).
 - **`GENERATION_STRATEGY.md`** — records Planetology as the first stage in generation ordering and the
   sibling-pass architecture convention (BL-051).
 - **`RESOURCES.md` / `PRODUCTION.md`** — the endowment mapping above is the seam; § Open calls 3 is a

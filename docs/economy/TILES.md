@@ -17,13 +17,13 @@ Composition describes the material character of the tile — the geology, ecolog
 | Barren | Dry, dusty, minimal organic matter | Low | Iron ore, coal, petroleum, stone |
 | Rocky | Hard rock outcrops, fractured surface | Low | Iron ore, copper ore, rare earth ore, stone |
 | Volcanic | Geologically active, lava flows or recent ejecta | Very low | Rare earth ore, iron ore |
-| Icy | Ice-dominated surface; frozen subsurface | Low | Water ice, silica (trapped) |
+| Icy | Ice-dominated surface; frozen subsurface | Low | Water ice (only — see deposit tables) |
 | Tundra | Cold but not ice-covered; sparse vegetation | Low–medium | Iron ore (surface), peat, stone |
 | Grassland | Open fertile land; moderate climate | High | Agricultural produce, stone, sand |
 | Forest | Dense tree cover | High | Timber, agricultural produce (clearing) |
 | Wetland | Marsh, bog, floodplain | Medium–high | Agricultural produce, timber, clay |
 | Ocean | Open deep water | — (no buildings) | Marine goods (deferred) |
-| Regolith | Loose surface material on airless bodies | Very low | Regolith, water ice (polar) |
+| Regolith | Loose surface material on airless bodies | Very low | Regolith, stone (polar ice sits on icy tiles) |
 | Metallic | High metal content; asteroid or ancient impact surface | Very low | Iron-nickel ore, platinum group metals, regolith |
 
 **Habitable compositions** — grassland, forest, wetland — support population centres and amenity production. The others are primarily extraction or infrastructure terrain.
@@ -52,77 +52,109 @@ The deposits that can appear on a tile are determined primarily by composition, 
 
 ### Composition deposit tables
 
+Regenerated 2026-07-31 from `generate_deposits` (`src/world/tile_generation.cpp`) — the earlier
+tables carried ~10 row-level drifts against the code (petroleum landform rule, phantom icy
+silica and regolith water, missing volcanic copper, invented rarity-row modifiers, and others).
+Reading the tables:
+
+- Ranges are the richness roll `[lo, hi]`; a landform modifier multiplies the **upper bound
+  only** (`roll_mod`), leaving the floor fixed.
+- **Rarity-gated** rows (BL-040, full-set deposit authoring) appear with probability equal to
+  the resource's seeded rarity scalar and are magnitude-scaled by it — they carry **no landform
+  modifiers**. Base rarities: silica 0.65, coal 0.60, iron-nickel 0.55, copper 0.50, rare
+  earth 0.30, PGM 0.15 (± a small seeded jitter).
+- **Clay** is cross-cutting: any composition's **valley** landform rolls clay 8–20, not just
+  wetland. It is listed only in the wetland table below.
+- **Ocean** tiles carry nothing.
+
 **Barren:**
 | Deposit | Relative weight | Landform modifier |
 |---------|---------------|-------------------|
-| Iron ore | High | Mountain, rift: higher |
-| Coal | Moderate | Plains, highland: higher |
-| Petroleum | Moderate | Plains only |
-| Silica | Low | Canyon: higher |
-| Stone (ambient) | Always present | — |
-| Sand (ambient) | Plains and canyon | — |
+| Iron ore | 0–150 | Mountain ×1.4, rift ×1.2 |
+| Petroleum | 0–120 (all landforms) | Valley ×1.2 |
+| Coal | 30–140, rarity-gated | — |
+| Silica | 20–90, rarity-gated | — |
+| Stone (ambient) | 10–30, always present | — |
+| Sand (ambient) | 10–25, plains and canyon | — |
 
 **Rocky:**
 | Deposit | Relative weight | Landform modifier |
 |---------|---------------|-------------------|
-| Iron ore | High | Mountain: higher |
-| Copper ore | Moderate | Mountain, canyon: higher |
-| Silica | Moderate | — |
-| Rare earth ore | Low | Mountain, rift: higher |
-| Stone (ambient) | Always present | — |
+| Iron ore | 0–200 | Mountain ×1.5 |
+| Silica | 20–100, rarity-gated | — |
+| Copper ore | 30–160, rarity-gated | — |
+| Rare earth ore | 10–70, rarity-gated | — |
+| Stone (ambient) | 10–30, always present | — |
 
 **Volcanic:**
 | Deposit | Relative weight | Landform modifier |
 |---------|---------------|-------------------|
-| Rare earth ore | High | Rift: higher |
-| Iron ore | Moderate | — |
-| Stone (ambient) | Always present | — |
+| Iron ore | 0–150 | Rift ×1.3 |
+| Copper ore | 30–180, rarity-gated | — |
+| Rare earth ore | 20–100, rarity-gated | — |
+| Stone (ambient) | 10–30, always present | — |
+
+Note the inversion from the old table: **iron ore is the volcanic primary** (guaranteed roll);
+rare earth is rarity-gated at 0.30, so it is both sparser and smaller than iron here.
 
 **Icy:**
 | Deposit | Relative weight | Landform modifier |
 |---------|---------------|-------------------|
-| Water | High | — |
-| Silica | Low | Mountain: higher |
+| Water | 0–400 | — |
+
+Icy is **water-only** — no silica, and no stone ambient (the stone rule excludes icy alongside
+ocean).
 
 **Tundra:**
 | Deposit | Relative weight | Landform modifier |
 |---------|---------------|-------------------|
-| Iron ore | Low | Mountain: higher |
-| Peat (ambient) | Moderate | Plains, valley |
-| Stone (ambient) | Always present | — |
+| Iron ore | 0–60 | Mountain ×1.3 |
+| Peat (ambient) | 5–15, plains and valley | — |
+| Stone (ambient) | 10–30, always present | — |
 
 **Grassland:**
 | Deposit | Relative weight | Landform modifier |
 |---------|---------------|-------------------|
-| Agricultural produce | High | Valley: higher |
-| Stone (ambient) | Always present | — |
-| Sand (ambient) | Plains: moderate | — |
+| Agricultural produce | 40–180 | Valley ×1.3 |
+| Stone (ambient) | 10–30, always present | — |
+
+Grassland has **no sand and no timber** ambient — sand is barren-only, timber forest/wetland-only.
 
 **Forest:**
 | Deposit | Relative weight | Landform modifier |
 |---------|---------------|-------------------|
-| Timber | High | — |
-| Agricultural produce | Low | Valley: moderate |
+| Agricultural produce | 10–80 | Valley ×1.15 |
+| Timber (ambient) | 15–40 | — |
+| Stone (ambient) | 10–30, always present | — |
 
 **Wetland:**
 | Deposit | Relative weight | Landform modifier |
 |---------|---------------|-------------------|
-| Agricultural produce | High | — |
-| Timber | Moderate | — |
-| Clay (ambient) | Moderate | — |
+| Agricultural produce | 40–200 | — |
+| Timber (ambient) | 15–40 | — |
+| Clay (ambient) | 8–20 (also on any valley landform) | — |
+| Stone (ambient) | 10–30, always present | — |
 
 **Regolith:**
 | Deposit | Relative weight | Landform modifier |
 |---------|---------------|-------------------|
-| Regolith | Always present | — |
-| Water (from icy pole) | Low | Crater: higher |
+| Regolith | 20–50, always present | — |
+| Stone (ambient) | 10–30, always present | — |
+
+Regolith composition carries **no water** — polar ice on airless bodies is icy-composition
+tiles, which carry the water.
 
 **Metallic:**
 | Deposit | Relative weight | Landform modifier |
 |---------|---------------|-------------------|
-| Iron-nickel ore | High | — |
-| Platinum group metals | Low | Rift: higher |
-| Regolith | Always present | — |
+| Iron ore | 50–250 (prototype primary) | — |
+| Iron-nickel ore | 60–260, rarity-gated | — |
+| Platinum group metals | 20–120, rarity-gated | — |
+| Regolith | 20–50, always present | — |
+| Stone (ambient) | 10–30, always present | — |
+
+The metallic **primary maps to iron ore** in the prototype (the seven-resource subset);
+iron-nickel ore and PGM ride the rarity-gated full-set pass on top.
 
 ---
 
@@ -136,10 +168,10 @@ Certain deposits are present on virtually every tile and require no special geol
 
 | Ambient resource | Found on | Building to extract |
 |-----------------|----------|---------------------|
-| Stone | All non-water compositions | Quarry |
-| Timber | Forest, wetland (also very sparse on grassland) | Lumber Camp |
+| Stone | All compositions except ocean **and icy** | Quarry |
+| Timber | Forest, wetland only | Lumber Camp |
 | Sand | Barren plains, barren canyon | Quarry (sand variant, or same building) |
-| Clay | Wetland, valley | Quarry (clay variant) |
+| Clay | Wetland (any landform), or valley landform on any composition | Quarry (clay variant) |
 | Peat | Tundra plains and valley | Mine (surface) |
 
 Ambient resources are always generated at a low baseline deposit value on eligible tiles, so every tile has at least one extractable resource.

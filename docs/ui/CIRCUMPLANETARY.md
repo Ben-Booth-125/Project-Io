@@ -64,12 +64,14 @@ Moon orbital radii are **not** true scale — real moon distances would render o
 top of the planet — they use a visible offset, consistent with how moons are
 drawn on the Solar screen.
 
-**Reference distance is rung-relative.** On the Circumplanetary rung the distance reference is
-the **parent body — 0 AU at the parent** — so a moon's surfaced distance is its distance *from
-its parent*, the meaningful figure when the view is framed on the parent. This already holds for
-the hover tooltip; it must also apply to the **body stat block** (`draw_body_summary` in
-`entity_summary.cpp`), which today always measures from the star. The reference is chosen by the
-current rung, not hard-coded to the star (see SOLAR.md for the Solar-rung reference).
+**Reference distance is rung-relative (landed).** On the Circumplanetary rung the distance
+reference is the **parent body — 0 AU at the parent** — so a moon's surfaced distance is its
+distance *from its parent*, the meaningful figure when the view is framed on the parent. This
+holds for the hover tooltip, and — landed since this note was first written — for the **body stat
+block** too: the canvas-aware `draw_body_summary(const world&, const ui_state&, entity_id)`
+overload in `entity_summary.cpp` switches on `ui_state::primary_level` and prints
+`Dist from <parent>` on this rung (re-targeted 2026-07-31; the legacy single-argument overload
+keeps the star-referenced line). See SOLAR.md for the Solar-rung reference.
 
 ---
 
@@ -106,6 +108,6 @@ framing.
 | Item | Deferred to |
 |---|---|
 | Stations and orbital infrastructure | Later layers |
-| Local traffic / convoys in transit | Layer 5 (supply routing) |
+| Local traffic / convoys in transit | Partly landed — the Supply lens draws a per-body **convoy-count badge** on this rung (LENSES.md § Supply); moving convoy entities still undrawn here |
 | True-scale or selectable orbit framing | Post-prototype |
-| Market / faction overlays | Layer 4+ |
+| Faction overlays | Post-prototype — the **Market lens's per-body price strip** is already built on this rung (LENSES.md § Market; row corrected 2026-07-31) |

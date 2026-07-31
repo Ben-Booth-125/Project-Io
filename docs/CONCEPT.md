@@ -2,7 +2,7 @@
 
 ## Player — identity
 ### Faction leader
-The player controls a corporate or nation-state entity. The exact form is undecided but will be a single, committed choice once tradeoffs are weighed.
+The player controls a **corporation** — decided; the prototype is built on it. An open item, BL-094 (player-nation pivot, designed 2026-07-04), moves the player to the nation seat around the v0.2.0 era, with the corp staying the economic actor underneath; its design stays in the backlog until it lands.
 ### Asset-based existence
 The faction persists as long as it holds any asset. Owning a single building keeps the corporation alive; the parent nation must also be destroyed for total elimination.
 ### Development through ages
@@ -20,7 +20,7 @@ Supply/demand calculations resolve per Tick, keeping simulation cost bounded whi
 ### Symmetrical rules
 All non-player factions operate under the same ruleset as the player, or a deliberate, defined subset. No hidden AI exceptions.
 ### Solar to galactic scope
-The map starts as a solar system but can expand to multiple-systems. Initial, procedural generation driven by player-set parameters which inform sequential rounds of generation.
+The map starts as a solar system but can expand to multiple-systems. The player-parameter generation is now concrete (BL-167, complete): the New World wizard walks player-set parameters through the staged Planetology chain, one decision per generation stage — see `docs/generation/PLANETOLOGY.md`.
 ### Modular tech trees
 Technology is organised into discrete trees, each unlocked by meeting a known precondition. This keeps progression legible and goal-oriented without requiring a single monolithic research path.
 ### Sentiment-based diplomacy
@@ -65,4 +65,6 @@ There is no end-game screen. You don't "lose" an Era; you enter the next one und
 Progression is the actionable spine of the Era system, and it has to stay actionable. It is a **quest-based, disjoint tree** rather than a single research path: the fiction supplies the theory (drawn from real sci-fi tech), the player has to actually *build* it, and building enough reaches the **tech goal** that gates the next Era. Each fictional advancement traces to specific techs and structures — that is the test of whether an Era is real or just flavour — and the whole thing runs through the same intuitive, already-tested UI the rest of the game uses. This makes "Modular tech trees" above concrete: discrete, precondition-gated trees whose payoff is the next Era.
 
 ### Opponents — the open problem
-The hardest unsolved design question is *interesting opponents*. A ~100-hour grand campaign does not support multiplayer well, so the AI carries the competition, and getting it right matters more than any single mechanic. The current direction is small, lightweight neural networks; the unsolved part is difficulty — keeping them off both extremes of unbeatable and trivially beaten. Developer working notes on this thread live in `CONCEPT_TO_READ`.
+The hardest unsolved design question is *interesting opponents*. A ~100-hour grand campaign does not support multiplayer well, so the AI carries the competition, and getting it right matters more than any single mechanic. The unsolved part is difficulty — keeping them off both extremes of unbeatable and trivially beaten.
+
+*(Superseded 2026-07-31.)* The earlier direction here — small, lightweight neural networks — is rejected: NNs sit badly with the determinism rule, and the shipped direction is a **deterministic scored-utility layer** over the corp-command seam (BL-202, landed; see the `src/world/corp_ai.hpp` header). Stage B — BL-203 (predictive spending) — is queued for v0.2.0. Design authority and working notes live in `docs/ai/AI_OPPONENT.md`.

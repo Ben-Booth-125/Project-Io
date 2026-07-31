@@ -38,13 +38,32 @@ compositions and applies the same logic regardless of which body it operates on.
 
 ## Generation pipeline
 
+### Pass 0 — The history ladder (landed 2026-07-30, BL-221 pre-national ladder)
+
+Before any seed is placed, `run_history_ladder` (`src/world/history_ladder.cpp`) runs over the
+finished tile map and the body's planetology state. It scores every tile for agrarian value
+(`agrarian_score` — composition, landform, habitability), picks the independent **cradles** by
+greedy argmax with a separation floor, and measures the **barrier field** (ocean, mountain,
+canyon, dead ground). From those it computes `fragmentation_q`, `conquest_cost_q` and
+`exit_cost_q` (integer, 0–1000 — gate-path arithmetic stays integer per `PLANETOLOGY.md`
+§ Determinism).
+
+`nation_params_from_ladder` then **modulates the nation parameters** from those scalars: a
+fragmented world lowers `land_tiles_per_seed` and `min_nation_tiles` (denser seeds, smaller
+viable survivors — both clamped to [½, 1½] of the base so a tuning mistake cannot produce a
+one-nation or thousand-nation world), and a high conquest cost raises `min_seed_separation`.
+The ladder **drives** the political map rather than narrating one it was handed (Ben,
+2026-07-30). A world with no cradles (below a land biosphere) leaves the caller's defaults
+untouched. Full stage design: `../lore/HISTORY.md`.
+
 ### Pass 1 — Seed placement
 
 A set of nation seeds are placed across the body's landmass tiles. The seed count is **derived
-from the habitable landmass**: one seed per `land_tiles_per_seed` non-ocean tiles (80 by default,
-so Kepler's ~6,000 habitable tiles budget ~75 seeds). Placement avoids stacking seeds in small
-geographic areas: a minimum separation distance (in tiles) is enforced between seeds, which also
-caps how many seeds physically fit whatever the density asks for.
+from the habitable landmass, as modulated by the ladder** (Pass 0): one seed per
+`land_tiles_per_seed` non-ocean tiles (base 80, scaled down on a fragmented world). Placement
+avoids stacking seeds in small geographic areas: a minimum separation distance (in tiles) is
+enforced between seeds, which also caps how many seeds physically fit whatever the density asks
+for.
 
 A seed is only a **candidate core**, not a nation — the density is deliberately several times
 denser than the surviving count, because Pass 2c absorbs most of them.
@@ -127,6 +146,47 @@ Each nation receives a generated name from a culture-flavoured template bank. Te
 seeded and combine a structural form (adjective + noun, compound noun, etc.) with a
 phoneme table. No human-authored list of specific names is required.
 
+### Pass 6 — Substrate density (BL-050 saturated substrate)
+
+The last pass in `generate_nations` seeds the background economy's geography. For every
+nation-owned tile it finds the nearest population centre on the same body (Chebyshev distance)
+and computes a **density ripple**: `max(0, 1 − dist/8) × centre.scale`, taking the strongest
+centre. That value is written to `tile_component.substrate_density`, and for every tile with
+density > 0 it accumulates into the per-(nation, body) `nation_substrate`:
+`population_weight += density` and `capacity[r] += density × tile.resource_deposit[r]`.
+
+Only **generation baselines** are stored here (BL-078): the economic scalars — capacity scale,
+demand basket, elasticity, clearing fraction — are applied at tick time by
+`inject_substrate_demand`, so the demand/supply model is retunable from `economy.lua` without
+regenerating the world. This is the surface any future substrate work reads. Requires
+population centres to already exist — which is why `generate_population_centres` runs before
+`generate_nations` in `hard_coded_world.cpp` (see § Settlement generation below).
+
+---
+
+## Settlement generation (companion pass)
+
+Not part of `generate_nations`, but sequenced around it and documented here because the nation
+passes read it.
+
+**Population centres** — `generate_population_centres` (`src/world/population_generation.cpp`)
+runs on Kepler *before* the ladder and the nation pass. It places 20–40 centres (grid tiles /
+1000, clamped) on valid tiles (`placement_rules::can_place_population_centre`), one at a time
+with a 3× weighting for tiles adjacent to an existing centre, so agglomeration is progressive.
+Each centre draws a **scale** 1–5 from a weighted distribution (40/30/20/8/2%) mapping to
+10k–5M population, and is named from an independent seeded stream (`generate_city_name`) so
+naming never perturbs placement.
+
+**Market carving** — after nations exist, `hard_coded_world.cpp` seeds Kepler's markets from
+the centres (the surface BL-036, seed market centres, shipped). Markets anchor to
+population-centre tiles but are **resource-carved** (BL-096): each nation's tradeable-raw
+concentration (mean deposit per owned tile, seeded jitter ×[0.85, 1.15]) is classified against
+the cross-nation mean into a population-scale gate — ≥1.30× mean → gate 2 (fracture: more of
+its centres get markets), <0.70× mean → gate 4 (fold: its small centres route to a
+neighbour's market via `market_for_tile`), otherwise gate 3. A centre seeds a market only if
+its scale clears its nation's gate; one unanchored fallback market is seeded if none qualifies.
+Endemic goods are then priced by distance from where they grow (BL-191).
+
 ---
 
 ## Prototype scope
@@ -134,12 +194,23 @@ phoneme table. No human-authored list of specific names is required.
 In the prototype, Kepler is the only body with nation generation. Selene, Cinder, and Pallas
 are unclaimed territory.
 
-Nation count for Kepler: **not authored**. Its ~6,000 habitable tiles budget ~75 candidate seeds
-(one per 80), and the size floor leaves **17–21 nations** across sampled campaign seeds (21 on the
-default seed 0), with strongly varied sizes — the largest holds ~850 tiles against a floor of 80.
-Halving Kepler's habitable area roughly halves the count. The knobs are `land_tiles_per_seed`,
-`min_seed_separation`, and `min_nation_tiles`; the New World setup screen has **no nations
-slider** — the count is not the player's to set.
+Nation count for Kepler: **not authored**. Since the ladder landed (BL-221, 2026-07-30) the
+size floor and seed density are fragmentation-modulated, and the default seed settles at
+**43 nations** — up from the pre-ladder 17–21 (21 on seed 0). The jump is the ladder doing its
+job, and it was settled deliberately (Ben, 2026-07-30 — recorded in `../lore/HISTORY.md`
+§ Implementation): let naturally different cultures emerge; a future war/conflict stage narrows
+the count if needed, rather than tuning the generator to a target. Sizes stay strongly varied.
+The base knobs are `land_tiles_per_seed`, `min_seed_separation`, and `min_nation_tiles`
+(`nation_params`), now modulated by `nation_params_from_ladder`; the New World setup screen has
+**no nations slider** — the count is not the player's to set. (Note: the `min_nation_tiles`
+doc-comment in `nation_generation.hpp` still quotes the pre-ladder 17–21 — stale.)
+
+**What planetology data nation placement does and does not consume.** The ladder consumes the
+planetology state directly (`life_stage` peak, `arable_share`, `endemics` — BL-221 closed that
+half of `PLANETOLOGY.md`'s "hands nothing downstream" weakness). `generate_nations` itself
+still reads only tiles: seed preference over habitable compositions and Pass 3's
+deposit-summed resource profile are *indirectly* downstream of the biosphere, but no endowment,
+province, or biography data is read at placement time.
 
 Nation system behaviour — taxes, laws, diplomatic actions, military response, territorial
 ambition — is **not implemented in the prototype**. Nations are generated and exist as data

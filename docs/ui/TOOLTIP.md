@@ -1,264 +1,188 @@
 # Project Io — Hover Card
 
-Authoritative spec for the **shared hover-card primitive** — the transient,
-pointer-following popup that shows a compact readout of whatever the player is
-hovering, on any canvas or in any ledger. It is the **Focus**-state surface in
-the three-state pointer model (see [SELECTION.md](SELECTION.md)): where the
-Selection info element answers "what is this thing I clicked?", the hover card
-answers "what is this thing under my cursor right now?", and dismisses the
-instant the pointer leaves.
+Authoritative spec for the **shared hover-card primitive** — the transient popup
+that shows a compact readout of whatever the player is hovering. It is the
+**Focus**-state surface in the three-state pointer model (see
+[SELECTION.md](SELECTION.md)): where the Selection info element answers "what is
+this thing I clicked?", the hover card answers "what is this thing under my
+cursor right now?".
 
-It is one primitive serving every hoverable entity, built on the same
-per-entity content builders the Selection info element and the ledgers use. This
-document settles its structure, what it serves, and the design decisions the
-[B4] Brief raised. It is **design only** — nothing here is implemented yet; the
-ad-hoc canvas tooltips described under *Current state* are what exists today.
+The card is **built** (landed 2026-07-30, BL-228/BL-230): the frame is
+`src/ui/hover_card.{hpp,cpp}`, the content dispatch is
+`src/ui/hover_content.cpp`, and the host is the Planetary surface
+(`body_surface_canvas.cpp`). The reveal model that shipped — **glance, then
+stick** — is documented below; the original reveal-timing design it replaced,
+and the retired dwell-to-open bar, are preserved under § Superseded.
 
-See also: [LAYOUT.md](LAYOUT.md) (§ UI popup elements — where the card sits in
-the shell), [SELECTION.md](SELECTION.md) (the three pointer states and the
-shared content builders), [CANVASES.md](CANVASES.md) (the canvases that host it),
-`src/ui/entity_summary.hpp` (the shared builders), `src/ui/presentation.hpp`,
+See also: [LAYOUT.md](LAYOUT.md) (where the card sits in the shell),
+[SELECTION.md](SELECTION.md) (the three pointer states and the click model),
+[CANVASES.md](CANVASES.md) (the canvases), `src/ui/presentation.hpp`,
 `src/ui/format.hpp`, `src/ui/icons.hpp` (the metadata/formatter/glyph helpers).
 
 ---
 
 ## Current state (what exists)
 
-The prototype already has **ad-hoc, per-call-site tooltips**, each open-coding
-its own content:
-
-- **Planetary** (`body_surface_canvas.cpp`) — an `ImGui::BeginTooltip` block on
-  the hovered tile: grid coordinates, composition · landform, hazard.
+- **Planetary surface** — the shared hover card, glance-then-stick, serving
+  tiles, buildings, and market centres through the lens-keyed
+  `draw_hover_content` dispatch (below). This replaced the old open-coded
+  `BeginTooltip` block on the hovered tile.
 - **Solar / Circumplanetary** (`solar_system_canvas.cpp`,
-  `circumplanetary_canvas.cpp`) — an `ImGui::SetTooltip` on the hovered body:
-  name, type, orbital radius.
-- **Overlay strip** (`overlay.cpp`) — a one-line `SetTooltip` naming the lens.
-
-These are lightweight, instant, and inconsistent: each duplicates formatting the
-[SELECTION.md](SELECTION.md) builders already centralise. The hover card unifies
-them onto one primitive and one content source, exactly as the Selection element
-unified the per-entity stat blocks.
+  `circumplanetary_canvas.cpp`) — still the lightweight ad-hoc `SetTooltip` on
+  the hovered body: name, type, orbital radius. Migrating them onto the card is
+  owed, not landed.
+- **Overlay strip** (`overlay.cpp`) — a one-line `SetTooltip` naming the lens;
+  the nav rail's slot tooltips (`nav_pane.cpp`, BL-174) are the same class of
+  lightweight chrome tooltip. These are fine as they are — instant identity
+  labels on chrome, not entity readouts.
 
 ---
 
-## Card structure
+## The landed model — glance, then stick (BL-228/BL-230)
 
-A hover card is a stack of up to four bands, top to bottom. Only the title line
-is mandatory; the rest appear when the entity and the caller's context warrant
-them.
+Hovering **never opens the Selection band** — opening is the click's job alone,
+one gesture, one meaning. This retires BL-200's dwell-to-open and its progress
+bar (see § Superseded). What hover does instead has **two phases**, driven by
+three constants in `hover_card.hpp` and the hover state in `ui_state.hpp`
+(`hover_card_entity` / `hover_card_stuck` / `hover_card_anchor` /
+`hover_card_min` / `hover_card_max`, fed by `hovered_entity` + `hover_ticks`):
 
-1. **Title line** — `icon name · type`. The identity glyph from
-   `ui::icons` (building marker, resource pip, unit chevron, ledger glyph,
-   body dot), the entity's display name, and a dimmed type label
-   (`selection_kind_name`, or the more specific `body_type_name` /
-   `building_type_name`). This is the same title shape the Selection panel header
-   draws (`selection_title` + dimmed `selection_kind_name`).
+- **Glance** — after `kHoverAppearDelay` (30 frames ≈ 0.5 s at 60 Hz) of stable
+  hover, the card appears and **tracks the live cursor** like an ordinary
+  tooltip. Leaving the entity dismisses it.
+- **Stick** — after `kHoverStickDelay` (150 frames ≈ 2.5 s total, i.e. 2 s
+  after appearing), the card **freezes** at its current position and stops
+  following the pointer. It is dismissed only once the cursor leaves the card's
+  reported rect inflated by `kHoverCardExitPadPx` (26 px — spans the gap
+  between the anchor and the card drawn above it), so a long line can be read
+  to its end without the card sliding away.
 
-2. **Stat block** — a short, fixed set of the entity's defining figures: a tile's
-   composition × landform + hazard; a building's recipe + throughput; a market's
-   headline price and balance; a body's orbit + surface summary. This is
-   **identical content** to the Selection element's stat block — it *is* the
-   shared builder (see *Sharing the content builders*).
+**Z-order is constant across both phases.** The window carries
+`ImGuiWindowFlags_NoInputs` plus the `Tooltip` flag: it draws above every other
+window but never captures the pointer, so canvas hover/click always resolves to
+the tile or marker beneath it. A new card is never summoned while one is up, or
+while construction placement mode is active (the ghost owns that moment).
 
-3. **Sectioned detail (optional)** — when an entity has more than the headline
-   stats, a thin separator then a second labelled section (e.g. a building's
-   per-input draw, a market's per-good rows). Kept short; the hover card is a
-   glance, not a ledger. The full breakdown stays in the relevant ledger.
+---
 
-4. **"Why" annotations (optional)** — a dimmed trailing line explaining how a
-   derived figure was produced: how a market **price** was set, how a building's
-   **yield** was scaled (workforce scalar, deposit richness, terrain affinity).
-   This is the hover card's distinctive value over the click-to-inspect path —
-   it surfaces *derivation at the point of curiosity* without making the player
-   open a ledger and reason backward. The annotation reads from the same
-   intermediate figures the economy/generation records already expose (cf. the
-   Generation Ledger's per-pass breadcrumb in
-   `docs/generation/GENERATION_LEDGER.md`); where a figure has no recorded
-   derivation, the band is simply omitted.
+## The frame — `draw_hover_card`
 
-The card has **no chrome** — no title bar, no close button, no 'go to'. It is
-transient and self-dismissing; any action belongs to the click that follows, not
-the hover.
+`draw_hover_card(ImVec2 anchor, content, ImVec2* out_min, ImVec2* out_max)`
+(`hover_card.hpp`) is an **anchor + content frame, nothing more**: a
+semi-opaque, chrome-free ImGui window (no title bar, 4 px rounding, max width
+200 px) drawn just above `anchor`, invoking the caller-supplied `content`
+closure for its body and reporting the rect it occupied so the caller can
+hit-test dismissal next frame. The caller passes the live cursor as `anchor`
+while glancing and the frozen position once stuck.
+
+The card has **no chrome** — no title bar, no close button, no 'go to'. Any
+action belongs to the click that follows, not the hover.
+
+## The content — `draw_hover_content` (lens-keyed)
+
+Dispatch lives in `src/ui/hover_content.cpp`, not in the frame. It resolves the
+hovered entity by probing the world maps (tile / building / market) and then
+keys the **variant on the active lens**, so the card answers the question the
+lens is asking:
+
+| Entity | Lens | Content |
+|---|---|---|
+| **Tile** | Resource | composition · landform header, the selected resource's deposit richness, a richness-band why-line |
+| **Tile** | Population | header, habitability, workforce cap, the 0.6-cliff why-line (BL-069) |
+| **Tile** | *(default)* | header, habitability, and the landform's movement-cost multiplier (`landform_logistics_cost`) when not plains (BL-232) |
+| **Building** (player) | any | type, target/recipe line, workforce, an operational why-line (idle / understaffed / active) |
+| **Building** (rival) | any | type + owner emblem only — production/stockpile stay private (BL-068) |
+| **Market centre** | Market | headline price vs base, supply/demand, a price-signal why-line |
+| **Market centre** | *(default)* | market identity + "Switch to Market lens for prices" |
+
+Every tile variant shares the **terrain header** — `composition · landform`,
+with plains left unnamed as the baseline — so the on-canvas landform glyph
+vocabulary is learnable at the point of looking (BL-231/BL-232, CANVASES.md
+§ Terrain channels).
+
+The shipped bands match the designed shape: a title line, one or two stat
+lines, then a dimmed **"why" annotation** interpreting the figure — the card's
+distinctive value over the click-to-inspect path. The fourth designed band
+(sectioned detail) has not been needed by any variant yet.
+
+---
+
+## The Selection band (the click surface)
+
+The click-opened counterpart landed as the **Selection band** (BL-195/BL-213):
+`ui::draw_selection_band` (`src/ui/selection_card.{hpp,cpp}`) frames a **fixed
+bottom rect** and calls `draw_selection_content` (`selection_panel.cpp`) — the
+full per-kind Selection layout, **not** the hover content. The interim
+BL-194 form (a click-anchored card at the ledger spawn anchor, showing
+`draw_hover_content` as placeholder) is fully superseded; SELECTION.md
+§ Layout & chrome is the authority for the band.
+
+Same content family, opposite lifetimes: the band **persists** and carries
+actions ('go to', close, drill-down); the hover card is **transient** and
+carries none.
+
+---
+
+## Owner's calls — settled in play
+
+The § Superseded design flagged three owner's calls; the landed model settles
+them. **Reveal delay:** 0.5 s to appear, 2.5 s to stick (the constants above).
+**Rich-by-default:** resolved by the lens-keyed dispatch — depth follows the
+active lens, not the entity kind. **"Why" verbosity:** one dimmed line per
+variant.
+
+---
+
+## Superseded
+
+### Dwell-to-open bar (BL-200 — RETIRED 2026-07-30 by BL-228/BL-230)
+
+> **Retired, not just superseded.** BL-200's dwell-to-open — holding the
+> pointer still filled a thin progress bar at the card's foot, then opened the
+> Selection surface on the hovered entity — is removed (commits b04ecfc,
+> aea9ab4). Hovering never opens the Selection band; clicking is the only
+> opener. The original design, for the record:
 
 **Dwell-to-open bar (BL-200).** The one exception to "no action here" is a thin
 progress bar at the foot of the card that fills while the pointer holds **still**,
 then opens the sticky detail card on the hovered entity (SELECTION.md § Click
 model). It is a *pre-open indicator*, deliberately hosted by this transient
 tooltip rather than the opened card's header (Ben, 2026-07-23), and shows only
-mid-dwell (strictly between empty and full). See `hover_card.{hpp,cpp}`.
+mid-dwell (strictly between empty and full).
+
+### Reveal-timing design (superseded by glance→stick, 2026-07-30)
+
+> The pre-implementation design proposed **instant reveal for lightweight
+> cards, a ~450 ms delay for rich cards**, with depth (lightweight vs rich) a
+> per-kind hint on one primitive. What shipped instead is the two-phase
+> glance→stick model above: one delay to appear, a second to stick, and depth
+> keyed on the **lens** rather than a caller hint. The instant-vs-delayed
+> split survives only as chrome tooltips (instant) vs the entity card
+> (delayed).
+
+### `selection_kind` dispatch through the shared builders (superseded)
+
+> The design called for `draw_hover_card(const world&, entity_id hovered)` to
+> classify by `selection_kind_of` and dispatch to the `entity_summary.hpp`
+> builders (`draw_body_summary`, `draw_tile_summary`, …) — the same content
+> source as the then-stat-block Selection element, serving a seven-kind table
+> (body, tile, building, market, resource pip, unit/convoy, route/lane) across
+> every canvas and ledger. Two things moved under it: the Selection element
+> **stopped being a stat block** (BL-093 — SELECTION.md § Removed), and the
+> card that shipped keys content on the **lens**, which the builders do not
+> see. The landed dispatch is `draw_hover_content` (above); the
+> `entity_summary` builders remain the Tile Ledger's content, and an uncalled
+> tooltip wrapper of the same name survives in `entity_summary.{hpp,cpp}`.
+> Body hover (Solar/Circumplanetary) and the later unit/route kinds remain the
+> designed-for extension when those canvases migrate onto the card.
 
 ---
-
-## What it serves
-
-One primitive, dispatched by `selection_kind` (`src/ui/selection.hpp`), serving
-every hoverable entity across every surface:
-
-| Entity | Hovered on | Headline stats | "Why" annotation |
-|---|---|---|---|
-| **Body** | Solar, Circumplanetary, minimap | Type, orbit, parent, surface summary | — |
-| **Tile** | Planetary surface | Composition × landform, hazard, habitability, deposits | Deposit richness → terrain affinity |
-| **Building** | Planetary surface, Tile Ledger rows | Type, recipe, throughput, host tile | Yield = base × workforce scalar × deposit |
-| **Market** | Tile Ledger / Market ledger rows | Body, headline price, balance | Price = supply/demand pressure |
-| **Resource pip** | Resource strips, deposit markers | Name, tier, stockpile | — |
-| **Unit / convoy** *(later)* | Canvas markers | Type, owner, location, status | — |
-| **Route / lane** *(later)* | Logistics overlay | Endpoints, cargo, throughput | — |
-
-The set is deliberately the **same polymorphic family** as the Selection element
-(SELECTION.md § Polymorphism) plus the lighter strip/pip entities. New kinds are
-added in one place — the builder dispatch — and inherit the card for free.
-
----
-
-## Design decisions
-
-### 1. One `draw_hover_card(...)` helper, not per-call-site tooltips
-
-**Recommendation: a single dispatcher, reusing the existing per-kind builders.**
-
-The Selection element already established the pattern: `selection_kind_of`
-classifies the entity, and a `switch` dispatches to the matching builder in
-`src/ui/entity_summary.hpp` (`draw_body_summary`, `draw_tile_summary`,
-`draw_building_summary`, `draw_market_summary`, …). The hover card is the *same
-dispatch wrapped in a tooltip frame*:
-
-```
-void draw_hover_card(const world& w, entity_id hovered);
-// internally: kind = selection_kind_of(w, hovered);
-//             ImGui::BeginTooltip(); draw title; draw_summary(w, kind, hovered); EndTooltip();
-```
-
-Each canvas/ledger computes its `hovered` entity (it already does, as a
-per-frame local — SELECTION.md calls this the **Focus** state) and calls the one
-helper. This replaces the three open-coded tooltip blocks with one call site
-each. Per-entity *builders* exist; per-call-site *tooltips* should not.
-
-This keeps the abstraction seam exactly where SELECTION.md put it: the **builder**
-is shared content; the **frame** (pinned panel vs. ledger row vs. tooltip)
-differs per caller. The hover card is just the third frame.
-
-### 2. Instant reveal for lightweight cards, short delay for rich cards
-
-**Recommendation: instant for the title-only / single-stat case; a short
-(~400–500 ms) hover delay before a rich, multi-band card.**
-
-The existing canvas tooltips are instant and should stay so — an instant
-identity readout while sweeping the pointer over bodies/tiles is good. But a
-*rich* card with derivation annotations is visually heavy; showing it the instant
-the pointer grazes an entity makes a busy canvas flicker. So: the **lightweight**
-card (title + one stat line) appears immediately; the **rich** card's extra bands
-(sectioned detail + "why") fade in only after the pointer **dwells**. ImGui
-exposes the dwell timer (`IsItemHovered(ImGuiHoveredFlags_DelayNormal)` /
-`HoveredFlags_ForTooltip`), so this is a flag on the same call, not a second code
-path. The delay constant is a single tunable; **flag for the owner** whether
-~450 ms feels right in play (see *Owner's call*).
-
-### 3. Rich card vs. lightweight canvas tooltip — same primitive, two depths
-
-**Recommendation: not two primitives — one card with a depth that scales to the
-context.** LAYOUT.md § UI popup elements already distinguishes "a richer hover
-card than the canvas tooltip"; this spec resolves that as **depth, not type**:
-
-- **Lightweight** (today's canvas tooltips) = bands 1–2 only (title + stat
-  block), instant.
-- **Rich** = bands 1–4 (adds sectioned detail + "why"), delayed.
-
-The same `draw_hover_card` produces both; the caller passes a depth hint (or the
-card derives it from the entity kind — a market/building warrants the rich form,
-a passing body does not). Keeping it one primitive means the title/stat content
-never diverges between the two, which was the duplication the builders exist to
-prevent.
-
----
-
-## Overlap with the Selection info element
-
-The hover card and the Selection element (SELECTION.md) present the **same
-per-entity detail** in different frames. They must **share, not duplicate**:
-
-- **One content source.** Both call the `src/ui/entity_summary.hpp` builders.
-  The Selection panel calls `draw_summary` inside its pinned frame; the hover
-  card calls the same `draw_summary` inside `BeginTooltip`/`EndTooltip`. A change
-  to a tile's stat block changes both surfaces at once. This is the seam
-  SELECTION.md § Shared content builders already names the hover card as a
-  consumer of — this doc just makes the card the concrete third caller.
-- **Three pointer states, three surfaces.** SELECTION.md's table maps cleanly:
-  **Active** drives which rung renders, **Selection** drives the pinned panel,
-  **Focus** (the per-frame `hovered_*` local) drives *this card*. The card is the
-  visible manifestation of the Focus state, which until now had no UI.
-- **Distinct lifetimes.** The Selection panel **persists** until you select
-  elsewhere and carries actions ('go to', close). The hover card is **transient**,
-  follows the pointer, and carries no actions. Same content, opposite
-  persistence — which is exactly why they are separate frames over one builder
-  rather than one widget.
-- **Builder signature.** The builders take `(const world&, entity_id)` and emit
-  ImGui content into the current window — frame-agnostic by construction, so they
-  already work unmodified inside a tooltip. No builder change is required to land
-  the card; only the new dispatcher and the call-site swaps.
-
----
-
-## Layer 4 support
-
-Layer 4 brings building and market detail to the fore (the Market / Balance /
-Construction ledger family, per ROADMAP / OPENS § Ledger). The hover card is the
-**low-friction inspection path** for that data:
-
-- **Building hover** surfaces recipe, throughput, and the **yield derivation**
-  ("why" band) — letting a player read a site's economics without opening the
-  Construction ledger. The builder is `draw_building_summary`; the card adds the
-  derivation annotation on top.
-- **Market hover** surfaces headline price and balance plus the **price
-  derivation** ("why" band: supply/demand pressure) — the single most-asked
-  economy question, answered at the point of pointing. The builder is
-  `draw_market_summary`.
-- Because the card reuses the ledger's own builders, **the Layer 4 ledgers and
-  the hover card stay in lockstep by construction** — a new market figure added
-  to the ledger row appears in the card without separate work.
-
-The "why" annotation band is the piece that earns its keep in Layer 4: it turns
-the card from a label into the game's primary *explainer* of derived economic
-figures, complementing the deeper, persistent ledgers.
-
----
-
-## Owner's call (flagged)
-
-- **Reveal delay.** ~450 ms for the rich card is a starting guess; the right
-  value is a feel decision made in play, not from first principles.
-- **Rich-by-default kinds.** Whether markets/buildings should jump straight to
-  the rich card on hover, or always start lightweight and deepen on dwell, is a
-  UX preference for the owner once the card is in hand.
-- **"Why" verbosity.** How much derivation to show (one summary line vs. a small
-  factor breakdown) trades clarity against clutter; settle against a real
-  populated economy in Layer 4.
-
----
-
-## The sticky detail card (BL-194, landed 2026-07-22)
-
-A second, larger surface beside the transient hover card above: a **click-opened**
-detail card, `ui::draw_selection_card` (`src/ui/selection_card.{hpp,cpp}`). Single-click
-already *selects* (SELECTION.md), so opening the card piggybacks on that state rather
-than adding a parallel one — it is open exactly when
-`ui.selected_entity != null_entity && ui.selected_entity != ui.selection_hidden_for`.
-Dismissing (the card's `x`, or Esc) sets `selection_hidden_for`, the same hide-not-destroy
-mechanism the fold-out Selection element already used.
-
-Binary open/closed only — no animation, no partial reveal (ImGui has no per-window
-transform, and scaled text is blurry). The mouse wheel stays canvas zoom, uninvolved.
-Positioned at the shared ledger-family spawn anchor (`ledger_window_spawn`, clear of the
-shell column and profile chrome), drawn after the other chrome so it z-orders on top.
-
-Content is currently the shared `draw_hover_content` dispatch — a placeholder until
-BL-195 relocates the full Selection element's content here (superseding the fold-out
-column's copy) and BL-196 makes that content recursively clickable into child cards.
 
 ## Prototype / deferred notes
 
-- Convoy/route hover entities are designed-for here but land with logistics
-  (Layer 5); their builders do not yet exist.
-- The card has no spec-level styling beyond reusing `palette` and `icons`; it
-  inherits the shell's ImGui theme.
-- Like all popup elements (LAYOUT.md), this is prototype ImGui; the production
-  shell's retained-mode equivalent is a later concern.
+- Solar / Circumplanetary body hover still uses ad-hoc `SetTooltip`; migrating
+  it onto the card (and the unit/convoy/route kinds, Layer 5) is owed.
+- The card has no spec-level styling beyond `palette` and the shell's ImGui
+  theme; the production shell's retained-mode equivalent is a later concern.
+- Text-wrap behaviour inside the 200 px card is within scope of the open
+  BL-215 (text-wrap render audit) — see LAYOUT.md § Container vocabulary.

@@ -9,33 +9,42 @@ The prototype UI is built with Dear ImGui (see TECH_FOUNDATIONS). Everything her
 ## Screen regions
 
 ```
-┌────────────────┬──────────────────────────────┬──────────────┐
-│ Profile        │            Header             │  Time panel  │
-│ (identity tile)│    (budget + resource strip)  │ (date + bar, │
-├──────────┬─────┤  — one top band, level tiles  │  speed ctl)  │
-│ Nav rail │     ├──────────────────────────────┼──────────────┤
-│ (icons)  │Fold-│                               │              │
-│ ▢        │out  │       Primary canvas          │  Comms log   │
-│ ▢        │col: │ (Solar / Circumplanetary /    │  (channel    │
-│ ▢  …     │ledger                    Surface)   │    chat)     │
-│ ▦ (9)    │     │  (shrinks vertically to clear ├──────────────┤
-│ ▢  …     │(runs│   the Selection band below)   │              │
-│ ▢        │full ├───────────────────────────────┤   Minimap    │
-│ ▢        │height├─ SELECTION BAND (fixed) ─────┤ [lens bar]   │
-│          │)    │  action/facts or tile layout  │  (runs full  │
-└──────────┴─────┴───────────────────────────────┴  height) ────┘
+┌──────────────────┬─────────────────────────────┬──────────────┐
+│ Profile          │           Header            │  Time panel  │
+│ (identity tile)  │   (budget + resource strip) │ (date + bar, │
+├─────┬────────────┤ — one top band, level tiles │  speed ctl)  │
+│ Nav │ Fold-out   ├─────────────────────────────┴──────────────┤
+│ rail│ column:    │                                            │
+│ ▢   │ ledger     │            Primary canvas                  │
+│ ▢   │            │   (Solar / Circumplanetary / Surface)      │
+│ ▢ … │ (stops at  │                                            │
+│ ▦   │ the comms  │                             ┌──────────────┤
+│ ▢ … │ dock's top │                             │   Minimap    │
+│ ▢   │ edge)      │                             │  [lens bar]  │
+│     ├────────────┴──────┬──────────────────────┤              │
+│     │ COMMS DOCK        │ SELECTION BAND (fixed│              │
+│     │ (channel chat)    │ action/facts or tile)│              │
+└─────┴───────────────────┴──────────────────────┴──────────────┘
 ```
 
-The nav rail, fold-out column, and the right chrome column (comms + minimap) all run the
-**full screen height**; the Selection band (BL-213) is sandwiched between them at the
-bottom, in its own fixed rect — see *Selection band* below.
+The nav rail runs the **full screen height**. The screen's **bottom strip** (BL-213/
+BL-227) is one solid band, all three tiles sharing a top edge that lands exactly on
+the minimap's: the **comms dock** bottom-left (`comms_dock_rect`, three quarters of
+the fold-out column's width), the **Selection band** from the dock's right edge to
+the right chrome column, and the **minimap** in the corner. The fold-out column
+stops at the dock's top edge, so every ledger is permanently shorter by the strip's
+height — see *Selection band* and *Comms dock* below.
 
 Two layers compose the screen:
 
 - **Background** — the canvases, drawn edge-to-edge via the ImGui background draw list.
 - **Foreground** — the ImGui panels below (profile, header, nav pane, comms log, time column, minimap, ledger windows), drawn on top of the canvases.
 
-The comms log (BL-205, 2026-07-26) occupies the band the Explorer placeholder reserved. Layer 2 ships the nav pane, canvases, time column, minimap, and the Tile Ledger window; the header (Layer 3 finalisation) and profile (`src/ui/profile_panel.cpp`) have since landed.
+The comms log (BL-205, 2026-07-26) first occupied the right-middle band the Explorer
+placeholder reserved; BL-227 (comms dock bottom-left, 2026-07-30) moved it into the
+bottom strip. Layer 2 shipped the nav pane, canvases, time column, minimap, and the
+Tile Ledger; the header (Layer 3 finalisation) and profile (`src/ui/profile_panel.cpp`)
+have since landed.
 
 ---
 
@@ -52,17 +61,23 @@ this column at all — the freed width goes to the band instead. It now resolves
 1720 wide, ~410 px at 1920. The column is reserved down the whole left edge:
 
 - The **identity tile** (profile) caps it at top, taking the full width `W`.
-- The narrow **icon nav rail** (56 px) runs down its left sub-edge.
+- The narrow **icon nav rail** (56 px) runs down its left sub-edge, full height.
 - A **fold-out ledger** fills the rest of the column (`[nav_pane_width, W]`, below the
-  identity tile to the bottom margin) when a nav slot is active — see *Ledger windows*.
-- The **Selection element** shares that same fold-out slot as a sidebar, mutually exclusive
-  with the ledgers — see *Selection info element*.
+  identity tile) when a nav slot is active — see *Ledger windows*. Since BL-227 (comms
+  dock bottom-left) the column **stops at the comms dock's top edge**
+  (`foldout_column_rect`), so every ledger is permanently shorter by the bottom strip's
+  height.
 - The **balance bar** (header) starts at `x = W` permanently, whether or not any fold-out is
   open, so it always clears the column.
 
-The 480 px floor forces the one-question-per-view panel splits (BL-117..121). The per-panel
-splits and the Tile Ledger's migration into the column are **not** part of BL-122 — the
-skeleton hosts each panel's current content.
+> **Superseded (BL-213, 2026-07-28).** The Selection element no longer shares the fold-out
+> slot as a sidebar, mutually exclusive with the ledgers — that was the BL-124 shape. It
+> lives in the fixed bottom band (*Selection band* below), and selection leaves an open
+> ledger untouched.
+
+The 380 px floor keeps the one-question-per-view panel splits (BL-117..121) load-bearing.
+The per-panel splits and the Tile Ledger's migration into the column are **not** part of
+BL-122 — the skeleton hosts each panel's current content.
 
 ---
 
@@ -98,9 +113,9 @@ The header answers "can I afford this, and which way is it trending?" without op
 
 A fixed, full-height **icon rail** pinned to the left edge (`nav_pane_width`, currently 56 px), below the profile. Cannot move, resize, or collapse. The rail is narrow; the profile keeps its own (wider) `profile_panel_width` above it rather than matching the rail.
 
-- Holds a vertical strip of **ten square icon slots** — the home for the game's menus and ledgers. Each slot shows a **vector glyph** (`src/ui/icons.hpp`) instead of a worded label, with the menu name in a hover tooltip.
-- Each slot toggles a panel open/closed; the active slot is highlighted. Since BL-122 an active slot **folds its ledger out into the shell column** to the rail's right (`[nav_pane_width, W]`) rather than spawning a floating window; opening one collapses whichever was open (accordion, via `close_all_panels`).
-- **Layer 2 wires only one slot: the Tile Ledger** (a ruled-table glyph), parked at slot 8. The other nine are reserved, disabled placeholders (a neutral hollow-square glyph). Slot placement is temporary while canvas work takes priority over menu design.
+- Holds a vertical strip of **nine square icon slots** (BL-174 dropped the glyph-less tenth) — the home for the game's menus and ledgers. **Every slot carries its own vector glyph** (`src/ui/icons.hpp`) — live slots in the bright stroke, reserved slots dimmed — plus a wrapping name-and-blurb tooltip (BL-174, nav-rail legibility).
+- Each slot toggles a panel open/closed; the open slot lights its glyph in the selection accent. An active slot **folds its ledger out into the shell column** to the rail's right (`[nav_pane_width, W]`, BL-122) rather than spawning a floating window; opening one collapses whichever was open (accordion, via `close_all_panels`).
+- **Five slots are live** (`nav_pane.cpp`): Corporation overview, Budget, Market Ledger, Construction, History. **Four are reserved**, disabled with dimmed glyphs: Workforce, Research, Corp. Strategy, Diplomacy. Full slot semantics in `MENU.md`.
 
 ---
 
@@ -124,15 +139,16 @@ A fixed inset in the bottom-right corner showing the **zoom-out neighbour** of t
 **Spec: `MINIMAP.md` / `LENSES.md`**
 
 The overlay-lens controls no longer occupy their own bottom-left strip — BL-093
-relocated them onto the **minimap itself**, as a 7-glyph mode bar running along
-its bottom edge (`ui::draw_overlay_controls`, called from the minimap block in
-`src/core/app.cpp`). The on-screen seven are Corp, Country, Resource, Market,
-Population, Opportunity, and Production; Scarcity and Industry join Supply as
+relocated them onto the **minimap itself**, as an **eight-glyph** mode bar running
+along its bottom edge (`ui::draw_overlay_controls`, called from the minimap block
+in `src/core/app.cpp`). The on-screen eight are Corp, Country, Resource, Market,
+Population, Opportunity, Production, and — since BL-226 (Continent lens) —
+Continent; Scarcity, Industry, Reach, and Supply-routes join Supply as
 **keyboard-cycle only** lenses (no bar glyph — the bar does not have room for
-all nine). Clicking a glyph toggles that lens; the active one is highlighted,
+all thirteen). Clicking a glyph toggles that lens; the active one is highlighted,
 and clicking it again clears the overlay. The lens-local resource/good picker
-(Resource, Market, Scarcity) is now a **popup button** on the bar rather than an
-inline combo — the fixed-width combo did not fit the bar's reduced footprint.
+(Resource, Market, Scarcity) moved off the bar into the **on-canvas lens legend**
+(BL-134, lens selector in legend).
 
 The read-only **lens legend** (the on-canvas key for the graded lenses — Resource,
 Market, Production, Opportunity, Population, Scarcity, Industry) is a separate element
@@ -146,9 +162,12 @@ otherwise have overlapped. `LENSES.md` is the authoritative spec.
 **Spec: `SELECTION.md`**
 
 The Selection info element lives in a **fixed band at the bottom of the screen**
-(BL-213, 2026-07-28), sandwiched between the shell column (nav rail + fold-out ledger)
-and the right chrome column (comms + minimap) — both of which run the **full screen
-height** either side of it. This is the third shape the element has had: the original
+(BL-213, 2026-07-28) — the middle tile of the bottom strip, between the **comms dock**
+on its left (BL-227; the band starts at the dock's right edge) and the **minimap** on
+its right. Its height is `selection_band_height` (`src/ui/foldout_column.{hpp,cpp}`),
+**derived from the minimap height** plus `chrome_margin` so the whole strip's top edge
+lands on the minimap's (2026-07-30 — replaced a flat 340 px that overhung the minimap).
+This is the third shape the element has had: the original
 BL-065 full-width bottom bar, then the BL-124 shell-column sidebar (mutually exclusive
 with the ledgers), then this fixed band, which **retires click-anchoring** (the
 BL-194/195 "sticky card" that froze at the click position) in favour of always
@@ -191,76 +210,75 @@ A single panel in the top-right corner, the same width as the minimap so the rig
 
 **Speed controls** (right column, 75%) — a raw `Sim` counter with the current multiplier, then the controls:
 
-- **`II`** pauses; **`1`–`5`** set the speed multiplier. The active speed is highlighted.
+- A **pause button** — a drawn filled square while running (deliberately not "||", which read as the Roman numeral II beside the tiers), flipping to a play "**>**" while paused — then speed tiers **I–V** in Roman numerals. The active speed is highlighted; each tier names its real rate on hover (BL-178).
 
 The clock has three layers — sim tick → day → economy tick — paced so that 1× ≈ 6 s/day and 3× ≈ 2 s/day. The economy resolves quarterly. The authoritative calendar/pacing constants live in `src/core/sim_loop.hpp` and are deliberately tentative.
 
 ---
 
-## Comms log — right, middle
+## Comms dock — bottom-left
 **Spec: `CHAT.md`**
 
-A panel on the right edge, below the time column and above the minimap (`src/ui/chat_panel.cpp`). The channel-based **comms chat log** (BL-205): the Public channel plus arbitrary player-created corp groups, fed by deterministic sim events (the BL-079 agency reflexes today) and player messages.
+The channel-based **comms chat log** (BL-205): the Public channel plus arbitrary
+player-created corp groups, fed by deterministic sim events (the BL-079 agency reflexes
+today) and player messages (`src/ui/chat_panel.cpp`).
 
-It replaced the Explorer placeholder (2026-07-26) — pinning was never wired; if it returns it will be a chat-adjacent affordance, not a reserved band. The diplomacy-as-communication principle behind the surface: `docs/ai/AI_OPPONENT.md` § 7.
+Since **BL-227 (comms dock bottom-left, 2026-07-30)** it docks in the **bottom-left tile
+of the bottom strip** (`comms_dock_rect`, `src/ui/foldout_column.{hpp,cpp}`): the fold-out
+column's x-range, three quarters of the column's width, sharing the Selection band's top
+edge and height so the two read as one bar. Comms is ambient chatter (BL-212), not a
+decision surface, so it gave up the prime right-edge slot under the time panel; the
+quarter-width it gives back goes to the Selection band. The icon rail keeps its full
+height past the dock — at the 1280×720 floor a shortened rail would clip two slots.
+
+It replaced the Explorer placeholder (2026-07-26) in its original right-middle home —
+pinning was never wired; **BL-216 (chat pinning)** is the open item for its return as a
+chat-adjacent affordance, not a reserved band. The diplomacy-as-communication principle
+behind the surface: `docs/ai/AI_OPPONENT.md` § 7.
 
 ---
 
-## Ledger windows — fold-out (BL-122) and floating
+## Ledger windows — all fold-out (BL-122)
 
-Since **BL-122** the five named ledgers — **Construction, Economy, Market, Balance, and
-Corporations** — no longer float. Each draws as a **pinned, borderless panel filling the
-shell column** (`ui::foldout_begin`/`foldout_end`, `src/ui/foldout_column.hpp`) when its
-nav slot is active, and folds back to just the icon rail when toggled off or when another
-opens (accordion). There is no title-bar close — closing is the nav-rail toggle. The old
-uniform floating chrome (`ledger_window_spawn`/`size`, `ImGuiCond_Once` movable windows)
-and the Construction panel's BL-082 height-cap no longer apply to these five.
-
-The **Tile Ledger** (History, slot 9) is the exception — it **still floats** as a movable
-window (its migration into the column is deferred). The set of menus is described in
-**`MENU.md`**.
+Since **BL-122** no ledger floats. Every ledger — Construction, Economy, Market, Balance,
+Corporations, the tile construction ledger (BL-162), **and the Tile Ledger** (History,
+slot 9 — `tile_inspector.cpp` opens through the same path; its migration into the column
+is done, not deferred) — draws as a **pinned, borderless panel filling the shell column**
+(`ui::foldout_begin`/`foldout_end`, `src/ui/foldout_column.hpp`) when its nav slot is
+active, and folds back to just the icon rail when toggled off or when another opens
+(accordion). There is no title-bar close and no **✕** — closing is the nav-rail toggle.
+The old uniform floating chrome (`ledger_window_spawn`/`size`, `ImGuiCond_Once` movable
+windows) and the Construction panel's BL-082 height-cap apply to nothing any more. The
+set of menus is described in **`MENU.md`**.
 
 **All ledgers start closed** on a fresh session — none are shown until the player opens them from the pane (see the policy in `MENU.md`).
 
 Only **broad** ledgers (overviews across many entities) earn a nav-rail slot; targeted, per-entity actions are reached contextually through the Selection info element or a popup, not the rail (see `MENU.md` § Menus are broad ledgers).
 
-### Uniform ledger-window chrome (settled principle)
+### Superseded: uniform floating ledger-window chrome
 
-Every ledger window obeys a **single chrome rule**: they all share **one size and one
-spawn anchor**. A ledger opens at the same on-screen position and the same default
-extent as every other, so the family reads as one consistent surface rather than a
-scatter of differently-sized windows. Concretely, the prototype should drive the
-floating ledgers from **one shared size constant and one shared spawn-position
-constant** (anchored clear of the profile/header chrome, `ImGuiCond_Once` so the player
-may then move/resize freely), rather than each ledger hard-coding its own.
-
-This is now **implemented**: the shared constants `ledger_window_size` and
-`ledger_window_spawn` live in `src/ui/ledger_chrome.hpp` (the spawn anchor derived from
-the profile-panel dimensions so it clears the top-left chrome), and both the **Tile
-Ledger** (`tile_inspector.cpp`) and the **Economy panel** (`economy_panel.cpp`) drive
-their `SetNextWindowSize`/`SetNextWindowPos` from them with `ImGuiCond_Once`. This
-resolved the prior inconsistency (Tile Ledger 820×560, Economy panel 760×620, at
-different offsets). The **Market / Balance / Construction ledger family** (deferred to
-Layer 4 — OPENS § Ledger) inherits the same two constants when it is built. The header is
-exempt — it is persistent chrome, not a ledger.
-
-> **Superseded by BL-122.** The uniform floating chrome above now applies **only to the
-> still-floating Tile Ledger**. The five named ledgers (Construction, Economy, Market,
-> Balance, Corporations) fold out into the shell column instead (see *Ledger windows*) and
-> no longer read `ledger_window_spawn`/`size`. The **BL-082 Construction-panel height-cap
-> is dissolved** — the fold-out ledger is confined to the shell column, so the panel can no
-> longer occlude the canvas or the build front door and needs no caller-supplied spawn.
+> **Superseded — no floating ledger remains (2026-07-31).** The settled principle below
+> governed the floating era: every ledger window shared **one size and one spawn anchor**
+> (`ledger_window_size` / `ledger_window_spawn`, `src/ui/ledger_chrome.hpp`,
+> `ImGuiCond_Once`) so the family read as one consistent surface. BL-122 folded the five
+> named ledgers into the shell column; the Tile Ledger — the last floater — has since
+> docked too (`tile_inspector.cpp`, `foldout_begin`). The `ledger_chrome.hpp` constants
+> still exist but have **zero callers**; the uniform chrome the family now shares is the
+> fold-out column itself. The **BL-082 Construction-panel height-cap is dissolved** — a
+> fold-out ledger is confined to the shell column and needs no caller-supplied spawn.
 
 ### One-question-per-view splits (BL-117 sweep)
 
 Fold-out ledgers with more than one question split their content across a **button-strip nav**
 (`ui::nav_button`, `foldout_column.hpp` — a manual `Selectable`/`Button` strip, since
-`ImGui::BeginTabBar` does not render in this build), each view drawing exclusively. The
-**Construction** panel (Build / Manage / Sell Orders) and the **Economy** panel (Corps / Holdings /
-Markets, `ui_state::economy_view`) use this. The **Balance**, **Market**, **Corporation**, and (still-
-floating) **Tile** ledgers were audited and found to be single-question already — no split. The
-principle is *one question per view, a menu to move between views* — not a mandate to split every
-panel.
+`ImGui::BeginTabBar` does not render in this build), each view drawing exclusively. The current
+splits: the **Construction** panel — **Construction / Buildings** (BL-143, building ledger
+redesign; the Build front door moved to the tile Selection element and Sell Orders moved out;
+defaults to Buildings, BL-176); the **Market Ledger** — **Prices / Sell Orders** (BL-159,
+sell orders on the market surface); the **Economy** panel — Corps / Holdings / Markets
+(`ui_state::economy_view`); the **History** ledger — Story / Chain / Tiles (BL-211). The
+**Balance** and **Corporation** ledgers remain single-question — no split. The principle is
+*one question per view, a menu to move between views* — not a mandate to split every panel.
 
 **Toggle rule on the strip (BL-126).** Consistent with the universal toggle rule
 (`.claude/rules/io-standing-rules.md`): re-clicking the **currently-active** sub-view tab **closes
@@ -293,20 +311,23 @@ finding.
 All ledger windows share four standing conventions, stated once here so each new ledger
 need not rediscover them:
 
-- **Uniform chrome.** Every ledger drives `SetNextWindowSize` / `SetNextWindowPos` from
-  `ledger_window_size` and `ledger_window_spawn` in `src/ui/ledger_chrome.hpp`, with
-  `ImGuiCond_Once` so the player may freely move or resize after first open.
+- **Uniform chrome = the fold-out column.** Every ledger draws through
+  `foldout_begin`/`foldout_end`, pinned to `foldout_column_rect` — one rect, one border
+  policy, no per-ledger sizing. (The floating-era `ledger_window_size`/`spawn` constants
+  are superseded — see above.)
 - **Player corporation defaulted.** Every ledger that shows per-corporation data defaults
   to `w.player_entity` in its corp selector and offers a selector to view any other
   corporation's figures. Cross-corporation side-by-side comparison is not in scope for
   the prototype.
 - **Shared content builders.** Per-entity stat blocks are rendered through the shared
-  `entity_summary` helpers (`src/ui/entity_summary.{hpp,cpp}`), which are also used by
-  the Selection info element and the hover card. Do not duplicate this logic inside a
-  ledger — call the shared builders.
-- **Start closed.** All ledger windows open with their initial `open` flag set to `false`
-  (policy established in `src/ui/ledger_chrome.hpp` / `src/ui/nav_pane.cpp`). None are
-  shown until the player explicitly opens them from the nav pane.
+  `entity_summary` helpers (`src/ui/entity_summary.{hpp,cpp}`) — today that means the
+  Tile Ledger. The Selection element stopped calling them (BL-093 — SELECTION.md
+  § Removed) and the shipped hover card carries its own lens-keyed content
+  (`hover_content.cpp`, TOOLTIP.md); the rule stands for any new ledger stat block —
+  do not duplicate the logic, call the builders.
+- **Start closed.** All ledgers open with their initial `show_*` flag `false`
+  (`src/ui/ui_state.hpp` defaults; toggled in `src/ui/nav_pane.cpp`). None are shown
+  until the player explicitly opens them from the nav pane.
 
 ---
 
@@ -321,15 +342,24 @@ these nine rather than inventing a tenth.
 
 | # | Container | Sizing | Text policy | Overflow |
 |---|---|---|---|---|
-| 1 | **Fold-out ledger column** (`foldout_column`) | Fixed-width (`[nav_pane_width, W]`), stretches to the column's full height | Wrap to inner width | Vertical scroll |
+| 1 | **Fold-out ledger column** (`foldout_begin`, `foldout_column.cpp`) | Fixed-width (`[nav_pane_width, W]`), stretches from below the identity tile to the **comms dock's top edge** (BL-227 — no longer the full column height) | Wrap to inner width | Vertical scroll |
 | 2 | **On-canvas lens legend box** (draw-list, `body_surface_canvas.cpp`) | Fit-to-content — box sized from its own entries | Guaranteed-fit | None — box grows to fit |
-| 3 | **Selection info element** (`selection_panel.cpp`) | Fixed-width panel (shares the fold-out column slot) | Wrap | Vertical scroll |
+| 3 | **Selection band** (`draw_selection_band`, `selection_card.cpp` framing `draw_selection_content`, `selection_panel.cpp`) | Fixed rect — comms dock's right edge to the right chrome column, `selection_band_height` tall (minimap-derived) | Wrap | Vertical scroll |
 | 4 | **Header / balance strip** (`header_panel.cpp`) | Stretch-to-width, fixed height | Guaranteed-fit — segments measured, never wraps | Elide-with-tooltip, only as a last resort; never silent truncation |
-| 5 | **Time panel** (`app.cpp`) | Fixed size | Guaranteed-fit — authored to fit | None |
-| 6 | **Hover card** | Fit-to-content, capped at a max width | Wrap at the max width | Grows vertically |
+| 5 | **Time panel** (`app.cpp`) | Fixed width (shares the minimap's), content-derived height (BL-097) | Guaranteed-fit — authored to fit | None |
+| 6 | **Hover card** (`draw_hover_card`, `hover_card.cpp`) | Fit-to-content, capped at 200 px max width, auto height | Wrap at the max width | Grows vertically |
 | 7 | **Minimap lens bar** | Fixed strip | Icon-only / guaranteed-fit labels | None |
-| 8 | **Nav rail** | Fixed (56 px) | Icon-only; tooltips wrap | None (tooltip wrap absorbs it) |
+| 8 | **Nav rail** | Fixed (56 px) | Icon-only; tooltips wrap (`nav_pane.cpp`, BL-174 — `PushTextWrapPos`, implementing this row's stated policy) | None (tooltip wrap absorbs it) |
 | 9 | **ImGui table** (ledgers) | Stretch columns with per-column min widths | Per-cell guaranteed-fit (clip + tooltip) for numeric/identity columns, wrap for description columns | Horizontal scroll on the table; never silent truncation of a load-bearing value |
+
+The **comms dock** (BL-227) is not a tenth kind: it is a fixed-rect docked panel obeying
+container 1's policy (wrap, vertical scroll) in the bottom strip.
+
+This table is the baseline the open **BL-215 (text-wrap render audit)** consumes — an
+audit of every container's *rendered* wrap behaviour against the policy declared here —
+so the rows above describe the real containers, re-derived from the code 2026-07-31.
+(BL-140, text/image containment, and BL-141, this vocabulary, both landed; BL-215 is the
+open follow-through.)
 
 A few cross-cutting notes:
 
@@ -348,9 +378,9 @@ A few cross-cutting notes:
 
 ## UI popup elements
 
-Beyond the persistent chrome and the floating ledgers, the production UI will use **transient popup elements** — context menus, confirmation dialogs, hover cards, and action prompts that appear in response to a click or hover and dismiss on action or click-away. Examples: right-clicking a unit for an order menu, a "confirm purchase" dialog, a richer hover card than the canvas tooltip.
+Beyond the persistent chrome, the production UI will use **transient popup elements** — context menus, confirmation dialogs, hover cards, and action prompts that appear in response to a click or hover and dismiss on action or click-away. Examples: right-clicking a unit for an order menu, a "confirm purchase" dialog.
 
-These are **not implemented next** and have no dedicated spec yet. They are noted here so the layout accounts for content that floats above every region without belonging to any one of them. The canvas hover tooltips (see `CANVASES.md`) are the only popup-like elements in the prototype. Hover cards use the shared `draw_hover_card` dispatcher — see [`TOOLTIP.md`](TOOLTIP.md).
+The **hover card is built** (BL-228/BL-230, landed 2026-07-30): the glance-then-stick card on the Planetary surface, framed by `draw_hover_card` (`src/ui/hover_card.cpp`) with lens-keyed content from `hover_content.cpp` — [`TOOLTIP.md`](TOOLTIP.md) is its spec. The system menu (BL-070) and its inline exit-confirm are the popup dialogs that exist. Context menus and richer confirmation dialogs remain unbuilt; they are noted here so the layout accounts for content that floats above every region without belonging to any one of them.
 
 ---
 
@@ -362,10 +392,10 @@ These are **not implemented next** and have no dedicated spec yet. They are note
 
 ## Prototype / temporary notes
 
-- The comms log (BL-205) is live in the right middle band; profile and header are live.
-- Nav slot layout (count, ordering, the slot-8 Tile Ledger) is placeholder.
+- The comms log (BL-205) is live in the bottom-left dock (BL-227); profile and header are live.
+- Nav slot layout is settled — nine slots, the MENU.md curated order, per-slot glyphs (BL-174).
 - Canvases are not yet inset clear of the chrome.
-- Popup elements (context menus, dialogs) are deferred.
+- Context menus and confirmation dialogs (beyond the system menu's exit-confirm) are deferred; the hover card is built (TOOLTIP.md).
 - ImGui is the prototype UI only; the production shell is a later, Lua-driven retained layer (TECH_FOUNDATIONS).
 
 ---
@@ -374,6 +404,7 @@ These are **not implemented next** and have no dedicated spec yet. They are note
 
 | Region | Document |
 |---|---|
+| Entry screens (menu / wizard / handoff) | `STARTUP.md` |
 | Profile | `PROFILE.md` |
 | Header | `HEADER.md` |
 | Navigation pane / menus | `MENU.md` |
@@ -382,5 +413,10 @@ These are **not implemented next** and have no dedicated spec yet. They are note
 | Circumplanetary canvas | `CIRCUMPLANETARY.md` |
 | Planetary canvas | `PLANETARY.md` |
 | Minimap | `MINIMAP.md` |
+| Lenses (overlay modes) | `LENSES.md` |
+| Icon vocabulary | `ICONS.md` |
+| Selection band | `SELECTION.md` |
+| Hover card | `TOOLTIP.md` |
+| Discovery / fog surfaces | `DISCOVERY.md` |
 | Time column | `TIME_CONTROLS.md` |
-| Comms log | `CHAT.md` |
+| Comms dock | `CHAT.md` |

@@ -1,6 +1,6 @@
 # Project Io — Population and Development
 
-Population is the human layer of the economy — the source of workforce, the driver of consumer demand, and the reason habitability matters. Development is the act of improving a tile or region in ways that affect population, efficiency, or amenity rather than raw extraction. Population centres are **first implemented in v0.0.6 as a static MVP** (seeded fixed-level centres producing workforce supply, demand, and the agglomeration bonus); the **dynamic half** (habitability feedback and growth) follows as a v0.0.6 follow-up. The full model is designed here so each implementation step extends it rather than replacing it.
+Population is the human layer of the economy — the source of workforce, the driver of consumer demand, and the reason habitability matters. Development is the act of improving a tile or region in ways that affect population, efficiency, or amenity rather than raw extraction. Population centres landed from v0.0.6 onward: seeded centres producing workforce supply, a stub demand, and later the habitability feedback and growth — but **not** land use or the agglomeration bonus (§ Prototype notes for the honest split, updated 2026-07-31). The full model is designed here so each implementation step extends it rather than replacing it.
 
 ---
 
@@ -33,6 +33,15 @@ that staffs it is seeded onto **their** territory:
 The exact tier thresholds and per-nation centre counts are tuning targets fixed at promotion;
 the decisions here are *nation-seeded, habitability-clustered, level-derived*.
 
+> **Discrepancy: the shipped pass diverges from this design (recorded 2026-07-31).**
+> `generate_population_centres` (`src/world/population_generation.cpp`) runs **before**
+> `generate_nations`, not after — nation territory generation reads the centres, not the other
+> way round (`make_hard_coded_world`). Placement is habitability-*gated* (placement rules) with
+> a 3× adjacency weight for progressive clustering, but **not** nation-seeded; scale is drawn
+> from a weighted random distribution (40/30/20/8/2 % for scale 1–5), **not** derived from
+> cluster size; and no `land_use` is set (the field does not exist — § Prototype notes).
+> Whether to converge the pass on this design or ratify the shipped order is a design call.
+
 ## Centre rendering (implemented 2026-07-04)
 
 The BL-083 presentation layer draws the generated centres on the Planetary canvas
@@ -55,7 +64,7 @@ surface reads as inhabited rather than "resources with industry on top":
 
 ---
 
-Until v0.0.6, the prototype treats workforce as an authored constant (`workforce_assigned`) on each building. The population model is designed here to ensure that the workforce field, the habitability tile property, and the demand side of the market are all positioned correctly for the implementation.
+The workforce pool model is now **live**: per-body labour supply derives from the population centres and throttles buildings through the contention scalar (§ Prototype notes below for the landed/outstanding split; PRODUCTION.md § Workforce model for the shipped arithmetic). The design prose here remains the authority for the parts not yet built.
 
 ---
 
@@ -139,12 +148,13 @@ Habitability is reduced by:
 
 ## Workforce model (prototype → Layer 4)
 
-The prototype ships a placeholder: `building_component.workforce_assigned` is an authored
-constant in `[0, 1]`, read-only, applied as a single linear scalar at both the extraction
-and processing stages (see PRODUCTION.md § Workforce). This section settles the **real
-model** so Layer 4 building management exposes a coherent system rather than a constant —
-and so the data model positions for it now. It is design only; the implementation is the
-**Workforce pool & population coupling** Brief (OPENS § Workforce).
+This section settled the pool model, and its two migration steps have since **landed**
+(status updated 2026-07-31): the per-`(corp, body)` pool with contention, and the
+population-derived supply feeding it (BL-042). `building_component.workforce_assigned` remains
+an authored constant in `[0, 1]` — the *request* the contention scalar throttles — as designed.
+The shipped arithmetic is documented in PRODUCTION.md § Workforce model; what stays unbuilt
+here is wage-level derivation and allocation policy. The dead "(OPENS § Workforce)" pointer
+that stood here referenced a worklist section that no longer exists.
 
 ### The labour pool
 
@@ -159,9 +169,11 @@ Each pool has:
   and
 - a **demand** — the sum of the labour its buildings on that body want this Tick.
 
-In the prototype, supply is a fixed authored figure per `(corp, body)`; once population
-centres exist (the rest of this document), **supply derives from the population centres on
-the body**: population level → labour force → the share that contracts to the corporation.
+Supply now **derives from the population centres on the body** (BL-042, workforce supply
+derivation — landed): centre scale → labour units (1 / 3 / 10 / 30 / 100 for scale 1–5), with a
+corp's share set by its share of the body's building count. The fixed authored figure
+(`world::workforce_supply`, default 3.0) survives only as the fallback for bodies with no
+centres.
 
 ### Contention
 
@@ -179,13 +191,16 @@ production arithmetic gains a factor rather than changing shape:
 
 ### Player-set vs. system-allocated
 
-The split, stated once:
+The split, stated once (corrected 2026-07-31 — the player lever is **not** `workforce_assigned`):
 
-- **The player sets** the *target* staffing of each building — the `workforce_assigned`
-  request (how hard they want it run) — and, later, standing allocation **policy** (which
-  buildings get priority under contention; SYSTEMS.md § Policy).
+- **The player sets** the *target* staffing of each building via
+  `building_component.workforce_target` (0–200 % of nominal), which by default is
+  **auto-solved** each tick to maximise the building's profit (BL-181, workforce auto-solver);
+  a manual choice pins it, opting out. `workforce_assigned` is an authored constant set at
+  placement (0.5 producing, 0 passive) and is never player-edited. Standing allocation
+  **policy** (priority under contention; SYSTEMS.md § Policy) remains a later feature.
 - **The system allocates** the actual labour: it computes pool supply from population,
-  sums demand from the player's targets, derives the contention scalar, and applies it.
+  sums demand from the assigned requests, derives the contention scalar, and applies it.
   The player never hand-assigns headcount; they express intent and the pool resolves it.
 
 ### Wages
@@ -223,25 +238,46 @@ and the agglomeration bonus); **Briefs 6–7 (the dynamic half — habitability 
 are a v0.0.6 follow-up**, deferred from the first pass so the load-bearing L4 workforce/demand
 grounding lands without building the whole feedback economy at once.
 
-| # | Brief | Depends on | MVP |
+| # | Brief | Depends on | Status (2026-07-31) |
 |---|-------|-----------|-----|
-| 1 | **Land-use foundation** — add `land_use` enum + field to `tile_component`; transition rules (extraction occupies; urban/amenity displaces deposit) through `placement_rules`. | — | ✓ |
-| 2 | **Population-centre model + generation** — the centre entity (attached tiles, derived level tier) and the nation-seeded, habitability-clustered generation pass (§ Generation). | 1 | ✓ |
-| 3 | **Population demand** — per-Tick basket (food / water / consumer / habitability goods) consumed from the body market, feeding `market_component.demand`. | 2 | ✓ |
-| 4 | **Workforce supply derivation** — population level → labour force → contracted corp share. *This is [A4] § Workforce step 2* — it stays its own Brief there, grounded by this work. | 2 | ✓ |
-| 5 | **Agglomeration / scale bonus** — centre level → production bonus (processing throughput + extraction yield), per § Scale bonus model. | 2 | ✓ |
-| 6 | **Habitability aggregate + feedback** — body habitability from urban/amenity tiles → workforce efficiency (and the growth input for 7). | 3 | follow-up |
-| 7 | **Population growth** — habitability / met-demand → level change over Ticks. | 6 | follow-up |
+| 1 | **Land-use foundation** — add `land_use` enum + field to `tile_component`; transition rules (extraction occupies; urban/amenity displaces deposit) through `placement_rules`. | — | **not built** |
+| 2 | **Population-centre model + generation** — the centre entity (attached tiles, derived level tier) and the nation-seeded, habitability-clustered generation pass (§ Generation). | 1 | landed (divergent — § Generation note) |
+| 3 | **Population demand** — per-Tick basket (food / water / consumer / habitability goods) consumed from the body market, feeding `market_component.demand`. | 2 | partial (agri stub + substrate basket) |
+| 4 | **Workforce supply derivation** — population level → labour force → contracted corp share. *This is [A4] § Workforce step 2* — it stays its own Brief there, grounded by this work. | 2 | landed (BL-042) |
+| 5 | **Agglomeration / scale bonus** — centre level → production bonus (processing throughput + extraction yield), per § Scale bonus model. | 2 | **not built** |
+| 6 | **Habitability aggregate + feedback** — body habitability from urban/amenity tiles → workforce efficiency (and the growth input for 7). | 3 | landed (BL-048A/BL-069) |
+| 7 | **Population growth** — habitability / met-demand → level change over Ticks. | 6 | landed (BL-048B/BL-078) |
 
-Briefs 3, 4, and 5 are **disjoint dependents of 2** (different systems: market demand, workforce
-pool, production bonus) — parallel-safe once the model exists. 1 → 2 is the serial foundation.
+The MVP column previously ticked Briefs 1–5 wholesale; corrected 2026-07-31 to what actually
+shipped. Briefs 1 (land use) and 5 (agglomeration bonus) never landed — Brief 2 shipped without
+its Brief 1 dependency, which is why population and extraction do not compete for tiles today.
 
 ## Prototype notes
 
-Population centres, land use transitions, and the agglomeration bonus are all **deferred** from the prototype. The following are in place and must not be retrofitted when population is implemented:
+Rewritten 2026-07-31 — the old "centres, land use, agglomeration all deferred" note was stale.
+The honest split:
 
-- `tile_component.habitability` — already exists; is the per-tile habitability ceiling.
-- `building_component.workforce_assigned` — already exists; will be driven by the population model.
-- `market_component.demand` — already exists; will reflect population consumption once the population model is live.
+**Landed:**
 
-The tile `land_use` field does not yet exist in `tile_component`. It should be added when population is implemented.
+- **Generation** — `generate_population_centres` (`src/world/population_generation.cpp`) seeds
+  20–40 habitability-gated, adjacency-clustered centres per body (divergent from the § Generation
+  design — see the note there).
+- **Per-body workforce supply** — centre scale → labour units, feeding the `(corp, body)`
+  contention scalar (BL-042; the arithmetic is PRODUCTION.md § Workforce model).
+- **Habitability aggregate + growth** — the scale-weighted body habitability mean, the
+  workforce-efficiency multiplier (BL-069), and met-supply-gated centre growth (BL-048B/BL-078),
+  all in `run_economy_step` (`src/world/economy_system.cpp`).
+
+**Not built:**
+
+- **Land use** — `tile_component` has **no** `land_use` field (the `land_use_component` struct in
+  `components.hpp` is declared but attached to nothing). Population and extraction do **not**
+  compete for tiles today; a centre's tile keeps its full deposit.
+- **The agglomeration production bonus** — § Scale bonus model has no code backing. Scale feeds
+  **labour supply only**; it confers no throughput or yield bonus.
+- **The real demand basket** — a centre's own market demand is a stub: 1 unit of
+  `agricultural_produce` per scale level per tick. The broader consumption signal comes from the
+  nation-substrate basket (`scripts/economy.lua` § `substrate`), which is nation-level, not
+  per-centre. Of § Population demand's four listed goods, only food rations has an enum value —
+  clean water, consumer goods, and habitability goods do not exist in `resource_type`
+  (RESOURCES.md § Prototype scope).

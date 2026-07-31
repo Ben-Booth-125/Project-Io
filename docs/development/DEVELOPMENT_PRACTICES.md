@@ -14,11 +14,25 @@ Tests are written alongside the layer they cover, not deferred to the end — al
 
 Focus on the simulation's pure, deterministic logic — the parts that transform state — in `world/*` (no SDL/Lua/ImGui):
 
-- Price resolution given a supply/demand ratio (`econ_harness`, `market_clearing`)
-- Extraction yield / workforce-efficiency curves (`workforce_harness`)
-- Convoy progress + persistent trade-route recording at the tick boundary (`trade_routes_harness`)
-- Budget arithmetic, debt, and bankruptcy (`econ_bankruptcy`, `econ_stability`)
-- Generation audits — tile/nation/corp placement legality and world determinism (`world_audit`, `corp_terrain_matrix`, `determinism_harness`)
+*(List regenerated 2026-07-31 from `ls tools/verify/` — 29 harnesses. The old nine-name list was
+stale and named a `market_clearing` harness that never existed.)*
+
+- Economy — price resolution, budget arithmetic, debt, stability, workforce curves, pre-game
+  balance (`econ_harness`, `econ_bankruptcy`, `econ_stability`, `workforce_harness`,
+  `pregame_balance_harness`)
+- Construction — placement gates, build flow, spree behaviour (`construction_harness`,
+  `construction_gate_harness`, `build_spree_harness`)
+- Supply & trade — convoy advance, persistent routes, logistics, roads (`supply_advance`,
+  `trade_routes_harness`, `logistics_harness`, `road_generation_harness`)
+- Discovery — survey, visibility rule, commercial fog (`survey_harness`, `visibility_harness`,
+  `commercial_fog_harness`)
+- Generation — world/placement audits, continents, planetology chain, chemistry tables, history
+  ladder, population MVP (`world_audit`, `corp_terrain_matrix`, `continents_harness`,
+  `planetology_harness`, `planetology_sweep`, `chemistry_tables_harness`,
+  `history_ladder_harness`, `population_mvp`)
+- Determinism (`determinism_harness`, `world_determinism`)
+- Corp AI — agency triggers, scored utility, blackboard export, persona counsel
+  (`corp_agency_harness`, `corp_ai_harness`, `blackboard_harness`, `persona_counsel_harness`)
 
 Do not test rendering, ImGui panels, or SDL3 platform behaviour in a harness — those are not unit-testable in a meaningful way and are validated by observation and by the **visual verification** tier below.
 
@@ -61,7 +75,13 @@ ProjectIo --verify scripts/verify/<name>.lua
   reference at `scripts/verify/golden/<name>.png` (note: singular `golden/`); the harness logs
   `Golden PASS/FAIL <name>: <pct>% differing` and exits non-zero on any fail. Re-bless a golden
   deliberately with `ProjectIo --verify <script> --bless` (overwrites it — a reviewable diff in
-  version control). The tolerance model below is the **shipped** behaviour.
+  version control).
+- **Shipped tolerance** (`app::compare_to_golden`, `src/core/app.cpp`): a two-threshold budget — a
+  pixel differs when any R/G/B channel delta exceeds 8; the capture fails when differing pixels
+  exceed 0.5% of the frame. A diff image lands in `screenshots/diff/<name>.png`. **Still owed**
+  from the 2026-06-15 tolerance design (its superseded "build deferred" subsection removed
+  2026-07-31): per-golden ignore masks, per-check tolerance overrides via the Lua API (noted as a
+  follow-on in `compare_to_golden`), and CI promotion — the Linux visual-verify job stays advisory.
 
 #### Acceptance flows — driving a real player action through the commit path (BL-113)
 
@@ -83,48 +103,24 @@ game state through the *same code path the interactive control uses*, then asser
   the `capture()` at the end is incidental. Stage preconditions with existing primitives
   (e.g. `verify.set_balance` to afford an action) rather than entangling a separate concern.
 
-#### Golden-image diffing — tolerance model (designed 2026-06-15, [F3]; build deferred)
-
-When automatic pass/fail is built, it diffs each freshly-captured `screenshots/<name>.png` against
-a committed reference. The settled model:
-
-- **Golden storage.** Reference images live beside their script under
-  `scripts/verify/goldens/<name>.png`, committed to the repo. A `--update-goldens` flag on the
-  verify harness rewrites them deliberately (never silently), so a golden change is a reviewable
-  diff in version control.
-- **Tolerance (perceptual, not exact).** Exact-match is too brittle — anti-aliasing and font
-  rasterisation jitter by a pixel. The model is a **two-threshold budget**: a per-pixel RGB delta
-  ignored below a small magnitude (`ε_channel`), and a cap on the **fraction of pixels** allowed
-  to exceed it (`ε_area`). A frame passes when the differing-pixel fraction stays under `ε_area`.
-- **Masked regions.** Zones known to jitter (text glyphs, sub-pixel-animated markers — see the
-  body-label stepping note in OPENS § Known Bug) may carry an optional **ignore mask** per golden,
-  excluded from the budget, so legitimate text-AA noise never fails a structural check.
-- **CI decision.** It runs as a **local pre-commit / on-demand** check first, not gated in CI —
-  there is no rendering-capable CI runner today. Promotion into CI is a later call once a headless
-  GPU/software-raster runner exists; the harness is designed to run identically in both.
-
 #### Golden staleness — shared chrome regresses every capture (observed 2026-07-05)
 
 A golden captures the **whole 1280×720 window**, so it regresses when *shared chrome* changes — the
 profile card, header, or minimap toolbar — **even if the feature under test is untouched**. So a
-change that edits shell chrome staleens **every** golden that shows it, at once. A full sweep on
-2026-07-05 found this concretely: **9 pass / 66 fail / 55 no-golden** across `scripts/verify/*.lua`.
-The 9 passes were exactly the goldens blessed *after* the v0.0.9 chrome cluster (BL-070 system menu,
-BL-080 corp name, BL-085 presence, BL-090 emblem, BL-093 lens-strip relocation), at ≤0.5%; the 66
-failures were pre-cluster goldens whose **only** delta is that chrome (confirmed by eye:
-`survey_planetary_masked` differs *only* in the chrome — the surveyed surface is pixel-identical).
-This is not a cross-platform or capture-timing artefact: if it were, the fresh goldens would fail too.
+change that edits shell chrome staleens **every** golden that shows it, at once. This is not a
+cross-platform or capture-timing artefact — a fresh golden passes at ≤0.5% on the same box.
 Two disciplines follow:
 
 - **Re-bless dependent goldens as part of the chrome change** (DELIVERY step 5), not later — a stale
-  golden hides real regressions behind chrome noise, which is what "66 red" was masking.
-- **The canonical baseline platform is unresolved** — Linux (per memory
-  `cross-platform-golden-mismatch`) vs. this Windows box, where fresh goldens pass ≤0.5%, making
-  Windows-blessing self-consistent. Decide before any bulk re-bless; do **not** blanket `--bless`
-  until then.
+  golden hides real regressions behind chrome noise.
+- **Bless policy (settled by practice, 2026-07-31).** The old instruction — hold blanket `--bless`
+  until the baseline-platform (Linux vs Windows) decision — is retired: three bulk re-blesses have
+  since run on this Windows box (95004cf, 85c847d, 6b8e109, all 2026-07-30). The de-facto policy:
+  **Windows is the working baseline; re-bless freely; flag only unexplained diffs.** Goldens are
+  disposable — a bless is routine bookkeeping, not a review event.
 
-The **55 no-golden** captures are a second gap: they render frames but have no committed reference, so
-they enforce nothing — candidates to bless or retire.
+*(The 2026-07-05 sweep numbers that used to sit here — 9 pass / 66 fail / 55 no-golden — are dead:
+the bulk re-blesses above reset the whole baseline, 68 scripts blessed per sweep.)*
 
 This is the standard tool for the `visual` verification class in
 [`req/REQUIREMENTS.md`](req/REQUIREMENTS.md). When a requirement's verification is
@@ -206,12 +202,12 @@ All public interfaces are documented with **Doxygen-style comments**. This appli
 float resolve_price(float supply, float demand, float base_price);
 ```
 
-### Design-direction Q&A (Batch Publish)
+### Design-direction Q&A (Batch Delivery)
 
-A **Batch Publish** (multiple Briefs in one block; see GLOSSARY) that made non-trivial or
-ambiguous design calls **closes by raising a short design-direction Q&A** — the open questions
-and the calls made on the user's behalf — and **records the outcome in the DEVLOG** with the
-session. No dedicated log file: DEVLOG is the home, the way the 2026-06-14 Layer 3 Q&A was kept.
+A **Batch Delivery** (multiple items in one block; see `DELIVERY.md` § Batch Delivery) that made
+non-trivial or ambiguous design calls **closes by raising a short design-direction Q&A** — the open
+questions and the calls made on the user's behalf — and **records the outcome in the DEVLOG** with
+the session. No dedicated log file: DEVLOG is the home, the way the 2026-06-14 Layer 3 Q&A was kept.
 
 **Rationale:** code lands faster than design intent is pinned, so a batch quietly makes calls
 (what shape a generated thing takes, which of two mechanics wins). Surfacing them at the close
@@ -222,8 +218,8 @@ surfaced nothing worth asking, and keep the questions few. The point is to catch
 genuine fork, not to manufacture questions.
 
 **A formal Q&A is itself the review — no transient `⟳` note needed.** The `> ⟳` "pending review"
-blockquote exists to flag a design call the user has *not yet* seen (the Batch Publish
-documentation discipline; see OPENS § Publish). When a design call is settled **through a formal
+blockquote exists to flag a design call the user has *not yet* seen (the Batch Delivery
+documentation discipline; see `DELIVERY.md` § Batch Delivery). When a design call is settled **through a formal
 Q&A with the user** — the user chose the direction live — that review has already happened, so the
 resulting doc change **does not carry a `⟳` note**. Write the settled design directly. Reserve
 `⟳` for calls made on the user's behalf that still await their eyes.
@@ -245,14 +241,16 @@ progress += delta;
 
 ImGui panel code is an exception — brief section comments are encouraged there since panels serve as the functional specification for the production UI and will be read as reference material.
 
-### ImGui panels — one per milestone, as it is built
+### An observable surface per milestone, as it is built
 
-Wire an ImGui panel alongside each milestone as it is built, not at the end — the panel is the
-first time the milestone shows itself working. Each panel needs only to make that milestone's
-state observable — a tile inspector, a market price readout, a
-convoy list, a budget line. These panels are debugging tools *and* the functional
-specification for the production UI. Write ImGui code clearly, not cleverly — it is reference
-material as much as working code.
+*(Restated 2026-07-31 — the original "one ImGui panel per milestone" wording predates the lens
+family and the verify harnesses; the practised rule is broader.)* Each milestone gets an
+**observable surface** wired alongside it as it is built, not at the end — a panel, a map lens, or
+a harness readout — the first time the milestone shows itself working. The surface needs only to
+make that milestone's state observable: a tile inspector, a market price readout, a convoy list, a
+budget line, a lens tint, a `world_audit` section. These surfaces are debugging tools *and* the
+functional specification for the production UI. Write ImGui code clearly, not cleverly — it is
+reference material as much as working code.
 
 ---
 
@@ -268,7 +266,12 @@ these are the recurring "do not" rules that come up while building:
 - Do not expose individual tile data to Lua.
 - Do not use unprotected sol2 calls where errors can occur.
 - Do not add SQLite — flat binary serialisation is correct for now.
-- Do not build AI faction behaviour beyond the data-model minimum stub.
+- Do not build AI faction behaviour beyond the data-model minimum stub. Two dated, scoped
+  exceptions are recorded in `.claude/rules/io-standing-rules.md`: BL-079 (background-corp
+  per-building agency, landed 2026-07-07) and BL-181 (player workforce auto-solve, landed
+  2026-07-15). The corp-AI item family (BL-199 architecture and its BL-202+ stages) extends this
+  under its own accepted design — check the standing rules and those items before assuming the
+  stub rule applies unqualified.
 - Do not introduce a retained-mode UI framework in place of ImGui for the prototype.
 
 ---
@@ -308,14 +311,15 @@ resolution-scaled value.
 ## Cutting a release
 
 A **Cut** finalises a version. Replaces the old versioned-backup scheme: the authoritative
-record is now an annotated git tag (`vX.Y.Z`), recoverable forever with `git checkout vX.Y.Z`;
-the local `backups/vX.Y.Z/` snapshot is kept only as a convenience and is gitignored.
+record is an annotated git tag (`vX.Y.Z`), recoverable forever with `git checkout vX.Y.Z`.
 
 Work starts on a `feature/*` branch. To cut version `vX.Y.Z`:
 
 1. **Finalize** — build green; fill the `[Unreleased]` section of `CHANGELOG.md`; pick the version.
 2. **Merge** the working branch into `main` locally.
-3. **Backup** — copy `src/` to `backups/vX.Y.Z/` (local-only, gitignored — belt-and-braces).
+3. *(Retired 2026-07-31.)* The "copy `src/` to `backups/vX.Y.Z/`" step was never practised — no
+   `backups/` directory exists, and the actual cut commits (e.g. 934a4e5, Cut v0.0.9) stamp
+   CHANGELOG + README only. The tag is the record; no local snapshot.
 4. **Stamp** — move `CHANGELOG.md`'s `[Unreleased]` entries under `## [vX.Y.Z] — <date>`, refresh
    its compare links, and update the README "Latest release" summary.
 5. **Commit** the stamp on `main`.

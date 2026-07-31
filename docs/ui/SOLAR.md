@@ -11,7 +11,7 @@ shared selection state, implementation approach).
 
 The star sits at the centre. Each body orbits it at a position derived from `orbital_radius_au` and `orbital_angle_rad`. Orbital rings mark each body's distance from the star. Bodies are labelled.
 
-**Reference distance is rung-relative (2026-06-15).** On the Solar rung the distance reference is the **star — 0 AU at the centre** (as today), so a body's surfaced distance is its distance from the star. This is the Solar-rung case of the shared rung-relative rule; on the Circumplanetary rung the reference is the parent body instead (see CIRCUMPLANETARY.md). The body stat block (`draw_body_summary`) reads the reference from the current rung rather than hard-coding the star.
+**Reference distance is rung-relative (2026-06-15; landed).** On the Solar rung the distance reference is the **star — 0 AU at the centre** (as today), so a body's surfaced distance is its distance from the star. This is the Solar-rung case of the shared rung-relative rule; on the Circumplanetary rung the reference is the parent body instead (see CIRCUMPLANETARY.md). The rung-aware read lives in the canvas-aware `draw_body_summary(const world&, const ui_state&, entity_id)` overload in `entity_summary.cpp` (the body hover card's builder), which switches on `ui_state::primary_level`; the legacy single-argument overload keeps the plain star-referenced orbit line (re-targeted 2026-07-31).
 
 The **star is a body entity** (`body_type::star`) at the system centre
 (`orbital_radius_au = 0`, no parent, stationary) — not a hard-coded circle. It
@@ -116,9 +116,13 @@ Bodies orbit continuously. Each `body_component` carries an `orbital_angular_vel
 
 ## What is deferred
 
+*(Pruned 2026-07-31: the two Layer-5 rows this table used to carry landed —
+trade corridors are drawn per § Visual elements (BL-088/BL-089), the Supply lens
+draws a line per live convoy (`w.convoys`, `supply_system.cpp`), and the convoy
+vision beams landed with BL-150/BL-152/BL-154.)*
+
 | Item | Deferred to |
 |---|---|
-| Supply route lines | Layer 5 (supply routing) |
-| Market price indicators on bodies | Layer 4 (market) |
+| Market price indicators on bodies | None intended — prices are per-body-market with no Solar surface (LENSES.md § rung table) |
 | Faction colour coding on bodies | Post-prototype (diplomacy) |
-| Convoy entities in transit | Layer 5 |
+| Reach / Supply-routes lens Solar surfaces (connected-body glow; aggregated lane graph) | Owed — BL-011 (reach lens) / BL-014 (supply-routes lens) shipped Planetary keys only |

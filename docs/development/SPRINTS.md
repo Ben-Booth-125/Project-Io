@@ -31,6 +31,23 @@ and/or a version goal (v0.1.1 etc.).
 
 ---
 
+## Sprint 2 — Close out the v0.1.0 cut set (opened 2026-07-31)
+
+*(Goal set by the assistant during the 2026-07-31 doc sweep — Ben to amend.)*
+
+**Goal.** Land the remaining v0.1.0-goal items so the prototype cut is unblocked: the build
+surface finished, terrain's combat consequence in, the tooltip text rendering clean.
+
+**Planned.**
+- BL-162 — tile construction panel: the per-candidate expected-profit chart (the one owed half)
+- BL-233 — terrain combat modifiers (measurement landed 2026-07-31; adoption decision + wiring)
+- BL-234 — font glyph range (defect: `fonts.cpp` atlas misses U+2014/U+2265; 26 strings show "?")
+- BL-226 — continent lens: finish the settled option-B follow-on (still open, `designed`)
+
+**Retro** — *pending.*
+
+---
+
 ## Sprint 1 — Procedural generation v1 (opened 2026-07-21)
 
 **Goal.** Take procedural generation to a v1 worth building on — not just the immediate
@@ -80,7 +97,25 @@ axis; the rivers/food cluster (BL-166/168/170) is still the outstanding half.
 - BL-169 (solar geometry feasibility) — not touched; a different axis (system layout, not planet
   generation), left for its own pass.
 
-**Retro** — *pending, fill in once BL-166/168/170 land (build in progress) and Sprint 1's goal is
-otherwise settled. Note: session Runtime tracking hit a real gap this sprint — the wall-clock
-timer conflated an idle/interruption gap with work time; worth fixing before relying on it for
-the retro's pacing read.*
+**Retro** (closed 2026-07-31 — *written by the assistant during the doc sweep, not by Ben;
+factual from git log + backlog.json, amend freely*).
+- **Slipped: the entire planned build set.** BL-166 (hydroponics), BL-168 (fishing wharf),
+  BL-170 (rivers) and BL-190 (food demand) were all re-goaled to **post-v0.1.0** in the backlog
+  without a closing entry here — deprioritised when the v0.1.0 cut set took over, not blocked.
+- **Landed instead** (the window's actual output, 2026-07-21 → 2026-07-31): the BL-167 Planetology
+  chain + New World wizard (noted above); the v0.1.0 legibility batch (BL-174/176/177/178/179);
+  corp AI stage A + blackboard + persona counsel (BL-202/206/207); the Selection band move
+  (BL-213); the history ledger (BL-211); comms dock (BL-227); hover glance-then-stick (BL-230,
+  retiring BL-228's freeze model); continent lens (BL-226, follow-on still open); dated history
+  timestamps (BL-220); pre-national ladder (BL-221); landform render + spanning markers
+  (BL-231/232); terrain-combat measurement (BL-233, ladder untouched). Plus three bulk golden
+  re-blesses and the BL-220..225 history-ladder filing.
+- **Runtime:** not summed — the wall-clock timer gap noted below was never fixed, so the pacing
+  signal for this sprint is unreliable; treat it as missing rather than compute a bad number.
+- **Feedback:** the sprint goal named one theme (procgen v1) and the work delivered another
+  (v0.1.0 legibility + AI + history). The generation half was genuinely exceeded (BL-167), but
+  the rivers/food cluster — the stated "outstanding half" — quietly left the version goal without
+  this file noticing. That is the exact drift a close-out entry exists to catch; close the sprint
+  when the goal changes, not just when it lands.
+- *(Carried note: session Runtime tracking hit a real gap this sprint — the wall-clock timer
+  conflated an idle/interruption gap with work time; worth fixing before relying on it.)*

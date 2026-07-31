@@ -10,6 +10,65 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## Session — Doc-truth sweep: every authority doc reconciled with the shipped code (2026-07-31)
+
+**Runtime.** ~2h. Full (batch: four audit agents, then seven parallel rewrite agents + main-session
+ledger surgery). No `src/` changes — docs, backlog.json, requirements.json only.
+
+**Where it came from.** Ben asked for a docs pass: with the code and the later backlog in view,
+which documents need a rewrite before they mis-initialise future sessions? The audit answer was
+*most of them* — the docs described the project as it stood ~6 weeks ago. The worst offenders were
+the three docs CLAUDE.md loads first: ROADMAP said we were at v0.0.8 with wrong themes for every
+upcoming minor; TECH_FOUNDATIONS declared "settled" that procedural generation is out of scope and
+only the player's corp exists; SYSTEMS claimed one market per body and no cross-body prices.
+
+**What was done.** Forty-five docs corrected, four written new, two retired to pointers:
+
+- **Core** — ROADMAP re-derived from the live `version_goal` sets (v0.1.1 = shell/legibility, not
+  roads; v0.2.0 = the AI opponent); TECH_FOUNDATIONS split into still-settled vs
+  superseded-by-scope-growth, tick model rewritten from `sim_loop`'s real three-layer clock;
+  SYSTEMS' trade/roads claims flipped to landed and four missing systems added; CONCEPT's player
+  identity settled (corp now, BL-094 nation pivot later) and the NN-opponent direction marked
+  rejected; GLOSSARY gained ten missing load-bearing terms.
+- **Economy** — PRODUCTION's building/recipe tables reframed as design targets over the real
+  6-type/3-recipe model, workforce model rewritten to the landed per-(corp,body) form; RESOURCES
+  now states the enum-freeze truth and what actually trades; ERAS and SUPPLY got honest status
+  banners; TILES' deposit tables regenerated from `generate_deposits`. **New: MARKETS.md** (the
+  clearing/order-book model had no doc home) and **FINANCE.md** (ditto the budget loop).
+- **Generation** — TILE_GENERATION reframed around the Planetology-derived profile with all
+  drifted constants fixed; NATION_GENERATION gained Pass 0 (history ladder) and Pass 6 (substrate),
+  count corrected 17–21 → 43; HISTORY's Stages 5–6 carry SUPERSEDED banners (rejected 2026-07-30,
+  replacement owed to BL-223); **new: CONTINENTS.md**. PLANETOLOGY got a TOC + status table only.
+- **UI** — TOOLTIP/SELECTION/LAYOUT reconciled to the landed shell (bottom Selection band, comms
+  dock bottom-left, glance-then-stick hover, BL-200 dwell-to-open retired, eight-lens bar);
+  LENSES gained a current-roster table + the missing Reach/Supply-routes sections; **new:
+  STARTUP.md** for the menu/wizard screens.
+- **Process** — KNOWN_BUGS and REVIEW_LOG retired to pointers (defects live in the backlog; the
+  review gate is verifier-review + requirements); BACKLOG.md drained to a tombstone; Sprint 1
+  closed with a descope-recording retro and Sprint 2 opened; REFINED drained to policy.
+- **Ledger** — BL-200 (dwell-to-open) design prefixed with its retirement note; BL-051/BL-054
+  status prose aligned with their status fields; `v0.2` → `v0.2.0` normalised; BL-069/072/073/074
+  authority docs repointed off ROADMAP (the finance three now point at FINANCE.md); BL-114's
+  pending R3 row annotated (its menu was superseded by the wizard). Lint: 0 fails, 0 warnings.
+
+**Real defects found by verification, not fixed here** (filed as one-click task chips): the
+supply-routes lens is unreachable (`overlay_mode_count` 13 vs 14 values since BL-226); the
+population agri-demand stub is zero-reset by `clear_markets` the same tick; the buy-order book has
+no live caller (BL-037 preferred-seller routing dormant in play); eleven stale code comments now
+contradict the corrected docs.
+
+**In-session decisions.** New docs over squeezed sections for markets/finance/continents/startup —
+each is a surface upcoming items will read (BL-130-132/160-161 markets, BL-036 settlement,
+BL-155 laws-era budget). Authority time-slice held throughout: open items (BL-223, BL-094,
+BL-214…) are status-marked in the docs, never design-imported. Statuses were not flipped —
+BL-226 (continent lens) looks fully landed but stays `designed` pending Ben's call.
+
+**Open for Ben** (the closing Q&A lives in the session chat): BL-094's version goal; whether
+BL-226 should close; the Sprint 2 goal as written; the supply-routes access story; whether the
+body-label rounding bug gets filed as an item.
+
+---
+
 ## Session — BL-231 (landform render): drawing the axis the build cost already charged for (2026-07-31)
 
 **Runtime.** ~1h. Full (two render channels, a new glyph family, a measurement harness, three docs).

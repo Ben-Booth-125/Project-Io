@@ -33,7 +33,7 @@ Canonical definitions for all project terms. Use these terms consistently. If a 
 All settled technical decisions: language, framework, architecture, tick model, data model, UI approach, and serialisation. Read this before writing any code or making any architectural suggestion. It also defines the prototype scope and what is explicitly excluded.
 
 **`docs/development/ROADMAP.md`**
-The milestone map from the current state to v0.1.0 (the finished prototype): the version sequence, the theme of each minor, and the v0.1.0 done-definition. Forward-facing and lean — it sits above the backlog and worklist, naming which theme each minor carries, not the individual items. Read this for questions about sequence, what comes when, or whether a feature belongs in the prototype's remaining arc.
+The milestone map from the current state through v0.1.0 (the finished prototype) and into the post-prototype arc (laws, tech, the v0.2.0 AI opponent): the version sequence, the theme of each minor, and the v0.1.0 done-definition. Forward-facing and lean — it sits above the backlog and worklist, naming which theme each minor carries, not the individual items. Read this for questions about sequence, what comes when, or whether a feature belongs in the prototype's remaining arc.
 
 **`docs/development/DEVELOPMENT_PRACTICES.md`**
 Testing framework (Catch2), naming conventions, documentation standards, the per-milestone ImGui panel rule, the standing development constraints, the tone/approach guidance, and how to cut a release. Read this alongside TECH_FOUNDATIONS when working on implementation.
@@ -52,10 +52,10 @@ not a new authority. Read/update when starting or closing out a week's work.
 The backlog and delivery system. **`backlog.json`** is the canonical **metadata index and design
 prose store** — status (`designed` ✓ / `design-owed` ~), priority, difficulty, sequencing, a
 **version goal** (every new item names the minor it targets — DELIVERY.md § Priority, difficulty
-& version goal), file scope, and the **`design` field** holding each item's prose. **`BACKLOG.md`** is a **legacy drain**:
-it holds markdown bodies only for older items not yet migrated; when an item is edited or promoted,
-its body moves to `backlog.json`'s `design` field and is replaced by a tombstone. New items get
-**no** `BACKLOG.md` body. Authority time-slices: `backlog.json` while the item is open; the
+& version goal), file scope, and the **`design` field** holding each item's prose. **`BACKLOG.md`** is a
+**drained legacy file** (drain completed 2026-07-31): every body has migrated to `backlog.json`'s
+`design` field; the file keeps only a tombstone note plus seven one-line stubs that old
+`@BACKLOG.md` design pointers still resolve to. New items get **no** `BACKLOG.md` body. Authority time-slices: `backlog.json` while the item is open; the
 subject's authority doc once the work lands. **`REFINED.md`** is the *active worklist*: a `designed`
 item is **promoted** into file-scoped tasks when we act on it. **`DELIVERY.md`** is the method
 authority — the Delivery lifecycle, design-state model, depth verbs, and worktree sub-agent model.
@@ -76,16 +76,19 @@ before UX-review work, coverage audits, or when reasoning about whether a player
 Overview of the three primary canvases — Solar, Circumplanetary, and Planetary — arranged as a **zoom ladder** (descend by clicking a body in the primary, ascend by clicking the minimap). Covers the shared layout, selection/view state, and implementation approach. Per-canvas detail lives in `SOLAR.md`, `CIRCUMPLANETARY.md`, and `PLANETARY.md`; the minimap chrome and ladder navigation are in `MINIMAP.md`. Authoritative reference for Layer 2 and for later work that adds overlays to these canvases.
 
 **`docs/ui/SELECTION.md`**
-The Selection info element — a pinned, polymorphic panel showing detail of the current selection. Defines the three interaction states (Active / Focus / Selection) and the single-click-selects / double-click-navigates click-model change shared across all canvases. Read before any work on selection state, canvas click handling, or the shared per-entity content builders (which the Tile Ledger and the future hover card also use).
+The Selection info element — a pinned, polymorphic panel showing detail of the current selection. Defines the three interaction states (Active / Focus / Selection) and the single-click-selects / double-click-navigates click-model change shared across all canvases. Read before any work on selection state, canvas click handling, or the shared per-entity content builders (which the Tile Ledger and the hover card also use).
 
 **`docs/ui/LAYOUT.md`**
-Surface-level description of the application shell — how the screen regions (navigation pane, canvas area, time column, ledger windows) are arranged around the canvases. Read for questions about overall UI layout; CANVASES.md covers the canvas internals.
+Surface-level description of the application shell — how the screen regions (navigation pane, canvas area, time column, comms dock, Selection band, fold-out ledgers) are arranged around the canvases. Read for questions about overall UI layout; CANVASES.md covers the canvas internals.
+
+**`docs/ui/STARTUP.md`**
+The app's entry screens — the `app_screen` state machine (menu / generating / in_game), the main menu, the New World wizard (preferences in, `world_params` out), the staged generation screen, and the `start_new_game` handoff. Written 2026-07-31; these are the first screens a player (and a fresh session) sees. Read before any work on the title screen, the wizard, or campaign initialisation.
 
 **`docs/ui/ICONS.md`**
 The icon vocabulary — every hand-drawn vector glyph in the `ui::icons` namespace (`src/ui/icons.{hpp,cpp}`, the source of truth): building markers, resource pips, unit markers, nav-rail affordances, and the map-lens glyphs. Catalogues each glyph's shape, meaning, usage, and colour source, the shared `(dl, centre, r, colour)` contract, and the recipe for adding one. Read before adding or changing any on-canvas/strip glyph; identity *colours* live in `presentation.hpp`, not here.
 
 **`docs/ui/LENSES.md`**
-The map-lens system — the overlay modes (`overlay_mode` in `src/ui/ui_state.hpp`) selectable from the canvas control strip. The full strip lens family is now built: **Corporation, Country, Resource, Population, Opportunity, Production, Scarcity, Market**, and **Industry** (BL-084) — each catalogued with its surface and key. Only the **Supply** lens remains gated, on Layer-5 supply-route rendering. Read before any work on overlay modes, lens rendering, or the lens icon vocabulary (which propagates to ICONS.md).
+The map-lens system — the overlay modes (`overlay_mode` in `src/ui/ui_state.hpp`) selectable from the minimap lens bar. The lens family is built: the eight bar lenses (**Corporation, Country, Resource, Market, Population, Opportunity, Production, Continent**) plus the off-bar **Scarcity, Industry, Reach**, and **Supply-routes** — a current-roster table opens the doc. Only the **Supply** flow lens remains gated. Read before any work on overlay modes, lens rendering, or the lens icon vocabulary (which propagates to ICONS.md).
 
 **`docs/ui/DISCOVERY.md`**
 The discovery & intelligence model — how the player *learns about the world*. Owns the two independent "fogs": the **geographic fog** (the Survey system, BL-067 — bodies start unsurveyed; a paid survey reveals tiles + deposit bands region-by-region) and the **activity fog** (the commercial sphere, BL-089 — a body-level Unknown/Known/Stale/Visible tier lit by the player's own trade routes + presence, `body_activity_visibility`), plus the **competitor-visibility rule** (BL-068 — rival buildings visible, internals private, markets public) and **persistent trade routes** (BL-088, the substrate the activity fog reads). The two fogs are independent axes (a body can be Known-but-unsurveyed). Read before any work on survey, competitor intelligence, trade-route recording, or the activity fog; the canvas rendering lives in SOLAR/PLANETARY/SELECTION, the glyphs in ICONS.
@@ -96,8 +99,14 @@ The canonical resource list: all 23 resources organised into three tiers (raw �
 **`docs/economy/PRODUCTION.md`**
 All extraction and processing buildings: placement rules, valid terrain, output resources, and full recipe tables. Also covers the workforce scalar model, stockpile flow, and the Layer 3 prototype scope. Read before any work involving buildings, recipes, or production logic.
 
+**`docs/economy/MARKETS.md`**
+The market model — how market centres are seeded (BL-096, resource-carved), the clearing tick, price resolution (`resolve_price`, the price band, EMA smoothing), the sell/buy order book with preferred-seller routing (BL-037), and the honest current limitations. Carved out 2026-07-31; previously the clearing model had no doc home. Read before any work on markets, prices, orders, or the exchange-policy arc (BL-160/BL-161).
+
+**`docs/economy/FINANCE.md`**
+The money loop — `apply_budget`'s five flows (income / expenditure / maintenance / wages / interest), the BL-049 wage/maintenance split, debt interest (BL-073), and the surfaces that read it (budget ledger, header runway, per-building profitability). Carved out 2026-07-31. Read before any work on corporate balances, operating costs, or the budget surfaces.
+
 **`docs/economy/ERAS.md`**
-The Era system — the formal phase structure of the game's industrial arc. Era 0 (Terrestrial) starts at the campaign epoch; Era 1 (Early Space) is unlocked by the Rocketry research + Launchpad + propellant gate. Read for questions about what is accessible when, and how the transition to space is structured.
+The Era system — the formal phase structure of the game's industrial arc. Era 0 (Terrestrial) starts at the campaign epoch; Era 1 (Early Space) is unlocked by the Rocketry research + Launchpad + propellant gate. Designed, **not implemented** — the doc opens with a status banner; in code, space access is gated on launchpad presence only. Read for questions about what is accessible when, and how the transition to space is structured.
 
 **`docs/economy/TILES.md`**
 Tile classification: the two-axis terrain model (composition × landform), resource deposit profiles per terrain type, ambient resource guarantee, and amenity tile concept. Read before any work involving terrain types, tile generation, or the `terrain_composition`/`terrain_landform` enums. Includes an implementation note recording that the two-axis split is now implemented.
@@ -113,6 +122,9 @@ Design-owed authority for the body-level Planetology pass (BL-167) — generated
 
 **`docs/generation/TILE_GENERATION.md`**
 The procedural tile generation strategy and six-pass pipeline used in `hard_coded_world.cpp`. Covers solar parameters (temperature class, atmosphere class, hydrological state, geological activity), prototype body profiles, the hybrid terrain / noise-banded ocean / cluster landform approach, and deposit generation rules. Read before any work on tile generation or the terrain enum expansion.
+
+**`docs/generation/CONTINENTS.md`**
+The Continents/Drift pass (`src/world/continents.{hpp,cpp}`) — plate derivation from the planetology outputs, the `height_bias` contract into tile Pass 1, `plate_id` retention for the Continent lens (BL-226), and the biography lines it appends. Written 2026-07-31; replaces the stale authority pointer in `continents.hpp`. Read before any work on plates, landmass shape, or the Continent lens.
 
 **`docs/generation/NATION_GENERATION.md`**
 The procedural nation generation strategy: Voronoi BFS territory placement over the tile map, resource profile derivation, political character assignment, and naming. Nation system behaviour is an open item; this document covers generation only. Read before any work on the world political layer or campaign setup.
@@ -172,7 +184,7 @@ backlog**, or **B) implement now** (smoke-test, then ask before committing).
 | Concern | Authority | Notes |
 |---|---|---|
 | Backlog **metadata** (status, priority, sequencing, version goal, files) | `docs/development/backlog.json` | Queryable; the JSON wins over any prose/glyph. |
-| Backlog **design prose** for an open item | `docs/development/backlog.json` (`design` field) | Design authority *while the item is open*; `BACKLOG.md` holds legacy bodies not yet migrated. |
+| Backlog **design prose** for an open item | `docs/development/backlog.json` (`design` field) | Design authority *while the item is open*; `BACKLOG.md` is drained (pointer stubs only, 2026-07-31). |
 | **Active worklist** (promoted tasks) | `docs/development/REFINED.md` | Transient; empty between work blocks. |
 | **Blocker triage** (items awaiting a UI/visual artifact from Ben) | `docs/development/review.json` | Companion to the backlog, not a replacement — see its own `_note`. |
 | **Player-intent coverage** (user stories) | `docs/development/user_stories.json` (view: `USER_STORIES.md`) | The second route — intent axis; companion to the backlog, consumed by BL-098's review. |
