@@ -176,6 +176,36 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\continents_harness.cpp ^
 .\build_gen\verify\continents_harness.exe
 ```
 
+```bat
+:: Creeds (BL-235) - one pantheon per cradle-culture in its own generated tongue.
+:: Asserts determinism of the full biography across two generations (C1); one
+:: shrine per culture, pairwise-distinct chief-god names, every creed line
+:: carries its consequence (C2); the creed DRIVES - a won tribal war lowers
+:: fragmentation_q before nation seeding, peaceable creeds are a no-op, welding
+:: floors at half, conquest cost can hold a frontier (C3); exactly one 1951
+:: common-tongue globalisation line, after every shrine (C4). Calls
+:: make_hard_coded_world, so it links the full SDL/Lua-free world superset
+:: (every src\world\*.cpp except recipe_registry.cpp and tech_tree.cpp) -
+:: mirror CMakeLists' IO_WORLD_SOURCES glob if this list drifts.
+cl /nologo /std:c++20 /EHsc /I src tools\verify\creeds_harness.cpp ^
+   src\world\budget_system.cpp src\world\building_profit.cpp src\world\chemistry_tables.cpp ^
+   src\world\city_names.cpp src\world\construction.cpp src\world\continents.cpp ^
+   src\world\corp_ai.cpp src\world\corp_command.cpp src\world\corporation_generation.cpp ^
+   src\world\creeds.cpp src\world\economy_system.cpp src\world\hard_coded_world.cpp ^
+   src\world\history_ladder.cpp src\world\logistics.cpp src\world\market_clearing.cpp ^
+   src\world\nation_generation.cpp src\world\orbital_system.cpp src\world\placement_rules.cpp ^
+   src\world\planetology.cpp src\world\population_generation.cpp src\world\road_generation.cpp ^
+   src\world\supply_system.cpp src\world\survey_system.cpp src\world\terrain_combat.cpp ^
+   src\world\tile_generation.cpp src\world\world.cpp ^
+   /Fo:build_gen\verify\creeds_harness\ /Fe:build_gen\verify\creeds_harness.exe
+.\build_gen\verify\creeds_harness.exe
+```
+
+On Windows via CMake (no need to hand-list sources): `cmake --build build --target creeds_harness`
+then `.\build\creeds_harness.exe` — it is picked up by the generic `tools/verify/*.cpp` glob batch
+at the foot of `CMakeLists.txt`, the same path `continents_harness` and `population_demand_harness`
+use, so no hand-declared target is needed.
+
 **BL-202 TU ripple:** `run_economy_step` now calls the strategic tier
 (`run_corp_strategic_step`), so ANY harness linking `economy_system.cpp` also
 needs `corp_ai.cpp corp_command.cpp construction.cpp placement_rules.cpp

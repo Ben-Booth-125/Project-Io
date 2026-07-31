@@ -6637,6 +6637,60 @@
           "notes": "Also re-ran population_mvp (11/11 PASS) after updating its R4/growth tests to the new tick pair."
         }
       ]
+    },
+    {
+      "brief": "creeds-pantheon-per-culture",
+      "title": "Creeds — one pantheon per cradle-culture (BL-235)",
+      "difficulty": 3,
+      "importance": "B",
+      "evaluated_difficulty": 3,
+      "status": "complete",
+      "resolved": "2026-07-31",
+      "resolution": "Complete, all rows met first run: creeds_harness 13/13 PASS; history_ladder_harness and world_audit re-run green after the welding stage landed.",
+      "promoted_from": "BL-235 (creeds)",
+      "batch": null,
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: creeds are a pure deterministic function of (seed, tiles) — two generations of the same seed write the identical biography including shrine, war, and common-tongue lines.",
+          "verification": [
+            "headless: tools/verify/creeds_harness.cpp C1"
+          ],
+          "status": "complete",
+          "result_metric": "C1 PASS (identical event text + dates across two runs)",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "requirement": "One pantheon per culture, each in its own tongue: every cradle raises exactly one shrine line, chief-god names are pairwise distinct, and every creed line carries its -> consequence.",
+          "verification": [
+            "headless: tools/verify/creeds_harness.cpp C2"
+          ],
+          "status": "complete",
+          "result_metric": "C2 PASS (distinct native names; consequences present)",
+          "notes": "Distinctness is the observable of per-culture phonologies."
+        },
+        {
+          "id": "R3",
+          "requirement": "The creed drives: a won tribal war lowers fragmentation_q before nation seeding; peaceable creeds leave it untouched; welding is floored at half the incoming value and conquest cost can hold a frontier.",
+          "verification": [
+            "headless: tools/verify/creeds_harness.cpp C3"
+          ],
+          "status": "complete",
+          "result_metric": "C3 PASS on synthetic extremes (weld, no-op, floor, frontier-holds)",
+          "notes": "First honest form of the deferred war-consolidation (Ben 2026-07-30)."
+        },
+        {
+          "id": "R4",
+          "requirement": "Globalisation closes generation: exactly one common-tongue line, dated 1951, after every shrine line; the record renders in the player language (English for dev) while proper names stay native.",
+          "verification": [
+            "headless: tools/verify/creeds_harness.cpp C4"
+          ],
+          "status": "complete",
+          "result_metric": "C4 PASS (one line, -9 years epoch offset, latest)",
+          "notes": ""
+        }
+      ]
     }
   ]
 }
