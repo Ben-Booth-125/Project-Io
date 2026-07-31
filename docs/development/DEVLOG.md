@@ -10,6 +10,64 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## Session — BL-231 (landform render): drawing the axis the build cost already charged for (2026-07-31)
+
+**Runtime.** ~1h. Full (two render channels, a new glyph family, a measurement harness, three docs).
+
+**Where it came from.** Ben asked whether the tile set needed to be more diverse — "we don't even
+have a visual render for mountains or hills." The answer was **no, the set is fine and the renderer
+was throwing half of it away**: `terrain_colour` switched on composition alone, so six of the seven
+landforms drew as flat hexes. `hex_render.hpp` had asserted for months that "landform is conveyed by
+glyphs, not hue"; no landform glyph existed anywhere. The comment documented an intention nobody
+built, and is now true.
+
+The gap mattered because landform is load-bearing — build cost ×1.0–×2.0, hazard, habitability,
+mineral richness. The player was paying a doubled build cost for terrain the map never showed them.
+
+**Measurement changed the design, which is the point of measuring.** `world_audit` gained an S3
+per-body landform histogram (there was none — only a composition one). The numbers:
+
+```
+SYSTEM (25536 land)  plains 77.0%  valley 18.0%  highland 3.5%
+                     crater 0.8%  mountain 0.6%  canyon 0.1%  rift 0.1%
+Kepler ( 6216 land)  plains 89.8%  highland 7.7%  mountain 1.5%  valley 0.0%
+```
+
+The design had planned an edge/contour channel for a continuous elevation gradient. There is no such
+gradient — 95% of land is plains or valley — so contours **collapsed to a two-step relief tint**, and
+the glyph set **grew from three to four** as canyon joined the ≤1.5%, cost-≥×1.3 set. Simpler than
+the design, and only because the numbers existed before the proportions were fixed.
+
+**Two channels, split by that measurement.** Common ground takes a small signed relief shade (warm
+highlight up, cool shadow down, plains untouched); the four dramatic landforms take a stroke-only
+glyph. Composited **after every lens branch** — composition owns hue and lenses tint over it at
+0.6–0.80 alpha, so a signal folded into the base fill dies exactly when a lens is on. That is
+BL-226's different-channel rule, applied unchanged. Ink is luminance-picked (`contrast_ink`) so the
+glyphs read from near-white ice to dark forest. Both channels live in `hex_render`, so the Selection
+band's neighbourhood view cannot drift from the canvas.
+
+Both suppressed on a **built** tile: that hex is swapped wholesale for its owner plate as identity,
+and elevation matters when *siting*, not after the cost is spent.
+
+**An unrelated finding, recorded not fixed.** Kepler generates **zero valley tiles**. Valley is
+unclaimed non-ocean ground below the height threshold — but on a wet body the ocean already took
+everything that low, so the ×1.1 fertile landform is unreachable on exactly the bodies where river
+valleys should be characteristic (dry bodies carry 20–27%). Self-consistent, not a defect, and a
+*generation* question rather than a rendering one. Noted in TILES.md against BL-051.
+
+**Verified.** Build clean; **CTest 29/29**, determinism intact; `world_audit` S3 PASS;
+`scripts/verify/landform_relief.lua` — 7 captures blessed across a wet body and a dry one, plain plus
+the Continent (0.80 alpha, hardest case) and Country lenses. The first run of that script captured a
+dark grid and proved nothing: Cinder is not the home body and opens unsurveyed, so the survey mask
+blanked it. Fixed with `verify.set_survey` rather than by trusting the first green-looking run.
+
+**Follow-up.** Ben, on seeing it: bridge contiguous runs into one **spanning** marker — a wavy ridge
+across a line of mountains, a filled interior for a compact cluster — instead of repeating a per-tile
+glyph. The mechanism already exists 150 lines away in the same file (BL-172's road span/symmetry
+fix). Filed as its own item rather than folded in.
+
+---
+
 ## Session — BL-221 (pre-national ladder): the first stage that shapes the political map (2026-07-30)
 
 **Runtime.** ~1h 15m. Full (new generation pass, drives nation generation, new harness).

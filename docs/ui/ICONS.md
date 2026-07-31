@@ -85,6 +85,34 @@ On the Planetary canvas the **building** glyph's `fill` now encodes the *owning
 corporation* (player corp = corp slot 0; rivals a hashed slot), so the
 silhouette reads the building **type** and the fill reads **who owns it**.
 
+### 1b. Landform glyphs — terrain shape, drawn on the canvases
+
+A family apart from the entity markers above: these say what the tile *is*, not what is
+*on* it. Accordingly they are **stroke-only** and none carries the filled family's dark
+`outline` — a filled silhouette would read as "something is installed here", which is the
+one thing a landform is not. One entry point, `landform(…, terrain_landform, colour)`,
+dispatching by landform (the third multi-parameter case, alongside `building` and
+`settlement`).
+
+| Glyph | Function | Shape | Colour | Drawn for / where |
+|---|---|---|---|---|
+| **Mountain** | `landform(…, mountain, colour)` | Twin peaks sharing a saddle, open at the feet — no baseline, which is what separates it from the *filled* port triangle and the production up-triangle (both sit **on** a line) | Caller stroke — `ui::contrast_ink(fill)` | Unbuilt tile, Planetary canvas + Selection neighbourhood |
+| **Canyon** | `landform(…, canyon, colour)` | Two level rim shoulders split by a narrow incision cutting below them; the gorge is the **gap**, and the level rims distinguish it from the Continent lens's diagonal seam | Caller stroke | As above |
+| **Crater** | `landform(…, crater, colour)` | A flattened bowl — a wide, low ellipse with a raised near rim arc inside its lower half. The squashed aspect is load-bearing: it is deliberately **not** concentric circles (the `activity` pulse) nor a circle-plus-cross (the `market_centre`) | Caller stroke | As above |
+| **Rift** | `landform(…, rift, colour)` | A single jagged fissure running top to bottom — the only zigzag in the vocabulary, so it cannot be read as a chevron (which meets at one point) or as the canyon's paired rims | Caller stroke | As above |
+
+**Plains, highland and valley draw nothing.** They are the common ground — plains and
+valley alone measure ~95 % of land tiles (`world_audit` § S3) — and are carried by the
+**relief tint** (`ui::landform_relief`), not by a glyph. Putting an icon on nearly every
+tile would be far denser than any other glyph family and would fight the building
+silhouette for the hex centre. See [CANVASES.md](CANVASES.md) § Terrain channels for the
+two-channel split and why the relief composites *after* the lens tints (BL-231).
+
+Because the terrain palette spans near-white ice to dark forest, and any lens may
+composite over it, these glyphs take their stroke from `ui::contrast_ink(fill)` — chosen
+by the finished fill's luminance — rather than a fixed colour that would vanish somewhere
+in that range.
+
 ### 2. UI-affordance glyphs — drawn in chrome
 
 | Glyph | Function | Shape | Colour | Used by |

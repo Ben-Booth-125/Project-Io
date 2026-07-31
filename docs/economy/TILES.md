@@ -164,3 +164,19 @@ This two-axis model is **implemented** (2026-06-14; see DEVLOG § "Two-axis terr
 - `terrain_landform` — the physical shape (7 values: plains, highland, mountain, canyon, valley, crater, rift)
 
 The prototype bodies are generated against the full model by the six-pass pipeline in `src/world/tile_generation.cpp` (see `docs/generation/TILE_GENERATION.md`); there is no remaining retrofit. Tuning refinements that remain open are tracked in `docs/development/BACKLOG.md` § Environment.
+
+**Both axes now render (BL-231, 2026-07-31).** Until then the canvas drew *composition only* — `terrain_colour` switched on the composition enum and landform never reached the screen, so mountain, highland, canyon, valley, crater and rift all appeared as flat hexes despite driving build cost, hazard, habitability and deposit richness. Landform is now a second, independent render channel: a subtle **relief tint** for the common ground and a **glyph** for the four dramatic landforms. The split is authored in `docs/ui/CANVASES.md` § Terrain channels; the glyph shapes are catalogued in `docs/ui/ICONS.md` § Landform glyphs.
+
+**Measured landform distribution** (`world_audit` § S3, the canonical seed — reported per body because the profile varies sharply between wet and airless bodies):
+
+| Landform | System | Kepler (home) | Build cost |
+|---|---|---|---|
+| Plains | 77.0% | 89.8% | ×1.0 |
+| Valley | 18.0% | 0.0% | ×1.1 |
+| Highland | 3.5% | 7.7% | ×1.25 |
+| Crater | 0.8% | 0.4% | ×1.3 |
+| Mountain | 0.6% | 1.5% | ×2.0 |
+| Canyon | 0.1% | 0.4% | ×1.5 |
+| Rift | 0.1% | 0.3% | ×1.6 |
+
+**Open tuning question raised by that measurement: Kepler generates no valley tiles at all.** Valley is assigned to unclaimed non-ocean ground below the height threshold (Pass 5), but on a wet body the ocean has already taken everything that low — so the ×1.1 fertile landform is unreachable on exactly the bodies where river valleys should be most characteristic. Dry bodies carry 20–27% valley. This is self-consistent rather than a defect, but it is a generation-tuning question, not a rendering one; it belongs with the tile-generation refinements (BL-051).

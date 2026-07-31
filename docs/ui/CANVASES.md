@@ -154,6 +154,51 @@ navigation pane; the canvases do not touch it.
 
 ---
 
+## Terrain channels — composition and landform (BL-231)
+
+A tile's character has two axes ([TILES.md](../economy/TILES.md)), and the Planetary
+canvas draws them on **two separate channels**. Both are **always-on chrome**, not an
+`overlay_mode`: terrain identity is not something the player opts into, and landform's
+build-cost multiplier applies whether or not a lens is active.
+
+| Axis | Channel | Source |
+|---|---|---|
+| **Composition** (what it is made of) | **Hue** — the flat hex fill | `ui::terrain_colour` |
+| **Landform** (its physical shape) | **Relief tint** + **glyph** | `ui::landform_relief`, `ui::icons::landform` |
+
+**Why two channels rather than one.** Lens tints composite over the terrain hue at
+0.6–0.80 alpha, so a second signal carried *in that hue* is obliterated exactly when a
+lens is on. This is the rule BL-226 established for the Continent lens's plate
+boundaries and it applies here unchanged: the relief is composited **after** every lens
+branch, and the glyphs are drawn over the finished fill in a contrasting ink
+(`ui::contrast_ink`, picked by the fill's luminance so it reads over the whole palette).
+
+**Why the landform channel splits in two.** The measured mix (`world_audit` § S3) decided
+it. Plains and valley alone are ~95 % of land tiles, while every dramatic landform is
+≤ 1.5 %:
+
+- **Common ground — relief tint.** Plains is the untouched baseline; elevated ground lifts
+  toward a warm highlight and sunken ground toward a cool shadow, on a small signed
+  ordinal scale (mountain highest → canyon lowest). Deliberately subtle: it must read as
+  light on terrain, never as a change of composition.
+- **Dramatic landforms — glyph.** Mountain, canyon, crater and rift each draw a stroke-only
+  silhouette ([ICONS.md](ICONS.md) § Landform). These are the ≤ 1.5 % set whose build cost
+  is ×1.3 or worse, so an invisible surprise there is expensive. A glyph on *every* tile
+  would be far denser than any other glyph family and would fight the building silhouette
+  for the hex centre.
+
+**Suppression rules.** The glyph is skipped on a **built** tile (which already carries an
+enlarged silhouette plus a corp emblem tag, and whose cost is already spent — elevation
+matters when *siting*) and under the **Population/Opportunity** lenses (which claim the hex
+centre for their own value mark, BL-135). The relief tint is likewise skipped on a built
+tile, whose hex is swapped wholesale for its owner plate as an identity signal.
+
+Both channels also render in the Selection band's zoomed tile-neighbourhood view, which is
+why they live in `hex_render` rather than in the canvas — one implementation, so the two
+surfaces cannot drift. Verified by `scripts/verify/landform_relief.lua`.
+
+---
+
 ## Implementation approach
 
 Each canvas is a free function. The minimap-role canvases take an explicit

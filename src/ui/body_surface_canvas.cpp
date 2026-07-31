@@ -1614,6 +1614,19 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             }
         }
 
+        // Landform relief (BL-231). Composited HERE — after every lens tint and the
+        // suitability wash — because composition owns hue and the lenses composite over
+        // that hue at 0.6–0.80 alpha; relief folded into the base fill would be buried
+        // exactly when a lens is active. Landform drives build cost (×1.0–×2.0), hazard,
+        // habitability and mineral richness, and that cost applies whether or not a lens
+        // is on, so this is always-on terrain chrome rather than an overlay_mode.
+        //
+        // Skipped on a built tile: that hex is swapped wholesale for its owner plate as
+        // an identity signal, and shading it would muddy whose it is. No read is lost —
+        // the elevation matters when SITING, and a built tile has already been sited.
+        if (!built)
+            fill = landform_relief(fill, tile.landform);
+
         // Survey mask (BL-067): tiles in regions not yet revealed render as a dark
         // locked overlay with no lens detail, borders, markers, or hit-testing — the
         // locked fill is drawn, then the per-copy detail is skipped. A fully surveyed
@@ -1858,6 +1871,24 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     }
                 }
             }
+
+            // Landform glyph (BL-231): the categorical half of the landform channel.
+            // Only the four DRAMATIC landforms draw — mountain, canyon, crater, rift —
+            // measured at ≤1.5 % of land tiles each (world_audit § S3) and each carrying
+            // a build cost of ×1.3 or worse, so this is the set where an invisible
+            // surprise is expensive. Plains, highland and valley draw nothing; between
+            // them plains and valley are ~95 % of land, and an icon on nearly every tile
+            // would be far denser than any other glyph family.
+            //
+            // Unbuilt tiles only: a built hex already carries an enlarged silhouette plus
+            // a corp emblem tag, and its cost is spent. Suppressed under the two value
+            // lenses, which claim the hex centre for their own mark below (BL-135). Ink
+            // contrasts against the finished fill, so the glyph reads over any terrain
+            // hue and any lens tint composited on top of it.
+            if (!built && state.overlay != overlay_mode::population &&
+                state.overlay != overlay_mode::opportunity)
+                icons::landform(dl, {cx, cy}, std::max(3.0f, draw_r * 0.44f),
+                                tile.landform, contrast_ink(fill));
 
             // Value-lens tile marks (BL-135): Workforce (Population lens) and
             // Opportunity replace their old full-tile tint with a per-tile red→green

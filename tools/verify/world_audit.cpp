@@ -12,6 +12,7 @@
 #include "world/world.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstdio>
 #include <map>
 #include <set>
@@ -48,6 +49,65 @@ int main()
                 wetland, total ? 100.0f * wetland / total : 0.0f, fw_frac);
     std::printf("  S2 target forest+wetland >= 3%% of all tiles: %s\n",
                 fw_frac >= 3.0f ? "PASS" : "FAIL");
+
+    // --- S3 (BL-231): per-body landform histogram ---
+    // The renderer keys only on composition, so the landform axis has never been
+    // looked at. It drives build cost (x1.0-x2.0), hazard, habitability and
+    // mineral richness, so how SPARSE each landform is decides how it should be
+    // drawn: a landform holding a third of a body wants a field treatment, one
+    // holding a few percent wants a marker. Reported per body because the
+    // profile differs sharply (airless bodies are cratered; atmospheric ones
+    // are not). Measurement first — see backlog.json BL-231 § Step 1.
+    static const char* kLandformName[7] = {
+        "plains", "highland", "mountain", "canyon", "valley", "crater", "rift" };
+    constexpr int kNumLandform = 7;
+
+    std::printf("\nLandform distribution (BL-231; land tiles only, ocean excluded)\n");
+    std::map<entity_id, std::array<int, kNumLandform>> per_body;
+    std::map<entity_id, int> per_body_land;
+    std::array<int, kNumLandform> system_hist{};
+    int system_land = 0;
+    for (const auto& [tid, tc] : w.tiles)
+    {
+        if (tc.composition == terrain_composition::ocean)
+            continue;
+        const int lf = static_cast<int>(tc.landform);
+        if (lf < 0 || lf >= kNumLandform)
+            continue;
+        ++per_body[tc.body][lf];
+        ++per_body_land[tc.body];
+        ++system_hist[lf];
+        ++system_land;
+    }
+
+    for (const auto& [bid, hist_lf] : per_body)
+    {
+        const auto bit = w.bodies.find(bid);
+        const int  n   = per_body_land[bid];
+        std::printf("  %-12s (%4d land)", bit == w.bodies.end() ? "?" : bit->second.name.c_str(), n);
+        for (int i = 0; i < kNumLandform; ++i)
+            std::printf("  %s %.1f%%", kLandformName[i], n ? 100.0f * hist_lf[i] / n : 0.0f);
+        std::printf("\n");
+    }
+
+    std::printf("  SYSTEM       (%4d land)", system_land);
+    for (int i = 0; i < kNumLandform; ++i)
+        std::printf("  %s %.1f%%", kLandformName[i],
+                    system_land ? 100.0f * system_hist[i] / system_land : 0.0f);
+    std::printf("\n");
+
+    // The generation pipeline can emit all seven; a landform absent system-wide
+    // means a pass stopped firing (a silently flattened mix), which is exactly
+    // the regression this check exists to catch.
+    int landform_absent = 0;
+    for (int i = 0; i < kNumLandform; ++i)
+        if (system_hist[i] == 0)
+        {
+            ++landform_absent;
+            std::printf("  BAD: landform '%s' appears on no body\n", kLandformName[i]);
+        }
+    std::printf("  BL-231 R1 every landform generation can produce appears somewhere: %s\n",
+                landform_absent == 0 ? "PASS" : "FAIL");
 
     // --- S1: extraction asset placement audit ---
     const resource_type extractable[] = {
@@ -510,5 +570,5 @@ int main()
             && absent == 0 && ordering_ok
             && floor_ok && variance_ok && count_ok
             && market_count_ok && cross_nation_ok && market_determinism_ok
-            && hq_bad == 0 && hq_det_bad == 0) ? 0 : 1;
+            && hq_bad == 0 && hq_det_bad == 0 && landform_absent == 0) ? 0 : 1;
 }

@@ -6532,6 +6532,51 @@
           "result_metric": "NOT RUN. The ledger clips below the fold and the verify API has no scroll driver — the same blind spot BL-220 raised; a follow-up task is open for it."
         }
       ]
+    },
+    {
+      "brief": "landform-render",
+      "batch": "2026-07-31-landform-render",
+      "title": "BL-231 — landform render (draw the axis the build cost already charges for)",
+      "status": "completed",
+      "promoted_from": "backlog.json BL-231 LANDFORM_RENDER",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "completed",
+          "requirement": "HEADLESS: the landform mix is MEASURED, not assumed — world_audit reports the per-body and system-wide landform distribution over land tiles, and asserts that every landform generation can produce appears somewhere. This is the gate on the render proportions and the standing guard against a tuning change silently flattening the mix.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "world_audit S3 — PASS. System (25536 land): plains 77.0%, valley 18.0%, highland 3.5%, crater 0.8%, mountain 0.6%, canyon 0.1%, rift 0.1%. Kepler (6216 land): plains 89.8%, highland 7.7%, mountain 1.5%, canyon 0.4%, crater 0.4%, rift 0.3%, valley 0.0%. Numbers moved the design: no continuous elevation gradient exists to contour, so relief collapsed to a two-step tint and the glyph set grew from 3 to 4."
+        },
+        {
+          "id": "R2",
+          "status": "completed",
+          "requirement": "VISUAL: on the plain canvas the four dramatic landforms — mountain, canyon, crater, rift — are individually distinguishable from plains and from each other at default zoom, on both a wet body (Kepler) and a dry one (Cinder).",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "scripts/verify/landform_relief.lua — PASS. landform_kepler_zoom + landform_kepler_relief show all four silhouettes simultaneously and mutually distinguishable (twin peaks / split rims / flattened bowl / jagged fissure); landform_cinder_zoom shows craters on the dry body. Density reads as scattered accents, not a rash, matching the measured <=1.5% per landform."
+        },
+        {
+          "id": "R3",
+          "status": "completed",
+          "requirement": "VISUAL: the landform read SURVIVES AN ACTIVE LENS. Composition owns hue and lens tints composite over it at 0.6-0.80 alpha, so the landform channel must still be legible with a saturated lens active (BL-226 § the different-channel rule).",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "PASS. landform_cinder_lens_continent (0.80 alpha, the hardest case) and landform_cinder_lens_country both retain legible glyphs over the lens tint. Ordering verified in source: relief composites at body_surface_canvas.cpp:1617, after the last lens branch at 1556. Relief itself survives but is subtle under a saturated lens — noted, not a failure, since the glyphs carry the categorical read by design."
+        },
+        {
+          "id": "R4",
+          "status": "completed",
+          "requirement": "VISUAL: highland and valley read as elevation, not as a different terrain type — the relief tint must modulate the composition hue without being mistakable for a change of composition, and plains must stay the untouched baseline.",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "PASS. Plains stays the untouched baseline; highland lifts (visible on landform_kepler_relief) and valley sinks (visible on landform_cinder_zoom/wide — Kepler has no valley at all, which is why the dry body is captured). The tint modulates luminance within a composition rather than crossing into another composition band, so it reads as elevation, not as a terrain-type change."
+        }
+      ]
     }
   ]
 }

@@ -179,6 +179,32 @@ void industry(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Fill colour of both plates.
 void continent(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw a **landform** marker for @p lf — the terrain-shape glyph family (BL-231).
+/// Stroke-only, in @p colour, so it reads as *engraved terrain* rather than as one
+/// more entity marker sitting on the tile; the caller picks a colour that contrasts
+/// with the hex beneath (see `ui::contrast_ink`).
+///
+/// Only the four **dramatic** landforms draw: mountain, canyon, crater and rift.
+/// Plains, highland and valley draw **nothing** — they are the common ground
+/// (measured at ~95 % of land tiles between plains and valley alone) and are carried
+/// by the relief tint in `hex_render`, not by a glyph. Drawing them would put an icon
+/// on nearly every tile, which is far denser than any other glyph family and would
+/// fight the building silhouette for the hex centre.
+///
+/// Silhouettes are chosen against the existing vocabulary: the mountain **range** is
+/// stroke-only twin peaks with no baseline (so it never reads as the *filled* port
+/// triangle or the production up-triangle); the canyon is a pair of rims split by a
+/// narrow **incision**; the crater is a **flattened bowl** with a raised near rim (not
+/// concentric circles — that is the activity pulse); and the rift is a single jagged
+/// fissure, the only zigzag in the set.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param lf     Landform to depict; plains/highland/valley draw nothing.
+/// @param colour Stroke colour.
+void landform(ImDrawList* dl, ImVec2 centre, float r, terrain_landform lf, ImU32 colour);
+
 /// Draw the History nav-rail glyph — an hourglass (a down-triangle over an
 /// up-triangle meeting at a waist) — in @p colour. Slot 9 previously drew the
 /// same @ref ledger glyph as the Budget slot, so the two were indistinguishable;

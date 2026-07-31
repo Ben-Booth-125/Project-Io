@@ -20,8 +20,33 @@ struct world;
 namespace ui {
 
 /// Identity fill colour for a tile's composition — the single source of truth for
-/// surface tinting (landform is conveyed by glyphs, not hue).
+/// surface tinting. Composition owns **hue**; landform is a separate channel
+/// (`landform_relief` below, plus the `ui::icons::landform` glyphs), because lens
+/// tints composite over this hue and would obliterate any second signal carried in it.
 ImU32 terrain_colour(terrain_composition t);
+
+/// Composite a **relief** shade for @p lf over @p base — the landform channel's
+/// half that covers the common ground (BL-231).
+///
+/// Landform drives build cost (×1.0–×2.0), hazard, habitability and mineral richness,
+/// but never reached the screen: `terrain_colour` keys on composition alone. Measurement
+/// (world_audit § S3) settled the shape of the fix — the mix is ~95 % plains + valley with
+/// every dramatic landform ≤ 1.5 %, so there is no continuous gradient worth contouring.
+/// Elevated ground therefore lifts toward a warm sunlit highlight and sunken ground sinks
+/// toward a cool shadow, on a small signed ordinal scale (mountain highest, canyon lowest,
+/// plains untouched at zero).
+///
+/// The amounts are deliberately **subtle**: this must read as light falling on terrain,
+/// never as a change of composition (the hue is the identity channel and stays intact).
+/// Callers composite this **after** any lens tint, so the relief survives a saturated
+/// overlay rather than being buried under it.
+ImU32 landform_relief(ImU32 base, terrain_landform lf);
+
+/// Pick an ink that reads against @p bg — dark on a light background, light on a dark
+/// one, by perceived luminance. The terrain palette spans near-white ice to dark forest
+/// and any lens may composite over it, so a fixed glyph colour would vanish somewhere;
+/// this keeps the landform glyphs legible across the whole range.
+ImU32 contrast_ink(ImU32 bg);
 
 /// Fills `out[6]` with the screen-space vertices of a pointy-top hexagon centred
 /// at (cx, cy) with circumradius r.

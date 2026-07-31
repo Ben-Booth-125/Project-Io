@@ -294,6 +294,102 @@ void continent(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     dl->AddPolyline(right, 4, outline, ImDrawFlags_Closed, 1.0f);
 }
 
+void landform(ImDrawList* dl, ImVec2 centre, float r, terrain_landform lf, ImU32 colour)
+{
+    // Terrain shape, not an entity — so every glyph here is STROKE-ONLY and none
+    // carries the filled family's dark `outline`. A filled silhouette would read as
+    // "something is installed on this tile", which is the one thing landform is not.
+    //
+    // The stroke scales with r but never below ~1px, so a glyph stays visible when
+    // the canvas is zoomed out far enough that hexes are small.
+    const float t = std::max(1.0f, r * 0.16f);
+
+    switch (lf)
+    {
+        case terrain_landform::mountain:
+        {
+            // Twin peaks sharing a saddle, open at the bottom. No baseline: the
+            // open feet are what separate this from the filled port triangle and
+            // the production up-triangle, both of which sit ON a line.
+            const ImVec2 range[5] = {
+                { centre.x - r,         centre.y + r * 0.62f },
+                { centre.x - r * 0.34f, centre.y - r * 0.72f },
+                { centre.x + r * 0.04f, centre.y + r * 0.06f },
+                { centre.x + r * 0.46f, centre.y - r * 0.46f },
+                { centre.x + r,         centre.y + r * 0.62f },
+            };
+            dl->AddPolyline(range, 5, colour, ImDrawFlags_None, t);
+            break;
+        }
+        case terrain_landform::canyon:
+        {
+            // Two rim shoulders split by a narrow incision that cuts BELOW them —
+            // the gorge is the gap, and the rims are level, so it reads as a cleft
+            // in flat ground rather than as the continent glyph's diagonal seam.
+            const ImVec2 left[3] = {
+                { centre.x - r,         centre.y - r * 0.42f },
+                { centre.x - r * 0.30f, centre.y - r * 0.42f },
+                { centre.x - r * 0.10f, centre.y + r * 0.78f },
+            };
+            const ImVec2 right[3] = {
+                { centre.x + r,         centre.y - r * 0.42f },
+                { centre.x + r * 0.30f, centre.y - r * 0.42f },
+                { centre.x + r * 0.10f, centre.y + r * 0.78f },
+            };
+            dl->AddPolyline(left,  3, colour, ImDrawFlags_None, t);
+            dl->AddPolyline(right, 3, colour, ImDrawFlags_None, t);
+            break;
+        }
+        case terrain_landform::crater:
+        {
+            // A flattened bowl: a wide, low ellipse with a raised near rim drawn as
+            // a second arc inside its lower half. Deliberately NOT concentric circles
+            // (the activity pulse) and not a circle-plus-cross (the market centre) —
+            // the squashed aspect ratio is what says "impact basin seen from above".
+            const int   kSeg = 20;
+            ImVec2      rim[kSeg];
+            for (int i = 0; i < kSeg; ++i)
+            {
+                const float a = 6.2831853f * static_cast<float>(i) / static_cast<float>(kSeg);
+                rim[i] = { centre.x + r * 0.98f * std::cos(a),
+                           centre.y + r * 0.56f * std::sin(a) };
+            }
+            dl->AddPolyline(rim, kSeg, colour, ImDrawFlags_Closed, t);
+
+            const int kInner = 9; // lower half only — the near rim of the bowl
+            ImVec2    floor_arc[kInner];
+            for (int i = 0; i < kInner; ++i)
+            {
+                const float a = 3.1415927f * static_cast<float>(i) / static_cast<float>(kInner - 1);
+                floor_arc[i] = { centre.x + r * 0.52f * std::cos(a),
+                                 centre.y + r * 0.30f * std::sin(a) };
+            }
+            dl->AddPolyline(floor_arc, kInner, colour, ImDrawFlags_None, t * 0.8f);
+            break;
+        }
+        case terrain_landform::rift:
+        {
+            // A single jagged fissure running top to bottom — the only zigzag in the
+            // vocabulary, so it cannot be confused with any chevron (which meet at one
+            // point) or with the canyon's paired rims.
+            const ImVec2 fissure[6] = {
+                { centre.x + r * 0.30f, centre.y - r },
+                { centre.x - r * 0.16f, centre.y - r * 0.44f },
+                { centre.x + r * 0.24f, centre.y - r * 0.06f },
+                { centre.x - r * 0.26f, centre.y + r * 0.34f },
+                { centre.x + r * 0.14f, centre.y + r * 0.66f },
+                { centre.x - r * 0.20f, centre.y + r },
+            };
+            dl->AddPolyline(fissure, 6, colour, ImDrawFlags_None, t);
+            break;
+        }
+        case terrain_landform::plains:
+        case terrain_landform::highland:
+        case terrain_landform::valley:
+            break; // common ground — carried by the relief tint, not a glyph
+    }
+}
+
 void history(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
 {
     // Hourglass: a down-triangle over an up-triangle meeting at a centre waist,

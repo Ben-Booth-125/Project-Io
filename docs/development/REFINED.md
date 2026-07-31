@@ -36,6 +36,46 @@ focused agents, not a hard disjointness gate. Agents build and commit on their o
 worktree branch; the integrating session merges, builds, and verifies. See
 [`DELIVERY.md`](DELIVERY.md) § Sub-agents & worktrees for the authoritative model.
 
+## Landform render (promoted from backlog.json § BL-231) — **COMPLETE**
+
+All six tasks landed 2026-07-31. Build clean, **CTest 29/29** (determinism intact),
+`world_audit` S3 PASS, `landform_relief.lua` 7 captures blessed. Requirements
+`requirements.json § landform-render` R1–R4 all complete. Per-item detail and the
+measured distribution: backlog.json BL-231 `resolution`, TILES.md § Implementation note.
+Follow-up raised by Ben on delivery — bridge contiguous landform runs into one spanning
+marker — filed separately rather than folded in. Summary retained one cycle.
+
+Requirements: requirements.json § landform-render (R1–R4).
+Goal: draw the landform axis. `terrain_colour` keys on composition only, so six of seven
+landforms render as flat hexes — while landform drives build cost ×1.0–×2.0, hazard,
+habitability and mineral richness.
+
+**A gated everything else**, and its numbers changed the design: the measured mix is 95%
+plains+valley with every dramatic landform ≤1.5%, so there is no continuous elevation gradient
+to contour. Relief collapsed to a two-step tint (highland lift / valley sink); the glyph set
+grew from 3 to 4 (mountain, canyon, crater, rift — the ≤1.5%, cost-≥×1.3 set where an invisible
+surprise is expensive).
+
+- **[1] A — Measurement gate: per-body + system landform histogram over land tiles, with an
+  every-landform-appears assertion.** Files: `tools/verify/world_audit.cpp`. Deps: foundation.
+  Satisfies: R1. **DONE** — PASS; numbers recorded in backlog.json BL-231 and requirement R1.
+- **[2] B — Four landform glyphs.** Files: `src/ui/icons.{hpp,cpp}`. Deps: A (A decides the set
+  is 4, not 3). Parallel-safe with C. Satisfies: R2.
+- **[2] C — Relief tint + contrast ink helpers; correct the false landform comment.**
+  Files: `src/ui/hex_render.{hpp,cpp}`. Deps: A. Parallel-safe with B. Satisfies: R4.
+- **[2] D — Canvas wiring: composite relief AFTER the lens tints so it survives them; draw the
+  glyph on unbuilt revealed tiles.** Files: `src/ui/body_surface_canvas.cpp`. Deps: B, C.
+  Satisfies: R2, R3, R4.
+- **[1] E — Docs: ICONS.md glyph rows, CANVASES.md landform-channel section, TILES.md render
+  note.** Files: `docs/ui/ICONS.md`, `docs/ui/CANVASES.md`, `docs/economy/TILES.md`. Deps: D.
+  Satisfies: authority propagation.
+- **[1] F — Visual check.** Files: `scripts/verify/landform_relief.lua`. Deps: D.
+  Satisfies: R2, R3, R4.
+
+Parallelisation note: A → {B ∥ C} → D → {E ∥ F}. Run main-session-serial — B and C are small,
+adjacent, and D integrates both immediately; worktree fan-out would cost more than the two
+small files save.
+
 ## AI constituents batch (promoted from backlog.json § BL-202, BL-206, BL-207) — **COMPLETE**
 
 Batch: 2026-07-27-ai-constituents. Requirements: requirements.json §
