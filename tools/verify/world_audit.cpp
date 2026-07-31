@@ -9,6 +9,7 @@
 #include "world/hard_coded_world.hpp"
 #include "world/nation_generation.hpp"
 #include "world/placement_rules.hpp"
+#include "world/terrain_combat.hpp"
 #include "world/world.hpp"
 
 #include <algorithm>
@@ -108,6 +109,71 @@ int main()
         }
     std::printf("  BL-231 R1 every landform generation can produce appears somewhere: %s\n",
                 landform_absent == 0 ? "PASS" : "FAIL");
+
+    // --- S5 (BL-233): terrain combat value, binary vs graded ---
+    // MEASUREMENT ONLY — history_ladder.cpp is untouched and still uses its own
+    // is_barrier bool. This reports what the ladder's barrier field looks like today
+    // against what the graded terrain_resistance would give, so the political-map
+    // consequence can be seen BEFORE anything is switched over. barrier_q is a share
+    // of ALL tiles (n = gw*gh, ocean included), so the ocean split below matters: if
+    // water dominates the field, terrain is barely driving the political map at all.
+    //
+    // Downstream, exactly as the ladder computes it:
+    //   fragmentation_q = (barrier_q*6 + cradle_q*4)/10   -> d_frag  = 0.6 * d_barrier
+    //   polity_seeds    = cradles + fragmentation_q*12/1000 -> d_seeds = 12 * d_frag / 1000
+    std::printf("\nTerrain combat value (BL-233; binary is_barrier vs graded terrain_resistance)\n");
+    for (const auto& [bid, bc] : w.bodies)
+    {
+        if (bc.grid_width <= 0 || bc.grid_height <= 0)
+            continue;
+        const int total_n = bc.grid_width * bc.grid_height;
+
+        int bin_barrier = 0, bin_ocean = 0, graded_sum = 0, land_n = 0;
+        long long def_sum = 0, att_sum = 0;
+        for (const auto& [tid, tc] : w.tiles)
+        {
+            if (tc.body != bid)
+                continue;
+            const bool ocean = (tc.composition == terrain_composition::ocean);
+
+            // Replicate the ladder's is_barrier exactly (history_ladder.cpp § is_barrier).
+            const bool bin = ocean
+                          || tc.landform == terrain_landform::mountain
+                          || tc.landform == terrain_landform::canyon
+                          || tc.composition == terrain_composition::barren
+                          || tc.composition == terrain_composition::icy;
+            if (bin)   ++bin_barrier;
+            if (ocean) ++bin_ocean;
+
+            if (!ocean)
+            {
+                ++land_n;
+                graded_sum += terrain_resistance(tc.composition, tc.landform);
+                def_sum    += terrain_defence(tc.composition, tc.landform);
+                att_sum    += terrain_attrition(tc.composition, tc.landform);
+            }
+        }
+        if (total_n <= 0)
+            continue;
+
+        const int bin_q = std::clamp((bin_barrier * 1000) / total_n, 0, 1000);
+        // Graded, on the same denominator so the two are comparable. Ocean contributes
+        // zero resistance here — it is a MODE, and the ladder prices it separately via
+        // the coastal term in exit_cost_q.
+        const int grd_q = std::clamp(graded_sum / total_n, 0, 1000);
+
+        const int  d_barrier = grd_q - bin_q;
+        const float d_frag   = 0.6f * static_cast<float>(d_barrier);
+        const float d_seeds  = 12.0f * d_frag / 1000.0f;
+
+        std::printf("  %-12s barrier_q binary %4d (of which ocean %4d)  graded %4d  delta %+5d\n",
+                    bc.name.c_str(), bin_q,
+                    std::clamp((bin_ocean * 1000) / total_n, 0, 1000), grd_q, d_barrier);
+        std::printf("                -> fragmentation_q %+.1f, polity_seeds %+.2f | land means: defence %d, attrition %d\n",
+                    static_cast<double>(d_frag), static_cast<double>(d_seeds),
+                    land_n ? static_cast<int>(def_sum / land_n) : 0,
+                    land_n ? static_cast<int>(att_sum / land_n) : 0);
+    }
 
     // --- S4 (BL-232): landform CONTIGUITY ---
     // BL-231 draws one glyph per tile, so a run of three mountains reads as three
