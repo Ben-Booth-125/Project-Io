@@ -36,7 +36,20 @@ focused agents, not a hard disjointness gate. Agents build and commit on their o
 worktree branch; the integrating session merges, builds, and verifies. See
 [`DELIVERY.md`](DELIVERY.md) § Sub-agents & worktrees for the authoritative model.
 
-## Sprint 3 — Corp AI Stage B + skill harness (promoted from backlog.json § BL-203, BL-204)
+## Sprint 3 — Corp AI Stage B + skill harness (promoted from backlog.json § BL-203, BL-204) — **PAUSED (deliberate, pre-execution)**
+
+**Paused 2026-07-31, before any task started** — an intentional exception to "drive a group to
+complete in one block" (REFINED.md § Pausing a task group), not a stall. Ben's call: this batch
+touches AI behaviour and a new headless harness with no visual surface a remote session can show
+him directly, and he wants to build and see the output himself on his own PC. Decomposition
+(collision map, task order, requirement rows) is done and considered good; **implementation is
+deliberately deferred to local dev**, not because it's blocked.
+
+**Resume here:** start at **B1** (state hash, `src/world/world.hpp`/`.cpp`) — foundation of the
+disjoint B-chain — or **A1** (strategy layer, `src/world/corp_ai.{hpp,cpp}`) if starting the
+A-chain first; both are independent roots. No code exists yet for either chain. Build is green
+(nothing touched). Requirements `corp-ai-predictive-spending` / `ai-skill-harness` are `active`,
+all rows unstarted.
 
 Requirements: requirements.json § corp-ai-predictive-spending, ai-skill-harness. Goal: make the
 corp AI genuinely solvent (priority buckets + predictive spending, replacing BL-202's crude
