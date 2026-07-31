@@ -172,7 +172,9 @@ overlay_mode overlay_from_name(const std::string& s)
     if (s == "production")  return overlay_mode::production;
     if (s == "scarcity")    return overlay_mode::scarcity;
     if (s == "industry")    return overlay_mode::industry;
+    if (s == "reach")       return overlay_mode::reach;
     if (s == "continent")   return overlay_mode::continent;
+    if (s == "supply_routes") return overlay_mode::supply_routes;
     return overlay_mode::none;
 }
 
