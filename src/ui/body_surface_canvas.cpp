@@ -1206,7 +1206,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
     // Supply lens pre-pass: check whether the active body has any player convoys
     // (source or destination). Used inside the tile loop to gate the per-tile glyph.
-    // w.convoys is empty until the dispatch system lands; supply_active stays false.
+    // w.convoys is populated by dispatch_convoys (supply_system.cpp) each tick.
     bool supply_active = false;
     if (state.overlay == overlay_mode::supply)
     {
@@ -1975,7 +1975,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
             // Supply lens: draw a convoy glyph on every tile when the active body
             // has a player convoy passing through it. supply_active is false when
-            // w.convoys is empty, so this is a no-op until dispatch is wired.
+            // no player convoy touches this body.
             if (supply_active)
             {
                 constexpr ImU32 supply_col = IM_COL32(80, 200, 255, 200);

@@ -11,10 +11,10 @@ struct foldout_rect { float x, y, w, h; };
 /// ledger fills the rest when a nav slot is active. This width is what the balance bar
 /// and the Selection element clear on their left.
 ///
-/// W = clamp(round(0.17 * disp_x), 300, 360). ~300 @1280, ~326 @1920. Runtime-computed
-/// from the display width (not a compile-time constant) so it stays legible across the
-/// display-robustness range (DEVELOPMENT_PRACTICES § Display environment). The 300px
-/// floor is deliberate — it is the constraint that forces the one-question-per-view
+/// W = clamp(round(0.20 * disp_x), 380, 460). ~380 @1280–1920, ~410 @2048. Runtime-
+/// computed from the display width (not a compile-time constant) so it stays legible
+/// across the display-robustness range (DEVELOPMENT_PRACTICES § Display environment).
+/// The floor is deliberate — it is the constraint that forces the one-question-per-view
 /// panel splits (BL-117..121) rather than leaving them optional.
 float shell_column_width(float disp_x);
 

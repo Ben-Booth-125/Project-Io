@@ -35,8 +35,9 @@ void credit_arrived_convoys(world& w, int tick = 0);
 /// cost constants are passed in directly (loaded from economy.lua by the caller).
 ///
 /// Space-mode convoys require a building_type::launchpad in the source corp's assets
-/// on the source body. Land-mode is ungated. Sea and air modes are not dispatched
-/// in the prototype (no ports/airfields gating logic yet).
+/// on the source body. Land-mode is ungated. Sea mode is selected automatically when
+/// the intra-body path crosses ocean (path.crosses_ocean — see docs/economy/SUPPLY.md);
+/// air mode is not dispatched in the prototype.
 ///
 /// @param w         World; convoys are appended and source pools debited.
 /// @param reg       Registry (for building type lookups).
