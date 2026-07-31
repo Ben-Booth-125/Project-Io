@@ -109,6 +109,78 @@ int main()
     std::printf("  BL-231 R1 every landform generation can produce appears somewhere: %s\n",
                 landform_absent == 0 ? "PASS" : "FAIL");
 
+    // --- S4 (BL-232): landform CONTIGUITY ---
+    // BL-231 draws one glyph per tile, so a run of three mountains reads as three
+    // identical icons rather than as one range. Bridging them into a spanning ridge
+    // only pays if runs actually exist: Pass 5 grows mountain from seeds where ring 0
+    // is mountain but ring 1 is only 30% mountain, so clusters may be scattered specks.
+    // Reported as the share of tiles with 0 / 1 / 2+ same-landform CARDINAL neighbours
+    // (the 4 directions the span idiom uses, matching BL-172's road edges) plus the
+    // share that are fully interior — those three numbers decide whether the spanning
+    // case or the filled-interior case is the common one, or neither is. Measurement
+    // before the visual, exactly as S3 gated BL-231.
+    const terrain_landform kLinear[3] = { terrain_landform::mountain,
+                                          terrain_landform::rift,
+                                          terrain_landform::canyon };
+
+    // Per-body raster of landform, so a cardinal neighbour is an O(1) lookup and the
+    // column wrap matches the canvas (columns wrap, rows do not).
+    std::map<entity_id, std::vector<int>> body_lf; // -1 = ocean or absent
+    for (const auto& [bid, bc] : w.bodies)
+        if (bc.grid_width > 0 && bc.grid_height > 0)
+            body_lf[bid].assign(static_cast<std::size_t>(bc.grid_width) * bc.grid_height, -1);
+    for (const auto& [tid, tc] : w.tiles)
+    {
+        const auto bit = body_lf.find(tc.body);
+        if (bit == body_lf.end() || tc.composition == terrain_composition::ocean)
+            continue;
+        const auto bc = w.bodies.find(tc.body);
+        if (bc == w.bodies.end())
+            continue;
+        const std::size_t idx = static_cast<std::size_t>(tc.grid_y) * bc->second.grid_width + tc.grid_x;
+        if (idx < bit->second.size())
+            bit->second[idx] = static_cast<int>(tc.landform);
+    }
+
+    std::printf("\nLandform contiguity (BL-232; same-landform cardinal neighbours)\n");
+    for (terrain_landform lf : kLinear)
+    {
+        const int lfi = static_cast<int>(lf);
+        int n0 = 0, n1 = 0, n2plus = 0, interior = 0, tiles = 0;
+        for (const auto& [bid, raster] : body_lf)
+        {
+            const auto bc = w.bodies.find(bid);
+            if (bc == w.bodies.end())
+                continue;
+            const int bw = bc->second.grid_width, bh = bc->second.grid_height;
+            for (int row = 0; row < bh; ++row)
+                for (int col = 0; col < bw; ++col)
+                {
+                    if (raster[static_cast<std::size_t>(row) * bw + col] != lfi)
+                        continue;
+                    ++tiles;
+                    int same = 0;
+                    static const int off[4][2] = {{+1, 0}, {-1, 0}, {0, +1}, {0, -1}};
+                    for (auto& d : off)
+                    {
+                        const int nrow = row + d[1];
+                        if (nrow < 0 || nrow >= bh)
+                            continue;
+                        const int ncol = ((col + d[0]) % bw + bw) % bw; // columns wrap
+                        if (raster[static_cast<std::size_t>(nrow) * bw + ncol] == lfi)
+                            ++same;
+                    }
+                    if (same == 0)      ++n0;
+                    else if (same == 1) ++n1;
+                    else                ++n2plus;
+                    if (same == 4)      ++interior;
+                }
+        }
+        const float pc = tiles ? 100.0f / tiles : 0.0f;
+        std::printf("  %-9s %5d tiles | isolated %.1f%%  end-of-run %.1f%%  in-run(2+) %.1f%%  interior %.1f%%\n",
+                    kLandformName[lfi], tiles, n0 * pc, n1 * pc, n2plus * pc, interior * pc);
+    }
+
     // --- S1: extraction asset placement audit ---
     const resource_type extractable[] = {
         resource_type::iron_ore, resource_type::petroleum,
