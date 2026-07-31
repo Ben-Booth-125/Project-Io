@@ -150,6 +150,27 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\corp_ai_harness.cpp ^
 ```
 
 ```bat
+:: AI skill-regression harness (BL-204) — freezes a 5-seed benchmark set
+:: (world_params.seed 0-4) and runs 300 ticks of the real bot-vs-bot economy
+:: loop per seed, asserting net-worth curve / solvency / survival / thrash
+:: action-counts against disposable golden bands, plus world::state_hash
+:: (the BL-204 tick-boundary FNV-1a checksum) identity across two same-seed
+:: runs. Hand-builds a recipe_registry (mirrors scripts/economy.lua/recipes.lua);
+:: links the generation TU superset (as world_audit/corp_terrain_matrix) plus
+:: the corp-AI/economy TUs.
+cl /nologo /std:c++20 /EHsc /I src tools\verify\ai_skill_harness.cpp ^
+   src\world\world.cpp src\world\economy_system.cpp src\world\market_clearing.cpp ^
+   src\world\budget_system.cpp src\world\building_profit.cpp src\world\corp_ai.cpp ^
+   src\world\corp_command.cpp src\world\construction.cpp src\world\placement_rules.cpp ^
+   src\world\survey_system.cpp src\world\supply_system.cpp src\world\logistics.cpp ^
+   src\world\hard_coded_world.cpp src\world\tile_generation.cpp src\world\planetology.cpp ^
+   src\world\continents.cpp src\world\nation_generation.cpp src\world\population_generation.cpp ^
+   src\world\city_names.cpp src\world\corporation_generation.cpp src\world\road_generation.cpp ^
+   src\world\orbital_system.cpp /Fe:ai_skill_harness.exe
+.\ai_skill_harness.exe
+```
+
+```bat
 :: Molecular vocabulary (BL-209) — the species/reaction dictionary the seven-gate
 :: abiogenesis chain is written against. Asserts the 8-byte molecular_event record
 :: shape, NO ORPHAN IDS (every process names a gate and resolves every species it

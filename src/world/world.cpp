@@ -2,12 +2,101 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <limits>
 #include <utility>
+#include <vector>
 
 entity_id world::create_entity()
 {
     return m_next_id++;
+}
+
+// ---------------------------------------------------------------------------
+// Tick-boundary state hash (BL-204) — FNV-1a over a canonicalised tick snapshot
+// ---------------------------------------------------------------------------
+namespace {
+
+constexpr uint64_t fnv_offset_basis = 14695981039346656037ull;
+constexpr uint64_t fnv_prime        = 1099511628211ull;
+
+void fnv1a_bytes(uint64_t& h, const void* data, std::size_t n)
+{
+    const unsigned char* p = static_cast<const unsigned char*>(data);
+    for (std::size_t i = 0; i < n; ++i)
+    {
+        h ^= p[i];
+        h *= fnv_prime;
+    }
+}
+
+void fnv1a_i32(uint64_t& h, int32_t v) { fnv1a_bytes(h, &v, sizeof v); }
+void fnv1a_u32(uint64_t& h, uint32_t v) { fnv1a_bytes(h, &v, sizeof v); }
+void fnv1a_f32(uint64_t& h, float v) { fnv1a_bytes(h, &v, sizeof v); }
+
+} // namespace
+
+uint64_t world::state_hash(int tick) const
+{
+    uint64_t h = fnv_offset_basis;
+    fnv1a_i32(h, tick);
+
+    // Corporations: balance is the tick-mutating field the money loop drives.
+    {
+        std::vector<entity_id> ids;
+        ids.reserve(corporations.size());
+        for (const auto& kv : corporations) ids.push_back(kv.first);
+        std::sort(ids.begin(), ids.end());
+        for (const entity_id id : ids)
+        {
+            const corporation_component& cc = corporations.at(id);
+            fnv1a_u32(h, id);
+            fnv1a_f32(h, cc.balance);
+        }
+    }
+
+    // Buildings: every field the AI / economy tick may mutate.
+    {
+        std::vector<entity_id> ids;
+        ids.reserve(buildings.size());
+        for (const auto& kv : buildings) ids.push_back(kv.first);
+        std::sort(ids.begin(), ids.end());
+        for (const entity_id id : ids)
+        {
+            const building_component& b = buildings.at(id);
+            fnv1a_u32(h, id);
+            fnv1a_f32(h, b.workforce_assigned);
+            fnv1a_i32(h, b.workforce_target);
+            fnv1a_u32(h, b.recipe);
+            fnv1a_i32(h, b.decommissioned ? 1 : 0);
+            fnv1a_i32(h, b.ticks_remaining);
+            fnv1a_f32(h, b.construction_progress);
+        }
+    }
+
+    // Markets: the resolved price array is the clearing tick's output.
+    {
+        std::vector<entity_id> ids;
+        ids.reserve(markets.size());
+        for (const auto& kv : markets) ids.push_back(kv.first);
+        std::sort(ids.begin(), ids.end());
+        for (const entity_id id : ids)
+        {
+            const market_component& m = markets.at(id);
+            fnv1a_u32(h, id);
+            for (const float p : m.price) fnv1a_f32(h, p);
+        }
+    }
+
+    // Corp/body stockpile pools — std::map, already sorted by (corp,body).
+    for (const auto& [key, sc] : corp_body_pools)
+    {
+        fnv1a_u32(h, key.first);
+        fnv1a_u32(h, key.second);
+        for (const float q : sc.quantities) fnv1a_f32(h, q);
+    }
+
+    return h;
 }
 
 entity_id owner_corp_of(const world& w, entity_id building)
