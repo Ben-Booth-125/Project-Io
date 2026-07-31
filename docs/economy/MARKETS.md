@@ -109,7 +109,10 @@ extracted there enter the economy only by convoy to a Kepler market.
   market-inertness residue.
 - **The buy-order book is engine-only.** `clear_markets` implements it, and harnesses exercise
   it, but the live app passes only `ui_state.sell_orders` — no UI path submits a buy order yet,
-  so preferred-seller routing is dormant in play.
+  so preferred-seller routing is dormant in play. *Decided 2026-07-31:* the wiring waits for
+  BL-160 (auto-exchange policy, v0.2.0), whose buy band is the intended player buy surface and
+  whose `derive_exchange_orders` is the first live emitter — no interim manual buy tab. See the
+  dated note in that item's design for the open preferred-seller call.
 - **The population agri demand stub never reaches clearing.** `run_economy_step`'s
   population-centre pass writes `agricultural_produce` demand directly into markets, but
   `clear_markets` zero-resets demand before accumulating — the write is erased the same tick.
