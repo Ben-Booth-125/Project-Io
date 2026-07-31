@@ -73,15 +73,19 @@ bool tile_surveyed(const world& w, const tile_component& tc)
 /// One scored candidate action awaiting selection.
 struct candidate
 {
-    corp_command         cmd;
-    float                score  = 0.0f;
-    float                spend  = 0.0f; ///< Committed capex (build cost / survey cost).
-    corp_decision_reason reason = corp_decision_reason::best_build;
+    corp_command          cmd;
+    float                 score  = 0.0f;
+    float                 spend  = 0.0f; ///< Committed capex (build cost / survey cost).
+    corp_decision_reason  reason = corp_decision_reason::best_build;
+    corp_priority_bucket  bucket = corp_priority_bucket::nice_to_have;
 };
 
-/// Deterministic ordering: score desc, then verb, then subject, then tile.
+/// Deterministic ordering: bucket asc FIRST (a lower bucket may never starve
+/// a higher one — AI_OPPONENT.md §2B), then score desc, then verb, subject,
+/// tile as the existing BL-202 tie-break.
 bool candidate_before(const candidate& a, const candidate& b)
 {
+    if (a.bucket != b.bucket) return a.bucket < b.bucket;
     if (a.score != b.score) return a.score > b.score;
     if (a.cmd.verb != b.cmd.verb) return a.cmd.verb < b.cmd.verb;
     if (a.cmd.subject != b.cmd.subject) return a.cmd.subject < b.cmd.subject;
@@ -132,6 +136,75 @@ float corp_reserve_floor(const world& w, const recipe_registry& reg,
     }
     // One tick is one quarter, so wage_bill IS the quarterly wage bill.
     return std::max(p.floor_constant, p.floor_wage_mult * wage_bill);
+}
+
+corp_priority_bucket bucket_for_reason(corp_decision_reason reason)
+{
+    switch (reason)
+    {
+        case corp_decision_reason::dial_idle:
+            return corp_priority_bucket::must_have; // stops wage/maintenance bleed now
+        case corp_decision_reason::dial_recipe:
+        case corp_decision_reason::dial_workforce:
+        case corp_decision_reason::dial_resume:
+            return corp_priority_bucket::should_have; // feeds/tunes a running asset
+        case corp_decision_reason::best_build:
+        case corp_decision_reason::survey_expand:
+        default:
+            return corp_priority_bucket::nice_to_have; // expansion
+    }
+}
+
+float corp_should_have_buffer(const world& w, const recipe_registry& reg,
+                              const economy_report& report, entity_id corp)
+{
+    const auto cit = w.corporations.find(corp);
+    if (cit == w.corporations.end())
+        return 0.0f;
+    float buffer = 0.0f;
+    for (const entity_id bid : cit->second.assets)
+    {
+        const auto bit = w.buildings.find(bid);
+        if (bit == w.buildings.end())
+            continue;
+        const building_component& b = bit->second;
+        if (b.type != building_type::processing_facility)
+            continue;
+        if (b.decommissioned || b.ticks_remaining > 0)
+            continue;
+        const building_profit bp = estimate_building_profit(w, reg, report, bid);
+        if (bp.has_data)
+            buffer += std::max(0.0f, bp.input_cost);
+    }
+    return buffer;
+}
+
+float forecast_glut_multiplier(const world& w, entity_id tile, resource_type target,
+                               float added_rate_per_tick, int horizon_ticks,
+                               const corp_ai_params& p)
+{
+    if (added_rate_per_tick <= 0.0f)
+        return 1.0f;
+    const entity_id mid = market_for_tile(w, tile);
+    if (mid == null_entity)
+        return 1.0f; // no market to glut — nothing to forecast against
+    const auto mit = w.markets.find(mid);
+    if (mit == w.markets.end())
+        return 1.0f;
+    const market_component& m = mit->second;
+    const std::size_t r = static_cast<std::size_t>(target);
+    const float demand = m.demand[r]; // PUBLIC aggregate only (BL-068) — same fact a rival sees.
+    if (demand <= 0.0f)
+        return 1.0f; // no public demand signal to forecast against; do not guess.
+    const float horizon = static_cast<float>(std::max(1, horizon_ticks));
+    const float projected_supply = m.supply[r] + added_rate_per_tick * horizon;
+    const float ratio = projected_supply / demand;
+    if (ratio <= p.glut_taper_ratio)
+        return 1.0f;
+    if (ratio >= p.glut_veto_ratio)
+        return 0.0f;
+    const float span = std::max(1.0e-6f, p.glut_veto_ratio - p.glut_taper_ratio);
+    return 1.0f - (ratio - p.glut_taper_ratio) / span;
 }
 
 namespace {
@@ -196,6 +269,12 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
 
         const float jitter  = corp_personality_jitter(corp, p.personality_seed);
         const float floor_  = corp_reserve_floor(w, reg, corp, p);
+        // Should-Have buffer (BL-203): cash reserved for feeding this corp's
+        // own running processors, ahead of any Nice-to-Have (build/survey)
+        // spend — the concrete "a lower bucket may never starve a higher
+        // one" enforcement for the only bucket that carries capex.
+        const float should_have_buffer = corp_should_have_buffer(w, reg, report, corp);
+        const float nice_to_have_floor = floor_ + should_have_buffer;
 
         std::vector<candidate> cands;
 
@@ -247,6 +326,19 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     continue; // never build into an expected loss
                 const float capex = std::max(1.0f, ex.build_cost);
                 const float payback = capex / net;
+
+                // Predictive spending (BL-203): forecast this build's added
+                // supply against the local market's PUBLIC demand over its
+                // construction horizon + one clearing pass, so the corp does
+                // not build into its own glut. Visibility-honest: reads only
+                // market_component.supply/demand, the same public aggregates
+                // export_corp_blackboard shows a rival (BL-068).
+                const float added_rate = ex.base_rate * rich * wf * (1.0f - tc.hazard_level);
+                const int   horizon    = static_cast<int>(ex.build_duration_ticks) + p.forecast_clearing_ticks;
+                const float glut       = forecast_glut_multiplier(w, s.tile, s.target, added_rate, horizon, p);
+                if (glut <= 0.0f)
+                    continue; // forecast hard glut — veto, do not even enumerate
+
                 candidate c;
                 c.cmd.tick   = tick;
                 c.cmd.corp   = corp;
@@ -254,9 +346,10 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 c.cmd.tile   = s.tile;
                 c.cmd.type   = building_type::extraction_site;
                 c.cmd.target = s.target;
-                c.score  = (net / payback) * focus_weight(cc.focus, corp_verb::build) * jitter;
+                c.score  = (net / payback) * focus_weight(cc.focus, corp_verb::build) * jitter * glut;
                 c.spend  = capex;
                 c.reason = corp_decision_reason::best_build;
+                c.bucket = bucket_for_reason(c.reason);
                 cands.push_back(c);
             }
         }
@@ -296,6 +389,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                             c.cmd.verb = corp_verb::resume; c.cmd.subject = bid;
                             c.score = gain * jitter;
                             c.reason = corp_decision_reason::dial_resume;
+                            c.bucket = bucket_for_reason(c.reason);
                             cands.push_back(c);
                         }
                     }
@@ -317,6 +411,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     c.cmd.verb = corp_verb::idle; c.cmd.subject = bid;
                     c.score = gain * jitter;
                     c.reason = corp_decision_reason::dial_idle;
+                    c.bucket = bucket_for_reason(c.reason);
                     cands.push_back(c);
                 }
             }
@@ -341,6 +436,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         c.cmd.workforce = proposed;
                         c.score = gain * jitter;
                         c.reason = corp_decision_reason::dial_workforce;
+                        c.bucket = bucket_for_reason(c.reason);
                         cands.push_back(c);
                     }
                 }
@@ -371,6 +467,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                         c.cmd.recipe = best_id;
                         c.score = gain * jitter;
                         c.reason = corp_decision_reason::dial_recipe;
+                        c.bucket = bucket_for_reason(c.reason);
                         cands.push_back(c);
                     }
                 }
@@ -401,6 +498,7 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 c.score  = score;
                 c.spend  = cost;
                 c.reason = corp_decision_reason::survey_expand;
+                c.bucket = bucket_for_reason(c.reason);
                 cands.push_back(c);
             }
         }
@@ -428,9 +526,15 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                                      c.cmd.subject) != touched_this_eval.end())
                 continue;
 
-            // Solvency gate: cash − committed spend must stay above the floor.
+            // Solvency gate (BL-203 bucket-aware): Must-Have/Should-Have carry
+            // no capex so they are never floor-gated (they cannot starve
+            // themselves); only Nice-to-Have (build/survey) spend is checked,
+            // and against the STRICTER should-have-aware floor — the "a lower
+            // bucket may never starve a higher one" rule, concretely enforced.
+            const float required_floor =
+                (c.bucket == corp_priority_bucket::nice_to_have) ? nice_to_have_floor : floor_;
             if (c.spend > 0.0f &&
-                w.corporations.at(corp).balance - committed - c.spend <= floor_)
+                w.corporations.at(corp).balance - committed - c.spend <= required_floor)
                 continue;
 
             entity_id built = null_entity;

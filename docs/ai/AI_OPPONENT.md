@@ -253,7 +253,47 @@ wage rate, logistics cost to nearest market, build-cost amortisation) — no new
 `strategy_weight` biases toward the corp's generated **industrial focus** (specialist premise,
 CORPORATION_GENERATION.md), giving distinct-but-legible personalities for free. A **solvency
 gate** (cash − committed spend > reserve floor) vetoes any spend that breaks the floor; stage B
-replaces this crude floor with priority buckets + predictive spending.
+replaces this crude floor with priority buckets + predictive spending (landed 2026-07-31, see
+§ 2B below).
+
+### 2B. Stage B — strategy, priority buckets, predictive spending (BL-203, landed 2026-07-31)
+
+Implemented in `src/world/corp_ai.{hpp,cpp}`, extending BL-202's scorer rather than replacing it:
+
+- **Strategy layer.** `corp_strategy` is a named alias of `industrial_focus` — the corp's
+  generated specialist premise (extraction / processing / trade) IS its strategy, kept as its
+  own concept so the bias is legible and can diverge from the generation-time focus later
+  without a signature break. `focus_weight` (BL-202) already biases build/survey scores by this
+  strategy; stage B does not change that mechanism, only names it.
+- **Priority buckets** (`corp_priority_bucket`: `must_have` / `should_have` / `nice_to_have`),
+  derived deterministically from each candidate's existing `corp_decision_reason` via
+  `bucket_for_reason` — `dial_idle` is Must-Have (stops a sustained loss's wage/maintenance
+  bleed); `dial_recipe` / `dial_workforce` / `dial_resume` are Should-Have (tune or restore a
+  running asset); `best_build` / `survey_expand` are Nice-to-Have (expansion). Candidates sort
+  bucket-ascending before score-descending, so a Must/Should-Have action is never starved by a
+  higher-scoring Nice-to-Have one. Concretely, only Nice-to-Have candidates carry capex in this
+  codebase (dials are free), so the "never starve a higher bucket" rule is enforced by gating
+  build/survey spend against a **stricter** floor: `corp_should_have_buffer` sums
+  `estimate_building_profit(...).input_cost` over the corp's own running processing facilities
+  — the cash needed to keep feeding them this tick — and `nice_to_have_floor = reserve_floor +
+  should_have_buffer` is the gate a build/survey must clear, on top of (not instead of) BL-202's
+  existing reserve floor.
+- **Predictive spending.** `forecast_glut_multiplier` forecasts a candidate build's added supply
+  (`base_rate × richness × workforce × (1 − hazard)`) over a horizon of
+  `build_duration_ticks + forecast_clearing_ticks` (1 by default — "one clearing pass") against
+  the **local market's PUBLIC `supply`/`demand` aggregates only** — the same facts
+  `export_corp_blackboard` would show a rival (BL-068/DISCOVERY.md), never a private read. No
+  public demand signal (`demand <= 0`) yields no penalty (the AI cannot forecast against a fact
+  it cannot see); the projected supply/demand ratio is unpenalised at or below
+  `glut_taper_ratio` (1.0), tapers the build's score linearly to zero at `glut_veto_ratio` (2.0),
+  and vetoes (removes the candidate entirely) at or above it. Applied only to build candidates;
+  dials and survey are unaffected (a body's total surveyed area doesn't glut a market).
+
+Verified by `tools/verify/corp_ai_predictive_harness.cpp` (R1: the reason→bucket mapping; R2: the
+Should-Have buffer is well-defined and never loosens the floor; R3: the forecast is
+visibility-honest, monotone, tapers, and vetoes at the documented ratios; R4: an end-to-end
+saturated-market scene actually vetoes a build the plain BL-202 scorer would have taken) and
+regression-checked against `corp_ai_harness.cpp` (BL-202), all green.
 
 ### Hysteresis & action budget
 
@@ -327,7 +367,7 @@ BL-199 closes with this decomposition; the build work is carried by:
 | Item | Carries | Requires |
 |---|---|---|
 | **BL-202** `CORP_AI_SCORED_UTILITY` | Stage A: the scorer, the corp-command seam + decision log, state-export implementation | — |
-| **BL-203** `CORP_AI_PREDICTIVE_SPENDING` | Stage B: strategy layer, priority buckets, spending forecast — the solvency answer | BL-202 |
+| **BL-203** `CORP_AI_PREDICTIVE_SPENDING` | Stage B: strategy layer, priority buckets, spending forecast — the solvency answer (**landed 2026-07-31**, § 2B) | BL-202 |
 | **BL-204** `AI_SKILL_HARNESS` | Seed-set skill-regression harness (bot-vs-bot goldens: solvency, net-worth curves) + the tick-boundary **state hash** (doubles as the multiplayer desync primitive) | BL-202 |
 | **BL-205** `CORP_CHAT_LOG` | The § 7 surface: chat window replacing the Explorer, channels + groups, agency-event feed (first slice lands with the item's filing) | — |
 
