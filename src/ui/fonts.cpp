@@ -16,6 +16,35 @@ ImFont* load_ui_font(float size_px)
     cfg.OversampleV = 1;
     cfg.PixelSnapH  = false; // allow fractional horizontal placement so motion stays fluid
 
+    // Glyph range (BL-234). Without this ImGui builds its default atlas — Basic
+    // Latin + Latin-1 only, U+0020..U+00FF — and every codepoint above renders as
+    // the not-found glyph "?". That inverts the meaning of the bare em-dash
+    // placeholders in entity_summary.cpp, which read as "the app does not know"
+    // rather than "nothing is selected".
+    //
+    // Three blocks past Latin-1 are actually used in UI string literals; a survey
+    // of src/ found 43 sites across 7 codepoints:
+    //   General Punctuation  — (U+2014, 37 sites) – …
+    //   Arrows               ← ↑ → ↓ (U+2190..U+2193, the nav hints in app.cpp)
+    //   Mathematical Ops     ≥ (U+2265) ≈ (U+2248)
+    // The ranges are widened to whole blocks rather than the exact seven, so the
+    // next em-dash sibling someone types does not silently regress this.
+    //
+    // Static storage is required: ImGui keeps the pointer and reads the array
+    // later, when the atlas is built — not here.
+    //
+    // The bundled DejaVuSans covers all three blocks (verified against its cmap:
+    // General Punctuation 107/112, Arrows 112/112, Mathematical Operators
+    // 256/256), so nothing here asks the font for a glyph it does not have.
+    static constexpr ImWchar k_glyph_ranges[] = {
+        0x0020, 0x00FF, // Basic Latin + Latin-1 Supplement (ImGui's default)
+        0x2000, 0x206F, // General Punctuation — em/en dash, ellipsis, quotes
+        0x2190, 0x21FF, // Arrows
+        0x2200, 0x22FF, // Mathematical Operators
+        0,
+    };
+    cfg.GlyphRanges = k_glyph_ranges;
+
     // Font candidates, most-preferred first.
     //
     // The bundled DejaVuSans (copied next to the executable from assets/ by the
@@ -49,8 +78,11 @@ ImFont* load_ui_font(float size_px)
     }
 
     // Fallback: the built-in font, still oversampled so it benefits as far as a
-    // pixel font can. SizePixels left at ProggyClean's native 13.
-    cfg.SizePixels = 13.0f;
+    // pixel font can. SizePixels left at ProggyClean's native 13. The glyph range
+    // is cleared first — ProggyClean is Latin-1 only, so asking it for the three
+    // extra blocks would build atlas space for glyphs it cannot supply.
+    cfg.GlyphRanges = nullptr;
+    cfg.SizePixels  = 13.0f;
     return io.Fonts->AddFontDefault(&cfg);
 }
 
