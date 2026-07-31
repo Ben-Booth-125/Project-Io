@@ -36,6 +36,63 @@ focused agents, not a hard disjointness gate. Agents build and commit on their o
 worktree branch; the integrating session merges, builds, and verifies. See
 [`DELIVERY.md`](DELIVERY.md) § Sub-agents & worktrees for the authoritative model.
 
+## Sprint 3 — Corp AI Stage B + skill harness (promoted from backlog.json § BL-203, BL-204)
+
+Requirements: requirements.json § corp-ai-predictive-spending, ai-skill-harness. Goal: make the
+corp AI genuinely solvent (priority buckets + predictive spending, replacing BL-202's crude
+reserve-floor gate) and give it a regression harness that IS simulated play (seed-set bot-vs-bot
+goldens) — the stress-test instrument Ben asked for. Both require only BL-202 (complete).
+
+File scope is disjoint (BL-203 writes `corp_ai.{hpp,cpp}` only; BL-204 writes a new harness file
++ `world.{hpp,cpp}`'s state hash), so B lands first to give the harness a pre-change baseline golden,
+then A lands and the golden is re-blessed to show the delta — cheaper than inventing a synthetic
+"before" state later.
+
+- **[2] B1 — State hash.** `src/world/world.hpp`/`.cpp`: `uint64_t world_state_hash(const world&)`,
+  FNV-1a over a deterministic serialisation of the tick-relevant snapshot (entity/component
+  values touched by the econ tick — stockpiles, markets, balances, building state; excludes
+  render/UI-only fields). Deps: foundation. Satisfies: R3 (ai-skill-harness).
+- **[3] B2 — Benchmark seed-set + rollout harness skeleton.** New `tools/verify/ai_skill_harness.cpp`:
+  a small frozen seed list spanning body/terrain/market diversity (reuse `hard_coded_world`'s
+  `world_params` descriptor, BL-114); headless bot-vs-bot rollout per seed for N ticks. Deps: B1
+  (asserts hash equality across two same-seed runs as its own smoke check). Satisfies: R1, R3.
+- **[2] B3 — Metrics + thrash detector.** Same file: per-corp net-worth curve (sampled every N
+  ticks), solvency (ticks below zero balance), survival, and action-counts-by-verb (flags a corp
+  cycling one building's recipe repeatedly). Deps: B2. Satisfies: R1, R2.
+- **[1] B4 — Bless baseline goldens, wire into CTest.** Bless B3's metrics as goldens against
+  today's BL-202-only behaviour (the pre-BL-203 baseline); register per the verifier-headless
+  convention. Deps: B3. Satisfies: R1, R4.
+- **[3] A1 — Strategy layer.** `corp_ai.{hpp,cpp}`: derive a coarse `industrial_strategy`
+  (extraction / processing / trade) from the corp's generated `industrial_focus`
+  (CORPORATION_GENERATION.md), biasing `strategy_weight` in the existing scorer. Deps: foundation
+  (independent of B). Satisfies: R3 (corp-ai-predictive-spending).
+- **[3] A2 — Priority buckets.** Same files: classify candidate spends Must-Have (wages,
+  maintenance, debt service) > Should-Have (input feed for running processors) > Nice-to-Have
+  (expansion); a lower bucket may never starve a higher one. Replaces `corp_reserve_floor`'s crude
+  gate. Deps: A1. Satisfies: R1.
+- **[3] A3 — Predictive spending forecast.** Same files: before committing a build, forecast its
+  post-completion market impact (supply delta vs current local demand, construction
+  `ticks_remaining` + one clearing pass) from public market data only (visibility-honest); veto or
+  deprioritise builds that would glut. Deps: A2. Satisfies: R2.
+- **[1] A4 — Wire strategic decisions into chat.** `economy_system.cpp`: strategic `corp_command`s
+  (not just the BL-079 reflex tier) post templated messages to the existing Public agency-event
+  feed (BL-205's `agency_event` vector), closing BL-205's own named "LATER: BL-202 command-stream
+  messages" follow-on. Deps: A3. Satisfies: none new (BL-205 already complete; this is that item's
+  deferred tail, small enough to ride along rather than reopen a whole sprint for it).
+- **[1] C1 — Re-bless goldens post-change.** Re-run B2/B3's harness against A1-A3's landed
+  behaviour; re-bless, and the diff itself (net-worth/solvency shift) is the acceptance evidence
+  that Stage B actually changed AI behaviour for the better. Deps: A3, B4. Satisfies: R4.
+- **[1] D1 — Docs.** `AI_OPPONENT.md` §8 table: mark BL-203/BL-204 landed, record final tuning
+  constants (bucket floors, forecast horizon, benchmark seed list). Deps: all. Satisfies: authority
+  propagation.
+
+Parallelisation note: B1→B2→B3→B4 and A1→A2→A3→A4 are two disjoint chains (different files) —
+safe as two worktree agents. C1 depends on both chains reaching A3/B4. D1 closes. Given the total
+size (~10h across both chains), a single main-session-serial run is also reasonable if worktree
+overhead isn't worth it for this batch.
+
+---
+
 ## AI constituents batch (promoted from backlog.json § BL-202, BL-206, BL-207) — **COMPLETE**
 
 Batch: 2026-07-27-ai-constituents. Requirements: requirements.json §

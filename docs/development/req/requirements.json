@@ -6415,6 +6415,88 @@
           "result_metric": "scripts/verify/chat_panel.lua — golden blessed 2026-07-28; a per-corp Counsel channel tab renders (Counsel: <corp name>)."
         }
       ]
+    },
+    {
+      "brief": "ai-skill-harness",
+      "batch": "sprint-3-corp-ai-stageB",
+      "title": "BL-204 — AI skill-regression harness: seed-set bot-vs-bot goldens + tick-boundary state hash",
+      "status": "active",
+      "promoted_from": "backlog.json BL-204 AI_SKILL_HARNESS",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "active",
+          "requirement": "HEADLESS: a frozen benchmark seed-set spanning body/terrain/market diversity runs bot-vs-bot rollouts headlessly; per-corp net-worth curve, solvency rate, and survival are asserted as regression goldens.",
+          "verification": ["headless: tools/verify/ai_skill_harness.cpp"],
+          "result_metric": "",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "active",
+          "requirement": "HEADLESS: action counts by verb are tracked per corp per seed as a thrash detector (a corp cycling one building's recipe/workforce repeatedly is flagged, not silently averaged away).",
+          "verification": ["headless: tools/verify/ai_skill_harness.cpp"],
+          "result_metric": "",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "status": "active",
+          "requirement": "HEADLESS: a tick-boundary state hash (FNV-1a over the serialised econ-tick snapshot) is exposed on `world`; two same-seed runs produce byte-identical hashes.",
+          "verification": ["headless: tools/verify/ai_skill_harness.cpp"],
+          "result_metric": "",
+          "notes": "Doubles as the parked MULTIPLAYER_PRINCIPLES.md lockstep desync primitive — one addition serving both."
+        },
+        {
+          "id": "R4",
+          "status": "active",
+          "requirement": "An intentional AI behaviour change (BL-203 landing) produces a flagged, explainable golden diff — not a silent pass and not a false failure on unrelated churn.",
+          "verification": ["headless: tools/verify/ai_skill_harness.cpp"],
+          "result_metric": "",
+          "notes": "Verified by deliberately re-running after BL-203 lands and confirming the diff reads as the expected solvency/net-worth improvement."
+        }
+      ]
+    },
+    {
+      "brief": "corp-ai-predictive-spending",
+      "batch": "sprint-3-corp-ai-stageB",
+      "title": "BL-203 — Corp AI stage B: strategy layer, priority buckets, predictive spending",
+      "status": "active",
+      "promoted_from": "backlog.json BL-203 CORP_AI_PREDICTIVE_SPENDING",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "active",
+          "requirement": "HEADLESS: priority-bucket ordering holds — Must-Have (wages, maintenance, debt service) is never starved to fund Should-Have (input feed) or Nice-to-Have (expansion) spend.",
+          "verification": ["headless: tools/verify/ai_skill_harness.cpp (post-BL-203 rerun)"],
+          "result_metric": "",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "status": "active",
+          "requirement": "HEADLESS: before committing a build, the AI forecasts its post-completion market impact (supply delta vs current local demand, from public market data only) and vetoes or deprioritises a build that would glut the local market.",
+          "verification": ["headless"],
+          "result_metric": "",
+          "notes": "Forecast reads visibility-honest data only — no fog cheat."
+        },
+        {
+          "id": "R3",
+          "status": "active",
+          "requirement": "HEADLESS: each corp's coarse strategy (extraction/processing/trade) derives deterministically from its generated `industrial_focus` and biases scoring; no new non-deterministic randomness beyond the existing personality jitter.",
+          "verification": ["headless"],
+          "result_metric": "",
+          "notes": ""
+        },
+        {
+          "id": "R4",
+          "status": "active",
+          "requirement": "Re-running the BL-204 skill harness after this item lands shows solvency rate and net-worth curves hold or improve vs the BL-202-only baseline, not regress.",
+          "verification": ["headless: tools/verify/ai_skill_harness.cpp"],
+          "result_metric": "",
+          "notes": "Cross-item acceptance check shared with BL-204 R4."
+        }
+      ]
     }
   ]
 }

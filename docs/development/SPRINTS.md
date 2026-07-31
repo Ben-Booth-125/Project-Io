@@ -141,41 +141,65 @@ vs-bot skill-regression harness — the literal simulated-play stress test) → 
 surface) → BL-207 (persona counsel packs). All four are already `designed` (promote-ready) — this
 is execution, not another design pass, which is the cheap path.
 
-### Sprint 3 — Stage B + the skill harness (BL-203, BL-204)
+### Sprint 3 — Stage B + the skill harness (BL-203, BL-204) — **PROMOTED, ready to build**
 
 **Goal.** Make the corp AI actually skilled (predictive spending replacing the crude solvency
 floor) and give it a regression harness that *is* simulated play: seed-set bot-vs-bot goldens
 (solvency, net-worth curves) plus the tick-boundary state hash (doubles as the multiplayer desync
 primitive, AI_OPPONENT.md §8). Both require only BL-202 (complete) — no blocking dependency.
 
-**Planned.** BL-203 (diff 4), BL-204 (diff 3). Promote together — BL-204's goldens are the natural
-acceptance check for BL-203's behaviour change, so building them in the same batch is cheaper than
-sequencing.
+**Decomposed 2026-07-31** into REFINED.md § "Sprint 3 — Corp AI Stage B + skill harness" (10 tasks,
+B1-B4/A1-A4/C1/D1) and `requirements.json` § corp-ai-predictive-spending / ai-skill-harness.
+Source-verified before decomposing: `corp_ai.hpp` already has the Stage-A scaffolding (
+`corp_ai_params`, `corp_reserve_floor`, `corp_personality_jitter`, `run_corp_strategic_step`) this
+item extends rather than a blank slate. Harness (B-chain) lands first for a pre-change baseline
+golden; strategy layer (A-chain) lands second; re-bless shows the delta as the acceptance evidence.
+A4 also closes BL-205's own deferred "wire BL-202 command-stream messages into chat" tail — small
+enough to ride along rather than reopen a sprint for it (see Sprint 4 below).
 
-### Sprint 4 — the communication surface (BL-205)
+**Planned.** BL-203 (diff 4), BL-204 (diff 3).
 
-**Goal.** Land the § 7 chat principle: a channel-based message surface (Public + arbitrary groups)
-replacing the Explorer placeholder, carrying Stage-A templated decision-log messages now and
-becoming the medium personas (BL-207) and, later, a free-text LLM planner (Stage C) speak through.
-`designed`, no dependency — could in principle run before Sprint 3, sequenced after only to keep
-one theme per sprint.
+### Sprint 4 — retired: BL-205's core surface was already built at filing time
 
-**Planned.** BL-205 (diff 3).
+**Finding (2026-07-31, source-checked before drafting a sprint for it).** `chat_panel.{hpp,cpp}`
+already implements the whole first slice BL-205 itemises — `chat_channel`/`chat_state`, Public +
+player-created groups, `chat_post`/`draw_chat_panel` — landed the same session BL-205 was filed
+(2026-07-26), not left as a pending build. What BL-205's own summary names as still open ("LATER:
+BL-202 command-stream messages; C-route in-character LLM chat; AI-AI private groups + intercept
+mechanics") isn't a sprint-sized chat surface anymore — it's three small, disjoint follow-ons,
+already covered elsewhere: the command-stream wiring is Sprint 3's task A4; the LLM chat is BL-220
+below; the private groups + intercepts are BL-221 below. No standalone sprint needed — this is the
+"trivial step, fold it in or spin it off" case Ben asked to watch for.
 
-### Sprint 5 — persona audit + naming the natural-language tier (BL-207 + new item)
+### Sprint 5 — persona bench expansion (BL-207 continuation)
 
-**Goal.** Two threads. First, reconcile a likely stale status: REFINED.md's 2026-07-27 "AI
-constituents batch" already logged BL-207 R1–R3 as covered (persona packs C1, loader/runtime C2,
-Counsel channel C3, `persona_counsel_harness` C4) and marked the batch **COMPLETE**, but
-`backlog.json` still carries BL-207 as `designed`, not `complete` — verify against the harness and
-flip the status if the earlier landing checks out, rather than re-building already-shipped work.
-Second: file the still-unitemized **Stage C** — the out-of-process LLM planner that speaks
-in-character in channels (AI_OPPONENT.md §2 Area C, §7 Stage C) — as a `design-owed` item. This is
-the actual "skilled natural language agent" tier Ben is pointing at; A/B (BL-202/203) and the chat
-medium (BL-205) are the scaffolding it needs to stand on, which is why it lands last, not first.
+**Finding.** No stale-status discrepancy after all: BL-207's own `progress_note` (added at a
+2026-07-29 audit) already records slice 1 landed (pack loader, the mountain bench — sun-tzu/
+amaterasu/krishna, the Counsel channel, `persona_counsel_harness`) while correctly keeping status
+`designed`, because the item's full scope isn't done. Checked `persona_pack.hpp`: the bench loader
+(`load_bench(dir)`) is generic — seating the hearth and banner benches, and the remaining
+Faculty-analyst personas beyond the seated three, is authoring more `scripts/personas/*.lua` files
+against an already-built runtime, not new plumbing. Mechanical, but real content work (each persona
+needs its extractor + phrase bank + documented failure condition per persona-runtime.md) — still
+worth its own sprint rather than folding into Sprint 3.
 
-**Planned.** BL-207 audit (diff 1–2), file Stage-C item (diff 1, design-owed, no build).
+**Planned.** BL-207 continuation: hearth + banner bench authoring (remaining scope, no new backlog
+item needed — same id, same design field).
 
-**Not yet in scope.** Actually promoting Sprint 3 into REFINED.md task groups + `requirements.json`
-— that collision-mapping step happens at the start of Sprint 3 itself (DELIVERY.md: built fresh at
-promotion, not frozen ahead of time), not in this planning pass.
+### Sprint 6 — naming the natural-language tier proper (BL-220, BL-221) — **filed, not designed**
+
+**Goal.** The two genuinely new threads this decomposition pass surfaced, filed 2026-07-31 as
+`design-owed` (scoping only, per the Design depth verb):
+
+- **BL-220** — Stage C, the out-of-process LLM planner (AI_OPPONENT.md §2 Area C / §7 Stage C).
+  This is the actual "skilled natural-language agent" tier Ben named — everything through Sprint 5
+  is the deterministic, legible scaffolding (scored actions, blackboard, chat medium, persona
+  voices) it stands on. Difficulty 5; its own design pass names narration-only vs real-planning as
+  the first fork.
+- **BL-221** — AI-AI private message groups + the intercept mechanic, extending DISCOVERY.md's fog
+  model to comms a third time (after BL-212's public-comms anonymisation). Smaller (difficulty 3),
+  reuses BL-205's existing `chat_channel` machinery, and is a candidate to land before or
+  independently of BL-220.
+
+**Planned.** Design passes for BL-220 and BL-221 — not code. Sequencing between them (or against
+BL-217's resumed nations-rewrite thread) is a call for whenever Sprint 6 actually opens.
