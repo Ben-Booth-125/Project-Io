@@ -20,6 +20,7 @@
 #include "ui/fonts.hpp"
 #include "ui/generation_charts.hpp" // the shared chain-stage charts (BL-211)
 #include "ui/format.hpp"
+#include "ui/frame_stats.hpp" // frame-budget HUD (BL-249, v0.1.0 quality audit)
 #include "ui/header_panel.hpp"
 #include "ui/foldout_column.hpp" // shell_column_width — permanent left shell column (BL-122)
 #include "ui/nav_pane.hpp"
@@ -1814,6 +1815,18 @@ void app::handle_key_down(const SDL_KeyboardEvent& key)
         return;
     }
 
+    // F11 toggles the frame-budget HUD (BL-249). Outside the binding table for the
+    // same reason F12 is: the table routes through ui::canvas_command, and this is a
+    // dev instrument, not part of the shared canvas vocabulary the verify scripts
+    // drive. Toggle rule — pressing F11 while the HUD is up puts it away, exactly as
+    // its own close button does. Handled before the screen guard so the frame budget
+    // can be watched on the menu and the generation screen too.
+    if (key.scancode == SDL_SCANCODE_F11)
+    {
+        m_ui.show_frame_hud = !m_ui.show_frame_hud;
+        return;
+    }
+
     // No game bindings on the menu or the generation screen — there is nothing to
     // navigate yet (the generation screen carries its own two buttons).
     if (m_screen != app_screen::in_game)
@@ -2327,6 +2340,16 @@ void app::draw_generation_screen()
 
 void app::render()
 {
+    // Frame-budget instrument (BL-249). A function-local static rather than an app
+    // member: every call site — the phase marks and the HUD draw — sits inside
+    // render(), so the whole instrument is one include plus a handful of calls,
+    // liftable after the v0.1.0 audit without touching app's declared state.
+    // begin_frame() closes out the PREVIOUS frame, so the period it stamps covers the
+    // event pump and the sim step as well as this function; see ui/frame_stats.hpp
+    // § Sampling model.
+    static ui::frame_stats s_frame_stats;
+    s_frame_stats.begin_frame();
+
     ImGui_ImplSDLRenderer3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
@@ -2341,16 +2364,27 @@ void app::render()
         else
             draw_main_menu();
 
+        // The pre-play screens are frames like any other, so the instrument follows
+        // them too — the generation screen's chain preview is exactly the kind of
+        // per-frame work worth watching. Nothing here reserves a shell column, so the
+        // HUD's first-use anchor is a plain top-left inset.
+        constexpr float hud_inset = 16.0f;
+        ui::draw_frame_budget_hud(s_frame_stats, {hud_inset, hud_inset}, m_ui.show_frame_hud);
+
+        s_frame_stats.mark_build_end();
         ImGui::Render();
         SDL_SetRenderDrawColor(m_renderer, 15, 15, 20, 255);
         SDL_RenderClear(m_renderer);
         ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer);
+        s_frame_stats.mark_submit_end(*ImGui::GetDrawData());
         if (m_capture_requested)
         {
             save_screenshot();
             m_capture_requested = false;
         }
+        s_frame_stats.mark_present_begin();
         SDL_RenderPresent(m_renderer);
+        s_frame_stats.mark_present_end();
         return;
     }
 
@@ -2929,7 +2963,12 @@ void app::render()
                     ImGui::TableSetColumnIndex(1);
                     ImGui::TextDisabled("%s", b.key_name);
                 }
-                // F12 stays outside the table (it needs the renderer)
+                // F11/F12 stay outside the table (F12 needs the renderer; F11 is a
+                // dev instrument, not part of the shared canvas command vocabulary),
+                // so they are listed by hand to keep the cheat-sheet complete.
+                ImGui::TableNextRow();
+                ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted("Frame budget HUD");
+                ImGui::TableSetColumnIndex(1); ImGui::TextDisabled("F11");
                 ImGui::TableNextRow();
                 ImGui::TableSetColumnIndex(0); ImGui::TextUnformatted("Screenshot");
                 ImGui::TableSetColumnIndex(1); ImGui::TextDisabled("F12");
@@ -3026,10 +3065,21 @@ void app::render()
     // scripts/tech_tree.lua; no simulation coupling.
     ui::draw_tech_tree_panel(m_tech_tree, m_show_tech_tree);
 
+    // F11 frame-budget HUD (BL-249) — the v0.1.0 audit instrument. Drawn last so it
+    // measures a full frame's worth of panels, and anchored (first use only; it is
+    // movable after) into the canvas area's top-left corner, clear of the shell
+    // column and the header strip rather than at a fixed pixel offset.
+    ui::draw_frame_budget_hud(
+        s_frame_stats,
+        {ui::shell_column_width(disp.x) + margin, ui::header_panel_height + margin},
+        m_ui.show_frame_hud);
+
+    s_frame_stats.mark_build_end();
     ImGui::Render();
     SDL_SetRenderDrawColor(m_renderer, 15, 15, 20, 255);
     SDL_RenderClear(m_renderer);
     ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), m_renderer);
+    s_frame_stats.mark_submit_end(*ImGui::GetDrawData());
 
     // Capture before present so the screenshot is the exact composited frame.
     if (m_capture_requested)
@@ -3038,7 +3088,9 @@ void app::render()
         m_capture_requested = false;
     }
 
+    s_frame_stats.mark_present_begin();
     SDL_RenderPresent(m_renderer);
+    s_frame_stats.mark_present_end();
 }
 
 namespace {
