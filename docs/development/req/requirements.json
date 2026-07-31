@@ -6691,6 +6691,131 @@
           "notes": ""
         }
       ]
+    },
+    {
+      "brief": "font-glyph-range",
+      "title": "Font glyph range — UI codepoints above Latin-1 actually render (BL-234)",
+      "difficulty": 1,
+      "importance": "C",
+      "evaluated_difficulty": 1,
+      "status": "complete",
+      "resolved": "2026-07-31",
+      "resolution": "Complete. font_glyph_harness proves the atlas carries all 7 codepoints; the same probe against the pre-fix fonts.cpp fails 9 of 11 with the two Latin-1 controls still passing, so the check is not vacuous. Scope was WIDER than the item stated — see R2.",
+      "promoted_from": "BL-234 (font glyph range)",
+      "batch": null,
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: the atlas built by ui::load_ui_font carries a real (non-fallback) glyph for every codepoint above Latin-1 that src/ string literals use.",
+          "verification": [
+            "headless: tools/verify/font_glyph_harness.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "12/12 PASS (11 probed codepoints + load_ui_font returns a font)",
+          "notes": "Uses FindGlyphNoFallback, not FindGlyph — the latter substitutes the fallback glyph and would pass vacuously for every codepoint."
+        },
+        {
+          "id": "R2",
+          "requirement": "The fix covers the REAL site set, not the item's stated one. BL-234 claimed 26 sites across 2 codepoints (em-dash, >=); a full survey must be run and the glyph range must cover whatever it finds.",
+          "verification": [
+            "code: src/ui/fonts.cpp k_glyph_ranges",
+            "headless: tools/verify/font_glyph_harness.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "Survey found 43 sites across 7 codepoints in 3 Unicode blocks — 26 hex-escaped em-dash + 11 RAW em-dash in literals, 1 >=, 4 nav arrows, 1 ~=. Ranges widened to the whole blocks (General Punctuation, Arrows, Mathematical Operators).",
+          "notes": "The item's design undercounted: it missed the raw (unescaped) literals and the app.cpp nav-hint arrows entirely. Whole blocks rather than the exact 7 so a sibling character typed later does not silently regress."
+        },
+        {
+          "id": "R3",
+          "requirement": "The bundled DejaVuSans actually has the glyphs — the fix must not request a range the font cannot supply.",
+          "verification": [
+            "headless: tools/verify/font_glyph_harness.cpp",
+            "code: assets/fonts/DejaVuSans.ttf cmap"
+          ],
+          "status": "complete",
+          "result_metric": "cmap (format 12) coverage: General Punctuation 107/112, Arrows 112/112, Mathematical Operators 256/256. All 7 used codepoints present.",
+          "notes": ""
+        },
+        {
+          "id": "R4",
+          "requirement": "The ProggyClean fallback path must not inherit a range it cannot satisfy.",
+          "verification": [
+            "code: src/ui/fonts.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "cfg.GlyphRanges reset to nullptr before AddFontDefault.",
+          "notes": "Latin-1-only pixel font; requesting three extra blocks would build atlas space for glyphs it cannot supply."
+        }
+      ]
+    },
+    {
+      "brief": "terrain-combat-modifiers",
+      "title": "Terrain combat modifiers adopted into the history ladder (BL-233)",
+      "difficulty": 3,
+      "importance": "B",
+      "evaluated_difficulty": 3,
+      "status": "complete",
+      "resolved": "2026-07-31",
+      "resolution": "Complete. is_barrier deleted; barrier_q is now graded land resistance + a separately-weighted ocean term (weight 750, chosen by sweep, Ben's call). Kepler's political map holds at 30 nations; Pallas's flat-zero barrier field is fixed. history_ladder_harness and world_audit green.",
+      "promoted_from": "BL-233 (terrain combat modifiers)",
+      "batch": null,
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: the ladder prices conquest from the GRADED terrain field, not a bool. is_barrier is deleted so there is exactly one source of truth for 'does this ground resist an army'.",
+          "verification": [
+            "code: src/world/history_ladder.cpp",
+            "headless: tools/verify/history_ladder_harness.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "is_barrier removed; barrier_q = mean(terrain_resistance) over land + ocean_share * 750/1000. history_ladder_harness ALL PASS.",
+          "notes": "terrain_defence/terrain_attrition/terrain_resistance landed earlier as the measurement-only commit; this adopts them."
+        },
+        {
+          "id": "R2",
+          "requirement": "Water enters as its own weighted term, not folded into the terrain signal — the measurement found 588 of Kepler's 730 binary barrier tiles were simply ocean.",
+          "verification": [
+            "code: src/world/history_ladder.cpp k_ocean_barrier_weight",
+            "headless: tools/verify/world_audit.cpp S5"
+          ],
+          "status": "complete",
+          "result_metric": "Kepler barrier_q now decomposes as land 281 + ocean 588 x0.75 = 722 (was 732 binary, of which 588 was ocean).",
+          "notes": "Ben's design call 2026-07-31, chosen over folding water in at zero or at full weight."
+        },
+        {
+          "id": "R3",
+          "requirement": "The political-map consequence is MEASURED and put to Ben before any constant is locked — the item forbids silently tuning to preserve an outcome.",
+          "verification": [
+            "headless: tools/verify/world_audit.cpp S5",
+            "manual: ocean-weight sweep put to Ben"
+          ],
+          "status": "complete",
+          "result_metric": "Sweep across w=0/250/500/750/1000 gave Kepler 17/17/17/30/36 nations (23/23/26/33/50 realms) against a binary baseline of 30/37. Ben chose 750.",
+          "notes": "Recorded in the k_ocean_barrier_weight doc comment so a later re-tune knows continuity was a deliberate choice, not an accident."
+        },
+        {
+          "id": "R4",
+          "requirement": "The grading defects the item was filed for are actually fixed: a metallic high-attrition body no longer reads as open ground, and land tiles differentiate.",
+          "verification": [
+            "headless: tools/verify/world_audit.cpp S5"
+          ],
+          "status": "complete",
+          "result_metric": "Pallas barrier_q 0 -> 325 (was a flat zero: no mountain/canyon and compositions outside the barren/icy pair). Per-body land means now differ: defence 80/88/130/135, attrition 509/694/696/777.",
+          "notes": "The per-body defence/attrition means are retained in S5 as the standing tuning guard — a change that flattens the field shows as the means collapsing together."
+        },
+        {
+          "id": "R5",
+          "requirement": "No serialisation-seam change, no new stored field, and determinism intact.",
+          "verification": [
+            "headless: tools/verify/determinism_harness.cpp",
+            "headless: tools/verify/world_determinism.cpp",
+            "build: ctest"
+          ],
+          "status": "complete",
+          "result_metric": "determinism_harness + world_determinism PASS; 33/34 ctest green (the one failure is BL-252, pre-existing and unrelated).",
+          "notes": "terrain_combat exposes pure functions of (composition, landform) — nothing stored, nothing serialised."
+        }
+      ]
     }
   ]
 }
