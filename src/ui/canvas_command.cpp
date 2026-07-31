@@ -16,12 +16,10 @@ namespace {
 constexpr float pan_step  = 80.0f;
 constexpr float zoom_step = 1.1f;
 
-// Number of overlay_mode values, for wrap-around lens cycling. Keep in sync with
-// the enum in ui_state.hpp (none, supply, market, country, corporation, resource,
-// population, opportunity, production, scarcity, industry, reach, supply_routes).
-// (Corrected from a stale 10 to 13 while adding reach/supply_routes — industry
-// had been added to the enum without this count following, BL-011/BL-014.)
-constexpr int overlay_mode_count = 13;
+// Number of overlay_mode values, for wrap-around lens cycling. Derived from the
+// enum's count sentinel — a hand-kept literal here went stale twice (10 at BL-011,
+// 13 when BL-226's continent insert left supply_routes beyond the cycle).
+constexpr int overlay_mode_count = static_cast<int>(overlay_mode::count);
 
 /// Pointers to the pan/zoom fields of whichever rung is currently primary, so the
 /// pan/zoom commands act on the foregrounded canvas without per-rung branches.

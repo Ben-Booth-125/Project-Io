@@ -10,6 +10,34 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## Session — Lens-cycle fix: supply_routes was unreachable (2026-07-31)
+
+**Runtime.** ~1h (most of it first-build-in-worktree + golden forensics). Light.
+
+**What.** BL-226 (continent lens) inserted `continent` into `overlay_mode`, making
+`supply_routes` (BL-014) the 14th value — but `overlay_mode_count` in
+`canvas_command.cpp` was still a hand-kept 13, so the L lens-cycle never reached it.
+Same count had gone stale once before (10 → 13 at BL-011/BL-014). Fixed by adding a
+`count` sentinel to the enum and deriving the modulus from it — the literal cannot
+go stale a third time. Also added the missing `reach` / `supply_routes` entries to
+`overlay_from_name` (verify scripts could not select either by name), and extended
+`lens_modes.lua` with `lens_reach` / `lens_supply_routes` captures.
+
+**Verified.** Both lenses render their empty-state key ("no routes/lanes from this
+body" — the seeded world has no player trade routes); an ad-hoc `lens_prev`-from-none
+check wrapped to Supply routes, proving the cycle covers the enum.
+
+**Golden forensics.** All 9 pre-existing `lens_modes` goldens failed at 2.7–25%.
+Stash test proved the fix contributes zero pixels — the divergence predates it:
+goldens were blessed at the spanning-marker commit, before BL-233's terrain-scalar
+commit shifted generation (nation names/terrain differ). Re-blessed all 11 (software
+renderer). **Open item:** other verify scripts' goldens are likely stale for the
+same reason — a full `bless_all` sweep is owed.
+
+**Design question for Ben (not decided).** Reach and Supply-routes remain off-strip
+(keyboard-cycle only), per the settled BL-093 curation. Do either deserve a strip
+slot now that Continent made the row eight?
+
 ## Session — BL-231 (landform render): drawing the axis the build cost already charged for (2026-07-31)
 
 **Runtime.** ~1h. Full (two render channels, a new glyph family, a measurement harness, three docs).
