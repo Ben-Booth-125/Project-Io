@@ -1,0 +1,867 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Project Io — "What do you want to know?" Exemplar</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root{
+    --bg:#05070b;
+    --panel:#0c1018;
+    --panel-2:#0e131c;
+    --border:#2a3140;
+    --border-soft:#1c2230;
+    --text:#d6dae2;
+    --text-dim:#aeb3bd;
+    --text-mute:#8c92a0;
+    --green:#6EC878;
+    --red:#D86460;
+    --grey:#AAAFB9;
+    --white:#ffffff;
+    --hover:#78BEFF;
+    --amber:#FFC85A;
+    --accent:#3D84E0;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; min-height:100%;
+    background:var(--bg);
+    color:var(--text);
+    font-family: "Segoe UI", Inter, system-ui, -apple-system, sans-serif;
+    font-size:13px;
+  }
+
+  /* ---------- background flavor ---------- */
+  .bg-canvas{
+    position:fixed; inset:0; z-index:-1;
+    background-color:var(--bg);
+    background-image:
+      linear-gradient(135deg, rgba(255,255,255,0.02) 25%, transparent 25%),
+      linear-gradient(225deg, rgba(255,255,255,0.02) 25%, transparent 25%);
+    background-position: 22px 0, 22px 0;
+    background-size: 44px 44px;
+  }
+  .bg-label{
+    position:fixed; top:18px; left:24px; z-index:1;
+    color:var(--text-mute); letter-spacing:.04em;
+    font-size:11px; text-transform:uppercase; opacity:.55;
+    pointer-events:none;
+  }
+  .bg-label b{ color:var(--text-dim); font-weight:600; }
+  .bg-crumbs-hint{
+    position:fixed; top:18px; right:24px; z-index:1;
+    color:var(--text-mute); font-size:11px; opacity:.5;
+    pointer-events:none; text-align:right; max-width:320px;
+  }
+
+  /* ---------- page shell ---------- */
+  .page-wrap{
+    max-width:720px; margin:64px auto 96px; padding:0 24px;
+  }
+  .panel{
+    background:var(--panel); border:1px solid var(--border);
+  }
+  .panel-header{
+    padding:16px 20px; border-bottom:1px solid var(--border-soft);
+  }
+  .panel-title{ font-size:16px; color:var(--text); font-weight:600; }
+  .panel-sub{ font-size:12px; color:var(--text-mute); margin-top:5px; line-height:1.5; }
+
+  /* ---------- question list ---------- */
+  .question-list{ list-style:none; margin:0; padding:8px; }
+  .question-item{
+    border:1px solid transparent; border-radius:2px;
+    padding:11px 13px; margin-bottom:3px; cursor:pointer;
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    transition: background 120ms ease, border-color 120ms ease;
+  }
+  .question-item:hover{ background:rgba(255,255,255,0.03); border-color:var(--border-soft); }
+  .question-item.active{ background:#101724; border-color:var(--accent); }
+  .question-item-left{ display:flex; flex-direction:column; gap:3px; min-width:0; }
+  .question-cat{
+    font-size:10px; color:var(--text-mute); text-transform:uppercase; letter-spacing:.06em;
+  }
+  .question-text{ font-size:13.5px; color:var(--text); line-height:1.4; }
+  .question-item.active .question-text{ color:var(--white); }
+  .question-chevron{ color:var(--text-mute); font-size:12px; flex:0 0 auto; transition:color 120ms ease; }
+  .question-item.active .question-chevron{ color:var(--accent); }
+  .question-item:hover .question-chevron{ color:var(--hover); }
+
+  /* ---------- answer slot (folded resting card) ---------- */
+  .answer-slot{ border-top:1px solid var(--border); }
+  .answer-card{ padding:14px 20px 16px; }
+  .answer-card-label{
+    font-size:10.5px; color:var(--text-mute); text-transform:uppercase; letter-spacing:.06em;
+    margin-bottom:8px;
+  }
+  .fold-row{
+    display:flex; align-items:center; gap:9px; cursor:pointer;
+    padding:6px 4px; border-radius:2px; transition: background 120ms ease;
+  }
+  .fold-row:hover{ background:rgba(255,255,255,0.03); }
+  .fold-row .fold-chevron{ color:var(--text-mute); font-size:11px; flex:0 0 auto; }
+  .fold-row:hover .fold-chevron{ color:var(--hover); }
+  .glance-line{
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    font-size:14.5px; color:var(--text); min-width:0;
+  }
+  .pip{ width:8px; height:8px; border-radius:50%; flex:0 0 auto; }
+  .pip.ok{ background:var(--green); }
+  .pip.warn{ background:var(--amber); }
+  .pip.bad{ background:var(--red); }
+  .glance-sub{ color:var(--text-mute); font-size:11.5px; margin-top:4px; padding-left:21px; }
+  .fold-hint{ font-size:10px; color:var(--text-mute); opacity:.55; margin-top:10px; padding-left:21px; }
+  .verdict-pos{ color:var(--green); }
+  .verdict-neg{ color:var(--red); }
+  .verdict-neutral{ color:var(--amber); }
+
+  /* ---------- full-screen expanded view ---------- */
+  .fs-overlay{
+    position:fixed; inset:0; z-index:50;
+    background:var(--bg);
+    opacity:0; pointer-events:none;
+    transition: opacity 200ms ease;
+    overflow-y:auto;
+  }
+  .fs-overlay.open{ opacity:1; pointer-events:auto; }
+  .fs-inner{
+    width:min(880px, calc(100% - 96px));
+    margin: 56px auto 64px;
+  }
+  .fs-header{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:12px; padding-bottom:16px; margin-bottom:24px;
+    border-bottom:1px solid var(--border);
+  }
+  .fs-breadcrumb{
+    display:flex; align-items:center; gap:7px; flex-wrap:wrap;
+    font-size:14.5px; color:var(--text-mute); min-width:0;
+  }
+  .fs-breadcrumb .crumb{ cursor:pointer; }
+  .fs-breadcrumb .crumb:hover{ color:var(--hover); text-decoration:underline; }
+  .fs-breadcrumb .crumb.current{ color:var(--text); cursor:default; text-decoration:none; font-weight:600; }
+  .fs-breadcrumb .crumb-sep{ opacity:.5; }
+  .fs-header-controls{ display:flex; align-items:center; gap:10px; flex:0 0 auto; }
+  .fs-fold-btn{
+    appearance:none; background:none; border:1px solid var(--border-soft);
+    color:var(--text-dim); padding:5px 10px; border-radius:2px; cursor:pointer;
+    display:flex; align-items:center; gap:6px; font-size:12px;
+  }
+  .fs-fold-btn:hover{ border-color:var(--hover); color:var(--hover); }
+  .fs-back-btn{
+    background:none; border:1px solid var(--border-soft); color:var(--text-dim);
+    width:24px; height:24px; border-radius:2px; cursor:pointer; font-size:14px; flex:0 0 auto;
+  }
+  .fs-back-btn:hover{ border-color:var(--hover); color:var(--hover); }
+
+  .fs-glance-line{
+    display:flex; align-items:center; gap:10px;
+    font-size:21px; color:var(--text); margin-bottom:4px;
+  }
+  .fs-glance-line .pip{ width:11px; height:11px; }
+  .fs-glance-sub{ color:var(--text-mute); font-size:13px; margin-bottom:26px; }
+
+  .fs-legend-row{ display:flex; gap:24px; margin-bottom:14px; font-size:13px; flex-wrap:wrap; }
+  .fs-legend-item{ display:flex; align-items:center; gap:7px; color:var(--text-dim); }
+  .fs-legend-swatch{ width:11px; height:11px; border-radius:2px; flex:0 0 auto; }
+  .fs-legend-item .lv{ color:var(--text); font-weight:600; margin-left:2px; }
+
+  .fs-chart{
+    position:relative; height:220px; display:flex; align-items:flex-end;
+    gap:36px; padding:0 12px; border-bottom:1px solid var(--border-soft);
+    margin-bottom:16px; flex-wrap:nowrap; overflow-x:auto;
+  }
+  .fs-gridline{
+    position:absolute; left:0; right:0; border-top:1px dotted var(--border-soft);
+    pointer-events:none;
+  }
+  .fs-bar-col{
+    display:flex; flex-direction:column; align-items:center; justify-content:flex-end;
+    width:84px; height:100%; position:relative; flex:0 0 auto;
+  }
+  .fs-bar-value{ font-size:13.5px; color:var(--text-dim); margin-bottom:6px; white-space:nowrap; }
+  .fs-bar{
+    width:52px; border-radius:3px 3px 0 0;
+    transition: filter 120ms ease, transform 120ms ease;
+  }
+  .fs-bar.clickable{ cursor:pointer; }
+  .fs-bar.clickable:hover{ filter:brightness(1.2); transform:translateY(-1px); }
+  .fs-bar.c-green{ background:var(--green); }
+  .fs-bar.c-red{ background:var(--red); }
+  .fs-bar.c-amber{ background:var(--amber); }
+  .fs-bar.c-grey{ background:var(--grey); }
+  .fs-bar.c-accent{ background:var(--accent); }
+  .fs-bar-label{ font-size:12px; color:var(--text-mute); margin-top:8px; text-align:center; line-height:1.3; }
+  .fs-bar-badge{
+    font-size:9.5px; color:var(--green); border:1px solid var(--green);
+    border-radius:2px; padding:1px 5px; margin-top:4px; text-transform:uppercase; letter-spacing:.04em;
+  }
+  .fs-bar-hint{ font-size:10.5px; color:var(--text-mute); opacity:.65; margin-top:4px; }
+
+  .fs-derivation{
+    font-size:13px; color:var(--text-dim); line-height:1.6; max-width:64ch;
+  }
+  .fs-derivation b{ color:var(--text); font-weight:600; }
+
+  .fs-drill-hint{ font-size:12px; color:var(--text-mute); margin-bottom:14px; }
+  .fs-line-chart-wrap svg{ width:100%; height:220px; overflow:visible; }
+  .fs-lc-grid{ stroke:var(--border-soft); stroke-width:1; stroke-dasharray:1 3; }
+  .fs-lc-line{ fill:none; stroke:var(--green); stroke-width:2.2; }
+  .fs-lc-area{ fill:url(#lcGrad); opacity:.5; }
+  .fs-lc-dot{ fill:var(--green); }
+  .fs-lc-dot.current{ fill:var(--white); }
+  .fs-lc-axis-label{ font-size:11px; fill:var(--text-mute); }
+  .fs-drill-stats{ display:flex; gap:32px; margin-top:22px; font-size:13px; flex-wrap:wrap; }
+  .fs-drill-stat b{ display:block; color:var(--text); font-size:19px; margin-top:3px; }
+  .fs-drill-stat span{ color:var(--text-mute); }
+
+  .fs-ranked-list{ display:flex; flex-direction:column; gap:10px; max-width:64ch; }
+  .fs-ranked-row{
+    display:flex; align-items:center; gap:12px; cursor:default;
+  }
+  .fs-ranked-name{ width:210px; flex:0 0 auto; font-size:13px; color:var(--text-dim); }
+  .fs-ranked-name b{ color:var(--text); }
+  .fs-ranked-track{ flex:1; height:14px; background:var(--panel-2); border:1px solid var(--border-soft); border-radius:2px; overflow:hidden; }
+  .fs-ranked-fill{ height:100%; }
+  .fs-ranked-val{ width:46px; flex:0 0 auto; text-align:right; font-size:12.5px; color:var(--text-dim); }
+
+  .fs-stat-note{ font-size:14px; color:var(--text-dim); line-height:1.6; max-width:64ch; }
+
+  /* scrollbar tidy */
+  .fs-overlay::-webkit-scrollbar{ width:8px; }
+  .fs-overlay::-webkit-scrollbar-thumb{ background:var(--border); border-radius:4px; }
+</style>
+</head>
+<body>
+
+  <div class="bg-canvas"></div>
+  <div class="bg-label">Project Io &mdash; <b>Genom Systems</b> operations console <span style="opacity:.6">(mock render, non-interactive backdrop)</span></div>
+  <div class="bg-crumbs-hint">"What do you want to know?" exemplar &middot; discarded pre-written-Q&amp;A pattern, kept for comparison &middot; superseded by BL-247 (chart question log)</div>
+
+  <div class="page-wrap">
+    <div class="panel">
+
+      <div class="panel-header">
+        <div class="panel-title">What do you want to know?</div>
+        <div class="panel-sub">Pick a question. The answer folds open below &mdash; expand it for the full breakdown.</div>
+      </div>
+
+      <ul class="question-list" id="questionList"></ul>
+
+      <div class="answer-slot" id="answerSlot" style="display:none;">
+        <div class="answer-card" id="answerCard"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- FULL-SCREEN expanded view -->
+  <div class="fs-overlay" id="fsOverlay">
+    <div class="fs-inner">
+      <div class="fs-header" id="fsHeader"></div>
+      <div class="fs-body" id="fsBody"></div>
+    </div>
+  </div>
+
+<script>
+(function(){
+
+  /* ================= question + answer data =================
+     Hand-authored (not seeded RNG) — every question is a fixed, self-consistent
+     mock scenario for Genom Systems. This exemplar is the discarded "pre-written
+     Q&A" exploration: the game poses the questions AND answers them, which is
+     exactly the pattern later corrected against (see NOTES.md / BL-247). Kept
+     as-is for the historical record. */
+
+  const QUESTIONS = [
+    {
+      id:'iron_loss',
+      cat:'Operating the economy',
+      text:'Why is my Iron Ore extractor at Kepler losing money?',
+      breadcrumbLabel:'Why is my Iron Ore extractor losing money?',
+      render: renderIronLoss
+    },
+    {
+      id:'steel_price',
+      cat:'Reading trade',
+      text:'Where should I sell Steel for the best price right now?',
+      breadcrumbLabel:'Where should I sell Steel?',
+      render: renderSteelPrice
+    },
+    {
+      id:'silica_demand',
+      cat:'Finding opportunity',
+      text:'Which market has the most unmet demand for Silica?',
+      breadcrumbLabel:'Unmet demand for Silica',
+      render: renderSilicaDemand
+    },
+    {
+      id:'cash_trend',
+      cat:'Operating the economy',
+      text:'How is my corporation’s cash position trending?',
+      breadcrumbLabel:'Cash position trend',
+      render: renderCashTrend
+    },
+    {
+      id:'fuel_costs',
+      cat:'Reading trade',
+      text:'What is driving up my Refined Fuel input costs?',
+      breadcrumbLabel:'Refined Fuel cost drivers',
+      render: renderFuelCosts
+    },
+    {
+      id:'least_efficient',
+      cat:'Operating the economy',
+      text:'Which of my buildings are least efficient right now?',
+      breadcrumbLabel:'Least efficient buildings',
+      render: renderLeastEfficient
+    }
+  ];
+
+  /* ================= app state =================
+     Two orthogonal axes, per the settled mechanics:
+     - Depth (binary fold): state.expanded — folded resting card, or full-screen.
+     - Subject drill (BL-196): state.drill — only reachable while expanded;
+       null at the top answer, or a string naming a deeper child view. */
+  const state = {
+    selectedQ: null,
+    expanded: false,
+    drill: null
+  };
+
+  function findQuestion(id){ return QUESTIONS.find(q=>q.id===id); }
+
+  /* ================= question list ================= */
+  function renderQuestionList(){
+    const list = document.getElementById('questionList');
+    list.innerHTML = QUESTIONS.map(q=>{
+      const active = state.selectedQ === q.id;
+      return `
+        <li class="question-item${active?' active':''}" data-qid="${q.id}">
+          <div class="question-item-left">
+            <span class="question-cat">${q.cat}</span>
+            <span class="question-text">${q.text}</span>
+          </div>
+          <span class="question-chevron">${active ? '&#9662;' : '&#8250;'}</span>
+        </li>
+      `;
+    }).join('');
+    list.querySelectorAll('.question-item').forEach(el=>{
+      el.addEventListener('click', ()=> selectQuestion(el.getAttribute('data-qid')));
+    });
+  }
+
+  function selectQuestion(id){
+    if(state.selectedQ === id){
+      // toggle: re-clicking the active question closes its answer (visible
+      // active-state control -> toggle, per the standing UI rule)
+      state.selectedQ = null;
+      state.expanded = false;
+      state.drill = null;
+    } else {
+      state.selectedQ = id;
+      state.expanded = false;
+      state.drill = null;
+    }
+    renderAll();
+  }
+
+  /* ================= folded answer card (resting state) ================= */
+  function renderAnswerSlot(){
+    const slot = document.getElementById('answerSlot');
+    const card = document.getElementById('answerCard');
+    if(!state.selectedQ){
+      slot.style.display = 'none';
+      card.innerHTML = '';
+      return;
+    }
+    slot.style.display = '';
+    const q = findQuestion(state.selectedQ);
+    const v = q.verdict();
+    card.innerHTML = `
+      <div class="answer-card-label">Answer</div>
+      <div class="fold-row" id="answerFoldRow">
+        <span class="fold-chevron">&#9662;</span>
+        <span class="glance-line">
+          <span class="pip ${v.pip}"></span>
+          <span class="${v.cls}"><b>${v.headline}</b></span>
+        </span>
+      </div>
+      <div class="glance-sub">${v.sub}</div>
+      <div class="fold-hint">Click to expand &mdash; full screen</div>
+    `;
+    card.querySelector('#answerFoldRow').addEventListener('click', openExpanded);
+  }
+
+  /* ================= full-screen expanded view ================= */
+  function openExpanded(){
+    state.expanded = true;
+    state.drill = null;
+    renderFullscreen();
+  }
+  function closeExpanded(){
+    state.expanded = false;
+    state.drill = null;
+    document.getElementById('fsOverlay').classList.remove('open');
+  }
+
+  function renderFullscreen(){
+    const overlay = document.getElementById('fsOverlay');
+    if(!state.expanded || !state.selectedQ){ overlay.classList.remove('open'); return; }
+    overlay.classList.add('open');
+    renderFsHeader();
+    renderFsBody();
+  }
+
+  function renderFsHeader(){
+    const header = document.getElementById('fsHeader');
+    const q = findQuestion(state.selectedQ);
+
+    const crumbs = [];
+    crumbs.push(`<span class="crumb" data-to="root">Questions</span>`);
+    if(state.drill){
+      crumbs.push(`<span class="crumb-sep">&rsaquo;</span>`);
+      crumbs.push(`<span class="crumb" data-to="answer">${q.breadcrumbLabel}</span>`);
+      crumbs.push(`<span class="crumb-sep">&rsaquo;</span>`);
+      crumbs.push(`<span class="crumb current">${state.drill.label}</span>`);
+    } else {
+      crumbs.push(`<span class="crumb-sep">&rsaquo;</span>`);
+      crumbs.push(`<span class="crumb current">${q.breadcrumbLabel}</span>`);
+    }
+
+    header.innerHTML = `
+      <div class="fs-breadcrumb">
+        ${state.drill ? `<button class="fs-back-btn" id="fsBackBtn" title="Back">&#8249;</button>` : ''}
+        ${crumbs.join('')}
+      </div>
+      <div class="fs-header-controls">
+        <button class="fs-fold-btn" id="fsFoldBtn" title="Fold back up">&#9652; Fold up</button>
+      </div>
+    `;
+
+    header.querySelectorAll('.crumb[data-to="root"]').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        // jump straight to the top: closes the overlay AND clears the
+        // selected question, returning to the bare list.
+        state.selectedQ = null;
+        state.expanded = false;
+        state.drill = null;
+        renderAll();
+      });
+    });
+    header.querySelectorAll('.crumb[data-to="answer"]').forEach(el=>{
+      el.addEventListener('click', ()=>{ state.drill = null; renderFullscreen(); });
+    });
+    const backBtn = header.querySelector('#fsBackBtn');
+    if(backBtn){
+      backBtn.addEventListener('click', ()=>{ state.drill = null; renderFullscreen(); });
+    }
+    header.querySelector('#fsFoldBtn').addEventListener('click', closeExpanded);
+  }
+
+  function renderFsBody(){
+    const bodyEl = document.getElementById('fsBody');
+    const q = findQuestion(state.selectedQ);
+    if(state.drill){
+      bodyEl.innerHTML = state.drill.html;
+      wireDrillEvents(bodyEl);
+      return;
+    }
+    bodyEl.innerHTML = q.render(false);
+    wireLevelOneEvents(bodyEl, q);
+  }
+
+  function wireLevelOneEvents(root, q){
+    if(q.id === 'iron_loss'){
+      const wagesBar = root.querySelector('[data-drill="wages"]');
+      if(wagesBar){
+        wagesBar.addEventListener('click', ()=>{
+          state.drill = { key:'wages', label:'Wages detail', html: renderWagesDrill() };
+          renderFullscreen();
+        });
+      }
+    }
+  }
+  function wireDrillEvents(root){
+    // no further drill below level 2 in this exemplar
+  }
+
+  /* ================= per-question verdict (folded line) ================= */
+  QUESTIONS.find(q=>q.id==='iron_loss').verdict = function(){
+    const d = IRON_LOSS;
+    return {
+      pip:'bad', cls:'verdict-neg',
+      headline:`Losing Cr ${Math.abs(d.net).toFixed(1)}/tick`,
+      sub:'Iron Ore Extractor &middot; Kepler, Highland Ridge'
+    };
+  };
+  QUESTIONS.find(q=>q.id==='steel_price').verdict = function(){
+    const best = STEEL_MARKETS.reduce((a,b)=> b.price>a.price?b:a);
+    return {
+      pip:'ok', cls:'verdict-pos',
+      headline:`Best at ${best.name} &mdash; Cr ${best.price.toFixed(2)}/unit`,
+      sub:`${best.body} &middot; ${STEEL_MARKETS.length} markets compared`
+    };
+  };
+  QUESTIONS.find(q=>q.id==='silica_demand').verdict = function(){
+    const top = SILICA_MARKETS.reduce((a,b)=> b.unmet>a.unmet?b:a);
+    return {
+      pip:'warn', cls:'verdict-neutral',
+      headline:`${top.name} &mdash; ${top.unmet} units/tick unmet`,
+      sub:`${top.body} &middot; largest gap of ${SILICA_MARKETS.length} markets surveyed`
+    };
+  };
+  QUESTIONS.find(q=>q.id==='cash_trend').verdict = function(){
+    const first = CASH_HISTORY[0], last = CASH_HISTORY[CASH_HISTORY.length-1];
+    const avgDelta = (last-first)/(CASH_HISTORY.length-1);
+    const up = avgDelta >= 0;
+    return {
+      pip: up?'ok':'bad', cls: up?'verdict-pos':'verdict-neg',
+      headline:`${up?'+':''}Cr ${Math.round(avgDelta).toLocaleString()}/tick avg, trending ${up?'up':'down'}`,
+      sub:`Last ${CASH_HISTORY.length} ticks &middot; currently Cr ${last.toLocaleString()}`
+    };
+  };
+  QUESTIONS.find(q=>q.id==='fuel_costs').verdict = function(){
+    const main = FUEL_DRIVERS[0];
+    return {
+      pip:'bad', cls:'verdict-neg',
+      headline:`Petroleum input price +${FUEL_DELTA_PCT}% since T-12`,
+      sub:`${main.label} is the largest driver &middot; ${main.value}% of the increase`
+    };
+  };
+  QUESTIONS.find(q=>q.id==='least_efficient').verdict = function(){
+    const worst = LEAST_EFFICIENT.reduce((a,b)=> b.eff<a.eff?b:a);
+    return {
+      pip:'bad', cls:'verdict-neg',
+      headline:`${worst.name} &middot; ${worst.body} &mdash; ${worst.eff}% efficiency`,
+      sub:`Lowest of ${LEAST_EFFICIENT.length} buildings surveyed this tick`
+    };
+  };
+
+  /* ================= Q1: Iron Ore Extractor loss breakdown ================= */
+  const IRON_LOSS = {
+    revenue: 210.0,
+    inputs: 46.0,
+    wages: 142.2,
+    maintenance: 60.0,
+    get net(){ return this.revenue - this.inputs - this.wages - this.maintenance; }
+  };
+  function renderIronLoss(){
+    const d = IRON_LOSS;
+    const bars = [
+      { label:'Revenue', value: d.revenue, color:'c-green' },
+      { label:'Inputs', value: -d.inputs, color:'c-red' },
+      { label:'Wages', value: -d.wages, color:'c-red', drill:'wages' },
+      { label:'Maintenance', value: -d.maintenance, color:'c-red' },
+      { label:'Net', value: d.net, color:'c-red' }
+    ];
+    const maxAbs = Math.max(...bars.map(b=>Math.abs(b.value))) * 1.15;
+    const barsHtml = bars.map(b=>{
+      const h = (Math.abs(b.value)/maxAbs*100).toFixed(1);
+      const clickable = b.drill ? ' clickable' : '';
+      const attr = b.drill ? ` data-drill="${b.drill}" title="Drill into ${b.label}"` : '';
+      const sign = b.value < 0 ? '&minus;' : '';
+      return `
+        <div class="fs-bar-col">
+          <div class="fs-bar-value">${sign}Cr ${Math.abs(b.value).toFixed(1)}</div>
+          <div class="fs-bar ${b.color}${clickable}" style="height:${h}%"${attr}></div>
+          <div class="fs-bar-label">${b.label}</div>
+          ${b.drill ? '<div class="fs-bar-hint">click to drill in</div>' : ''}
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="fs-glance-line">
+        <span class="pip bad"></span>
+        <span class="verdict-neg">Losing <b>Cr ${Math.abs(d.net).toFixed(1)}/tick</b></span>
+      </div>
+      <div class="fs-glance-sub">Iron Ore Extractor &middot; Kepler, Highland Ridge</div>
+
+      <div class="fs-chart">
+        <div class="fs-gridline" style="bottom:25%"></div>
+        <div class="fs-gridline" style="bottom:50%"></div>
+        <div class="fs-gridline" style="bottom:75%"></div>
+        ${barsHtml}
+      </div>
+
+      <div class="fs-derivation">
+        <b>Revenue</b> Cr ${d.revenue.toFixed(1)} &minus; <b>Inputs</b> Cr ${d.inputs.toFixed(1)}
+        &minus; <b>Wages</b> Cr ${d.wages.toFixed(1)} &minus; <b>Maintenance</b> Cr ${d.maintenance.toFixed(1)}
+        = <b>Net</b> &minus;Cr ${Math.abs(d.net).toFixed(1)}/tick.
+        Wages is the largest single cost &mdash; click that bar for the staffing breakdown.
+      </div>
+    `;
+  }
+
+  /* Wages drill — second level (Questions › Why is my Iron Ore extractor
+     losing money? › Wages detail) */
+  const WAGES_DETAIL = { workers:18, capacity:24, rate:7.90 };
+  function renderWagesDrill(){
+    const w = WAGES_DETAIL;
+    const staffedPct = Math.round(w.workers/w.capacity*100);
+    const total = w.workers * w.rate;
+    return `
+      <div class="fs-drill-hint">Staffing and pay for the Wages line in the Iron Ore Extractor breakdown.</div>
+      <div class="fs-glance-line">
+        <span class="pip warn"></span>
+        <span>${w.workers} / ${w.capacity} positions staffed <b>(${staffedPct}%)</b></span>
+      </div>
+      <div class="fs-glance-sub">Iron Ore Extractor &middot; Kepler, Highland Ridge</div>
+
+      <div class="fs-drill-stats">
+        <div class="fs-drill-stat"><span>Workers</span><b>${w.workers}</b></div>
+        <div class="fs-drill-stat"><span>Capacity</span><b>${w.capacity}</b></div>
+        <div class="fs-drill-stat"><span>Staffed</span><b>${staffedPct}%</b></div>
+        <div class="fs-drill-stat"><span>Rate</span><b>Cr ${w.rate.toFixed(2)}/tick</b></div>
+      </div>
+
+      <div class="fs-derivation" style="margin-top:22px;">
+        <b>${w.workers}</b> workers &times; <b>Cr ${w.rate.toFixed(2)}/tick</b> each
+        = <b>Cr ${total.toFixed(1)}/tick</b> in wages, at ${staffedPct}% of full staffing.
+        Filling the remaining ${w.capacity - w.workers} positions would raise wage cost further
+        even as it lifts output &mdash; the extractor is short-staffed, not overstaffed.
+      </div>
+    `;
+  }
+
+  /* ================= Q2: best Steel price ================= */
+  const STEEL_MARKETS = [
+    { name:'Meridian Exchange', body:'Kepler', price:64.20 },
+    { name:'Selene Highport', body:'Selene', price:61.10 },
+    { name:'Aurora Basin', body:'Kepler', price:59.80 },
+    { name:'Coldwell Yards', body:'Kepler', price:55.40 }
+  ];
+  function renderSteelPrice(){
+    const best = STEEL_MARKETS.reduce((a,b)=> b.price>a.price?b:a);
+    const worstPrice = Math.min(...STEEL_MARKETS.map(m=>m.price));
+    const maxV = Math.max(...STEEL_MARKETS.map(m=>m.price)) * 1.15;
+    const barsHtml = STEEL_MARKETS.map(m=>{
+      const h = (m.price/maxV*100).toFixed(1);
+      const isBest = m === best;
+      return `
+        <div class="fs-bar-col">
+          <div class="fs-bar-value">Cr ${m.price.toFixed(2)}</div>
+          <div class="fs-bar ${isBest?'c-green':'c-grey'}" style="height:${h}%"></div>
+          <div class="fs-bar-label">${m.name}<br><span style="opacity:.7">${m.body}</span></div>
+          ${isBest ? '<div class="fs-bar-badge">Best</div>' : ''}
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="fs-glance-line">
+        <span class="pip ok"></span>
+        <span class="verdict-pos">Best at <b>${best.name}</b> &mdash; <b>Cr ${best.price.toFixed(2)}/unit</b></span>
+      </div>
+      <div class="fs-glance-sub">Steel sell price across ${STEEL_MARKETS.length} markets currently reachable by trade route</div>
+
+      <div class="fs-chart">
+        <div class="fs-gridline" style="bottom:25%"></div>
+        <div class="fs-gridline" style="bottom:50%"></div>
+        <div class="fs-gridline" style="bottom:75%"></div>
+        ${barsHtml}
+      </div>
+
+      <div class="fs-derivation">
+        <b>${best.name}</b> on ${best.body} clears <b>Cr ${(best.price - worstPrice).toFixed(2)}</b>
+        above the lowest quoted price at Coldwell Yards &mdash; routing Steel there is the highest-margin sale available this tick.
+      </div>
+    `;
+  }
+
+  /* ================= Q3: Silica unmet demand ================= */
+  const SILICA_MARKETS = [
+    { name:'Selene Highport', body:'Selene', unmet:340 },
+    { name:'Meridian Exchange', body:'Kepler', unmet:120 },
+    { name:'Aurora Basin', body:'Kepler', unmet:65 },
+    { name:'Coldwell Yards', body:'Kepler', unmet:40 }
+  ];
+  function renderSilicaDemand(){
+    const top = SILICA_MARKETS.reduce((a,b)=> b.unmet>a.unmet?b:a);
+    const maxV = Math.max(...SILICA_MARKETS.map(m=>m.unmet)) * 1.15;
+    const barsHtml = SILICA_MARKETS.map(m=>{
+      const h = (m.unmet/maxV*100).toFixed(1);
+      const isTop = m === top;
+      return `
+        <div class="fs-bar-col">
+          <div class="fs-bar-value">${m.unmet}/tick</div>
+          <div class="fs-bar ${isTop?'c-amber':'c-grey'}" style="height:${h}%"></div>
+          <div class="fs-bar-label">${m.name}<br><span style="opacity:.7">${m.body}</span></div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="fs-glance-line">
+        <span class="pip warn"></span>
+        <span class="verdict-neutral"><b>${top.name}</b> &mdash; <b>${top.unmet} units/tick</b> unmet</span>
+      </div>
+      <div class="fs-glance-sub">Silica buy orders left unfilled per tick, by market</div>
+
+      <div class="fs-chart">
+        <div class="fs-gridline" style="bottom:25%"></div>
+        <div class="fs-gridline" style="bottom:50%"></div>
+        <div class="fs-gridline" style="bottom:75%"></div>
+        ${barsHtml}
+      </div>
+
+      <div class="fs-derivation">
+        ${top.name} on ${top.body} is carrying the largest standing Silica shortfall &mdash;
+        <b>${top.unmet} units/tick</b> of buy orders go unfilled there, nearly triple the next-largest gap.
+        An unserved market this size is worth a new supply route before the price premium closes.
+      </div>
+    `;
+  }
+
+  /* ================= Q4: cash position trend ================= */
+  const CASH_HISTORY = [18400, 19100, 19800, 20950, 21700, 23200, 24350, 26000, 27100, 29200, 31000, 33280];
+  function renderCashTrend(){
+    const first = CASH_HISTORY[0], last = CASH_HISTORY[CASH_HISTORY.length-1];
+    const avgDelta = (last-first)/(CASH_HISTORY.length-1);
+    const up = avgDelta >= 0;
+    const minV = Math.min(...CASH_HISTORY) * 0.94;
+    const maxV = Math.max(...CASH_HISTORY) * 1.06;
+    const W = 720, H = 220, pad = 10;
+    const pts = CASH_HISTORY.map((v,i)=>{
+      const x = pad + (i/(CASH_HISTORY.length-1)) * (W - pad*2);
+      const y = H - pad - ((v-minV)/(maxV-minV)) * (H - pad*2);
+      return {x,y,v};
+    });
+    const lineStr = pts.map(p=>`${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+    const areaStr = `${pad},${H-pad} ` + lineStr + ` ${W-pad},${H-pad}`;
+    const dots = pts.map((p,i)=> `<circle class="fs-lc-dot${i===pts.length-1?' current':''}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${i===pts.length-1?4.5:3}"></circle>`).join('');
+    const gridlines = [0.25,0.5,0.75].map(f=> `<line class="fs-lc-grid" x1="${pad}" x2="${W-pad}" y1="${(H-pad*2)*f+pad}" y2="${(H-pad*2)*f+pad}"></line>`).join('');
+
+    return `
+      <div class="fs-glance-line">
+        <span class="pip ${up?'ok':'bad'}"></span>
+        <span class="${up?'verdict-pos':'verdict-neg'}">${up?'+':''}Cr ${Math.round(avgDelta).toLocaleString()}/tick avg, trending ${up?'up':'down'}</span>
+      </div>
+      <div class="fs-glance-sub">Corporate cash on hand, last ${CASH_HISTORY.length} ticks &middot; currently Cr ${last.toLocaleString()}</div>
+
+      <div class="fs-line-chart-wrap">
+        <svg viewBox="0 0 ${W} ${H}">
+          <defs>
+            <linearGradient id="lcGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#6EC878" stop-opacity="0.35"/>
+              <stop offset="100%" stop-color="#6EC878" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          ${gridlines}
+          <polygon class="fs-lc-area" points="${areaStr}"></polygon>
+          <polyline class="fs-lc-line" points="${lineStr}"></polyline>
+          ${dots}
+          <text class="fs-lc-axis-label" x="${pad}" y="${H+16}">T-11</text>
+          <text class="fs-lc-axis-label" x="${W-pad}" y="${H+16}" text-anchor="end">T-0</text>
+        </svg>
+      </div>
+
+      <div class="fs-drill-stats">
+        <div class="fs-drill-stat"><span>Now</span><b>Cr ${last.toLocaleString()}</b></div>
+        <div class="fs-drill-stat"><span>12 ticks ago</span><b>Cr ${first.toLocaleString()}</b></div>
+        <div class="fs-drill-stat"><span>Avg change</span><b style="color:${up?'var(--green)':'var(--red)'}">${up?'+':''}Cr ${Math.round(avgDelta).toLocaleString()}/tick</b></div>
+      </div>
+    `;
+  }
+
+  /* ================= Q5: Refined Fuel input cost drivers ================= */
+  const FUEL_DELTA_PCT = 18;
+  const FUEL_DRIVERS = [
+    { label:'Petroleum spot price', value:62 },
+    { label:'Transport surcharge', value:22 },
+    { label:'Import tariff', value:16 }
+  ];
+  function renderFuelCosts(){
+    const maxV = Math.max(...FUEL_DRIVERS.map(d=>d.value)) * 1.2;
+    const barsHtml = FUEL_DRIVERS.map((d,i)=>{
+      const h = (d.value/maxV*100).toFixed(1);
+      return `
+        <div class="fs-bar-col">
+          <div class="fs-bar-value">${d.value}%</div>
+          <div class="fs-bar ${i===0?'c-red':'c-amber'}" style="height:${h}%"></div>
+          <div class="fs-bar-label">${d.label}</div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="fs-glance-line">
+        <span class="pip bad"></span>
+        <span class="verdict-neg">Petroleum input price <b>+${FUEL_DELTA_PCT}%</b> since T-12</span>
+      </div>
+      <div class="fs-glance-sub">Refined Fuel input cost increase, by contributing driver</div>
+
+      <div class="fs-legend-row">
+        <div class="fs-legend-item"><span class="fs-legend-swatch" style="background:var(--red)"></span>Share of the +${FUEL_DELTA_PCT}% increase</div>
+      </div>
+      <div class="fs-chart">
+        <div class="fs-gridline" style="bottom:25%"></div>
+        <div class="fs-gridline" style="bottom:50%"></div>
+        <div class="fs-gridline" style="bottom:75%"></div>
+        ${barsHtml}
+      </div>
+
+      <div class="fs-derivation">
+        <b>Petroleum spot price</b> accounts for ${FUEL_DRIVERS[0].value}% of the increase &mdash; the dominant driver &mdash;
+        with <b>Transport surcharge</b> (${FUEL_DRIVERS[1].value}%) and <b>Import tariff</b> (${FUEL_DRIVERS[2].value}%)
+        making up the remainder. Refining margin itself is unchanged; the whole move is upstream of the refinery.
+      </div>
+    `;
+  }
+
+  /* ================= Q6: least efficient buildings ================= */
+  const LEAST_EFFICIENT = [
+    { name:'Coal Mine', body:'Selene', eff:41 },
+    { name:'Copper Refinery', body:'Kepler', eff:58 },
+    { name:'Iron Ore Extractor', body:'Kepler', eff:63 },
+    { name:'Electronics Assembly', body:'Kepler', eff:88 }
+  ];
+  function effColor(eff){
+    if(eff < 50) return 'var(--red)';
+    if(eff < 70) return 'var(--amber)';
+    return 'var(--green)';
+  }
+  function renderLeastEfficient(){
+    const sorted = LEAST_EFFICIENT.slice().sort((a,b)=>a.eff-b.eff);
+    const worst = sorted[0];
+    const rows = sorted.map(b=>{
+      return `
+        <div class="fs-ranked-row">
+          <div class="fs-ranked-name"><b>${b.name}</b> &middot; ${b.body}</div>
+          <div class="fs-ranked-track"><div class="fs-ranked-fill" style="width:${b.eff}%; background:${effColor(b.eff)}"></div></div>
+          <div class="fs-ranked-val">${b.eff}%</div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="fs-glance-line">
+        <span class="pip bad"></span>
+        <span class="verdict-neg"><b>${worst.name}</b> &middot; ${worst.body} &mdash; <b>${worst.eff}%</b> efficiency</span>
+      </div>
+      <div class="fs-glance-sub">All buildings, ranked lowest to highest efficiency this tick</div>
+
+      <div class="fs-ranked-list">${rows}</div>
+
+      <div class="fs-derivation" style="margin-top:22px;">
+        Efficiency here is output at current staffing and input supply, relative to the building's rated
+        maximum. ${worst.name} on ${worst.body} is the clearest maintenance-or-staffing candidate &mdash;
+        every other building is running at least ${sorted[1].eff}% or better.
+      </div>
+    `;
+  }
+
+  /* ================= render ================= */
+  function renderAll(){
+    renderQuestionList();
+    renderAnswerSlot();
+    renderFullscreen();
+  }
+
+  renderAll();
+
+})();
+</script>
+</body>
+</html>
