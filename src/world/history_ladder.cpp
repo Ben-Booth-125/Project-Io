@@ -1,6 +1,7 @@
 #include "history_ladder.hpp"
 
 #include "nation_generation.hpp"
+#include "terrain_combat.hpp"
 
 #include <algorithm>
 
@@ -85,17 +86,34 @@ int agrarian_score(const tile_component& t)
     return clampi(score, 0, 100);
 }
 
-/// Does this tile resist an army — mountain, open water, or dead ground?
-/// Stage 2 reads the SAME barriers BL-218 will later cluster culture regions
-/// on, consumed here a second time to price conquest.
-bool is_barrier(const tile_component& t)
-{
-    if (t.composition == terrain_composition::ocean) return true;
-    if (t.landform == terrain_landform::mountain)    return true;
-    if (t.landform == terrain_landform::canyon)      return true;
-    return t.composition == terrain_composition::barren
-        || t.composition == terrain_composition::icy;
-}
+/// How heavily open water counts toward the barrier field, per 1000 of ocean
+/// share (BL-233; Ben's call, 2026-07-31).
+///
+/// Water is a movement MODE, not a magnitude, so `terrain_resistance` returns 0
+/// for it and it cannot ride in on the graded land term. But it plainly does
+/// resist an army, so it enters as its own term at its own weight — tunable
+/// independently of terrain, which is the whole point of separating them.
+///
+/// The predecessor `is_barrier` gave water weight 1000: one ocean tile counted
+/// exactly as much as one mountain. That is what the measurement pass found to
+/// be wrong — on Kepler, 588 of 730 "barrier" tiles were simply ocean, so 81%
+/// of a field meant to say "can an army get there?" was really saying "how wet
+/// is this planet?".
+///
+/// CHOSEN BY SWEEP, not by taste. Kepler's nation count across the knob, against
+/// a committed `is_barrier` baseline of 30 nations / 37 realms:
+///
+///     weight     0    250    500    750   1000
+///     nations   17     17     17     30     36
+///     realms    23     23     26     33     50
+///
+/// 750 is the value that holds the political map Ben set while the land term
+/// still does its job — the grading defect (mountain and barren plain scoring
+/// alike, forest scoring nothing) is fixed without moving the world shape that
+/// downstream generation and every existing golden already assume. Lower values
+/// are defensible on principle and were offered; this is the deliberate choice
+/// of continuity, recorded so a later re-tune knows it was a choice.
+constexpr int k_ocean_barrier_weight = 750;
 
 /// A deterministic descriptive name for a grid position. Cradles predate
 /// nations, so there is no political name to borrow — and inventing a proper
@@ -147,16 +165,32 @@ history_ladder_state run_history_ladder(const planetology_state& pl,
     const std::size_t n = static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh);
 
     // --- Pass 1: score every tile, and measure the barrier field ------------
+    // The barrier field is measured in TWO independent quantities (BL-233),
+    // because the ground and the water resist an army for different reasons and
+    // at different strengths:
+    //   - resistance_sum — graded terrain_resistance summed over LAND tiles, so
+    //     a mountain and a barren plain no longer score identically and a forest
+    //     no longer scores nothing.
+    //   - ocean_tiles — counted separately, because water is a movement mode
+    //     rather than a magnitude (terrain_combat.hpp § WHY TWO FUNCTIONS).
     std::vector<int> score(n, 0);
-    int land_tiles = 0, barrier_tiles = 0, fertile_tiles = 0;
+    int land_tiles = 0, ocean_tiles = 0, fertile_tiles = 0;
+    long long resistance_sum = 0;
 
     for (std::size_t i = 0; i < n; ++i)
     {
         const tile_component* t = tile_at(w, tile_ids, i);
         if (!t) continue;
 
-        if (t->composition != terrain_composition::ocean) ++land_tiles;
-        if (is_barrier(*t)) ++barrier_tiles;
+        if (t->composition == terrain_composition::ocean)
+        {
+            ++ocean_tiles;
+        }
+        else
+        {
+            ++land_tiles;
+            resistance_sum += terrain_resistance(t->composition, t->landform);
+        }
 
         score[i] = agrarian_score(*t);
         if (score[i] >= 60) ++fertile_tiles;
@@ -220,7 +254,16 @@ history_ladder_state run_history_ladder(const planetology_state& pl,
     // there?) and cradle count (are there separate peoples to weld?). A smooth
     // world with many cradles and a broken world with one should NOT score the
     // same, and one term alone cannot tell them apart.
-    const int barrier_q = clampi((barrier_tiles * 1000) / std::max(1, static_cast<int>(n)), 0, 1000);
+    // barrier_q has two terms (BL-233): the MEAN graded resistance of the land,
+    // plus the ocean share at its own weight. Water is deliberately not folded
+    // into the first — see k_ocean_barrier_weight for why it earns its own.
+    const int land_resistance_q = land_tiles > 0
+        ? clampi(static_cast<int>(resistance_sum / land_tiles), 0, 1000)
+        : 0;
+    const int ocean_share_q = clampi((ocean_tiles * 1000) / std::max(1, static_cast<int>(n)), 0, 1000);
+
+    const int barrier_q = clampi(
+        land_resistance_q + (ocean_share_q * k_ocean_barrier_weight) / 1000, 0, 1000);
     const int cradle_q  = clampi(static_cast<int>(out.cradles.size()) * 110, 0, 1000);
 
     out.fragmentation_q = clampi((barrier_q * 6 + cradle_q * 4) / 10, 0, 1000);
