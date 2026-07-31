@@ -55,13 +55,14 @@ void draw_selection_content(world& w, const recipe_registry& reg,
 /// nav-rail ledgers — the app draws it in place of the Selection panel while its flag
 /// is set and no nav ledger owns the column.
 ///
-/// Lists every building type placeable on the tile (via placement_rules) with a
-/// placeholder image, its full construction cost (budget + materials, from the
-/// registry), a reason-coded validity read, and a Build action that enqueues a
-/// construction request on the tile (ui_state::construction.pending_tile) — executed
-/// by app against the mutable world, the same seam the placement-mode canvas click
-/// uses. First pass: profit charting (per BL-162) is a follow-on; the images are
-/// placeholders.
+/// Lists every building type placeable on the tile (via placement_rules) with its
+/// full construction cost as one credit total (build cost plus materials priced at
+/// the local market), an expected net-per-tick magnitude bar drawn on a ceiling
+/// shared across the list, the payback that capex implies, a reason-coded validity
+/// read, and a Build action that enqueues a construction request on the tile
+/// (ui_state::construction.pending_tile) — executed by app against the mutable
+/// world, the same seam the placement-mode canvas click uses. Candidates sort by
+/// expected net descending (BL-162), so the best options need no scrolling.
 ///
 /// @param w    Read-only world (tile + deposits + player balance).
 /// @param reg  Loaded registry — per-type build costs.
