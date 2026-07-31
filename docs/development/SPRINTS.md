@@ -84,3 +84,44 @@ axis; the rivers/food cluster (BL-166/168/170) is still the outstanding half.
 otherwise settled. Note: session Runtime tracking hit a real gap this sprint — the wall-clock
 timer conflated an idle/interruption gap with work time; worth fixing before relying on it for
 the retro's pacing read.*
+
+---
+
+## Sprint 2 — BL-210 decomposition: the Nations/Corporations history rewrite (opened 2026-07-31)
+
+**Goal.** Take BL-210's umbrella pivot (design-owed, difficulty 5, "the biggest remaining piece"
+per DEVLOG 2026-07-28) from one unactionable mega-item to a sequenced set of promote-ready design
+passes — this is also the first sprint to deliberately practice the Design depth verb
+(DELIVERY.md § Depth verbs) rather than jumping straight to code.
+
+**Why this over the v0.1.2–v0.1.5 stubs.** Ben's ask was to decompose the diplomacy/war/tech/legal
+placeholders (BL-155/156/157/158). Investigation first: those four are all `design-owed` against
+the *current* nation model (Voronoi BFS + a random politics draw), and BL-210 is already
+mid-rewrite of exactly that model into a simulated settlement/industrialisation history. Designing
+Laws/Politics against nations that are about to stop being Voronoi blobs risks rework. Ben chose
+(2026-07-31) to sequence BL-210 first; the four stubs resume once nations have real history to hang
+policy/military/politics off.
+
+**Planned — this sprint's decomposition (done 2026-07-31).**
+- Split BL-210's three still-open subject-doc passes into their own sequenced items, since a
+  difficulty-5 item should break down (DELIVERY.md § Priority, difficulty & version goal) rather
+  than stay flat:
+  - **BL-217** — checkpoint/branch data model (where branch state lives; how a lean biases which
+    branch fires at a checkpoint, extending BL-167's preferences mechanism). No dependency beyond
+    the already-shipped BL-167. Difficulty 3.
+  - **BL-218** — Nations rewrite: territory/political-character/wealth as *outputs* of a simulated
+    settlement → industrialisation → 1900s history, replacing Voronoi BFS + random politics draw.
+    Requires BL-217. DEVLOG's named "biggest remaining piece". Difficulty 4.
+  - **BL-219** — Corporations rewrite: industrial focus as an emergent consequence of the home
+    nation's settlement history, replacing the authored focus table. Requires BL-218. Difficulty 3.
+  - BL-210 itself stays open as the umbrella closing condition (all three built, plus the
+    batch-sweep extension and authority-doc propagation into TILE_GENERATION/NATION_GENERATION/
+    CORPORATION_GENERATION).
+
+**Not yet in scope this sprint.** Actually *settling* BL-217/218/219's open questions (each still
+needs a real design conversation — see each item's `design` field) or touching any `src/`. This
+sprint's goal was decomposition only (the Design depth verb's first half); running BL-217's design
+conversation is the natural Sprint 3 candidate once Ben is ready to work through its open questions.
+
+**Retro** — *pending, fill in once BL-217's design conversation happens or Sprint 2 is otherwise
+closed out.*
