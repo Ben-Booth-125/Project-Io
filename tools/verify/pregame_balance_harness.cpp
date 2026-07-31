@@ -31,7 +31,9 @@
 //      src\world\survey_system.cpp src\world\building_profit.cpp ^
 //      src\world\recipe_registry.cpp src\scripting\lua_state.cpp ^
 //      C:\claude\io-deps\src\lua-5.4.7\*.c ^
-//      /Fe:build\pregame_balance_harness.exe
+//      /Fo:build_gen\verify\pregame_balance_harness\ ^
+//      /Fe:build_gen\verify\pregame_balance_harness.exe
+// Run: .\build_gen\verify\pregame_balance_harness.exe
 
 #include "scripting/lua_state.hpp"
 #include "world/budget_system.hpp"

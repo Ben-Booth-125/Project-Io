@@ -1,5 +1,6 @@
 #include "hex_render.hpp"
 
+#include "icons.hpp" // landform glyphs (BL-231)
 #include "world/logistics.hpp" // body_tile_grid — O(1) neighbour lookup (BL-077 raster)
 #include "world/world.hpp"
 
@@ -12,7 +13,64 @@ namespace ui {
 namespace {
 constexpr float kSqrt3 = 1.7320508f;
 constexpr float kPi    = 3.14159265f;
+
+ImU32 blend(ImU32 a, ImU32 b, float t)
+{
+    t = std::clamp(t, 0.0f, 1.0f);
+    const float ar = static_cast<float>((a >> IM_COL32_R_SHIFT) & 0xFF);
+    const float ag = static_cast<float>((a >> IM_COL32_G_SHIFT) & 0xFF);
+    const float ab = static_cast<float>((a >> IM_COL32_B_SHIFT) & 0xFF);
+    const float aa = static_cast<float>((a >> IM_COL32_A_SHIFT) & 0xFF);
+    const float br = static_cast<float>((b >> IM_COL32_R_SHIFT) & 0xFF);
+    const float bg = static_cast<float>((b >> IM_COL32_G_SHIFT) & 0xFF);
+    const float bb = static_cast<float>((b >> IM_COL32_B_SHIFT) & 0xFF);
+    return IM_COL32(static_cast<int>(ar + (br - ar) * t),
+                    static_cast<int>(ag + (bg - ag) * t),
+                    static_cast<int>(ab + (bb - ab) * t),
+                    static_cast<int>(aa));
+}
+
+// Signed elevation, plains = 0. Ordered as topography, not as the enum: mountain
+// stands highest, then highland; valley, crater, rift and canyon sink in turn.
+// Magnitudes stay small on purpose — see landform_relief's contract.
+float relief_amount(terrain_landform lf)
+{
+    switch (lf)
+    {
+        case terrain_landform::mountain: return  0.22f;
+        case terrain_landform::highland: return  0.12f;
+        case terrain_landform::plains:   return  0.00f;
+        case terrain_landform::crater:   return -0.08f;
+        case terrain_landform::valley:   return -0.10f;
+        case terrain_landform::rift:     return -0.14f;
+        case terrain_landform::canyon:   return -0.16f;
+    }
+    return 0.0f;
+}
 } // namespace
+
+ImU32 landform_relief(ImU32 base, terrain_landform lf)
+{
+    const float a = relief_amount(lf);
+    if (a == 0.0f)
+        return base; // plains is the untouched baseline
+
+    // Warm sun above, cool shadow below — the convention that makes a shaded map
+    // read as topography rather than as two arbitrary tints.
+    constexpr ImU32 highlight = IM_COL32(255, 248, 225, 255);
+    constexpr ImU32 shadow    = IM_COL32( 18,  24,  40, 255);
+    return blend(base, a > 0.0f ? highlight : shadow, a > 0.0f ? a : -a);
+}
+
+ImU32 contrast_ink(ImU32 bg)
+{
+    const float r = static_cast<float>((bg >> IM_COL32_R_SHIFT) & 0xFF);
+    const float g = static_cast<float>((bg >> IM_COL32_G_SHIFT) & 0xFF);
+    const float b = static_cast<float>((bg >> IM_COL32_B_SHIFT) & 0xFF);
+    const float luma = 0.2126f * r + 0.7152f * g + 0.0722f * b; // Rec. 709
+    return luma > 140.0f ? IM_COL32(24, 26, 32, 225)
+                         : IM_COL32(238, 240, 246, 225);
+}
 
 ImU32 terrain_colour(terrain_composition t)
 {
@@ -127,13 +185,18 @@ void draw_tile_neighbourhood(ImDrawList* dl, world& w, entity_id centre_tile,
             ImVec2 verts[6];
             hex_vertices(verts, lc.x, lc.y, hex_sz * 0.94f);
 
-            const bool is_built = built.count(tid) != 0;
+            const auto tt        = w.tiles.find(tid);
+            const bool have_tile = (tt != w.tiles.end());
+            const bool is_built  = built.count(tid) != 0;
             ImU32 fill = built_plate;
             if (!is_built)
             {
-                const auto tt = w.tiles.find(tid);
-                fill = (tt != w.tiles.end()) ? terrain_colour(tt->second.composition)
-                                             : IM_COL32(60, 60, 60, 255);
+                fill = have_tile ? terrain_colour(tt->second.composition)
+                                 : IM_COL32(60, 60, 60, 255);
+                // Same landform channel the Planetary canvas draws (BL-231) — this
+                // view exists so the two surfaces cannot drift apart.
+                if (have_tile)
+                    fill = landform_relief(fill, tt->second.landform);
             }
             dl->AddConvexPolyFilled(verts, 6, fill);
             dl->AddPolyline(verts, 6, outline_col, ImDrawFlags_Closed, 1.0f);
@@ -141,6 +204,11 @@ void draw_tile_neighbourhood(ImDrawList* dl, world& w, entity_id centre_tile,
             {
                 const float m = hex_sz * 0.30f;
                 dl->AddRectFilled({lc.x - m, lc.y - m}, {lc.x + m, lc.y + m}, built_mark, 1.0f);
+            }
+            else if (have_tile)
+            {
+                icons::landform(dl, lc, hex_sz * 0.42f, tt->second.landform,
+                                contrast_ink(fill));
             }
             if (tid == centre_tile)
             {

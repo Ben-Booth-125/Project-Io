@@ -269,6 +269,263 @@ void industry(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     dl->AddRectFilled({ centre.x - bw * 0.85f, centre.y - r }, { centre.x - bw * 0.5f, top }, colour);
 }
 
+void continent(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // Two plates split by a diagonal seam. Each plate is its own convex quad —
+    // the seam is the GAP between them, not a drawn line, so the "crust in
+    // pieces" reading survives at strip size where a hairline would vanish. The
+    // quads are deliberately not mirror images: an irregular pair reads as
+    // tectonic, a symmetric one reads as a button.
+    const ImVec2 left[4] = {
+        { centre.x - r,         centre.y - r * 0.90f },
+        { centre.x + r * 0.05f, centre.y - r * 0.70f },
+        { centre.x - r * 0.15f, centre.y + r * 0.90f },
+        { centre.x - r,         centre.y + r * 0.70f },
+    };
+    const ImVec2 right[4] = {
+        { centre.x + r * 0.30f, centre.y - r * 0.70f },
+        { centre.x + r,         centre.y - r * 0.90f },
+        { centre.x + r,         centre.y + r * 0.70f },
+        { centre.x + r * 0.10f, centre.y + r * 0.90f },
+    };
+    dl->AddConvexPolyFilled(left, 4, colour);
+    dl->AddPolyline(left, 4, outline, ImDrawFlags_Closed, 1.0f);
+    dl->AddConvexPolyFilled(right, 4, colour);
+    dl->AddPolyline(right, 4, outline, ImDrawFlags_Closed, 1.0f);
+}
+
+void landform(ImDrawList* dl, ImVec2 centre, float r, terrain_landform lf, ImU32 colour)
+{
+    // Terrain shape, not an entity — so every glyph here is STROKE-ONLY and none
+    // carries the filled family's dark `outline`. A filled silhouette would read as
+    // "something is installed on this tile", which is the one thing landform is not.
+    //
+    // The stroke scales with r but never below ~1px, so a glyph stays visible when
+    // the canvas is zoomed out far enough that hexes are small.
+    const float t = std::max(1.0f, r * 0.16f);
+
+    switch (lf)
+    {
+        case terrain_landform::mountain:
+        {
+            // Twin peaks sharing a saddle, open at the bottom. No baseline: the
+            // open feet are what separate this from the filled port triangle and
+            // the production up-triangle, both of which sit ON a line.
+            const ImVec2 range[5] = {
+                { centre.x - r,         centre.y + r * 0.62f },
+                { centre.x - r * 0.34f, centre.y - r * 0.72f },
+                { centre.x + r * 0.04f, centre.y + r * 0.06f },
+                { centre.x + r * 0.46f, centre.y - r * 0.46f },
+                { centre.x + r,         centre.y + r * 0.62f },
+            };
+            dl->AddPolyline(range, 5, colour, ImDrawFlags_None, t);
+            break;
+        }
+        case terrain_landform::canyon:
+        {
+            // Two rim shoulders split by a narrow incision that cuts BELOW them —
+            // the gorge is the gap, and the rims are level, so it reads as a cleft
+            // in flat ground rather than as the continent glyph's diagonal seam.
+            const ImVec2 left[3] = {
+                { centre.x - r,         centre.y - r * 0.42f },
+                { centre.x - r * 0.30f, centre.y - r * 0.42f },
+                { centre.x - r * 0.10f, centre.y + r * 0.78f },
+            };
+            const ImVec2 right[3] = {
+                { centre.x + r,         centre.y - r * 0.42f },
+                { centre.x + r * 0.30f, centre.y - r * 0.42f },
+                { centre.x + r * 0.10f, centre.y + r * 0.78f },
+            };
+            dl->AddPolyline(left,  3, colour, ImDrawFlags_None, t);
+            dl->AddPolyline(right, 3, colour, ImDrawFlags_None, t);
+            break;
+        }
+        case terrain_landform::crater:
+        {
+            // A flattened bowl: a wide, low ellipse with a raised near rim drawn as
+            // a second arc inside its lower half. Deliberately NOT concentric circles
+            // (the activity pulse) and not a circle-plus-cross (the market centre) —
+            // the squashed aspect ratio is what says "impact basin seen from above".
+            const int   kSeg = 20;
+            ImVec2      rim[kSeg];
+            for (int i = 0; i < kSeg; ++i)
+            {
+                const float a = 6.2831853f * static_cast<float>(i) / static_cast<float>(kSeg);
+                rim[i] = { centre.x + r * 0.98f * std::cos(a),
+                           centre.y + r * 0.56f * std::sin(a) };
+            }
+            dl->AddPolyline(rim, kSeg, colour, ImDrawFlags_Closed, t);
+
+            const int kInner = 9; // lower half only — the near rim of the bowl
+            ImVec2    floor_arc[kInner];
+            for (int i = 0; i < kInner; ++i)
+            {
+                const float a = 3.1415927f * static_cast<float>(i) / static_cast<float>(kInner - 1);
+                floor_arc[i] = { centre.x + r * 0.52f * std::cos(a),
+                                 centre.y + r * 0.30f * std::sin(a) };
+            }
+            dl->AddPolyline(floor_arc, kInner, colour, ImDrawFlags_None, t * 0.8f);
+            break;
+        }
+        case terrain_landform::rift:
+        {
+            // A single jagged fissure running top to bottom — the only zigzag in the
+            // vocabulary, so it cannot be confused with any chevron (which meet at one
+            // point) or with the canyon's paired rims.
+            const ImVec2 fissure[6] = {
+                { centre.x + r * 0.30f, centre.y - r },
+                { centre.x - r * 0.16f, centre.y - r * 0.44f },
+                { centre.x + r * 0.24f, centre.y - r * 0.06f },
+                { centre.x - r * 0.26f, centre.y + r * 0.34f },
+                { centre.x + r * 0.14f, centre.y + r * 0.66f },
+                { centre.x - r * 0.20f, centre.y + r },
+            };
+            dl->AddPolyline(fissure, 6, colour, ImDrawFlags_None, t);
+            break;
+        }
+        case terrain_landform::plains:
+        case terrain_landform::highland:
+        case terrain_landform::valley:
+            break; // common ground — carried by the relief tint, not a glyph
+    }
+}
+
+bool landform_spans(terrain_landform lf)
+{
+    return lf == terrain_landform::mountain
+        || lf == terrain_landform::rift
+        || lf == terrain_landform::canyon;
+}
+
+void landform_span(ImDrawList* dl, ImVec2 from, ImVec2 mid, float amp, float thick,
+                   terrain_landform lf, ImU32 colour)
+{
+    if (!landform_spans(lf))
+        return;
+
+    const float dx  = mid.x - from.x;
+    const float dy  = mid.y - from.y;
+    const float len = std::sqrt(dx * dx + dy * dy);
+    if (len < 0.5f)
+        return;
+
+    // Canonical perpendicular. Deriving it from the direction of travel alone would
+    // point it opposite ways for the two halves of one span — they would deflect to
+    // opposite sides and meet in a kink instead of forming a continuous wave. Forcing
+    // a deterministic side (up on screen; leftward for a vertical run) makes both
+    // halves agree without either tile knowing about the other.
+    float px = -dy / len;
+    float py =  dx / len;
+    if (py > 0.0f || (py == 0.0f && px > 0.0f)) { px = -px; py = -py; }
+
+    // Sample the half-span at fixed parameters, offset perpendicular by the profile.
+    // Both ends sit at zero offset so the halves join flush at `mid` and at the centre.
+    auto stroke = [&](const float* offs, int n, float t_thick) {
+        ImVec2 pts[6];
+        for (int i = 0; i < n; ++i)
+        {
+            const float t = static_cast<float>(i) / static_cast<float>(n - 1);
+            const float o = offs[i] * amp;
+            pts[i] = { from.x + dx * t + px * o, from.y + dy * t + py * o };
+        }
+        dl->AddPolyline(pts, n, colour, ImDrawFlags_None, t_thick);
+    };
+
+    switch (lf)
+    {
+        case terrain_landform::mountain:
+        {
+            // ONE peak per half-edge, so a tile-to-tile span reads as two summits and a
+            // three-tile run as four — a row of peaks, which is how a range is drawn on
+            // a map. An earlier profile put two spikes in each half; at four per span the
+            // teeth were fine enough that a cluster read as a jagged OUTLINE rather than
+            // a ridge, which is the one thing bridging was meant to fix.
+            static const float teeth[3] = { 0.0f, 1.0f, 0.0f };
+            stroke(teeth, 3, thick);
+            break;
+        }
+        case terrain_landform::rift:
+        {
+            // A jagged crack: alternating deflection at higher frequency and a thinner
+            // stroke, echoing the lone tile's fissure. The only span that crosses its
+            // own axis, so it never reads as a ridge.
+            static const float crack[4] = { 0.0f, 0.85f, -0.85f, 0.0f };
+            stroke(crack, 4, thick * 0.8f);
+            break;
+        }
+        case terrain_landform::canyon:
+        {
+            // Two straight parallel rims with the gorge between them — the lone tile's
+            // paired-rim glyph, extended along the run.
+            static const float rim_hi[2] = {  1.0f,  1.0f };
+            static const float rim_lo[2] = { -1.0f, -1.0f };
+            stroke(rim_hi, 2, thick * 0.8f);
+            stroke(rim_lo, 2, thick * 0.8f);
+            break;
+        }
+        default:
+            break;
+    }
+}
+
+void history(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // Hourglass: a down-triangle over an up-triangle meeting at a centre waist,
+    // with capped ends. Read as "time"; the meeting point is what distinguishes
+    // it from the scarcity and production single triangles.
+    const float hw = r * 0.72f;   // half-width at the capped ends
+    dl->AddLine({ centre.x - hw, centre.y - r }, { centre.x + hw, centre.y - r }, colour, 1.5f);
+    dl->AddLine({ centre.x - hw, centre.y + r }, { centre.x + hw, centre.y + r }, colour, 1.5f);
+    // The two tapers crossing at the waist.
+    dl->AddLine({ centre.x - hw, centre.y - r }, { centre.x, centre.y }, colour, 1.5f);
+    dl->AddLine({ centre.x + hw, centre.y - r }, { centre.x, centre.y }, colour, 1.5f);
+    dl->AddLine({ centre.x - hw, centre.y + r }, { centre.x, centre.y }, colour, 1.5f);
+    dl->AddLine({ centre.x + hw, centre.y + r }, { centre.x, centre.y }, colour, 1.5f);
+}
+
+void research(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // Branching tree: a stem rising from the bottom to a fork, then two
+    // diagonals out to capped terminal nodes. The only branching glyph in the
+    // vocabulary, so it reads as "tech tree" rather than an arrow or triangle.
+    const float fork_y = centre.y - r * 0.15f;
+    const float node_r = std::max(1.0f, r * 0.22f);
+    // Stem.
+    dl->AddLine({ centre.x, centre.y + r }, { centre.x, fork_y }, colour, 1.5f);
+    // Two branches out to their nodes.
+    const ImVec2 left  = { centre.x - r * 0.70f, centre.y - r * 0.75f };
+    const ImVec2 right = { centre.x + r * 0.70f, centre.y - r * 0.75f };
+    dl->AddLine({ centre.x, fork_y }, left,  colour, 1.5f);
+    dl->AddLine({ centre.x, fork_y }, right, colour, 1.5f);
+    dl->AddCircleFilled(left,  node_r, colour);
+    dl->AddCircleFilled(right, node_r, colour);
+}
+
+void strategy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // Pennant on a pole: a vertical staff with a filled right-triangle flag at
+    // its head, flying to the right. The flag hangs off the staff top rather
+    // than resting on a baseline, keeping it clear of the production triangle.
+    const float x = centre.x - r * 0.55f;
+    dl->AddLine({ x, centre.y - r }, { x, centre.y + r }, colour, 1.5f);
+    const ImVec2 v[3] = {
+        { x,                 centre.y - r },          // staff head
+        { centre.x + r,      centre.y - r * 0.45f },  // flag point
+        { x,                 centre.y + r * 0.10f },  // flag foot on the staff
+    };
+    dl->AddConvexPolyFilled(v, 3, colour);
+}
+
+void diplomacy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // Two overlapping circle outlines — two parties meeting. The overlap is the
+    // motif, so it never reads as the single market-centre circle.
+    const float cr  = r * 0.62f;
+    const float off = r * 0.38f;
+    dl->AddCircle({ centre.x - off, centre.y }, cr, colour, 0, 1.5f);
+    dl->AddCircle({ centre.x + off, centre.y }, cr, colour, 0, 1.5f);
+}
+
 void market_centre(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
 {
     // Circle outline.

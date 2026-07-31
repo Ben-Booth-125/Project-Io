@@ -7,21 +7,40 @@ summarises how they relate and records the cross-doc decisions that no single on
 
 The subject docs:
 
-- **`PLANETOLOGY.md`** (BL-167, post-v0.1.0, design-owed on the doc itself — see below) — the
-  body-level history pass: generated atmosphere/chemistry and a simulated abiogenesis/evolution
-  history, ahead of tile generation, in the spirit of Shadow Empire's Planetology phase.
+- **`PLANETOLOGY.md`** — **implemented (first cut, BL-167 complete)** — the body-level history
+  pass: generated atmosphere/chemistry and a simulated abiogenesis/evolution history, ahead of
+  tile generation, in the spirit of Shadow Empire's Planetology phase. It now *derives* each
+  `body_profile` that used to be hand-authored.
+- **`CONTINENTS.md`** (new 2026-07-31) — the plate-drift pass (BL-210 first slice, landed
+  2026-07-28): plates derived from Planetology's Engine output, feeding a height bias into the
+  tile pipeline's Pass 1.
 - **`TILE_GENERATION.md`** — the procedural tile pipeline (terrain, ocean, deposits) per body.
-- **`NATION_GENERATION.md`** — Voronoi territory placement and nation profiles over the tile map.
+- **`NATION_GENERATION.md`** — Voronoi territory placement and nation profiles over the tile map,
+  now driven by the pre-national history ladder.
+- **`../lore/HISTORY.md`** — the institutional history ladder: *why* the 1960 campaign world is
+  market-based and non-hegemonic. Stages 0–2 are built (BL-221); Stages 5–6 as written are
+  superseded pending BL-223 (averted rupture).
 - **`CORPORATION_GENERATION.md`** — corporation placement, focus, holdings, and finance.
-- **`GENERATION_LEDGER.md`** — the design-only tuning surface that explains *why* a tile generated as it did.
+- **`GENERATION_LEDGER.md`** — the tuning surface that explains *why* a tile generated as it did
+  (Chain half built and player-facing; breadcrumb/lens half still design).
 
-Generation runs **planetology → tiles → nations → corporations** (a body's atmosphere/history
-precedes its terrain; deposits exist before territory is drawn over them; territory exists
-before corporations are placed within it). All passes are **deterministic** from the campaign
-seed. Within the tile-generation layer, the six-pass core stays fixed and every extension
-(rivers, deposits, coastline refinement, and PLANETOLOGY.md's own future body-level pass) lands
-as a **sibling pass** reading the shared `generation_record` rather than growing the core pipeline
-(settled 2026-07-21, BL-051).
+Generation runs (verified against `make_hard_coded_world`, 2026-07-31):
+
+```
+planetology → continents → tiles          (per body)
+  → population centres → history ladder → nations
+  → institutional history → roads → corporations   (Kepler only)
+```
+
+A body's atmosphere/history precedes its plates; plates precede its terrain; deposits exist
+before territory is drawn over them. On Kepler, population centres are placed **before** nations
+(so the substrate-density pass can read them), the history ladder runs **before**
+`generate_nations` because it *drives* the seed budget, and Stages 1–2 of the institutional
+history are recorded **after** — they name and count nations that did not exist a moment
+earlier. Roads are stamped once nations + centres exist; corporations are placed last. All
+passes are **deterministic** from the campaign seed. Within the tile-generation layer, the
+six-pass core stays fixed and every extension lands as a **sibling pass** reading the shared
+`generation_record` rather than growing the core pipeline (settled 2026-07-21, BL-051).
 
 ---
 
@@ -74,12 +93,16 @@ The descriptor lives in the app, **not** the `world` struct, so it stays off the
 | `seed` (`uint32_t`) | XOR-folded into each **existing per-body seed literal** (`params.seed ^ 0xC1D0001u`, …). Seed `0` yields the original literals, so the **default descriptor reproduces the legacy world bit-for-bit**. | cheap |
 | `abundance` (`sparse`/`lean`/`standard`) | A **deposit-density scalar** applied as a pure post-multiply in `generate_body_tiles` Pass 6 (`0.40` / `0.65` / `1.00`). Consumes no RNG, so `standard` (1.0) is bit-identical to the unscaled surface. | cheap, isolated |
 | `body_count` (`int`) | **Reserved — phased to a follow-on.** The body set is still hand-authored prototype profiles (Cinder/Kepler/Selene/Pallas); a true count knob needs the generator to synthesise variable body profiles, which is out of BL-114's budget. The field exists so the descriptor is forward-shaped. | heaviest (deferred) |
+| `preferences` (`world_preferences`) | The New World wizard's input (BL-167): eight **leans** (`any`/`low`/`mid`/`high`), resolved against the seed by `resolve_preferences` with reject-and-reroll until the homeworld clears the strict Earth-like floor. Preferences, not parameters — see `PLANETOLOGY.md` § Preferences, not parameters. | cheap |
 
-**There is no nation-count field.** The number of nations on the home body is a *consequence* of
-generation, not a descriptor input: seeds scale with habitable land area and every nation below a
-minimum viable territory is absorbed (`NATION_GENERATION.md` § Pass 1 / Pass 2c). The New World
-setup screen therefore has no nations slider — a world's political granularity is something the
-player discovers, not something they dial in.
+**There is no nation-count field** — still true. The number of nations on the home body is a
+*consequence* of generation, not a descriptor input: seeds scale with habitable land area,
+every nation below a minimum viable territory is absorbed (`NATION_GENERATION.md` § Pass 1 /
+Pass 2c), and since BL-221 (pre-national ladder, landed 2026-07-30) the seed budget itself is
+**driven by the history ladder's `fragmentation_q`** — a broken, many-cradled world seeds more
+densely and keeps smaller survivors (`nation_params_from_ladder`, `history_ladder.cpp`). The
+New World setup screen therefore has no nations slider — a world's political granularity is
+something the player discovers, not something they dial in.
 
 **Abundance honours the resource ceiling (above).** `standard` **is** the earth-like ceiling
 (1.0×); the other tiers step *down* (`lean` 0.65, `sparse` 0.40) — there is no tier above Earth.
@@ -101,7 +124,7 @@ input to the staged-generation Tile Ledger ([[BL-100]]) as a tuning surface.
 
 ---
 
-## The oral-history pivot (BL-210, design-owed, post-v0.1.0)
+## The oral-history pivot (BL-210, design-owed — first slices landed)
 
 **Settled direction, 2026-07-28 (Ben):** generation is being reframed from four separate
 mechanisms into **one continuous simulated history**, extending BL-167's proven S0–S9 chain
@@ -114,18 +137,21 @@ S0 System → S1–S4 Continents (simulated plate drift/collision/rift, replaces
   authored corporation focus tables)
 ```
 
-Mass extinctions (already narrated today) and new **historical-extinction** analogues
-(collapse, war) become **branch checkpoints**: the existing preference-lean mechanism
-(`PLANETOLOGY.md` § Preferences) extends to bias which branch fires, and the batch-sweep
-tool (`planetology_sweep.cpp`) generalises to explore lean × branch space across worlds —
-the mechanism for tuning target parameters and surfacing dead-end combinations.
+Where that stands as of 2026-07-31:
 
-This directly closes the gap `PLANETOLOGY.md` § Known weaknesses names as the largest
-missing connection: *"the pass hands nothing to nation or corporation generation."* **Full
-architecture, rationale, and the per-doc open questions live in BL-210** (`backlog.json`) —
-this note exists so the pipeline ordering above is not read as settled fact until each
-subject doc (`TILE_GENERATION.md`, `NATION_GENERATION.md`, `CORPORATION_GENERATION.md`) has
-had its own design pass.
+| Slice | Status |
+|---|---|
+| Continents/Drift — plates from Engine output, height bias into tile Pass 1 | **Landed** 2026-07-28 (`CONTINENTS.md`); Continent lens built 2026-07-30 (BL-226) |
+| Settlement Stages 0–2 — cradles, charter, border accord; ladder drives the nation seed budget | **Landed** 2026-07-30 (BL-221 pre-national ladder; `../lore/HISTORY.md` § Implementation) |
+| Full S1–S4 continents simulation (replacing the remaining noise machinery) | Owed — **BL-210 (oral-history pivot, design-owed)** |
+| Industrialisation / later ladder stages | Owed — **BL-222 (industrial ladder, designed)**, **BL-223 (averted rupture, design-owed)** |
+| Branch checkpoints (historical-extinction analogues) + lean × branch sweep | Owed — stays with BL-210 |
+
+The gap `PLANETOLOGY.md` § Known weaknesses named as the largest missing connection — *"the
+pass hands nothing to nation or corporation generation"* — is now **half-closed**:
+`run_history_ladder` consumes the planetology state and `nation_params_from_ladder` feeds its
+fragmentation into nation seeding. The corporation half is still open. **Full architecture,
+rationale, and the per-doc open questions live in BL-210** (`backlog.json`).
 
 ---
 

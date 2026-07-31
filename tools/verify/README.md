@@ -9,22 +9,33 @@ These are the cases behind the **`verifier-headless`** skill
 the build commands. Adding a `tools/verify/*.cpp` here and naming it in that skill
 is how a new headless check becomes a permanent, reusable asset.
 
-Compile and run from the repo root, after sourcing the VS BuildTools `vcvars64`:
+Compile and run from the repo root, after sourcing the VS BuildTools `vcvars64`.
+
+**Output goes to `build_gen\verify\` — never `%TEMP%`, never the repo root.** Every recipe below
+passes both `/Fe:` (exe) and `/Fo:` (objects, trailing `\` required); `cl` defaults both to the
+current directory, so dropping either scatters artifacts across the tree. Keep the harness's
+**full name** in the output path — an abbreviated `hlh.exe` or `ct.exe` is unidentifiable later
+and reads as malware to a virus scanner. `%TEMP%` is banned outright: unsigned exes in
+user-writable staging are exactly the shape of a dropper, and excluding `%TEMP%` from a scanner
+to quieten the warning would blind it to real threats. Nothing here dirties `git status` —
+`.gitignore` covers `build_gen/` outright, plus `*.exe` / `*.obj` / `*.pdb` by extension.
 
 ```bat
 :: Layer 3 economy logic: production -> market clearing -> budget, including
 :: supply/demand price resolution and deposit-depletion taper/exhaustion.
 cl /nologo /std:c++20 /EHsc /I src tools\verify\econ_harness.cpp ^
    src\world\world.cpp src\world\economy_system.cpp ^
-   src\world\market_clearing.cpp src\world\budget_system.cpp /Fe:econ_harness.exe
-.\econ_harness.exe
+   src\world\market_clearing.cpp src\world\budget_system.cpp ^
+   /Fo:build_gen\verify\econ_harness\ /Fe:build_gen\verify\econ_harness.exe
+.\build_gen\verify\econ_harness.exe
 
 :: Multi-tick economy stability — runs the loop 100 ticks on a small fixed world
 :: and asserts price-band, finiteness, monotonic reserve, and bounded balances.
 cl /nologo /std:c++20 /EHsc /I src tools\verify\econ_stability.cpp ^
    src\world\world.cpp src\world\economy_system.cpp ^
-   src\world\market_clearing.cpp src\world\budget_system.cpp /Fe:econ_stability.exe
-.\econ_stability.exe
+   src\world\market_clearing.cpp src\world\budget_system.cpp ^
+   /Fo:build_gen\verify\econ_stability\ /Fe:build_gen\verify\econ_stability.exe
+.\build_gen\verify\econ_stability.exe
 
 :: World audit — Kepler biome balance (S2) + extraction placement (S1) +
 :: deposit-reserve seeding (resource_remaining = richness x reserve factor).
@@ -33,22 +44,24 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\world_audit.cpp ^
    src\world\corporation_generation.cpp src\world\placement_rules.cpp ^
    src\world\population_generation.cpp src\world\hard_coded_world.cpp ^
    src\world\orbital_system.cpp src\world\city_names.cpp src\world\planetology.cpp ^
-   src\world\road_generation.cpp src\world\logistics.cpp /Fe:world_audit.exe
-.\world_audit.exe
+   src\world\road_generation.cpp src\world\logistics.cpp ^
+   /Fo:build_gen\verify\world_audit\ /Fe:build_gen\verify\world_audit.exe
+.\build_gen\verify\world_audit.exe
 
 :: Layer 4 player construction — construct_building validation, build-cost spend,
 :: component authoring, and the insufficient-funds / unknown-corp/tile guards.
 cl /nologo /std:c++20 /EHsc /I src tools\verify\construction_harness.cpp ^
    src\world\world.cpp src\world\construction.cpp src\world\placement_rules.cpp ^
-   /Fe:construction_harness.exe
-.\construction_harness.exe
+   /Fo:build_gen\verify\construction_harness\ /Fe:build_gen\verify\construction_harness.exe
+.\build_gen\verify\construction_harness.exe
 
 :: Supply layer — advance_convoys (R1), logistics constants (R4), dispatch_convoys
 :: gate check + balance debit + pool debit (R5, R6), credit_arrived_convoys pool +
 :: market supply injection (R7, R8). BL-039 / BL-038 / BL-045.
 cl /nologo /std:c++20 /EHsc /I src tools\verify\supply_advance.cpp ^
-   src\world\world.cpp src\world\supply_system.cpp /Fe:supply_advance.exe
-.\supply_advance.exe
+   src\world\world.cpp src\world\supply_system.cpp ^
+   /Fo:build_gen\verify\supply_advance\ /Fe:build_gen\verify\supply_advance.exe
+.\build_gen\verify\supply_advance.exe
 
 :: Population MVP + workforce-pool step 2 — population centres on Kepler (R3),
 :: agricultural demand from pop (R4), agglomeration workforce contention (R5 / BL-042 R1).
@@ -59,8 +72,28 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\population_mvp.cpp ^
    src\world\corporation_generation.cpp src\world\placement_rules.cpp ^
    src\world\population_generation.cpp src\world\hard_coded_world.cpp ^
    src\world\orbital_system.cpp src\world\economy_system.cpp ^
-   src\world\market_clearing.cpp src\world\budget_system.cpp /Fe:population_mvp.exe
-.\population_mvp.exe
+   src\world\market_clearing.cpp src\world\budget_system.cpp ^
+   /Fo:build_gen\verify\population_mvp\ /Fe:build_gen\verify\population_mvp.exe
+.\build_gen\verify\population_mvp.exe
+
+:: Population demand ordering (BL-190 fix, 2026-07-31) — inject_population_demand
+:: unit routing (R1); the demand survives clear_markets' per-tick reset into the
+:: cleared state price resolution reads (R2); stale pre-clearing demand is erased
+:: while the injection lands (R3). Links the full SDL/Lua-free world superset
+:: (every src\world\*.cpp except recipe_registry.cpp and tech_tree.cpp).
+:: (List current as of 2026-07-31; if it drifts, mirror CMakeLists' IO_WORLD_SOURCES glob.)
+cl /nologo /std:c++20 /EHsc /I src tools\verify\population_demand_harness.cpp ^
+   src\world\budget_system.cpp src\world\building_profit.cpp src\world\chemistry_tables.cpp ^
+   src\world\city_names.cpp src\world\construction.cpp src\world\continents.cpp ^
+   src\world\corp_ai.cpp src\world\corp_command.cpp src\world\corporation_generation.cpp ^
+   src\world\economy_system.cpp src\world\hard_coded_world.cpp src\world\history_ladder.cpp ^
+   src\world\logistics.cpp src\world\market_clearing.cpp src\world\nation_generation.cpp ^
+   src\world\orbital_system.cpp src\world\placement_rules.cpp src\world\planetology.cpp ^
+   src\world\population_generation.cpp src\world\road_generation.cpp src\world\supply_system.cpp ^
+   src\world\survey_system.cpp src\world\terrain_combat.cpp src\world\tile_generation.cpp ^
+   src\world\world.cpp ^
+   /Fo:build_gen\verify\population_demand_harness\ /Fe:build_gen\verify\population_demand_harness.exe
+.\build_gen\verify\population_demand_harness.exe
 ```
 
 ```bat
@@ -68,35 +101,38 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\population_mvp.cpp ^
 :: region partition + reveal order, home starts surveyed, concurrent surveys
 :: advance independently, dispatch guards + upfront debit.
 cl /nologo /std:c++20 /EHsc /I src tools\verify\survey_harness.cpp ^
-   src\world\world.cpp src\world\survey_system.cpp /Fe:survey_harness.exe
-.\survey_harness.exe
+   src\world\world.cpp src\world\survey_system.cpp ^
+   /Fo:build_gen\verify\survey_harness\ /Fe:build_gen\verify\survey_harness.exe
+.\build_gen\verify\survey_harness.exe
 ```
 
 On Linux (the primary dev target), the same harness builds via CMake
 (`cmake --build build --target survey_harness`) or directly:
-`g++ -std=c++20 -I src tools/verify/survey_harness.cpp src/world/world.cpp src/world/survey_system.cpp -o survey_harness`.
+`g++ -std=c++20 -I src tools/verify/survey_harness.cpp src/world/world.cpp src/world/survey_system.cpp -o build_gen/verify/survey_harness`.
 
 ```bat
 :: Visibility model (BL-068) — read-side ownership accessors: owner_corp_of resolves
 :: a building to its owning corporation (null when unowned); is_player_owned is the
 :: single uniform rival branch point.
 cl /nologo /std:c++20 /EHsc /I src tools\verify\visibility_harness.cpp ^
-   src\world\world.cpp /Fe:visibility_harness.exe
-.\visibility_harness.exe
+   src\world\world.cpp ^
+   /Fo:build_gen\verify\visibility_harness\ /Fe:build_gen\verify\visibility_harness.exe
+.\build_gen\verify\visibility_harness.exe
 ```
 
 On Linux: `cmake --build build --target visibility_harness` or
-`g++ -std=c++20 -I src tools/verify/visibility_harness.cpp src/world/world.cpp -o visibility_harness`.
+`g++ -std=c++20 -I src tools/verify/visibility_harness.cpp src/world/world.cpp -o build_gen/verify/visibility_harness`.
 
 ```bat
 :: Population legibility (BL-069) — regression guard: workforce_efficiency reproduces
 :: the prior inline economy_system curve bit-identically across [0,1]. Header-only.
-cl /nologo /std:c++20 /EHsc /I src tools\verify\workforce_harness.cpp /Fe:workforce_harness.exe
-.\workforce_harness.exe
+cl /nologo /std:c++20 /EHsc /I src tools\verify\workforce_harness.cpp ^
+   /Fo:build_gen\verify\workforce_harness\ /Fe:build_gen\verify\workforce_harness.exe
+.\build_gen\verify\workforce_harness.exe
 ```
 
 On Linux: `cmake --build build --target workforce_harness` or
-`g++ -std=c++20 -I src tools/verify/workforce_harness.cpp -o workforce_harness`.
+`g++ -std=c++20 -I src tools/verify/workforce_harness.cpp -o build_gen/verify/workforce_harness`.
 
 ```bat
 :: Corp AI stage A (BL-202) — the corp-command seam (R1: seam-only mutation,
@@ -108,8 +144,30 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\corp_ai_harness.cpp ^
    src\world\world.cpp src\world\economy_system.cpp src\world\market_clearing.cpp ^
    src\world\budget_system.cpp src\world\building_profit.cpp src\world\corp_ai.cpp ^
    src\world\corp_command.cpp src\world\construction.cpp src\world\placement_rules.cpp ^
-   src\world\survey_system.cpp /Fe:corp_ai_harness.exe
-.\corp_ai_harness.exe
+   src\world\survey_system.cpp ^
+   /Fo:build_gen\verify\corp_ai_harness\ /Fe:build_gen\verify\corp_ai_harness.exe
+.\build_gen\verify\corp_ai_harness.exe
+```
+
+```bat
+:: AI skill-regression harness (BL-204) — freezes a 5-seed benchmark set
+:: (world_params.seed 0-4) and runs 300 ticks of the real bot-vs-bot economy
+:: loop per seed, asserting net-worth curve / solvency / survival / thrash
+:: action-counts against disposable golden bands, plus world::state_hash
+:: (the BL-204 tick-boundary FNV-1a checksum) identity across two same-seed
+:: runs. Hand-builds a recipe_registry (mirrors scripts/economy.lua/recipes.lua);
+:: links the generation TU superset (as world_audit/corp_terrain_matrix) plus
+:: the corp-AI/economy TUs.
+cl /nologo /std:c++20 /EHsc /I src tools\verify\ai_skill_harness.cpp ^
+   src\world\world.cpp src\world\economy_system.cpp src\world\market_clearing.cpp ^
+   src\world\budget_system.cpp src\world\building_profit.cpp src\world\corp_ai.cpp ^
+   src\world\corp_command.cpp src\world\construction.cpp src\world\placement_rules.cpp ^
+   src\world\survey_system.cpp src\world\supply_system.cpp src\world\logistics.cpp ^
+   src\world\hard_coded_world.cpp src\world\tile_generation.cpp src\world\planetology.cpp ^
+   src\world\continents.cpp src\world\nation_generation.cpp src\world\population_generation.cpp ^
+   src\world\city_names.cpp src\world\corporation_generation.cpp src\world\road_generation.cpp ^
+   src\world\orbital_system.cpp /Fe:ai_skill_harness.exe
+.\ai_skill_harness.exe
 ```
 
 ```bat
@@ -120,8 +178,10 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\corp_ai_harness.cpp ^
 :: S5e survival floor cuts through the Lost City band (45-90 C).
 :: Links chemistry_tables.cpp only — no world.cpp, no generation TUs.
 cl /nologo /std:c++20 /EHsc /I src tools\verify\chemistry_tables_harness.cpp ^
-   src\world\chemistry_tables.cpp /Fe:chemistry_tables_harness.exe
-.\chemistry_tables_harness.exe
+   src\world\chemistry_tables.cpp ^
+   /Fo:build_gen\verify\chemistry_tables_harness\ ^
+   /Fe:build_gen\verify\chemistry_tables_harness.exe
+.\build_gen\verify\chemistry_tables_harness.exe
 ```
 
 ```bat
@@ -132,9 +192,40 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\chemistry_tables_harness.cpp ^
 :: sign-biased (R4), and every emitted history line names its consequence (R5).
 :: Links planetology.cpp (reads mobile_lid/theta) + continents.cpp.
 cl /nologo /std:c++20 /EHsc /I src tools\verify\continents_harness.cpp ^
-   src\world\planetology.cpp src\world\continents.cpp /Fe:continents_harness.exe
-.\continents_harness.exe
+   src\world\planetology.cpp src\world\continents.cpp ^
+   /Fo:build_gen\verify\continents_harness\ /Fe:build_gen\verify\continents_harness.exe
+.\build_gen\verify\continents_harness.exe
 ```
+
+```bat
+:: Creeds (BL-235) - one pantheon per cradle-culture in its own generated tongue.
+:: Asserts determinism of the full biography across two generations (C1); one
+:: shrine per culture, pairwise-distinct chief-god names, every creed line
+:: carries its consequence (C2); the creed DRIVES - a won tribal war lowers
+:: fragmentation_q before nation seeding, peaceable creeds are a no-op, welding
+:: floors at half, conquest cost can hold a frontier (C3); exactly one 1951
+:: common-tongue globalisation line, after every shrine (C4). Calls
+:: make_hard_coded_world, so it links the full SDL/Lua-free world superset
+:: (every src\world\*.cpp except recipe_registry.cpp and tech_tree.cpp) -
+:: mirror CMakeLists' IO_WORLD_SOURCES glob if this list drifts.
+cl /nologo /std:c++20 /EHsc /I src tools\verify\creeds_harness.cpp ^
+   src\world\budget_system.cpp src\world\building_profit.cpp src\world\chemistry_tables.cpp ^
+   src\world\city_names.cpp src\world\construction.cpp src\world\continents.cpp ^
+   src\world\corp_ai.cpp src\world\corp_command.cpp src\world\corporation_generation.cpp ^
+   src\world\creeds.cpp src\world\economy_system.cpp src\world\hard_coded_world.cpp ^
+   src\world\history_ladder.cpp src\world\logistics.cpp src\world\market_clearing.cpp ^
+   src\world\nation_generation.cpp src\world\orbital_system.cpp src\world\placement_rules.cpp ^
+   src\world\planetology.cpp src\world\population_generation.cpp src\world\road_generation.cpp ^
+   src\world\supply_system.cpp src\world\survey_system.cpp src\world\terrain_combat.cpp ^
+   src\world\tile_generation.cpp src\world\world.cpp ^
+   /Fo:build_gen\verify\creeds_harness\ /Fe:build_gen\verify\creeds_harness.exe
+.\build_gen\verify\creeds_harness.exe
+```
+
+On Windows via CMake (no need to hand-list sources): `cmake --build build --target creeds_harness`
+then `.\build\creeds_harness.exe` — it is picked up by the generic `tools/verify/*.cpp` glob batch
+at the foot of `CMakeLists.txt`, the same path `continents_harness` and `population_demand_harness`
+use, so no hand-declared target is needed.
 
 **BL-202 TU ripple:** `run_economy_step` now calls the strategic tier
 (`run_corp_strategic_step`), so ANY harness linking `economy_system.cpp` also

@@ -1,6 +1,8 @@
 # Build output
 build/
 build-web/
+build_gen/
+build_live/
 out/
 dist/
 .cmake/

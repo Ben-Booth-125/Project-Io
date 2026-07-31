@@ -165,6 +165,131 @@ void scarcity(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 /// @param colour Fill colour of the silhouette.
 void industry(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
 
+/// Draw the Continent-lens glyph — two interlocking plates split by a jagged
+/// seam — in @p colour. For the overlay-lens control strip; reads as "the crust
+/// is in pieces, and this is where they meet", which is the lens's whole subject.
+/// The seam is the load-bearing shape: it distinguishes this from the Country
+/// glyph (a bordered territory) and from any solid landmass blob, because what
+/// the lens shows is the *boundary*, not the area. See LENSES.md § Continent
+/// lens (BL-226).
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Fill colour of both plates.
+void continent(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
+/// Draw a **landform** marker for @p lf — the terrain-shape glyph family (BL-231).
+/// Stroke-only, in @p colour, so it reads as *engraved terrain* rather than as one
+/// more entity marker sitting on the tile; the caller picks a colour that contrasts
+/// with the hex beneath (see `ui::contrast_ink`).
+///
+/// Only the four **dramatic** landforms draw: mountain, canyon, crater and rift.
+/// Plains, highland and valley draw **nothing** — they are the common ground
+/// (measured at ~95 % of land tiles between plains and valley alone) and are carried
+/// by the relief tint in `hex_render`, not by a glyph. Drawing them would put an icon
+/// on nearly every tile, which is far denser than any other glyph family and would
+/// fight the building silhouette for the hex centre.
+///
+/// Silhouettes are chosen against the existing vocabulary: the mountain **range** is
+/// stroke-only twin peaks with no baseline (so it never reads as the *filled* port
+/// triangle or the production up-triangle); the canyon is a pair of rims split by a
+/// narrow **incision**; the crater is a **flattened bowl** with a raised near rim (not
+/// concentric circles — that is the activity pulse); and the rift is a single jagged
+/// fissure, the only zigzag in the set.
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param lf     Landform to depict; plains/highland/valley draw nothing.
+/// @param colour Stroke colour.
+void landform(ImDrawList* dl, ImVec2 centre, float r, terrain_landform lf, ImU32 colour);
+
+/// True when @p lf is a **linear** landform whose contiguous runs should be bridged
+/// into one spanning marker rather than drawn as a repeated per-tile glyph (BL-232).
+/// Mountain, rift and canyon are lines; crater is a basin — a blob, not a line — so it
+/// always keeps its centred glyph.
+bool landform_spans(terrain_landform lf);
+
+/// Draw **one half** of a spanning landform ridge: from a tile centre @p from to
+/// @p mid, the midpoint of the edge it shares with a same-landform neighbour (BL-232).
+///
+/// This is BL-172's road span/symmetry idiom applied to terrain. Each tile draws only
+/// its own half, so the neighbour's half meets this one exactly at @p mid — one
+/// continuous marker, identical whichever tile is "from", needing no cross-tile state,
+/// and clipping cleanly against the survey fog because a masked neighbour simply draws
+/// nothing.
+///
+/// Each landform's span echoes the silhouette of its own centred glyph, so a run and a
+/// lone tile read as the same feature: mountain draws **peaked teeth**, rift a **jagged
+/// crack**, canyon **two parallel rims**. The waveform's perpendicular is canonicalised
+/// (never derived from the direction of travel alone), so two halves meeting at @p mid
+/// deflect to the *same* side instead of mirroring into a kink.
+///
+/// Roads use this exact geometry in warm tan, so these must not read as roads: the
+/// caller supplies a contrasting ink and the shapes are deliberately non-smooth.
+///
+/// @param dl     Draw list to render into.
+/// @param from   Tile centre, screen pixels.
+/// @param mid    Shared-edge midpoint, screen pixels.
+/// @param amp    Waveform amplitude, screen pixels (a fraction of the hex radius).
+/// @param thick  Stroke thickness, screen pixels.
+/// @param lf     Landform to depict; a non-spanning landform draws nothing.
+/// @param colour Stroke colour.
+void landform_span(ImDrawList* dl, ImVec2 from, ImVec2 mid, float amp, float thick,
+                   terrain_landform lf, ImU32 colour);
+
+/// Draw the History nav-rail glyph — an hourglass (a down-triangle over an
+/// up-triangle meeting at a waist) — in @p colour. Slot 9 previously drew the
+/// same @ref ledger glyph as the Budget slot, so the two were indistinguishable;
+/// the joined pair is unmistakably "time" and collides with neither the hollow
+/// scarcity down-triangle nor the filled production up-triangle, because it is
+/// the meeting of the two that reads. See ICONS.md § Nav-rail affordances (BL-174).
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Stroke colour of both triangles.
+void history(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
+/// Draw the Research nav-rail glyph — an upward branching tree (a stem that
+/// splits into two diagonals, each capped with a terminal node) — in @p colour.
+/// Reads as "tech tree / lines of enquiry"; nothing else in the vocabulary
+/// branches, so it stays distinct from the production up-triangle and the
+/// market bars. Reserved-slot glyph, drawn dim. See ICONS.md § Nav-rail
+/// affordances (BL-174).
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Stroke colour of the stem, branches and nodes.
+void research(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
+/// Draw the Corp. Strategy nav-rail glyph — a pennant on a pole (a vertical
+/// staff with a filled right-triangle flag at its head) — in @p colour. Reads
+/// as "a planted objective"; the flag hangs off the staff's top rather than
+/// sitting on a baseline, which keeps it distinct from the production
+/// up-triangle. Reserved-slot glyph, drawn dim. See ICONS.md § Nav-rail
+/// affordances (BL-174).
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph, screen pixels.
+/// @param colour Stroke colour of the staff and fill of the pennant.
+void strategy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
+/// Draw the Diplomacy nav-rail glyph — two overlapping circle outlines (a
+/// two-parties-meeting motif) — in @p colour. Distinct from the single
+/// market-centre circle and the concentric activity pulse because the overlap
+/// is the point. Reserved-slot glyph, drawn dim. See ICONS.md § Nav-rail
+/// affordances (BL-174).
+///
+/// @param dl     Draw list to render into.
+/// @param centre Glyph centre, screen pixels.
+/// @param r      Half-extent of the glyph pair, screen pixels.
+/// @param colour Stroke colour of both outlines.
+void diplomacy(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour);
+
 /// Draw a market-centre marker — a small circle with a centred cross (+) — in
 /// @p colour. Distinct from the building square/diamond/triangle glyphs and the
 /// unit chevron. Used as an on-canvas selectable marker for market entities

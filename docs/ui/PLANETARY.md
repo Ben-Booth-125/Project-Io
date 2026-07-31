@@ -1,6 +1,6 @@
 # Project Io — Planetary Screen (Layer 2)
 
-The Planetary screen is the tile-grid view of the selected body's surface — the **bottom rung** of the canvas ladder, and the rung the game opens on (the corporation's home planet). It is the primary focus of Layer 2. See [CANVASES.md](CANVASES.md) for layout rules shared across the three canvases (the zoom ladder, context minimap, region sizing, shared selection state, implementation approach).
+The Planetary screen is the tile-grid view of the selected body's surface — the **bottom rung** of the canvas ladder, and the rung play opens on (the corporation's home planet — the app itself opens on the main menu first, see [STARTUP.md](STARTUP.md)). It is the primary focus of Layer 2. See [CANVASES.md](CANVASES.md) for layout rules shared across the three canvases (the zoom ladder, context minimap, region sizing, shared selection state, implementation approach).
 
 Because it is the bottom rung, the Planetary screen is **only ever primary** — it is never shown in the minimap. Reaching it is a descend click on the Circumplanetary screen; leaving it is a click on the minimap (which shows the Circumplanetary view) to ascend.
 
@@ -32,15 +32,27 @@ Stockpile readouts, market state, and workforce indicators are added in later la
 
 ## Terrain types
 
-| Terrain | Colour | Notes |
-|---|---|---|
-| Barren | `(170, 145, 100)` sandy tan | Flat, easy to build, low extraction cost |
-| Rocky | `(112, 105, 95)` warm grey | Moderate yield, higher build cost |
-| Icy | `(160, 200, 220)` pale blue | High ice deposit, low habitability |
-| Volcanic | `(135, 55, 28)` dark red-brown | High hazard, elevated rare metals |
-| Water | `(40, 80, 160)` deep blue | Ocean/sea; no land resources, high habitability |
+A tile's character has **two axes** (the two-axis model, [TILES.md](../economy/TILES.md)):
 
-**Water coverage:** approximately 60% of a body's tiles should be water, placed as one contiguous region (no isolated lakes in the prototype). The generation algorithm floods outward from a seed set of tiles using BFS, stopping at the 60% threshold. The remaining 40% forms one or more land masses; a single continent is preferred for prototype readability.
+- **Composition** — what the tile is made of. **Eleven values** (`terrain_composition`,
+  `src/world/components.hpp`): barren, rocky, volcanic, icy, tundra, grassland, forest,
+  wetland, ocean, regolith, metallic. Composition owns the hex's **hue** —
+  `ui::terrain_colour` (`src/ui/hex_render.{hpp,cpp}`) is the single colour source of
+  truth; the palette is not duplicated here (an earlier five-terrain RGB table in this
+  section drifted and is superseded).
+- **Landform** — the tile's physical shape. Seven values (`terrain_landform`): plains,
+  highland, mountain, canyon, valley, crater, rift. Landform renders on its **own
+  channels** — a subtle relief tint (`ui::landform_relief`) plus stroke-only glyphs for
+  the dramatic set, inked by luminance (`ui::contrast_ink`) — never in the hue. The full
+  render spec is [CANVASES.md](CANVASES.md) § Terrain channels (BL-231/BL-232), shared
+  with the Selection band's neighbourhood view via `hex_render`.
+
+> **Superseded — water coverage (2026-07-31).** The old rule here — ~60% water flooded
+> outward by BFS as one contiguous region, a single preferred continent — is superseded
+> by the **Continents/Drift tectonic-plate pass**, which derives ocean and landmass from
+> generated plates (see `docs/generation/CONTINENTS.md`; the Continent lens, BL-226,
+> renders the plates). Ocean fraction is now an outcome of the plate pass and the body's
+> hydrological state, not a flood-fill target.
 
 ---
 
@@ -49,17 +61,38 @@ Stockpile readouts, market state, and workforce indicators are added in later la
 | Element | Description |
 |---|---|
 | Background | Dark: `(18, 18, 24)` |
-| Tile | Filled hexagon. Colour from terrain table above. A 1 px gap between hexes lets the background show through as a border — achieved by drawing each hex at `circumradius - 1 px` rather than adding explicit borders. |
+| Tile | Filled hexagon. Colour from `ui::terrain_colour` (composition hue), composited with the landform relief tint (§ Terrain types above). A 1 px gap between hexes lets the background show through as a border — achieved by drawing each hex at `circumradius - 1 px` rather than adding explicit borders. |
 | Building marker | A small white vector glyph centred on the tile (~22% of hex circumradius), drawn by `ui::icons::building` with a thin dark outline. The silhouette encodes the type: extraction = ore-chunk, processing = square, port = triangle, inland logistics hub = hexagon (BL-149), other = circle. |
 | Road network | **Always-on** (like terrain, not a lens): the generated road lattice (BL-146) plus player-placed roads (BL-147) render as **continuous, symmetric spans** (BL-172). Each roaded tile draws its **own half** of every shared road edge — from its centre to the midpoint of the centre-to-neighbour line — toward each roaded, survey-revealed cardinal neighbour; the two tiles' halves meet at the edge midpoint, so a road spans the pair identically whichever tile is "from" (no from/to asymmetry), and a small centre cap rounds junctions and keeps a lone / just-placed road visible. Cylinder-seam edges shift one period to stay short; drawn only toward survey-revealed neighbours, so roads don't leak past the survey fog. Styled by the drawing tile's **tier** — **Track** (`road_level` 1) thin/dim, **Road** (2) medium, **Highway** (3) thick/bright — so a tier change reads as a taper at the midpoint. |
 | Selection / hover indicator | Hex outline drawn through the shared highlight convention (`src/ui/highlight.hpp`): white for the selected tile, light blue for the hovered tile (per wrap copy), amber for pinned (not yet wired). |
-| Hover tooltip | Tile coordinates `[col, row]`, terrain name, hazard, habitability, and all four resource deposit values. Suppress zero deposits. |
+| Hover card | The shared glance-then-stick hover card ([TOOLTIP.md](TOOLTIP.md), BL-228/BL-230), content **lens-keyed** (`src/ui/hover_content.cpp`). A tile's default variant: `composition · landform` header (plains unnamed), habitability, and the landform's movement-cost multiplier when not plains (BL-232). Under the Resource lens: the selected resource's deposit richness; under Population: habitability + workforce cap. Buildings and market centres carry their own variants (rival buildings show type + owner only, BL-068). |
 | Body label | Canvas title bar shows the selected body name, type, and grid dimensions. As the Planetary screen is always primary (full size), the title is always shown. A **survey-status suffix** follows it (survey system, BL-067): `UNSURVEYED`, `Survey en route`, or `Surveying k/N` — nothing once surveyed. |
 | Survey region mask | On a body whose survey is incomplete, tiles in **unrevealed regions** render as a flat dark "locked" fill `(12, 14, 20)` with no lens tint, borders, markers, selection outline, or hit-testing; revealed regions render normally. Regions reveal in deterministic raster (row-major) order as the survey scans (survey system, BL-067). A fully surveyed body (the home planet, or a completed survey) shows everything. |
 | Settlement markers | Always-on civic chrome, not lens-gated (BL-083): generated population centres are clustered into **conurbations** and drawn at their highest-scale member with a tier glyph (`ui::icons::settlement`) whose size grows with scale. Only **City+** conurbations (tier ≥ 4) carry a name label, to keep the map legible. Colour is civic-neutral (`palette::settlement`) except under the Country lens, where the host nation's tint applies — tier stays carried by size, keeping colour out of ownership. |
 | Home-cluster ring + HQ star | Always-on player-presence chrome on `home_body` only (BL-085/BL-092): a translucent ring (player-identity colour) encloses the player's holdings cluster on that body ("my region"), and an `ui::icons::hq` star marks the building nearest the cluster centroid ("my origin"). Composes with, does not duplicate, the per-tile ownership outline. |
 
 ---
+
+## Layers — what draws on this canvas today (2026-07-31)
+
+Beyond the base grid and the chrome in the table above, the draw pass
+(`body_surface_canvas.cpp`) composites, in broad order:
+
+- **Terrain channels** — composition hue + landform relief tint and glyph/spans
+  (BL-231/BL-232). Spec: [CANVASES.md](CANVASES.md) § Terrain channels.
+- **Lens tints** — twelve live lenses keyed on `ui_state::overlay`
+  ([LENSES.md](LENSES.md)); relief composites *after* the lens tint so landform
+  survives a saturated overlay.
+- **Built-tile installations** — building markers (enlarged silhouette + corp
+  emblem tag on built tiles), road spans (BL-172), settlement conurbation
+  markers, the home-cluster ring + HQ star.
+- **Corporate borders** — per-corp seat borders (`draw_corp_border`, BL-201
+  foundation).
+- **Activity fog + convoy beams** — the intra-body vision layers
+  (`permanent_vision`, `convoy_beams` in `ui_state`, BL-151/152/154) and the
+  survey region mask (BL-067). Model authority: [DISCOVERY.md](DISCOVERY.md).
+- **Hover/selection chrome** — the highlight convention, the glance-then-stick
+  hover card ([TOOLTIP.md](TOOLTIP.md)), and the construction placement ghost.
 
 ## Cell sizing and coordinate mapping
 
@@ -107,6 +140,6 @@ for i in 0..5:
 | Item | Deferred to |
 |---|---|
 | Stockpile / output readout on tiles | Layer 3 (extraction) |
-| Resource deposit overlay / lens mode | Deferred indefinitely — terrain colour is sufficient for prototype |
+| Resource deposit overlay / lens mode | ~~Deferred indefinitely~~ **Shipped 2026-06-17** (Resource lens, BL-019 — LENSES.md § Resource lens) |
 | Tile inspector ledger redesign (exploration system) | Post-prototype |
 | Seam *visualisation* (an explicit marker showing where the wrap occurs) | Post-prototype — the wrap itself is seamless and needs no marker |

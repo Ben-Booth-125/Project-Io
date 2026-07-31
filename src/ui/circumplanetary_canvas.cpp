@@ -264,8 +264,8 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
         draw_market_price_strip(dl, w, anchor, state, origin, size);
 
     // Supply lens: draw a convoy count badge next to each body's label.
-    // w.convoys is empty until the dispatch system lands; the loop is a no-op
-    // in the meantime. Primary view only — the minimap is too small.
+    // w.convoys is populated by dispatch_convoys (supply_system.cpp) each tick.
+    // Primary view only — the minimap is too small.
     if (apply_view && state.overlay == overlay_mode::supply)
     {
         constexpr ImU32 badge_col  = IM_COL32(80, 200, 255, 200);

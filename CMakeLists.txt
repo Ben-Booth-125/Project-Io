@@ -173,25 +173,21 @@ if(WIN32)
 endif()
 
 # ---------------------------------------------------------------------------
-# Headless economy bankruptcy calibration harness (no SDL / Lua / ImGui)
+# econ_bankruptcy is NOT declared here — it is built by the generic harness
+# batch at the foot of this file, against the whole ${IO_WORLD_SOURCES} superset.
+#
+# It used to carry a hand-picked source list, and that list rotted: every time
+# economy_system.cpp gained a cross-TU call, this target had to be patched to
+# match. It was patched once for BL-079 (estimate_building_profit) and then NOT
+# patched for BL-202, which added run_corp_strategic_step — so the target failed
+# to link with an undefined reference, and because the `if(NOT TARGET ...)` guard
+# in the batch below skips any target already declared, the self-maintaining path
+# could not rescue it.
+#
+# Found 2026-07-30 by the first full `cmake --build` on Linux; Windows never
+# caught it because the day-to-day loop builds the ProjectIo target alone. The
+# other hand-declared harnesses above the batch carry the same latent hazard.
 # ---------------------------------------------------------------------------
-# Links only the SDL/Lua-free world translation units, mirroring the manual
-# build documented in tools/verify/README.md and run_harness.bat.
-add_executable(econ_bankruptcy
-    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/econ_bankruptcy.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/economy_system.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/market_clearing.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/budget_system.cpp"
-    # BL-079: economy_system's scoped-agency pass calls estimate_building_profit.
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/building_profit.cpp"
-)
-
-target_include_directories(econ_bankruptcy PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/src"
-)
-
-target_compile_features(econ_bankruptcy PRIVATE cxx_std_20)
 
 # ---------------------------------------------------------------------------
 # Headless survey-system harness (BL-067; no SDL / Lua / ImGui)
@@ -282,28 +278,12 @@ target_compile_features(commercial_fog_harness PRIVATE cxx_std_20)
 # placement-rules seam); recipe_registry.cpp (the Lua loader) is intentionally
 # NOT linked — the harness hand-builds a coarse reference registry via the
 # header's inline setters.
-add_executable(corp_terrain_matrix
-    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/corp_terrain_matrix.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/hard_coded_world.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/tile_generation.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/planetology.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/continents.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/nation_generation.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/population_generation.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/city_names.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/corporation_generation.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/road_generation.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/logistics.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/orbital_system.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/placement_rules.cpp"
-)
-
-target_include_directories(corp_terrain_matrix PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/src"
-)
-
-target_compile_features(corp_terrain_matrix PRIVATE cxx_std_20)
+# corp_terrain_matrix is NOT declared here either - the same rot as
+# econ_bankruptcy. Its hand-picked list linked hard_coded_world.cpp but not
+# history_ladder.cpp, so BL-221 broke it the moment the ladder was wired in -
+# exactly as the econ_bankruptcy commit predicted the remaining hand-declared
+# targets would break. The generic batch at the foot of this file builds it
+# against the whole ${IO_WORLD_SOURCES} superset, which cannot drift this way.
 
 # ---------------------------------------------------------------------------
 # CTest wiring (BL-104) — one test per tools/verify/*.cpp, one local command
@@ -311,7 +291,8 @@ target_compile_features(corp_terrain_matrix PRIVATE cxx_std_20)
 # The harnesses above keep their hand-tuned minimal link sets. This block then
 # (a) builds every REMAINING tools/verify/*.cpp not already declared — linking
 # the SDL/Lua/ImGui-free world superset (every src/world/*.cpp EXCEPT
-# recipe_registry.cpp and tech_tree.cpp, the TUs that pull sol2/Lua), mirroring the CI headless
+# recipe_registry.cpp, tech_tree.cpp, and world_gen_config.cpp, the TUs that pull
+# sol2/Lua), mirroring the CI headless
 # loop in .github/workflows/build.yml so CMake and CI stay in lockstep and a new
 # harness is picked up automatically — and (b) registers ALL harnesses
 # (hand-listed + globbed) as CTest tests. Run the whole logic tier with
@@ -320,7 +301,7 @@ target_compile_features(corp_terrain_matrix PRIVATE cxx_std_20)
 enable_testing()
 
 file(GLOB IO_WORLD_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/world/*.cpp")
-list(FILTER IO_WORLD_SOURCES EXCLUDE REGEX "(recipe_registry|tech_tree)\\.cpp$")
+list(FILTER IO_WORLD_SOURCES EXCLUDE REGEX "(recipe_registry|tech_tree|world_gen_config)\\.cpp$")
 
 # pregame_balance_harness is the one harness that genuinely needs a live Lua
 # state: it constructs a `lua_state`, loads scripts/economy.lua + recipes.lua,

@@ -6,7 +6,9 @@
 // Build (from repo root, after sourcing vcvars64):
 //   cl /nologo /std:c++20 /EHsc /I src econ_harness.cpp ^
 //      src\world\world.cpp src\world\economy_system.cpp ^
-//      src\world\market_clearing.cpp src\world\budget_system.cpp /Fe:econ_harness.exe
+//      src\world\market_clearing.cpp src\world\budget_system.cpp ^
+//      /Fo:build_gen\verify\econ_harness\ /Fe:build_gen\verify\econ_harness.exe
+// Run: .\build_gen\verify\econ_harness.exe
 
 #include "world/budget_system.hpp"
 #include "world/components.hpp"
@@ -98,6 +100,17 @@ int main()
         cc.starting_capital = 1000.0f;
         cc.balance = 1000.0f;
         cc.assets.push_back(bld_e);
+        // NOT AI-DRIVEN (added 2026-07-31). run_economy_step stopped being pure
+        // economy arithmetic when BL-202's strategic tier landed: it commands every
+        // non-player corp at the end of the tick, and a workforce command rewrites
+        // workforce_target, which scales BOTH maintenance and wages
+        // (compute_building_opex). This fixture exists to pin the wage/maintenance
+        // formula, so the AI's decisions have to be out of the picture or the
+        // assertions below measure the wrong thing. `is_player` is the supported
+        // "this corp is not AI-driven" exclusion (corp_ai.cpp: is_player || ==
+        // player_entity). Every asserted value is UNCHANGED by this - it restores
+        // the isolation the assertions always assumed rather than relaxing them.
+        cc.is_player = true;
         w.corporations[corp_e] = cc;
     }
 
@@ -125,6 +138,7 @@ int main()
         cc.starting_capital = 1000.0f;
         cc.balance = 1000.0f;
         cc.assets.push_back(bld_p);
+        cc.is_player = true; // not AI-driven — see corp_e above
         w.corporations[corp_p] = cc;
     }
     // Seed P's pool with 4 iron ore -> coverage 4/8 = 0.5 (between t_idle and t_full).
@@ -244,6 +258,7 @@ int main()
         world ww;
         const entity_id wb = ww.create_entity(); ww.bodies[wb] = body_component{};
         corporation_component cc; cc.balance = 1000.0f;
+        cc.is_player = true; // not AI-driven — see corp_e above
         for (int i = 0; i < 4; ++i)
         {
             const entity_id t = ww.create_entity();

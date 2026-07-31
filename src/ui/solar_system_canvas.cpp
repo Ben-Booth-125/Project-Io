@@ -328,8 +328,8 @@ void draw_solar_system_canvas(const world& w, ui_state& state, ImVec2 origin, Im
     }
 
     // Supply lens: draw a line between the two bodies for each inter-body convoy.
-    // w.convoys is empty until the dispatch system lands, so this branch is a
-    // no-op in the meantime. Primary view only — the minimap is too small.
+    // w.convoys is populated by dispatch_convoys (supply_system.cpp) each tick.
+    // Primary view only — the minimap is too small.
     if (apply_view && state.overlay == overlay_mode::supply)
     {
         constexpr ImU32 supply_col = IM_COL32(80, 200, 255, 160);

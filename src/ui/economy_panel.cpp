@@ -182,9 +182,11 @@ void draw_workforce(const world& w, const economy_report& report)
                 corp_label(w, key.first) + "  @  " + body_label(w, key.second);
             ImGui::TextUnformatted(title.c_str());
             ImGui::TableSetColumnIndex(1);
-            // Throttled labour reads as a warning colour and a percentage.
+            // Throttled labour reads as a warning colour and a percentage. The
+            // phrasing comes from the shared ui::fmt helper (BL-179) so this table
+            // and the Selection element cannot drift apart.
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative),
-                "%.0f%% (labour short)", scalar * 100.0f);
+                "%s", fmt::labour_contention(scalar).c_str());
         }
         ImGui::EndTable();
     }

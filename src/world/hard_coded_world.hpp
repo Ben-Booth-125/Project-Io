@@ -1,7 +1,9 @@
 #pragma once
 
+#include "continents.hpp"
 #include "planetology.hpp"
 #include "world.hpp"
+#include "world_gen_config.hpp"
 
 #include <cstdint>
 #include <string>
@@ -55,6 +57,15 @@ struct generation_report
         /// has no preview to consult). Drawdown consumes no randomness, so this is
         /// the same world minus its industrial history — not a second roll.
         planetology_state undrawn;
+
+        /// What the Continents/Drift pass computed for this body (BL-226). Its
+        /// `history` is empty here — those lines were moved into `state.history`
+        /// at generation, where the biography reads them; what is kept is the
+        /// plate set and the per-tile `plate_id`, which nothing else records.
+        /// The Continent lens is the consumer. Presentation data, like the rest
+        /// of this struct: it never enters `world`, so it stays off the
+        /// serialisation seam.
+        continent_state continents;
     };
 
     world_preferences       preferences{}; ///< What the player asked for.
@@ -86,5 +97,8 @@ struct generation_report
 /// @param report Optional out-param; when non-null, receives the per-body Planetology
 ///               results and the per-stage summaries the generation screen reveals.
 ///               The common path passes nullptr and pays nothing.
+/// @param gen_cfg Balance values authored in scripts/world_gen.lua (BL-236). Defaulted
+///               so a headless caller that never touches Lua reproduces the same world.
 /// @return A fully populated world ready to drive the simulation.
-world make_hard_coded_world(world_params params = {}, generation_report* report = nullptr);
+world make_hard_coded_world(world_params params = {}, generation_report* report = nullptr,
+                            const world_gen_config& gen_cfg = {});

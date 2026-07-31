@@ -207,6 +207,25 @@ struct world
         return (it != workforce_supply_overrides.end()) ? it->second : default_workforce_supply;
     }
 
+    /// Tick-boundary state hash (BL-204): an FNV-1a checksum over a deterministic
+    /// canonicalisation of the econ-tick snapshot — every corporation's balance,
+    /// every building's dial state (workforce target/assigned, recipe, decommissioned,
+    /// ticks_remaining), every market's resolved price array, and every corp/body
+    /// stockpile pool. Sorted by entity id (map/unordered_map iteration order is not
+    /// itself trusted) so two structurally-identical worlds hash identically
+    /// regardless of container internals.
+    ///
+    /// Two roles, one function: (1) today, a same-seed-two-runs regression primitive
+    /// for the AI skill harness (BL-204) — a divergence flags a determinism leak in
+    /// the corp-AI seam; (2) later, the lockstep desync detector floated in
+    /// MULTIPLAYER_PRINCIPLES.md — a remote peer's hash mismatch at a tick boundary
+    /// is the desync signal. `tick` is folded in so a hash is tick-scoped (comparing
+    /// hashes across different ticks is meaningless by construction).
+    ///
+    /// @param tick The sim day tick this snapshot is taken at (folded into the hash).
+    /// @return An FNV-1a 64-bit checksum of the canonicalised snapshot.
+    uint64_t state_hash(int tick) const;
+
 private:
     uint32_t m_next_id = 1; ///< Zero is null_entity; live IDs start at 1.
 };

@@ -14,8 +14,41 @@ the [canvas zoom ladder](CANVASES.md) it applies to, and how its legend reads.
 Glyph shapes live in [ICONS.md](ICONS.md); identity colours live in
 [`presentation.hpp`](../../src/ui/presentation.hpp) (the `palette` namespace).
 
+## Current roster (2026-07-31)
+
+The whole `overlay_mode` family at a glance, derived from `overlay.cpp` /
+`ui_state.hpp`. The per-lens sections below are the design history; this table is
+where to look first. Bar slots 1–8 are the minimap strip order (BL-226 made
+Continent the eighth); "off the bar" lenses are reached by the keyboard lens-cycle
+(`L` / `Shift+L`, `0` clears).
+
+| `overlay_mode` | Bar | Surface (one line) | Status |
+|---|---|---|---|
+| `corporation` | 1 | Planetary tile tint per owning corp, player border, rival HQ reach rings (BL-182) | built |
+| `country` | 2 | Planetary nation tint + owner borders + per-nation key (BL-133, landed 2026-07-09) | built |
+| `resource` | 3 | Planetary contiguous-deposit flat fill; good selector in the legend (BL-134) | built |
+| `market` | 4 | Planetary **catchment tint** — one colour per market (BL-015) + city-name key; Circumplanetary price strip | built |
+| `population` | 5 | Per-tile red→green **value mark** (workforce efficiency; BL-135, landed 2026-07-09) + gradient key | built |
+| `opportunity` | 6 | Per-tile red→green **value mark** (catchment demand-gap rank; BL-135/BL-136) + key | built |
+| `production` | 7 | Planetary intensity tint, red→yellow→green vs body mean (BL-137) + key | built |
+| `continent` | 8 | Planetary plate tint + boundary lift + plate-count key (BL-226, landed 2026-07-30) | built |
+| `scarcity` | off the bar | Per-market shortfall blocks + key | built |
+| `industry` | off the bar | Substrate-throughput amber tint + key (BL-084) | built |
+| `supply` | off the bar | Solar per-convoy lines · Circumplanetary convoy-count badge · Planetary per-tile convoy glyph | built — Layer 5 convoys are live |
+| `reach` | off the bar | Planetary key listing the active body's trade-route endpoints by recency (BL-011, landed 2026-07-08) | built |
+| `supply_routes` | off the bar | Planetary key of aggregated lanes, log-scaled thickness (BL-014, landed 2026-07-08) | built — **but see access note** |
+
+> **Access note (2026-07-31).** `overlay_mode_count` in `canvas_command.cpp` is
+> still 13; BL-226 (continent lens) inserted `continent` *before* `supply_routes`
+> in the enum without bumping it, so the keyboard cycle never reaches the
+> Supply-routes lens. Reach and Continent cycle fine. One-line code fix owed.
+
 > **Status.** All lenses are built except where a section names a gating
-> dependency. The **Lens & Legibility** batch (BL-013/052/019/017/009/018) settled
+> dependency. **BL-226** (2026-07-30) added the **Continent** lens — the
+> tectonic plates from BL-210's Continents/Drift pass, retained on the generation
+> report so the boundaries that shaped the terrain can be drawn back onto it. It
+> is the **eighth** glyph on the BL-093 strip, the first addition to that row of
+> seven. The **Lens & Legibility** batch (BL-013/052/019/017/009/018) settled
 > the curated single-select strip, renamed Faction → **Country**, reworked the
 > **Resource** lens to a flat contiguous-deposit fill, reworked **Scarcity** to a
 > per-market shortfall field, and added the **Opportunity** (net-margin) and
@@ -28,10 +61,16 @@ Glyph shapes live in [ICONS.md](ICONS.md); identity colours live in
 > Production** — **Scarcity** and **Industry** dropped off the visible bar to
 > **keyboard-cycle only**, joining Supply (all three `overlay_mode` values still
 > exist and still render when selected by keyboard; they are just not glyphed on
-> the bar). The resource/good selector (shared by Resource/Market/Scarcity) is now
-> a **popup** opened from the minimap bar — the old 140px inline combo does not
-> fit there. The **Market** lens's per-catchment surface still waits on
-> multi-market seeding (BL-036); **Supply** waits on Layer-5 route geometry.
+> the bar). The resource/good selector (shared by Resource/Market/Scarcity) was
+> briefly a popup on the minimap bar; **BL-134** (2026-07-09) moved it into the
+> **on-canvas lens legend** (`draw_lens_resource_combo`,
+> `body_surface_canvas.cpp`), where it now lives. The **Market** lens's
+> per-catchment surface **landed** — BL-036 (market seeding) shipped multiple
+> centres and BL-015 reworked the wash to a catchment-boundary tint. **Supply**
+> no longer waits: Layer 5 shipped (`supply_system.cpp` populates `w.convoys`),
+> so its route geometry renders on all three rungs, and the aggregated
+> trade-lane read is the **Supply-routes** lens (BL-014). **BL-011** (reach lens)
+> and **BL-014** (supply-routes lens) landed 2026-07-08 — see their sections.
 > Identity colours live in `presentation.hpp`; the corporation-identity helper is
 > `palette::corp_colour` (renamed from `faction_colour`, BL-052).
 
@@ -45,10 +84,11 @@ but its build is gated on a dependency (named in the lens section).
 
 The lens bar — now on the **minimap** (BL-093, relocated from the bottom-left
 strip; see [MINIMAP.md](MINIMAP.md)) — presents a **curated subset** in this order
-(BL-013, extended BL-084, trimmed BL-093): **Corporation → Country → Resource →
-Market → Population → Opportunity → Production**. **Scarcity** and **Industry**
-are off the bar, reached by **keyboard lens-cycle only** — joining **Supply**,
-which remains off-bar pending Layer-5 route geometry. The campaign
+(BL-013, trimmed BL-093, extended BL-226): **Corporation → Country → Resource →
+Market → Population → Opportunity → Production → Continent**. **Scarcity** and
+**Industry** are off the bar, reached by **keyboard lens-cycle only** — joining
+**Supply**, **Reach** and **Supply-routes**, which do not fit the strip (and
+Supply-routes is currently unreachable — see the roster's access note). The campaign
 opens on **no lens** (`overlay_mode::none`, the plain canvas) — a click only updates
 the Selection element and never re-skins the canvas, so the canvas starts unskinned
 and the player picks a lens deliberately (reverses BL-013's Corporation-default,
@@ -61,27 +101,32 @@ a dependency (named in the lens section).
 
 | Lens | Solar | Circumplanetary | Planetary |
 |---|---|---|---|
-| Supply *(keyboard-cycle only)* | (later) inter-body route lines | (later) per-body throughput badge | (later) per-tile route + stockpile |
-| **Corporation** | — | — | **✓ tile tint + player border** |
-| **Country** | — | — | **✓ tile tint + owner borders** |
+| Supply *(keyboard-cycle only)* | **✓ per-convoy route lines** | **✓ per-body convoy-count badge** | **✓ per-tile convoy glyph** (regenerated table, 2026-07-31 — Layer 5 convoys live) |
+| **Corporation** | — | — | **✓ tile tint + player border + rival reach rings (BL-182)** |
+| **Country** | — | — | **✓ tile tint + owner borders + nation key (BL-133)** |
 | **Resource** | — | — | **✓ contiguous-deposit flat fill + key** |
-| **Market** | — | ✓ per-body price strip | ✓ per-body price wash |
-| **Population** | — | — | **✓ workforce-efficiency tint + gradient key (BL-069)** |
-| **Opportunity** | — | — | **✓ per-catchment unmet-demand tint + key (BL-112)** |
-| **Production** | — | (later) per-body output-throughput badge | **✓ production-intensity tint + key** |
+| **Market** | — | ✓ per-body price strip | **✓ catchment tint + city-name key (BL-015)** |
+| **Population** | — | — | **✓ per-tile value marks, workforce efficiency (BL-069 re-key, BL-135 marks)** |
+| **Opportunity** | — | — | **✓ per-tile value marks, demand-gap rank (BL-136)** |
+| **Production** | — | (later) per-body output-throughput badge | **✓ production-intensity tint + key (BL-137 ramp)** |
 | **Scarcity** *(keyboard-cycle only)* | — | (later) per-body shortfall badge | **✓ per-market shortfall blocks + key** |
 | **Industry** *(keyboard-cycle only)* | — | — | **✓ substrate-throughput amber tint + key** |
+| **Continent** | — | — | **✓ plate tint + boundary lift + key (BL-226)** |
+| **Reach** *(keyboard-cycle only)* | (owed) connected-body glow | — | **✓ connection-list key (BL-011)** |
+| **Supply-routes** *(off the bar; cycle misses it — roster note)* | (owed) aggregated graph edges | — | **✓ lane-list key, log-scaled thickness (BL-014)** |
 
 **BL-012 per-lens rung notes.** Corporation, Country, Resource, Population,
-Opportunity, and Industry are **Planetary-only** — their unit of meaning (a tile, a
-building, a deposit, a margin, a substrate-throughput reading) is sub-body and has
-no coherent inter-body surface, and nations are sub-body political units. Market
-and Supply are the genuinely multi-rung lenses (prices per body-market; logistics
-span the ladder). Production and Scarcity are Planetary today but each has a
-natural **Circumplanetary per-body badge** owed (total output / aggregate shortfall
-for the anchor body) — additive passes guarded behind the same `overlay_mode`, not
-changing the Planetary behaviour. None propagate to the Solar rung in the
-prototype.
+Opportunity, Industry, and Continent are **Planetary-only** — their unit of meaning
+(a tile, a building, a deposit, a margin, a substrate-throughput reading, a plate)
+is sub-body and has no coherent inter-body surface, and nations are sub-body
+political units. Market and Supply are the genuinely multi-rung lenses (prices per
+body-market; logistics span the ladder); Reach and Supply-routes are body-level
+reads whose natural home is the Solar rung — their Solar surfaces (connected-body
+glow; the aggregated graph) are **owed**, with the Planetary keys standing in
+(BL-011/BL-014 notes in `body_surface_canvas.cpp`). Production and Scarcity are
+Planetary today but each has a natural **Circumplanetary per-body badge** owed
+(total output / aggregate shortfall for the anchor body) — additive passes guarded
+behind the same `overlay_mode`, not changing the Planetary behaviour.
 
 **Resource** is **built** (2026-06-17): unlike Supply and Market it had **no data
 dependency** (tile `resource_deposit` is already generated), so it landed directly as a
@@ -204,14 +249,26 @@ inter-body rungs. The render pass is guarded behind `overlay_mode::country` in
 strata.
 
 **Legend.** Named by the strip glyph highlight and its hover tooltip
-(`overlay_mode_name` → "Countries"); no on-canvas colour key yet. A
-per-nation colour key is a follow-up shared with the Corporation lens (both want
-the same identity-swatch list).
+(`overlay_mode_name` → "Countries"), plus — landed 2026-07-09, BL-133 (country
+lens legend) — an on-canvas **per-nation key** (`draw_country_key`,
+`body_surface_canvas.cpp`): one `palette::nation_colour` swatch + name per nation
+present on the active body, sorted by id, box auto-sized to the widest name. The
+Corporation-lens counterpart (a per-corp swatch list) remains a follow-up.
 
 **Interaction notes.** Planetary-only, single-select. Borders are recomputed at
 draw time from the neighbour ownership comparison; no border data is persisted.
 
-## Supply lens *(target spec — gated on Layer 5 route geometry)*
+## Supply lens *(landed with Layer 5 — gate dissolved 2026-07-31 note)*
+
+> **Landed (2026-07-31 note).** Layer 5 shipped: `supply_system.cpp` dispatches
+> real convoys into `w.convoys`, so the gate below is history. What renders today:
+> **Solar** — a line per player convoy in transit (`solar_system_canvas.cpp`);
+> **Circumplanetary** — a convoy-count badge beside each body's label;
+> **Planetary** — a convoy glyph on the active body's tiles while a player convoy
+> touches it (`supply_active` in `body_surface_canvas.cpp`). The *aggregated*
+> lane graph the spec below gestures at is its own lens now — see § Supply-routes
+> lens (BL-014). The throughput scale-key remains owed. Some code comments still
+> say "w.convoys is empty until dispatch lands" — stale, ignore them.
 
 **Intent.** Read the map as a *logistics network*: where goods move, along which
 routes, and where throughput concentrates. The economic counterpart to Faction's
@@ -238,11 +295,17 @@ re-skin terrain.
 scale-key (line weight → goods/tick) is part of the build when routes render.
 
 **Interaction notes.** Propagates across all three rungs (the exception to the
-Planetary-first default). **Gated on Layer 5**: no convoy/route geometry is
-generated yet, so nothing renders today. No interim Planetary-only stub is built —
-the lens waits for its data.
+Planetary-first default). ~~**Gated on Layer 5**: no convoy/route geometry is
+generated yet, so nothing renders today.~~ *(Superseded — see the landed note at
+the top of this section; the data arrived and the lens draws it.)*
 
 ## Market lens *(built 2026-06-16 — price resolution landed in v0.0.4)*
+
+> **Surface superseded (2026-07-31 note).** BL-015 (market boundary lens) reworked
+> the Planetary surface from the price wash described below to a **catchment
+> tint** — one colour per market, so market boundaries read as colour boundaries —
+> with a city-name swatch key (`draw_market_key`). The Circumplanetary price strip
+> stands. The wash prose below is history.
 
 **Intent.** Read the map as a *price surface*: where a good is dear or cheap, and
 how scarcity varies across markets. The complement to Supply — Supply shows flow,
@@ -281,9 +344,9 @@ is built: the Circumplanetary strip and the Planetary wash share the resolved
 Planetary wash in `body_surface_canvas.cpp` (`diverging_colour`, composited over terrain at ~0.55
 alpha); the per-body strip in **`circumplanetary_canvas.cpp`** — the Circumplanetary rung, *not*
 `solar_system_canvas.cpp` as the Session-2 handoff's file list said (Solar has no market surface).
-The good-selector is the shared combo from the Resource lens (`overlay.cpp`, bound to
-`ui_state.lens_resource`; since BL-093 a popup opened from the minimap bar rather than an inline
-combo). On-canvas keys/strip are anchored **flush-left of the minimap** (their right edge at the
+The good-selector is the shared combo from the Resource lens (bound to
+`ui_state.lens_resource`; since BL-134, 2026-07-09, it lives **in the on-canvas lens legend** —
+`draw_lens_resource_combo` in `body_surface_canvas.cpp` — not on the minimap bar). On-canvas keys/strip are anchored **flush-left of the minimap** (their right edge at the
 minimap's left edge, vertically centred on the minimap — a `lens_key_anchor` passed from `app.cpp`),
 reading as a drawer folding out from the minimap's left side and clearing the widened
 Selection/ledger column (relocated 2026-07-06 from the former canvas-left-edge placement past the nav
@@ -380,8 +443,8 @@ on-canvas key: the selected resource's identity swatch + name and the note
 
 **Interaction notes.** Planetary-only, single-select. The resource selector is the
 shared combo (form shared with the Market and Scarcity selectors, bound to
-`ui_state.lens_resource`) — since BL-093 a popup opened from the minimap lens bar
-rather than an inline strip combo. No new data, no tick dependency.
+`ui_state.lens_resource`) — since BL-134 (2026-07-09) it sits **in the on-canvas
+lens legend**, not on the minimap bar. No new data, no tick dependency.
 
 **Implemented 2026-06-17** (Lens & Legibility batch, BL-019). `overlay_mode::resource`
 Planetary pass in `body_surface_canvas.cpp`: a tile with `resource_deposit[sel] > 0` is
@@ -393,6 +456,12 @@ from the former left-edge / past-the-nav-rail placement. Verified by `scripts/ve
 (deterministic after the draw-order fix).
 
 ## Population lens *(built 2026-06-16, re-keyed 2026-06-30 — BL-069)*
+
+> **Surface superseded (2026-07-31 note).** BL-135 (value-lens tile marks,
+> 2026-07-09) replaced the full-tile tint below with a per-tile red→green
+> **value mark** (`icons::value_mark`) on every buildable tile, reading the same
+> `workforce_efficiency` quantity; tiles keep their terrain hue. The gradient key
+> stands. Shared change with the Opportunity lens.
 
 **Intent.** Read the map as a *liveability surface*: where land is hospitable, so the player can
 weigh siting and (later) population pressure. The complement to Resource's material read.
@@ -436,6 +505,13 @@ feedback the economy applies, rather than the lens showing a different quantity 
 consumes.
 
 ## Opportunity lens *(built 2026-06-17 — BL-017; rekeyed to unmet demand 2026-07-07 — BL-112)*
+
+> **Surface superseded (2026-07-31 note).** Two changes since the prose below:
+> BL-136 (opportunity demand signal, 2026-07-09) re-keyed the metric to a
+> body-relative, volume-weighted **demand-gap rank** per catchment, and BL-135
+> swapped the tile tint for the per-tile red→green **value mark**
+> (`icons::value_mark`), shared with the Population lens. Key is the red→green
+> rank bar.
 
 **Intent.** Read the map as an *opportunity surface*: where is demand going unmet, so the
 market will pay a premium to whoever supplies it? Under the BL-078 elastic economy the fillable
@@ -532,8 +608,9 @@ it gains spatial variation once multiple centres are seeded (BL-036).
 the inverse of the filled resource pip.
 
 **Legend.** An abundant→scarce gradient bar plus the selected resource's name and identity swatch,
-same placement as the others. Tooltip "Resource scarcity". The resource selector appears as the
-shared popup (form shared with Resource/Market) when the lens is active via keyboard-cycle.
+same placement as the others. Tooltip "Resource scarcity". The resource selector appears in the
+on-canvas lens legend (BL-134, shared with Resource/Market) when the lens is active via
+keyboard-cycle.
 
 **Interaction notes.** Planetary-only, single-select. The script runs `verify.econ_step(12)` so
 market supply/demand populate before capture. Verified by `scripts/verify/scarcity_lens.lua`
@@ -591,6 +668,110 @@ former nav-rail-inset left edge). The key landed in the 2026-07-04 reconciliatio
 **Interaction notes.** Planetary-only, single-select; the script runs `verify.econ_step(4)` so the
 substrate injection has settled before capture. Verified by `scripts/verify/industry_lens.lua`
 against blessed goldens (`industry_lens_full`, `industry_lens_zoom`).
+
+## Continent lens *(built 2026-07-30 — BL-226)*
+
+**On the strip as the eighth glyph.** The first addition to the BL-093 row of seven. It earns the
+slot rather than the keyboard-only shelf because it answers a question the player asks at *first
+sight* of a body — "why is the land shaped like that?" — which is exactly the moment they are
+looking at the strip.
+
+**Intent.** Show the **tectonic plates** the Continents/Drift pass (BL-210) drifted into place, and
+above all show **where they meet**. A plate interior is just a region; a plate *boundary* is where
+the mountain range, the rift and the porphyry copper came from. This is the lens that makes the
+generated history visible on the map rather than only readable in the biography.
+
+**Data definition (settled).** `run_continents` assigns every tile to a plate by wrapped Voronoi,
+then folds a per-tile height bias into Pass 1's heightmap — after which the plate that raised a tile
+is **unreadable from the finished terrain**. So the pass now returns its per-tile
+`continent_state::plate_id`, and `make_hard_coded_world` retains the whole `continent_state` on
+`generation_report::body_entry`. This is **presentation data**: the report never enters `world`, so
+the field stays off the serialisation seam (the same reasoning that keeps `world_params` in the app,
+BL-114). The canvas matches the active body to its report entry **by name**, the stable key the Tile
+Ledger's biography already uses. The pass's `history` lines are *moved* into the body biography and
+cleared, so those lines keep a single owner.
+
+Deriving the field instead by flood-filling contiguous land at render time was considered and
+rejected: it yields **landmasses, not plates**, so it can colour the continents but cannot explain
+them.
+
+**Rung.** Planetary only — plates are a per-tile surface field. Guarded behind
+`overlay_mode::continent` in
+[`body_surface_canvas.cpp`](../../src/ui/body_surface_canvas.cpp).
+
+**Colour.** **Categorical**, not sequential: each plate takes a slot from a dedicated ten-colour
+table (`plate_colour`), composited over the terrain at opacity `0.80` — the lens is about the plate
+field, not the terrain beneath it. Boundary tiles (any of the four neighbours belongs to another
+plate; columns wrap, rows do not) then take a **separate white lift** at `0.45`.
+
+Two constraints the first draft got wrong and the final version encodes:
+
+- The boundary must read on a **different channel** from the plate colour. "The same colour, blended
+  harder" is not a visible difference — those boundaries vanished entirely on capture.
+- The palette must be genuinely **categorical**. Muted mineral tones chosen to avoid resembling the
+  nation wheel all landed at luminance ~100–130 with almost no hue spread, and collapsed into one
+  grey wash. The final table keeps the earthy cast that separates it from
+  `palette::nation_colour` — plates are *substrate*, not identity, and this must not read as a
+  second Country lens — but alternates light/dark so adjacent slots differ even in greyscale.
+
+**Glyph.** Two interlocking plates split by a diagonal seam (`icons::continent`; see
+[ICONS.md](ICONS.md)). The **seam** is the load-bearing shape: it distinguishes the glyph from the
+Country glyph's bordered territory and from any solid landmass blob, because what the lens shows is
+the boundary, not the area.
+
+**Legend.** Strip glyph highlight + tooltip (`overlay_mode_name` → "Continents (tectonic plates)"),
+plus an on-canvas key (`draw_continent_key`) at the usual flush-left-of-the-minimap anchor. Unlike
+the gradient keys it has no scale to explain — the tint is categorical — so it explains the one
+thing that is not self-evident: that the **pale** tiles are boundaries. It also reports the plate
+count, and degrades honestly: a body with no plate record says so, and a **stagnant-lid** body
+(`plate_count == 1`) says "one immobile plate" rather than drawing a meaningless single tint.
+
+**Interaction notes.** Planetary-only, single-select. Verified by
+`scripts/verify/continents_terrain.lua`, which captures the lens on **Kepler** and on **Selene** (the
+small-grid body — a different plate count and a tighter key layout). The check that matters is
+**correspondence**: the boundaries in the lens capture should line up with the ridges and coastlines
+in the plain-terrain capture from the same script, since that is what confirms the lens is showing
+the field the terrain was actually derived from.
+
+## Reach lens *(built 2026-07-08 — BL-011; off the bar)*
+
+**Intent.** Read the map as *your commercial network*: which bodies the corp's
+persistent trade routes (`w.trade_routes`, BL-088) actually connect, tiered by
+recency. Player's own routes only, per the competitor-visibility rule
+([DISCOVERY.md](DISCOVERY.md)) — rival lanes stay private.
+
+**Surface.** `trade_route` is body-level, and the Planetary canvas only ever shows
+the *active* body's grid — so the "highlight the connected bodies" read lands here
+as a **connection-list key**: one row per endpoint the active body is routed to,
+name + recency dot (`draw_reach_key`, `body_surface_canvas.cpp`). Fresh routes
+read `palette::activity_known` green; gone-cold routes grey
+(`activity_stale`) — the activity-fog convention (BL-089). No tile re-skin. The
+body-marker glow the design calls for belongs on the **Solar** canvas and is owed.
+
+**Glyph / access.** Reuses `icons::convoy` (a dedicated glyph is an open TODO in
+`ui::icons`); not on the strip — keyboard lens-cycle only.
+
+**Key.** The shared `draw_scroll_list_key` chrome, headed "Reach (your trade
+network)"; an unrouted body honestly says "no routes from this body".
+
+## Supply-routes lens *(built 2026-07-08 — BL-014; off the bar)*
+
+**Intent.** The aggregated lane graph: one edge per (body pair), thickness from
+traffic volume, colour from recency — Supply shows convoys in flight, this shows
+the *standing lanes* they carved.
+
+**Surface.** Built from `w.trade_routes` at render time (already upserted per
+pair + corp, so the player filter yields one entry per pair). On the Planetary
+canvas it reads as a **lane-list key** (`draw_supply_routes_key`,
+`body_surface_canvas.cpp`): one row per lane touching the active body, a
+**log-scaled thickness bar** from `convoy_count` (a bare completion reads as a
+thin sliver; heavy repeat traffic saturates rather than dominating linearly),
+recency-tier colour shared with Reach. The Solar-canvas graph rendering the
+design specifies is owed.
+
+**Glyph / access.** Reuses `icons::supply`; off the strip. **Currently
+unreachable by the keyboard cycle** — the stale `overlay_mode_count` (see the
+roster's access note, 2026-07-31).
 
 ## Placement-suitability surface *(BL-010 — not a strip lens)*
 

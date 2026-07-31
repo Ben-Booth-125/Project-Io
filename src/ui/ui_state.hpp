@@ -37,6 +37,7 @@ enum class overlay_mode
     scarcity,    ///< Per-market supply-shortfall blocks (hot where demand outran supply). See LENSES.md § Scarcity lens.
     industry,    ///< Per-tile nation-substrate throughput field (occupation × terrain richness). See LENSES.md § Industry lens (BL-084).
     reach,       ///< Body-level commercial reach: bodies connected via the corp's trade_route entries, tiered by recency. BL-011. See LENSES.md § Reach lens.
+    continent,   ///< Tectonic plates from the Continents/Drift pass: per-plate tint + boundary emphasis, read from the generation report. BL-226. See LENSES.md § Continent lens.
     supply_routes, ///< Aggregated trade_route graph: one edge per body pair, thickness from log-scaled convoy_count, colour from recency tier. BL-014. See LENSES.md § Supply-routes lens.
 };
 
@@ -91,10 +92,26 @@ struct construction_state
     /// human string shown by the build UI ("Built.", "Can't afford it.", …).
     std::string   last_message;
 
-    /// Which bounded sub-view the Construction window shows (2026-07-06 tabbed
-    /// redesign — Build / Manage / Sell Orders are three different questions,
-    /// this is the nav selector between them). 0=Build, 1=Manage, 2=Sell Orders.
-    int           panel_view = 0;
+    /// Which bounded sub-view the Building window shows (2026-07-06 tabbed
+    /// redesign; slimmed to two by BL-143 when the Build front door moved to the
+    /// tile Selection element and Sell Orders moved to the Market Ledger).
+    /// **0 = Construction** (the queue: "what's building?"),
+    /// **1 = Buildings** ("what do I own?", plus the inline recipe/workforce
+    /// detail for the selected row).
+    ///
+    /// Defaults to **Buildings** (BL-176): the queue is empty most of the time,
+    /// so opening on it made the panel's front door an empty room, while the
+    /// player always owns buildings. The old default of 0 predates the BL-143
+    /// slim, when view 0 was the Build front door rather than a queue.
+    int           panel_view = 1;
+
+    /// Last building the panel auto-focused on (BL-176). The Buildings tab keys
+    /// its selected row off the shared `ui_state::selected_entity`, so selecting
+    /// a building anywhere already selects its row here; this field only tracks
+    /// the EDGE, so newly selecting a building snaps the panel to the Buildings
+    /// view once, without pinning it there every frame (which would stop the
+    /// player ever reaching the queue).
+    entity_id     panel_focus_building = null_entity;
 };
 
 /// Shared selection and view state for the three primary canvases.
@@ -126,7 +143,7 @@ struct ui_state
     bool show_tile_ledger = false; ///< Whether the Tile Ledger window is open. Toggled by the nav pane tab and the window's close button.
     bool show_economy_panel = false; ///< Whether the Layer 3 economy panel is open. Toggled by the nav pane tab and the window's close button.
     bool show_construction_panel = false; ///< Whether the Layer 4 construction / building-management panel is open. Toggled by the nav pane tab and the window's close button.
-    bool show_build_ledger = false;       ///< Whether the tile-contextual construction ledger is open (BL-162). Opened by the tile Selection element's "Construct Buildings" button; reads selected_entity as the target tile. Not a nav-rail ledger — closed by close_all_panels and by selecting a new entity. Mutually exclusive with the Selection element in the fold-out column.
+    bool show_build_ledger = false;       ///< Whether the tile-contextual construction ledger is open (BL-162). Opened by the tile Selection element's "Construct Buildings" button; reads selected_entity as the target tile. Not a nav-rail ledger — closed by close_all_panels and by selecting a new entity. The Selection element itself lives in the bottom band (BL-213), not the fold-out column.
     bool show_market_ledger = false; ///< Whether the Market Ledger is open.
     bool show_balance_ledger = false; ///< Whether the Balance Ledger is open.
 
@@ -230,15 +247,18 @@ struct ui_state
     entity_id hovered_entity = null_entity; ///< Entity the cursor rested on last frame; used to detect stable hover.
     int       hover_ticks    = 0;           ///< Consecutive frames of stable hover over hovered_entity; resets on entity change. Governs the transient glance (draw_hover_card).
 
-    // --- dwell-to-open state (BL-200) ---
-    // A second opener for the Selection band, alongside the click: holding the
-    // pointer STILL over an entity fills a bar at the cursor and then opens the card.
-    // Distinct from hover_ticks — this timer advances only while the mouse is still
-    // (movement past kDwellJitterPx resets it), which is the anti-bombardment gate
-    // that keeps a pointer sweep across the tile grid from auto-opening. See
-    // hover_card.hpp, body_surface_canvas.cpp, docs/ui/SELECTION.md.
-    ImVec2 dwell_anchor { -1.0f, -1.0f }; ///< Pointer position where the current stillness began; reset when the pointer moves beyond the jitter radius.
-    int    dwell_ticks  = 0;              ///< Consecutive still frames over hovered_entity; drives the dwell-to-open bar and auto-open.
+    // --- hover card (BL-228/230, retires BL-200 dwell-to-open) ---
+    // Hovering no longer OPENS anything. The card has two phases: a GLANCE that
+    // appears after kHoverAppearDelay and still tracks the live cursor, then a
+    // STUCK freeze after kHoverStickDelay that stops following the pointer and
+    // stays put until the cursor leaves its bounds — so the player can read a
+    // long line to its end without the card sliding away. Opening the
+    // Selection band is the click's job alone — one gesture, one meaning.
+    entity_id hover_card_entity = null_entity;   ///< Subject of the card (glance or stuck); null_entity = no card up.
+    bool      hover_card_stuck  = false;         ///< false = glance (tracks cursor); true = frozen (dismiss-by-leaving-rect).
+    ImVec2    hover_card_anchor { -1.0f, -1.0f }; ///< Draw position: live cursor while glancing, frozen once stuck.
+    ImVec2    hover_card_min    { 0.0f, 0.0f };   ///< Last drawn card rect (screen px) — hit-tested next frame to decide dismissal.
+    ImVec2    hover_card_max    { 0.0f, 0.0f };
 
     // --- selection band recursive drill-down (BL-196) ---
     // One drilled frame: a resource time-series view opened from a tile card's

@@ -45,6 +45,23 @@ enum class life_stage : uint8_t
 
 /// The ten stages of the chain. A body's `died_at` names the gate it failed;
 /// `chain_stage::count` means it survived every gate.
+///
+/// ORDERED BY CHAIN POSITION, and that ordering is load-bearing: gates and the
+/// harness both compare stages with `>=` (planetology_harness R6 asserts that a
+/// knob leaves every stage BEFORE its decision point untouched). So a new stage
+/// is inserted at its causal position, NOT appended — the opposite of the
+/// append-only rule `body_archetype` carries below. That is safe precisely
+/// because no serialiser exists yet; if one lands, this enum needs a stable
+/// wire mapping before anything else is inserted.
+///
+/// ONE ENUM FOR THE WHOLE HISTORY (BL-220 residual call 2). The stages of the
+/// historical ladder (docs/lore/HISTORY.md, landing as BL-221/BL-222) join this
+/// enum rather than running a parallel one, because a single ordered biography
+/// is the entire presentation model — a second enum would mean the ledger could
+/// not sort its own lines. Their causal position is AFTER `legacy` (S8 leaves
+/// the endowment) and BEFORE `spend` (S9 draws it down, which is what
+/// industrialisation DOES), with a seam reserved ahead of settlement for a
+/// pre-settlement narrative stage.
 enum class chain_stage : uint8_t
 {
     system = 0, ///< S0 — one roll for the whole campaign.
@@ -111,6 +128,34 @@ enum class abiogenesis_depth : uint8_t
     coded,         ///< DNA, proofreading, and a genome that can grow.
 };
 
+/// The calendar year the campaign opens in — 1 January 1960 (ERAS.md § Era 0),
+/// and the zero point every `history_event` counts backwards from.
+///
+/// `ui::fmt::campaign_epoch_year` (src/ui/format.hpp) is the same year for the
+/// tick calendar; the two must agree, and tile_inspector.cpp static_asserts it
+/// where both are in scope. It is duplicated rather than shared because the
+/// world layer cannot include a UI header.
+constexpr int64_t campaign_epoch_year = 1960;
+
+/// Convert deep time in billions of years to the stored representation.
+///
+/// Deep-time gates read naturally in Gya ("the GOE at 2.4"), so the emitters
+/// still say it that way and this narrows it once, here. The rounding is a
+/// plain offset-and-truncate rather than `std::llround` to keep libm out of a
+/// value that participates in sorting (PLANETOLOGY.md § Determinism & cost).
+constexpr int64_t years_from_gya(float gya)
+{
+    const double y = static_cast<double>(gya) * 1.0e9;
+    return static_cast<int64_t>(y >= 0.0 ? y + 0.5 : y - 0.5);
+}
+
+/// Convert a calendar year (negative for BCE, astronomical numbering) to the
+/// stored representation. The historical ladder's entry point.
+constexpr int64_t years_from_calendar_year(int64_t year)
+{
+    return campaign_epoch_year - year;
+}
+
 /// One dated line of a body's history. `event` is the left column (what
 /// happened); `consequence` is the right column (what it left behind) and is
 /// empty for lines that carry no endowment payload.
@@ -120,11 +165,66 @@ enum class abiogenesis_depth : uint8_t
 /// scroll past. See PLANETOLOGY.md § Presentation.
 struct history_event
 {
-    float       gya   = 0.0f;                  ///< Billions of years before present.
+    /// Years before the campaign epoch. Positive is the past; 0 is the epoch
+    /// itself.
+    ///
+    /// ONE FIELD SPANS BOTH REGIMES rather than two the consumers must branch
+    /// on — deep time and recorded history sort into a single ordered
+    /// biography, which is the whole presentation model.
+    ///
+    /// It is an INTEGER for three reasons, of which only the first two are
+    /// what BL-220 originally claimed:
+    ///
+    ///  1. DISPLAY. 1450 CE is 5.1e-7 Gya. The ledger's `%.2f Gya` renders
+    ///     every historical date as "0.00", and no single float format reads
+    ///     sensibly at both 4.5 Gya and 1687 CE. R14 pins this.
+    ///  2. ARITHMETIC. Any date derived NEAR the epoch from a deep-time
+    ///     baseline loses catastrophically: `4.5f - 273yr` is exactly `4.5f`.
+    ///     The historical ladder computes dates that way constantly.
+    ///  3. EXACTNESS. An integer year is exact by construction, sorts exactly,
+    ///     and tie-breaks deterministically — and a timestamp that
+    ///     participates in sorting is effectively a gate path
+    ///     (PLANETOLOGY.md § Determinism & cost).
+    ///
+    /// Correcting the record: BL-220's filed design also claimed float would
+    /// make "two events centuries apart compare EQUAL". That is overstated —
+    /// float32 holds ~7 significant digits regardless of exponent, so 1687 and
+    /// 1688 stored directly as Gya do compare unequal and round-trip intact.
+    /// The conclusion stands on (1) and (2); the stated mechanism did not.
+    ///
+    /// 4.5 Gyr needs 33 bits; int64_t leaves the range unbounded for any stage
+    /// that lands later.
+    ///
+    /// Build it with `years_from_gya` or `years_from_calendar_year`; render it
+    /// with `format_history_date`, never by hand.
+    int64_t     years_before_epoch = 0;
     chain_stage stage = chain_stage::system;   ///< Which gate emitted this line.
     std::string event;                         ///< Left column — the cause.
     std::string consequence;                   ///< Right column — the endowment effect (may be empty).
 };
+
+/// Render a timestamp for display, picking its unit from its magnitude.
+///
+/// Deep time is NOT linearised (PLANETOLOGY.md § Presentation) — "4.50 Gya" and
+/// "1687" are the same field seen at the two ends of its range:
+///
+///   | >= 1 Gyr        | `4.50 Gya`         |
+///   | >= 1 Myr        | `252 Mya`          |
+///   | >= 10 kyr       | `11,650 years ago` |
+///   | within 10 kyr   | `1687`, `-3200`    |
+///   | 0               | `now`              |
+///
+/// The 10 kyr boundary is the conventional start of the Neolithic: older than
+/// that a date is a CLIMATE event and reads as an interval; younger than that
+/// it is a HUMAN one and reads as a calendar year. That is what puts the
+/// historical ladder's own lines (BL-221's granary cities, its charters at
+/// 1602) on the calendar side without a second field to switch on.
+///
+/// The boundary is a judgement call, not a physical constant, and it is the
+/// one number here worth revisiting: push it too late and a Younger-Dryas
+/// climate line starts claiming a calendar year it has no business having;
+/// too early and a granary-cities line reads as a bare interval.
+std::string format_history_date(int64_t years_before_epoch);
 
 /// The player-facing generation knobs, chosen on the New World setup screen and
 /// carried in `world_params`. Defaults reproduce a Sol-like system with an

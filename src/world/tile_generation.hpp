@@ -33,10 +33,11 @@ enum class geological_activity : uint8_t { none, low, moderate, high };
 /// Override for bodies whose surface composition is dominated by a single type.
 enum class composition_bias : uint8_t { standard, metallic };
 
-/// Solar-level constants describing what kind of world a body is. Authored by
-/// hand per body in make_hard_coded_world(); the generation passes read these and
-/// branch on nothing else. A future layer could derive them from orbital
-/// mechanics (see docs/generation/TILE_GENERATION.md § Deferred).
+/// Solar-level constants describing what kind of world a body is. Derived per
+/// body by the Planetology pass (run_planetology's returned state carries the
+/// profile); the generation passes read these and branch on nothing else. A
+/// future layer could derive them from orbital mechanics (see
+/// docs/generation/TILE_GENERATION.md § Deferred).
 struct body_profile
 {
     temperature_class   temperature    = temperature_class::temperate;

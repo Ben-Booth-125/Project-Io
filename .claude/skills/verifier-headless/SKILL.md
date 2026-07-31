@@ -86,6 +86,31 @@ in `tools/verify/README.md`.
   exp/log/pow in a gate path); and the S5e survival floor cuts through the Lost City band,
   45–90 °C (R12e). Links `chemistry_tables.cpp` only. CMake target
   `chemistry_tables_harness`.
+- **`population_demand_harness`** — BL-190 population-demand ordering fix (2026-07-31):
+  `inject_population_demand` routes each centre's agricultural_produce demand (1 × scale)
+  to its catchment market (R1); the demand survives `clear_markets`' per-tick reset into
+  the cleared state price resolution reads (R2); stale demand written before clearing is
+  erased while the injection still lands (R3 — the ordering contract that was previously
+  broken: the econ-step stub was zeroed the same tick, never priced). Links the SDL/Lua-free
+  world superset (glob minus `recipe_registry`/`tech_tree`). CMake target
+  `population_demand_harness`.
+- **`ai_skill_harness`** — AI skill-regression instrument (BL-204,
+  docs/ai/AI_OPPONENT.md § 3): freezes a 5-seed benchmark set (`world_params.seed`
+  0-4, spanning the generator's body/terrain/market diversity), runs 300 ticks of
+  the real bot-vs-bot economy loop per seed (BL-202's strategic tier already
+  commands every non-player corp), and asserts four metrics per seed against
+  disposable golden bands — net-worth curve (final + minimum), solvency (ticks
+  any AI corp balance sampled below zero), survival (fraction of AI corps still
+  fielding an active building), and action counts by `corp_verb` (the thrash
+  detector). Also proves `world::state_hash` (the BL-204 tick-boundary FNV-1a
+  checksum) is identical across two same-seed runs and differs across two
+  different seeds — the harness's own determinism primitive, and the future
+  multiplayer lockstep desync detector's first exercise. Hand-builds a
+  `recipe_registry` (mirrors `scripts/economy.lua` / `recipes.lua`); links the
+  generation TU superset (as `world_audit`/`corp_terrain_matrix`) plus
+  `corp_ai.cpp`/`corp_command.cpp`/`construction.cpp`/`survey_system.cpp`/
+  `supply_system.cpp`/`building_profit.cpp`. CMake target `ai_skill_harness`
+  (picked up by the generic glob below — no CMakeLists entry needed).
 - **`continents_harness`** — Continents/Drift (BL-210 first slice): the plate-drift
   sibling pass. Determinism (R1 — same seed identical, different seed different);
   mobile-lid plate count lands in [4,10] (R2); the stagnant-lid special case is one
@@ -119,13 +144,33 @@ only when building outside the CMake tree.
    ```
    cl /nologo /std:c++20 /EHsc /I src tools\verify\econ_harness.cpp ^
       src\world\world.cpp src\world\economy_system.cpp ^
-      src\world\market_clearing.cpp src\world\budget_system.cpp /Fe:econ_harness.exe
+      src\world\market_clearing.cpp src\world\budget_system.cpp ^
+      /Fo:build_gen\verify\econ_harness\ /Fe:build_gen\verify\econ_harness.exe
    ```
    Keep harnesses **outside `src/`** — CMake `GLOB_RECURSE`s `src/*.cpp` into the
    real build.
+
+   **Build output goes under `build_gen\verify\` — never `%TEMP%`, never the repo root.**
+   Three rules, all load-bearing:
+   - Always pass **both** `/Fe:` (exe) and `/Fo:` (objects, trailing `\` required).
+     `cl` defaults both to the *current directory*, so omitting them scatters
+     `.obj` files across the tree.
+   - Use the harness's **full name** from **Available harnesses** above. No
+     abbreviations — a stray `hlh.exe` or `ct.exe` is unidentifiable weeks later
+     and reads as malware to a virus scanner.
+   - `%TEMP%` is banned as an output target. It is user-writable staging that AV
+     tools watch closely, so an unsigned exe there is exactly the shape of a
+     dropper — and excluding `%TEMP%` from a scanner to quieten that would blind
+     it to real threats. `build_gen/` gives Norton et al. one narrow, stable
+     exclusion path instead.
+
+   Nothing here dirties `git status`: `.gitignore` already covers `*.exe`, `*.obj`,
+   `*.pdb`, `build/` and `.claude/worktrees/`. Keeping artifacts in-tree costs
+   nothing and buys a scannable, self-describing location.
 2. **Run** the produced exe. From PowerShell a bare name fails (`9009`) when cwd
-   isn't on PATH — invoke as `& ".\econ_harness.exe"` or with an absolute path.
-   Each harness prints `PASS` / `FAIL` lines and exits non-zero on any failure.
+   isn't on PATH — invoke as `& ".\build_gen\verify\econ_harness.exe"` or with an
+   absolute path. Each harness prints `PASS` / `FAIL` lines and exits non-zero on
+   any failure.
 3. **Report** the assertion results against the requirement being checked; cite the
    harness name and the failing lines if any.
 

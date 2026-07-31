@@ -22,8 +22,8 @@
 // half of "graphical (hexes) + textual (fully recorded)" that every
 // oral-history stage must carry (Ben, 2026-07-28).
 //
-// Design authority: docs/generation/GENERATION_STRATEGY.md § The oral-history
-// pivot; full architecture in backlog.json BL-210.
+// Design authority: docs/generation/CONTINENTS.md; full architecture in
+// backlog.json BL-210.
 // ---------------------------------------------------------------------------
 
 /// One drifting plate. Position and drift are on the tile grid's own axes so
@@ -41,6 +41,15 @@ struct tectonic_plate
 struct continent_state
 {
     std::vector<tectonic_plate> plates;
+
+    /// [row*gw+col] index into `plates` — which plate owns each tile, from the
+    /// Voronoi assignment. Always sized gw*gh; all-zero on a stagnant-lid body
+    /// (one plate owns the whole surface). Retained so the Continent lens can
+    /// draw the plates the height bias was derived FROM, rather than inferring
+    /// landmasses back out of the finished terrain — the boundary that raised a
+    /// mountain range is the thing worth showing, and it is invisible once the
+    /// bias has been folded into Pass 1's heightmap. See LENSES.md § Continent.
+    std::vector<int> plate_id;
 
     /// [row*gw+col] height contribution, roughly [-1, 1]. Zero everywhere on a
     /// stagnant-lid body (one plate, no boundaries, no bias). Added into Pass

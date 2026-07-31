@@ -4,9 +4,10 @@
 // Build (from repo root, after sourcing vcvars64):
 //   cl /nologo /std:c++20 /EHsc /I src tools\verify\supply_advance.cpp ^
 //      src\world\world.cpp src\world\supply_system.cpp ^
-//      src\world\market_clearing.cpp /Fe:supply_advance.exe
+//      src\world\market_clearing.cpp ^
+//      /Fo:build_gen\verify\supply_advance\ /Fe:build_gen\verify\supply_advance.exe
 // Run:
-//   .\supply_advance.exe
+//   .\build_gen\verify\supply_advance.exe
 
 #include "world/components.hpp"
 #include "world/market_clearing.hpp"

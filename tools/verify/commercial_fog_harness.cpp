@@ -5,8 +5,10 @@
 //
 // Build (from repo root, after sourcing vcvars64):
 //   cl /nologo /std:c++20 /EHsc /I src tools\verify\commercial_fog_harness.cpp ^
-//      src\world\world.cpp /Fe:commercial_fog_harness.exe
-// Run: .\commercial_fog_harness.exe
+//      src\world\world.cpp ^
+//      /Fo:build_gen\verify\commercial_fog_harness\ ^
+//      /Fe:build_gen\verify\commercial_fog_harness.exe
+// Run: .\build_gen\verify\commercial_fog_harness.exe
 //
 // Registered as the `commercial_fog_harness` CMake target (verifier-headless skill).
 

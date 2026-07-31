@@ -1,12 +1,39 @@
 #include "nav_pane.hpp"
 
 #include "icons.hpp"
+#include "presentation.hpp"
 
 #include <imgui.h>
 
 #include <cstdio>
 
 namespace ui {
+
+namespace {
+
+/// A rail slot's hover text: the slot's name, then one line saying what the
+/// system is FOR (BL-174). The rail is icon-only per LAYOUT.md container 8 — at
+/// 56 px there is no room for a label without silently truncating it — so the
+/// tooltip is where a slot explains itself, and it is the only place it can.
+///
+/// Drawn through BeginItemTooltip + PushTextWrapPos rather than SetItemTooltip:
+/// container 8 declares "tooltips wrap", but SetItemTooltip sizes the box to the
+/// text and never wraps, so the rail did not implement its own stated policy.
+void slot_tooltip(const char* title, const char* blurb, bool reserved)
+{
+    if (!ImGui::BeginItemTooltip())
+        return;
+    ImGui::PushTextWrapPos(ImGui::GetFontSize() * 16.0f);
+    ImGui::TextUnformatted(title);
+    ImGui::Separator();
+    ImGui::TextWrapped("%s", blurb);
+    if (reserved)
+        ImGui::TextDisabled("Not yet built.");
+    ImGui::PopTextWrapPos();
+    ImGui::EndTooltip();
+}
+
+} // namespace
 
 /// Close every nav-pane panel so at most one is open at a time. Call before
 /// toggling a slot ON; skip when toggling OFF (the toggle handles that itself).
@@ -48,11 +75,15 @@ void draw_nav_pane(ui_state& state, float top_offset)
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2{6.0f, 8.0f});
     ImGui::Begin("##nav_pane", nullptr, flags);
 
-    // Nine slots from MENU.md § Menu set and ordering (slot 10 is a spare placeholder).
-    // Slots 1–9 match the MENU.md curated sequence; live slots toggle their panel;
-    // placeholder slots (Research, Workforce, Corp Strategy, Diplomacy, History) are
-    // disabled — a neutral glyph keeps them legible.
-    constexpr int tab_count = 10;
+    // Nine slots from MENU.md § Menu set and ordering. Slots 1–9 match the
+    // MENU.md curated sequence; live slots toggle their panel; reserved slots
+    // (Workforce, Research, Corp. Strategy, Diplomacy) are disabled but each
+    // carries its OWN glyph so the rail teaches the shape of the game rather
+    // than showing a row of identical blanks (BL-174).
+    //
+    // BL-174 dropped the former slot 10 — a disabled placeholder with no glyph
+    // and no tooltip, so it was pure noise a new player could not interpret.
+    constexpr int tab_count = 9;
 
     // Square slots; Selectable treats a nonzero size as literal, so derive the
     // rail width explicitly rather than passing -1.
@@ -74,7 +105,7 @@ void draw_nav_pane(ui_state& state, float top_offset)
                 close_all_panels(state);
                 state.show_corporation_panel = !was_open;
             }
-            ImGui::SetItemTooltip("Corporations");
+            slot_tooltip("Corporation overview", "Your corporation at a glance - balance, holdings, alerts.", false);
             break;
         case 2: // Budget (BL-028)
             if (ImGui::Selectable(id, state.show_balance_ledger, 0, {slot_size, slot_size})) {
@@ -82,19 +113,19 @@ void draw_nav_pane(ui_state& state, float top_offset)
                 close_all_panels(state);
                 state.show_balance_ledger = !was_open;
             }
-            ImGui::SetItemTooltip("Budget");
+            slot_tooltip("Budget", "Income, costs, and where the money went.", false);
             break;
         case 3: // Workforce / Population — placeholder (BL-042 step 2 feeds this)
             ImGui::BeginDisabled();
             ImGui::Selectable(id, false, 0, {slot_size, slot_size});
             ImGui::EndDisabled();
-            ImGui::SetItemTooltip("Workforce (coming)");
+            slot_tooltip("Workforce", "Labour supply, contention, and habitability.", true);
             break;
         case 4: // Research — placeholder
             ImGui::BeginDisabled();
             ImGui::Selectable(id, false, 0, {slot_size, slot_size});
             ImGui::EndDisabled();
-            ImGui::SetItemTooltip("Research (coming)");
+            slot_tooltip("Research", "Technology unlocks and the route to space.", true);
             break;
         case 5: // Market Ledger (BL-027)
             if (ImGui::Selectable(id, state.show_market_ledger, 0, {slot_size, slot_size})) {
@@ -102,7 +133,7 @@ void draw_nav_pane(ui_state& state, float top_offset)
                 close_all_panels(state);
                 state.show_market_ledger = !was_open;
             }
-            ImGui::SetItemTooltip("Market Ledger");
+            slot_tooltip("Market Ledger", "Prices, supply and demand on the bodies you trade on.", false);
             break;
         case 6: // Building (BL-029, renamed BL-143)
             if (ImGui::Selectable(id, state.show_construction_panel, 0, {slot_size, slot_size})) {
@@ -110,19 +141,19 @@ void draw_nav_pane(ui_state& state, float top_offset)
                 close_all_panels(state);
                 state.show_construction_panel = !was_open;
             }
-            ImGui::SetItemTooltip("Building");
+            slot_tooltip("Construction", "What you are building now, and the buildings you own.", false);
             break;
         case 7: // Corp. Strategy — placeholder
             ImGui::BeginDisabled();
             ImGui::Selectable(id, false, 0, {slot_size, slot_size});
             ImGui::EndDisabled();
-            ImGui::SetItemTooltip("Corp. Strategy (coming)");
+            slot_tooltip("Corp. Strategy", "Standing policy - wage levels, military posture.", true);
             break;
         case 8: // Diplomacy — placeholder
             ImGui::BeginDisabled();
             ImGui::Selectable(id, false, 0, {slot_size, slot_size});
             ImGui::EndDisabled();
-            ImGui::SetItemTooltip("Diplomacy (coming)");
+            slot_tooltip("Diplomacy", "Relations with nations and rival corporations.", true);
             break;
         case 9: // History (Tile Ledger lives here per MENU.md renaming)
             if (ImGui::Selectable(id, state.show_tile_ledger, 0, {slot_size, slot_size})) {
@@ -130,28 +161,44 @@ void draw_nav_pane(ui_state& state, float top_offset)
                 close_all_panels(state);
                 state.show_tile_ledger = !was_open;
             }
-            ImGui::SetItemTooltip("History");
+            slot_tooltip("History", "How this world was generated - its biography and its numbers.", false);
             break;
-        default: // Slot 10 — spare placeholder
-            ImGui::BeginDisabled();
-            ImGui::Selectable(id, false, 0, {slot_size, slot_size});
-            ImGui::EndDisabled();
+        default: // Unreachable — tab_count is 9 and every slot is handled above.
             break;
         }
 
-        // Glyph centred on the slot: a table for the wired ledger, a neutral
-        // Glyph centred on the slot.
+        // Glyph centred on the slot. Every slot draws its OWN glyph (BL-174):
+        // live slots in the bright stroke, reserved slots in the dim one so
+        // "not yet available" is carried by colour while the shape still says
+        // WHICH system the slot is for. The tooltips ("Research (coming)", …)
+        // already named them; the glyphs now agree.
         const ImVec2 centre = {p0.x + slot_size * 0.5f, p0.y + slot_size * 0.5f};
         const float  r      = slot_size * 0.30f;
-        const ImU32  live   = IM_COL32(225, 228, 235, 255);
         const ImU32  dim    = IM_COL32(110, 116, 132, 255);
+        const ImU32  closed = IM_COL32(225, 228, 235, 255);
+        const ImU32  open   = palette::selection;
+
+        // Which system am I in? The Selectable's ImGuiCol_Header fill is nearly
+        // invisible, so the OPEN slot lights its glyph in the selection accent —
+        // the same idiom the minimap lens strip already uses for its active lens,
+        // so the two icon strips read as one vocabulary rather than two (BL-174).
+        const auto lit = [&](bool is_open) { return is_open ? open : closed; };
+
         switch (slot)
         {
-        case 1: icons::corporation(dl, centre, r, live); break;
-        case 2: icons::ledger(dl, centre, r, live);      break;
-        case 5: icons::market(dl, centre, r, live);      break;
-        case 6: icons::building(dl, centre, r, building_type::processing_facility, live); break;
-        case 9: icons::ledger(dl, centre, r, live);      break;
+        case 1: icons::corporation(dl, centre, r, lit(state.show_corporation_panel));  break;
+        case 2: icons::ledger(dl, centre, r, lit(state.show_balance_ledger));          break;
+        case 3: icons::population(dl, centre, r, dim);   break;  // Workforce (reserved)
+        case 4: icons::research(dl, centre, r, dim);     break;  // Research (reserved)
+        case 5: icons::market(dl, centre, r, lit(state.show_market_ledger));           break;
+        // Slot 6 draws the factory, NOT building(processing_facility): that glyph
+        // is a plain filled square, and slot 1's corporation seal is the same
+        // square with a ~4.6 px dot — at the rail's radius the two were one
+        // silhouette, which is exactly the collision BL-174 exists to fix.
+        case 6: icons::industry(dl, centre, r, lit(state.show_construction_panel));    break;
+        case 7: icons::strategy(dl, centre, r, dim);     break;  // Corp. Strategy (reserved)
+        case 8: icons::diplomacy(dl, centre, r, dim);    break;  // Diplomacy (reserved)
+        case 9: icons::history(dl, centre, r, lit(state.show_tile_ledger));            break;
         default: icons::placeholder(dl, centre, r, dim); break;
         }
     }

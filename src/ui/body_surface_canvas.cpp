@@ -523,6 +523,93 @@ void draw_population_key(ImDrawList* dl, ImVec2 anchor)
 /// On-canvas legend for the Industry lens (BL-084): a low→high amber gradient bar
 /// mapping the substrate-throughput tint (terrain hue → industrial amber), so the
 /// field reads as "where the existing industry is densest". Same placement as the others.
+/// Colour for tectonic plate @p index (Continent lens, BL-226). A dedicated
+/// palette rather than palette::nation_colour, because plates are substrate and
+/// not identity — but a *categorical* palette all the same, so the first draft's
+/// near-monochrome mineral tones are deliberately abandoned: they blended into
+/// one grey wash and the lens could not do the one job it has (tell one plate
+/// from the next). These keep the earthy cast that separates them from the
+/// nation wheel while carrying real hue AND lightness separation, alternating
+/// light/dark so adjacent slots differ even in greyscale. Ten slots covers
+/// run_continents' clamp of 4..10 mobile plates; the modulo is belt-and-braces.
+ImU32 plate_colour(int index)
+{
+    static constexpr ImU32 table[10] = {
+        IM_COL32(196, 152,  92, 255), // sandstone (light warm)
+        IM_COL32( 62,  88, 110, 255), // deep slate (dark cool)
+        IM_COL32(182, 108,  86, 255), // clay red (light warm)
+        IM_COL32( 70, 110,  92, 255), // dark serpentine (dark cool)
+        IM_COL32(206, 190, 128, 255), // pale marl (very light)
+        IM_COL32( 96,  76, 116, 255), // dark porphyry (dark violet)
+        IM_COL32(150, 176, 106, 255), // olivine (light green)
+        IM_COL32( 58,  76,  84, 255), // basalt (very dark)
+        IM_COL32(206, 146, 160, 255), // rose quartz (light pink)
+        IM_COL32(104,  92,  60, 255), // dark ochre
+    };
+    return table[static_cast<std::size_t>(((index % 10) + 10) % 10)];
+}
+
+/// The Continent lens key. Unlike the gradient keys, this legend has no scale to
+/// explain — the tint is categorical — so it explains the one thing that is not
+/// self-evident: that the BRIGHT tiles are plate boundaries, and why they matter.
+void draw_continent_key(ImDrawList* dl, ImVec2 anchor, const continent_state* plates)
+{
+    const float pad    = 8.0f;
+    const float box_w  = 176.0f;
+    const float line_h = ImGui::GetTextLineHeight();
+    const float sw     = 11.0f; // swatch edge
+
+    const float body_h = pad + line_h + 6.0f + sw + 4.0f + sw + 4.0f + line_h + pad;
+    const ImVec2 p0 = { anchor.x - box_w, anchor.y - body_h * 0.5f };
+    const ImVec2 p1 = { p0.x + box_w, p0.y + body_h };
+    dl->AddRectFilled(p0, p1, IM_COL32(18, 18, 24, 210), 4.0f);
+    dl->AddRect      (p0, p1, IM_COL32(80, 80, 90, 255), 4.0f);
+
+    const float x = p0.x + pad;
+    float       y = p0.y + pad * 0.5f;
+
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Tectonic plates");
+    y += line_h + 6.0f;
+
+    if (!plates)
+    {
+        dl->AddText({x, y}, IM_COL32(170, 170, 180, 255), "No plate record");
+        y += line_h + 4.0f;
+        dl->AddText({x, y}, IM_COL32(150, 150, 160, 255), "for this body.");
+        return;
+    }
+
+    const int n = static_cast<int>(plates->plates.size());
+    if (n <= 1)
+    {
+        dl->AddText({x, y}, IM_COL32(170, 170, 180, 255), "Stagnant lid:");
+        y += line_h + 4.0f;
+        dl->AddText({x, y}, IM_COL32(150, 150, 160, 255), "one immobile plate.");
+        return;
+    }
+
+    // A row of plate swatches — the count is the readable fact, not the identity
+    // of any one plate, so they run as an unlabelled strip.
+    float sx = x;
+    for (int i = 0; i < n; ++i)
+    {
+        dl->AddRectFilled({ sx, y }, { sx + sw, y + sw }, plate_colour(i));
+        sx += sw + 3.0f;
+    }
+    y += sw + 4.0f;
+
+    // The boundary swatch carries the same white lift the map applies, so the
+    // legend shows the actual treatment rather than describing it.
+    dl->AddRectFilled({ x, y }, { x + sw, y + sw },
+                      lerp_colour(plate_colour(0), IM_COL32(255, 255, 245, 255), 0.45f));
+    dl->AddText({ x + sw + 6.0f, y - 1.0f }, IM_COL32(220, 220, 228, 255), "pale = boundary");
+    y += sw + 4.0f;
+
+    char buf[64];
+    std::snprintf(buf, sizeof(buf), "%d plates - uplift & rift", n);
+    dl->AddText({x, y}, IM_COL32(170, 170, 180, 255), buf);
+}
+
 void draw_industry_key(ImDrawList* dl, ImVec2 anchor)
 {
     const float pad    = 8.0f;
@@ -803,7 +890,8 @@ void update_body_vision(world& w, ui_state& state, double now_days)
 }
 
 void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_registry& reg,
-                              const economy_report& report, ImVec2 origin, ImVec2 size,
+                              const economy_report& report, const generation_report& gen,
+                              ImVec2 origin, ImVec2 size,
                               bool input_enabled, ImVec2 lens_key_anchor)
 {
     ImDrawList* dl = ImGui::GetBackgroundDrawList();
@@ -1118,7 +1206,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
     // Supply lens pre-pass: check whether the active body has any player convoys
     // (source or destination). Used inside the tile loop to gate the per-tile glyph.
-    // w.convoys is empty until the dispatch system lands; supply_active stays false.
+    // w.convoys is populated by dispatch_convoys (supply_system.cpp) each tick.
     bool supply_active = false;
     if (state.overlay == overlay_mode::supply)
     {
@@ -1138,6 +1226,25 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 break;
             }
         }
+    }
+
+    // Continent lens pre-pass (BL-226): the Continents/Drift pass (BL-210) decided
+    // where the land ended up, then folded its verdict into Pass 1's heightmap and
+    // vanished — by the time a tile exists, the plate that raised it is unreadable
+    // from the terrain. The generation report retains the plate field precisely so
+    // this lens can put it back on the map. Matched by body NAME, the same stable
+    // key the Tile Ledger's biography uses (body_entry carries no entity_id).
+    const continent_state* plates = nullptr;
+    if (state.overlay == overlay_mode::continent)
+    {
+        for (const auto& be : gen.bodies)
+            if (be.name == body.name) { plates = &be.continents; break; }
+        // A world generated before the field was retained (or a body absent from
+        // the report) leaves this null — the lens then draws plain terrain and
+        // says so in its key, rather than inventing plates.
+        if (plates && plates->plate_id.size() !=
+                static_cast<std::size_t>(body.grid_width) * static_cast<std::size_t>(body.grid_height))
+            plates = nullptr;
     }
 
     // Industry lens pre-pass (BL-084): render the already-live nation-owned
@@ -1441,6 +1548,40 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 fill = lerp_colour(fill, ind, 0.15f + 0.6f * t);
             }
         }
+        // Continent lens (BL-226): tint each tile by the tectonic plate that owns
+        // it, and brighten the tiles that touch another plate. The boundary is the
+        // point of the lens — a plate interior is just a region, but a boundary is
+        // where the mountains, the rifts and the porphyry copper came from, so it
+        // gets the emphasis rather than reading as an incidental edge.
+        else if (state.overlay == overlay_mode::continent && plates)
+        {
+            const int gw  = body.grid_width;
+            const int gh  = body.grid_height;
+            const int idx = tile.grid_x + tile.grid_y * gw;
+            const int me  = plates->plate_id[static_cast<std::size_t>(idx)];
+
+            // Columns wrap (the grid is a cylinder, TILE_GENERATION.md); rows do not.
+            bool boundary = false;
+            const int cols[2] = { (tile.grid_x + 1) % gw, (tile.grid_x + gw - 1) % gw };
+            for (const int c : cols)
+                if (plates->plate_id[static_cast<std::size_t>(c + tile.grid_y * gw)] != me) boundary = true;
+            for (const int dy : { -1, 1 })
+            {
+                const int ry = tile.grid_y + dy;
+                if (ry < 0 || ry >= gh) continue;
+                if (plates->plate_id[static_cast<std::size_t>(tile.grid_x + ry * gw)] != me) boundary = true;
+            }
+
+            // The plate tint is near-opaque: this lens is about the plate field,
+            // not the terrain under it, and a weak blend let the terrain's own
+            // hues swamp the categories. The boundary reads on a SEPARATE channel
+            // — a lift toward white on top of the plate colour — because "more of
+            // the same colour" is not a visible difference, which is exactly how
+            // the first draft's boundaries disappeared.
+            fill = lerp_colour(fill, plate_colour(me), 0.80f);
+            if (boundary)
+                fill = lerp_colour(fill, IM_COL32(255, 255, 245, 255), 0.45f);
+        }
         // Player-owned tile? Drives the persistent, lens-independent ownership
         // accent: a subtle wash at the plain default plus an outline under every
         // lens (drawn in the border pass), so "these tiles are mine" reads without
@@ -1472,6 +1613,19 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     fill = lerp_colour(fill, IM_COL32(100, 200, 100, 255), 0.24f);
             }
         }
+
+        // Landform relief (BL-231). Composited HERE — after every lens tint and the
+        // suitability wash — because composition owns hue and the lenses composite over
+        // that hue at 0.6–0.80 alpha; relief folded into the base fill would be buried
+        // exactly when a lens is active. Landform drives movement cost (×1.0–×2.0), hazard,
+        // habitability and mineral richness, and that cost applies whether or not a lens
+        // is on, so this is always-on terrain chrome rather than an overlay_mode.
+        //
+        // Skipped on a built tile: that hex is swapped wholesale for its owner plate as
+        // an identity signal, and shading it would muddy whose it is. No read is lost —
+        // the elevation matters when SITING, and a built tile has already been sited.
+        if (!built)
+            fill = landform_relief(fill, tile.landform);
 
         // Survey mask (BL-067): tiles in regions not yet revealed render as a dark
         // locked overlay with no lens detail, borders, markers, or hit-testing — the
@@ -1718,6 +1872,80 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 }
             }
 
+            // Landform glyph (BL-231): the categorical half of the landform channel.
+            // Only the four DRAMATIC landforms draw — mountain, canyon, crater, rift —
+            // measured at ≤1.5 % of land tiles each (world_audit § S3) and each carrying
+            // a movement cost of ×1.3 or worse, so this is the set where an invisible
+            // surprise is expensive. Plains, highland and valley draw nothing; between
+            // them plains and valley are ~95 % of land, and an icon on nearly every tile
+            // would be far denser than any other glyph family.
+            //
+            // Unbuilt tiles only: a built hex already carries an enlarged silhouette plus
+            // a corp emblem tag, and its cost is spent. Suppressed under the two value
+            // lenses, which claim the hex centre for their own mark below (BL-135). Ink
+            // contrasts against the finished fill, so the glyph reads over any terrain
+            // hue and any lens tint composited on top of it.
+            //
+            // BRIDGING (BL-232): a run of three mountains should read as ONE range, not
+            // three identical icons, so a tile with a same-landform cardinal neighbour
+            // draws SPANS instead of its centred glyph — this tile's half of each shared
+            // edge, exactly as BL-172's roads do, so the neighbour's half meets it at the
+            // midpoint with no cross-tile state and the survey fog clips it cleanly.
+            // Measured (world_audit § S4): 71 % of mountain and 81 % of rift tiles have
+            // such a neighbour, and modal run length is 2-3. Crater never spans — a basin
+            // is a blob, not a line. The all-four-neighbours "filled interior" case that
+            // was designed alongside this was CANCELLED on the same measurement: not one
+            // tile in the system has four, so it would have been dead code on every seed.
+            if (!built && state.overlay != overlay_mode::population &&
+                state.overlay != overlay_mode::opportunity)
+            {
+                const ImU32 ink = contrast_ink(fill);
+                bool        spanned = false;
+
+                if (icons::landform_spans(tile.landform))
+                {
+                    const float amp   = std::max(1.5f, draw_r * 0.20f);
+                    const float thick = std::max(1.0f, draw_r * 0.13f);
+
+                    static const int card_off[4][2] = {{+1, 0}, {-1, 0}, {0, +1}, {0, -1}};
+                    for (int n = 0; n < 4; ++n)
+                    {
+                        const int nrow = tile.grid_y + card_off[n][1];
+                        if (nrow < 0 || nrow >= gh)
+                            continue;
+                        const int raw_col = tile.grid_x + card_off[n][0];
+                        int ncol = raw_col % gw;
+                        if (ncol < 0)
+                            ncol += gw;
+
+                        const auto nb_it = tile_at.find(static_cast<long long>(nrow) * gw + ncol);
+                        if (nb_it == tile_at.end())
+                            continue;
+                        const auto nb_tile_it = w.tiles.find(nb_it->second);
+                        if (nb_tile_it == w.tiles.end()
+                            || nb_tile_it->second.landform != tile.landform)
+                            continue;
+                        if (!survey_tile_visible(body.survey, gw, gh, ncol, nrow))
+                            continue;
+
+                        ImVec2 nb_sc = to_screen(hex_local_centre(ncol, nrow, hex_size));
+                        nb_sc.x += static_cast<float>(k) * period_px;
+                        if (raw_col >= gw)    nb_sc.x += period_px; // east across the seam
+                        else if (raw_col < 0) nb_sc.x -= period_px; // west across the seam
+
+                        const ImVec2 mid = {(cx + nb_sc.x) * 0.5f, (cy + nb_sc.y) * 0.5f};
+                        icons::landform_span(dl, {cx, cy}, mid, amp, thick, tile.landform, ink);
+                        spanned = true;
+                    }
+                }
+
+                // The lone tile keeps its centred glyph — the same role the road's centre
+                // cap plays, and needed by 29 % of mountain and 50 % of canyon tiles.
+                if (!spanned)
+                    icons::landform(dl, {cx, cy}, std::max(3.0f, draw_r * 0.44f),
+                                    tile.landform, ink);
+            }
+
             // Value-lens tile marks (BL-135): Workforce (Population lens) and
             // Opportunity replace their old full-tile tint with a per-tile red→green
             // dot on every BUILDABLE tile (valid terrain for activity — ocean
@@ -1747,7 +1975,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
 
             // Supply lens: draw a convoy glyph on every tile when the active body
             // has a player convoy passing through it. supply_active is false when
-            // w.convoys is empty, so this is a no-op until dispatch is wired.
+            // no player convoy touches this body.
             if (supply_active)
             {
                 constexpr ImU32 supply_col = IM_COL32(80, 200, 255, 200);
@@ -2092,6 +2320,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         draw_scarcity_key(dl, lens_key_anchor, state);
     else if (state.overlay == overlay_mode::industry)
         draw_industry_key(dl, lens_key_anchor);
+    else if (state.overlay == overlay_mode::continent)
+        draw_continent_key(dl, lens_key_anchor, plates);
     else if (state.overlay == overlay_mode::reach)
         draw_reach_key(lens_key_anchor, key_top, key_bot, w, reach_links);
     else if (state.overlay == overlay_mode::supply_routes)
@@ -2158,58 +2388,81 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             ++state.hover_ticks;
         }
 
-        // Dwell-to-open (BL-200). A second opener for the Selection band alongside the
-        // click: this timer advances only while the pointer holds STILL over an
-        // entity — any movement past the jitter radius resets it, so a sweep across
-        // the tile grid never auto-opens (the anti-bombardment gate). hover_ticks
-        // (above) governs the transient glance; dwell_ticks governs the auto-open.
-        const float ddx   = mouse.x - state.dwell_anchor.x;
-        const float ddy   = mouse.y - state.dwell_anchor.y;
-        const bool  moved = (ddx * ddx + ddy * ddy) > kDwellJitterPx * kDwellJitterPx;
-        if (moved || hover_eid == null_entity)
+        // Glance-then-stick hover (BL-228/230, retires BL-200's dwell-to-open).
+        //
+        // Hovering no longer OPENS the Selection band. Opening is the click's job
+        // alone — one gesture, one meaning.
+        //
+        // What hover does now, in two phases: past kHoverAppearDelay the card
+        // appears as a GLANCE and tracks the live cursor like an ordinary
+        // tooltip, so it does not yet own the pointer. Past kHoverStickDelay it
+        // STICKS — freezes at its current position, stops following the cursor,
+        // and stays up until the pointer leaves its bounds. That makes a long
+        // line readable (it cannot slide away mid-read) while still letting a
+        // player who is only passing through dismiss it by moving on normally.
+        if (state.hover_card_entity != null_entity && state.hover_card_stuck)
         {
-            state.dwell_anchor = { mouse.x, mouse.y };
-            state.dwell_ticks  = 0;
+            // Stuck: dismiss only when the pointer leaves the rect. The pad spans
+            // the gap between the anchor and the card drawn above it, so the
+            // card does not dismiss itself the frame it freezes.
+            const bool inside =
+                mouse.x >= state.hover_card_min.x - kHoverCardExitPadPx &&
+                mouse.x <= state.hover_card_max.x + kHoverCardExitPadPx &&
+                mouse.y >= state.hover_card_min.y - kHoverCardExitPadPx &&
+                mouse.y <= state.hover_card_max.y + kHoverCardExitPadPx;
+
+            if (!inside)
+            {
+                state.hover_card_entity = null_entity;
+                state.hover_card_stuck  = false;
+            }
         }
-        else
+        else if (state.hover_card_entity != null_entity)
         {
-            ++state.dwell_ticks;
-        }
-
-        // The card is already open for this entity when it is the live selection and
-        // not hidden — no dwell bar and no re-fire while it stays open.
-        const bool card_open_here = hover_eid != null_entity &&
-                                    state.selected_entity == hover_eid &&
-                                    state.selection_hidden_for != hover_eid;
-
-        // The dwell bar fills across [kHoverDelay, kDwellOpenTicks]: it starts once
-        // the glance is up and completes as the card opens. Zeroed when the card is
-        // already open here (nothing to signal).
-        float dwell_fraction = 0.0f;
-        if (hover_eid != null_entity && !card_open_here && kDwellOpenTicks > kHoverDelay)
-            dwell_fraction = std::clamp(
-                static_cast<float>(state.dwell_ticks - kHoverDelay) /
-                    static_cast<float>(kDwellOpenTicks - kHoverDelay),
-                0.0f, 1.0f);
-
-        if (hover_eid != null_entity)
-        {
-            draw_hover_card(mouse, state.hover_ticks, [&]() {
-                draw_hover_content(w, state, hover_eid);
-            }, dwell_fraction);
+            // Glancing: the card is not yet stuck, so it lives only as long as
+            // the cursor keeps hovering the same entity that summoned it.
+            if (hover_eid != state.hover_card_entity)
+                state.hover_card_entity = null_entity;
         }
 
-        // Auto-open on a completed dwell — the pointer-driven twin of the click
-        // path (Ben, 2026-07-23: click still opens instantly; dwell is the addition;
-        // both converge on the same open). Suppressed in construction mode (a dwell
-        // must not retarget the Selection element mid-placement) and when the card
-        // is already open here.
-        if (hover_eid != null_entity && !state.construction.active && !card_open_here &&
-            state.dwell_ticks >= kDwellOpenTicks)
+        // Summon a new glance card once the appear delay is met over an entity —
+        // but never while one is already up (a glance or stuck card owns the slot
+        // until dismissed), and never mid-placement, where a floating card would
+        // sit over the ghost.
+        if (state.hover_card_entity == null_entity &&
+            hover_eid != null_entity &&
+            !state.construction.active &&
+            state.hover_ticks >= kHoverAppearDelay)
         {
-            state.selected_entity      = hover_eid;
-            state.selection_hidden_for = null_entity;
-            state.dwell_ticks          = 0; // consume, so it fires once per dwell
+            state.hover_card_entity = hover_eid;
+            state.hover_card_stuck  = false;
+        }
+
+        // Promote glance -> stuck once the stick delay elapses, freezing the
+        // card at its current (live-cursor) position.
+        if (state.hover_card_entity != null_entity &&
+            !state.hover_card_stuck &&
+            state.hover_ticks >= kHoverStickDelay)
+        {
+            state.hover_card_stuck  = true;
+            state.hover_card_anchor = { mouse.x, mouse.y };
+            // Seed the rect around the anchor so the first frame's hit-test (which
+            // runs before the card has been drawn at this position) cannot
+            // dismiss it early.
+            state.hover_card_min = { mouse.x, mouse.y };
+            state.hover_card_max = { mouse.x, mouse.y };
+        }
+
+        // While glancing (not yet stuck), the card tracks the live cursor.
+        if (state.hover_card_entity != null_entity && !state.hover_card_stuck)
+            state.hover_card_anchor = { mouse.x, mouse.y };
+
+        if (state.hover_card_entity != null_entity)
+        {
+            const entity_id card_eid = state.hover_card_entity;
+            draw_hover_card(state.hover_card_anchor, [&]() {
+                draw_hover_content(w, state, card_eid);
+            }, &state.hover_card_min, &state.hover_card_max);
         }
     }
 

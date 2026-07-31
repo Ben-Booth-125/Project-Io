@@ -10,6 +10,466 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## Session — BL-214/BL-247/BL-248 (drill-through UI): narrow-by-default disclosure design, and a mid-session tree wipe (2026-07-31)
+
+**Runtime.** ~2h. Full (design session — four parallel HTML exemplars, two rounds of live
+design revision, a mid-session data-loss incident and recovery, three backlog items).
+
+**Where it came from.** Ben's ask: the game's charts are individually excellent but
+collectively overwhelming ("information overload"), and he wanted exemplars of a narrower,
+recursive/drill-down data-presentation pattern. Two mechanics already existed for exactly this
+— BL-214 (drill-through, designed but not built) and BL-196 (recursive card-drill, already
+shipped) — so the exemplars were grounded in those rather than inventing a competing pattern.
+
+**What was built.** Four standalone HTML/CSS/JS exemplars at `build_UI_example_1` through `_4`
+(throwaway design mockups, outside `src/`, never wired into the real game): the Selection band
+and History Ledger (the two real surfaces BL-214 already names), a from-scratch Corporation
+dashboard exploration, and a question-driven "Ask" panel that Ben reviewed and then explicitly
+rejected as too close to a leading tutorial.
+
+Two rounds of live design iteration followed, each captured back into the backlog rather than
+left in the exemplars alone:
+- **BL-214 amended** — the original three-tier Glance/Read/Study stepper is superseded by a
+  strictly binary fold model (one line by default, a chevron to a true full-screen mode-switch,
+  not an in-place grow).
+- **BL-247 filed** — a per-chart "why this chart" log (a closed-by-default Answers/Because
+  note), explicitly NOT the pre-written Q&A pattern from example 4, which Ben rejected as
+  over-helpful ("tutorials should never tell a player what they should be asking").
+- **BL-248 filed** — promotes MENU.md's long-unbuilt Slot 1 (Corporation dashboard) into a
+  buildable item, flagging rather than resolving that the exemplar's four roll-ups don't match
+  MENU.md's settled MVP set.
+
+**The incident.** Mid-session, a concurrent session (Ben's own, working in this same checkout
+rather than an isolated worktree) landed its own commits and merges on this branch, including a
+`reset` that wiped every uncommitted change in the shared working tree — both examples 3 & 4
+(never read into context, so unrecoverable byte-for-byte) and the in-progress backlog edits.
+Recovered via a leftover `git stash` that happened to snapshot the backlog.json edits mid-loss
+(reapplied cleanly), this session's own conversation record for examples 1 & 2 (restored
+verbatim), and a from-scratch rebuild for examples 3 & 4 (functionally verified against the
+same mechanics, not byte-identical to what Ben first reviewed).
+
+**Left open.** BL-248's roll-up-set discrepancy needs Ben's call before that item is promoted.
+A `git stash` ("wip before Sprint3 merge") is still sitting in this repo, unexamined beyond the
+two pieces this session needed from it — worth a look before it's dropped or reapplied. Two
+`worktree-agent-*` branches from the concurrent session's merges are still present locally and
+likely safe to delete once confirmed merged. If another session runs concurrently with this
+repo again, it should use an isolated `git worktree` rather than this same checkout — this
+session's incident is the concrete cost of not doing that.
+
+---
+
+## Session — BL-190 (food demand): population demand was erased before pricing — ordering fix (2026-07-31)
+
+**Runtime.** ~30m. Full-lite (economy seam, but one coherent fix: two world files, two harnesses, no REFINED promotion).
+
+**Where it came from.** The 2026-07-31 doc sweep spotted a code wrinkle: `run_economy_step` wrote
+the population `agricultural_produce` demand stub straight into market demand, but `clear_markets`
+zero-resets demand before accumulating its own. The population signal was erased the same tick and
+never reached price resolution.
+
+That contradicted BL-190 (food demand)'s settled design, which calls the stub "a real, live market
+signal today" — the consumer BL-166 (Hydroponics Bay) and BL-168 (Fishing Wharf) sell into. It was
+a signal in the component for part of a tick, never a priced one.
+
+**The fix follows the BL-078 (nation substrate) precedent exactly.** The injection moved into
+`clear_markets`, after the reset, as `inject_population_demand` (`market_clearing.cpp`) — the same
+additive-after-reset slot the substrate injection already occupies. Routing upgraded from
+first-market-in-map-order to the `market_for_tile` catchment, matching the BL-096 multi-market
+model.
+
+**Verification.** New `tools/verify/population_demand_harness.cpp` (registered in the
+verifier-headless skill + README): unit routing, demand-survives-clearing (cleared demand ==
+summed centre scale, 41.0 on Kepler), and the ordering contract itself (pre-seeded stale demand
+erased while the injection lands). 4/4 PASS. `population_mvp` updated — its R4 asserted demand
+after the econ step alone, which the fix makes false by design — and re-passes 11/11.
+
+**Left open.** The doc-sweep session's `docs/economy/MARKETS.md` (which records the wrinkle) exists
+on no branch yet; its wrinkle note should flip to "fixed 2026-07-31" when it lands. The
+`food_rations` swap-in stays future work per BL-190.
+---
+
+## Session — Doc-truth sweep: every authority doc reconciled with the shipped code (2026-07-31)
+
+**Runtime.** ~2h. Full (batch: four audit agents, then seven parallel rewrite agents + main-session
+ledger surgery). No `src/` changes — docs, backlog.json, requirements.json only.
+
+**Where it came from.** Ben asked for a docs pass: with the code and the later backlog in view,
+which documents need a rewrite before they mis-initialise future sessions? The audit answer was
+*most of them* — the docs described the project as it stood ~6 weeks ago. The worst offenders were
+the three docs CLAUDE.md loads first: ROADMAP said we were at v0.0.8 with wrong themes for every
+upcoming minor; TECH_FOUNDATIONS declared "settled" that procedural generation is out of scope and
+only the player's corp exists; SYSTEMS claimed one market per body and no cross-body prices.
+
+**What was done.** Forty-five docs corrected, four written new, two retired to pointers:
+
+- **Core** — ROADMAP re-derived from the live `version_goal` sets (v0.1.1 = shell/legibility, not
+  roads; v0.2.0 = the AI opponent); TECH_FOUNDATIONS split into still-settled vs
+  superseded-by-scope-growth, tick model rewritten from `sim_loop`'s real three-layer clock;
+  SYSTEMS' trade/roads claims flipped to landed and four missing systems added; CONCEPT's player
+  identity settled (corp now, BL-094 nation pivot later) and the NN-opponent direction marked
+  rejected; GLOSSARY gained ten missing load-bearing terms.
+- **Economy** — PRODUCTION's building/recipe tables reframed as design targets over the real
+  6-type/3-recipe model, workforce model rewritten to the landed per-(corp,body) form; RESOURCES
+  now states the enum-freeze truth and what actually trades; ERAS and SUPPLY got honest status
+  banners; TILES' deposit tables regenerated from `generate_deposits`. **New: MARKETS.md** (the
+  clearing/order-book model had no doc home) and **FINANCE.md** (ditto the budget loop).
+- **Generation** — TILE_GENERATION reframed around the Planetology-derived profile with all
+  drifted constants fixed; NATION_GENERATION gained Pass 0 (history ladder) and Pass 6 (substrate),
+  count corrected 17–21 → 43; HISTORY's Stages 5–6 carry SUPERSEDED banners (rejected 2026-07-30,
+  replacement owed to BL-223); **new: CONTINENTS.md**. PLANETOLOGY got a TOC + status table only.
+- **UI** — TOOLTIP/SELECTION/LAYOUT reconciled to the landed shell (bottom Selection band, comms
+  dock bottom-left, glance-then-stick hover, BL-200 dwell-to-open retired, eight-lens bar);
+  LENSES gained a current-roster table + the missing Reach/Supply-routes sections; **new:
+  STARTUP.md** for the menu/wizard screens.
+- **Process** — KNOWN_BUGS and REVIEW_LOG retired to pointers (defects live in the backlog; the
+  review gate is verifier-review + requirements); BACKLOG.md drained to a tombstone; Sprint 1
+  closed with a descope-recording retro and Sprint 2 opened; REFINED drained to policy.
+- **Ledger** — BL-200 (dwell-to-open) design prefixed with its retirement note; BL-051/BL-054
+  status prose aligned with their status fields; `v0.2` → `v0.2.0` normalised; BL-069/072/073/074
+  authority docs repointed off ROADMAP (the finance three now point at FINANCE.md); BL-114's
+  pending R3 row annotated (its menu was superseded by the wizard). Lint: 0 fails, 0 warnings.
+
+**Real defects found by verification, not fixed here** (filed as one-click task chips): the
+supply-routes lens is unreachable (`overlay_mode_count` 13 vs 14 values since BL-226); the
+population agri-demand stub is zero-reset by `clear_markets` the same tick; the buy-order book has
+no live caller (BL-037 preferred-seller routing dormant in play); eleven stale code comments now
+contradict the corrected docs.
+
+**In-session decisions.** New docs over squeezed sections for markets/finance/continents/startup —
+each is a surface upcoming items will read (BL-130-132/160-161 markets, BL-036 settlement,
+BL-155 laws-era budget). Authority time-slice held throughout: open items (BL-223, BL-094,
+BL-214…) are status-marked in the docs, never design-imported. Statuses were not flipped —
+BL-226 (continent lens) looks fully landed but stays `designed` pending Ben's call.
+
+**Open for Ben** (the closing Q&A lives in the session chat): BL-094's version goal; whether
+BL-226 should close; the Sprint 2 goal as written; the supply-routes access story; whether the
+body-label rounding bug gets filed as an item.
+
+---
+
+## Session — BL-231 (landform render): drawing the axis the build cost already charged for (2026-07-31)
+
+**Runtime.** ~1h. Full (two render channels, a new glyph family, a measurement harness, three docs).
+
+**Where it came from.** Ben asked whether the tile set needed to be more diverse — "we don't even
+have a visual render for mountains or hills." The answer was **no, the set is fine and the renderer
+was throwing half of it away**: `terrain_colour` switched on composition alone, so six of the seven
+landforms drew as flat hexes. `hex_render.hpp` had asserted for months that "landform is conveyed by
+glyphs, not hue"; no landform glyph existed anywhere. The comment documented an intention nobody
+built, and is now true.
+
+The gap mattered because landform is load-bearing — build cost ×1.0–×2.0, hazard, habitability,
+mineral richness. The player was paying a doubled build cost for terrain the map never showed them.
+
+**Measurement changed the design, which is the point of measuring.** `world_audit` gained an S3
+per-body landform histogram (there was none — only a composition one). The numbers:
+
+```
+SYSTEM (25536 land)  plains 77.0%  valley 18.0%  highland 3.5%
+                     crater 0.8%  mountain 0.6%  canyon 0.1%  rift 0.1%
+Kepler ( 6216 land)  plains 89.8%  highland 7.7%  mountain 1.5%  valley 0.0%
+```
+
+The design had planned an edge/contour channel for a continuous elevation gradient. There is no such
+gradient — 95% of land is plains or valley — so contours **collapsed to a two-step relief tint**, and
+the glyph set **grew from three to four** as canyon joined the ≤1.5%, cost-≥×1.3 set. Simpler than
+the design, and only because the numbers existed before the proportions were fixed.
+
+**Two channels, split by that measurement.** Common ground takes a small signed relief shade (warm
+highlight up, cool shadow down, plains untouched); the four dramatic landforms take a stroke-only
+glyph. Composited **after every lens branch** — composition owns hue and lenses tint over it at
+0.6–0.80 alpha, so a signal folded into the base fill dies exactly when a lens is on. That is
+BL-226's different-channel rule, applied unchanged. Ink is luminance-picked (`contrast_ink`) so the
+glyphs read from near-white ice to dark forest. Both channels live in `hex_render`, so the Selection
+band's neighbourhood view cannot drift from the canvas.
+
+Both suppressed on a **built** tile: that hex is swapped wholesale for its owner plate as identity,
+and elevation matters when *siting*, not after the cost is spent.
+
+**An unrelated finding, recorded not fixed.** Kepler generates **zero valley tiles**. Valley is
+unclaimed non-ocean ground below the height threshold — but on a wet body the ocean already took
+everything that low, so the ×1.1 fertile landform is unreachable on exactly the bodies where river
+valleys should be characteristic (dry bodies carry 20–27%). Self-consistent, not a defect, and a
+*generation* question rather than a rendering one. Noted in TILES.md against BL-051.
+
+**Verified.** Build clean; **CTest 29/29**, determinism intact; `world_audit` S3 PASS;
+`scripts/verify/landform_relief.lua` — 7 captures blessed across a wet body and a dry one, plain plus
+the Continent (0.80 alpha, hardest case) and Country lenses. The first run of that script captured a
+dark grid and proved nothing: Cinder is not the home body and opens unsurveyed, so the survey mask
+blanked it. Fixed with `verify.set_survey` rather than by trusting the first green-looking run.
+
+**Follow-up.** Ben, on seeing it: bridge contiguous runs into one **spanning** marker — a wavy ridge
+across a line of mountains, a filled interior for a compact cluster — instead of repeating a per-tile
+glyph. The mechanism already exists 150 lines away in the same file (BL-172's road span/symmetry
+fix). Filed as its own item rather than folded in.
+
+---
+
+## Session — BL-221 (pre-national ladder): the first stage that shapes the political map (2026-07-30)
+
+**Runtime.** ~1h 15m. Full (new generation pass, drives nation generation, new harness).
+
+**What landed.** `docs/lore/HISTORY.md` Stages 0–2 as `src/world/history_ladder.{hpp,cpp}` — a
+sibling pass that **interleaves** with nation generation rather than preceding it:
+`run_history_ladder` (cradles, fragmentation, Stage 0's line) → `nation_params_from_ladder` →
+`generate_nations` → `record_institutional_history` (Stages 1–2). Two entry points, because the
+Charter Act names a nation and the border accord counts them.
+
+**It drives, and that is asserted rather than claimed.** Harness group H2 pins that a fragmented
+ladder state seeds more densely, lets smaller nations survive the merge, pushes neighbours further
+apart, stays inside its bounds at both extremes, and leaves the caller's defaults alone when no
+cradles formed. Kepler's biography now reads:
+
+```
+ -3843  First granary cities in the northern western floodplain.   -> 11 cradles -> fragmentation 81%
+  1376  The {nation} Charter Act - first perpetual company registered.
+  1586  The Great Accord - 44 realms confirm mutual borders.       -> no hegemon
+```
+
+**Nation count 14 → 43, and the decision was Ben's, not mine.** The item hit exactly the call
+BL-224 says to flag rather than settle silently. Both options were **measured first** and put to
+him against real numbers — seeds-only gave 27 nations and passed every existing check;
+seeds-plus-floor gave 43 and cost two `world_audit` updates. His answer:
+
+> "Ignore the previous assertions. We will simulate war to narrow down the count if needed. Just
+> let naturally different cultures emerge here."
+
+So 43 it is, which effectively meets this project's own "~45 nations" premise — but by *letting
+cultures emerge*, with consolidation deferred to a future war stage, not by tuning to hit 45.
+
+**The two `world_audit` assertions were repointed, not weakened.** R1 asserted `>= 80` tiles, a
+literal that stopped being constant the moment the ladder derived the merge floor. It now asserts
+the ladder's *construction guarantee* — the derived floor can never fall below half the base —
+which is still true by construction and still catches degenerate output. R3's ceiling became a
+runaway guard rather than a target. Worth being explicit that this is the distinction between
+updating a stale assertion and widening a band to hide a failure.
+
+**Scope was cut honestly at the top.** Two of Stage 0's designed inputs don't exist: river
+connectivity (BL-170) and domesticable clades (BL-217), both designed-but-unbuilt. Rather than
+approximate them silently, `agrarian_score` names exactly where each missing term slots in, and
+the substitutes (arable terrain, landform, habitability, coastal access, the generated `endemics`)
+are refinable rather than replaceable — nothing needs rewiring when those items land.
+
+**The CMake hazard flagged an hour earlier fired on schedule.** `corp_terrain_matrix` was a second
+hand-declared target whose source list didn't include `history_ladder.cpp`, so it broke the moment
+the ladder was wired in — exactly what the `econ_bankruptcy` commit predicted the remaining
+hand-declared targets would do. Removed the same way. Five such targets remain.
+
+**Smart App Control blocked the new harness on Windows**, so it was built and run in WSL under the
+rule established this session. First time that rule paid out, and it paid immediately.
+
+**Left open / owed.**
+
+- **Stage 2's failure branch is written but unreached.** Across a 12-seed spread every world
+  produced the multipolar accord and none a hegemon. Ben asked to *see* failure cases, so this is
+  a tuning target for BL-219's sweep, not a defect — the harness prints the split every run.
+- **Nation names read badly at this count** — "The JalenJalaon March", "XenithHelonTarithath". A
+  pre-existing naming artifact that 43 nations makes far more visible than 14 did.
+- **No visual check.** The ladder lines land in the biography the History ledger clips below the
+  fold — the same blind spot BL-220 raised, and the open scroll-driver task covers both.
+- **BL-222 (industrial ladder) is now unblocked** on BL-221, though it still wants BL-218.
+
+---
+
+## Session — BL-220 (dated history timestamps): the foundation under the HISTORY.md ladder (2026-07-30)
+
+**Runtime.** ~50m. Full (touches the generation seam, five files plus the harness).
+
+**Context.** Continue the BL-210 oral-history pivot; re-verify the roadmap against `backlog.json`,
+then take the build frontier. Recommended order: BL-220 first, since BL-221/BL-222 and the History
+ledger's historical dates all sit on it.
+
+**Roadmap audit.** The handed-over status matched `backlog.json` exactly — no drift. One correction
+worth stating: BL-220 formally lists **BL-208 (world-history log)** in `requires`, but its own design
+says it is "cheap enough to land alone" and must land *before* any historical stage emits a line.
+BL-208 is still `design-owed`, and BL-220 is a mechanical change to a struct that exists today, so
+the dependency was treated as nominal.
+
+**What landed.** `history_event::gya` (float) → `years_before_epoch` (`int64_t`), a signed year count
+back from the 1960 campaign epoch, with `years_from_gya` / `years_from_calendar_year` constructors and
+a magnitude-picking `format_history_date` — Gya / Mya / "11,650 years ago" / calendar year / "now".
+
+**The blast radius was one line, by design.** Deep-time stages still *date* in Gya, because that is
+how their chemistry is argued; the `say` lambda in `run_planetology` narrows the conversion in one
+place, so all ~50 emitter call sites were untouched. Three consumers changed (the two sorts, the
+ledger, the harness).
+
+**Two defects found in passing, both in the *old* code:**
+
+- `continents.cpp` sorted the biography with `std::sort`. Tied elements are left in an unspecified
+  order, so with an integer key that is a live determinism hazard — the float key merely made ties
+  unlikely rather than impossible. Promoted to `std::stable_sort`, matching `hard_coded_world.cpp`.
+- `planetology_harness`'s `same()` compared `history.size()` but never the timestamps, so R1 could
+  not have caught a nondeterministic date at all. Now compares them exactly.
+
+**A claim in the filed design did not survive checking, and the record is corrected.** BL-220 argued
+that float would make *"two events centuries apart compare EQUAL"*. That is overstated: float32
+carries ~7 significant digits at any exponent, so 1687 and 1688 stored directly as Gya compare
+unequal and round-trip intact. The change stands on the two *real* defects — the ledger's `%.2f Gya`
+rendered every historical date as `0.00 Gya`, and any date derived near the epoch from a deep-time
+baseline dies to cancellation (`4.5f - 273yr` **is** `4.5f`), which is exactly how the ladder will
+compute dates. R14 asserts the display defect rather than the claimed one, and both `PLANETOLOGY.md`
+and the header comment now record the correction rather than repeating the original reasoning.
+
+**Residual calls settled.** (1) `int64_t` years, not a fixed-point pair — no serialiser exists, and
+integers sort exactly. (2) **One `chain_stage` enum**: the ladder's stages join it in causal position
+(after `legacy`, before `spend`), with a seam reserved ahead of settlement for a pre-settlement
+narrative stage. The consequence is documented because it inverts a rule elsewhere in the same file —
+`chain_stage` is *inserted into*, where `body_archetype` is *append-only* — and that is only safe
+while no serialiser exists.
+
+**Verification.** New harness group **R14** (R12 is reserved by BL-209, R13 by BL-217) covers the
+conversions, all five format bands, total oldest-first ordering, and a historical line interleaving
+between deep time and the epoch — the property BL-221/BL-222 build on, asserted before anything
+relies on it. Regression set green: `determinism_harness`, `world_audit`, `planetology_harness`,
+`continents_harness`, plus the `history_ledger_and_comms` golden.
+
+**Two of my own assertions failed first, and both were worth the failure.** The 12 kyr human/deep-time
+boundary put the design's own example (11,650) on the wrong side — moved to 10 kyr, the conventional
+Neolithic start, which satisfies both the example and the ladder's actual lines. And "a historical
+line sorts last" was simply wrong: Kepler's S9 drawdown line is dated *at* the epoch, so a 1602
+charter is properly older than it. The assertion now claims what is true — it lands *between* the
+two regimes.
+
+**An adversarial review pass (author ≠ reviewer) found six real defects in my own first cut, and the
+two worst were tests that could not fail.** Recorded because the failure mode is instructive: I had
+asserted the *middle* of every format band and no boundary at all.
+
+- **An out-of-band unit.** The band was chosen from the magnitude but the Myr rounding applied after,
+  so 999,999,999 fell through the Gyr threshold, took the Myr branch and rounded *up* to `"1000 Mya"`
+  — a unit the table never promises. Reachable in real generation: `continents.cpp` draws its
+  boundary dates uniformly over [0.3, 4.1) Gya. Fixed by rounding to Myr *before* picking the unit.
+- **A vacuous assertion carrying the item's headline justification.** "The old float format rendered
+  distinct historical dates identically" formatted two float literals with a hard-coded `%.2f Gya`
+  *inside the harness*. It exercised no production code — the entire change could be reverted and it
+  would still pass, while reading like the regression was pinned. Replaced with an assertion through
+  the real function.
+- **A conversion assertion that did not exercise its own rounding.** `years_from_gya(4.50f)` uses an
+  exactly-representable value, so `+ 0.5` could have been deleted with the suite green, and the
+  negative branch was never executed at all. Worse, its name claimed *exactness*, which is false:
+  `2.4f` lands ~95 years off a round 2.4 Gya. Harmless (deterministic, and invisible at 0.01 Gyr
+  display resolution) but not exact, so the harness now prints the drift as evidence and both the
+  assertion name and `PLANETOLOGY.md` say "deterministic, not exact".
+- **Unsigned negatives in the deep-time bands.** `-252000000` rendered `"-252 Mya"`. Not hypothetical:
+  the water gate emits `age - 1.2f` against an age clamped only at 1.0 Gyr, so a low `system_age_gyr`
+  already reaches it. Now renders `"252 Myr hence"`; `INT64_MIN` is special-cased (negating it is UB).
+- **An out-of-bounds read in the failure path.** `mixed[at - 1]` guarded `at < size()` but not
+  `at == 0` — and `check()` records a FAIL without aborting, so the harness would have indexed with
+  `(size_t)-1` in exactly the regression it exists to diagnose.
+
+R14 grew from 17 assertions to 34, now pinning both edges of every band.
+
+**Left open / owed.**
+
+- **The visual check has a blind spot, and the golden's 0.0000% diff is misleading.** Every line
+  visible in `history_story_kepler` is ≥ 1 Gya, and for that band the old and new formats are
+  byte-identical; the lines that would actually differ (`567 Mya`, `now`) are clipped below the panel
+  fold. The verify API has no scroll driver, so they cannot be reached from a script. R14 covers the
+  formatter exhaustively at the unit level, but the *visual* path for four of five bands is
+  uncovered. Flagged as a follow-up task.
+- **`continents_harness` could not be re-confirmed after the review fixes** — Windows **Device Guard**
+  began blocking that one binary mid-session (`"blocked by your organization's Device Guard policy"`),
+  from `build\` and from `build_gen\verify\` alike, while `planetology_harness`, `determinism_harness`,
+  `world_audit` and `ProjectIo.exe` all still run. It went green *with every `continents.cpp` change
+  already in place* earlier in the session, and `continents.cpp` is byte-identical to that run — the
+  post-review edits were confined to `format_history_date` and the harness file, neither of which
+  continents_harness asserts on. So the evidence stands, but a re-run does not exist. **Worth an item
+  if it recurs**; it makes the logic tier unrunnable on this machine.
+- **The mythic-era seam is not yet reached.** `chain_stage` and the timestamp are deliberately wide
+  enough to admit a pre-settlement narrative stage; the pipeline has not arrived there.
+- **`build_app.bat` cannot self-heal a corrupted generated makefile.** SDL3's `SDL_uclibc` target lost
+  its `depend` rule mid-session (`NMAKE U1073`) and the script only runs `nmake`, never re-invokes
+  CMake, so every retry failed identically. Fixed by forcing `cmake -S . -B build`. A `--regen` flag
+  would have saved the diagnosis.
+- BL-221 (pre-national ladder) is now unblocked on its timestamp dependency.
+
+---
+
+## Session — v0.1.0 legibility batch: the five cut-blockers, and four items designed (2026-07-30)
+
+**Runtime.** ~5h 30m. Full (ultracode; two design workflows over 20 agents, then five items built,
+verified and merged). Ben delegated all design calls and stepped away after answering three
+scoping questions.
+
+**Context.** "Use the roadmap as a clear picture of where we are headed, and provide authoritative
+answers to the questions... act on my behalf." Target: the six `design-owed` v0.1.0 cut-blockers
+(BL-162/174/176/177/178/179) plus the v0.1.1 legibility trio (BL-214/215/216), deepest-first.
+
+**Two filed premises were stale, and the code had already moved past them.** This was the session's
+most useful finding, and it narrowed two items sharply:
+
+- **BL-162** was filed as "the construction front door is broken - the panel cannot build".
+  `SELECTION.md` (BL-123, reshaped BL-213 - newer than the backlog prose) records that
+  `draw_construction_ledger` already lists placeable types with full cost, reason-coded validity
+  and a working `construction.pending_tile` enqueue. Only the expected-profit chart is owed.
+- **BL-176** was filed as "the recipe/workforce controls are one step past where the player looks".
+  They are on the building Selection element, put there by Ben's 2026-07-22 review. What the
+  walkthrough actually hit was "Controls unlock when construction completes" - correct behaviour.
+  The real defect was just the panel's default view.
+
+Authority time-slicing works, but only if the reader checks the authority doc *before* the backlog
+prose. Worth remembering when an item has sat open across several minors.
+
+**What landed (all five built, verified, merged to local main).**
+
+- **BL-174 - orient legibility.** Confirmed by evidence that the blank rail slots were genuine, not
+  a software-renderer artifact: wired glyphs render crisply in the *same* capture. Four reserved
+  slots drew one identical placeholder square; slot 9 duplicated slot 2's ledger glyph; slot 6's
+  `building(processing_facility)` square was slot 1's corporation seal at rail size. Added
+  `history`/`research`/`strategy`/`diplomacy` glyphs, moved slot 6 to `industry`, dropped the
+  uninterpretable slot 10, gave the open slot an accent-lit glyph (the lens strip's idiom), and made
+  the tooltips actually wrap - container 8 *claimed* "tooltips wrap" but `SetItemTooltip` never does.
+  Strand 2 seeds the launch selection to the HQ tile and primes the Construct action, both derived
+  from world state - no tutorial flag, nothing persisted, nothing that can go stale.
+- **BL-178 - time controls.** Progress bar is text-height with a "90 d to Q2" overlay; tiers carry
+  truthful rates *derived* from `speed_multiplier`/`seconds_per_day_1x`/`econ_tick_days`, so a label
+  cannot drift into lying. An always-visible line names the active tier's rate.
+- **BL-177 - the runway.** A RUNWAY header segment, shown only while burning - "infinite quarters"
+  when profitable would be a lie dressed as a figure. The first cut *clipped* at 1280; caught in
+  capture and fixed by measuring into the header's drop discipline, not by shortening the string.
+- **BL-176 - building management.** Panel defaults to Buildings; edge-triggered snap on selecting a
+  building. Ratifies SELECTION.md's existing division of labour rather than overturning it.
+- **BL-179 - workforce legibility.** "Body allows 84% (labour short) - habitability 0.40" under the
+  workforce slider. The one-story constraint was met structurally: the phrasing moved into a shared
+  `ui::fmt::labour_contention` that the Economy panel now calls too, so the two cannot drift.
+
+**Designed, not built** (full prose in `backlog.json`, each with an auditable "Decisions taken on
+Ben's behalf" section): **BL-162** (needs a new `estimate_prospective_profit` - the existing
+estimator cannot evaluate a hypothetical building - plus a `charts::draw_value_bar` primitive),
+**BL-214** (disclosure levels), **BL-215** (1280x720 stated as the floor; a machine-checkable
+overflow detector preferred over an eyeball sweep), **BL-216** (comms **rails** at 1280x720 rather
+than docking - measured, only 556 px of band budget, so it degrades honestly instead of clamping).
+
+**Decisions taken on Ben's behalf.** Recorded per item in `backlog.json`. The load-bearing ones:
+BL-174 strand 2 chose the highlighted starter action over a dismissible hint (which would need a
+tenth container and a notion of "dismissed" that cannot persist - there is no save/load, so every
+reload is a new campaign) and over a header objective (which presupposes a goal system that does
+not exist). BL-177 shows the runway only when it means something. BL-215 fixes 1280x720 as the
+contract.
+
+**Left open / owed.**
+
+- **BL-162, BL-214, BL-215, BL-216** are `designed` and promote-ready; none is built.
+- **A visual eyeball is owed on all five landed items** - they are verified by capture, not by Ben.
+- **Golden diffing has a sensitivity floor.** The nav-rail change diffs 0.23%, under the 0.5%
+  fail threshold - golden comparison cannot see nav-rail-scale regressions. Relevant to BL-215's
+  "can this be checked rather than eyeballed" question.
+- **`econ_harness` WF.R4 fails on main and has for some time** ("wages paid on effective workforce",
+  got 15.5 want 44.0). Not touched this session; confirmed identical on branch and main by building
+  both the same way. Worth an item.
+- **Goldens and `docs/ui/mockdata/*.csv` were both stale** before this session (13-31% drift, from
+  BL-211/212/213 landing). Both re-blessed. A bless is cheap; letting drift accumulate makes every
+  later diff unreadable.
+
+**Runtime pacing signal.** The two design workflows cost ~4h wall-clock and ~3.9M subagent tokens
+and were the session's bottleneck - the first was killed mid-flight by an interrupt and had to be
+relaunched. Implementation of all five items took ~1h once designs existed. Design-by-fan-out pays
+for hard, genuinely-open questions (BL-216's geometry, BL-215's checkability) but is poor value for
+items whose answer is already in the code - three of the six were settled faster by reading the
+source directly. Prefer: read first, fan out only on what reading cannot settle.
+
+---
+
 ## Session — History ledger: the generation charts get a second home (BL-211) (2026-07-29)
 
 **Runtime.** ~1h. Full-lite (one extraction plus a container; no economy/save seam touched).

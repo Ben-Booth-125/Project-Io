@@ -1,5 +1,13 @@
 # Project Io — Eras
 
+> **Status: designed, NOT implemented (recorded 2026-07-31).** No era state exists in code — no
+> enum, no gate check, no transition. The tech side is data-only: `scripts/tech_tree.lua` states
+> in its own header that nothing in the simulation reads it (the F9 viewer displays it, BL-087).
+> What actually gates space access today is **launchpad presence alone**: an inter-body convoy
+> dispatches iff the corp holds a launchpad on the source body (`corp_has_launchpad_on`,
+> `src/world/supply_system.cpp`). No research, no propellant reserve, no staffing check.
+> The design below stands as the target; the inline markers flag the terms with no code backing.
+
 An **Era** is a named phase in the game's industrial arc, defined by the accessible territory, available buildings, and the dominant strategic challenge. Eras are a formal game system: each has a defined entry gate, a distinct resource profile, and a characteristic question for the player to answer. The game begins in Era 0; transitions are triggered by meeting explicit conditions, not by an automatic timer.
 
 Only Era 0 and Era 1 are designed for the prototype. Later eras are stubbed.
@@ -20,13 +28,15 @@ The start date signals the technology level and industrial character, not histor
 
 ### Available resources
 
-All Earth-sourced raw materials and their downstream products: iron ore, coal, petroleum, silica, copper ore, rare earth ore, agricultural produce, plus the refined goods and products they feed. Space-sourced resources (water, iron-nickel ore, platinum group metals, regolith) are inaccessible.
+All Earth-sourced raw materials and their downstream products: iron ore, coal, petroleum, silica, copper ore, rare earth ore, agricultural produce, plus the refined goods and products they feed. Space-sourced resources (iron-nickel ore, platinum group metals, regolith) are inaccessible. *(Water is not on that inaccessible list in practice — it trades terrestrially from tick 0; RESOURCES.md § What actually trades.)*
 
 ### Available buildings
 
 Mine, Oil Platform, Farm, Smelter, Refinery, Chemical Plant, Electronics Lab, Fabricator, Food Processor, Port.
 
-The Launchpad can be **constructed** during Era 0 (it is a ground installation requiring steel and machinery) but cannot be **operated** until the Era 0→1 gate is fully met.
+*(None of these named types is a `building_type` value — the prototype ships generic extraction/processing buildings; PRODUCTION.md § Extraction buildings.)*
+
+The Launchpad can be **constructed** during Era 0 (it is a ground installation requiring steel and machinery) but cannot be **operated** until the Era 0→1 gate is fully met. *(Machinery has no `resource_type` value; the launchpad's real authored cost is steel 50 + refined fuel 20 plus 500 credits, `scripts/economy.lua`. And in code a built launchpad operates immediately — the operate-gate is unimplemented, per the banner.)*
 
 ### Era 0 → Era 1 gate
 
@@ -34,9 +44,9 @@ All three conditions must be met simultaneously:
 
 1. **Rocketry research purchased.** Rocketry is the only technology required for the Era 0→1 transition. In the prototype it is a single standalone unlock with no prerequisite. The full tech tree is a post-prototype feature.
 2. **Launchpad constructed and staffed.** A Launchpad building exists on the home body with `workforce_assigned > 0`.
-3. **Propellant reserve met.** The home body's stockpile contains at least the minimum propellant quantity required for an initial launch. This threshold is a Lua balance value.
+3. **Propellant reserve met.** The home body's stockpile contains at least the minimum propellant quantity required for an initial launch. This threshold is a Lua balance value. *(Propellant has no `resource_type` value; no such threshold exists in the Lua constants.)*
 
-When all three conditions hold, Era 1 begins: space bodies become accessible to convoy dispatch, and the Ice Extractor and Assembly Plant become available for construction.
+When all three conditions hold, Era 1 begins: space bodies become accessible to convoy dispatch, and the Ice Extractor and Assembly Plant become available for construction. *(In code, condition 2's presence half is the whole gate — see the banner.)*
 
 ---
 
@@ -58,6 +68,8 @@ Water (from icy bodies), iron-nickel ore (from metallic asteroids), platinum gro
 
 Ice Extractor, Surface Extractor, Assembly Plant, Orbital Port.
 
+*(None is a `building_type` value — all four are design targets.)*
+
 ### Era 1 → Era 2 gate
 
 Not designed for the prototype. Placeholder: expansion beyond the home solar system, requiring technologies and resources not yet defined.
@@ -72,4 +84,9 @@ Deferred. Era 2 likely involves multi-system expansion where the home solar syst
 
 ## Era and body accessibility
 
-Space bodies are visible on the Solar canvas from day one — the player can see Cinder, the asteroid belt, and Selene from the opening screen. Accessibility (whether a convoy can be dispatched there) is what the era gate controls, not visibility. This keeps the solar system legible as a strategic map throughout Era 0 even when its bodies are out of reach.
+Bodies are **not** fully visible from day one (corrected 2026-07-31 — BL-067, survey fog,
+superseded the original claim here). Every body except the home body starts
+`survey_phase::hidden`: the player sees its type, orbit, and grid size on the Solar canvas, but
+its tile map and deposits are revealed only by a paid survey (`docs/ui/DISCOVERY.md`). The
+underlying point stands with that amendment: accessibility (whether a convoy can be dispatched)
+is a separate axis from visibility, and the designed era gate would control the former.

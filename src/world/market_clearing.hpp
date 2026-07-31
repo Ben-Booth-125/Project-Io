@@ -22,6 +22,17 @@ struct corp_cash_flow
     float expenditure = 0.0f; ///< Inputs auto-bought × resolved price.
 };
 
+/// Inject population food demand into body markets (BL-190: a plain
+/// market-demand pull, never a starvation mechanic). Each population centre adds
+/// 1 unit of agricultural_produce demand per scale level to its catchment market
+/// (market_for_tile, so BL-096 multi-market bodies route by nearest centre).
+/// Called from clear_markets after the per-tick supply/demand reset, before the
+/// order-book pass, so the demand is additive and survives into price
+/// resolution. Deterministic — no RNG.
+///
+/// @param w World; market demand arrays are mutated in place.
+void inject_population_demand(world& w);
+
 /// Clear every body market for one economy tick using a per-(body, resource)
 /// matched order book. For each market and resource:
 ///   - Sell side: each corp's pool surplus above its processors' next-run need,

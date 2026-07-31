@@ -1,5 +1,8 @@
 # Project Io — REFINED (active worklist)
 
+> Drained 2026-07-31 (doc sweep): thirteen stale COMPLETE sections removed per the
+> retain-one policy — their record lives in DEVLOG.md and req/requirements.json.
+
 The **active, prioritised, actionable worklist** (formerly TASKS.md). Unlike the backlog
 ([`backlog.json`](backlog.json) metadata + [`BACKLOG.md`](BACKLOG.md) design bodies), every
 entry here is a concrete, file-scoped, individually-buildable step ready to execute. Tasks are
@@ -36,73 +39,46 @@ focused agents, not a hard disjointness gate. Agents build and commit on their o
 worktree branch; the integrating session merges, builds, and verifies. See
 [`DELIVERY.md`](DELIVERY.md) § Sub-agents & worktrees for the authoritative model.
 
-## AI constituents batch (promoted from backlog.json § BL-202, BL-206, BL-207) — **COMPLETE**
+## Landform render (promoted from backlog.json § BL-231) — **COMPLETE**
 
-Batch: 2026-07-27-ai-constituents. Requirements: requirements.json §
-corp-ai-scored-utility, blackboard-export, persona-counsel-slice1.
-Goal: land BL-207's prerequisites so agents can read the game — the corp-command
-seam + scorer (BL-202), the JSONL blackboard (BL-206), then the first counsel
-slice (BL-207 loader + mountain bench + Counsel channel).
+All six tasks landed 2026-07-31. Build clean, **CTest 29/29** (determinism intact),
+`world_audit` S3 PASS, `landform_relief.lua` 7 captures blessed. Requirements
+`requirements.json § landform-render` R1–R4 all complete. Per-item detail and the
+measured distribution: backlog.json BL-231 `resolution`, TILES.md § Implementation note.
+Follow-up raised by Ben on delivery — bridge contiguous landform runs into one spanning
+marker — filed separately rather than folded in. Summary retained one cycle.
 
-- [x] **A1 — corp_command seam.** `src/world/corp_command.{hpp,cpp}`: the
-  `{tick, corp, verb, args}` record, verb enum over the §5 table, and
-  `apply_corp_command` dispatching to the player-grade seams
-  (`construct_building`, `demolish_building`, recipe write, workforce target,
-  idle/resume, `place_road`, `dispatch_survey`). Expose `solve_workforce_target`
-  in `economy_system.hpp`. Rejections return a result, mutate nothing.
-- [x] **A2 — corp_ai scorer.** `src/world/corp_ai.{hpp,cpp}`: bounded candidate
-  enumeration (top-M sites by terrain affinity × deposit richness, per-building
-  dials, survey), `score = expected_net_per_tick / payback_ticks × strategy_weight`
-  from existing estimators, solvency gate, hysteresis (θ ≈ 15 %, cooldowns,
-  loss/gain streaks), budget (1 construction + few dials), staggered cadence
-  `id(c) % K`, per-corp seed-hash personality jitter. Decision-log ring buffer
-  (command + winning vs runner-up score).
-- [x] **A3 — integration.** `economy_system.cpp`: BL-079 block folds in as reflex
-  tier 0; strategic eval emits `corp_command`s applied at the tick boundary;
-  `agency_event` grows command kinds for the chat feed. Depends on A1, A2.
-- [x] **A4 — state export.** Per-corp visibility-honest export struct
-  (own full; market public; rival buildings not internals; survey/activity-gated
-  tile facts). Lives beside corp_ai; schema versioned. Depends on A3.
-- [x] **A5 — corp_ai_harness.** `tools/verify/corp_ai_harness.cpp` covering
-  BL-202 R1–R3. Depends on A1–A4.
-- [x] **B1 — blackboard JSONL.** `to_jsonl` on the export struct; `--export-blackboard
-  <corp|all> [--out <dir>]` in `src/main.cpp` (headless world, N warm-up econ
-  steps, `blackboard_<corp>_<tick>.jsonl`, `_v` stamp). Depends on A4.
-- [x] **B2 — blackboard_harness.** `tools/verify/blackboard_harness.cpp` covering
-  BL-206 R1–R3. Depends on B1.
-- [x] **C1 — persona packs (Lua).** `scripts/personas/{sun-tzu,amaterasu,krishna,
-  scales-of-maat}.lua` compiled by hand from the Pantheon seeds
-  (`C:/Users/benbo/Pantheon/data/personas/*.md`): each exposes
-  `extract(blackboard) → findings` and `phrase(finding) → text`; opinion records
-  in the codebook grammar; documented failure condition. Parallel-safe vs A.
-- [x] **C2 — pack loader/runtime.** `src/scripting/persona_pack.{hpp,cpp}`:
-  sandboxed sol2 env (no io/os/package, no world pointer), fact-table marshalling,
-  fixed per-eval budget, opinion-record collection, scales-of-maat verdict
-  aggregation, bounded `strategy_weight` nudge, bench assignment at corp
-  generation (mountain bench first). Depends on A4/B1 fact schema + C1.
-- [x] **C3 — Counsel channel.** Per-corp Counsel channel in `chat_state`;
-  phrase-bank counsel posts wired in `app.cpp` `step_economy`. Main-session
-  hotspot. Depends on C2.
-- [x] **C4 — persona_counsel_harness.** `tools/verify/persona_counsel_harness.cpp`
-  covering BL-207 R1–R3 (two corps, strong-vs-weak precedent dilemma). Depends on C2.
+Requirements: requirements.json § landform-render (R1–R4).
+Goal: draw the landform axis. `terrain_colour` keys on composition only, so six of seven
+landforms render as flat hexes — while landform drives build cost ×1.0–×2.0, hazard,
+habitability and mineral richness.
 
-Parallelisation: roots A1+A2 (one worktree agent — same slice) and C1 (second
-agent, reads only Pantheon + the designed fact schema). A3–A5 follow in the A
-agent; B and C2–C4 sequential in the main session after A merges. Chat/app.cpp
-wiring stays in the main session.
+**A gated everything else**, and its numbers changed the design: the measured mix is 95%
+plains+valley with every dramatic landform ≤1.5%, so there is no continuous elevation gradient
+to contour. Relief collapsed to a two-step tint (highland lift / valley sink); the glyph set
+grew from 3 to 4 (mountain, canyon, crater, rift — the ≤1.5%, cost-≥×1.3 set where an invisible
+surprise is expensive).
 
-## Sticky detail card cluster (promoted from backlog.json § BL-195, BL-196, BL-197, BL-198) — **COMPLETE**
+- **[1] A — Measurement gate: per-body + system landform histogram over land tiles, with an
+  every-landform-appears assertion.** Files: `tools/verify/world_audit.cpp`. Deps: foundation.
+  Satisfies: R1. **DONE** — PASS; numbers recorded in backlog.json BL-231 and requirement R1.
+- **[2] B — Four landform glyphs.** Files: `src/ui/icons.{hpp,cpp}`. Deps: A (A decides the set
+  is 4, not 3). Parallel-safe with C. Satisfies: R2.
+- **[2] C — Relief tint + contrast ink helpers; correct the false landform comment.**
+  Files: `src/ui/hex_render.{hpp,cpp}`. Deps: A. Parallel-safe with B. Satisfies: R4.
+- **[2] D — Canvas wiring: composite relief AFTER the lens tints so it survives them; draw the
+  glyph on unbuilt revealed tiles.** Files: `src/ui/body_surface_canvas.cpp`. Deps: B, C.
+  Satisfies: R2, R3, R4.
+- **[1] E — Docs: ICONS.md glyph rows, CANVASES.md landform-channel section, TILES.md render
+  note.** Files: `docs/ui/ICONS.md`, `docs/ui/CANVASES.md`, `docs/economy/TILES.md`. Deps: D.
+  Satisfies: authority propagation.
+- **[1] F — Visual check.** Files: `scripts/verify/landform_relief.lua`. Deps: D.
+  Satisfies: R2, R3, R4.
 
-Batch: 2026-07-22-sticky-card. All five tasks (A–E, i.e. BL-194/195/196/197/198) landed
-across commits 32389d3, 491d18a, fd97f81, d46e74f (2026-07-22/23) — this file was never
-updated to reflect it, leaving the group looking paused when it was actually done.
-Backlog audit (2026-07-29) corrected the backlog.json statuses; removing the stale task
-rows here for the same reason. See backlog.json's BL-195/196/197/198 `resolution` fields
-for the landing commits.
+Parallelisation note: A → {B ∥ C} → D → {E ∥ F}. Run main-session-serial — B and C are small,
+adjacent, and D integrates both immediately; worktree fan-out would cost more than the two
+small files save.
 
-### Template
-
-```
 ## <Group name> (promoted from BACKLOG § <item>)
 
 Requirements: requirements.json § <slug>
@@ -184,146 +160,6 @@ Pausing is only legitimate if the stop is **clean and resumable**:
 A paused group is therefore *not* a terminal state — it is an explicit, recorded intermission.
 The barrier semantics for a multi-item set still hold *within* a session; pausing is how a
 session boundary is drawn *between* them.
-
----
-
-## Road tiers + span fix (promoted from backlog.json § BL-172) — **COMPLETE**
-
-Requirements: requirements.json § 2026-07-11-road-tiers (R1–R3 complete). Ben's call (2026-07-11):
-3-tier ladder Track/Road/Highway, ship end-to-end; railroad → BL-173. Built main-session-serial —
-the registry struct → placement → front-door chain is interdependent, so fan-out buys nothing.
-Delivered: build 347/347 clean, CTest 21/21 (determinism intact), visual roads.lua verified.
-Deferred (Ben): on-canvas road weight/tier-contrast tuning (faint vs nation borders) — tune later.
-
-- **[2] A — Economy foundation: `road_economics` → per-tier; `road_econ(tier)` accessor; Lua `roads.track/road/highway` + loader; multiplier/field comments.** Files: `src/world/recipe_registry.hpp`, `src/world/recipe_registry.cpp`, `scripts/economy.lua`, `src/world/components.hpp`, `src/world/logistics.cpp`. Deps: foundation. Satisfies: R3.
-- **[2] B — Generation: 3-tier assignment by centre scale (Highway/Road/Track); header comment.** Files: `src/world/road_generation.cpp`, `src/world/road_generation.hpp`. Deps: A (tier constants shared conceptually, none in code). Satisfies: R2.
-- **[2] C — Placement: `place_road(tier)` + `can_place_road(tc,tier)` upgrade-in-place.** Files: `src/world/placement_rules.hpp`, `src/world/placement_rules.cpp`, `src/world/construction.hpp`, `src/world/construction.cpp`. Deps: A. Satisfies: R3.
-- **[2] D — UI plumbing: `pending_road_tier`; app passes tier; build front door lists Track/Road/Highway.** Files: `src/ui/ui_state.hpp`, `src/core/app.cpp`, `src/ui/selection_panel.cpp`. Deps: A, C. Satisfies: R1, R3.
-- **[3] E — Render span/symmetry fix + 3-tier styling (the headline fix).** Files: `src/ui/body_surface_canvas.cpp`. Deps: none (reads road_level). Satisfies: R1.
-- **[2] F — Tools stay green: road_generation_harness R2 (3-tier ceiling), logistics_harness T10 (tier + upgrade), roads.lua (3 tiers + front door).** Files: `tools/verify/road_generation_harness.cpp`, `tools/verify/logistics_harness.cpp`, `scripts/verify/roads.lua`. Deps: A, B, C. Satisfies: R2, R3.
-- **[1] G — Docs: SUPPLY.md tier ladder + GLOSSARY Track/Road/Highway + PLANETARY/ICONS render note.** Files: `docs/economy/SUPPLY.md`, `docs/GLOSSARY.md`, `docs/ui/PLANETARY.md`, `docs/ui/ICONS.md`. Deps: all. Satisfies: authority propagation.
-
-Parallelisation note: A is the foundation (registry/Lua). B ∥ C ∥ E are independent given A (disjoint files). D depends on A+C; F depends on A+B+C; G closes. Run serial in main session (interdependent chain, small files) — no worktree fan-out.
-
----
-
-## v0.1.1 Batch — Roads & planetary logistics (BL-148, BL-149, BL-147) — **COMPLETE**
-
-Three `designed` items delivered in one main-session-serial Batch Delivery (shared files +
-co-evolving discount interface, so no fan-out). **BL-148** shared logistics-node discount in
-`dispatch_convoys` (scans `logistics_path.tiles`; population-centre tiles discount by scale, capped;
-tunables `economy.lua`). **BL-149** `inland_logistics_hub` building type (enum + econ + placement +
-front door + hexagon glyph); its completed tiles reuse the BL-148 node scan (flat discount). **BL-147**
-always-on road-edge render in `body_surface_canvas.cpp` (trunk vs local) + player `place_road`
-(`construction.cpp`; money + materials; raises `road_level`, clears `astar_cost_cache`) via the build
-front door. Also fixed pre-existing BL-146 residue (`corp_terrain_matrix` CMake target missing
-`road_generation.cpp` + `logistics.cpp`). Verified: build green (348 targets), **CTest 21/21**
-(determinism intact), `logistics_harness` T8/T9/T10 (city/hub discount + `place_road`), visual
-`roads.lua`. Requirements `requirements.json § 2026-07-10-roads` (3 groups) all complete. Per-item
-detail: DEVLOG 2026-07-10. Commits: one per item. Summary retained one cycle.
-
----
-
-## 2026-07-09 Batch — v0.1.0 legibility polish + UX-review cluster (BL-133–145, BL-159) — **COMPLETE**
-
-Fourteen items (the full 2026-07-08 UX-review cluster) landed in one Batch Delivery, fanned to 8
-wave-1 worktree agents + 1 wave-2 agent. Wave 1 (fully disjoint file scopes, ran concurrently):
-**A** BL-141 container vocabulary (`docs/ui/LAYOUT.md`), **B** BL-138 compact time panel (`app.cpp`,
-`format.{cpp,hpp}`), **C** BL-142 budget view player-only (`balance_ledger.cpp`), **D** BL-159 then
-BL-143 sequential (`market_ledger.cpp` → `construction_panel.cpp`, `nav_pane.cpp`), **E** BL-144 tile
-ledger fold-out standard (`tile_inspector.cpp`), **F** BL-145 corp focus invisible (4 panel files),
-**G** BL-139 tile-primary selection (`selection_panel.cpp`), **G2** the lens legibility cluster —
-BL-137→134→133→136→135 sequential in one agent (`body_surface_canvas.cpp`, `overlay.cpp`,
-`icons.{hpp,cpp}`). Wave 2: **H** BL-140 UI text/image containment, run after wave 1 merged since it
-mechanically applies A's vocabulary across the surfaces the other waves had just changed.
-
-Two agents (E, G2) hit a background API disconnect mid-task and were resumed via SendMessage with a
-status recap; both picked up cleanly from their last commit. Two merge conflicts surfaced against
-concurrent upstream work landed earlier the same session (`tile_inspector.cpp`'s ledger-chrome
-signature had already changed; `app.cpp`'s time panel had an older BL-097 height fix and
-`body_surface_canvas.cpp`'s `draw_market_key` had gained city-name labels) — both resolved by hand,
-keeping the newer/better upstream approach (content-derived height, city-name labels) while grafting
-in this batch's new content. Full integrating build green after every merge; final build 615/615
-targets, **20/20 CTest harnesses PASS**, no regressions. All 14 items flipped to `complete` in
-backlog.json; requirements `requirements.json § 2026-07-09-uxbatch` (9 groups) all `complete`.
-Per-item detail: DEVLOG 2026-07-09.
-
----
-
-## 2026-07-08 Batch — Backlog refinement pass (BL-011, BL-014, BL-016, BL-053, BL-063, BL-097) — **COMPLETE (residue noted)**
-
-Five design-owed items designed and promoted in one session, fanned to 5 worktree agents (Wave 1:
-reach/supply lenses, accessibility palette+contrast, accessibility UI-scale, country generation,
-view-bounding audit) + 1 follow-on (Wave 2: view-bounding fix, informed by the audit's findings).
-All branches merged clean except one `backlog.json` conflict (country-gen agent's worktree had
-branched before the design-settling commit landed; reconciled by hand). Full app build green
-throughout; `world_audit`/`world_determinism` re-run after every merge, ALL PASS, no regressions.
-
-**BL-053** (country generation) fully complete: discovered the size-variance mechanism
-(`merge_small_nations`) already existed from an earlier commit, retuned constants (14→24 nations,
-34 seeds pre-merge), harness-verified (count [20,28] + max≥3× min both PASS).
-**BL-063** (UI-scale) fully complete: discrete 1.0/1.25/1.5× font-atlas reload, persisted in
-`options.cfg`, wired into the F10 Options window.
-**BL-097** (view-bounding) fully complete: audit found 2 real bugs (time-panel height pinned to
-`mm_h*0.5f`; Tile Ledger spawn anchored off the stale `profile_panel_width`), both fixed; the rest
-of the shell (header/profile/nav-rail/minimap/explorer/economy-panel/lens-key) confirmed already
-correct.
-**BL-011/BL-014** (Reach + Supply-routes lenses) code-complete with one scope deviation: rendered
-as an on-canvas key/readout rather than cross-body glow/edges, since `body_surface_canvas.cpp`
-only ever draws the active body's own tile grid — the fuller cross-body visual is a follow-up for
-`solar_system_canvas.cpp`.
-**BL-016** (lens palette) code-complete for the palette half (Okabe-Ito/Viridis re-hue); on-canvas
-country/market labels + Corporation-lens legend deferred as a `body_surface_canvas.cpp`/`overlay.cpp`
-follow-up.
-
-**Residue (recorded, not dropped):** visual goldens need re-blessing (lens hues changed); the
-`palette::text_secondary` AA token isn't yet wired into ~90 existing `TextDisabled` call sites; a
-`scripts/verify/*.lua` multi-resolution sweep script (for BL-097) wasn't authored; `docs/ui/ACCESSIBILITY.md`
-still isn't written. Requirements `requirements.json` § {reach-supply-lenses, accessibility-strand-1}
-remain `pending` on visual verification; § {country-generation-variety} complete; § {view-bounding-audit}
-pending on the visual sweep. Permanent record: `docs/development/backlog.json` (BL-011/014/016/053/063/097
-all flipped to `complete`), commits `35dd1fb`, `287d8e0`, `95788ef`→`004c5f9` (merge), `1ffe395`→`2506c97`
-(merge), `47da542`→`02819a7` (merge). Summary retained one cycle.
-
----
-
-## 2026-07-07 Batch — Economy dynamism (BL-078, BL-095, BL-096, BL-079, BL-112) — **COMPLETE**
-
-Five interlocking economy items delivered 2026-07-07. **BL-078** redefined the nation substrate into a
-tick-time elastic per-capita basket demand + abstract nation-capacity supply (price discovers via
-`base×√(D/S)`, `[0.25×,4×]` band kept). **BL-095** made construction market-gated + pay-as-you-build
-(3-regime rate, derived stock = prior-tick market supply, analog front-door). **BL-096** resource-carved
-the market map (nation-gated by tradeable-resource concentration, fresh RNG offset `0xA5310096u`) +
-distributed substrate across a body's markets. **BL-079** added narrow deterministic background-corp
-agency (idle a loss-maker / switch a floored recipe; player exempt), reconciled the stale depletion docs,
-and wrote the scoped standing-rule exception. **BL-112** upgraded `pregame_balance_harness` into the
-economy gate (differentiated/elastic/live-margin/fillable/determinism — all PASS) and rekeyed the
-Opportunity lens to unmet demand.
-
-Verified: full app build + **19/19 headless tests green** (incl. new `construction_gate_harness`,
-`corp_agency_harness`, and `world_audit` BL-096 assertions), `verifier-review` GO COMPILE, determinism
-preserved (`world_determinism`/`econ_stability` green). The two UI slices (095 front-door, 112 lens) were
-fanned to sub-agents; the determinism-critical tick core stayed main-session-serial. **Design decision
-(Ben, 2026-07-07): the emergent milder opening — the player opens ~break-even/profitable rather than at
-the intended net loss — is ACCEPTED**; the fillable-gap dynamism is the win. Requirements
-`requirements.json` § {product-market-inert, market-stockpile-build-gate, market-resource-generation,
-extraction-boombust-feedback, starting-economy-viability} all complete. Deferred follow-ons: BL-130
-(real market inventory vs derived), BL-131 (player market destruction), BL-132 (full market
-co-generation). Permanent record: DEVLOG 2026-07-07, PRODUCTION.md, GENERATION_STRATEGY.md, LENSES.md,
-io-standing-rules.md. Summary retained one cycle.
-
----
-
-## 2026-07-07 Batch — BL-126 + BL-113 (08:04:31 → 08:17:27, 12m 56s) — **COMPLETE**
-
-Two-item batch. **BL-126** (toggle rule — `nav_button` re-click on the active tab closes the ledger
-via an optional `bool* close`; wired at economy_panel + construction_panel; diff-1, build-green,
-correct-by-inspection). **BL-113** (interactive-flow acceptance — recipe/workforce, sell, survey verify
-primitives + three acceptance scripts driving the real commit path; sub-agent authored in a worktree,
-main session integrated + built + ran all three to PASS; survey funds staged via `set_balance`;
-sell_order floor-precedence assert known-weak with a 0 pool). Requirements `interactive-flow-acceptance`
-R1–R3 complete. Commits `4e8c3fd`, `be92911`. Permanent record: DEVLOG 2026-07-07, LAYOUT.md,
-DEVELOPMENT_PRACTICES.md § Acceptance flows. Summary retained one cycle.
 
 ---
 
@@ -412,86 +248,4 @@ later waves. After each wave the integrator wires hooks, **builds, and verifies*
 wave. Verify retroactively — do not assume an agent's self-reported success.
 
 ---
-
-## Cross-platform build — Linux + Windows (promoted from BACKLOG § BL-057) — **COMPLETE**
-
-Closed 2026-07-04 by reconciliation: the promoted tasks were left non-terminal although the work
-verifiably shipped. Font portability (bundled DejaVuSans), the native Linux build (GCC-14 /
-sol2 v3.5.0 fixes), the Actions CI matrix (Linux g++-13/g++-14 + Windows MSVC — first run green
-on all three jobs), and the Xvfb/software-renderer offscreen spike all landed and verified.
-Permanent record: DEVLOG 2026-06-29 (first native Linux GUI build),
-`req/requirements.json § cross-platform-build`, TECH_FOUNDATIONS § Building. **Residue (recorded
-per the cancelling policy):** the golden re-bless under the software renderer is deferred —
-`scripts/verify/bless_all.sh` exists; once re-blessed goldens land, the advisory `visual-verify`
-CI job drops `continue-on-error` and becomes a hard gate. Summary retained one cycle
-(from 2026-07-04).
-
----
-
-## v0.0.8 Batch Delivery — Legibility pass + commercial-sphere fog (promoted 2026-07-04) — **COMPLETE**
-
-All six items landed 2026-07-04, one commit each: BL-088 persistent trade routes (`57e8b7b`),
-BL-083 population-centre markers (`ae64ed1`), BL-085 player presence (`370a0a7`), BL-084
-industry-density lens (`1619b13`), BL-086 ambient opportunity read (`6878160`), BL-089
-commercial-sphere fog (`af07ad0`); batch close `d3629a2`; v0.0.8 cut `8540878`. Verified by the
-`trade_routes` + `commercial_fog` headless harnesses and blessed visual goldens. Permanent
-record: DEVLOG 2026-07-04, `req/requirements.json`, `docs/ui/DISCOVERY.md`. Summary retained
-one cycle (from 2026-07-04).
-
----
-
-## v0.0.9 Batch Delivery — polish pass (delivered 2026-07-05) — **COMPLETE**
-
-Five promote-ready polish items delivered in one batch, per-item commits: **BL-070** in-app system
-menu (gear popup — Pause/Resume + Exit-with-confirm, Esc parity), **BL-081** economy-ledger
-legibility (widened balances + dropped per-building table + un-cramped sibling Workforce/Pools/
-Markets tables), **BL-082** construction panel height-capped clear of the bottom-left Selection
-element during placement, **BL-090** corp-emblem glyph family (shared `ui::icons::corp_emblem` +
-`palette::corp_emblem_shape`/`corp_identity_colour`, rendered for player + rivals on card /
-selection header / on-canvas markers / hover), and **BL-089 deferral 1 of 2** (hover-card body
-activity line). Sub-agents ran the three disjoint UI slices (BL-081, BL-090, BL-089-hover); the two
-`app.cpp`-touching items (BL-070, BL-082) stayed in the main session; one integrating build.
-Verified by the new `scripts/verify/v009_batch.lua` (4 Windows-blessed goldens) + build-clean;
-interaction/hover-gated surfaces (BL-070 popup interior, BL-089 tooltip) code-verified.
-**Deferred (recorded, not dropped):** the BL-089 proximity-glimpse peek (save-seam/determinism cost
-disproportionate to a polish minor — re-assess at the v0.1.0 boundary). Permanent record: DEVLOG
-2026-07-05, `req/requirements.json`, backlog resolutions, `docs/ui/{MENU,LAYOUT,SELECTION,ICONS,
-DISCOVERY}.md`. Summary retained one cycle (from 2026-07-05).
-
----
-
-## BL-099 — Commercial-fog proximity-glimpse peek (delivered 2026-07-08) — **COMPLETE**
-
-BL-089 deferral 2 of 2, landed as its own item. **Sample-and-store** dissolved the determinism
-objection that caused the deferral: body positions are mutated `orbital_angle_rad` (not pure in tick),
-so `record_proximity_glimpses` samples the closest-approach set ONCE at a player convoy's discrete
-completion tick (in `credit_arrived_convoys`, after orbits advanced for that frame) and stores the tick
-in `world.body_last_glimpse_tick` (off `body_component`); `body_activity_visibility` returns
-`known_stale` for a glimpsed-but-unrouted body within `glimpse_fresh_ticks_default` (90), never
-`known`/`visible`, and a body's own route outranks a glimpse. R = `glimpse_radius_au_default` (0.25 AU).
-The renderer was untouched (BL-089's blessed `known_stale` badge path). Built main-session-serial.
-
-Verified: `commercial_fog_harness` 19/19 (10 new BL-099 assertions — geometry, tier, endpoint-exclusion,
-decay, route-precedence, determinism) + full CTest **19/19** (determinism intact); on-canvas by-eye via
-`scripts/verify/proximity_glimpse.lua` before/after. Requirements `requirements.json § proximity-glimpse`
-R1+R2 complete. Authority propagated to `docs/ui/DISCOVERY.md`. Golden bless owed on the Linux box
-(new `proximity_glimpse` goldens + `commercial_fog_solar` re-bless — its `known_stale` set widened).
-Summary retained one cycle (from 2026-07-08).
-
----
-
-## BL-077 — Planetary logistics: economic core (delivered 2026-07-08) — **COMPLETE**
-
-Rescoped core of the logistics epic, built main-session-serial. **Data model** (A): tile_component.road_level
-(default 0), land_use infrastructure value, per-body grid->tile index + A* route cache on world. **A* pathfinder**
-(B, new world/logistics.{hpp,cpp}): canonical landform cost table (TILES.md), terrain-weighted A* over the tile grid
-(4-cardinal, column wrap, road discount, ocean sea-leg + land/sea mode selection), symmetric edge cost, cached;
-reuses nation_generation's Dijkstra shape, expansion_cost untouched (world-gen determinism). **Intra-body dispatch**
-(C, supply_system.cpp): same-body market shortfalls source the corp's on-body pool, hauling from its representative
-tile to the short market's centre_tile via A*, mode land/sea by ocean-crossing, cost reg.logistics_cost(mode)*dist*qty;
-inter-body space path unchanged. **Harness** (D, tools/verify/logistics_harness.cpp).
-
-Verified: logistics_harness 19/19 + full CTest **20/20** (econ_stability + pregame_balance stable on the real world,
-determinism intact, supply_advance + trade_routes unaffected). Commits a202dc8 (facility) + this (dispatch).
-Requirements planetary-logistics-core R1-R3 complete. Authority: SUPPLY.md. Summary retained one cycle (from 2026-07-08).
-
+

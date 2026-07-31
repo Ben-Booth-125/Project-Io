@@ -10,9 +10,12 @@
 
 economy = {
     -- Two-threshold partial-run model for processing buildings, expressed as a
-    -- fraction of a full run's input need that the corp pool must cover:
+    -- fraction of a full run's input need that the corp pool must cover. A body
+    -- WITH a market bypasses these entirely: the building runs a full batch,
+    -- pool-first, auto-buying any shortfall (economy_system.cpp; PRODUCTION.md).
+    -- The thresholds are the no-market fallback:
     --   pool coverage >= t_full          -> run full from the pool (self-sufficient)
-    --   t_idle <= coverage < t_full      -> run full, auto-buying the shortfall
+    --   t_idle <= coverage < t_full      -> partial run, scaled to coverage
     --   coverage < t_idle                -> idle
     thresholds = {
         t_full = 1.0,

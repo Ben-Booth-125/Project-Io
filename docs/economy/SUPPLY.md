@@ -1,6 +1,6 @@
 # Project Io — Supply (Layer 5)
 
-Layer 5 of the economy is the **logistics / convoy layer** — the mechanism that physically moves goods between markets and bodies, coupling otherwise-isolated price pools through cargo movement. A convoy is the unit of flow; there is no abstract price-coupling term between bodies: the convoy *is* the coupling. Full design authority for this layer is BL-039 (`[S5]`) in `docs/development/BACKLOG.md` § Supply; the build is v0.0.7's whole theme.
+Layer 5 of the economy is the **logistics / convoy layer** — the mechanism that physically moves goods between markets and bodies, coupling otherwise-isolated price pools through cargo movement. A convoy is the unit of flow; there is no abstract price-coupling term between bodies: the convoy *is* the coupling. BL-039 (supply convoys) landed as v0.0.7's theme and is **complete**, so this document is now the authority for the shipped layer (§ Build status for the landed/outstanding split, updated 2026-07-31).
 
 ---
 
@@ -11,7 +11,7 @@ A convoy is a world ECS component. Each active convoy carries:
 | Field | Type / values | Notes |
 |---|---|---|
 | `source_market` | market entity | The market the cargo was dispatched from |
-| `destination_market` | market entity | The market the cargo is being delivered to |
+| `dest_market` | market entity | The market the cargo is being delivered to |
 | `mode` | `{land, sea, air, space}` | Determines infrastructure gate and cost multiplier |
 | `cargo_resource` | resource enum | The good being transported |
 | `cargo_qty` | quantity | Units in transit |
@@ -42,7 +42,7 @@ land < sea < air < space
 
 For **space convoys**, `distance` is the Euclidean distance between the parent bodies' centres (no path routing — straight-line in the prototype). For **intra-body convoys** (land / sea), `distance` is the **terrain-weighted A* path** over the body's tile grid (BL-077, `src/world/logistics.{hpp,cpp}`): each tile weighted by its landform cost (TILES.md — plains 1.0 … mountain 2.0) and discounted by `road_level`, respecting the east–west cylinder wrap; the edge cost is the average of the two tiles (so the path is symmetric) and results cache per fixed endpoint pair. Ocean tiles carry a higher sea-leg cost, so the cheapest path prefers land and a water crossing selects **sea** mode.
 
-The cost is charged at dispatch (or amortised per Tick — the exact timing is a build decision). It is the term that makes distant arbitrage marginal: a profitable inter-body trade requires `source_price + logistical_cost_per_unit < destination_price`.
+The cost is charged in full at dispatch (`dispatch_convoys` debits `corp.balance` before the convoy is created; a corp that cannot afford the cheapest route dispatches nothing). It is the term that makes distant arbitrage marginal: a profitable inter-body trade requires `source_price + logistical_cost_per_unit < destination_price`.
 
 **Logistics-node discount (BL-148 / BL-149).** The intra-body haul cost is further discounted for each **logistics node** the A* path crosses, so the world's cities — and the player's own hubs — form a cheap network the specialist corporation plugs into. A **population centre** on the path discounts by `logistics.node_discount.city_per_scale × centre.scale` (tier 1–5); an **Inland Logistics Hub** (BL-149) by a flat `logistics.node_discount.hub`. The summed discount is capped (`node_discount.cap`) so a route is never free, and is applied as `cost × (1 − discount)` (`dispatch_convoys`, over `logistics_path.tiles`). Since intra-body markets are city-seeded, most hauls deliver *into* a city and take the discount; the player extends the reach by placing hubs along a corridor. Deterministic — a pure function of the path tiles and the (population-centre / hub) node sets.
 
@@ -56,7 +56,11 @@ The cost is charged at dispatch (or amortised per Tick — the exact timing is a
 
 **Player-direction is the exception.** A player can direct a specific convoy — for example, fulfilling a standing sell order whose counterparty is on another body. This covers targeted arbitrage and order-book matching across bodies.
 
-**Space launches are always player-directed.** Leaving the gravity well is an explicit decision, never auto-dispatched — in Era 0 and Era 1 alike. Terrestrial (land / sea / air) convoys auto-dispatch.
+**Space launches auto-dispatch too (corrected 2026-07-31 — the "always player-directed" rule
+written here was never built).** `dispatch_convoys` auto-dispatches inter-body convoys exactly
+like intra-body ones, gated only on the corp holding a launchpad on the source body
+(`corp_has_launchpad_on`). Whether leaving the gravity well *should* be an explicit player
+decision is a design call still open against the shipped behaviour, not a description of it.
 
 **Reachability.** In the prototype all bodies are treated as reachable (Exploration is a data-model stub). Infrastructure gates (below) are the operative constraint on reachability, not exploration state.
 
@@ -64,14 +68,16 @@ The cost is charged at dispatch (or amortised per Tick — the exact timing is a
 
 ## Infrastructure gates
 
-Each convoy mode is gated on endpoint infrastructure. Mode is selected by the source/destination pair: inter-body → **space**; intra-body → **land** by default, **sea** when the route must cross water.
+Mode is selected by the source/destination pair: inter-body → **space**; intra-body → **land** by default, **sea** when the cheapest A* path crosses ocean (`path.crosses_ocean` — the *path* picks the mode, not an infrastructure check). The designed endpoint gates are mostly **not built** (table corrected 2026-07-31):
 
-| Mode | Gate | Status |
+| Mode | Designed gate | Code truth |
 |---|---|---|
-| **Land** | Ungated — available across contiguous land with no built prerequisite | Prototype default for intra-body |
-| **Sea** | **Port** building at both endpoints | Port is in the Era 0 building set |
-| **Air** | **Airfield** building at both endpoints | Designed; building not in the prototype set — deferred |
-| **Space** | **Launchpad** at the origin + **Orbital Port** at the destination; **Era 1 required** | Era gate already enforced by `docs/economy/ERAS.md` |
+| **Land** | Ungated | Ungated — as designed |
+| **Sea** | **Port** building at both endpoints | **No port check exists** — sea mode fires whenever the path crosses ocean. Port gating is owed to BL-188 (coastal ports / sea trade, design-owed) |
+| **Air** | **Airfield** building at both endpoints | Air mode is never dispatched; no airfield building exists — deferred |
+| **Space** | **Launchpad** at origin + **Orbital Port** at destination; Era 1 required | **Launchpad at origin only** (`corp_has_launchpad_on`). No orbital-port check, no era gate (the era system is unimplemented — ERAS.md banner) |
+
+Note `supply_system.hpp`'s own header comment still claims sea/air "are not dispatched in the prototype" — it disagrees with the dispatch code beneath it; flagged for a code-comment fix, not edited here.
 
 Roads are a land cost-reducer over a **three-tier ladder** (BL-172; BL-146/BL-147 shipped a two-tier local/trunk form). `road_level` is a real `tile_component` field (BL-077 core, default 0) that discounts the A* traversal cost of the tiles a route crosses (`road_traversal_multiplier` = `1 / (1 + 0.5·tier)`):
 
@@ -89,12 +95,18 @@ Per-node throughput capacity (a larger Port or Orbital Port carrying more cargo 
 
 ## Build status
 
-This layer is **designed but not yet built**. BL-039 (`[S5]`) is v0.0.7's whole theme — the largest remaining v0.1.0 build. The decomposition at promotion (foundation-first) is:
+**BL-039 (supply convoys) is complete** (status rewritten 2026-07-31 — this section previously
+still read "designed but not yet built"). `src/world/supply_system.cpp` (~340 lines) is the
+shipped layer.
 
-1. Convoy component + per-Tick advance
-2. Logistical-cost budget term + economy-constants entries
-3. Dispatch triggers (auto, then player-directed)
-4. Destination crediting + inter-body market effect
-5. Supply lens render passes (disjoint from 1–4)
+**Landed:**
+- Convoy component, per-Tick advance, destination crediting + market supply injection
+- Terrain-weighted A* intra-body routing with roads and the node discount (BL-077 planetary logistics; BL-146–149; BL-172 road tiers)
+- Auto-dispatch of shortfall-filling convoys, intra- **and** inter-body (launchpad-gated)
+- Persistent trade-route recording (BL-088) + the proximity-glimpse peek (BL-099)
 
-Files touched at build time: `src/world/supply_system.{hpp,cpp}` (new), `src/world/components.hpp` (convoy component), `src/world/budget_system.cpp` (cost), `scripts/economy.lua` (per-mode constants), `src/world/market_clearing.{hpp,cpp}` (delivery).
+**Outstanding:**
+- Per-node throughput capacity (out of prototype scope, § Infrastructure gates)
+- Air mode (never dispatched; no airfield building)
+- Port gating for sea mode (BL-188, coastal ports — design-owed)
+- Player-directed dispatch (the § Dispatch trigger "exception" has no UI or code path yet)

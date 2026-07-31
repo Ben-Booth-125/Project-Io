@@ -43,7 +43,71 @@ struct corp_ai_params
     /// its generation seed, so this is supplied by the caller (0 by default —
     /// the corp id alone still yields a stable, campaign-constant jitter).
     uint64_t personality_seed = 0;
+
+    /// Predictive-spending horizon padding (AI_OPPONENT.md §2B): a build's
+    /// forecast horizon is its own build_duration_ticks (post-completion,
+    /// so the projection lands after the building is live) plus this many
+    /// ticks for "one clearing pass". 1 by default.
+    int forecast_clearing_ticks = 1;
+
+    /// Projected supply/demand ratio at which a build's score starts to taper
+    /// (>1.0 = the forecast expects the market to be adequately served) and
+    /// the ratio at which it is vetoed outright (a hard glut). Linear taper
+    /// between the two; ratio <= glut_taper_ratio is unpenalised.
+    float glut_taper_ratio = 1.0f;
+    float glut_veto_ratio  = 2.0f;
 };
+
+// ---------------------------------------------------------------------------
+// Stage B — strategy, priority buckets, predictive spending (BL-203,
+// AI_OPPONENT.md §2B). The Victoria-3 import that replaces BL-202's crude
+// reserve-floor gate with a solvency answer that scales with the AI's actual
+// commitments, so it can stay solvent honestly rather than needing a cheat.
+// ---------------------------------------------------------------------------
+
+/// A corp's coarse strategy — currently a direct read of its generated
+/// industrial focus (CORPORATION_GENERATION.md's specialist premise); kept as
+/// its own named concept (rather than inlining `industrial_focus` everywhere)
+/// so the scorer's strategy bias is legible and can diverge from the
+/// generation-time focus later without a signature break.
+using corp_strategy = industrial_focus;
+
+/// Spending priority — a lower bucket may NEVER starve a higher one
+/// (AI_OPPONENT.md §2B). Must-Have candidates carry no capex (idling a
+/// loss-maker only saves wages/maintenance) so they are never floor-gated;
+/// Should-Have dials (recipe/workforce/resume — feeding a running processor)
+/// are likewise free; only Nice-to-Have (build/survey — expansion) spends
+/// cash, and it alone is gated against the stricter should-have-aware floor.
+enum class corp_priority_bucket : uint8_t
+{
+    must_have    = 0, ///< Solvency defense: stop a sustained loss (wages/maintenance bleed).
+    should_have  = 1, ///< Keep running assets fed/tuned (recipe, workforce, resume).
+    nice_to_have = 2, ///< Expansion: new construction, survey.
+};
+
+/// The bucket a decision reason belongs to — a pure, deterministic mapping.
+corp_priority_bucket bucket_for_reason(corp_decision_reason reason);
+
+/// The cash a corp must reserve, beyond the BL-202 wage/maintenance floor, to
+/// keep feeding its currently-running processing facilities this tick — the
+/// Should-Have buffer that a Nice-to-Have (build/survey) spend may never dip
+/// into. Sum of `estimate_building_profit(...).input_cost` over the corp's
+/// running processing facilities. Exposed for the harness.
+float corp_should_have_buffer(const world& w, const recipe_registry& reg,
+                              const economy_report& report, entity_id corp);
+
+/// Predictive-spending score multiplier for a candidate build of `type`
+/// producing `target` at `tile`, given its expected per-tick output
+/// `added_rate_per_tick` once live. Forecasts the added supply over
+/// `horizon_ticks` against the LOCAL MARKET'S PUBLIC supply/demand
+/// aggregates only (visibility-honest — the same facts export_corp_blackboard
+/// would show a rival, per BL-068/DISCOVERY.md) and returns 1.0 (no penalty)
+/// when the forecast supply/demand ratio stays at or below `p.glut_taper_ratio`,
+/// tapering linearly to 0.0 (veto) at `p.glut_veto_ratio`. Exposed for the
+/// harness; also used internally by the build-candidate scorer.
+float forecast_glut_multiplier(const world& w, entity_id tile, resource_type target,
+                               float added_rate_per_tick, int horizon_ticks,
+                               const corp_ai_params& p = {});
 
 /// The corp's solvency reserve floor under `p` (exposed for the harness).
 float corp_reserve_floor(const world& w, const recipe_registry& reg,

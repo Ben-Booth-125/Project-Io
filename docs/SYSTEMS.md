@@ -14,11 +14,11 @@ Systems are grouped into three supporting tiers below the pillars.
 
 The player's corporation sells goods from any location to any market. Markets are pooled exchanges — buyers and sellers anywhere can transact — but logistical cost determines whether a sale is profitable. Base prices are set by global rarity; local supply and demand shift them each Tick. The player exploits price differentials by controlling production locations and minimising the cost of getting goods to market. The player can also place **standing sell orders** — a per-(body, resource) quantity with a **floor price** — which are honoured at market clearing and take precedence over the anonymous auto-sell path, so the player governs how their controlled stock is released rather than dumping it at the resolved price.
 
-Choosing **counterparties** preferentially (whether a buyer can pick or bias which seller it matches) is an open Brief under active design — see OPENS § Trade.
+Choosing **counterparties** preferentially shipped with BL-037 (preferential purchasing): a buyer's `preferred_seller` hint wins ties at clearing and is honoured when up to 10% more expensive than the cheapest alternative (`src/world/market_clearing.cpp`).
 
-**Intra-body market structure (multiple tile-centred markets).** A market is **centred on a tile** (usually a body's principal/capital tile), and a body may carry **several** markets. A tile clears against the market whose centre is nearest by grid distance — the market's *catchment* (`market_for_tile`, `src/world/market_clearing.cpp`); clearing routes each corp's body-aggregate supply/demand to the market nearest its representative holding. A body with a single market routes there unconditionally, so the present world — which seeds **one market per body** — behaves as before. Seeding genuinely multiple centres (from capitals / population centres) is owed and follows the population layer — see OPENS § Trade.
+**Intra-body market structure (multiple tile-centred markets).** A market is **centred on a tile** (usually a body's principal/capital tile), and a body may carry **several** markets. A tile clears against the market whose centre is nearest by grid distance — the market's *catchment* (`market_for_tile`, `src/world/market_clearing.cpp`); clearing routes each corp's body-aggregate supply/demand to the market nearest its representative holding. A body with a single market routes there unconditionally. Multiple centres are seeded for real (landed across v0.0.5–v0.0.6): `hard_coded_world.cpp` anchors a market to each qualifying population centre once nations and population centres exist, with the split **resource-carved per nation** (BL-096, resource-carved markets) — a resource-rich nation fractures into more markets, a barren one folds into a neighbour's catchment.
 
-**Inter-body markets (structural design — open, Selene worked example).** Each body resolves its market **in isolation**; there is no cross-body price linkage today, and that divergence is the *point*. The settled *structure* for when a second body matters — **Selene** (Kepler's moon) as the worked example: Kepler and Selene each keep their **own** locally-resolved market, and are coupled **only through Supply convoys** (Layer 5): a convoy carrying a good from Kepler to Selene adds it to Selene's supply on arrival and removes it from Kepler's at dispatch, so prices converge or diverge purely as a function of what logistics physically carry, net of logistical cost. There is **no abstract price-coupling term** — the convoy *is* the coupling, and a profitable arbitrage is simply *source price + per-unit logistical cost < destination price*. The convoy mechanics are the [S5] Supply Brief; this records the market-side framework. See OPENS § Trade / § Supply.
+**Inter-body markets (landed v0.0.6 — Selene worked example).** Each body resolves its market **in isolation**; there is no abstract cross-body price-coupling term, and that isolation is the *point*. Kepler and Selene each keep their **own** locally-resolved market, coupled **only through Supply convoys** (`src/world/supply_system.cpp`): a convoy debits the source pool at dispatch and credits the destination market's supply on arrival, so prices converge or diverge purely as a function of what logistics physically carry, net of logistical cost. The convoy *is* the coupling, and a profitable arbitrage is simply *source price + per-unit logistical cost < destination price*. The convoy mechanics are § Supply below and `docs/economy/SUPPLY.md`; this records the market-side framework.
 
 ### Conflict
 The player claims, defends, and invades territory through military force. Combat runs concurrently with the economy: supply routes are live targets, and active conflict on a body inhibits its trade connections. Territorial control is both a strategic objective and a source of ongoing economic pressure on opponents.
@@ -37,7 +37,7 @@ Raw materials are extracted from bodies and processed into higher-tier goods thr
 ### Supply
 The physical movement of goods, materiel, and forces through space. Supply is cheap on Earth but becomes costly and vulnerable with distance and conflict. A disrupted route halts production, construction, and operations at the destination. The player cannot project power or sustain a colony beyond what their logistics can support.
 
-Layer 5 of the economy is the **convoy layer** — the mechanism that couples bodies through physical cargo movement. The settled prototype model (BL-039 / [S5]; full build is v0.0.7's theme) is documented in `docs/economy/SUPPLY.md` and summarised here.
+Layer 5 of the economy is the **convoy layer** — the mechanism that couples bodies through physical cargo movement. The prototype model (BL-039, the convoy layer; landed v0.0.6, `src/world/supply_system.cpp`) is documented in `docs/economy/SUPPLY.md` and summarised here.
 
 **Convoy entity.** A convoy is a world component carrying `(source market, destination market, mode {land|sea|air|space}, cargo {resource, qty}, progress 0–1, speed)`. The coupling is market-to-market. A convoy is created when goods are dispatched toward a destination shortfall; it advances a fixed fraction of `progress` per Tick (linear; no orbital mechanics in the prototype); on arrival it credits the destination pool and is retired. Cargo leaves the source pool at **dispatch**, not arrival — goods in transit are committed.
 
@@ -46,17 +46,17 @@ Layer 5 of the economy is the **convoy layer** — the mechanism that couples bo
 **Dispatch trigger.** The **auto path is the default**: the system fills a destination shortfall from the cheapest reachable source without player intervention. Player-direction of individual convoys is reserved for sell-order / buy-match counterparties on another body. **Exception:** space launches — leaving the gravity well — are **always player-directed** and never auto-dispatched, in Era 0 and Era 1 alike. Terrestrial (land / sea / air) convoys auto-dispatch.
 
 **Infrastructure gates per mode.**
-- **Land** — ungated; always available across contiguous land on a body. Roads are an optional cost-reducer (deferred to a follow-on pass).
+- **Land** — ungated; always available across contiguous land on a body. Roads are a per-tile cost-reducer, landed as the three-tier Track/Road/Highway ladder (BL-146–149, road network + hubs; generated lattice in `src/world/road_generation.cpp` plus player placement; `tile_component.road_level` discounts A* traversal).
 - **Sea** — gated on a **Port** building at both endpoints.
 - **Air** — gated on an **Airfield** building at both endpoints; the Airfield is designed but not in the prototype building set (air mode is deferred).
 - **Space** — gated on a **Launchpad** at the origin and an **Orbital Port** at the destination; requires **Era 1** (per `docs/economy/ERAS.md`).
 
-> **Design-reference note — the target logistics feel (2026-06-15).** The long-term direction for the **land / sea / air** logistic-strength model is an **emanation / cross-section "fuel" model**: supply radiates from sources and **attenuates across distance and terrain** (a continuous supply *field*, contested along its path), and the same logistics carry **goods, unit supply, and population supply** — not just discrete point-to-point goods convoys. **Space is a separate, larger consideration** (the convoy/launch model stands for it). The reference for the desired feel — despite the genre, theme, and tonal difference — is **Shadow Empire**'s logistics. This is a durable design-direction note, not a Brief; the prototype keeps the simple per-mode-cost convoy model and grows toward this.
+> **Design-reference note — the target logistics feel (2026-06-15).** The long-term direction for the **land / sea / air** logistic-strength model is an **emanation / cross-section "fuel" model**: supply radiates from sources and **attenuates across distance and terrain** (a continuous supply *field*, contested along its path), and the same logistics carry **goods, unit supply, and population supply** — not just discrete point-to-point goods convoys. **Space is a separate, larger consideration** (the convoy/launch model stands for it). The reference for the desired feel — despite the genre, theme, and tonal difference — is **Shadow Empire**'s logistics. This is a durable design-direction note, not a backlog item; the prototype keeps the simple per-mode-cost convoy model and grows toward this.
 
 ### Infrastructure
 The physical substrate that makes all other systems possible: surface installations, orbital facilities, ports, and relay stations. Infrastructure determines the efficiency and capacity of every system in a given location. Damage has cascading consequences distinct from battlefield losses, and construction cost is shaped by local environment.
 
-> **Infrastructure gates settled (2026-06-15, [B4]).** Each convoy mode's gate is now settled: land is **ungated** (road is an optional cost-reducer tile attribute, deferred); sea is gated on a **Port** at both endpoints; air on an **Airfield** (designed, deferred); space on a **Launchpad** at the origin and an **Orbital Port** at the destination (Era 1 required). Per-mode `base_logistics_cost` multipliers live in `scripts/economy.lua` (land < sea < air < space). Capacity (per-node throughput cap) is deferred. Full detail in `docs/economy/SUPPLY.md`.
+> **Infrastructure gates settled (2026-06-15, [B4]).** Each convoy mode's gate is now settled: land is **ungated** (road is a cost-reducer tile attribute — landed since as the three-tier ladder, BL-146–149, road network + hubs; 2026-07-31); sea is gated on a **Port** at both endpoints; air on an **Airfield** (designed, deferred); space on a **Launchpad** at the origin and an **Orbital Port** at the destination (Era 1 required). Per-mode `base_logistics_cost` multipliers live in `scripts/economy.lua` (land < sea < air < space). Capacity (per-node throughput cap) is deferred. Full detail in `docs/economy/SUPPLY.md`.
 
 ### Workforce
 The labour layer that operates extraction, production, and military assets. The player allocates workforce across competing priorities; shortages create bottlenecks throughout the productive tier. Military units draw from the same pool, creating tension between economic output and force size.
@@ -74,6 +74,12 @@ Exploration reveals bodies, their resource profiles, and their suitability for s
 ### Environment
 Each body, and each subdivision of land within it, has a procedurally generated profile of resources, terrain, hazard, and habitability. Environment sets the local cost of construction, the difficulty of military operations, and extraction yields.
 
+### Generation (Planetology & the chain)
+The world is generated, not authored — a deterministic, seeded chain (added 2026-07-31): planetology (atmosphere, chemistry, evolution history — `src/world/planetology.cpp`, BL-167 planetology) → continents → tiles → population centres → history ladder → nations → roads → markets → corporations. Each stage is a consequence of the one upstream, entered through the New World wizard. Authority: `docs/generation/GENERATION_STRATEGY.md` and `docs/generation/PLANETOLOGY.md`.
+
+### History ladder
+The institutional history that makes the campaign premise causal rather than asserted (added 2026-07-31). The pre-national ladder (BL-221, `src/world/history_ladder.cpp`) runs upstream of nation generation and *drives* it — counting agrarian cradles, pricing conquest against exit, and setting the nation seed budget (`nation_params_from_ladder`). Later stages (BL-222 industrial ladder, BL-223 averted rupture) are open. Authority: `docs/lore/HISTORY.md`.
+
 ### Research
 Technology is organised into discrete, modular trees, each unlocked by a visible precondition. Research raises capability ceilings across all systems and competes directly with other budget priorities.
 
@@ -83,10 +89,16 @@ The player sets standing rules that govern automatic behaviour: trade thresholds
 ---
 
 ## Relational tier
-*The system governing interactions with other actors.*
+*The systems governing interactions with other actors.*
 
 ### Diplomacy
 Each faction maintains a sentiment value toward every other, shaped by trade history, territorial conflict, and ideological alignment. Diplomacy modulates the likelihood and cost of conflict and affects what trade arrangements are available. Military takeover by another faction is one of the two primary loss vectors.
+
+### AI opponent
+Rival corporations act (added 2026-07-31): BL-079 (background-corp agency) gives narrow per-building reflexes, and BL-202 (corp AI stage A) layers a deterministic scored-utility evaluation over the corp-command seam (`src/world/corp_ai.cpp`). Stage B (BL-203, predictive spending) is designed, not built. Authority: `docs/ai/AI_OPPONENT.md`; the scoped limits live in `.claude/rules/io-standing-rules.md`.
+
+### Comms
+The channel-based chat log (added 2026-07-31) — the surface of the diplomacy-as-communication principle: since every rival is AI, inter-corp coordination happens in a visible medium, and the mechanical actions of background corps surface as messages first. `src/ui/chat_panel.{hpp,cpp}`; authority: `docs/ui/CHAT.md`.
 
 ---
 

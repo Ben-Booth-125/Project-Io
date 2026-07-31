@@ -59,7 +59,7 @@
     "are present and marked `scope: post-prototype`, deliberately unpopulated — do not author",
     "out-of-scope stories (io-standing-rules § Scope & sequence).",
     "",
-    "COVERAGE STATE (2026-07-05). Legacy-feature pass: 12 stories spanning all seven prototype",
+    "COVERAGE STATE (2026-07-05; count refreshed 2026-07-31). 13 stories spanning all seven prototype",
     "clusters, every story requirement-linked. This baselines the shipped player-facing features",
     "(lenses, navigation, time, build, recipe/workforce, sell, convoys, survey, rivals, population)",
     "as `served`. Next passes: fill secondary stories, and build the coverage-audit tool (a check",

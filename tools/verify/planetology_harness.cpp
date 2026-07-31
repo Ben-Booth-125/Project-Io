@@ -27,6 +27,14 @@
 //       reaches a land biosphere and always retains liquid water — the
 //       guarantee is on the INPUTS, so no knob combination may break it.
 //
+//   R14 THE DATED TIMESTAMP (BL-220). history_event carries an integer year
+//       before the campaign epoch, so ONE ordered biography spans 4.5 Gya and
+//       1687 CE. Asserts exact construction, the magnitude-picking display
+//       format, total oldest-first ordering, and that a historical line
+//       interleaves into the deep-time list — the foundation the HISTORY.md
+//       ladder (BL-221/BL-222) is built on. R12 is reserved by BL-209 and R13
+//       by BL-217, so this group takes the next free number.
+//
 // HONEST SCOPE NOTE: this validates the deterministic skeleton and the gate
 // ordering. The model has more free parameters (~40 tuning constants) than it
 // has real calibration bodies, so a green run means the constants have not
@@ -39,8 +47,10 @@
 #include "world/planetology.hpp"
 #include "world/world.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -80,6 +90,10 @@ bool same(const planetology_state& a, const planetology_state& b)
     if (a.profile.temperature != b.profile.temperature) return false;
     if (a.profile.water_fraction != b.profile.water_fraction) return false;
     if (a.history.size() != b.history.size()) return false;
+    // Timestamps are compared exactly — they are integers now, so R1 catches a
+    // nondeterministic date rather than tolerating it as float noise (BL-220).
+    for (std::size_t i = 0; i < a.history.size(); ++i)
+        if (a.history[i].years_before_epoch != b.history[i].years_before_epoch) return false;
     for (std::size_t i = 0; i < resource_count; ++i)
         if (a.endowment[i] != b.endowment[i]) return false;
     return true;
@@ -105,7 +119,8 @@ void dump(const char* label, const planetology_state& s)
                 static_cast<double>(dep(s, resource_type::timber)),
                 static_cast<double>(dep(s, resource_type::water)));
     for (const history_event& h : s.history)
-        std::printf("      %5.2f Gya  %-52s %s\n", static_cast<double>(h.gya),
+        std::printf("      %14s  %-52s %s\n",
+                    format_history_date(h.years_before_epoch).c_str(),
                     h.event.c_str(), h.consequence.c_str());
 }
 
@@ -274,7 +289,8 @@ int main()
                 bool found = false;
                 for (const history_event& m : mod.history)
                     if (m.stage == h.stage && m.event == h.event &&
-                        m.consequence == h.consequence && m.gya == h.gya)
+                        m.consequence == h.consequence &&
+                        m.years_before_epoch == h.years_before_epoch)
                     { found = true; break; }
                 if (!found) { stable = false; break; }
             }
@@ -523,6 +539,157 @@ int main()
             std::printf(" 0x%08X", seeds_ok[i]);
         std::printf("\n");
         check(with > 0, "R11 the player can open with a processing facility to manage");
+    }
+
+    // --- R14 the dated timestamp (BL-220) -------------------------------------
+    // history_event stores an integer year before the campaign epoch, so one
+    // ordered biography can carry both 4.5 Gya and 1687 CE. R12 is reserved by
+    // BL-209 (the molecular trace) and R13 by BL-217 (rarity), hence R14.
+    {
+        // --- construction ---
+        // 4.5e9 is exactly representable, so it does NOT exercise the rounding.
+        // Assert a value that does, in both directions, or the `+ 0.5` in
+        // years_from_gya could be deleted with the suite still green.
+        check(years_from_gya(4.50f) == 4500000000LL,
+              "R14 an exactly-representable Gya value converts without drift");
+        check(years_from_gya(1.0e-6f) == 1000LL,
+              "R14 a value needing round-half-up converts to the nearer year");
+        check(years_from_gya(-1.0e-6f) == -1000LL,
+              "R14 the negative branch of the rounding is symmetric");
+        check(years_from_calendar_year(campaign_epoch_year) == 0,
+              "R14 the campaign epoch is year zero");
+        check(years_from_calendar_year(1687) == 273,
+              "R14 a historical year converts to years-before-epoch");
+        check(years_from_calendar_year(-3200) == 5160,
+              "R14 a BCE year converts across the zero crossing");
+
+        // NOT ASSERTED, deliberately: years_from_gya is not exact in general.
+        // float32 carries ~7 significant digits at any exponent, so 2.4f lands
+        // ~95 years off a round 2.4 Gya. That is harmless for deep time (the
+        // display rounds to 0.01 Gyr) and it is DETERMINISTIC, which is what
+        // the model actually requires — but it is not exactness, and claiming
+        // it would be a lie the harness then has to defend.
+        std::printf("      years_from_gya(2.4f) = %lld (a round 2.4 Gya would be 2400000000)\n",
+                    static_cast<long long>(years_from_gya(2.4f)));
+
+        // The defect the item exists to fix, rendered through the REAL
+        // function. The old float path collapsed every historical date onto
+        // "0.00 Gya"; these two must now differ, and differ as calendar years.
+        // Asserting against a hard-coded "%.2f Gya" in the harness instead
+        // would exercise no production code at all.
+        check(format_history_date(years_from_calendar_year(1687)) == "1687" &&
+              format_history_date(years_from_calendar_year(1450)) == "1450",
+              "R14 two historical dates that both read '0.00 Gya' before now read as themselves");
+
+        // Each magnitude band picks its own unit.
+        check(format_history_date(0) == "now",
+              "R14 the epoch itself reads as 'now'");
+        check(format_history_date(years_from_gya(4.50f)) == "4.50 Gya",
+              "R14 deep time reads in Gya");
+        check(format_history_date(252000000LL) == "252 Mya",
+              "R14 the hundred-million-year band reads in Mya");
+        check(format_history_date(11650LL) == "11,650 years ago",
+              "R14 the late-glacial band reads as an interval, with separators");
+        check(format_history_date(273LL) == "1687",
+              "R14 recorded history reads as a calendar year");
+        check(format_history_date(5160LL) == "-3200",
+              "R14 a BCE date reads as a negative calendar year");
+
+        // BOUNDARIES, both sides. Asserting the middle of each band is what let
+        // a real defect through: 999,999,999 rounded UP into "1000 Mya", a unit
+        // the table never promises, because the unit was chosen before the
+        // rounding. Every band edge is now pinned from both directions.
+        check(format_history_date(999999999LL) == "1.00 Gya",
+              "R14 a value just under a Gyr rounds INTO Gya, never to '1000 Mya'");
+        check(format_history_date(1000000000LL) == "1.00 Gya",
+              "R14 exactly one Gyr reads in Gya");
+        check(format_history_date(999499999LL) == "999 Mya",
+              "R14 the last value that genuinely rounds to 999 Myr stays in Mya");
+        check(format_history_date(1000000LL) == "1 Mya",
+              "R14 exactly one Myr reads in Mya");
+        check(format_history_date(999999LL) == "999,999 years ago",
+              "R14 one year under a Myr reads as an interval");
+        check(format_history_date(10000LL) == "10,000 years ago",
+              "R14 exactly ten kyr is an interval");
+        check(format_history_date(9999LL) == "-8039",
+              "R14 one year under ten kyr is a calendar year");
+        check(format_history_date(1LL) == "1959",
+              "R14 the year before the epoch reads as 1959");
+
+        // The Mya rounding, actually exercised. 252000000 is already an exact
+        // multiple of 1e6, so it leaves the +500000 offset dead weight.
+        check(format_history_date(251900000LL) == "252 Mya",
+              "R14 a fractional Myr rounds to the nearer whole, not truncated");
+        check(format_history_date(251400000LL) == "251 Mya",
+              "R14 and rounds down when it should");
+        // A grouping length that is an exact multiple of three, which is where
+        // a separator loop goes wrong (a leading comma).
+        check(format_history_date(100000LL) == "100,000 years ago",
+              "R14 a six-digit interval groups without a leading comma");
+
+        // Future dates are degenerate but must not render as garbage: nothing
+        // generates one today, but the water gate emits `age - 1.2f` against an
+        // age clamped only at 1.0 Gyr, so a caller setting system_age_gyr low
+        // already reaches this branch. A bare "-200 Mya" is a worse answer than
+        // saying the date is in the future.
+        check(format_history_date(-1LL) == "1961",
+              "R14 a future year reads as a calendar year, not a negative");
+        check(format_history_date(-20000LL) == "20,000 years hence",
+              "R14 a far-future interval reads 'hence', with no minus sign");
+        check(format_history_date(-252000000LL) == "252 Myr hence",
+              "R14 a future deep-time date never renders as a negative 'Mya'");
+        check(format_history_date(-4500000000LL) == "4.50 Gyr hence",
+              "R14 nor as a negative 'Gya'");
+
+        // Ordering is total and oldest-first over a real body's biography —
+        // the property the single-list presentation model depends on, and the
+        // one that has to survive the historical stages interleaving into it.
+        bool ordered = true, in_range = true;
+        for (std::size_t i = 0; i < k.history.size(); ++i)
+        {
+            if (i > 0 && k.history[i - 1].years_before_epoch < k.history[i].years_before_epoch)
+                ordered = false;
+            const int64_t y = k.history[i].years_before_epoch;
+            if (y < 0 || y > 14000000000LL) in_range = false;
+        }
+        check(ordered,  "R14 the biography is ordered oldest-first");
+        check(in_range, "R14 every line is dated within the age of the universe");
+
+        // A historical line sorts into the SAME list as the deep-time ones.
+        // This is the interleave BL-221/BL-222 depend on, asserted now so the
+        // foundation is proven before a stage relies on it.
+        //
+        // It does NOT land last: Kepler's S9 drawdown line is dated AT the
+        // epoch ("now"), and a 1602 charter is properly older than that. The
+        // claim worth asserting is that it lands strictly between the two
+        // regimes — after every deep-time line, before the epoch.
+        const int64_t charter = years_from_calendar_year(1602);
+        std::vector<history_event> mixed = k.history;
+        mixed.push_back(history_event{ charter, chain_stage::legacy,
+                                       "A chartered company is registered.", "" });
+        std::stable_sort(mixed.begin(), mixed.end(),
+                         [](const history_event& a, const history_event& b)
+                         { return a.years_before_epoch > b.years_before_epoch; });
+
+        std::size_t at = mixed.size();
+        bool still_ordered = true;
+        for (std::size_t i = 0; i < mixed.size(); ++i)
+        {
+            if (mixed[i].years_before_epoch == charter) at = i;
+            if (i > 0 && mixed[i - 1].years_before_epoch < mixed[i].years_before_epoch)
+                still_ordered = false;
+        }
+        check(still_ordered, "R14 the biography stays ordered once a historical line joins it");
+        const bool interleaved = (at > 0 && at + 1 < mixed.size());
+        check(interleaved,
+              "R14 a historical line interleaves between deep time and the epoch");
+        // `check` records a FAIL and returns — it does not abort — so this must
+        // guard on `interleaved` rather than re-deriving the bound. Testing
+        // only `at < mixed.size()` leaves `at == 0` live, and `mixed[at - 1]`
+        // then indexes with (size_t)-1 in exactly the regression this group
+        // exists to catch.
+        check(interleaved && mixed[at - 1].years_before_epoch >= 1000000LL,
+              "R14 every deep-time line still sorts ahead of the historical one");
     }
 
     std::printf("\n=== %s ===\n", g_fail == 0 ? "ALL PASS" : "FAILURES PRESENT");

@@ -14,7 +14,10 @@
 //      src\world\market_clearing.cpp src\world\hard_coded_world.cpp ^
 //      src\world\tile_generation.cpp src\world\nation_generation.cpp ^
 //      src\world\corporation_generation.cpp src\world\population_generation.cpp ^
-//      src\world\orbital_system.cpp /Fe:build_spree_harness.exe
+//      src\world\orbital_system.cpp ^
+//      /Fo:build_gen\verify\build_spree_harness\ ^
+//      /Fe:build_gen\verify\build_spree_harness.exe
+// Run: .\build_gen\verify\build_spree_harness.exe
 
 #include "world/components.hpp"
 #include "world/construction.hpp"

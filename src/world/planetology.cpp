@@ -2,6 +2,8 @@
 
 #include <cmath>
 #include <cstdio>
+#include <cstring>
+#include <string>
 #include <vector>
 
 // ---------------------------------------------------------------------------
@@ -461,6 +463,73 @@ const char* chain_stage_title(chain_stage s)
     return "";
 }
 
+std::string format_history_date(int64_t years_before_epoch)
+{
+    const int64_t y = years_before_epoch;
+    if (y == 0)
+        return "now";
+
+    char buf[64];
+
+    // Everything below works on the MAGNITUDE and picks its suffix from the
+    // sign, so a future date can never render as a bare negative. Nothing
+    // generates one today, but the water gate emits `age - 1.2f` against an age
+    // clamped only at 1.0 Gyr, so a caller setting system_age_gyr low already
+    // reaches this branch — and "-200 Mya" is a worse answer than "200 Myr
+    // hence". INT64_MIN is special-cased because negating it is UB.
+    if (y == INT64_MIN)
+        return "beyond reckoning";
+    const bool past = y > 0;
+    const int64_t mag = past ? y : -y;
+
+    // Deep time, in the units the chemistry is argued in. Integer division
+    // keeps the split points exact; only the final display divide is float.
+    //
+    // Round to Myr BEFORE choosing the unit, not after. Rounding second means
+    // 999,999,999 sits just under the Gyr threshold, takes the Myr branch, and
+    // then rounds UP to "1000 Mya" — a unit the table never promises, for a
+    // value that should read "1.00 Gya".
+    const int64_t myr = (mag + 500000LL) / 1000000LL;
+    if (myr >= 1000LL)
+    {
+        std::snprintf(buf, sizeof buf, "%.2f %s", static_cast<double>(mag) / 1.0e9,
+                      past ? "Gya" : "Gyr hence");
+        return buf;
+    }
+    if (mag >= 1000000LL)
+    {
+        // Nearest Myr rather than truncated, so 251.9 Myr does not print as the
+        // wrong century of the Permian.
+        std::snprintf(buf, sizeof buf, "%lld %s", static_cast<long long>(myr),
+                      past ? "Mya" : "Myr hence");
+        return buf;
+    }
+
+    // Human time. See the table on format_history_date's declaration for why
+    // the boundary sits at 10 kyr.
+    if (mag >= 10000LL)
+    {
+        // Thousands separators: "11,650 years ago" is read at a glance, and
+        // std::locale is not something a deterministic build should touch.
+        char digits[32];
+        std::snprintf(digits, sizeof digits, "%lld", static_cast<long long>(mag));
+        std::string grouped;
+        const std::size_t n = std::strlen(digits);
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            if (i > 0 && (n - i) % 3 == 0) grouped.push_back(',');
+            grouped.push_back(digits[i]);
+        }
+        return grouped + (past ? " years ago" : " years hence");
+    }
+
+    // Recorded history: a calendar year, astronomical numbering (negative for
+    // BCE), which is what the historical ladder's own lines want to read as.
+    const int64_t year = campaign_epoch_year - y;
+    std::snprintf(buf, sizeof buf, "%lld", static_cast<long long>(year));
+    return buf;
+}
+
 // ---------------------------------------------------------------------------
 
 planetology_state run_planetology(const body_inputs& in,
@@ -470,8 +539,11 @@ planetology_state run_planetology(const body_inputs& in,
     planetology_state st;
     st.endowment.fill(1.0f);
 
+    // Deep-time stages date in Gya because that is how their chemistry is
+    // argued; the conversion to the stored integer year narrows here, once, so
+    // no gate path ever sees the float timestamp (BL-220).
     auto say = [&](float gya, chain_stage stage, std::string ev, std::string cons = {}) {
-        st.history.push_back(history_event{ gya, stage, std::move(ev), std::move(cons) });
+        st.history.push_back(history_event{ years_from_gya(gya), stage, std::move(ev), std::move(cons) });
     };
     auto die = [&](chain_stage where, body_archetype a) {
         st.died_at   = where;

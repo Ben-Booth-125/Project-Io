@@ -45,9 +45,11 @@ struct nation_params
     /// the merge pass entirely (every placed seed keeps its Voronoi cell).
     ///
     /// Set equal to `land_tiles_per_seed` by default, which reads as: a nation
-    /// must end up holding at least the land its own seed was budgeted. On Kepler
-    /// (~6,000 habitable tiles) that settles at roughly 17–21 nations; halve the
-    /// habitable area and the count roughly halves with it.
+    /// must end up holding at least the land its own seed was budgeted. The
+    /// resulting count is ladder-derived: the history ladder (BL-221) modulates
+    /// seeding, so the default Kepler seed lands well above the pre-ladder figure
+    /// (43 nations at the current default seed). Halve the habitable area and
+    /// the count still roughly halves with it.
     int min_nation_tiles = 80;
 };
 

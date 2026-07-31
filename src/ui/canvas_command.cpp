@@ -19,9 +19,13 @@ constexpr float zoom_step = 1.1f;
 // Number of overlay_mode values, for wrap-around lens cycling. Keep in sync with
 // the enum in ui_state.hpp (none, supply, market, country, corporation, resource,
 // population, opportunity, production, scarcity, industry, reach, supply_routes).
-// (Corrected from a stale 10 to 13 while adding reach/supply_routes — industry
-// had been added to the enum without this count following, BL-011/BL-014.)
-constexpr int overlay_mode_count = 13;
+// Derived from the enum's last enumerator so a new lens can no longer strand the
+// cycle: a stale literal has now bitten twice (10 when industry landed, 13 when
+// continent landed — BL-226 left supply_routes unreachable). The static_assert is
+// the tripwire: adding a lens after supply_routes must update both lines together.
+constexpr int overlay_mode_count = static_cast<int>(overlay_mode::supply_routes) + 1;
+static_assert(overlay_mode_count == 14,
+              "overlay_mode grew - re-anchor overlay_mode_count to the new last enumerator");
 
 /// Pointers to the pan/zoom fields of whichever rung is currently primary, so the
 /// pan/zoom commands act on the foregrounded canvas without per-rung branches.

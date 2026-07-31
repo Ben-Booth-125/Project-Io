@@ -1,6 +1,7 @@
 #include "tile_inspector.hpp"
 
 #include "foldout_column.hpp"    // shell fold-out column host (BL-122/BL-144)
+#include "format.hpp"            // campaign_epoch_year, cross-checked below (BL-220)
 #include "generation_charts.hpp" // the chain-stage charts, shared with the wizard (BL-211)
 #include "presentation.hpp"
 #include "world/components.hpp"
@@ -12,6 +13,13 @@
 #include <vector>
 
 namespace ui {
+
+// The tick calendar and the generated history count from the same year, and
+// nothing else forces them to agree — the world layer cannot include a UI
+// header, so ::campaign_epoch_year (planetology.hpp) is a deliberate duplicate.
+// This is the only place both are in scope, so the guard lives here.
+static_assert(fmt::campaign_epoch_year == static_cast<int>(::campaign_epoch_year),
+              "History dates and the tick calendar must share a campaign epoch");
 
 void draw_tile_inspector(const world& w, ui_state& s,
                          const generation_report& report, bool* p_open)
@@ -125,13 +133,16 @@ void draw_tile_inspector(const world& w, ui_state& s,
         }
         else
         {
-            ImGui::TextDisabled("%s - %.2f Gya to present",
+            ImGui::TextDisabled("%s - %s to present",
                 archetype_name(entry->state.archetype),
-                entry->state.history.front().gya);
+                format_history_date(entry->state.history.front().years_before_epoch).c_str());
             ImGui::Spacing();
             for (const history_event& ev : entry->state.history)
             {
-                ImGui::TextWrapped("%.2f Gya  %s", ev.gya, ev.event.c_str());
+                // The date's unit comes from its own magnitude, so a deep-time
+                // line and a historical one share this loop (BL-220).
+                ImGui::TextWrapped("%s  %s",
+                    format_history_date(ev.years_before_epoch).c_str(), ev.event.c_str());
                 if (!ev.consequence.empty())
                 {
                     // Wrapped, not TextDisabled: the consequence is the longer half

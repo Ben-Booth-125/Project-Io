@@ -4965,7 +4965,7 @@
             "build: ProjectIo links with the menu block"
           ],
           "result_metric": "App builds+links green; interactive menu not captured in a saved visual script this pass.",
-          "notes": "Follow-on: author scripts/verify/new_world_setup.lua and run verifier-visual. Load-bearing determinism guarantee is covered headlessly by R1/R2."
+          "notes": "Follow-on: author scripts/verify/new_world_setup.lua and run verifier-visual. Load-bearing determinism guarantee is covered headlessly by R1/R2. Noted 2026-07-31 (doc sweep): the menu this row describes was superseded by the BL-167 New World wizard, so the capture can no longer be authored as written; left pending as an honest record — the wizard surface is BL-167 territory."
         }
       ]
     },
@@ -6413,6 +6413,282 @@
             "visual"
           ],
           "result_metric": "scripts/verify/chat_panel.lua — golden blessed 2026-07-28; a per-corp Counsel channel tab renders (Counsel: <corp name>)."
+        }
+      ]
+    },
+    {
+      "brief": "history-dated-epochs",
+      "batch": "2026-07-30-generation-frontier",
+      "title": "BL-220 — a historical-epoch timestamp for the oral history log",
+      "status": "completed",
+      "promoted_from": "backlog.json BL-220 HISTORY_EVENT_DATED_EPOCHS",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "completed",
+          "requirement": "HEADLESS: history_event carries an integer year before the 1960 campaign epoch; years_from_gya and years_from_calendar_year convert correctly, including the round-half-up path and its negative branch.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "tools/verify/planetology_harness.cpp R14 — ALL PASS, 2026-07-30."
+        },
+        {
+          "id": "R2",
+          "status": "completed",
+          "requirement": "HEADLESS: format_history_date picks its unit from magnitude across all five bands (Gya / Mya / interval / calendar year / now), asserted at BOTH EDGES of every band, and never renders a future date as a bare negative.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "tools/verify/planetology_harness.cpp R14 — 34 assertions, ALL PASS. Caught a real out-of-band \"1000 Mya\" defect at 999,999,999 that band-interior assertions had missed."
+        },
+        {
+          "id": "R3",
+          "status": "completed",
+          "requirement": "HEADLESS: the biography is totally ordered oldest-first, and a historical line interleaves into the same list between deep time and the epoch — the property BL-221/BL-222 build on.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "tools/verify/planetology_harness.cpp R14 — ALL PASS."
+        },
+        {
+          "id": "R4",
+          "status": "completed",
+          "requirement": "HEADLESS: generation stays deterministic — the twice-generated world is identical, and planetology R1 now compares timestamps exactly rather than only history length.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "determinism_harness 23/23, world_audit 19/19, planetology_harness 101/101 — all PASS, 2026-07-30. continents_harness went green pre-review but could not be re-confirmed (Smart App Control blocked the binary); continents.cpp is byte-identical to that run."
+        },
+        {
+          "id": "R5",
+          "status": "partial",
+          "requirement": "VISUAL: the History ledger renders each date in the correct unit for its magnitude.",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "scripts/verify/history_ledger_and_comms.lua — 6/6 goldens PASS, but coverage is PARTIAL and the 0.0000% diff is misleading: every visible line is >= 1 Gya, the one band where old and new formats are byte-identical. The sub-Gyr bands are clipped below the panel fold and the verify API has no scroll driver. Follow-up task raised."
+        }
+      ]
+    },
+    {
+      "brief": "history-ladder-prenational",
+      "batch": "2026-07-30-generation-frontier",
+      "title": "BL-221 — the pre-national history ladder (HISTORY.md Stages 0-2)",
+      "status": "completed",
+      "promoted_from": "backlog.json BL-221 HISTORY_LADDER_PRENATIONAL",
+      "rows": [
+        {
+          "id": "H1",
+          "status": "completed",
+          "requirement": "HEADLESS: the ladder is a pure function of (seed, tiles) — the same world generated twice yields an identical biography, including every ladder line.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "tools/verify/history_ladder_harness.cpp H1 — PASS; determinism_harness 23/23 PASS."
+        },
+        {
+          "id": "H2",
+          "status": "completed",
+          "requirement": "HEADLESS: the ladder DRIVES the political map rather than narrating it — a fragmented state must produce different nation_params than a unifiable one, in the stated direction, and the modulation must stay inside its bounds at both extremes.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "H2 — 6 assertions PASS. Kepler nation count moved 14 -> 43 as a consequence."
+        },
+        {
+          "id": "H3",
+          "status": "completed",
+          "requirement": "HEADLESS: the causal chain holds — cradle count feeds fragmentation, and fragmentation reaches the political map, so the stages are a ladder rather than independent dice.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "H3 — PASS."
+        },
+        {
+          "id": "H4",
+          "status": "completed",
+          "requirement": "HEADLESS: every ladder line carries its consequence (PLANETOLOGY.md § Presentation), is dated inside recorded history, and sorts into the biography oldest-first with the stages strictly ordered.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "H4 — 4 assertions PASS. Kepler: -3843 granary cities / 1376 Charter Act / 1586 Great Accord."
+        },
+        {
+          "id": "H5",
+          "status": "completed",
+          "requirement": "HEADLESS: failure cases are output, not defects — a world below a land biosphere emits no ladder and no padding, and Stage 2 reports a hegemon rather than hiding one.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "H5 — PASS, with an honest gap recorded: across 12 seeds all produced the accord and none a hegemon, so the failure branch is written but unreached. Tuning target for BL-219."
+        },
+        {
+          "id": "H6",
+          "status": "pending",
+          "requirement": "VISUAL: the ladder lines render in the History ledger biography alongside the deep-time lines.",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "NOT RUN. The ledger clips below the fold and the verify API has no scroll driver — the same blind spot BL-220 raised; a follow-up task is open for it."
+        }
+      ]
+    },
+    {
+      "brief": "landform-render",
+      "batch": "2026-07-31-landform-render",
+      "title": "BL-231 — landform render (draw the axis the build cost already charges for)",
+      "status": "completed",
+      "promoted_from": "backlog.json BL-231 LANDFORM_RENDER",
+      "rows": [
+        {
+          "id": "R1",
+          "status": "completed",
+          "requirement": "HEADLESS: the landform mix is MEASURED, not assumed — world_audit reports the per-body and system-wide landform distribution over land tiles, and asserts that every landform generation can produce appears somewhere. This is the gate on the render proportions and the standing guard against a tuning change silently flattening the mix.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "world_audit S3 — PASS. System (25536 land): plains 77.0%, valley 18.0%, highland 3.5%, crater 0.8%, mountain 0.6%, canyon 0.1%, rift 0.1%. Kepler (6216 land): plains 89.8%, highland 7.7%, mountain 1.5%, canyon 0.4%, crater 0.4%, rift 0.3%, valley 0.0%. Numbers moved the design: no continuous elevation gradient exists to contour, so relief collapsed to a two-step tint and the glyph set grew from 3 to 4."
+        },
+        {
+          "id": "R2",
+          "status": "completed",
+          "requirement": "VISUAL: on the plain canvas the four dramatic landforms — mountain, canyon, crater, rift — are individually distinguishable from plains and from each other at default zoom, on both a wet body (Kepler) and a dry one (Cinder).",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "scripts/verify/landform_relief.lua — PASS. landform_kepler_zoom + landform_kepler_relief show all four silhouettes simultaneously and mutually distinguishable (twin peaks / split rims / flattened bowl / jagged fissure); landform_cinder_zoom shows craters on the dry body. Density reads as scattered accents, not a rash, matching the measured <=1.5% per landform."
+        },
+        {
+          "id": "R3",
+          "status": "completed",
+          "requirement": "VISUAL: the landform read SURVIVES AN ACTIVE LENS. Composition owns hue and lens tints composite over it at 0.6-0.80 alpha, so the landform channel must still be legible with a saturated lens active (BL-226 § the different-channel rule).",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "PASS. landform_cinder_lens_continent (0.80 alpha, the hardest case) and landform_cinder_lens_country both retain legible glyphs over the lens tint. Ordering verified in source: relief composites at body_surface_canvas.cpp:1617, after the last lens branch at 1556. Relief itself survives but is subtle under a saturated lens — noted, not a failure, since the glyphs carry the categorical read by design."
+        },
+        {
+          "id": "R4",
+          "status": "completed",
+          "requirement": "VISUAL: highland and valley read as elevation, not as a different terrain type — the relief tint must modulate the composition hue without being mistakable for a change of composition, and plains must stay the untouched baseline.",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "PASS. Plains stays the untouched baseline; highland lifts (visible on landform_kepler_relief) and valley sinks (visible on landform_cinder_zoom/wide — Kepler has no valley at all, which is why the dry body is captured). The tint modulates luminance within a composition rather than crossing into another composition band, so it reads as elevation, not as a terrain-type change."
+        }
+      ]
+    },
+    {
+      "brief": "landform-spanning-markers",
+      "batch": "2026-07-31-landform-render",
+      "title": "BL-232 — bridge contiguous landform runs, and name the glyphs in the tooltip",
+      "status": "completed",
+      "promoted_from": "backlog.json BL-232 LANDFORM_SPANNING_MARKERS",
+      "rows": [
+        {
+          "id": "S1",
+          "status": "completed",
+          "requirement": "HEADLESS: contiguity is MEASURED before the render is built — world_audit reports, per linear landform, the share of tiles with 0 / 1 / 2+ same-landform cardinal neighbours and the fully-interior share, so a case that cannot fire is found before it is written.",
+          "verification": [
+            "headless"
+          ],
+          "result_metric": "world_audit § S4 — PASS. mountain 142 tiles (isolated 28.9 / end 52.8 / in-run 18.3 / interior 0.0); rift 16 (18.8 / 56.2 / 25.0 / 0.0); canyon 24 (50.0 / 33.3 / 16.7 / 0.0). Interior 0.0% across all three cancelled the filled-interior case."
+        },
+        {
+          "id": "S2",
+          "status": "completed",
+          "requirement": "VISUAL: a contiguous run reads as ONE feature rather than a repeated icon, and a lone tile still reads as that landform — the span-vs-cap contrast must be legible side by side.",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "landform_span_mountain_run vs landform_span_mountain_lone: the run draws a continuous double-peak wave across the shared edge, the lone tile its centred twin-peak glyph. landform_span_rift_run shows one unbroken fissure across ~3 tiles. landform_span_canyon_run captured to keep its thinness (50% isolated) on the record."
+        },
+        {
+          "id": "S3",
+          "status": "completed",
+          "requirement": "VISUAL: the glyph vocabulary is LEARNABLE — hovering a tile names its landform and states a consequence, without the player having to click through to the Selection panel.",
+          "verification": [
+            "visual"
+          ],
+          "result_metric": "landform_tooltip_mountain / landform_tooltip_rift — PASS. Cards read \"Rocky · Mountain / Habitability: 13% / Convoys pay ×2.00 to cross\" and \"Barren · Rift / … / ×1.60\". Needed verify.frames(40) for BL-230's appear delay. The cost line deliberately says movement, not build cost — no build path reads landform."
+        }
+      ]
+    },
+    {
+      "brief": "population-demand-ordering",
+      "title": "Population demand survives market clearing (BL-190 ordering fix)",
+      "difficulty": 1,
+      "importance": "high",
+      "evaluated_difficulty": 1,
+      "status": "complete",
+      "resolved": "2026-07-31",
+      "resolution": "Complete. The population agricultural_produce demand stub, previously written by run_economy_step and erased by clear_markets' per-tick demand reset the same tick (never priced), now lives in inject_population_demand (market_clearing.cpp), called from clear_markets after the reset alongside the BL-078 substrate injection. Routing upgraded from first-market-on-body to market_for_tile catchment (BL-096 multi-market bodies). population_demand_harness: 4/4 PASS; population_mvp (R4 + growth updated to call clear_markets): 11/11 PASS.",
+      "promoted_from": "BL-190 (food demand) — 2026-07-31 doc-sweep wrinkle",
+      "batch": null,
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: the population food-demand pull (BL-190) reaches price resolution — it is injected after clear_markets' demand reset, not erased by it, and each centre routes to its catchment market.",
+          "verification": [
+            "headless: tools/verify/population_demand_harness.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "R1 unit routing PASS; R2 cleared demand == summed centre scale (41.0 on Kepler) PASS; R3 pre-seeded 999/market erased while injection lands PASS; exit 0",
+          "notes": "Also re-ran population_mvp (11/11 PASS) after updating its R4/growth tests to the new tick pair."
+        }
+      ]
+    },
+    {
+      "brief": "creeds-pantheon-per-culture",
+      "title": "Creeds — one pantheon per cradle-culture (BL-235)",
+      "difficulty": 3,
+      "importance": "B",
+      "evaluated_difficulty": 3,
+      "status": "complete",
+      "resolved": "2026-07-31",
+      "resolution": "Complete, all rows met first run: creeds_harness 13/13 PASS; history_ladder_harness and world_audit re-run green after the welding stage landed.",
+      "promoted_from": "BL-235 (creeds)",
+      "batch": null,
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: creeds are a pure deterministic function of (seed, tiles) — two generations of the same seed write the identical biography including shrine, war, and common-tongue lines.",
+          "verification": [
+            "headless: tools/verify/creeds_harness.cpp C1"
+          ],
+          "status": "complete",
+          "result_metric": "C1 PASS (identical event text + dates across two runs)",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "requirement": "One pantheon per culture, each in its own tongue: every cradle raises exactly one shrine line, chief-god names are pairwise distinct, and every creed line carries its -> consequence.",
+          "verification": [
+            "headless: tools/verify/creeds_harness.cpp C2"
+          ],
+          "status": "complete",
+          "result_metric": "C2 PASS (distinct native names; consequences present)",
+          "notes": "Distinctness is the observable of per-culture phonologies."
+        },
+        {
+          "id": "R3",
+          "requirement": "The creed drives: a won tribal war lowers fragmentation_q before nation seeding; peaceable creeds leave it untouched; welding is floored at half the incoming value and conquest cost can hold a frontier.",
+          "verification": [
+            "headless: tools/verify/creeds_harness.cpp C3"
+          ],
+          "status": "complete",
+          "result_metric": "C3 PASS on synthetic extremes (weld, no-op, floor, frontier-holds)",
+          "notes": "First honest form of the deferred war-consolidation (Ben 2026-07-30)."
+        },
+        {
+          "id": "R4",
+          "requirement": "Globalisation closes generation: exactly one common-tongue line, dated 1951, after every shrine line; the record renders in the player language (English for dev) while proper names stay native.",
+          "verification": [
+            "headless: tools/verify/creeds_harness.cpp C4"
+          ],
+          "status": "complete",
+          "result_metric": "C4 PASS (one line, -9 years epoch offset, latest)",
+          "notes": ""
         }
       ]
     }

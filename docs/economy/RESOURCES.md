@@ -1,6 +1,6 @@
 # Project Io — Resources
 
-Resources are the goods that flow through the economy: extracted from tiles, refined by processing buildings, assembled into products, and bought and sold through markets. Every resource has a base price derived from global rarity; local supply and demand shift the market price each Tick.
+Resources are the goods that flow through the economy: extracted from tiles, refined by processing buildings, assembled into products, and bought and sold through markets. A tradeable resource has a base price derived from rarity; local supply and demand shift the market price each Tick (the clearing model is `docs/economy/MARKETS.md`; which resources actually carry a base price is § What actually trades below).
 
 ---
 
@@ -79,9 +79,14 @@ Available in Era 0 and all subsequent eras. Found predominantly on habitable or 
 
 Available in Era 1 and beyond. Found predominantly on moons, asteroids, and outer bodies.
 
+> **Water is not actually Era-gated (corrected 2026-07-31).** It trades on the home-body markets
+> from tick 0 — an authored base price (1.5) in the Kepler market template — and sits in the
+> substrate demand basket (weight 0.40). The "space-sourced / Era 1" framing describes where its
+> *deposits* concentrate (icy terrain), not when it enters the economy.
+
 | Resource | Terrain affinity | Notes |
 |----------|-----------------|-------|
-| Water | Icy | Extracted from surface and subsurface ice by an Ice Extractor; the output is liquid water. Also the baseline life-support input for off-world populations. |
+| Water | Icy | Deposits on icy terrain, extracted as liquid water; also the baseline life-support input for off-world populations. Trades terrestrially from tick 0 — see note above. |
 | Iron-nickel ore | Rocky (metallic asteroid) | Found in metallic asteroids; feeds the same smelting chain as iron ore and eliminates dependence on Earth-side steel once accessible. |
 | Platinum group metals | Rocky, volcanic (asteroid) | Ultra-rare catalytic and industrial metals. Very low deposit concentration; extremely high base price. The primary high-value trade good of the asteroid belt. |
 | Regolith | All terrain (airless bodies) | Loose surface dust and broken rock. Used for bulk construction in-situ; not typically traded (high mass, low unit value). Included in the resource model but excluded from market tables; see note below. |
@@ -168,6 +173,8 @@ out there.
 
 Refined goods are the primary goods in inter-body trade during the early game.
 
+> Of this table only **steel, refined fuel, and food rations** exist in `resource_type`; silicon, refined copper, REE alloy, and liquid oxygen are unmodelled design targets (marked 2026-07-31).
+
 | Resource | Primary inputs | Processing building |
 |----------|---------------|---------------------|
 | Steel | Iron ore or iron-nickel ore (+ coal as reagent) | Smelter |
@@ -183,6 +190,8 @@ Refined goods are the primary goods in inter-body trade during the early game.
 ## Tier 3 — Products
 
 Products are the highest-value goods and the primary driver of market price divergence. Most require multiple refined-good inputs.
+
+> **None** of this table exists in `resource_type` — the whole tier is an unmodelled design target (marked 2026-07-31).
 
 | Resource | Primary inputs | Processing building |
 |----------|---------------|---------------------|
@@ -200,6 +209,8 @@ Propellant and spacecraft components are the key outputs enabling space access. 
 
 Habitability goods are consumed by population centres for welfare rather than production. They do not feed industrial chains, but their supply raises local habitability, which raises workforce efficiency, which indirectly raises production throughput. Their profit margins are lower than industrial products, but they are load-bearing for any body that hosts a significant population.
 
+> **None** of this table exists in `resource_type` — the whole track is an unmodelled design target (marked 2026-07-31).
+
 | Resource | Primary inputs | Building | Effect if undersupplied |
 |----------|---------------|----------|------------------------|
 | Clean water | Water | Water Treatment Plant | Reduces habitability; suppresses population growth |
@@ -208,7 +219,7 @@ Habitability goods are consumed by population centres for welfare rather than pr
 | Medical supplies | Chemical outputs + agricultural | Pharmaceutical Lab | Reduces habitability; raises mortality (long-term) |
 | Utilities | — (abstracted as budget cost) | Power Plant, Sanitation | Habitability floor drops without continuous supply |
 
-Habitability goods are not in the prototype. Their market demand slots exist in `market_component.demand` and can be authored in a later pass. The buildings that produce them are listed in `docs/economy/PRODUCTION.md`.
+Habitability goods are not in the prototype — and, having no enum values, they have **no** market demand slots either (the arrays are sized by `resource_count`; corrected 2026-07-31). Authoring them means the save-format retrofit described under § Prototype scope. The buildings that would produce them are listed in `docs/economy/PRODUCTION.md`.
 
 ---
 
@@ -226,6 +237,40 @@ The full resource list above is the design target. For the prototype (Layers 3�
 | Refined fuel | 2 | — | from Petroleum |
 | Food rations | 2 | — | from Agricultural produce |
 
-All resource type enum values are defined from the start so array sizes are correct and no data-model retrofit is required later. Resources outside the prototype subset have zero tile deposits and no authored recipes; they do not appear in market tables until a later pass authors them.
+The `resource_type` enum (`src/world/components.hpp`) holds **23 values** — the frozen prototype
+set — not the full design list above (corrected 2026-07-31; the previous "no data-model retrofit
+required" claim was false). Adding a resource changes `resource_count` and with it the width of
+every serialised `std::array<float, resource_count>` — tile deposits and reserves, market
+supply/demand/price/base-price, stockpiles, nation abundance and substrate capacity. **Extending
+the enum IS a save-format retrofit.** The Tier 2/3 refined goods, habitability goods, and most
+Tier 3 products above have no enum value at all; they cannot be held, priced, or traded until
+that retrofit is made.
 
-The full resource count including ambient and habitability goods is approximately **35–40 entries**. This is a design target, not a final count; the exact list will be settled when ambient and habitability resources are authored.
+The full design list including ambient and habitability goods is approximately **35–40 entries**
+— a design target. The shipped count is 23, frozen for the prototype.
+
+---
+
+## What actually trades (recorded 2026-07-31)
+
+The load-bearing fact for any market work: of the 23 enum values, only a fraction carry a
+non-zero `base_price`, and `resolve_price` / the clearing pass ignore everything else
+(`docs/economy/MARKETS.md`). The tradeable set is:
+
+- **Seven authored base prices** (`make_hard_coded_world`, the Kepler market template):
+  iron ore 2.5, petroleum 3.5, water 1.5, agricultural produce 3.0, steel 8.0,
+  refined fuel 10.0, food rations 6.0.
+- **Endemic goods** (tobacco, spices, coffee, furs — BL-191, endemic trade goods) with
+  **distance-derived** per-market base prices: `1.5 × (1 + 7.0 × normalised distance to the
+  nearest source)` (§ Mercantile below). Only the 2–3 goods the world's biosphere actually
+  evolved get priced.
+
+Everything else — including every BL-040 (full-set deposit authoring) raw: coal, silica,
+copper ore, rare-earth ore, iron-nickel ore, platinum-group metals — has `base_price` 0 and is
+**never traded**. Note the asymmetry: the BL-040 raws have authored tile deposits, so they are
+**minable but unsellable** — an extraction site can dig coal into a pool that no market will
+ever clear. Pricing them is part of the owed market-rework family (BL-130, real market
+inventory, and kin — MARKETS.md § Owed follow-ons).
+
+Water is in this tradeable set from tick 0: it carries an authored base price on the home-body
+markets and sits in the substrate demand basket (`scripts/economy.lua`, weight 0.40).

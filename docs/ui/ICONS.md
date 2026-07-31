@@ -80,17 +80,83 @@ Glyphs fall into three families by role.
 | **HQ** | `hq(…, colour)` | Ringed eight-point star — a diamond overlaid with an axis-aligned square, enclosed by a ring, with a dark centre dot so it reads against a same-colour ownership fill | Caller `colour` (the player identity colour) | The player's HQ/origin building, Planetary canvas (BL-085, folding BL-092) |
 | **Corp emblem** | `corp_emblem(…, shape, fill)` | One of six geometric primitives (circle / square / triangle / diamond / hexagon / pentagon) chosen by `shape`; names *whose* an entity is, not *what* it is | Caller `fill` — the corp's identity colour (`palette::corp_identity_colour(corp, player)`); `shape` from `palette::corp_emblem_shape(corp)` | Faction-identity emblem (BL-090): the identity card portrait, the Selection-panel header (corporation + owned/rival building), a small identity tag beside each building marker (player **and** rival) on the Planetary canvas, and the rival hover card. The shared promotion of the former profile-card-only `draw_corp_emblem` |
 | **Activity** | `activity(…, colour)` | Concentric pulse — a filled core ringed by a signal ring (commercial-beacon motif; deliberately distinct from the survey magnifier and the unknown "?") | Caller `colour` — per activity tier (`palette::activity_known` / `activity_stale` / `activity_visible`) | Commercial-activity fog badge, Solar canvas — lower-left of the body, offset from the survey badge's upper-right so the two fogs read apart (BL-089; see [DISCOVERY.md](DISCOVERY.md)) |
+| **Value mark** | `value_mark(…, colour)` | Single filled dot | Caller fill — the caller's red→green ramp sample (`ryg_colour`) | Per-tile magnitude mark for the Workforce (Population) and Opportunity lenses (BL-135, landed 2026-07-09): drawn on every buildable tile while either lens is active, replacing both the old full-tile tint and, on occupied tiles, the building glyph. See LENSES.md § Population / § Opportunity |
 
 On the Planetary canvas the **building** glyph's `fill` now encodes the *owning
 corporation* (player corp = corp slot 0; rivals a hashed slot), so the
 silhouette reads the building **type** and the fill reads **who owns it**.
+
+### 1b. Landform glyphs — terrain shape, drawn on the canvases
+
+A family apart from the entity markers above: these say what the tile *is*, not what is
+*on* it. Accordingly they are **stroke-only** and none carries the filled family's dark
+`outline` — a filled silhouette would read as "something is installed here", which is the
+one thing a landform is not. One entry point, `landform(…, terrain_landform, colour)`,
+dispatching by landform (the third multi-parameter case, alongside `building` and
+`settlement`).
+
+| Glyph | Function | Shape | Colour | Drawn for / where |
+|---|---|---|---|---|
+| **Mountain** | `landform(…, mountain, colour)` | Twin peaks sharing a saddle, open at the feet — no baseline, which is what separates it from the *filled* port triangle and the production up-triangle (both sit **on** a line) | Caller stroke — `ui::contrast_ink(fill)` | Unbuilt tile, Planetary canvas + Selection neighbourhood |
+| **Canyon** | `landform(…, canyon, colour)` | Two level rim shoulders split by a narrow incision cutting below them; the gorge is the **gap**, and the level rims distinguish it from the Continent lens's diagonal seam | Caller stroke | As above |
+| **Crater** | `landform(…, crater, colour)` | A flattened bowl — a wide, low ellipse with a raised near rim arc inside its lower half. The squashed aspect is load-bearing: it is deliberately **not** concentric circles (the `activity` pulse) nor a circle-plus-cross (the `market_centre`) | Caller stroke | As above |
+| **Rift** | `landform(…, rift, colour)` | A single jagged fissure running top to bottom — the only zigzag in the vocabulary, so it cannot be read as a chevron (which meets at one point) or as the canyon's paired rims | Caller stroke | As above |
+
+**Contiguous runs are bridged into one marker (BL-232).** A tile with a same-landform
+cardinal neighbour draws `landform_span(…)` toward each such neighbour instead of its centred
+glyph — this tile's half of the shared edge, from centre to edge-midpoint, so the neighbour's
+half meets it exactly and a run reads as **one** feature. This is BL-172's road span/symmetry
+idiom reused wholesale, including its survey-fog behaviour (a masked neighbour draws nothing)
+and its centre-cap role, which the lone tile's centred glyph now plays.
+
+| Span | Shape | Echoes |
+|---|---|---|
+| **Mountain** | One peak per half-edge, all deflecting to the canonical side — a tile-to-tile span reads as two summits, a three-tile run as four | the twin-peak glyph |
+| **Rift** | A jagged crack crossing its own axis at higher frequency, thinner stroke — the only span that crosses its axis, so it never reads as a ridge | the fissure glyph |
+| **Canyon** | Two straight parallel rims with the gorge between | the paired-rim glyph |
+
+**Crater never spans** — a basin is a blob, not a line, and its bowl glyph already says so.
+Two constraints the implementation encodes: the waveform's perpendicular is **canonicalised**
+rather than derived from the direction of travel, or the two halves of one span would deflect to
+opposite sides and meet in a kink; and roads use this exact geometry in warm tan, so the spans
+must stay non-smooth and take the contrasting ink or the map gains two look-alike span families.
+
+An earlier mountain profile put *two* spikes in each half. At four per span the teeth were fine
+enough that a cluster read as a jagged **outline** rather than a ridge — the one thing bridging
+exists to fix — so the profile was cut to a single peak per half-edge.
+
+**Plains, highland and valley draw nothing.** They are the common ground — plains and
+valley alone measure ~95 % of land tiles (`world_audit` § S3) — and are carried by the
+**relief tint** (`ui::landform_relief`), not by a glyph. Putting an icon on nearly every
+tile would be far denser than any other glyph family and would fight the building
+silhouette for the hex centre. See [CANVASES.md](CANVASES.md) § Terrain channels for the
+two-channel split and why the relief composites *after* the lens tints (BL-231).
+
+Because the terrain palette spans near-white ice to dark forest, and any lens may
+composite over it, these glyphs take their stroke from `ui::contrast_ink(fill)` — chosen
+by the finished fill's luminance — rather than a fixed colour that would vanish somewhere
+in that range.
 
 ### 2. UI-affordance glyphs — drawn in chrome
 
 | Glyph | Function | Shape | Colour | Used by |
 |---|---|---|---|---|
 | **Ledger** | `ledger(…, colour)` | Ruled-table outline (box + two rules) | Caller stroke | Nav rail — slots that open a ledger window |
-| **Placeholder** | `placeholder(…, colour)` | Hollow rounded square | Caller stroke | Nav rail — reserved/unassigned slots |
+| **Placeholder** | `placeholder(…, colour)` | Hollow rounded square | Caller stroke | Nav rail — fallback only; **no slot draws it since BL-174** (see below) |
+| **History** | `history(…, colour)` | Hourglass — a down-taper over an up-taper meeting at a centre waist, both ends capped; the *meeting* is what distinguishes it from the scarcity and production single triangles | Caller stroke | Nav rail slot 9 (History). Replaced a second `ledger` glyph, which made slot 9 indistinguishable from slot 2 (Budget) |
+| **Research** | `research(…, colour)` | Branching tree — a stem rising to a fork, then two diagonals out to filled terminal nodes; the only branching glyph in the vocabulary | Caller stroke | Nav rail slot 4 (Research) — **reserved slot**, drawn dim |
+| **Strategy** | `strategy(…, colour)` | Pennant on a pole — a vertical staff with a filled right-triangle flag at its head; the flag hangs off the staff top rather than resting on a baseline, so it stays clear of the production up-triangle | Caller stroke + fill | Nav rail slot 7 (Corp. Strategy) — **reserved slot**, drawn dim |
+| **Diplomacy** | `diplomacy(…, colour)` | Two overlapping circle outlines — a two-parties-meeting motif; the overlap is the point, so it never reads as the single market-centre circle or the concentric activity pulse | Caller stroke | Nav rail slot 8 (Diplomacy) — **reserved slot**, drawn dim |
+
+**Nav-rail legibility rule (BL-174).** Every rail slot draws its **own** glyph — the shape says
+*which system the slot is for*, and **colour alone** carries availability (the bright stroke for a
+live slot, the dim stroke for a reserved one). Before BL-174 the four reserved slots (Workforce,
+Research, Corp. Strategy, Diplomacy) all drew the same hollow `placeholder` square, so a new player
+saw a column of identical blanks and could not tell what any of them was for; the tooltips already
+named them ("Research (coming)", …), but a tooltip cannot be seen without hovering, and never
+appears in a capture. Workforce reuses the existing `population` figure; the other three got the
+glyphs above. The former slot 10 — a disabled square with no glyph *and* no tooltip — was
+**removed**, since nothing about it was interpretable. Reserved slots stay `BeginDisabled`.
 
 ### 3. Map-lens glyphs — the overlay control strip
 
@@ -106,6 +172,7 @@ silhouette reads the building **type** and the fill reads **who owns it**.
 | **Production** | `production(…, colour)` | Filled upward-pointing triangle over a short baseline (output / throughput rising motif); distinct from the market bars and the scarcity hollow down-triangle | Caller fill | `overlay_mode::production` |
 | **Scarcity** | `scarcity(…, colour)` | Hollow downward-pointing triangle (empty / depleted motif; inverse of the filled resource pip) | Caller stroke | `overlay_mode::scarcity` |
 | **Industry** | `industry(…, colour)` | Factory silhouette — a filled body block with a two-tooth sawtooth roof and a left chimney rising above the roofline; distinct from the production up-triangle and the market bars (BL-084) | Caller fill | `overlay_mode::industry` |
+| **Continent** | `continent(…, colour)` | Two filled, deliberately asymmetric quads split by a diagonal **gap** — the seam is the shape that carries the meaning, and it is a gap rather than a drawn hairline so it survives at strip size. Reads "the crust is in pieces, and this is where they meet"; distinct from the Country shield (a bordered *territory*) and from any solid landmass blob, because the lens shows the *boundary*, not the area (BL-226) | Caller fill | `overlay_mode::continent` |
 
 In the strip ([`overlay.cpp`](../../src/ui/overlay.cpp), `draw_overlay_controls`)
 each lens is an invisible button with its glyph drawn over the rect; the active
@@ -153,12 +220,15 @@ firmed up (several feed the **lens-design** Brief):
    conventions: `building`/`country`/`corporation`/`unit`/`pip` → `colour` is fill;
    `supply`/`market`/`ledger`/`placeholder`/resource-lens → stroke.
 
-5. **The lens set is now complete.** The curated strip order is
+5. **The lens set is now complete.** The curated on-screen strip order is
    corporation / country / resource / market / population / **opportunity** /
-   **production** / scarcity / **industry** (Industry joined the strip with BL-084;
-   catalogued here 2026-07-04, its LENSES.md section still owed); the rest are
-   ratified in [LENSES.md](LENSES.md) and all are catalogued above (`supply`
-   exists but is off the strip). Note `resource` is **overloaded**:
+   **production** / **continent** (**Continent** joined with BL-226, 2026-07-30,
+   as the eighth on-screen glyph); scarcity and **industry** are keyboard-cycle
+   only (trimmed off the strip by BL-093 — Industry the same day BL-084 shipped
+   it). The set is ratified in [LENSES.md](LENSES.md) and all are catalogued
+   above (`supply` exists but is off the strip; Reach and Supply-routes reuse
+   the `convoy`/`supply` glyphs — dedicated glyphs are an open TODO,
+   `overlay.cpp` note, BL-011/BL-014). Note `resource` is **overloaded**:
    `resource(…, resource_type)` is the identity-coloured *pip* (a diamond), while
    `resource(…, ImU32)` is the *lens* glyph (the strata motif) — same name,
    disambiguated by the final argument type and by context (strip vs. canvas pip).

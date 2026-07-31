@@ -9,9 +9,11 @@
 #include "world/hard_coded_world.hpp"
 #include "world/nation_generation.hpp"
 #include "world/placement_rules.hpp"
+#include "world/terrain_combat.hpp"
 #include "world/world.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstdio>
 #include <map>
 #include <set>
@@ -48,6 +50,232 @@ int main()
                 wetland, total ? 100.0f * wetland / total : 0.0f, fw_frac);
     std::printf("  S2 target forest+wetland >= 3%% of all tiles: %s\n",
                 fw_frac >= 3.0f ? "PASS" : "FAIL");
+
+    // --- S3 (BL-231): per-body landform histogram ---
+    // The renderer keys only on composition, so the landform axis has never been
+    // looked at. It drives build cost (x1.0-x2.0), hazard, habitability and
+    // mineral richness, so how SPARSE each landform is decides how it should be
+    // drawn: a landform holding a third of a body wants a field treatment, one
+    // holding a few percent wants a marker. Reported per body because the
+    // profile differs sharply (airless bodies are cratered; atmospheric ones
+    // are not). Measurement first — see backlog.json BL-231 § Step 1.
+    static const char* kLandformName[7] = {
+        "plains", "highland", "mountain", "canyon", "valley", "crater", "rift" };
+    constexpr int kNumLandform = 7;
+
+    std::printf("\nLandform distribution (BL-231; land tiles only, ocean excluded)\n");
+    std::map<entity_id, std::array<int, kNumLandform>> per_body;
+    std::map<entity_id, int> per_body_land;
+    std::array<int, kNumLandform> system_hist{};
+    int system_land = 0;
+    for (const auto& [tid, tc] : w.tiles)
+    {
+        if (tc.composition == terrain_composition::ocean)
+            continue;
+        const int lf = static_cast<int>(tc.landform);
+        if (lf < 0 || lf >= kNumLandform)
+            continue;
+        ++per_body[tc.body][lf];
+        ++per_body_land[tc.body];
+        ++system_hist[lf];
+        ++system_land;
+    }
+
+    for (const auto& [bid, hist_lf] : per_body)
+    {
+        const auto bit = w.bodies.find(bid);
+        const int  n   = per_body_land[bid];
+        std::printf("  %-12s (%4d land)", bit == w.bodies.end() ? "?" : bit->second.name.c_str(), n);
+        for (int i = 0; i < kNumLandform; ++i)
+            std::printf("  %s %.1f%%", kLandformName[i], n ? 100.0f * hist_lf[i] / n : 0.0f);
+        std::printf("\n");
+    }
+
+    std::printf("  SYSTEM       (%4d land)", system_land);
+    for (int i = 0; i < kNumLandform; ++i)
+        std::printf("  %s %.1f%%", kLandformName[i],
+                    system_land ? 100.0f * system_hist[i] / system_land : 0.0f);
+    std::printf("\n");
+
+    // The generation pipeline can emit all seven; a landform absent system-wide
+    // means a pass stopped firing (a silently flattened mix), which is exactly
+    // the regression this check exists to catch.
+    int landform_absent = 0;
+    for (int i = 0; i < kNumLandform; ++i)
+        if (system_hist[i] == 0)
+        {
+            ++landform_absent;
+            std::printf("  BAD: landform '%s' appears on no body\n", kLandformName[i]);
+        }
+    std::printf("  BL-231 R1 every landform generation can produce appears somewhere: %s\n",
+                landform_absent == 0 ? "PASS" : "FAIL");
+
+    // --- S5 (BL-233): terrain combat value, binary vs graded ---
+    // MEASUREMENT ONLY — history_ladder.cpp is untouched and still uses its own
+    // is_barrier bool. This reports what the ladder's barrier field looks like today
+    // against what the graded terrain_resistance would give, so the political-map
+    // consequence can be seen BEFORE anything is switched over. barrier_q is a share
+    // of ALL tiles (n = gw*gh, ocean included), so the ocean split below matters: if
+    // water dominates the field, terrain is barely driving the political map at all.
+    //
+    // Downstream, exactly as the ladder computes it:
+    //   fragmentation_q = (barrier_q*6 + cradle_q*4)/10   -> d_frag  = 0.6 * d_barrier
+    //   polity_seeds    = cradles + fragmentation_q*12/1000 -> d_seeds = 12 * d_frag / 1000
+    std::printf("\nTerrain combat value (BL-233; binary is_barrier vs graded terrain_resistance)\n");
+    for (const auto& [bid, bc] : w.bodies)
+    {
+        if (bc.grid_width <= 0 || bc.grid_height <= 0)
+            continue;
+        const int total_n = bc.grid_width * bc.grid_height;
+
+        int bin_barrier = 0, bin_ocean = 0, graded_sum = 0, land_n = 0;
+        long long def_sum = 0, att_sum = 0;
+        for (const auto& [tid, tc] : w.tiles)
+        {
+            if (tc.body != bid)
+                continue;
+            const bool ocean = (tc.composition == terrain_composition::ocean);
+
+            // Replicate the ladder's is_barrier exactly (history_ladder.cpp § is_barrier).
+            const bool bin = ocean
+                          || tc.landform == terrain_landform::mountain
+                          || tc.landform == terrain_landform::canyon
+                          || tc.composition == terrain_composition::barren
+                          || tc.composition == terrain_composition::icy;
+            if (bin)   ++bin_barrier;
+            if (ocean) ++bin_ocean;
+
+            if (!ocean)
+            {
+                ++land_n;
+                graded_sum += terrain_resistance(tc.composition, tc.landform);
+                def_sum    += terrain_defence(tc.composition, tc.landform);
+                att_sum    += terrain_attrition(tc.composition, tc.landform);
+            }
+        }
+        if (total_n <= 0)
+            continue;
+
+        const int bin_q = std::clamp((bin_barrier * 1000) / total_n, 0, 1000);
+        // Graded, on the same denominator so the two are comparable. Ocean contributes
+        // zero resistance here — it is a MODE, and the ladder prices it separately via
+        // the coastal term in exit_cost_q.
+        const int grd_q = std::clamp(graded_sum / total_n, 0, 1000);
+
+        const int  d_barrier = grd_q - bin_q;
+        const float d_frag   = 0.6f * static_cast<float>(d_barrier);
+        const float d_seeds  = 12.0f * d_frag / 1000.0f;
+
+        std::printf("  %-12s barrier_q binary %4d (of which ocean %4d)  graded %4d  delta %+5d\n",
+                    bc.name.c_str(), bin_q,
+                    std::clamp((bin_ocean * 1000) / total_n, 0, 1000), grd_q, d_barrier);
+        std::printf("                -> fragmentation_q %+.1f, polity_seeds %+.2f | land means: defence %d, attrition %d\n",
+                    static_cast<double>(d_frag), static_cast<double>(d_seeds),
+                    land_n ? static_cast<int>(def_sum / land_n) : 0,
+                    land_n ? static_cast<int>(att_sum / land_n) : 0);
+    }
+
+    // --- S4 (BL-232): landform CONTIGUITY ---
+    // BL-231 draws one glyph per tile, so a run of three mountains reads as three
+    // identical icons rather than as one range. Bridging them into a spanning ridge
+    // only pays if runs actually exist: Pass 5 grows mountain from seeds where ring 0
+    // is mountain but ring 1 is only 30% mountain, so clusters may be scattered specks.
+    // Reported as the share of tiles with 0 / 1 / 2+ same-landform CARDINAL neighbours
+    // (the 4 directions the span idiom uses, matching BL-172's road edges) plus the
+    // share that are fully interior — those three numbers decide whether the spanning
+    // case or the filled-interior case is the common one, or neither is. Measurement
+    // before the visual, exactly as S3 gated BL-231.
+    const terrain_landform kLinear[3] = { terrain_landform::mountain,
+                                          terrain_landform::rift,
+                                          terrain_landform::canyon };
+
+    // Per-body raster of landform, so a cardinal neighbour is an O(1) lookup and the
+    // column wrap matches the canvas (columns wrap, rows do not).
+    std::map<entity_id, std::vector<int>> body_lf; // -1 = ocean or absent
+    for (const auto& [bid, bc] : w.bodies)
+        if (bc.grid_width > 0 && bc.grid_height > 0)
+            body_lf[bid].assign(static_cast<std::size_t>(bc.grid_width) * bc.grid_height, -1);
+    for (const auto& [tid, tc] : w.tiles)
+    {
+        const auto bit = body_lf.find(tc.body);
+        if (bit == body_lf.end() || tc.composition == terrain_composition::ocean)
+            continue;
+        const auto bc = w.bodies.find(tc.body);
+        if (bc == w.bodies.end())
+            continue;
+        const std::size_t idx = static_cast<std::size_t>(tc.grid_y) * bc->second.grid_width + tc.grid_x;
+        if (idx < bit->second.size())
+            bit->second[idx] = static_cast<int>(tc.landform);
+    }
+
+    std::printf("\nLandform contiguity (BL-232; same-landform cardinal neighbours)\n");
+    for (terrain_landform lf : kLinear)
+    {
+        const int lfi = static_cast<int>(lf);
+        int n0 = 0, n1 = 0, n2plus = 0, interior = 0, tiles = 0;
+        entity_id ex_run_body = null_entity, ex_lone_body = null_entity;
+        int ex_run_col = 0, ex_run_row = 0, ex_lone_col = 0, ex_lone_row = 0;
+        for (const auto& [bid, raster] : body_lf)
+        {
+            const auto bc = w.bodies.find(bid);
+            if (bc == w.bodies.end())
+                continue;
+            const int bw = bc->second.grid_width, bh = bc->second.grid_height;
+            for (int row = 0; row < bh; ++row)
+                for (int col = 0; col < bw; ++col)
+                {
+                    if (raster[static_cast<std::size_t>(row) * bw + col] != lfi)
+                        continue;
+                    ++tiles;
+                    int same = 0;
+                    static const int off[4][2] = {{+1, 0}, {-1, 0}, {0, +1}, {0, -1}};
+                    for (auto& d : off)
+                    {
+                        const int nrow = row + d[1];
+                        if (nrow < 0 || nrow >= bh)
+                            continue;
+                        const int ncol = ((col + d[0]) % bw + bw) % bw; // columns wrap
+                        if (raster[static_cast<std::size_t>(nrow) * bw + ncol] == lfi)
+                            ++same;
+                    }
+                    if (same == 0)      ++n0;
+                    else if (same == 1) ++n1;
+                    else                ++n2plus;
+                    if (same == 4)      ++interior;
+
+                    // Prefer the home body for the exemplars — that is the surface a
+                    // verify capture opens on without a survey reveal.
+                    const bool home = (bid == w.home_body);
+                    if (same >= 1 && (ex_run_body == null_entity
+                                      || (home && ex_run_body != w.home_body)))
+                    { ex_run_body = bid; ex_run_col = col; ex_run_row = row; }
+                    if (same == 0 && (ex_lone_body == null_entity
+                                      || (home && ex_lone_body != w.home_body)))
+                    { ex_lone_body = bid; ex_lone_col = col; ex_lone_row = row; }
+                }
+        }
+        const float pc = tiles ? 100.0f / tiles : 0.0f;
+        std::printf("  %-9s %5d tiles | isolated %.1f%%  end-of-run %.1f%%  in-run(2+) %.1f%%  interior %.1f%%\n",
+                    kLandformName[lfi], tiles, n0 * pc, n1 * pc, n2plus * pc, interior * pc);
+        // Exemplar coordinates for scripts/verify/landform_relief.lua, which needs a
+        // real spanning run and a real lone tile to point the cursor at. Printed rather
+        // than eyeballed off a screenshot so a generation change that moves them shows
+        // up here instead of silently turning a capture into a picture of empty ground.
+        if (ex_run_body != null_entity)
+        {
+            const auto eb = w.bodies.find(ex_run_body);
+            std::printf("      exemplar run  : %s [%d,%d]\n",
+                        eb == w.bodies.end() ? "?" : eb->second.name.c_str(),
+                        ex_run_col, ex_run_row);
+        }
+        if (ex_lone_body != null_entity)
+        {
+            const auto eb = w.bodies.find(ex_lone_body);
+            std::printf("      exemplar lone : %s [%d,%d]\n",
+                        eb == w.bodies.end() ? "?" : eb->second.name.c_str(),
+                        ex_lone_col, ex_lone_row);
+        }
+    }
 
     // --- S1: extraction asset placement audit ---
     const resource_type extractable[] = {
@@ -377,7 +605,22 @@ int main()
     // The nation COUNT is emergent (seeds scale with land area; every nation below
     // the minimum viable territory is absorbed), so the load-bearing assertion is
     // the floor itself, not a target count. The count band is a wide sanity guard.
-    const int floor_tiles = nation_params{}.min_nation_tiles;
+    //
+    // REPOINTED 2026-07-30 (BL-221, Ben's call). The history ladder now DERIVES
+    // the merge floor and the seed density from generated fragmentation, so
+    // `nation_params{}.min_nation_tiles` is no longer the floor the generator
+    // actually used — it is only the base the ladder modulates. Asserting the
+    // old literal would test a constant that no longer exists.
+    //
+    // What IS still guaranteed by construction is the clamp in
+    // nation_params_from_ladder: the derived floor can never fall below half the
+    // base. So that is what R1 asserts — the generator's real invariant, not a
+    // band widened to accommodate a failure. Kepler moved 14 -> 43 nations, which
+    // is roughly the ~45 docs/lore/HISTORY.md asserts; Ben's direction was to let
+    // culturally distinct polities emerge here and let a later war/consolidation
+    // stage narrow the count, rather than tuning the ladder to fit this file.
+    const int floor_base  = nation_params{}.min_nation_tiles;
+    const int floor_tiles = floor_base / 2;
     const int nation_n    = static_cast<int>(w.nations.size());
     int min_tiles = -1, max_tiles = 0;
     for (const auto& [nid, nat] : w.nations)
@@ -388,15 +631,18 @@ int main()
     }
     if (min_tiles < 0) min_tiles = 0;
     const bool floor_ok    = nation_n > 0 && min_tiles >= floor_tiles;
-    const bool count_ok    = nation_n >= 6 && nation_n <= 40;
+    // Ceiling raised 40 -> 90 for the same reason. This is a RUNAWAY guard, not
+    // a target: it still catches a ladder bug that seeds hundreds of polities,
+    // while leaving room for the emergent count the premise wants.
+    const bool count_ok    = nation_n >= 6 && nation_n <= 90;
     const bool variance_ok = min_tiles > 0 && max_tiles >= 3 * min_tiles;
     std::printf("Nations: %d (min tiles %d, max tiles %d; floor %d)\n",
                 nation_n, min_tiles, max_tiles, floor_tiles);
-    std::printf("  BL-053 R1 every nation clears the minimum viable territory (>= %d tiles): %s\n",
-                floor_tiles, floor_ok ? "PASS" : "FAIL");
+    std::printf("  BL-053 R1 every nation clears the ladder's guaranteed floor (>= %d tiles, half of base %d): %s\n",
+                floor_tiles, floor_base, floor_ok ? "PASS" : "FAIL");
     std::printf("  BL-053 R2 strong size variance (max >= 3x min): %s\n",
                 variance_ok ? "PASS" : "FAIL");
-    std::printf("  BL-053 R3 emergent nation count plausible ([6,40]): %s\n",
+    std::printf("  BL-053 R3 emergent nation count inside the runaway guard ([6,90]): %s\n",
                 count_ok ? "PASS" : "FAIL");
 
     // --- BL-096: resource-carved market generation ---
@@ -492,5 +738,5 @@ int main()
             && absent == 0 && ordering_ok
             && floor_ok && variance_ok && count_ok
             && market_count_ok && cross_nation_ok && market_determinism_ok
-            && hq_bad == 0 && hq_det_bad == 0) ? 0 : 1;
+            && hq_bad == 0 && hq_det_bad == 0 && landform_absent == 0) ? 0 : 1;
 }

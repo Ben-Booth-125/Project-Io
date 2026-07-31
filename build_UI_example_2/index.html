@@ -1,0 +1,784 @@
+<!-- Project Io — UI drill-down exemplar: History Ledger (fold/full-screen 2-level + BL-196 subject drill) -->
+<title>History Ledger — Kepler (exemplar)</title>
+<div class="app">
+  <aside class="ledger" id="ledger">
+    <header class="ledger-header">
+      <div class="ledger-title-row">
+        <h1>History &mdash; Kepler</h1>
+        <button class="go-to-btn" title="Jump to map (not wired in this mock)">[&rsaquo;]</button>
+      </div>
+      <nav class="stage-tabs" id="stageTabs"></nav>
+    </header>
+    <div class="stage-list" id="stageList"></div>
+  </aside>
+  <main class="canvas-area" id="canvasArea">
+    <div class="canvas-placeholder">Solar Canvas &mdash; not part of this mock</div>
+  </main>
+</div>
+
+<!-- FULL SCREEN expanded stage view: level 2, everything at once -->
+<div class="fs-overlay" id="fsOverlay" hidden>
+  <div class="fs-inner">
+    <div class="fs-header" id="fsHeader"></div>
+    <div class="fs-body" id="fsBody"></div>
+  </div>
+</div>
+
+<style>
+:root{
+  --bg:#05070b;
+  --panel-bg:#0c1018;
+  --card-bg:#0a0d14;
+  --border:#2a3140;
+  --text:#d6dae2;
+  --text-dim:#aeb3bd;
+  --text-dimmer:#8c92a0;
+  --accent:#3D84E0;
+  --accent-dim:rgba(61,132,224,0.25);
+  --green:#6EC878;
+  --red:#D86460;
+  --grey:#AAAFB9;
+  --white:#ffffff;
+  --hover:#78BEFF;
+  --amber:#FFC85A;
+}
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:"Segoe UI",Inter,system-ui,-apple-system,sans-serif;
+  font-size:13px;
+  -webkit-font-smoothing:antialiased;
+}
+.app{
+  display:flex;
+  width:100%;
+  height:100vh;
+  overflow:hidden;
+}
+
+/* ---------- Ledger column ---------- */
+.ledger{
+  width:360px;
+  min-width:320px;
+  max-width:380px;
+  height:100%;
+  overflow-y:auto;
+  background:var(--panel-bg);
+  border-right:1px solid var(--border);
+  flex-shrink:0;
+}
+.ledger-header{
+  position:sticky;
+  top:0;
+  z-index:5;
+  background:var(--panel-bg);
+  border-bottom:1px solid var(--border);
+  padding:12px 12px 10px;
+}
+.ledger-title-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+}
+.ledger-title-row h1{
+  font-size:15px;
+  font-weight:600;
+  margin:0;
+  color:var(--text);
+  letter-spacing:0.2px;
+}
+.go-to-btn{
+  background:transparent;
+  border:1px solid var(--border);
+  color:var(--text-dimmer);
+  font-size:11px;
+  padding:2px 7px;
+  border-radius:2px;
+  cursor:default;
+  opacity:0.7;
+}
+.stage-tabs{
+  display:flex;
+  gap:6px;
+  margin-top:10px;
+}
+.stage-tab{
+  width:26px;
+  height:26px;
+  border-radius:50%;
+  border:1px solid var(--border);
+  background:var(--card-bg);
+  color:var(--text-dim);
+  font-size:11px;
+  font-weight:600;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+  position:relative;
+  flex-shrink:0;
+}
+.stage-tab:hover{ border-color:var(--hover); color:var(--hover); }
+.stage-tab .dot{
+  position:absolute;
+  bottom:-3px;
+  right:-2px;
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  border:1px solid var(--panel-bg);
+}
+
+.stage-list{ padding:10px; }
+
+/* ---------- Stage card: folded resting state ---------- */
+.stage-card{
+  background:var(--card-bg);
+  border:1px solid var(--border);
+  border-radius:2px;
+  padding:9px 11px;
+  margin-bottom:8px;
+  transition:outline-color 160ms ease, background 120ms ease;
+  outline:1px solid transparent;
+  outline-offset:1px;
+  cursor:pointer;
+}
+.stage-card:hover{ background:#0d121b; }
+.stage-card.flash{ outline-color:var(--hover); }
+
+.stage-header{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.stage-badge{
+  width:20px;
+  height:20px;
+  border-radius:50%;
+  border:1px solid var(--border);
+  color:var(--text-dim);
+  font-size:9.5px;
+  font-weight:700;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-shrink:0;
+}
+.stage-title{
+  flex:1;
+  font-size:12.5px;
+  font-weight:600;
+  color:var(--text);
+  min-width:0;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+/* fold chevron — the whole depth control now: two positions only */
+.fold-chevron-btn{
+  appearance:none;
+  background:none;
+  border:1px solid var(--border);
+  color:var(--text-dim);
+  width:22px;
+  height:20px;
+  border-radius:2px;
+  cursor:pointer;
+  flex-shrink:0;
+  font-size:10px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.fold-chevron-btn:hover{ border-color:var(--hover); color:var(--hover); }
+
+.stage-glance{
+  display:flex;
+  align-items:flex-start;
+  gap:7px;
+  margin-top:7px;
+  font-size:12px;
+  line-height:1.4;
+  color:var(--text-dim);
+}
+.glyph{
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  flex-shrink:0;
+  margin-top:4px;
+}
+.glance-arrow{ font-size:10px; margin-right:3px; }
+.stage-fold-hint{
+  font-size:9.5px; color:var(--text-dimmer); opacity:.6;
+  margin-top:6px; padding-left:15px;
+}
+
+/* ---------- Canvas placeholder (background, non-interactive) ---------- */
+.canvas-area{
+  position:relative;
+  flex:1;
+  height:100%;
+  overflow:auto;
+  background:
+    repeating-linear-gradient(0deg, rgba(255,255,255,0.015) 0 1px, transparent 1px 48px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.015) 0 1px, transparent 1px 48px),
+    var(--bg);
+}
+.canvas-placeholder{
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  color:var(--text-dimmer);
+  font-size:12px;
+  letter-spacing:0.3px;
+  pointer-events:none;
+}
+
+/* ---------- Full-screen expanded stage view ---------- */
+.fs-overlay{
+  position:fixed; inset:0; z-index:50;
+  background:var(--bg);
+  opacity:0; pointer-events:none;
+  transition:opacity 200ms ease;
+  overflow-y:auto;
+}
+.fs-overlay.open{ opacity:1; pointer-events:auto; }
+.fs-inner{
+  width:min(980px, calc(100% - 96px));
+  margin:56px auto 64px;
+}
+.fs-header{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:12px; padding-bottom:16px; margin-bottom:26px;
+  border-bottom:1px solid var(--border);
+}
+.fs-breadcrumb{
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  font-size:16px; color:var(--text-dimmer);
+}
+.fs-breadcrumb .crumb-seg{
+  background:none; border:none; padding:0; cursor:pointer;
+  font-size:16px; color:var(--text-dimmer);
+}
+.fs-breadcrumb .crumb-seg:hover{ color:var(--hover); }
+.fs-breadcrumb .crumb-seg.current{ color:var(--text); font-weight:600; cursor:default; }
+.fs-breadcrumb .crumb-sep{ opacity:.5; }
+.fs-header-controls{ display:flex; align-items:center; gap:10px; flex:0 0 auto; }
+.fs-back-btn{
+  background:none; border:1px solid var(--border); color:var(--text-dim);
+  width:26px; height:26px; border-radius:2px; cursor:pointer; font-size:15px;
+}
+.fs-back-btn:hover{ border-color:var(--hover); color:var(--hover); }
+.fs-fold-btn{
+  appearance:none; background:none; border:1px solid var(--border);
+  color:var(--text-dim); padding:6px 11px; border-radius:2px; cursor:pointer;
+  display:flex; align-items:center; gap:7px; font-size:12.5px;
+}
+.fs-fold-btn:hover{ border-color:var(--hover); color:var(--hover); }
+
+.fs-verdict{
+  display:flex; align-items:center; gap:10px;
+  font-size:19px; color:var(--text); margin-bottom:28px;
+}
+.fs-verdict .glyph{ width:11px; height:11px; }
+.fs-verdict .glance-arrow{ font-size:14px; }
+
+.fs-charts-row{
+  display:flex;
+  gap:28px;
+  margin-bottom:26px;
+  flex-wrap:wrap;
+}
+.fs-chart-block{ flex:1 1 400px; min-width:0; }
+.fs-chart-title{
+  font-size:12.5px; color:var(--text-dimmer); margin-bottom:8px;
+  text-transform:uppercase; letter-spacing:0.3px;
+}
+.fs-chart-svg{ width:100%; height:auto; display:block; }
+.fs-gridline{ stroke:var(--border); stroke-dasharray:2,3; stroke-width:1; }
+.fs-axis-label{ fill:var(--text-dimmer); font-size:9px; }
+.fs-study-axis-label{ fill:var(--text-dimmer); font-size:8.5px; }
+.fs-bar-rect{ transition:opacity 120ms; }
+.fs-bar-rect.clickable{ cursor:pointer; }
+.fs-bar-rect.clickable:hover{ opacity:0.75; }
+.fs-line-path{ fill:none; stroke-width:2; }
+.fs-chart-point{ transition:r 120ms; }
+.fs-chart-point.clickable{ cursor:pointer; }
+.fs-chart-point.clickable:hover{ r:5.5; }
+.fs-threshold-line{ stroke:var(--red); stroke-width:1; stroke-dasharray:3,2; }
+.fs-threshold-label{ fill:var(--red); font-size:9px; }
+
+.fs-legend-row{
+  display:flex; flex-wrap:wrap; gap:12px; margin-top:8px;
+}
+.fs-legend-item{
+  display:flex; align-items:center; gap:5px; font-size:12px; color:var(--text-dim);
+}
+.fs-legend-swatch{ width:8px; height:8px; border-radius:1px; flex-shrink:0; }
+.fs-legend-value{ color:var(--text); font-weight:600; }
+
+/* "why this chart" log — a standing per-chart self-declaration, not a
+   tutorial: the question this chart answers and why this evidence answers
+   it. Closed by default, a small affordance next to the chart it belongs to. */
+.why-toggle{
+  display:inline-flex; align-items:center; gap:6px; margin:9px 0 4px;
+  background:none; border:none; padding:0; cursor:pointer;
+  font-size:11px; color:var(--text-dimmer);
+}
+.why-toggle:hover{ color:var(--hover); }
+.why-toggle .why-glyph{
+  width:13px; height:13px; border-radius:50%; border:1px solid currentColor;
+  display:flex; align-items:center; justify-content:center; font-size:9px;
+  flex:0 0 auto;
+}
+.why-note{
+  display:grid; grid-template-rows:0fr; transition:grid-template-rows 220ms ease;
+}
+.why-note.open{ grid-template-rows:1fr; }
+.why-note > div{ overflow:hidden; }
+.why-note-inner{
+  font-size:11.5px; line-height:1.55; color:var(--text-dim);
+  border-left:2px solid var(--border); padding:2px 0 8px 10px; margin-top:2px;
+}
+.why-note-inner .why-q{ color:var(--text); }
+
+.fs-prose{ font-size:13.5px; line-height:1.65; color:var(--text-dim); max-width:76ch; }
+.fs-prose p{ margin:0 0 12px; }
+.fs-prose p:last-child{ margin-bottom:0; }
+.fs-prose-unavailable{ font-size:12.5px; color:var(--text-dimmer); font-style:italic; }
+
+.fs-drill-hint{ font-size:12.5px; color:var(--text-dimmer); margin-bottom:14px; }
+.fs-events{
+  list-style:none; margin:14px 0 0; padding:0; border-top:1px solid var(--border);
+  max-width:76ch;
+}
+.fs-events li{
+  padding:9px 0; border-bottom:1px solid var(--border); font-size:13px;
+  color:var(--text-dim); display:flex; justify-content:space-between; gap:14px; align-items:baseline;
+}
+.fs-events .evt-delta{ color:var(--green); font-size:11.5px; flex-shrink:0; font-weight:600; }
+.fs-drill-tail-hint{ font-size:11.5px; color:var(--text-dimmer); margin-top:10px; font-style:italic; }
+
+/* scrollbars, kept subtle */
+.ledger::-webkit-scrollbar, .canvas-area::-webkit-scrollbar, .fs-overlay::-webkit-scrollbar{ width:9px; }
+.ledger::-webkit-scrollbar-thumb, .canvas-area::-webkit-scrollbar-thumb, .fs-overlay::-webkit-scrollbar-thumb{
+  background:var(--border);
+  border-radius:5px;
+}
+.ledger::-webkit-scrollbar-track, .canvas-area::-webkit-scrollbar-track{ background:transparent; }
+</style>
+
+<script>
+(function(){
+  "use strict";
+
+  var COLORS = { accent:"#3D84E0", green:"#6EC878", red:"#D86460", grey:"#AAAFB9", amber:"#FFC85A", hover:"#78BEFF" };
+
+  // -------------------------------------------------------------
+  // Stage data — five stages of Kepler's institutional history.
+  // Mock content only; numbers are invented-but-plausible.
+  // -------------------------------------------------------------
+  var STAGE3_EVENTS = [
+    ["Sealed oath ratified in closed session (all four basins)", "Ilun Basin reopens grain road to arbitrated toll"],
+    ["Coron Delta posts arbitration bond", "Mera Highlands adherence lags at 0.71"],
+    ["First cross-basin toll caravan completes without incident", "Vashtiri Coast ratifies clause 4 — border garrisons stand down"],
+    ["Fragmentation crosses back below the 0.75 runaway threshold", "Mera Highlands silo road reopens"],
+    ["Ilun–Mera trade-link density triples over the Stage II baseline", "Second arbitration panel seated"],
+    ["Coron Delta adherence score reaches 0.85", "Joint granary survey completed"],
+    ["Fragmentation index settles at 0.62", "Charter renewal scheduled for +5 years"]
+  ];
+
+  var STAGES = [
+    {
+      id:1, roman:"I", title:"Agrarian Surplus",
+      glyphColor:"green", glyphArrow:"▼",
+      verdict:"Stage I — Agrarian Surplus: settled cultivation exceeds subsistence, four cradle basins take root.",
+      charts:[
+        { type:"bar", title:"Cradle settlements by basin", color:COLORS.accent, unit:" settlements",
+          question:"Which basin actually seeded the earliest permanent settlement pattern?",
+          why:"Settlement count by basin is the starting condition every later fragmentation stage traces back to — Mera's late lead is why it's the slowest charter adherent in Stage III.",
+          data:[ {label:"Ilun", value:3}, {label:"Coron", value:2}, {label:"Mera", value:4}, {label:"Vashtiri", value:1} ] },
+        { type:"line", title:"Surplus ratio (output ÷ subsistence need)", color:COLORS.green, unit:"",
+          question:"Did surplus growth stay ahead of population, or flatten out?",
+          why:"A ratio and its trend, not the raw yield number, is what tells you whether labour is actually being freed off the land — a flattening ratio would mean population is quietly catching up.",
+          data:[ {label:"-400",value:1.02},{label:"-320",value:1.09},{label:"-240",value:1.15},{label:"-160",value:1.24},{label:"-80",value:1.31},{label:"-10",value:1.38} ] }
+      ],
+      prose:[
+        "Grain and root-crop yields across the four cradle basins crossed the subsistence threshold roughly four centuries before the epoch mark, freeing a growing share of each basin's population from direct food production. Ilun Basin's alluvial soils sustained the earliest surplus; Mera Highlands, terraced later, overtook it by output density within two centuries.",
+        "The surplus did not immediately consolidate into shared institutions — each basin banked its grain reserve independently, and inter-basin trade remained opportunistic rather than structural. That structural gap is the seed condition Stage II inherits."
+      ]
+    },
+    {
+      id:2, roman:"II", title:"Fragmentation Onset",
+      glyphColor:"red", glyphArrow:"▲",
+      verdict:"Stage II — Fragmentation Onset: cradle rivalry outpaces trade infrastructure, fragmentation index climbs to 0.81.",
+      charts:[
+        { type:"bar", title:"Trade-link density by basin pair", color:COLORS.grey, unit:"",
+          question:"Which basin pairs kept trading with each other as rivalry grew, and which didn't?",
+          why:"Per-pair density, not a single bloc-wide number, is what shows the fragmentation is uneven — Mera–Vashtiri is already nearly severed while Ilun–Coron still holds.",
+          data:[ {label:"Ilun–Coron", value:0.31}, {label:"Ilun–Mera", value:0.18}, {label:"Coron–Vash.", value:0.24}, {label:"Mera–Vash.", value:0.12} ] },
+        { type:"line", title:"Fragmentation index", color:COLORS.red, unit:"",
+          question:"How fast is the political landscape splintering, and is it accelerating?",
+          why:"The slope matters more than any single reading — a steepening climb is what forces Stage III's charter, a levelling-off would have meant no charter was needed at all.",
+          data:[ {label:"-60",value:0.42},{label:"-40",value:0.55},{label:"-20",value:0.63},{label:"0",value:0.71},{label:"+20",value:0.77},{label:"+40",value:0.81} ] }
+      ],
+      prose:[
+        "As reserves grew, each basin began garrisoning its own grain routes rather than pooling them; three recorded raids on Coron Delta's outer granaries in a single generation pushed Ilun Basin to wall its silo roads entirely.",
+        "Trade-link density between basin pairs fell even as absolute trade volume rose, because bilateral deals displaced the earlier informal, many-sided exchange. The fragmentation index — an inverse measure of that many-sidedness — rose accordingly, setting up the pressure Stage III's charter resolves."
+      ]
+    },
+    {
+      id:3, roman:"III", title:"Charter Age",
+      glyphColor:"green", glyphArrow:"▼",
+      verdict:"Stage III — Charter Age: sealed oath signed, fragmentation lowered to 0.62.",
+      charts:[
+        { type:"line", title:"Fragmentation index", color:COLORS.green, unit:"", drillable:true, id:"frag3",
+          threshold:0.75, thresholdLabel:"Runaway consolidation ≥ 0.75",
+          question:"Did the Charter actually reverse the fragmentation trend, or just slow it down?",
+          why:"Plotting against the 0.75 runaway-consolidation threshold turns 'crossed back under' into a visible event on the line, instead of a number you'd have to already know the threshold to interpret. Click any point to see what happened that tick.",
+          data:[ {label:"Q1'87",value:0.81},{label:"Q2'87",value:0.77},{label:"Q3'87",value:0.74},{label:"Q4'87",value:0.71},{label:"Q1'88",value:0.69},{label:"Q2'88",value:0.65},{label:"Q3'88",value:0.62} ] },
+        { type:"bar", title:"Oath adherence score by basin", color:COLORS.accent, unit:"",
+          question:"Which basin is honouring the charter the least, and by how much?",
+          why:"A per-basin breakdown is what makes Stage IV's widest bond spread (Mera) legible later — the aggregate fragmentation number alone would hide which basin is actually the risk.",
+          data:[ {label:"Ilun", value:0.92}, {label:"Coron", value:0.85}, {label:"Mera", value:0.78}, {label:"Vashtiri", value:0.88} ] }
+      ],
+      prose:[
+        "The sealed oath — ratified in closed session by all four basin delegations in Q1 1187 — bound each signatory to open its grain roads to arbitrated toll rather than unilateral closure. Adherence was uneven at first; Mera Highlands, still rebuilding after Stage II's raids, lagged the other three basins by nearly a full point of the adherence score through the first two quarters.",
+        "Fragmentation eased steadily rather than sharply, crossing back below the 0.75 runaway-consolidation threshold by Q4 1187 and settling near 0.62 by Q3 1188. Historians of the period read that threshold as the line past which no charter, once broken, credibly re-forms — Stage III's achievement is staying under it, not the specific index value reached."
+      ]
+    },
+    {
+      id:4, roman:"IV", title:"Capital Discipline",
+      glyphColor:"grey", glyphArrow:"▪",
+      verdict:"Stage IV — Capital Discipline: bond markets begin pricing sovereign risk, fragmentation holds at 0.58.",
+      charts:[
+        { type:"bar", title:"Sovereign bond spread by basin (bps)", color:COLORS.grey, unit:" bps",
+          question:"Which basin does the outside world now consider the riskiest bet?",
+          why:"External creditors are pricing what the charter can't measure about itself — a basin's own adherence score is self-reported, the bond spread is somebody else's money on the line.",
+          data:[ {label:"Ilun", value:42}, {label:"Coron", value:68}, {label:"Mera", value:91}, {label:"Vashtiri", value:55} ] },
+        { type:"line", title:"Fragmentation index", color:COLORS.grey, unit:"",
+          question:"Is capital discipline still lowering fragmentation, or has the charter's floor been reached?",
+          why:"The nearly-flat line is the point — it shows the ceiling is the charter itself, not the bond market, which the prose below states but this chart is what lets you check it.",
+          data:[ {label:"+60",value:0.60},{label:"+80",value:0.59},{label:"+100",value:0.58},{label:"+120",value:0.58},{label:"+140",value:0.57} ] }
+      ],
+      prose:[
+        "Once basin treasuries began issuing bonds against future toll revenue, external creditors started differentiating credit risk basin by basin rather than treating the charter bloc as a single counterparty. Mera Highlands, the slowest adherent in Stage III, now carries the widest spread.",
+        "The discipline is mild but real: two basins trimmed discretionary garrison spending after their first adverse spread movement, without any charter clause compelling them to. Fragmentation holds essentially flat through this stage — the charter's ceiling, not capital markets, remains the binding constraint on how low it can go."
+      ]
+    },
+    {
+      id:5, roman:"V", title:"Energy Transition",
+      glyphColor:"hover", glyphArrow:"…",
+      verdict:"Stage V — Energy Transition: hydrocarbon extraction begins; fragmentation data still resolving.",
+      charts:[
+        { type:"bar", title:"Extraction sites commissioned", color:COLORS.accent, unit:" sites",
+          question:"Which basin is placing the earliest bet on hydrocarbon extraction, and which is sitting out?",
+          why:"Mera's zero sites is the number worth noticing here — the basin still recovering adherence in Stage III is also the one not yet investing in the next transition.",
+          data:[ {label:"Ilun", value:2}, {label:"Coron", value:1}, {label:"Mera", value:0}, {label:"Vashtiri", value:3} ] },
+        { type:"line", title:"Energy output index", color:COLORS.green, unit:"",
+          question:"How fast is output actually ramping once a site comes online?",
+          why:"The near-quadrupling slope, not the index's abstract units, is what a reader needs to judge whether this transition is early or already underway.",
+          data:[ {label:"T+1",value:1.0},{label:"T+2",value:1.4},{label:"T+3",value:2.1},{label:"T+4",value:2.9},{label:"T+5",value:3.8} ] }
+      ],
+      prose:null
+    }
+  ];
+
+  // -------------------------------------------------------------
+  // Chart SVG generation — full-screen scale versions
+  // -------------------------------------------------------------
+  function fmt(v){
+    return (Math.round(v*100)/100).toString();
+  }
+
+  function svgBar(chart){
+    var w=440, h=180, chartH=h-34;
+    var max = Math.max.apply(null, chart.data.map(function(d){return d.value;})) * 1.2 || 1;
+    var step = w / chart.data.length;
+    var bw = step * 0.46;
+    var grid="";
+    [0.25,0.5,0.75,1].forEach(function(f){
+      var y = chartH - chartH*f;
+      grid += '<line x1="0" y1="'+y.toFixed(1)+'" x2="'+w+'" y2="'+y.toFixed(1)+'" class="fs-gridline"/>';
+    });
+    var maxLabel = '<text x="2" y="11" class="fs-study-axis-label">≈'+fmt(max/1.2)+' max</text>';
+    var rects="", labels="";
+    chart.data.forEach(function(d,i){
+      var bh = (d.value/max)*chartH;
+      var x = step*i + (step-bw)/2;
+      var y = chartH - bh;
+      var cls = "fs-bar-rect" + (chart.drillable ? " clickable" : "");
+      rects += '<rect class="'+cls+'" data-chart="'+(chart.id||"")+'" data-idx="'+i+'" x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(bh,1).toFixed(1)+'" fill="'+chart.color+'" rx="2"></rect>';
+      labels += '<text x="'+(x+bw/2).toFixed(1)+'" y="'+(h-12)+'" class="fs-axis-label" text-anchor="middle">'+d.label+'</text>';
+    });
+    return '<svg viewBox="0 0 '+w+' '+h+'" class="fs-chart-svg">'+grid+maxLabel+rects+labels+'</svg>';
+  }
+
+  function svgLine(chart){
+    var w=440, h=180, chartH=h-34;
+    var values = chart.data.map(function(d){return d.value;});
+    var lo = Math.min.apply(null, values), hi = Math.max.apply(null, values);
+    if(chart.threshold!==undefined){ lo = Math.min(lo, chart.threshold); hi = Math.max(hi, chart.threshold); }
+    var pad = (hi-lo)*0.15 || 0.1;
+    lo -= pad; hi += pad;
+    var range = (hi-lo) || 1;
+    var step = w / (chart.data.length - 1);
+    function yOf(v){ return chartH - ((v-lo)/range)*chartH; }
+
+    var grid="";
+    [0,0.25,0.5,0.75,1].forEach(function(f){
+      var y = chartH - chartH*f;
+      grid += '<line x1="0" y1="'+y.toFixed(1)+'" x2="'+w+'" y2="'+y.toFixed(1)+'" class="fs-gridline"/>';
+    });
+    var ticks = '<text x="2" y="10" class="fs-study-axis-label">'+fmt(hi)+'</text>'
+      + '<text x="2" y="'+(chartH-3)+'" class="fs-study-axis-label">'+fmt(lo)+'</text>';
+
+    var pts = chart.data.map(function(d,i){ return (step*i).toFixed(1)+","+yOf(d.value).toFixed(1); }).join(" ");
+    var poly = '<polyline points="'+pts+'" class="fs-line-path" stroke="'+chart.color+'"></polyline>';
+
+    var circles="", labels="";
+    chart.data.forEach(function(d,i){
+      var x=(step*i).toFixed(1), y=yOf(d.value).toFixed(1);
+      var cls = "fs-chart-point"+(chart.drillable?" clickable":"");
+      circles += '<circle class="'+cls+'" data-chart="'+(chart.id||"")+'" data-idx="'+i+'" cx="'+x+'" cy="'+y+'" r="4" fill="'+chart.color+'"></circle>';
+      labels += '<text x="'+x+'" y="'+(h-12)+'" class="fs-axis-label" text-anchor="middle">'+d.label+'</text>';
+    });
+
+    var threshold="";
+    if(chart.threshold!==undefined){
+      var ty = yOf(chart.threshold).toFixed(1);
+      threshold = '<line x1="0" y1="'+ty+'" x2="'+w+'" y2="'+ty+'" class="fs-threshold-line"></line>'
+        + '<text x="'+(w-2)+'" y="'+(parseFloat(ty)-4).toFixed(1)+'" class="fs-threshold-label" text-anchor="end">'+chart.thresholdLabel+'</text>';
+    }
+    return '<svg viewBox="0 0 '+w+' '+h+'" class="fs-chart-svg">'+grid+ticks+poly+circles+labels+threshold+'</svg>';
+  }
+
+  function legendRow(chart){
+    var items;
+    if(chart.type==="bar"){
+      items = chart.data.map(function(d){
+        return '<span class="fs-legend-item"><span class="fs-legend-swatch" style="background:'+chart.color+'"></span>'+d.label+' <span class="fs-legend-value">'+fmt(d.value)+chart.unit+'</span></span>';
+      }).join("");
+    } else {
+      var last = chart.data[chart.data.length-1];
+      items = '<span class="fs-legend-item"><span class="fs-legend-swatch" style="background:'+chart.color+'"></span>'+chart.title+' <span class="fs-legend-value">'+fmt(last.value)+chart.unit+' (current)</span></span>';
+      if(chart.threshold!==undefined){
+        items += '<span class="fs-legend-item"><span class="fs-legend-swatch" style="background:'+COLORS.red+'"></span>threshold <span class="fs-legend-value">'+fmt(chart.threshold)+'</span></span>';
+      }
+    }
+    return '<div class="fs-legend-row">'+items+'</div>';
+  }
+
+  /* "why this chart" log — a standing per-chart self-declaration, not a
+     tutorial: it never suggests the next question to ask, it only states
+     what THIS chart, here, answers and why this evidence justifies it. */
+  var whyCounter = 0;
+  function whyBlockHTML(question, why){
+    if(!question) return '';
+    whyCounter++;
+    var id = 'why-' + whyCounter;
+    return ''
+      + '<button class="why-toggle" data-why-target="'+id+'"><span class="why-glyph">?</span> Why this chart</button>'
+      + '<div class="why-note" id="'+id+'"><div><div class="why-note-inner">'
+      +   '<div class="why-q"><b>Answers:</b> '+question+'</div>'
+      +   '<div><b>Because:</b> '+why+'</div>'
+      + '</div></div></div>';
+  }
+  function wireWhyToggles(root){
+    root.querySelectorAll('.why-toggle').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        var note = document.getElementById(btn.getAttribute('data-why-target'));
+        note.classList.toggle('open');
+      });
+    });
+  }
+
+  function chartBlockHTML(chart){
+    var svg = chart.type==="bar" ? svgBar(chart) : svgLine(chart);
+    return '<div class="fs-chart-block" data-chart-block="'+(chart.id||"")+'">'
+      + '<div class="fs-chart-title">'+chart.title+'</div>'
+      + svg
+      + legendRow(chart)
+      + whyBlockHTML(chart.question, chart.why)
+      + '</div>';
+  }
+
+  // -------------------------------------------------------------
+  // Ledger list (folded cards) build
+  // -------------------------------------------------------------
+  function stageCardHTML(stage){
+    return ''
+      + '<article class="stage-card" data-stage-id="'+stage.id+'" id="stage-card-'+stage.id+'">'
+      +   '<div class="stage-header">'
+      +     '<div class="stage-badge">'+stage.roman+'</div>'
+      +     '<div class="stage-title">Stage '+stage.roman+' &mdash; '+stage.title+'</div>'
+      +     '<button class="fold-chevron-btn" data-open="'+stage.id+'" title="Expand to full screen">&#9662;</button>'
+      +   '</div>'
+      +   '<div class="stage-glance">'
+      +     '<span class="glyph" style="background:'+COLORS[stage.glyphColor]+'"></span>'
+      +     '<span><span class="glance-arrow" style="color:'+COLORS[stage.glyphColor]+'">'+stage.glyphArrow+'</span>'+stage.verdict+'</span>'
+      +   '</div>'
+      +   '<div class="stage-fold-hint">Click to expand &mdash; full screen</div>'
+      + '</article>';
+  }
+
+  // -------------------------------------------------------------
+  // Wiring: folded list
+  // -------------------------------------------------------------
+  var stageListEl = document.getElementById("stageList");
+  var stageTabsEl = document.getElementById("stageTabs");
+
+  stageListEl.innerHTML = STAGES.map(stageCardHTML).join("");
+  stageTabsEl.innerHTML = STAGES.map(function(s){
+    return '<button class="stage-tab" data-goto="'+s.id+'" title="Stage '+s.roman+' — '+s.title+'">'+s.roman
+      + '<span class="dot" style="background:'+COLORS[s.glyphColor]+'"></span></button>';
+  }).join("");
+
+  stageListEl.addEventListener("click", function(e){
+    var card = e.target.closest(".stage-card");
+    if(card) openStage(parseInt(card.dataset.stageId,10));
+  });
+
+  // stage tab navigation — scroll the (still folded) card into view
+  stageTabsEl.addEventListener("click", function(e){
+    var btn = e.target.closest(".stage-tab");
+    if(!btn) return;
+    var id = btn.dataset.goto;
+    var card = document.getElementById("stage-card-"+id);
+    if(!card) return;
+    card.scrollIntoView({behavior:"smooth", block:"start"});
+    card.classList.add("flash");
+    setTimeout(function(){ card.classList.remove("flash"); }, 900);
+  });
+
+  // -------------------------------------------------------------
+  // Full-screen expanded stage view (level 2 — everything at once)
+  // -------------------------------------------------------------
+  var fsOverlay = document.getElementById("fsOverlay");
+  var fsHeader = document.getElementById("fsHeader");
+  var fsBody = document.getElementById("fsBody");
+
+  var fsState = { stageId:null, drillIdx:null };
+
+  function stageById(id){
+    for(var i=0;i<STAGES.length;i++) if(STAGES[i].id===id) return STAGES[i];
+    return null;
+  }
+
+  function openStage(id){
+    fsState.stageId = id;
+    fsState.drillIdx = null;
+    fsOverlay.hidden = false;
+    requestAnimationFrame(function(){ fsOverlay.classList.add("open"); });
+    renderFs();
+  }
+  function closeFs(){
+    fsOverlay.classList.remove("open");
+    fsState.stageId = null;
+    fsState.drillIdx = null;
+    setTimeout(function(){ fsOverlay.hidden = true; }, 200);
+  }
+
+  function renderFs(){
+    var stage = stageById(fsState.stageId);
+    if(!stage) return;
+
+    if(fsState.drillIdx !== null){
+      renderFsHeaderDrill(stage);
+      renderFsBodyDrill(stage);
+      return;
+    }
+
+    fsHeader.innerHTML = ''
+      + '<div class="fs-breadcrumb">'
+      +   '<span class="crumb-seg" data-crumb="root">History</span>'
+      +   '<span class="crumb-sep">&rsaquo;</span>'
+      +   '<span class="crumb-seg current">Stage '+stage.roman+' &mdash; '+stage.title+'</span>'
+      + '</div>'
+      + '<div class="fs-header-controls">'
+      +   '<button class="fs-fold-btn" id="fsFoldBtn">&#9652; Fold up</button>'
+      + '</div>';
+    fsHeader.querySelector('#fsFoldBtn').addEventListener('click', closeFs);
+    fsHeader.querySelector('[data-crumb="root"]').addEventListener('click', closeFs);
+
+    var chartsHTML = stage.charts.map(chartBlockHTML).join("");
+    var proseHTML = stage.prose
+      ? '<div class="fs-prose">' + stage.prose.map(function(p){ return "<p>"+p+"</p>"; }).join("") + "</div>"
+      : '<div class="fs-prose-unavailable">Institutional record for this stage has not resolved to full detail yet &mdash; this is the whole record so far.</div>';
+
+    fsBody.innerHTML = ''
+      + '<div class="fs-verdict"><span class="glyph" style="background:'+COLORS[stage.glyphColor]+'"></span>'
+      +   '<span><span class="glance-arrow" style="color:'+COLORS[stage.glyphColor]+'">'+stage.glyphArrow+'</span>'+stage.verdict+'</span></div>'
+      + '<div class="fs-charts-row">'+chartsHTML+'</div>'
+      + proseHTML;
+
+    fsBody.querySelectorAll(".chart-point.clickable, .fs-chart-point.clickable, .fs-bar-rect.clickable").forEach(function(pt){
+      pt.addEventListener("click", function(){
+        if(pt.dataset.chart !== "frag3") return; // only Stage III's fragmentation chart is drillable in this mock
+        fsState.drillIdx = parseInt(pt.dataset.idx,10);
+        renderFs();
+      });
+    });
+    wireWhyToggles(fsBody);
+  }
+
+  function renderFsHeaderDrill(stage){
+    fsHeader.innerHTML = ''
+      + '<div class="fs-breadcrumb">'
+      +   '<button class="fs-back-btn" id="fsBackBtn" title="Back">&#8249;</button>'
+      +   '<span class="crumb-seg" data-crumb="root">History</span>'
+      +   '<span class="crumb-sep">&rsaquo;</span>'
+      +   '<span class="crumb-seg" data-crumb="stage">Stage '+stage.roman+'</span>'
+      +   '<span class="crumb-sep">&rsaquo;</span>'
+      +   '<span class="crumb-seg current">Fragmentation detail</span>'
+      + '</div>'
+      + '<div class="fs-header-controls">'
+      +   '<button class="fs-fold-btn" id="fsFoldBtn">&#9652; Fold up</button>'
+      + '</div>';
+    fsHeader.querySelector('#fsFoldBtn').addEventListener('click', closeFs);
+    fsHeader.querySelector('[data-crumb="root"]').addEventListener('click', closeFs);
+    fsHeader.querySelector('[data-crumb="stage"]').addEventListener('click', function(){ fsState.drillIdx = null; renderFs(); });
+    fsHeader.querySelector('#fsBackBtn').addEventListener('click', function(){ fsState.drillIdx = null; renderFs(); });
+  }
+
+  function renderFsBodyDrill(stage){
+    var chart = stage.charts[0]; // frag3
+    var idx = fsState.drillIdx;
+    var events = STAGE3_EVENTS[idx] || [];
+    var d = chart.data[idx];
+    var prevVal = idx>0 ? chart.data[idx-1].value : d.value;
+    var delta = (d.value - prevVal).toFixed(2);
+
+    var li = events.map(function(evt){
+      return '<li><span>'+evt+'</span><span class="evt-delta">'+(idx===0?'—':(delta<=0?"":"+")+delta+' frag')+'</span></li>';
+    }).join("");
+
+    fsBody.innerHTML = ''
+      + '<div class="fs-drill-hint">Fragmentation index &mdash; recent ticks, Stage III. Click another point to see that tick&rsquo;s events.</div>'
+      + '<div class="fs-chart-block">'
+      +   svgLine({ type:"line", color:chart.color, unit:"", drillable:true, id:"frag3",
+                     threshold:chart.threshold, thresholdLabel:chart.thresholdLabel, data:chart.data })
+      +   '<div class="fs-legend-row"><span class="fs-legend-item"><span class="fs-legend-swatch" style="background:'+chart.color+'"></span>selected tick <span class="fs-legend-value">'+d.label+' — '+fmt(d.value)+'</span></span></div>'
+      + '</div>'
+      + '<ul class="fs-events">'+li+'</ul>'
+      + '<div class="fs-drill-tail-hint">This is a second drill level below the stage &mdash; the breadcrumb above unwinds one hop at a time.</div>'
+      + whyBlockHTML(
+          "What actually happened in the world the tick fragmentation moved by this much?",
+          "The index alone can't distinguish a quiet drift from a specific, nameable event — the event list is the evidence a historian would cite if asked to justify the number."
+        );
+
+    fsBody.querySelectorAll(".fs-chart-point.clickable").forEach(function(c){
+      c.addEventListener("click", function(){ fsState.drillIdx = parseInt(c.dataset.idx,10); renderFs(); });
+    });
+    wireWhyToggles(fsBody);
+  }
+
+})();
+</script>

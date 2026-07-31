@@ -34,12 +34,14 @@ chrome** — tiered population-centre conurbation markers, sized by scale and la
 The game window is divided into two regions:
 
 - **Primary region** — the majority of the window. The active canvas fills this space.
-- **Minimap region** — a fixed inset in the bottom-right corner, framed by its own chrome (a title bar above). The neighbouring canvas renders in the inset beneath it. (The overlay-lens toggles that once sat in a mode bar below the inset now live in a bottom-left overlay control strip.)
+- **Minimap region** — a fixed inset in the bottom-right corner, framed by its own chrome (a title bar above, and the **lens mode bar** along its bottom edge — BL-093 moved the overlay-lens toggles onto the minimap itself; see `MINIMAP.md` / `LENSES.md`). The neighbouring canvas renders in the inset beneath it.
 
-**Default state.** The game opens on the **corporation's home planet** (Kepler in
-the hard-coded world): the Planetary screen is primary with the home body
-selected, and the minimap shows that planet's Circumplanetary view. The opening
-rung is the surface, not the system — the player starts looking at home.
+**Default state.** The app opens on the **main menu**, not a canvas: main menu →
+New World wizard → "Begin" hands over to `in_game` (the `app_screen` flow —
+see [STARTUP.md](STARTUP.md)). The **first in-game view** is then the
+**corporation's home planet**: the Planetary screen is primary with the home
+body selected, and the minimap shows that planet's Circumplanetary view. The
+opening rung is the surface, not the system — the player starts looking at home.
 
 ---
 
@@ -111,27 +113,15 @@ showing the game name rather than a canvas.
 
 ## Shared selection / view state
 
-A small struct in `src/ui/ui_state.hpp`, held by `app`:
-
-```cpp
-enum class canvas_level { solar, circumplanetary, planetary };
-enum class overlay_mode { none, supply, market, faction };
-
-struct ui_state
-{
-    entity_id    active_body   = null_entity;            // drives the lower rungs
-    entity_id    active_tile   = null_entity;            // set by tile click; consumed by later layers
-    canvas_level primary_level = canvas_level::solar;    // which rung fills the window
-    overlay_mode overlay       = overlay_mode::none;     // active overlay lens; toggled by the bottom overlay control strip (defaults to none — the plain canvas)
-
-    bool show_tile_ledger = false;                       // owned by the nav pane, not the canvases
-
-    // per-canvas pan/zoom (primary only; the minimap always shows default framing)
-    float solar_zoom, solar_pan_x, solar_pan_y;
-    float circum_zoom, circum_pan_x, circum_pan_y;
-    float planetary_zoom, planetary_pan_x, planetary_pan_y;
-};
-```
+The shared struct is `ui_state` in `src/ui/ui_state.hpp` — the code is the
+reference; no snippet is mirrored here (an earlier copy drifted badly). The
+load-bearing members for the canvases: the `active_body` / `active_tile`
+navigation anchors, `selected_entity` (the Selection state, SELECTION.md),
+`primary_level` (`canvas_level` — which rung fills the window), `overlay`
+(`overlay_mode` — **fourteen** values: `none` plus thirteen lenses, LENSES.md;
+the early `faction` mode was renamed **`country`**), and per-canvas pan/zoom.
+The struct has since grown hover-card, construction, vision, and drill-down
+state — see the header itself.
 
 Selection, hover, and pinning are drawn through a shared **highlight convention**
 (`src/ui/highlight.hpp`) so they read the same on every canvas: white for the
@@ -151,6 +141,72 @@ jump-to affordance; the Explorer that first motivated it is superseded, see
 parent if it is a moon — see `circumplanetary_anchor`), and the Planetary view
 draws `active_body`. `show_tile_ledger` is shared housekeeping for the left
 navigation pane; the canvases do not touch it.
+
+---
+
+## Terrain channels — composition and landform (BL-231)
+
+This section is the **shared-ladder spec** for the landform render — it lives here, not
+in PLANETARY.md, because the implementation is `hex_render` and serves two surfaces (the
+canvas and the Selection band's neighbourhood view); PLANETARY.md § Layers points back
+here (2026-07-31).
+
+A tile's character has two axes ([TILES.md](../economy/TILES.md)), and the Planetary
+canvas draws them on **two separate channels**. Both are **always-on chrome**, not an
+`overlay_mode`: terrain identity is not something the player opts into, and landform's
+movement-cost multiplier applies whether or not a lens is active.
+
+| Axis | Channel | Source |
+|---|---|---|
+| **Composition** (what it is made of) | **Hue** — the flat hex fill | `ui::terrain_colour` |
+| **Landform** (its physical shape) | **Relief tint** + **glyph** | `ui::landform_relief`, `ui::icons::landform` |
+
+**Why two channels rather than one.** Lens tints composite over the terrain hue at
+0.6–0.80 alpha, so a second signal carried *in that hue* is obliterated exactly when a
+lens is on. This is the rule BL-226 established for the Continent lens's plate
+boundaries and it applies here unchanged: the relief is composited **after** every lens
+branch, and the glyphs are drawn over the finished fill in a contrasting ink
+(`ui::contrast_ink`, picked by the fill's luminance so it reads over the whole palette).
+
+**Why the landform channel splits in two.** The measured mix (`world_audit` § S3) decided
+it. Plains and valley alone are ~95 % of land tiles, while every dramatic landform is
+≤ 1.5 %:
+
+- **Common ground — relief tint.** Plains is the untouched baseline; elevated ground lifts
+  toward a warm highlight and sunken ground toward a cool shadow, on a small signed
+  ordinal scale (mountain highest → canyon lowest). Deliberately subtle: it must read as
+  light on terrain, never as a change of composition.
+- **Dramatic landforms — glyph.** Mountain, canyon, crater and rift each draw a stroke-only
+  silhouette ([ICONS.md](ICONS.md) § Landform). These are the ≤ 1.5 % set whose movement cost
+  is ×1.3 or worse, so an invisible surprise there is expensive. A glyph on *every* tile
+  would be far denser than any other glyph family and would fight the building silhouette
+  for the hex centre.
+
+**Contiguous runs are bridged (BL-232).** A run of the same linear landform draws as **one**
+spanning marker rather than the same glyph repeated per tile — mountain as a chain of peaks, rift
+as one continuous fissure, canyon as paired rims — reusing BL-172's road span/symmetry idiom (each
+tile draws its own half of the shared edge, so halves meet at the midpoint with no cross-tile state
+and the survey fog clips cleanly). A lone tile keeps its centred glyph, the role the road's centre
+cap plays. Crater never spans. Contiguity was measured before the render was built (`world_audit`
+§ S4): 71% of mountain and 81% of rift tiles have such a neighbour, so bridging fires on the
+majority — while **no** tile in the system has all four, which cancelled the designed
+"filled interior" case before it was written.
+
+**The glyphs are named where the player looks.** Every tile hover card states
+`composition · landform` and, on the plain canvas, the landform's movement cost. Before BL-232 the
+hover named only the composition, so the glyph vocabulary could be learned only by clicking each
+tile through to the Selection panel — which is not learning. Plains stays unnamed: it is the
+untouched baseline in both channels.
+
+**Suppression rules.** The glyph is skipped on a **built** tile (which already carries an
+enlarged silhouette plus a corp emblem tag, and whose cost is already spent — elevation
+matters when *siting*) and under the **Population/Opportunity** lenses (which claim the hex
+centre for their own value mark, BL-135). The relief tint is likewise skipped on a built
+tile, whose hex is swapped wholesale for its owner plate as an identity signal.
+
+Both channels also render in the Selection band's zoomed tile-neighbourhood view, which is
+why they live in `hex_render` rather than in the canvas — one implementation, so the two
+surfaces cannot drift. Verified by `scripts/verify/landform_relief.lua`.
 
 ---
 
@@ -193,12 +249,14 @@ function still draws unconditionally; it just skips hover/click handling when
 
 ## What is deferred
 
-Economic and military data (supply routes, faction presence, convoy paths) are
-added in later layers as overlay **lenses** on these canvases. The overlay
-*mechanism* now exists as a building block — an overlay draw pass over each
-canvas (`src/ui/overlay.hpp`), an `overlay_mode` value in `ui_state`, and a
-bottom-left **overlay control strip** (`draw_overlay_controls`) wired to toggle
-it (a default lens is active on load). Until those layers supply data, the draw
-pass renders nothing — the active lens is named by the control strip, not an
-on-canvas chip; the lens geometry (Layer 5 supply routes first) hangs off the
-same pass.
+Little, on the lens front: **twelve of the thirteen lenses render today** —
+Corporation, Country, Resource, Market, Population, Opportunity, Production,
+Scarcity, Industry, Reach, Continent, and Supply-routes all draw real geometry
+in the Planetary canvas's draw pass (`body_surface_canvas.cpp`, keyed on
+`ui_state::overlay`; catalogued in LENSES.md). Only the original **Supply**
+lens remains gated, on Layer-5 supply-route rendering. The lens *controls* are
+the eight-glyph mode bar on the minimap (`draw_overlay_controls`,
+`src/ui/overlay.cpp`) plus keyboard cycling; no lens is active on load — the
+canvas opens unskinned. The vestigial `draw_canvas_overlay` pass in
+`overlay.cpp` still renders nothing — the lens geometry grew inside the canvas
+draw functions instead, which is where per-tile compositing had to happen.
