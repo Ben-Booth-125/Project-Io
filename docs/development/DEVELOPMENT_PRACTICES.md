@@ -122,6 +122,40 @@ Two disciplines follow:
 *(The 2026-07-05 sweep numbers that used to sit here — 9 pass / 66 fail / 55 no-golden — are dead:
 the bulk re-blesses above reset the whole baseline, 68 scripts blessed per sweep.)*
 
+#### Cross-platform goldens — settled 2026-08-01 (BL-252)
+
+The suite could not be green on Windows and Linux at once, and the two golden families turned out
+to need **different answers**. Both are now settled; the underlying measurement is in BL-252.
+
+**Visual goldens are Windows-authoritative.** They are blessed and diffed on Windows only. On
+Linux the same commit diffs 9–57%, because pixel output depends on font rasterisation and the
+GPU/driver as well as the toolchain — pinning a set per platform would mean re-blessing on every
+driver update, for no gain in regression detection. On Linux, **inspect captures by eye and do not
+golden-diff them**; the Linux visual-verify job stays advisory (§ above).
+
+**Headless golden bands are pinned per toolchain.** `ai_skill_harness` carries one blessed set per
+compiler, selected by `#if defined(_MSC_VER)` / `#elif defined(__GNUC__)`, with an `#error` for any
+third toolchain so it cannot silently inherit another's numbers. Both sets pass today.
+
+- **Why pinned, not widened.** The same commit gives seed 4 a final net worth of 182,746 under
+  GCC and 392,148 under MSVC. A band holding both would span ~±100% and detect no plausible
+  regression. Widening was measured and rejected, not assumed.
+- **Why this is not a determinism failure.** The standing invariant is same-seed, **same-build**
+  reproducibility, and it holds on each platform independently — `ai_skill_harness`'s R0 tier
+  (state hash, net-worth curve, action tallies, byte-identical across two same-seed runs) passes on
+  both. 300 ticks of a feedback-coupled economy amplifies last-bit float differences; bit-identical
+  FP across MSVC and GCC is explicitly **not** a goal this prototype adopts.
+- **Optimisation level is not the variable.** MSVC `/O2` reproduces MSVC Debug value for value.
+  The toolchain is.
+- **Re-blessing rule.** Run the harness on the platform whose set you are changing and change
+  **only that set**. Never copy one platform's observed values into the other's block.
+
+A corollary worth stating: a golden-band failure on a platform whose set was blessed long ago is
+usually **staleness, not regression**. BL-252's Windows bands had been blessed in the same commit
+that added the harness, before BL-203 rewrote the Corp AI strategy layer — so the AI was scored
+against goldens set for a different AI. Check what landed since the bless before reading a red band
+as a skill regression.
+
 This is the standard tool for the `visual` verification class in
 [`req/REQUIREMENTS.md`](req/REQUIREMENTS.md). When a requirement's verification is
 `visual` and no other tool fits, author (or extend) a `scripts/verify/*.lua` script

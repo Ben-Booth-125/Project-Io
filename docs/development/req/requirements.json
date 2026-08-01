@@ -7224,6 +7224,82 @@
           "notes": "Timeout values apply uniformly via the tools/verify/*.cpp glob loop, which is also where pregame_balance_harness/persona_counsel_harness/survey_harness/etc. register their add_test call despite being hand-declared executables above it."
         }
       ]
+    },
+    {
+      "brief": "goldens-platform-dependent",
+      "title": "Golden bands and visual goldens are platform-dependent (BL-252)",
+      "difficulty": 3,
+      "importance": "A",
+      "evaluated_difficulty": 3,
+      "status": "complete",
+      "resolved": "2026-08-01",
+      "resolution": "Complete. Diagnostic found BOTH candidate causes real and independent. Windows bands re-blessed (they were stale, blessed before BL-203 rewrote the Corp AI); bands then pinned per toolchain per Ben's call, with visual goldens declared Windows-authoritative. Both platforms now ALL PASS.",
+      "promoted_from": "BL-252 (goldens platform-dependent)",
+      "batch": null,
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: the suite can be green on Windows AND Linux at the same commit, without weakening what the bands detect.",
+          "verification": [
+            "headless: tools/verify/ai_skill_harness.cpp on both platforms"
+          ],
+          "status": "complete",
+          "result_metric": "Windows/MSVC: ALL PASS (0 failures). Linux/GCC -O2: ALL PASS (0 failures). Same commit, same source, two blessed sets selected by _MSC_VER / __GNUC__.",
+          "notes": "An #error guards any third toolchain so it cannot silently inherit another platform's numbers."
+        },
+        {
+          "id": "R2",
+          "requirement": "The two candidate causes (cross-platform float divergence vs stale goldens) are DISTINGUISHED by measurement before anything is re-blessed, as the item requires.",
+          "verification": [
+            "headless: ai_skill_harness re-run on Windows at the same commit",
+            "review: git log 8542e4b..HEAD -- src/world/"
+          ],
+          "status": "complete",
+          "result_metric": "BOTH are real. Windows failed 5 assertions on its own blessed bands => stale. Windows vs Linux differ by up to ~2x on the same commit (seed 4 final 392148.4 vs 182745.5) => platform divergence also real. Staleness cause identified precisely: bands were blessed in 8542e4b, the commit that ADDED the harness; BL-203, BL-221 and BL-233 all landed after.",
+          "notes": "The item anticipated one cause or the other; the measurement found both, which is why the policy needed two different answers."
+        },
+        {
+          "id": "R3",
+          "requirement": "The Debug/Release confound is removed — the divergence is attributed to the toolchain, not to optimisation level.",
+          "verification": [
+            "headless: MSVC /O2 build of ai_skill_harness compared against the MSVC Debug build"
+          ],
+          "status": "complete",
+          "result_metric": "MSVC /O2 reproduced MSVC Debug value for value on all five seeds (e.g. seed 3 final 338420.1 in both). Optimisation level is not the variable.",
+          "notes": "Built via a direct cl /O2 line; the VS multi-config generator could not be reconfigured because the SDL3 FetchContent egress is blocked on this box."
+        },
+        {
+          "id": "R4",
+          "requirement": "Widening bands to be platform-independent is evaluated against real numbers and not merely asserted to be unworkable.",
+          "verification": [
+            "review: measured band span required to hold both platforms"
+          ],
+          "status": "complete",
+          "result_metric": "REJECTED on measurement. Seed 4 alone runs 182746 (GCC) to 392148 (MSVC); a band holding both spans roughly +/-100% and would detect no plausible skill regression. Option (b) is dead, and recorded as dead.",
+          "notes": "Ben chose pinned-per-toolchain over Windows-authoritative for the headless tier, so a Linux session can still catch an AI skill regression."
+        },
+        {
+          "id": "R5",
+          "requirement": "The policy is written down where the next session will find it, not left implicit in code.",
+          "verification": [
+            "code: docs/development/DEVELOPMENT_PRACTICES.md § Cross-platform goldens",
+            "code: tools/verify/ai_skill_harness.cpp band block comment"
+          ],
+          "status": "complete",
+          "result_metric": "New DEVELOPMENT_PRACTICES.md section records both answers, the re-blessing rule (change only the set for the platform you ran on), why this is not a determinism failure, and the corollary that a long-unblessed red band is usually staleness.",
+          "notes": "The undocumented de-facto policy the item named — option (c), holding by accident — is now replaced by a stated one."
+        },
+        {
+          "id": "R6",
+          "requirement": "The visual-golden half is settled too, since the item notes it may answer differently from the headless bands.",
+          "verification": [
+            "code: docs/development/DEVELOPMENT_PRACTICES.md § Cross-platform goldens"
+          ],
+          "status": "complete",
+          "result_metric": "Declared Windows-authoritative (Ben's call): blessed and diffed on Windows only; Linux captures inspected by eye, never golden-diffed. Rationale recorded — pixel output depends on font rasterisation and GPU/driver, so a per-platform pin would force a re-bless on every driver update for no detection gain.",
+          "notes": "Still owed and deliberately outside this item: the four scripts/verify/*.lua goldens made stale by BL-162 row-anatomy changes need re-blessing on Windows."
+        }
+      ]
     }
   ]
 }

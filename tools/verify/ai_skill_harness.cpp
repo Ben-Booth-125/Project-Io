@@ -252,24 +252,84 @@ struct seed_golden
 // ---------------------------------------------------------------------------
 constexpr int ticks_per_seed = 300;
 
-// Bands observed from a first pass of this exact harness (2026-07-31):
-//   seed 0: net-worth final=372800.6 min=94455.8  solvency=6/30  survival=0.57  build=0 dial=123
-//   seed 1: net-worth final=406956.5 min=138680.5 solvency=0/30  survival=0.71  build=0 dial=155
-//   seed 2: net-worth final=306049.3 min=103739.1 solvency=4/30  survival=0.29  build=0 dial=159
-//   seed 3: net-worth final=215294.7 min=74739.2  solvency=3/30  survival=0.43  build=0 dial=108
-//   seed 4: net-worth final=285580.7 min=96026.4  solvency=5/30  survival=0.86  build=0 dial=121
+// RE-BLESSED 2026-08-01 on Windows/MSVC (BL-252). Observed:
+//   seed 0: net-worth final=206245.2 min=67709.2  solvency=6/30  survival=0.71  build=0 dial=123
+//   seed 1: net-worth final=357967.1 min=106137.9 solvency=0/30  survival=0.86  build=0 dial=169
+//   seed 2: net-worth final=305816.9 min=84838.8  solvency=0/30  survival=0.71  build=0 dial=156
+//   seed 3: net-worth final=338420.1 min=116730.4 solvency=8/30  survival=0.71  build=0 dial=157
+//   seed 4: net-worth final=392148.4 min=119728.7 solvency=4/30  survival=0.86  build=0 dial=121
 // Bands are the observed value ±roughly 30-45% (net-worth/survival) or a modest
 // fixed slack (solvency/action ceilings) — tight enough to catch a real skill
 // regression, loose enough that ordinary tuning noise doesn't force a re-bless
 // every session. Disposable per project convention: bless routinely from a
 // fresh run, don't stage a review, flag only an UNEXPLAINED divergence.
+//
+// Why the previous bands were stale, and why re-blessing them was safe: they were
+// authored from the FIRST run of this harness, in the same commit that added it
+// (8542e4b). Several world-layer changes landed afterwards — most decisively
+// BL-203 (Corp AI stage B: the strategy layer, priority buckets and predictive
+// spending), then BL-221 (pre-national ladder) and BL-233 (terrain combat
+// modifiers), both of which reshape the political map every seed generates. The
+// AI these bands score was substantially rewritten after its own goldens were
+// set, so the divergence is EXPLAINED, not a skill regression.
+//
+// THE BANDS ARE PINNED PER TOOLCHAIN (BL-252, Ben's call 2026-08-01).
+//
+// The same commit under Linux/GCC -O2 produces materially different values from
+// Windows/MSVC — seed 0 final 395143.0 against 206245.2, seed 4 182745.5 against
+// 392148.4 — while each platform stays perfectly deterministic WITHIN itself
+// (R0 passes on both: same-seed state hashes and net-worth curves are
+// byte-identical, on each). 300 ticks of a feedback-coupled economy amplifies
+// last-bit float differences, so this is expected rather than a defect. The
+// standing determinism invariant is same-seed/same-BUILD reproducibility, and it
+// is intact; bit-identical floating point across MSVC and GCC is explicitly not a
+// goal this prototype adopts.
+//
+// Optimisation level is NOT the variable: MSVC /O2 reproduces MSVC Debug exactly,
+// value for value. The toolchain is.
+//
+// Why pinned rather than widened: a single band wide enough to hold both platforms
+// would span roughly ±100% (seed 4 alone runs 182746 to 392148) and would detect
+// no plausible skill regression at all. Pinning keeps both platforms asserting
+// real bands, at the cost of re-blessing two sets when the AI deliberately changes.
+//
+// Re-blessing: run the harness on the platform whose set you are changing, and
+// change ONLY that set. Never copy one platform's observed values into the other's
+// block — that is the failure mode this structure exists to prevent. A third
+// toolchain (Clang, or a different libstdc++) needs its own block and its own
+// blessed run; it must not silently inherit the GCC set.
+//
+// The visual goldens answer differently and are Windows-authoritative (pixel
+// output additionally depends on font rasterisation and GPU/driver) — see
+// docs/development/DEVELOPMENT_PRACTICES.md § Goldens.
+#if defined(_MSC_VER)
+// --- Windows / MSVC — blessed 2026-08-01, values in the table above. ---
 const std::vector<seed_golden> goldens = {
-    { 0, {220000.0f, 520000.0f}, { 50000.0f, 150000.0f}, 12, {0.30f, 0.85f},  5, 200 },
-    { 1, {250000.0f, 560000.0f}, { 80000.0f, 200000.0f},  5, {0.45f, 0.95f},  5, 230 },
-    { 2, {180000.0f, 430000.0f}, { 55000.0f, 155000.0f}, 10, {0.05f, 0.55f},  5, 240 },
-    { 3, {120000.0f, 310000.0f}, { 40000.0f, 115000.0f},  8, {0.20f, 0.65f},  5, 165 },
-    { 4, {160000.0f, 410000.0f}, { 55000.0f, 145000.0f}, 10, {0.60f, 1.00f},  5, 185 },
+    { 0, {120000.0f, 290000.0f}, { 40000.0f,  95000.0f}, 12, {0.45f, 0.95f},  5, 200 },
+    { 1, {215000.0f, 500000.0f}, { 60000.0f, 150000.0f},  5, {0.60f, 1.00f},  5, 230 },
+    { 2, {180000.0f, 430000.0f}, { 50000.0f, 120000.0f},  5, {0.45f, 0.95f},  5, 220 },
+    { 3, {200000.0f, 475000.0f}, { 70000.0f, 165000.0f}, 14, {0.45f, 0.95f},  5, 220 },
+    { 4, {235000.0f, 550000.0f}, { 70000.0f, 170000.0f}, 10, {0.60f, 1.00f},  5, 200 },
 };
+#elif defined(__GNUC__)
+// --- Linux / GCC -O2 — blessed 2026-08-01. Observed:
+//   seed 0: net-worth final=395143.0 min=123180.0 solvency=5/30  survival=0.71  build=0 dial=174
+//   seed 1: net-worth final=550394.2 min=177619.3 solvency=0/30  survival=0.71  build=0 dial=170
+//   seed 2: net-worth final=505318.6 min=155243.2 solvency=0/30  survival=0.71  build=0 dial=244
+//   seed 3: net-worth final=305209.8 min=93584.9  solvency=3/30  survival=0.71  build=0 dial=109
+//   seed 4: net-worth final=182745.5 min=51070.9  solvency=4/30  survival=0.71  build=0 dial=122
+const std::vector<seed_golden> goldens = {
+    { 0, {235000.0f, 555000.0f}, { 70000.0f, 175000.0f}, 12, {0.45f, 0.95f},  5, 240 },
+    { 1, {330000.0f, 770000.0f}, {105000.0f, 250000.0f},  5, {0.45f, 0.95f},  5, 240 },
+    { 2, {300000.0f, 710000.0f}, { 90000.0f, 220000.0f},  5, {0.45f, 0.95f},  5, 330 },
+    { 3, {180000.0f, 430000.0f}, { 55000.0f, 130000.0f}, 10, {0.45f, 0.95f},  5, 160 },
+    { 4, {110000.0f, 255000.0f}, { 30000.0f,  72000.0f}, 10, {0.45f, 0.95f},  5, 180 },
+};
+#else
+#error "ai_skill_harness: no blessed golden band set for this toolchain (BL-252). \
+Bless one from a fresh run on this toolchain and add its own block — do not \
+reuse another toolchain's values."
+#endif
 
 } // namespace
 
