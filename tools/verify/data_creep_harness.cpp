@@ -17,6 +17,18 @@
 // to. A FAIL here is a finding about the simulation, not a broken harness — do not
 // weaken the tolerance to make it green.
 //
+// BL-254: the rollout also drives CONVOY TRAFFIC. The generated world places no
+// launchpad, so `dispatch_convoys`' inter-body lane is gated shut and its intra-body
+// lane never fires either — over 1500 ticks the original run dispatched nothing, and
+// `world.convoys` / `world.trade_routes` / `world.body_last_glimpse_tick` all sat at
+// zero, making their three plateau assertions VACUOUS. Those are the three structures
+// with the most reason to grow (`trade_route` is documented as never erased). So the
+// harness now seeds one convoy per tick onto a rotating, fully deterministic schedule
+// of (corp, body-pair, resource) and lets the REAL supply API carry it — the same
+// manufacture-a-convoy pattern app.cpp's `verify.seed_convoy` and
+// tools/verify/trade_routes_harness.cpp already use. No src/world change; no RNG.
+// See § CONVOY TRAFFIC below.
+//
 // Hand-builds a recipe_registry (mirrors scripts/economy.lua + scripts/recipes.lua)
 // so the harness stays Lua-free, per verifier-headless convention; links the
 // SDL/Lua-free world superset (every src/world/*.cpp except recipe_registry.cpp,
@@ -162,6 +174,153 @@ recipe_registry make_registry()
     reg.add_recipe(food);
 
     return reg;
+}
+
+// ---------------------------------------------------------------------------
+// CONVOY TRAFFIC (BL-254)
+// ---------------------------------------------------------------------------
+// Why seeded rather than auto-dispatched: `dispatch_convoys` only creates an
+// inter-body convoy for a corp that owns a launchpad on the source body, and the
+// generated world places none (app.cpp says as much at `verify.seed_convoy`:
+// "without depending on auto-dispatch (which requires launchpads not present in the
+// generated world)"). Manufacturing the convoy and handing it to the real
+// advance/credit path is the sanctioned pattern for exactly this reason — and it is
+// the credit path, not the dispatch path, that owns all three of the structures
+// under test (route upsert, glimpse stamp, convoy retirement).
+//
+// The schedule is a pure function of the tick:
+//
+//   pair_i = t % pairs.size()          rotating over every ordered body-pair
+//   corp_i = (t / pairs.size()) % corps.size()
+//   res_i  = t % k_cargo_count
+//
+// so the run cycles the WHOLE (corp × body-pair) key space of `trade_routes` many
+// times over. That is what makes the plateau bind: the route store must saturate at
+// its structural bound (distinct corp × unordered-pair keys) early and then stay
+// flat while traffic keeps arriving. If the upsert ever failed to dedupe, the store
+// would climb linearly for the rest of the run and the instrument would name it.
+//
+// Speed is fixed at 1/5 so each convoy spends five ticks in flight: `world.convoys`
+// must hold a steady ~5 and drain, not accumulate. Cargo is 1 unit — enough to
+// exercise the pool credit + market supply injection without drowning the economy
+// the other ~30 counters are measuring.
+
+constexpr float k_convoy_speed  = 0.2f;   // 5 ticks in flight
+constexpr float k_convoy_cargo  = 1.0f;
+constexpr int   k_max_traffic_corps = 3;  // player + the two lowest-id others
+
+const resource_type k_cargo[] = {
+    resource_type::iron_ore,
+    resource_type::petroleum,
+    resource_type::agricultural_produce,
+};
+constexpr int k_cargo_count = static_cast<int>(sizeof(k_cargo) / sizeof(k_cargo[0]));
+
+struct traffic_plan
+{
+    std::vector<entity_id> corps;                                  ///< Dispatching corps.
+    std::vector<std::pair<entity_id, entity_id>> market_pairs;     ///< Ordered market pairs.
+    long long seeded = 0;
+    long long stub_markets = 0;   ///< Markets the plan had to author (see below).
+    /// Structural bound on trade_routes this schedule can ever produce:
+    /// distinct corps x distinct unordered body-pairs.
+    long long route_key_bound = 0;
+};
+
+/// Build the schedule from the generated world. Deterministic: every collection is
+/// gathered in ascending entity-id order (w.markets / w.corporations / w.bodies are
+/// ordered maps).
+///
+/// Takes a mutable world because it may have to AUTHOR markets. Measured 2026-08-01:
+/// the generated world's six markets all sit on the single tiled body (Kepler), so the
+/// world contains **no inter-body market pair at all** — a second reason, independent
+/// of the launchpad gate, that the original rollout could not produce a single trade
+/// route. A route is body-level and intra-body lanes record nothing, so the plan seeds
+/// a minimal stub market on each remaining non-star body, exactly as app.cpp's
+/// `verify.seed_convoy` does ("If the destination body has no market a minimal one is
+/// created"). The stubs are authored ONCE, before tick 1 — a fixed additive offset on
+/// world.markets / entity count, not a per-tick allocation, so they cannot manufacture
+/// a plateau. Their count is reported.
+traffic_plan plan_traffic(world& w)
+{
+    traffic_plan plan;
+
+    // Player corp first (its convoys are the ones that stamp glimpses — see
+    // credit_arrived_convoys, which gates record_proximity_glimpses on the player),
+    // then the lowest-id others, so the schedule exercises both branches.
+    if (w.player_entity != null_entity && w.corporations.count(w.player_entity) != 0)
+        plan.corps.push_back(w.player_entity);
+    for (const auto& [cid, corp] : w.corporations)
+    {
+        if (static_cast<int>(plan.corps.size()) >= k_max_traffic_corps) break;
+        if (cid != w.player_entity) plan.corps.push_back(cid);
+    }
+
+    // One market per body (the lowest-id one), so a pair is always an inter-body lane
+    // — an intra-body lane records no route and would not exercise the store.
+    std::vector<std::pair<entity_id, entity_id>> body_market; // (body, market)
+    for (const auto& [mid, mc] : w.markets)
+    {
+        if (mc.body == null_entity) continue;
+        const bool seen = std::any_of(body_market.begin(), body_market.end(),
+                                      [&](const auto& bm) { return bm.first == mc.body; });
+        if (!seen) body_market.emplace_back(mc.body, mid);
+    }
+
+    // Author the missing endpoints (see the note on this function).
+    std::vector<entity_id> unmarketed;
+    for (const auto& [bid, bc] : w.bodies)
+    {
+        if (bc.type == body_type::star) continue;
+        const bool has = std::any_of(body_market.begin(), body_market.end(),
+                                     [&](const auto& bm) { return bm.first == bid; });
+        if (!has) unmarketed.push_back(bid);
+    }
+    for (const entity_id bid : unmarketed)
+    {
+        const entity_id mid = w.create_entity();
+        market_component mc{};
+        mc.body = bid;
+        w.markets[mid] = mc;
+        body_market.emplace_back(bid, mid);
+        ++plan.stub_markets;
+    }
+
+    std::sort(body_market.begin(), body_market.end());
+
+    for (std::size_t i = 0; i < body_market.size(); ++i)
+        for (std::size_t j = 0; j < body_market.size(); ++j)
+            if (i != j)
+                plan.market_pairs.emplace_back(body_market[i].second, body_market[j].second);
+
+    const long long n = static_cast<long long>(body_market.size());
+    plan.route_key_bound = static_cast<long long>(plan.corps.size()) * (n * (n - 1) / 2);
+    return plan;
+}
+
+/// Seed the tick's scheduled convoy. Mirrors app.cpp's `verify.seed_convoy` — build a
+/// convoy_component and push it; the real advance_convoys / credit_arrived_convoys
+/// pair does everything else (route upsert, glimpse stamp, pool credit, retirement).
+void seed_scheduled_convoy(world& w, traffic_plan& plan, int t)
+{
+    if (plan.corps.empty() || plan.market_pairs.empty()) return;
+
+    const std::size_t np = plan.market_pairs.size();
+    const std::size_t pi = static_cast<std::size_t>(t) % np;
+    const std::size_t ci = (static_cast<std::size_t>(t) / np) % plan.corps.size();
+
+    convoy_component cv{};
+    cv.source_market  = plan.market_pairs[pi].first;
+    cv.dest_market    = plan.market_pairs[pi].second;
+    cv.mode           = convoy_mode::space;
+    cv.cargo_resource = k_cargo[t % k_cargo_count];
+    cv.cargo_qty      = k_convoy_cargo;
+    cv.progress       = 0.0f;
+    cv.speed          = k_convoy_speed;
+    cv.corp           = plan.corps[ci];
+    cv.arrived        = false;
+    w.convoys.push_back(cv);
+    ++plan.seeded;
 }
 
 // ---------------------------------------------------------------------------
@@ -378,10 +537,12 @@ int main(int argc, char* argv[])
     for (const int m : marks)
         if (m <= 500) mid_tick = m;
 
-    std::printf("BL-251 data-creep instrument — real generated world, %d ticks\n", total_ticks);
-    std::printf("Sequence per tick: advance_orbits -> dispatch_convoys -> advance_convoys ->\n"
-                "                   run_economy_step -> clear_markets -> apply_budget ->\n"
-                "                   credit_arrived_convoys -> advance_surveys  (mirrors main.cpp)\n\n");
+    std::printf("BL-251 data-creep instrument (+BL-254 convoy traffic) — real generated world,"
+                " %d ticks\n", total_ticks);
+    std::printf("Sequence per tick: [seed convoy] -> advance_orbits -> dispatch_convoys ->\n"
+                "                   advance_convoys -> run_economy_step -> clear_markets ->\n"
+                "                   apply_budget -> credit_arrived_convoys -> advance_surveys\n"
+                "                   (mirrors main.cpp; the seed is the harness's own, BL-254)\n\n");
 
     std::printf("PLATEAU DEFINITION\n");
     std::printf("  A counter plateaus iff  |v(T_final) - v(T_mid)| <= max(%lld, %.0f%% of v(T_mid))\n",
@@ -425,10 +586,38 @@ int main(int argc, char* argv[])
     long long max_convoys = 0, max_routes = 0, max_glimpses = 0, max_astar = 0;
     long long max_flows = 0, max_purchases = 0;
 
+    // BL-254: the convoy schedule. Built once from the generated world, then replayed
+    // deterministically. `routes_saturated_at` records the first tick after which
+    // trade_routes stopped growing — the honest measure of "it saturated, then held".
+    traffic_plan plan = plan_traffic(w);
+    long long routes_saturated_at = 0;
+    long long completed_convoys   = 0;
+
+    std::printf("CONVOY TRAFFIC (BL-254) — deterministic seeded schedule\n");
+    std::printf("  %zu corps x %zu ordered market pairs; one convoy seeded per tick,\n"
+                "  speed %.2f (%d ticks in flight), cargo %.0f unit rotating over %d resources.\n",
+                plan.corps.size(), plan.market_pairs.size(), k_convoy_speed,
+                static_cast<int>(1.0f / k_convoy_speed), k_convoy_cargo, k_cargo_count);
+    std::printf("  Structural bound on world.trade_routes for this schedule: %lld keys\n"
+                "  (corps x distinct unordered body-pairs). Full schedule cycle: %zu ticks.\n",
+                plan.route_key_bound, plan.market_pairs.size() * plan.corps.size());
+    if (plan.stub_markets > 0)
+        std::printf("  FINDING: the generated world had markets on only ONE body, so it holds no\n"
+                    "  inter-body market pair and CANNOT record a trade route however long it runs.\n"
+                    "  The plan authored %lld stub market(s) once, pre-run, to give the lanes\n"
+                    "  endpoints (the verify.seed_convoy pattern). world.markets is offset by that\n"
+                    "  constant throughout; it is not a per-tick allocation.\n",
+                    plan.stub_markets);
+    std::printf("\n");
+
     const auto t_run0 = std::chrono::steady_clock::now();
     for (int t = 1; t <= total_ticks; ++t)
     {
         w.current_day_tick = t;
+        const long long routes_before  = static_cast<long long>(w.trade_routes.size());
+        const long long seeded_before  = plan.seeded;
+        const long long convoys_before = static_cast<long long>(w.convoys.size());
+        seed_scheduled_convoy(w, plan, t);
         advance_orbits(w, 1.0);
         dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
                          reg.logistics_cost(convoy_mode::space));
@@ -445,6 +634,15 @@ int main(int argc, char* argv[])
         max_astar    = std::max(max_astar,    static_cast<long long>(w.astar_cost_cache.size()));
         max_flows     = std::max(max_flows,     static_cast<long long>(flows.size()));
         max_purchases = std::max(max_purchases, static_cast<long long>(rep.purchases.size()));
+
+        // A convoy that left the store this tick was credited + retired. Exact, and it
+        // does NOT assume a seed happened: (held + seeded) - held_now. A LOWER bound if
+        // dispatch_convoys ever fires (its additions would mask a retirement); it does
+        // not fire in this world — see the STILL UNEXERCISED note.
+        completed_convoys += convoys_before + (plan.seeded - seeded_before)
+                             - static_cast<long long>(w.convoys.size());
+        if (static_cast<long long>(w.trade_routes.size()) != routes_before)
+            routes_saturated_at = t;
 
         if (next_mark < marks.size() && t == marks[next_mark])
         {
@@ -549,12 +747,38 @@ int main(int argc, char* argv[])
                     "        market/order-book side of this rollout is idle — its plateau\n"
                     "        is likewise vacuous. Not a creep finding; a coverage gap.\n");
     if (max_convoys == 0)
-        std::printf("  NOTE: no convoy was dispatched anywhere in this run, so the convoy /\n"
-                    "        trade-route / glimpse-stamp plateaus above are VACUOUS — those\n"
-                    "        structures were never exercised. `world.trade_routes` in\n"
-                    "        particular is documented as never-erased (components.hpp §\n"
-                    "        trade_route), i.e. accumulating by construction; this rollout\n"
-                    "        does not bound it. A convoy-exercising scenario is owed.\n");
+        std::printf("  NOTE: no convoy existed on ANY tick, so the convoy / trade-route /\n"
+                    "        glimpse-stamp plateaus above are VACUOUS — those structures were\n"
+                    "        never exercised. `world.trade_routes` in particular is documented\n"
+                    "        as never-erased (components.hpp § trade_route), i.e. accumulating\n"
+                    "        by construction; such a rollout does not bound it. The BL-254\n"
+                    "        seed schedule is supposed to prevent this — if you see this note,\n"
+                    "        the schedule itself is broken (see R4).\n");
+    else
+    {
+        std::printf("\n  Convoy cycling (BL-254): %lld seeded, %lld credited + retired,"
+                    " %lld still in flight at the end.\n",
+                    plan.seeded, completed_convoys, static_cast<long long>(w.convoys.size()));
+        std::printf("  world.trade_routes reached %lld of a structural bound of %lld keys;"
+                    " last grew at tick %lld\n"
+                    "  (i.e. flat for the final %d ticks while traffic kept arriving).\n",
+                    static_cast<long long>(w.trade_routes.size()), plan.route_key_bound,
+                    routes_saturated_at, total_ticks - static_cast<int>(routes_saturated_at));
+        std::printf("  world.body_last_glimpse_tick reached %lld (bounded by bodies: %zu);"
+                    " stamps are\n  overwritten in place by the player's lanes, not appended.\n",
+                    max_glimpses, w.bodies.size());
+    }
+
+    // What this rollout STILL does not exercise — named rather than left implied.
+    std::printf("\n  STILL UNEXERCISED by this rollout:\n");
+    std::printf("    - `dispatch_convoys` auto-dispatch. Inter-body lanes are launchpad-gated\n"
+                "      and the generated world places no launchpad; the intra-body branch also\n"
+                "      never fired here. The BL-254 traffic is SEEDED (the trade_routes_harness\n"
+                "      / verify.seed_convoy pattern), so what is under test is the credit +\n"
+                "      upsert + retire path, not the dispatch decision. A launchpad-bearing\n"
+                "      scenario would close that.\n");
+    if (max_flows == 0)
+        std::printf("    - the market order-book / cash-flow path (max flows = 0, above).\n");
 
     // --- assertions --------------------------------------------------------
     std::printf("\nASSERTIONS\n");
@@ -581,6 +805,19 @@ int main(int argc, char* argv[])
 
     check(samples.size() == marks.size(),
           "R3 every requested sample mark was reached (the run completed)");
+
+    // BL-254 coverage assertion. R1's convoy / trade-route / glimpse plateaus are only
+    // worth anything if those structures were actually driven; without this, a future
+    // change that silently stops the schedule would restore the vacuous green pass the
+    // instrument was built to refuse. Asserted, not merely reported.
+    const bool exercised = max_convoys > 0 && max_routes > 0 && max_glimpses > 0
+                           && completed_convoys > 0;
+    if (!exercised)
+        std::printf("  convoys max=%lld routes max=%lld glimpses max=%lld completed=%lld\n",
+                    max_convoys, max_routes, max_glimpses, completed_convoys);
+    check(exercised,
+          "R4 convoys / trade routes / glimpse stamps were non-zero and repeatedly cycled "
+          "(R1's plateau for them is not vacuous)");
 
     std::printf("\nRuntime: world gen %.2f s + %d ticks in %.2f s (%.1f ms/tick).\n",
                 build_s, total_ticks, run_s, 1000.0 * run_s / total_ticks);

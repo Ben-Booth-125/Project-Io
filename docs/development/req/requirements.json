@@ -7097,6 +7097,89 @@
           "notes": "The harness found and reported its own blind spot rather than passing quietly — the behaviour to preserve in future instruments."
         }
       ]
+    },
+    {
+      "brief": "data-creep-convoy-scenario",
+      "title": "Data-creep instrument exercises convoys (BL-254)",
+      "difficulty": 2,
+      "importance": "B",
+      "evaluated_difficulty": 2,
+      "status": "complete",
+      "resolved": "2026-08-01",
+      "resolution": "Complete. The 1500-tick rollout now drives a deterministic seeded convoy schedule; convoys / trade routes / glimpse stamps are non-zero and repeatedly cycled, and all three plateau. trade_routes saturates at its structural bound (18 keys) by tick 36 and holds flat to 4000 ticks. No unbounded structure found; two coverage findings recorded.",
+      "promoted_from": "BL-254 (data-creep instrument never exercises convoys)",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: the rollout drives real convoy traffic so world.convoys, world.trade_routes and world.body_last_glimpse_tick are non-zero and repeatedly cycled, and their plateau assertions bind rather than passing vacuously.",
+          "verification": [
+            "headless: tools/verify/data_creep_harness.cpp R1, R4"
+          ],
+          "status": "complete",
+          "result_metric": "1500 convoys seeded, 1496 credited + retired, 4 in flight at the end. world.convoys steady at 4 across all marks (drains, no live-object leak). world.trade_routes 18 at every mark. world.body_last_glimpse_tick 2 -> 3 by tick 500, then flat. R1 and R4 PASS.",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "requirement": "The traffic is deterministic — no RNG introduced, no wall-clock dependence in anything asserted.",
+          "verification": [
+            "headless: tools/verify/data_creep_harness.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "Schedule is a pure function of the tick (pair = t % pairs, corp = (t/pairs) % corps, cargo = t % 3) over collections gathered in ascending entity-id order from ordered maps. Two consecutive runs produced byte-identical counter tables; only the runtime line differed (13.78 s vs 7.28 s — VM scheduling noise).",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "requirement": "No src/world change to make convoys appear — traffic goes through the existing supply/convoy API the way the other harnesses do.",
+          "verification": [
+            "review: git diff — tools/verify/data_creep_harness.cpp only"
+          ],
+          "status": "complete",
+          "result_metric": "Only tools/verify/data_creep_harness.cpp changed. Convoys are manufactured as convoy_component records and handed to the real advance_convoys / credit_arrived_convoys pair — the same pattern as tools/verify/trade_routes_harness.cpp and app.cpp verify.seed_convoy. CMakeLists needed no change (the tools/verify glob already registers the target).",
+          "notes": ""
+        },
+        {
+          "id": "R4",
+          "requirement": "trade_routes — documented as never erased — is shown to be bounded by distinct (corp, body-pair) keys rather than by ticks.",
+          "verification": [
+            "headless: tools/verify/data_creep_harness.cpp COVERAGE"
+          ],
+          "status": "complete",
+          "result_metric": "Schedule cycles the whole key space every 36 ticks. trade_routes reached 18 of a structural bound of 18 (3 corps x C(4,2) = 6 unordered body-pairs), last grew at tick 36, then flat for 1464 ticks at 1500 and for 3964 ticks in a 4000-tick run. Bounded by pairs, not ticks — measured, no longer argued.",
+          "notes": "A broken upsert dedupe would now climb linearly and be named by GROWTH FINDINGS."
+        },
+        {
+          "id": "R5",
+          "requirement": "The COVERAGE section stops claiming the three plateaus are vacuous and still explicitly names what remains unexercised.",
+          "verification": [
+            "headless: tools/verify/data_creep_harness.cpp COVERAGE"
+          ],
+          "status": "complete",
+          "result_metric": "Vacuity note is now conditional on max_convoys == 0 and reads as a schedule-broken diagnostic pointing at R4. A new STILL UNEXERCISED block names dispatch_convoys auto-dispatch (never fires: inter-body lanes are launchpad-gated and the generated world places none; the intra-body branch also never fired) and the market cash-flow path when idle.",
+          "notes": "A vacuous pass reported as vacuous is worth more than a green tick — that behaviour is preserved, not removed."
+        },
+        {
+          "id": "R6",
+          "requirement": "The instrument keeps its refusal to run on fewer than two samples.",
+          "verification": [
+            "headless: tools/verify/data_creep_harness.cpp R0"
+          ],
+          "status": "complete",
+          "result_metric": "The samples.size() < 2 guard is untouched and still returns 1 before any plateau is reported.",
+          "notes": ""
+        },
+        {
+          "id": "R7",
+          "requirement": "Findings surfaced while exercising the structures are reported, not papered over.",
+          "verification": [
+            "headless: tools/verify/data_creep_harness.cpp CONVOY TRAFFIC"
+          ],
+          "status": "complete",
+          "result_metric": "FINDING printed in-output: the generated world seeds all six markets on the single tiled body (Kepler), so it holds NO inter-body market pair and cannot record a trade route however long it runs — a second cause, independent of the launchpad gate, of the BL-254 blind spot. The plan authors 3 stub markets once pre-run to give the lanes endpoints; world.markets carries that constant offset (6 -> 9) and it is not a per-tick allocation.",
+          "notes": "Worth a follow-up decision: whether market seeding on non-home bodies is intended to be absent at campaign start."
+        }
+      ]
     }
   ]
 }
