@@ -120,7 +120,7 @@ void draw_sell_orders_tab(const world& w, ui_state& state, entity_id body,
         }
         ImGui::EndCombo();
     }
-    ImGui::InputFloat("Quantity / tick", &add_quantity, 1.0f, 10.0f, "%.0f");
+    ImGui::InputFloat("Quantity / qtr", &add_quantity, 1.0f, 10.0f, "%.0f");
     ImGui::InputFloat("Floor price",     &add_floor,    0.1f, 1.0f,  "%.1f");
     if (add_quantity < 0.0f) add_quantity = 0.0f;
     if (add_floor    < 0.0f) add_floor    = 0.0f;

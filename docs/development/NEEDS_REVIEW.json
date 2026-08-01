@@ -37,7 +37,7 @@
       "title": "The construction ledger says \"50% staffing\", but the player's own corp auto-solves the dial on the first tick",
       "raised": "2026-08-01",
       "kind": "question",
-      "status": "open",
+      "status": "resolved",
       "source": "BL-162 (tile construction ledger) — surfaced by prospective_profit_harness",
       "what": "The ledger caption reads \"Est. net / tick at today's local prices - 50% staffing, no labour shortage.\" The estimate uses workforce_assigned = 0.5, which mirrors construction.cpp exactly, so it correctly describes the building at the instant it is created. But BL-181 gives player buildings workforce_auto = true by default, and the dial is auto-solved for maximum profit on the first tick. tools/verify/prospective_profit_harness.cpp measured realised extraction at 2x the estimate for exactly this reason, and had to pin workforce_auto = false to make its cross-check meaningful.",
       "why_it_matters": "The number is honest for the moment it is shown and dishonest as a prediction — and a player reads a profit bar as a prediction. Every candidate is understated by the same factor, so the RANKING (which is what the chart is for) is unaffected; the magnitude is not.",
@@ -51,14 +51,14 @@
         "src/ui/selection_panel.cpp",
         "src/world/building_profit.cpp"
       ],
-      "resolution": null
+      "resolution": "OPTION 2 (Ben, 2026-08-01) — say it is a floor. Caption now reads 'Est. net / tick at today's local prices - at least this, before auto-staffing; 50% staffing, no labour shortage. Capex is not in the bar; see payback.' No geometry change and no change to the estimator, so it still mirrors construction.cpp and stays verifiable against economy_system. The reasoning is recorded inline at the call site, not just here. Ben added the general point that a lot of these calls need big data sets from watching an AI play, which does not exist yet. That is the second time in this pass he has deferred a call for the same reason (see BL-261, player alerts); an item for AI-play observation was offered to him."
     },
     {
       "id": "NR-002",
       "title": "The header reads \"/ qtr\" while the ledger beside it reads \"/ tick\" — GLOSSARY defines Tick and does not define qtr",
       "raised": "2026-08-01",
       "kind": "observation",
-      "status": "open",
+      "status": "resolved",
       "source": "Noticed while inspecting the BL-162 goldens",
       "what": "The app header prints NET +3.2k / qtr. The construction ledger, the Selection band's profitability read, and draw_building_profit all print / tick. GLOSSARY.md defines Tick ('the fixed period between economy updates'); 'qtr' is not a defined term.",
       "why_it_matters": "The standing rules say that if a term is defined in GLOSSARY, do not substitute an alternative. This is a live violation sitting a few inches from figures that get it right, on the screen a new player reads first. It is also pre-existing and entirely outside BL-162's scope, which is why it was flagged rather than fixed — changing a header figure's units is a call about what the header is FOR, not a typo.",
@@ -72,14 +72,14 @@
         "src/core/app.cpp",
         "docs/GLOSSARY.md"
       ],
-      "resolution": null
+      "resolution": "RESOLVED THE OTHER WAY (Ben, 2026-08-01): 'Qtr is the preferred term for any economy tick. Tick is too technical of a term for average gamers.' So the header is RIGHT and every other surface is wrong — the opposite of the recommendation, which assumed the majority spelling won. Quarter becomes the player-facing term; Tick stays the internal/technical one, and GLOSSARY must define both plus which audience each serves. Supporting evidence found while scoping: construction_panel.cpp's ticks_label already prints '(~N yr)' at ticks/4, with the comment 'a Tick is ~3 months, so 4 ticks make a year (BL-095)'. A tick IS a quarter in the campaign calendar, so this is not a friendlier synonym for a technical unit — the display term is the more literally accurate one. Scope measured: ~25 player-facing strings across balance_ledger, construction_panel, corporation_dashboard, market_ledger, selection_panel and app.cpp, plus GLOSSARY, plus a visual-golden re-bless (already owed under BL-259)."
     },
     {
       "id": "NR-003",
       "title": "A payback faster than one tick prints \"payback ~0 ticks\", which reads as free rather than immediate",
       "raised": "2026-08-01",
       "kind": "observation",
-      "status": "open",
+      "status": "resolved",
       "source": "BL-162 — visible in the blessed golden tile_build_ledger_land",
       "what": "Extraction: Agricultural Produce shows '686 cr - payback ~0 ticks' (capex 686, net +1243/tick, so true payback ~0.55 ticks). The integer format rounds it to 0.",
       "why_it_matters": "Cosmetic, but '~0 ticks' is the one value in the row that could be read as an error or as 'costs nothing'. The intended meaning — it pays for itself inside the first tick — is stronger than what it prints.",
@@ -92,14 +92,14 @@
       "files": [
         "src/ui/selection_panel.cpp"
       ],
-      "resolution": null
+      "resolution": "LEAVE IT (Ben, 2026-08-01), and for a reason larger than the row: 'We actually shouldn't do that much work for the player. It's up to them to figure out what is profitable. Estimations like this can be made, but they should emerge from a reading of data, not from the data.' So neither option was taken — refining the payback wording is work in the wrong direction. The principle behind it reaches further than this entry and is raised separately as NR-019, because it questions the premise of the surface the row sits in."
     },
     {
       "id": "NR-004",
       "title": "Should non-home bodies have markets at campaign start? Today none do, and it makes inter-body trade unrepresentable",
       "raised": "2026-08-01",
       "kind": "question",
-      "status": "open",
+      "status": "resolved",
       "source": "BL-254 (data-creep convoy scenario) — reported by the harness itself",
       "what": "The generated world seeds all six markets on the single tiled body (Kepler). A trade_route is body-level, so intra-body lanes record nothing — meaning the generated world CANNOT record a trade route however long it runs, regardless of the launchpad gate. The data-creep harness had to author three stub markets pre-run to give its convoy lanes endpoints at all. This is a second, independent cause of the blind spot BL-254 was filed for; the filed item only named the launchpad gate.",
       "why_it_matters": "This is not a harness problem, it is a world-premise question. If no other body has a market at start, then inter-body trade — one of the two pillars every system is supposed to feed — has no destination on turn one, and the activity fog (BL-089), persistent trade routes (BL-088) and the supply lens all describe machinery with nothing to act on yet. It may well be intended (Era 0 is terrestrial; space access is gated), in which case it should be stated somewhere rather than being an emergent property of market seeding.",
@@ -114,14 +114,14 @@
         "docs/economy/ERAS.md",
         "src/world/hard_coded_world.cpp"
       ],
-      "resolution": null
+      "resolution": "ANSWERED OUTSIDE THE OPTIONS (Ben, 2026-08-01): \"I think markets should be spontaneously generated when colonisation / exploration starts.\" Not option 1 (document Era 0 as market-free), not option 2 (pre-seed elsewhere), not option 3 (defer) — market EXISTENCE becomes a runtime consequence of going somewhere. Filed as BL-263 (spontaneous market emergence), design-owed, post-v0.1.0. The structural consequence is that markets stop being a world-gen artifact and become simulation state, which reaches the save format, determinism, catchment routing and price discovery for a market with no price history. Five open calls recorded there; the trigger and what actually clears at an outpost market are the two that decide whether it plays."
     },
     {
       "id": "NR-005",
       "title": "BL-256 (generation globe): which fidelity tier, and is running the continents pass in the wizard preview affordable?",
       "raised": "2026-08-01",
       "kind": "question",
-      "status": "open",
+      "status": "resolved",
       "source": "BL-256, filed 2026-08-01",
       "what": "The wizard preview runs the planetology chain only (resolve_preferences + preview_system), so at wizard time there is no height field, no ocean mask and no terrain for a map-like globe to sample. The item is written with two tiers: Tier 1 a characterisation globe from the planetology scalars, Tier 2 a real-landmass globe that also runs the deterministic continents pass plus enough of tile Pass 1 to get a height/ocean field.",
       "why_it_matters": "Tier 2 is the one you actually asked for — the planet you are about to play. But the preview re-runs on EVERY control move, and the continents pass is the expensive half, so Tier 2 may not be affordable per-move. The cost has not been measured yet; the item says to measure before adopting.",
@@ -134,14 +134,14 @@
       "files": [
         "docs/development/backlog.json"
       ],
-      "resolution": null
+      "resolution": "ANSWERED BY REFRAMING (Ben, 2026-08-01): the globe becomes the generation screen PRIMARY view, pannable with a pole clamp, showing the world forming, with the charts demoted to extras on top; pre-world rounds show the solar system instead. So the tier question is settled sideways — Tier 2 (real landmass) is the target and Tier 1 survives only for rounds where landmass genuinely is not decided, captioned so the difference is visible. BL-256 rewritten to match, status moved back to design-owed and difficulty raised to 5. Two corrections went into it: (a) the original claim that the continents pass is the expensive half looks wrong on inspection (O(w*h*plates), roughly 180k int ops, sub-millisecond) — the cost is more likely the per-pixel DRAW once the disc is a primary view rather than a 200 px sketch, mitigated by caching the pixel->(lat,lon) table since rotation is only a longitude add; (b) the per-pixel projection the item already specified avoids both problems a per-tile-polygon approach would hit (ImGui 16-bit index ceiling, degenerate polar slivers) — poles smear instead of shatter. The one risk that cannot be settled on paper is how those smeared poles actually LOOK, so the item now sequences a throwaway prototype against the already-generated world as task 1, before any wizard work."
     },
     {
       "id": "NR-006",
       "title": "BL-257 (generated body names): which naming register?",
       "raised": "2026-08-01",
       "kind": "question",
-      "status": "open",
+      "status": "resolved",
       "source": "BL-257, filed 2026-08-01 — the item's one genuinely open design call",
       "what": "The current five bodies mix three registers: mythological (Helios, Selene), descriptive (Cinder) and scientist-eponym (Kepler). A generated pool has to pick deliberately, because a pool drawn at random from all three reads as noise rather than as a naming convention.",
       "why_it_matters": "This is the half of BL-257 that determines whether the result reads as a real system or a shuffle, and it is taste, not engineering. The other half (moving identity off the display string) is unambiguous and can proceed without this answer.",
@@ -155,14 +155,14 @@
       "files": [
         "docs/development/backlog.json"
       ],
-      "resolution": null
+      "resolution": "OPTION 4 (Ben, 2026-08-01): \"I agree, a deliberate mix is great.\" The registers stay mixed, but which one a body gets is decided by what the body is, so the mixing is legible rather than random. BL-257 patched — the register bullet no longer reads as an open call. The RULE itself is now the residual call and is deliberately left for promotion: proposed there is planets mythological (named at a distance, from lights), moons descriptive (named close up, by whoever surveyed them), and the scientist-eponym register reserved for what was catalogued rather than observed — which would make Kepler explicable rather than an inconsistency. Ben accepts or replaces that at promotion; the item now requires whichever rule is chosen to be written into the doc, since an unstated rule decays into the noise it was meant to prevent."
     },
     {
       "id": "NR-007",
       "title": "Decisions taken on your behalf 2026-08-01, each reversible",
       "raised": "2026-08-01",
       "kind": "decision-taken",
-      "status": "open",
+      "status": "resolved",
       "source": "Session 2026-08-01 (v0.1.0 cut set completion)",
       "what": "Four calls were made so work could continue. Each is recorded so it can be overturned rather than becoming precedent by default. (1) The Windows ai_skill_harness bands were RE-BLESSED. BL-252 said not to re-bless before knowing which cause was at work; the diagnostic established staleness, so this was the sanctioned action, but it is still a bless nobody reviewed. (2) The four tile_build_ledger goldens were re-blessed on Windows after inspection. (3) BL-162's requirement R7 had its 'visual' verification leg REMOVED, because this item staled that golden by construction and a row must not read complete on a red leg — the code and headless legs stand alone. (4) ctest timeout tiers were set at 60s default / 120s for three named long-runners, chosen against measured Debug runtimes.",
       "why_it_matters": "Re-blessing is routine per the standing convention, but two of these blesses moved a baseline that no human has looked at since, and the third quietly narrowed what a requirement claims to verify. None is hard to reverse; all are easy to forget.",
@@ -174,14 +174,14 @@
         "docs/development/req/requirements.json",
         "CMakeLists.txt"
       ],
-      "resolution": null
+      "resolution": "ACCEPTED, no reversals (Ben, 2026-08-01): \"I am happy with these.\" All four calls stand — the two golden re-blesses, the removal of BL-162 R7 visual leg, and the ctest timeout tiers. The data_creep_harness headroom (42.95 s against a 120 s timeout, 2.8x rather than the 3x the tier was sized for) was flagged and deliberately left unchanged."
     },
     {
       "id": "NR-008",
       "title": "backlog_lint's two standing warnings are pre-existing and nobody owns them",
       "raised": "2026-08-01",
       "kind": "observation",
-      "status": "open",
+      "status": "resolved",
       "source": "backlog_lint, every run this session",
       "what": "Two warnings survive every clean run: BL-114's requirement group is marked complete while row R3 is still pending, and BL-190's group is complete while the item itself is still status 'designed' (it should be terminal). Both predate this session and neither is a fail.",
       "why_it_matters": "A lint that always prints the same two warnings trains everyone to skim past the warning section, which is where a real new warning will appear. That is the same failure mode as a permanently-red test.",
@@ -195,11 +195,11 @@
         "docs/development/backlog.json",
         "docs/development/req/requirements.json"
       ],
-      "resolution": null
+      "resolution": "OPTION 1 — both resolved (Ben, 2026-08-01), not suppressed. BL-190 (population demand ordering fix): status designed -> complete. The work landed in fba0867 on 2026-07-31 with its requirement group already complete; only the item status was left behind. BL-114 R3 (New World setup exposes the descriptor): status pending -> CANCELLED, not back-filled. The row describes a main-menu setup screen that the BL-167 New World wizard superseded, so its named check scripts/verify/new_world_setup.lua can never be authored against the surface it describes — a row that CANNOT be satisfied is a different thing from one nobody has got to, and only the second should read as pending. No coverage is lost: the load-bearing half (a new game builds from the edited descriptor, deterministically) is already covered headlessly by R1/R2, and verifying the wizard surface itself belongs to BL-167. backlog_lint now reports clean, so the next warning to appear will be a real one."
     },
     {
       "raised": "2026-08-01",
-      "status": "open",
+      "status": "resolved",
       "source": "Session 2026-08-01 (disclosure spine — BL-214 / BL-247 / BL-248, commit d143aa4)",
       "options": [
         "Keep it. A full-screen mode needs a keyboard exit, and the ordering preserves Decision 10's real concern.",
@@ -211,7 +211,7 @@
         "src/core/app.cpp",
         "docs/ui/LAYOUT.md"
       ],
-      "resolution": null,
+      "resolution": "KEPT (Ben, 2026-08-01). Esc as a drill-up is sensible; the override stands and Decision 10 is superseded on this point. Ben added a consequence: the Selection element should be ALWAYS OPEN, so the 'hide selection' rung comes out of the ladder, and Esc's terminal rung becomes the pause screen once that exists. See NR-017 for that follow-up.",
       "id": "NR-009",
       "kind": "decision-taken",
       "title": "The fold overlay joins the Esc ladder, against BL-214's Decision 10",
@@ -220,7 +220,7 @@
     },
     {
       "raised": "2026-08-01",
-      "status": "open",
+      "status": "resolved",
       "source": "Session 2026-08-01 (disclosure spine — BL-214 / BL-247 / BL-248, commit d143aa4)",
       "options": [
         "Keep optional. A missing pair reads as a review signal, not a render defect.",
@@ -232,7 +232,7 @@
         "src/ui/detail_level.cpp",
         "src/ui/generation_charts.cpp"
       ],
-      "resolution": null,
+      "resolution": "OVERTURNED (Ben, 2026-08-01). The pair is REQUIRED, not optional: 'we need to have documentation for each element... low storage cost for perpetual clarity. So the docs are the audit, we don't need an audit method.' So neither my optional settlement NOR my recommended report-pass survives — the discipline is authorship, enforced by convention, and no headless check is to be built. Answers (2) and (3) stand unchallenged. Two consequences flagged back to Ben: (a) BACKFILL — pairs exist today only on generation_charts (5), corporation_dashboard (4) and selection_card (2); market_ledger, economy_panel, balance_ledger, tile_inspector, construction_panel and tech_tree_panel have none. (b) SCOPE — Ben said 'each element', where BL-247 says each chart/visual; if elements means every panel and table, that is wider than the item as filed. BEN CONFIRMED THE WIDER READING (2026-08-01): every information surface, not only things that plot. He added a storage requirement — each justification lives in a .json file rather than inline in the C++ call site, and carries the id of the BACKLOG ITEM THAT DEMANDED IT, so a surface traces back to the work that asked for it. That makes the log a queryable provenance index, not just player-facing text, and needs its own backlog item: it changes where the strings live (a load or codegen step where today they are string literals at the call site) and widens BL-247's file scope well past charts.",
       "id": "NR-010",
       "kind": "decision-taken",
       "title": "BL-247's three open questions, settled without you",
@@ -241,7 +241,7 @@
     },
     {
       "raised": "2026-08-01",
-      "status": "open",
+      "status": "resolved",
       "source": "Session 2026-08-01 (disclosure spine — BL-214 / BL-247 / BL-248, commit d143aa4)",
       "options": [
         "Keep it in detail_level.",
@@ -252,7 +252,7 @@
         "src/ui/detail_level.hpp",
         "src/ui/detail_level.cpp"
       ],
-      "resolution": null,
+      "resolution": "KEPT (Ben, 2026-08-01): 'I don't see a strong reason either way' — the departure from BL-247's filed scope stands. But he attached a much larger correction in the same breath: 'the why shouldn't leak into the UI, players don't need us telling them what they ought to ask of the game.' That retires the PLAYER-FACING half of BL-247 entirely — the question log is development documentation, not an in-game affordance — and it makes this entry's subject (where the draw helper lives) largely moot, since there may be no draw helper. Raised as NR-018 and folded into BL-260 rather than settled here.",
       "id": "NR-011",
       "kind": "decision-taken",
       "title": "why_note lives in detail_level.{hpp,cpp}, not charts.cpp as BL-247's file scope named",
@@ -261,7 +261,7 @@
     },
     {
       "raised": "2026-08-01",
-      "status": "open",
+      "status": "resolved",
       "source": "Session 2026-08-01 (disclosure spine — BL-214 / BL-247 / BL-248, commit d143aa4)",
       "options": [
         "Both fine — red verdicts are the alert, and the table was a duplicate.",
@@ -273,7 +273,7 @@
         "docs/ui/MENU.md",
         "src/ui/corporation_dashboard.cpp"
       ],
-      "resolution": null,
+      "resolution": "PART 1 RESOLVED (Ben, 2026-08-01): alerts are wanted but DEFERRED — 'I'm not sure where to put them yet... There's not much info on how the game plays yet, and I'm saving that eval until after we get basic AI which can play the game.' Filed as BL-261 (player alerts), parked, version goal v0.2.0, with the reasoning recorded: where alerts live and what earns one cannot be decided against a world with no opponent. The red-verdict treatment stands in the meantime and is not a placeholder. PART 2 RESOLVED (Ben, 2026-08-01): 'let's restore it. I didn't intend to delete any work.' src/ui/corporation_panel.{hpp,cpp} were restored verbatim from d143aa4^ and compile clean (CMake GLOB_RECURSE picks them up with no CMakeLists change). NOT yet wired to a call site: nav slot 1 now hosts the BL-248 dashboard, all nine MENU.md slots are assigned, and BL-174 explicitly dropped the tenth. Ben then chose the provisional home: 'Push it into diplomacy for now.' Wired to nav slot 8 behind a NEW flag ui_state::show_corporations_table (slot 1's show_corporation_panel stays the BL-248 dashboard's), added to close_all_panels and any_panel_open, glyph now lights instead of staying dim, tooltip reads 'Not yet built. For now: every corporation's balance, side by side.' Slot 8 keeps its Diplomacy label so the rail does not start teaching that Diplomacy IS a balance table. This is explicitly provisional and moves when Diplomacy is designed. Builds clean. MERGED FORWARD: Ben asked for the table to be folded into the scoring item; no such item existed, so BL-262 (scoring system) was opened and absorbs it. The table is that item's rough first surface — right question, wrong content — and its slot-8 home is explicitly provisional. A standing note for future sessions: 'duplicates an existing view' is not sufficient grounds to delete a file — dormant beats deleted, because the author's intent is not recoverable from a diff.",
       "id": "NR-012",
       "kind": "decision-taken",
       "title": "MENU.md's 'alert' concept was dropped rather than built, and the all-corporations table was deleted",
@@ -282,7 +282,7 @@
     },
     {
       "raised": "2026-08-01",
-      "status": "open",
+      "status": "resolved",
       "source": "Session 2026-08-01 (disclosure spine — BL-214 / BL-247 / BL-248, commit d143aa4)",
       "options": [
         "Settle BL-254's open question — seed markets on non-home bodies so lanes exist from the start.",
@@ -293,7 +293,7 @@
       "files": [
         "src/ui/corporation_dashboard.cpp"
       ],
-      "resolution": null,
+      "resolution": "RESOLVED BY BL-263 (spontaneous market emergence). This entry and NR-004 were the same cause seen twice — once as a harness blind spot, once as a dashboard quarter that reads 0 lanes on a fresh campaign and would never change. Once markets can emerge from colonisation, the Trade card fills in on its own and needs no UI change; the recommended option 3 (have the empty card say WHY it is empty) is dropped as unnecessary.",
       "id": "NR-013",
       "kind": "observation",
       "title": "The Trade roll-up reads '0 lanes' because every market seeds on one body",
@@ -302,14 +302,14 @@
     },
     {
       "raised": "2026-08-01",
-      "status": "open",
+      "status": "resolved",
       "source": "Session 2026-08-01 (disclosure spine — BL-214 / BL-247 / BL-248, commit d143aa4)",
       "options": [],
       "recommendation": "No action now — carry it into BL-215 (text-wrap render audit) as a known case.",
       "files": [
         "src/ui/tile_inspector.cpp"
       ],
-      "resolution": null,
+      "resolution": "DROPPED, not deferred to BL-215 (Ben, 2026-08-01): \"I am actually not a massive fan of the tiles table. This is because it can be seen by looking at the canvas. Feel free to drop this from UI.\" The per-tile table (x, y, composition, landform, hazard, habitability + 23 deposit columns) is removed from the History ledger. That is the better answer than fitting it: the Planetary canvas already shows every one of those fields spatially, where position is the point, and a 29-column table was the same data with the geography thrown away. BL-215 (text-wrap audit) loses a case rather than gaining one. SCOPE HELD DELIBERATELY: only the tiles table went. The view still carries its Buildings list and Market table, which Ben did not comment on — see NR-020, since both also duplicate other panels and the tab is now named after the one thing it no longer contains. Per NR-012 the code was not treated as disposable: it is recoverable from git and the removal is recorded at the call site with the reason, not silently deleted.",
       "id": "NR-014",
       "kind": "observation",
       "title": "Full-screen still does not fit the History Tiles table's 23 resource columns",
@@ -318,7 +318,7 @@
     },
     {
       "raised": "2026-08-01",
-      "status": "open",
+      "status": "resolved",
       "source": "Session 2026-08-01 (disclosure spine — BL-214 / BL-247 / BL-248, commit d143aa4)",
       "options": [
         "Leave the space. It is calm, and the wizard is not short of screen.",
@@ -330,7 +330,7 @@
       "files": [
         "src/core/app.cpp"
       ],
-      "resolution": null,
+      "resolution": "FILED AS LOW PRIORITY, not fixed now (Ben, 2026-08-02): \"it works fine now - just visually awkward.\" BL-264 (wizard layout after fold), priority C, post-v0.1.0, held behind BL-256. Ben gave four directions: the pre-gen map/globe fills the band; each expandable item gets bigger; the group is vertically centred; preference controls become buttons rather than dropdowns. He also asked for Esc to close these views — and that is genuinely missing rather than already covered, which the item records: app::handle_key returns early when m_screen != app_screen::in_game, so the entire Esc ladder including BL-214 fold rung is unreachable in the wizard, and a stage expanded there can only be closed by its chevron. The item requires the current heights be reported to Ben as measurements before anyone picks a size (Rule 0b).",
       "id": "NR-015",
       "kind": "question",
       "title": "The wizard's chart region is now mostly empty when its stages are folded",
@@ -339,17 +339,107 @@
     },
     {
       "raised": "2026-08-01",
-      "status": "open",
+      "status": "resolved",
       "source": "Session 2026-08-01 (disclosure spine — BL-214 / BL-247 / BL-248, commit d143aa4)",
       "options": [],
       "recommendation": "Next session: launch windowed on monitor 2, select a tile with deposits, and try the chevron on the band, the History Chain, and each of the four roll-ups.",
       "files": [],
-      "resolution": null,
+      "resolution": "CLOSED, and it did its job (Ben, 2026-08-02). He did not open the app but responded to the description: \"I didn't notice this. I like it, but...\" — and then asked for four changes to the disclosure model, three of them structural. Filed as BL-265 (disclosure controls revision): expand and full screen become TWO controls with expand acting in place; full screen is bounded to the CANVAS region rather than the whole window; a full-screened accordion scrolls ALL its items open; and the controls must sit in one predictable column. The last one is a measured defect rather than taste — generation_charts and corporation_dashboard draw the chevron LEFT of the label, tile_inspector and selection_panel push it to the RIGHT edge, so the same control does the same job in two different places. UNRESOLVED and put back to Ben: he asked for left alignment on the wizard (BL-264) and right alignment for the button pair (BL-265) in the same message, and it has to hold everywhere at once.",
       "id": "NR-016",
       "kind": "observation",
       "title": "Three surfaces changed shape and want your eyes on the live app",
       "what": "The batch is golden-verified, but three surfaces changed enough that captures are not a substitute for using them: (1) the Selection band's metric card gained a chevron and a full-screen view; (2) the History ledger's Chain view lost its accordions for verdict lines; (3) nav slot 1 is an entirely new dashboard. The fold gesture in particular is only really judgeable by clicking it.",
       "why_it_matters": "Standing practice is to open the live app whenever your judgement on visuals is wanted. Not done this session because you were about to restart the machine to test dispatch."
+    },
+    {
+      "id": "NR-017",
+      "title": "The Selection element should be always open — which removes the 'hide' rung from the Esc ladder",
+      "raised": "2026-08-01",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Ben's resolution of NR-009, 2026-08-01",
+      "what": "Ben: 'the selection element should probably be always open. So esc drills up to the pause screen, when we implement that.' Today app.cpp's Esc ladder has a 'hide, not destroy' rung (m_ui.selection_hidden_for = m_ui.selected_entity) sitting between the fold and the system menu, and selection_card.cpp gates its draw on selection_hidden_for. That rung is BL-194/196's dismissal concept. Making the element always open deletes the rung and the dismissal state with it, so Esc's terminal rung (already show_system_menu) becomes the only ending.",
+      "why_it_matters": "This is a retirement of a designed affordance (a dismissible card), not just a keybinding tweak — SELECTION.md and BL-194/196 both assume the card can be dismissed. It also raises what the band shows with NOTHING selected, which today is simply nothing drawn. 'Always open' needs an empty state, or selection must never be empty. Ben also named a pause screen that does not exist yet; the current terminal rung opens the system menu, which may or may not be the same thing.",
+      "options": [
+        "File a backlog item for it — remove the hide rung, delete selection_hidden_for, design the empty state, and align SELECTION.md.",
+        "Do it now as a Light change (rung + state removal only) and defer the empty-state design.",
+        "Wait until the pause screen is designed, since the two ends of the ladder settle together."
+      ],
+      "recommendation": "Option 1. The rung removal is two lines, but the empty state is a real design question and SELECTION.md is an authority doc that would go stale silently otherwise.",
+      "files": [
+        "src/core/app.cpp",
+        "src/ui/selection_card.cpp",
+        "docs/ui/SELECTION.md"
+      ],
+      "resolution": "FILED as BL-266 (selection always open), v0.1.1, plus BL-194/195/196 annotated STALE on their dismissal half at Ben's instruction (2026-08-02). His reason is recorded in all four, because it explains why a good decision expired rather than was wrong: \"at that point, the mini-map drew focus, and it would seem like the canvas was covered by a selection element. Currently, we basically fill the entire perimeter, meaning that it looks more awkward when the selection element disappears.\" Dismissal was right for a card floating over an open canvas; BL-213 fixed bottom band plus a full perimeter turns the same affordance into a hole in the frame. The item carries the two lines of rung removal AND the empty state, which has never been designed because nothing draws today when nothing is selected. Ben also restated the supersession rule (\"backlog items are always less important than later ones which contradict them\") — that is already codified in DELIVERY.md § Newest wins on conflict, and the annotations follow its no-retroactive-refactor half by appending dated notes rather than rewriting the originals."
+    },
+    {
+      "id": "NR-018",
+      "title": "The question log is DEVELOPMENT documentation — the 'why' should not appear in the game at all",
+      "raised": "2026-08-01",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Ben, alongside his resolution of NR-011, 2026-08-01",
+      "what": "Ben: 'the why shouldn't leak into the UI, players don't need us telling them what they ought to ask of the game.' BL-247 as designed and landed had a DUAL audience — player-facing (a closed-by-default 'Why this chart' toggle) and design-facing (Ben reading the log while designing). This removes the first. In code that means the eleven live why_note call sites (generation_charts, corporation_dashboard, selection_card) and the toggle in detail_level.cpp draw nothing in a player build.",
+      "why_it_matters": "It resolves BL-260's load-seam question by deleting it — if nothing renders, no codegen or runtime load into the UI is needed and the store is purely a doc artifact read by humans and tooling. It is also consistent with what Ben said when he made the pair mandatory ('For development, I think it's a low storage cost'), and with BL-247's own rejection of a leading-Q&A tutorial: he is extending that objection from 'do not curate a path' to 'do not state the question in-game either'. It retires a shipped affordance, so BL-247's authority text in LAYOUT.md needs the supersession written down rather than the toggle quietly vanishing.",
+      "options": [
+        "Remove the in-game affordance entirely — delete the why_note draw path; the store is documentation only.",
+        "Keep it behind a development-only gate (a debug flag or a non-shipping build), so Ben can still read the log inside the running app while a player never sees it.",
+        "Keep it player-facing after all, on the grounds that a closed-by-default opt-in toggle does not tell anyone what to ask."
+      ],
+      "recommendation": "Option 2 if reading the log IN CONTEXT is part of how you use it — you named that use yourself in BL-247 (navigating the UI to notice where an interesting question has no chart). Option 1 if the JSON store alone serves that. The difference is whether the justification is worth reading beside the surface it describes or on its own; that is your call, and it decides whether any draw code survives.",
+      "files": [
+        "src/ui/detail_level.cpp",
+        "src/ui/generation_charts.cpp",
+        "src/ui/corporation_dashboard.cpp",
+        "src/ui/selection_card.cpp",
+        "docs/ui/LAYOUT.md"
+      ],
+      "resolution": "OPTION 1 — REMOVED ENTIRELY (Ben, 2026-08-02): \"Remove it. If we need to examine that, I will just be asking you to look at documentation, not the game.\" So no development gate either; there is no draw path left. Done this session and building clean: why_note (both overloads) deleted from detail_level.{hpp,cpp}; the why_note_first verify sentinel and ui_state::why_note_open deleted; the answers/because parameters removed from generation_charts chart_row and its group helper, and from all 16 chart call sites; the 4 corporation_dashboard and 2 selection_card notes removed; verify.why_note removed from the Lua API; scripts/verify/chart_question_log.lua deleted along with its 4 goldens plus corp_rollup_finance_why.png; corp_dashboard.lua stripped of its why_note calls; stale comments in 4 headers/TUs corrected so nothing still promises the affordance. THE 22 AUTHORED PAIRS ARE NOT LOST and were deliberately NOT harvested into a file here — that would have pre-decided BL-260 open store-shape question. They are recoverable wholesale from commit d143aa4, which BL-260 names as its input."
+    },
+    {
+      "id": "NR-019",
+      "title": "\"Estimations should emerge from a reading of data, not from the data\" — how far does this reach into BL-162 and the roll-up cards?",
+      "raised": "2026-08-01",
+      "kind": "question",
+      "status": "resolved",
+      "source": "Ben, resolving NR-003, 2026-08-01",
+      "what": "Ben declined both options for the payback wording on a principle rather than on the merits: \"We actually should not do that much work for the player. It is up to them to figure out what is profitable. Estimations like this can be made, but they should emerge from a reading of data, not from the data.\" The immediate effect is that the payback row is left as it is. The unresolved part is scope, because several landed surfaces are pre-computed verdicts of exactly the kind the principle names: BL-162 ranks candidate buildings by ESTIMATED net profit and draws a bar chart of it; BL-248 four roll-up cards each print a verdict line and colour it red or green; the Selection band prints a per-building profitability read.",
+      "why_it_matters": "This is a design position about what the game is FOR, not a wording preference — a 4X where the player derives profitability from prices, deposits and recipes plays very differently from one where a panel ranks the options. It also cuts against the direction three landed items took, so leaving it implicit means the next surface built will guess. The distinction Ben drew is the operative one: SHOW the data a reading can be made from, do not PRINT the reading. A price, an output rate and a capex are data; \"payback ~5 qtrs\" and \"best candidate\" are readings.",
+      "options": [
+        "Narrow — the principle governs new work only; BL-162 and the roll-ups stand as built, and nothing is unwound.",
+        "Medium — no new pre-computed verdicts, and existing ones are re-examined when their item is next touched, but nothing is unwound now.",
+        "Wide — the ranked profit chart and the verdict lines are themselves the problem; file an item to replace the readings with the inputs they were computed from."
+      ],
+      "recommendation": "Worth your explicit answer rather than a default, because the cheapest reading (narrow) is the one that quietly preserves exactly what the principle objects to. Note the tension to resolve either way: BL-262 (scoring system) was opened an hour earlier in this same pass, and a score is by definition a reading rather than data. If the principle is wide, BL-262 has to justify why a standing is different from a payback estimate — my own view is that it is (a standing compares you to rivals, which no amount of staring at your own prices reveals), but that is exactly the argument the item should be made to state.",
+      "files": [
+        "src/ui/selection_panel.cpp",
+        "src/ui/corporation_dashboard.cpp",
+        "docs/CONCEPT.md"
+      ],
+      "resolution": "SHARPENED BY BEN (2026-08-01): \"I am contradicting myself there. The important thing is that we do not make the decisions for the player. Score does not really give anything more actionable than a metric.\" So the test is NOT whether a surface computes something — it is whether the surface makes the CHOICE. A metric the player interprets is fine; a surface that picks for them is not. BL-262 (scoring system) therefore survives the principle without needing a special argument: a standing is a metric, not an instruction. Practical reading for future work: publish quantities, do not publish recommendations. Rank orders and best-candidate highlighting are the borderline, since a ranking is a computation that behaves like a choice; BL-162 keeps its ranked profit chart because Ben left it alone in NR-003, not because it clearly passes. Nothing is unwound."
+    },
+    {
+      "id": "NR-020",
+      "title": "The History ledger’s Tiles tab is now named after the table it no longer contains",
+      "raised": "2026-08-02",
+      "kind": "question",
+      "status": "open",
+      "source": "Follow-on from NR-014, 2026-08-01",
+      "what": "With the per-tile table removed, the tab labelled \"Tiles\" holds two things: a bulleted Buildings list for the selected body, and a Market table (resource / supply / demand / price / base price). Neither is a tile.",
+      "why_it_matters": "The same argument that retired the tiles table applies to both, and Ben did not comment on either, so they were left alone rather than swept up. The Buildings list duplicates the Construction panel; the Market table duplicates the Market Ledger, and duplicates it less well (one body, no history, no orders). If the reasoning is \"the canvas already shows it\", the buildings are on the canvas too. The tab label is also now actively misleading, which is a small thing that a new player meets on the first visit.",
+      "options": [
+        "Rename the tab to what it now shows (Body, or Buildings & Market) and keep both sections.",
+        "Retire the whole view — the History ledger becomes Story + Chain, two views about how the world came to be, which is a cleaner premise than a third view about its current state.",
+        "Keep it as is; the label is wrong but nobody is harmed."
+      ],
+      "recommendation": "Option 2 reads best to me and is worth your eye rather than my call. Story and Chain both answer \"how did this world come to be\"; a current-state view has never belonged in a HISTORY ledger, and both its sections have better homes that already exist. That would also retire the history_tiles fold surface and simplify drill_through_fold.lua, which currently uses this table as its example of the fold’s biggest win.",
+      "files": [
+        "src/ui/tile_inspector.cpp",
+        "scripts/verify/drill_through_fold.lua",
+        "scripts/verify/history_ledger_and_comms.lua"
+      ],
+      "resolution": null
     }
   ]
 }

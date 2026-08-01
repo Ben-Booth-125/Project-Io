@@ -244,79 +244,20 @@ void draw_tile_inspector(const world& w, ui_state& s,
         return;
     }
 
-    // --- Tiles: what the chain left on the ground ---
-    // Section comment: columns map 1:1 to tile_component fields so this
-    // table doubles as the specification for the production tile canvas.
+    // --- What the chain left on the ground ---
     //
-    // Expanding (BL-214) opens the overlay HERE, so everything below draws into the
-    // full screen instead of the column without being restated. This view is the
-    // one the fold helps most: 6 + 23 columns have never fitted a 380 px ledger, so
-    // the horizontal scroll was permanent rather than exceptional.
+    // The per-tile table that used to open this view was REMOVED 2026-08-01 (Ben,
+    // NEEDS_REVIEW NR-014): "I'm actually not a massive fan of the tiles table. This
+    // is because it can be seen by looking at the canvas." It listed x, y,
+    // composition, landform, hazard, habitability and all 23 deposits for every tile
+    // on the body — 29 columns that never fitted the 380 px ledger, and every one of
+    // which the Planetary canvas already shows spatially, where position is the point.
+    // Recover it from git if it is ever wanted as a debug view; it is not a UI.
+    //
+    // Expanding (BL-214) still opens the overlay HERE so everything below draws into
+    // the full screen without being restated.
     const bool tiles_full =
         ui::fold_overlay_begin(s, detail_surface::history_tiles, 0, sel_body.name.c_str());
-
-    constexpr ImGuiTableFlags table_flags =
-        ImGuiTableFlags_BordersOuter  |
-        ImGuiTableFlags_BordersInnerV |
-        ImGuiTableFlags_RowBg         |
-        ImGuiTableFlags_ScrollY       |
-        ImGuiTableFlags_SizingFixedFit;
-
-    const float row_height    = ImGui::GetTextLineHeightWithSpacing();
-    const float table_height  = row_height * 12.0f; // show ~11 tiles before scroll
-
-    // Columns: x, y, composition, landform, hazard, habitability, then one per
-    // resource type.
-    const int col_count = 6 + static_cast<int>(resource_count);
-    if (ImGui::BeginTable("tiles", col_count, table_flags, {0.0f, table_height}))
-    {
-        ImGui::TableSetupScrollFreeze(0, 1);
-        ImGui::TableSetupColumn("X",    ImGuiTableColumnFlags_WidthFixed, 28.0f);
-        ImGui::TableSetupColumn("Y",    ImGuiTableColumnFlags_WidthFixed, 28.0f);
-        ImGui::TableSetupColumn("Composition", ImGuiTableColumnFlags_WidthFixed,  80.0f);
-        ImGui::TableSetupColumn("Landform",    ImGuiTableColumnFlags_WidthFixed,  72.0f);
-        ImGui::TableSetupColumn("Hazard",      ImGuiTableColumnFlags_WidthFixed,  60.0f);
-        ImGui::TableSetupColumn("Habitability",ImGuiTableColumnFlags_WidthFixed,  90.0f);
-        for (std::size_t r = 0; r < resource_count; ++r)
-            ImGui::TableSetupColumn(resource_name(static_cast<resource_type>(r)),
-                                    ImGuiTableColumnFlags_WidthFixed, 88.0f);
-        ImGui::TableHeadersRow();
-
-        // Collect and sort tiles belonging to the selected body.
-        std::vector<const tile_component*> body_tiles;
-        for (const auto& [id, tile] : w.tiles)
-        {
-            if (tile.body == selected_body)
-                body_tiles.push_back(&tile);
-        }
-        std::sort(body_tiles.begin(), body_tiles.end(),
-            [](const tile_component* a, const tile_component* b) {
-                return (a->grid_y != b->grid_y) ? (a->grid_y < b->grid_y)
-                                                : (a->grid_x < b->grid_x);
-            });
-
-        for (const tile_component* tile : body_tiles)
-        {
-            ImGui::TableNextRow();
-            ImGui::TableSetColumnIndex(0); ImGui::Text("%d", tile->grid_x);
-            ImGui::TableSetColumnIndex(1); ImGui::Text("%d", tile->grid_y);
-            ImGui::TableSetColumnIndex(2); ImGui::TextUnformatted(composition_name(tile->composition));
-            ImGui::TableSetColumnIndex(3); ImGui::TextUnformatted(landform_name(tile->landform));
-            ImGui::TableSetColumnIndex(4); ImGui::Text("%.2f", tile->hazard_level);
-            ImGui::TableSetColumnIndex(5); ImGui::Text("%.2f", tile->habitability);
-            for (std::size_t r = 0; r < resource_count; ++r)
-            {
-                ImGui::TableSetColumnIndex(static_cast<int>(6 + r));
-                const float deposit = tile->resource_deposit[r];
-                if (deposit > 0.0f)
-                    ImGui::Text("%.1f", deposit);
-                else
-                    ImGui::TextDisabled("—");
-            }
-        }
-
-        ImGui::EndTable();
-    }
 
     // --- Buildings on this body ---
     ImGui::Spacing();

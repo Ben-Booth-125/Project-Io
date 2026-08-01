@@ -62,7 +62,7 @@ void draw_profit_chart(ImDrawList* dl, ImVec2 mn, ImVec2 mx, const std::vector<f
     if (profit.size() < 2)
     {
         dl->AddText({plot_x0, (y_top + y_bot) * 0.5f}, label_col,
-                    "Run economy ticks to chart profit.");
+                    "Run economy quarters to chart profit.");
         return;
     }
 
@@ -277,13 +277,13 @@ void draw_balance_ledger(const world& w, const recipe_registry& reg,
         rank_player_buildings_by_profit(w, reg, report);
     if (ranking.empty())
     {
-        ImGui::TextDisabled("No buildings reporting yet - run an economy tick.");
+        ImGui::TextDisabled("No buildings reporting yet - run an economy quarter.");
     }
     else if (ImGui::BeginTable("##bldg_rank", 3,
                  ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingStretchProp))
     {
         ImGui::TableSetupColumn("Building",   ImGuiTableColumnFlags_WidthStretch, 3.0f);
-        ImGui::TableSetupColumn("Profit/tick", ImGuiTableColumnFlags_WidthStretch, 2.0f);
+        ImGui::TableSetupColumn("Profit/qtr", ImGuiTableColumnFlags_WidthStretch, 2.0f);
         ImGui::TableSetupColumn("vs yr",       ImGuiTableColumnFlags_WidthStretch, 1.4f);
         ImGui::TableHeadersRow();
 

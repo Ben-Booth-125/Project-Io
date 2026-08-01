@@ -18,20 +18,14 @@ verify.show_panel("corporation", true)
 verify.fold()
 shot("corp_dashboard")
 
--- ── R1 / R2 / R4: each card, full screen — chart, question log, drillable rows. ──
+-- ── R1 / R2: each card, full screen — chart and drillable rows. (The question
+--    log this used to capture was removed 2026-08-02, NEEDS_REVIEW NR-018.) ──
 local cards = {"production", "trade", "workforce", "finance"}
 for i, name in ipairs(cards) do
     verify.fold("corp_rollup", i - 1)
     verify.rollup_drill(-1)
-    verify.why_note(false)
     shot("corp_rollup_" .. name)
 end
-
--- ── R4: a question log open, on the card whose chart most needs one. ──
-verify.fold("corp_rollup", 3)
-verify.why_note(true)
-shot("corp_rollup_finance_why")
-verify.why_note(false)
 
 -- ── R3: the drills. Four different shapes, not one generic detail panel —
 --    a building's operating economics, a lane's traffic, a building's labour.

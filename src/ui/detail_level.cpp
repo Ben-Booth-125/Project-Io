@@ -36,7 +36,6 @@ void expand(ui_state& ui, detail_surface s, int key)
 {
     ui.expanded.surface     = s;
     ui.expanded.key         = key;
-    ui.why_note_open        = 0;  // the overlay opens in its resting state
     ui.corp_rollup_drill    = -1; // ...and at its roll-up, never a stale drill
 }
 
@@ -44,7 +43,6 @@ void fold(ui_state& ui)
 {
     ui.expanded.surface  = detail_surface::none;
     ui.expanded.key      = 0;
-    ui.why_note_open     = 0;
     ui.corp_rollup_drill = -1;
 }
 
@@ -120,47 +118,12 @@ void fold_overlay_end(ui_state&)
     ImGui::End();
 }
 
-bool why_note(ui_state& ui, const char* answers, const char* because)
-{
-    return why_note(ui, ImGui::GetID("##why"), answers, because);
-}
-
-bool why_note(ui_state& ui, unsigned int id_raw, const char* answers, const char* because)
-{
-    // Optional as a pair: an unlabelled chart draws no toggle rather than an empty
-    // note. Settles the item's open question 1 — forcing every chart to carry one
-    // would manufacture prose, and a missing pair is a review signal, not a defect.
-    if (answers == nullptr || because == nullptr || answers[0] == '\0' || because[0] == '\0')
-        return false;
-
-    const ImGuiID id = static_cast<ImGuiID>(id_raw);
-    if (ui.why_note_open == why_note_first)
-        ui.why_note_open = id; // the verify sentinel claims the first note drawn
-    const bool open = (ui.why_note_open == id);
-
-    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::ColorConvertU32ToFloat4(palette::text_secondary));
-    ImGui::PushStyleColor(ImGuiCol_Button,        IM_COL32(0, 0, 0, 0));
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(255, 255, 255, 24));
-    if (ImGui::SmallButton(open ? "? Why this chart  -" : "? Why this chart  +"))
-        ui.why_note_open = open ? 0u : id; // one note at a time; re-click closes
-    ImGui::PopStyleColor(3);
-
-    if (open)
-    {
-        // Exactly two lines and nothing more. "Answers" is the question a player
-        // would actually ask; "Because" is why this evidence settles it.
-        ImGui::Indent();
-        ImGui::PushTextWrapPos(0.0f);
-        ImGui::TextDisabled("Answers:");
-        ImGui::SameLine();
-        ImGui::TextUnformatted(answers);
-        ImGui::TextDisabled("Because:");
-        ImGui::SameLine();
-        ImGui::TextUnformatted(because);
-        ImGui::PopTextWrapPos();
-        ImGui::Unindent();
-    }
-    return open;
-}
+// The per-chart question log (BL-247) used to live here: a "? Why this chart"
+// toggle revealing an Answers/Because pair. REMOVED 2026-08-02 (Ben, NEEDS_REVIEW
+// NR-018) — "the why shouldn't leak into the UI, players don't need us telling them
+// what they ought to ask of the game." The log survives as DEVELOPMENT documentation
+// only; BL-260 relocates the authored pairs (recoverable from commit d143aa4) into a
+// JSON store tied to the backlog item that demanded each surface. Do not reinstate a
+// draw path here without reopening NR-018.
 
 } // namespace ui

@@ -163,6 +163,16 @@ struct ui_state
     int  budget_wage_tier = 2;
     bool show_corporation_panel = false; ///< Whether the Corporation Overview Dashboard is open.
 
+    /// Whether the all-corporations balance table is open (corporation_panel.cpp).
+    ///
+    /// PROVISIONAL HOME. This table used to occupy nav slot 1, and was deleted by
+    /// BL-248 as a duplicate of the Economy panel's Corps view. Ben restored it
+    /// (NEEDS_REVIEW NR-012, 2026-08-01) — the deletion was not intended — and parked
+    /// it on slot 8 (Diplomacy) so it is reachable and can be compared against the
+    /// Corps view before its real home is chosen. Slot 8 is otherwise unbuilt, so
+    /// nothing is displaced; when Diplomacy is actually designed this occupant moves.
+    bool show_corporations_table = false;
+
     // --- one-question-per-view nav selectors (BL-117 sweep) ---
     // Each fold-out ledger with more than one question splits its content into
     // button-strip views (ui::nav_button_strip); this is the selected view per panel,
@@ -193,10 +203,6 @@ struct ui_state
     /// expanded card. Cleared whenever a card folds.
     int        corp_rollup_drill = -1;
 
-    /// The one open "why this chart" note (BL-247), by ImGui id; 0 = none open.
-    /// Reset by ui::expand / ui::fold, so a note never survives into a view the
-    /// player has just opened — it is meant to be read once.
-    ImGuiID    why_note_open = 0;
 
     /// Within the History ledger's Chain view, which chain round's stages are
     /// listed (0..chain_round_count-1). Held here rather than as a function-local

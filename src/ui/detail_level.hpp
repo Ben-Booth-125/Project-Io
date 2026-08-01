@@ -62,15 +62,6 @@ struct fold_state
     int            key     = 0; ///< Meaningful only while `surface != none`.
 };
 
-/// Sentinel for `ui_state::why_note_open` meaning "open the FIRST question log
-/// drawn this frame, whichever it turns out to be".
-///
-/// It exists for the verify harness: a Lua script cannot compute an ImGui id (the
-/// ids are stack-dependent and only exist mid-frame), so without this the open
-/// state of a note would be unverifiable and every capture would show it closed.
-/// The first `why_note` to see the sentinel claims it by writing its own id, so the
-/// one-note-at-a-time invariant holds from the next frame on.
-inline constexpr unsigned int why_note_first = 0xFFFFFFFFu;
 
 namespace ui {
 
@@ -111,32 +102,5 @@ bool fold_overlay_begin(ui_state& ui, detail_surface s, int key, const char* tit
 /// Close an overlay that `fold_overlay_begin` returned true for.
 void fold_overlay_end(ui_state& ui);
 
-/// The chart question log (BL-247): a closed-by-default "Why this chart" toggle
-/// revealing exactly two lines — the question this chart answers, and why this
-/// evidence justifies that answer.
-///
-/// It is NOT a tutorial and never suggests what to ask next; it documents, on
-/// request, what a chart that already exists is for. Distinct from a derivation
-/// caption, which answers *how a number was computed* — a chart may want both, and
-/// they must not be merged into one blob of text.
-///
-/// Both strings are optional as a pair: passing nullptr for either draws no toggle
-/// at all, so an unlabelled chart costs nothing. At most one note is open at a
-/// time, and opening or folding any overlay closes it — the note is meant to be
-/// read once, not to become a way of reading the chart's normal content.
-///
-/// Lives here rather than in `charts.hpp` because it needs `ui_state`, and
-/// `charts::` is deliberately a pure draw-primitive namespace that knows nothing
-/// about it. Returns true while the note is open.
-bool why_note(ui_state& ui, const char* answers, const char* because);
-
-/// As above, but with the note's identity supplied by the caller.
-///
-/// A host that must RESERVE the note's height before opening a fixed-size container
-/// needs to know whether the note is open *before* drawing it, which means knowing
-/// its id first. The generation chart rows are exactly that case: no scrollbar, so
-/// an unreserved open note would clip. Prefer the overload above wherever the height
-/// is free.
-bool why_note(ui_state& ui, unsigned int id, const char* answers, const char* because);
 
 } // namespace ui

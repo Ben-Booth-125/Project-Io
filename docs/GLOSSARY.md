@@ -27,6 +27,15 @@ A generated sovereign state on the homeworld — the territorial/political actor
 **Tick**
 The fixed period between economy updates. Supply, demand, and market prices resolve at the end of each Tick. Real-time play continues within a Tick; the boundary is a hard economic checkpoint, not a pause.
 
+**Tick is the INTERNAL term.** It names the simulation step, and it is the right word in code, comments, harnesses, data exports and design docs. It is **not** the word the player sees — see **Quarter**.
+
+**Quarter (`qtr`)**
+The player-facing name for one Tick. A Tick is ~3 months of campaign time, so four make a year (BL-095) — the two words denote exactly the same period, and "Quarter" is the more literally accurate of them.
+
+Settled by Ben, 2026-08-01 (NEEDS_REVIEW NR-002): *"Qtr is the preferred term for any economy tick. Tick is too technical of a term for average gamers."* Every rate, duration and empty-state string a player reads uses Quarter or `qtr` — `Profit/qtr`, `payback ~5 qtrs`, `Est. qtrs left`, "run an economy quarter". Use the abbreviation `qtr` where space is tight (column headers, inline rates) and the full word in prose and tooltips.
+
+The split is by audience, not by meaning: a CSV export column stays `tick` because its reader is an analyst, while the header beside it reads `/ qtr` because its reader is a player.
+
 **Faction**
 Legacy umbrella term — prefer the specific actor: **Nation** (political/territorial) or **Corporation** (economic). The map lens formerly named Faction is the **Country** lens (renamed by BL-052, faction → country — it always showed nations). "Faction" as a colour concept — player-vs-rival identity — is the **Corporation** identity colour (`corp_colour` / `corp_identity_colour`, `src/ui/presentation.hpp`). Per-faction sentiment is designed, not built.
 

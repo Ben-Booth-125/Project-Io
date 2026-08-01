@@ -68,10 +68,15 @@ float construction_rate(const world& w, const recipe_registry& reg,
     return rate;
 }
 
-// Compact tick-count label; a Tick is ~3 months, so 4 ticks make a year (BL-095).
+// Compact quarter-count label; a Tick is ~3 months, so 4 make a year (BL-095).
+//
+// The DISPLAY word is "qtr", not "tick" (NR-002, Ben 2026-08-01): Tick is the internal
+// term for the economy step and reads as engineering to a player. It is also the less
+// accurate of the two here — the step is literally a calendar quarter, which is why this
+// function could already gloss it in years.
 std::string ticks_label(int ticks)
 {
-    std::string s = std::to_string(ticks) + (ticks == 1 ? " tick" : " ticks");
+    std::string s = std::to_string(ticks) + (ticks == 1 ? " qtr" : " qtrs");
     if (ticks >= 4)
         s += " (~" + std::to_string(ticks / 4) + " yr)";
     return s;
@@ -158,7 +163,7 @@ void draw_queue_section(const world& w, const recipe_registry& reg)
     ImGui::TableSetupColumn("Body",             ImGuiTableColumnFlags_WidthStretch, 1.5f);
     ImGui::TableSetupColumn("Building",         ImGuiTableColumnFlags_WidthStretch, 2.0f);
     ImGui::TableSetupColumn("Progress",         ImGuiTableColumnFlags_WidthStretch, 1.5f);
-    ImGui::TableSetupColumn("Est. ticks left",  ImGuiTableColumnFlags_WidthStretch, 1.5f);
+    ImGui::TableSetupColumn("Est. qtrs left",  ImGuiTableColumnFlags_WidthStretch, 1.5f);
     ImGui::TableSetupColumn("Cost remaining",   ImGuiTableColumnFlags_WidthStretch, 1.5f);
     ImGui::TableHeadersRow();
 

@@ -1,7 +1,7 @@
 #include "selection_card.hpp"
 
 #include "charts.hpp"           // draw_time_series — the drill-down chart
-#include "detail_level.hpp"     // the fold overlay + the chart question log (BL-214/247)
+#include "detail_level.hpp"     // the fold overlay (BL-214)
 #include "presentation.hpp"     // presentation_of — resource name / colour
 #include "selection.hpp"        // selection_kind_of — the open/kind gate
 #include "selection_panel.hpp"  // draw_selection_content — the card body
@@ -161,8 +161,7 @@ void draw_resource_drill(const world& w, const resource_history_view& hist, ui_s
 // The expanded view of one tile metric (BL-214): the same page the band's accordion
 // rests on, given the whole screen. Nothing is withheld in the band — Ben's call was
 // that a fixed 260 px rect opens showing its chart — so what the overlay adds is
-// ROOM: a chart eight times taller, the reference legend unsquashed, and the space
-// for the chart's own question log (BL-247), which the band has no room to carry.
+// ROOM: a chart eight times taller and the reference legend unsquashed.
 //
 // A drilled frame (BL-196) takes the overlay instead when one is open, so the two
 // axes compose: expand then drill, or drill then expand, and either order reads.
@@ -190,8 +189,7 @@ void draw_metric_expanded(const world& w, const resource_history_view& hist, ui_
     const ImVec2 p  = ImGui::GetCursorScreenPos();
     // A two-column comparison does not grow more legible past ~560 px either —
     // draw_bars caps the columns at 34 px, so extra width is empty plot, not a
-    // bigger chart. What the expanded view actually buys here is the axis room and
-    // the question log the 260 px band could never carry.
+    // bigger chart. What the expanded view actually buys here is the axis room.
     const float  cw = std::min(560.0f, ImGui::GetContentRegionAvail().x);
     const float  gh = std::min(380.0f, std::max(160.0f, ImGui::GetContentRegionAvail().y
                                                             - ImGui::GetFrameHeight() * 4.0f));
@@ -211,19 +209,6 @@ void draw_metric_expanded(const world& w, const resource_history_view& hist, ui_
         ImGui::Dummy({cw, gh});
     }
     draw_tile_metric_chart(ImGui::GetWindowDrawList(), p, {p.x + cw, p.y + gh}, mp);
-
-    ImGui::Spacing();
-    if (drillable)
-        why_note(ui,
-                 "Is this tile worth extracting from, next to the best ground I have surveyed?",
-                 "The top-decile column is the yield a great tile for this resource "
-                 "actually returns, so the gap between the two columns is the headroom "
-                 "a better site would buy.");
-    else
-        why_note(ui,
-                 "Is this tile unusually hostile or unusually liveable for this world?",
-                 "A single habitability figure means nothing on its own; against this "
-                 "body's own average it says whether the tile is the exception or the rule.");
 }
 
 } // namespace

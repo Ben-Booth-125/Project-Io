@@ -18,7 +18,7 @@
 //
 // It is four roll-up cards — Production, Trade, Workforce, Finance — on the fold
 // model (BL-214): each rests as ONE verdict line and expands to a full-screen view
-// carrying its chart, that chart's question log (BL-247), and a per-item drill.
+// carrying its chart and a per-item drill.
 //
 // The four drills are deliberately four different SHAPES, not one generic detail
 // panel: a building's operating state, a lane's traffic, a building's labour, the
@@ -86,7 +86,7 @@ corp_rollups derive_corp_rollups(const world& w, const economy_report& report, e
 /// @param reg    Loaded registry; the Production drill prices the building through
 ///               the shared profitability builder rather than re-deriving it.
 /// @param report Last economy step; supplies output, labour and the budget flows.
-/// @param s      UI state — the fold target, the roll-up drill, the open question log.
+/// @param s      UI state — the fold target and the roll-up drill.
 /// @param open   The nav slot's flag; the dashboard draws nothing while false.
 void draw_corporation_dashboard(const world& w, const recipe_registry& reg,
                                 const economy_report& report,

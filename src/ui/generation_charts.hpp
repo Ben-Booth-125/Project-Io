@@ -96,7 +96,8 @@ std::string stage_verdict(const generation_chart_source& src, chain_stage s);
 /// @param heading When true, prefixes a `SeparatorText` naming the stage and the
 ///                question it answers — the wizard wants it, the ledger does not
 ///                (its collapsing header already carries the name).
-/// @param log_ui  When non-null, each chart draws its BL-247 question log toggle.
+/// @param log_ui  Retained for call compatibility; the BL-247 question log it drove
+///                was removed 2026-08-02 (NEEDS_REVIEW NR-018). Unused.
 ///                Null suppresses them — a chart row in the 380 px ledger column
 ///                has no line to spare, and the logs are an expanded-view affordance.
 void draw_stage_charts(const generation_chart_source& src, chain_stage s, bool heading,

@@ -4958,14 +4958,14 @@
         },
         {
           "id": "R3",
-          "status": "pending",
+          "status": "cancelled",
           "requirement": "The main-menu New World setup exposes the descriptor — seed (hex entry + Roll/Copy), resource abundance (Sparse/Lean/Standard), nation count slider, and a disabled bodies stub — and starting a new game builds the world from the edited descriptor.",
           "verification": [
             "visual: scripts/verify/new_world_setup.lua (not yet authored)",
             "build: ProjectIo links with the menu block"
           ],
-          "result_metric": "App builds+links green; interactive menu not captured in a saved visual script this pass.",
-          "notes": "Follow-on: author scripts/verify/new_world_setup.lua and run verifier-visual. Load-bearing determinism guarantee is covered headlessly by R1/R2. Noted 2026-07-31 (doc sweep): the menu this row describes was superseded by the BL-167 New World wizard, so the capture can no longer be authored as written; left pending as an honest record — the wizard surface is BL-167 territory."
+          "result_metric": "CANCELLED 2026-08-01 (Ben, NEEDS_REVIEW NR-008). Not verifiable as written: the main-menu New World setup this row describes was superseded by the BL-167 New World wizard, so scripts/verify/new_world_setup.lua can never be authored against the surface named here. Cancelled rather than left pending, because a row that cannot be satisfied is not the same as one nobody has got to yet, and pending was making backlog_lint print the same warning on every run.",
+          "notes": "Follow-on: author scripts/verify/new_world_setup.lua and run verifier-visual. Load-bearing determinism guarantee is covered headlessly by R1/R2. Noted 2026-07-31 (doc sweep): the menu this row describes was superseded by the BL-167 New World wizard, so the capture can no longer be authored as written; left pending as an honest record — the wizard surface is BL-167 territory. RESOLVED 2026-08-01: status pending -> cancelled. The load-bearing half of this row (a new game builds from the edited descriptor, deterministically) is already covered headlessly by R1/R2, which are complete. The surviving half (the wizard surface itself is captured and verified) belongs to BL-167 and must be verified THERE, not back-filled here — see BL-167 for the wizard verification. No coverage is lost by this cancellation; what is lost is a row describing a screen that no longer exists."
         }
       ]
     },

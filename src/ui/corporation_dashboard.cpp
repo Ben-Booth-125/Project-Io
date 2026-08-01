@@ -1,7 +1,7 @@
 #include "corporation_dashboard.hpp"
 
 #include "charts.hpp"
-#include "detail_level.hpp"   // the fold idiom + the chart question log
+#include "detail_level.hpp"   // the fold idiom (BL-214)
 #include "foldout_column.hpp" // shell fold-out column host
 #include "format.hpp"
 #include "presentation.hpp"
@@ -199,7 +199,7 @@ void draw_corporation_dashboard(const world& w, const recipe_registry& reg,
 
         char buf[128];
 
-        std::snprintf(buf, sizeof buf, "%d making, %d idle, %.1f/tick",
+        std::snprintf(buf, sizeof buf, "%d making, %d idle, %.1f/qtr",
                       r.producing, r.idle, static_cast<double>(r.output_per_tick));
         card_row(s, 0, "Production", buf,
                  r.idle > 0 ? palette::negative : palette::positive);
@@ -214,10 +214,10 @@ void draw_corporation_dashboard(const world& w, const recipe_registry& reg,
                  r.tightest_contention < 0.999f ? palette::negative : palette::positive);
 
         if (r.budget_measured)
-            std::snprintf(buf, sizeof buf, "%+.1f/tick, balance %.0f",
+            std::snprintf(buf, sizeof buf, "%+.1f/qtr, balance %.0f",
                           static_cast<double>(r.budget.net()), static_cast<double>(r.balance));
         else
-            std::snprintf(buf, sizeof buf, "balance %.0f (no tick measured yet)",
+            std::snprintf(buf, sizeof buf, "balance %.0f (no quarter measured yet)",
                           static_cast<double>(r.balance));
         card_row(s, 3, "Finance", buf,
                  (r.budget_measured && r.budget.net() < 0.0f) ? palette::negative
@@ -297,7 +297,7 @@ void draw_corporation_dashboard(const world& w, const recipe_registry& reg,
         }
         else
         {
-            // The roll-up itself: the chart, its question log, then the drillable rows.
+            // The roll-up itself: the chart, then the drillable rows.
             if (card == 3)
             {
                 if (r.budget_measured)
@@ -319,18 +319,12 @@ void draw_corporation_dashboard(const world& w, const recipe_registry& reg,
                     charts::draw_bars(ImGui::GetWindowDrawList(), p, {p.x + cw, p.y + 220.0f},
                                       fb, 5, ceiling, "%.1f");
                     ImGui::Spacing();
-                    why_note(s,
-                             "Which outflow is actually eating the money I make?",
-                             "The five columns are the whole of the balance delta - income "
-                             "less each cost - so whatever is tallest beside Income is the "
-                             "thing to act on, with nothing hidden outside the chart.");
-                    ImGui::Spacing();
-                    ImGui::Text("Net this tick: %+.1f", static_cast<double>(r.budget.net()));
+                    ImGui::Text("Net this quarter: %+.1f", static_cast<double>(r.budget.net()));
                 }
                 else
                 {
                     ImGui::TextWrapped("No budget breakdown has been recorded yet - "
-                                       "advance time by one economy tick.");
+                                       "advance time by one economy quarter.");
                 }
             }
             else
@@ -356,26 +350,6 @@ void draw_corporation_dashboard(const world& w, const recipe_registry& reg,
                             s.corp_rollup_drill = i;
                 }
 
-                ImGui::Spacing();
-                if (card == 0)
-                    why_note(s,
-                             "Which of my buildings is carrying the corporation, and which "
-                             "is dead weight?",
-                             "Every building is on one shared output axis, so a short bar is "
-                             "a real underperformer rather than a different unit - and an "
-                             "idle one reads red at zero instead of silently vanishing.");
-                else if (card == 1)
-                    why_note(s,
-                             "Which routes am I actually running, as opposed to the ones I "
-                             "meant to?",
-                             "The bar is completed convoys, not planned ones, so a lane I "
-                             "believe in but never ship on shows up short.");
-                else
-                    why_note(s,
-                             "Is a labour shortage throttling production, and where?",
-                             "Effective labour is what a building actually got after "
-                             "contention, so comparing the rows shows whether a shortfall "
-                             "is one building's problem or the whole body's.");
             }
         }
 

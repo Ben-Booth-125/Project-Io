@@ -15,6 +15,7 @@
 #include "ui/detail_level.hpp" // the drill-through fold idiom (BL-214)
 #include "ui/balance_ledger.hpp"
 #include "ui/corporation_dashboard.hpp" // nav slot 1, the four roll-ups (BL-248)
+#include "ui/corporation_panel.hpp"     // all-corporations table, restored to slot 8 (NR-012)
 #include "ui/economy_panel.hpp"
 #include "ui/market_ledger.hpp"
 #include "ui/chat_panel.hpp"
@@ -1070,12 +1071,10 @@ int app::run_verify(const std::string& script_path, bool bless)
     // -1 to return to the roll-up itself.
     v.set_function("rollup_drill", [this](int row) { m_ui.corp_rollup_drill = row; });
 
-    // Open a chart's question log (BL-247). A script cannot name a specific chart —
-    // ImGui ids are stack-dependent and exist only mid-frame — so this arms the
-    // sentinel and the first log drawn claims it. `verify.why_note(false)` closes.
-    v.set_function("why_note", [this](sol::optional<bool> on) {
-        m_ui.why_note_open = on.value_or(true) ? why_note_first : 0u;
-    });
+    // `verify.why_note` lived here, arming BL-247's question-log sentinel. Removed
+    // 2026-08-02 with the log's draw path (NEEDS_REVIEW NR-018) — the log is
+    // development documentation now, not an in-game surface, so there is nothing on
+    // screen for a script to open. Scripts calling it must drop the call.
 
     // Open the Layer 4 construction / building-management panel so a capture shows
     // the building surface. The scaffold panel takes no economy state to populate.
@@ -2928,6 +2927,13 @@ void app::render()
     // panel's Corps view already carries it.
     ui::draw_corporation_dashboard(m_world, m_registry, m_last_econ_report, m_ui,
                                    m_ui.show_corporation_panel);
+
+    // The displaced table itself, restored (NR-012). BL-248 deleted it as a duplicate
+    // of the Economy panel's Corps view; Ben did not intend a deletion, so it is back
+    // and reachable from nav slot 8 until its real home is chosen. Deleting a file
+    // because a similar view exists is the call that was wrong here — dormant beats
+    // deleted, since intent is not recoverable from a diff.
+    ui::draw_corporation_panel(m_world, m_ui, m_ui.show_corporations_table);
 
     // Selection band (BL-213 — supersedes the BL-194/195 Selection band) — a FIXED
     // rect at the bottom of the screen, sandwiched between the shell column and

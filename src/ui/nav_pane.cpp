@@ -40,6 +40,7 @@ void slot_tooltip(const char* title, const char* blurb, bool reserved)
 void close_all_panels(ui_state& state)
 {
     state.show_corporation_panel = false;
+    state.show_corporations_table = false;
     state.show_balance_ledger    = false;
     state.show_market_ledger     = false;
     state.show_construction_panel = false;
@@ -50,7 +51,8 @@ void close_all_panels(ui_state& state)
 
 bool any_panel_open(const ui_state& state)
 {
-    return state.show_corporation_panel || state.show_balance_ledger ||
+    return state.show_corporation_panel || state.show_corporations_table ||
+           state.show_balance_ledger    ||
            state.show_market_ledger     || state.show_construction_panel ||
            state.show_tile_ledger       || state.show_economy_panel;
 }
@@ -149,11 +151,20 @@ void draw_nav_pane(ui_state& state, float top_offset)
             ImGui::EndDisabled();
             slot_tooltip("Corp. Strategy", "Standing policy - wage levels, military posture.", true);
             break;
-        case 8: // Diplomacy — placeholder
-            ImGui::BeginDisabled();
-            ImGui::Selectable(id, false, 0, {slot_size, slot_size});
-            ImGui::EndDisabled();
-            slot_tooltip("Diplomacy", "Relations with nations and rival corporations.", true);
+        // Diplomacy is still unbuilt, but the slot is no longer empty: it hosts the
+        // all-corporations balance table, provisionally. That table was BL-248's one
+        // deletion and Ben restored it (NR-012) — it needs a door, and every other
+        // slot is spoken for. Slot 8 is the least-wrong host because the table IS a
+        // rival-comparison read, which is what this slot is eventually for. It moves
+        // when Diplomacy is designed; the slot stays labelled by its real subject so
+        // the rail does not start teaching "Diplomacy = a balance table".
+        case 8: // Diplomacy — provisional host for the corporations table (NR-012)
+            if (ImGui::Selectable(id, state.show_corporations_table, 0, {slot_size, slot_size})) {
+                const bool was_open = state.show_corporations_table;
+                close_all_panels(state);
+                state.show_corporations_table = !was_open;
+            }
+            slot_tooltip("Diplomacy", "Not yet built. For now: every corporation's balance, side by side.", false);
             break;
         case 9: // History (Tile Ledger lives here per MENU.md renaming)
             if (ImGui::Selectable(id, state.show_tile_ledger, 0, {slot_size, slot_size})) {
@@ -197,7 +208,10 @@ void draw_nav_pane(ui_state& state, float top_offset)
         // silhouette, which is exactly the collision BL-174 exists to fix.
         case 6: icons::industry(dl, centre, r, lit(state.show_construction_panel));    break;
         case 7: icons::strategy(dl, centre, r, dim);     break;  // Corp. Strategy (reserved)
-        case 8: icons::diplomacy(dl, centre, r, dim);    break;  // Diplomacy (reserved)
+        // Slot 8 is live only because it provisionally hosts the corporations table
+        // (NR-012); the subject it is NAMED for is still unbuilt, so the glyph lights
+        // like any other live slot rather than staying dim.
+        case 8: icons::diplomacy(dl, centre, r, lit(state.show_corporations_table)); break;
         case 9: icons::history(dl, centre, r, lit(state.show_tile_ledger));            break;
         default: icons::placeholder(dl, centre, r, dim); break;
         }

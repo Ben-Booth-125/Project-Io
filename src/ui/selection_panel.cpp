@@ -143,11 +143,12 @@ float construction_rate(const world& w, const recipe_registry& reg,
     return rate;
 }
 
-// A compact tick-count label. A Tick is ~3 months, so 4 ticks make a year (BL-095);
-// years surface once the span reads better than a raw count.
+// A compact quarter-count label. A Tick is ~3 months, so 4 make a year (BL-095);
+// years surface once the span reads better than a raw count. The display word is
+// "qtr" — Tick is the internal term and stays out of player-facing text (NR-002).
 std::string ticks_label(int ticks)
 {
-    std::string s = std::to_string(ticks) + (ticks == 1 ? " tick" : " ticks");
+    std::string s = std::to_string(ticks) + (ticks == 1 ? " qtr" : " qtrs");
     if (ticks >= 4)
         s += " (~" + std::to_string(ticks / 4) + " yr)";
     return s;
@@ -380,12 +381,12 @@ void draw_building_profit(const world& w, const recipe_registry& reg,
                           const economy_report& report, entity_id id)
 {
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
-                       "Profitability (est. / tick)");
+                       "Profitability (est. / qtr)");
 
     const building_profit p = estimate_building_profit(w, reg, report, id);
     if (!p.has_data)
     {
-        ImGui::TextDisabled("Run an economy tick to estimate.");
+        ImGui::TextDisabled("Run an economy quarter to estimate.");
         return;
     }
 
@@ -947,7 +948,7 @@ const char* production_status(const building_component& b,
                               const building_report* row, ImU32& col)
 {
     if (b.decommissioned) { col = palette::neutral;  return "Idled - producing nothing"; }
-    if (row == nullptr)   { col = palette::neutral;  return "No data yet - run an economy tick"; }
+    if (row == nullptr)   { col = palette::neutral;  return "No data yet - run an economy quarter"; }
     if (row->exhausted)   { col = palette::negative; return "Deposit exhausted"; }
     if (row->idle)        { col = palette::negative; return "Idle - unstaffed or misconfigured"; }
     if (row->has_limiting)
@@ -1016,7 +1017,7 @@ void draw_building_selection(world& w, const recipe_registry& reg,
         ImGui::Dummy({pip * 2.0f + 6.0f, frame_h});
         ImGui::SameLine();
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
-                           "%.1f %s / tick", produced, presentation_of(made).name);
+                           "%.1f %s / qtr", produced, presentation_of(made).name);
 
         // Rate against the uncontended nominal ceiling, as a bar plus its percentage.
         if (ceiling > 0.0f)
@@ -1120,7 +1121,7 @@ void draw_building_selection(world& w, const recipe_registry& reg,
         if (ImGui::Checkbox("Auto##sel_wf_auto", &autos))
             b.workforce_auto = autos;
         if (ImGui::IsItemHovered())
-            ImGui::SetTooltip("Solve the target each tick for maximum profit.");
+            ImGui::SetTooltip("Solve the target each quarter for maximum profit.");
 
         ImGui::SameLine();
         ImGui::BeginDisabled(b.workforce_auto);
@@ -1548,9 +1549,19 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
 
     // What the bars mean, stated once. The assumptions are named rather than modelled
     // (see estimate_prospective_profit) — an honest static read beats a half-modelled one.
+    //
+    // "before auto-staffing" is doing real work (NR-001): the estimate mirrors
+    // construction.cpp's 50% workforce exactly, so it describes the building at the
+    // instant it is created — but BL-181 auto-solves a player building's workforce for
+    // maximum profit on its FIRST tick, and prospective_profit_harness measured realised
+    // extraction at ~2x this figure because of it. Every candidate is understated by the
+    // same factor, so the RANKING the chart exists for is unaffected; the magnitude is a
+    // floor, not a ceiling, and a player reads a profit bar as a prediction. Three words
+    // stop it reading as the most the building will ever earn (Ben's call, 2026-08-01).
     ImGui::PushStyleColor(ImGuiCol_Text, palette::text_secondary);
-    ImGui::TextWrapped("Est. net / tick at today's local prices - 50%% staffing, no labour "
-                       "shortage. Capex is not in the bar; see payback.");
+    ImGui::TextWrapped("Est. net / qtr at today's local prices - at least this, before "
+                       "auto-staffing; 50%% staffing, no labour shortage. Capex is not in "
+                       "the bar; see payback.");
     ImGui::PopStyleColor();
 
     // Four lines per candidate: name / cost + payback / profit bar / action.
@@ -1596,8 +1607,8 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
         {
             const float pb = c.capex / c.profit.net();
             cost += (pb > 999.0f)
-                    ? std::string(" - payback > 999 ticks")
-                    : " - payback ~" + std::to_string(static_cast<int>(pb)) + " ticks";
+                    ? std::string(" - payback > 999 qtrs")
+                    : " - payback ~" + std::to_string(static_cast<int>(pb)) + " qtrs";
         }
         ImGui::TextDisabled("%s", cost.c_str());
 
@@ -1618,7 +1629,7 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
             // honest net is minus its upkeep, and a red bar for that would read as a
             // bad investment rather than as an enabler.
             ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::neutral),
-                               "No direct revenue - upkeep %.0f / tick",
+                               "No direct revenue - upkeep %.0f / qtr",
                                static_cast<double>(c.profit.maintenance + c.profit.wages));
         }
         // else: unbuildable, or no market to price it — the reason text takes this slot.
