@@ -1338,164 +1338,26 @@ void draw_selection_content(world& w, const recipe_registry& reg,
 
 namespace {
 
-// --- Construction-ledger candidate economics (BL-162) ------------------------
-// The ledger ranks candidates by what each WOULD earn, so it needs a profit read for
-// a building that does not exist yet. estimate_building_profit (world/building_profit.hpp)
-// cannot serve that: it requires both a live building_component and a matching
-// economy_report row, and its revenue is the REALISED output_quantity. This models the
-// same `building_profit` struct from world state alone, so a candidate's number reads
-// identically to the built building's Net once it exists.
-//
-// Fixed, deliberate assumptions — stated in the ledger's caption rather than hidden:
-//   * workforce_assigned 0.5 (0.0 for port / inland_logistics_hub) and workforce_target
-//     100, exactly what construct_building authors (construction.cpp § placement);
-//   * contention scalar 1.0 — there is no economy_report in hand and the new building
-//     has not joined the labour pool yet, so assume no shortage and say so;
-//   * today's local prices, flat. No supply-response elasticity, no deposit sharing
-//     with existing sites (run_extraction gives every building the full richness, so
-//     no adjustment is the correct model). Do not "improve" these silently.
-//
-//     The depletion taper IS applied, and the original reasoning for omitting it —
-//     "extracted-to-date is zero for a building that does not exist" — was wrong: it
-//     confused per-BUILDING with per-TILE. `resource_remaining` is the tile's reserve,
-//     drawn down by every site that ever worked it, so a tile can be spent before this
-//     candidate exists. Without the taper the ledger put its tallest bar on a
-//     worked-out deposit.
-//
-// corp_ai.cpp's build scorer keeps its own cruder inline duplicate (it omits
-// habitability-scaled wages). Switching it would change AI build scoring, hence world
-// evolution, hence every blessed golden — a known, accepted divergence, not an oversight.
-building_profit prospective_profit(const world& w, const recipe_registry& reg,
-                                   entity_id tile_id, building_type type,
-                                   resource_type target, std::uint16_t recipe_id)
+// A recipe's display name for a construction-ledger row: "food_rations" ->
+// "Food Rations". Row names must be UNIQUE — the candidate card's ImGui id is its
+// name — so each processing recipe gets its own readable label (BL-162).
+std::string pretty_recipe(const std::string& raw)
 {
-    building_profit out;
-
-    const auto tit = w.tiles.find(tile_id);
-    if (tit == w.tiles.end())
-        return out;
-    const tile_component& tc = tit->second;
-
-    // The tile's market sets every price. Without one there is nothing honest to
-    // report, so has_data stays false — a chart of zeros is a lie.
-    const market_component* mkt = nullptr;
+    std::string out = raw;
+    bool at_start = true;
+    for (char& ch : out)
     {
-        const entity_id mid = market_for_tile(w, tile_id);
-        if (mid != null_entity)
+        if (ch == '_')
         {
-            const auto mit = w.markets.find(mid);
-            if (mit != w.markets.end())
-                mkt = &mit->second;
+            ch = ' ';
+            at_start = true;
+            continue;
         }
+        if (at_start && ch >= 'a' && ch <= 'z')
+            ch = static_cast<char>(ch - 'a' + 'A');
+        at_start = false;
     }
-    if (mkt == nullptr)
-        return out;
-    const auto price = [&](resource_type r) -> float {
-        const std::size_t ri = static_cast<std::size_t>(r);
-        return mkt->price[ri] > 0.0f ? mkt->price[ri] : mkt->base_price[ri];
-    };
-
-    // The building construct_building would actually author for this candidate.
-    building_component bc{};
-    bc.tile               = tile_id;
-    bc.type               = type;
-    bc.workforce_assigned =
-        (type == building_type::port || type == building_type::inland_logistics_hub) ? 0.0f : 0.5f;
-    bc.target_resource    = target;
-    bc.recipe             = recipe_id;
-
-    out.has_data = true;
-
-    // Opex through the shared budget formula, so the estimate and apply_budget agree
-    // exactly — the pre-build number and the post-build Net must be the same quantity.
-    const building_economics& econ = reg.economics(type);
-    const building_opex opex =
-        compute_building_opex(bc, econ, 1.0f, body_mean_habitability(w, tc.body));
-    out.maintenance = opex.maintenance;
-    out.wages       = opex.wages;
-
-    // workforce_target 100 and contention 1.0 both scale to 1, so the only labour
-    // term left is the assigned fraction (economy_system.cpp § run_extraction).
-    const float wf = bc.workforce_assigned;
-
-    if (type == building_type::extraction_site)
-    {
-        const std::size_t ri = static_cast<std::size_t>(target);
-        const float nominal = econ.base_rate * tc.resource_deposit[ri] * wf
-                              * (1.0f - tc.hazard_level);
-
-        // Apply run_extraction's depletion taper (economy_system.cpp § run_extraction).
-        // resource_deposit is RICHNESS — a fixed property of the tile — while
-        // resource_remaining is the reserve, drained by any extraction site that has
-        // ever worked this tile. Pricing off richness alone valued a spent tile as
-        // though it were untouched: demolish a worked-out mine, reselect the tile, and
-        // the ledger ranked that resource FIRST with the tallest bar, for a building
-        // that returns `exhausted` on its first tick and earns nothing ever.
-        //
-        // The estimate is per-tile because the reserve is per-tile. This is the one
-        // place the "a building that does not exist has extracted nothing" reasoning
-        // does not hold.
-        const float taper_band = deposit_taper_ticks * nominal;
-        const float taper      = taper_band > 0.0f
-            ? std::clamp(tc.resource_remaining[ri] / taper_band, 0.0f, 1.0f)
-            : 0.0f;
-
-        // Below the floor run_extraction reports `exhausted` and yields nothing. No
-        // special flag is needed to say so: revenue 0 against maintenance and wages
-        // that still fall due gives a NEGATIVE net, so the candidate draws a red bar
-        // and sorts last — which is exactly the truth about building there.
-        out.revenue = (nominal > 0.0f && taper < deposit_min_taper)
-            ? 0.0f
-            : nominal * taper * price(target);
-    }
-    else if (type == building_type::processing_facility)
-    {
-        if (const recipe* rcp = reg.get_recipe(recipe_id))
-        {
-            const float batches = econ.base_rate * wf;
-            for (std::size_t ri = 0; ri < resource_count; ++ri)
-            {
-                const float p = price(static_cast<resource_type>(ri));
-                out.revenue    += rcp->outputs[ri] * batches * p;
-                out.input_cost += rcp->inputs[ri]  * batches * p;
-            }
-        }
-    }
-    // Port / Launchpad / Inland Logistics Hub produce nothing directly: revenue and
-    // input cost stay zero, so net() is exactly their upkeep, negative by construction.
-
     return out;
-}
-
-// One horizontal magnitude bar inside [@p mn, @p mx] (BL-162). Bar LENGTH encodes
-// |value| / ceiling, COLOUR encodes the sign, and the signed value prints in full,
-// right-aligned, never elided — it is the load-bearing figure on the row.
-//
-// charts::draw_bars cannot serve here on two counts: it reserves gutter (40) plus a
-// 190 px legend, which exceeds this row's ~278 px inner width outright, and its y_of()
-// inverts the rect for a negative value, drawing outside the clip box.
-void draw_value_bar(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
-                    float value, float ceiling, ImU32 colour, const char* value_fmt = "%+.0f")
-{
-    dl->AddRectFilled(mn, mx, IM_COL32(48, 50, 58, 255), 2.0f); // track
-
-    char buf[32];
-    std::snprintf(buf, sizeof(buf), value_fmt, static_cast<double>(value));
-    const ImVec2 ts = ImGui::CalcTextSize(buf);
-
-    // Reserve the figure's measured width (never under 52 px) so it can be neither
-    // truncated nor collided with by the bar.
-    const float plot_w = (mx.x - mn.x) - std::max(52.0f, ts.x) - 6.0f;
-    const float frac   = (ceiling > 0.0f)
-                         ? std::clamp(std::fabs(value) / ceiling, 0.0f, 1.0f) : 0.0f;
-    // A 2 px stub at the origin when the value (or the ceiling) is zero, so zero reads
-    // as zero rather than as an absent bar.
-    const float fill_w = std::min(std::max(plot_w * frac, 2.0f), std::max(plot_w, 0.0f));
-    if (plot_w > 0.0f)
-        dl->AddRectFilled(mn, {mn.x + fill_w, mx.y}, colour, 2.0f);
-
-    dl->AddText({mx.x - ts.x, mn.y + (mx.y - mn.y - ts.y) * 0.5f},
-                IM_COL32(225, 228, 235, 255), buf);
 }
 
 } // namespace
@@ -1582,14 +1444,13 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
     // Candidate placements for this tile: one extraction option per extractable
     // resource actually deposited here, then the fixed processing / port / launchpad
     // types. Validity + reason come from the shared placement_rules seam; the expected
-    // per-tick net comes from prospective_profit.
+    // per-tick net comes from estimate_prospective_profit (world/building_profit.hpp).
     //
-    // BL-162 wants Processing expanded into one row per recipe (their margins genuinely
-    // diverge), but the chosen recipe has to survive to construction for that to be
-    // honest — a pending_recipe field on construction_state and a recipe parameter on
-    // construct_building. Until that seam lands, the single Processing row is priced at
-    // the recipe construct_building actually seeds ("steel"), so the figure can never
-    // misreport what the Build button would build.
+    // Processing expands into ONE ROW PER RECIPE: their margins genuinely diverge, so a
+    // single type-level row priced at "steel" would report "processing loses money here"
+    // on a tile where food rations clear well. The chosen recipe survives to construction
+    // via construction.pending_recipe → construct_building's trailing recipe parameter,
+    // so the bar always prices what the Build button would actually build.
     struct candidate
     {
         building_type type;
@@ -1608,8 +1469,12 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
         if (tile.resource_deposit[static_cast<std::size_t>(er)] > 0.0f)
             cands.push_back({building_type::extraction_site, er,
                              std::string("Extraction: ") + resource_name(er)});
-    cands.push_back({building_type::processing_facility,  resource_type::iron_ore,
-                     "Processing Facility", reg.recipe_id("steel")});
+    // One processing row per recipe, each priced on its own economics.
+    for (int ri = 0; ri < reg.recipe_count(building_type::processing_facility); ++ri)
+        cands.push_back({building_type::processing_facility, resource_type::iron_ore,
+                         "Processing: " + pretty_recipe(
+                             reg.recipe_at(building_type::processing_facility, ri).name),
+                         static_cast<std::uint16_t>(ri)});
     cands.push_back({building_type::port,                 resource_type::iron_ore, "Port"});
     cands.push_back({building_type::launchpad,            resource_type::iron_ore, "Launchpad"});
     cands.push_back({building_type::inland_logistics_hub, resource_type::iron_ore, "Inland Logistics Hub"}); // BL-149
@@ -1630,7 +1495,7 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
 
         c.produces = (c.type == building_type::extraction_site ||
                       c.type == building_type::processing_facility);
-        c.profit   = prospective_profit(w, reg, tile_id, c.type, c.target, c.recipe);
+        c.profit   = estimate_prospective_profit(w, reg, tile_id, c.type, c.target, c.recipe);
         c.group    = !c.pr.ok()                          ? 2
                      : (c.produces && c.profit.has_data) ? 0
                                                          : 1;
@@ -1660,7 +1525,7 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
     const float ceiling = charts::tight_ceil(peak);
 
     // What the bars mean, stated once. The assumptions are named rather than modelled
-    // (see prospective_profit) — an honest static read beats a half-modelled dynamic one.
+    // (see estimate_prospective_profit) — an honest static read beats a half-modelled one.
     ImGui::PushStyleColor(ImGuiCol_Text, palette::text_secondary);
     ImGui::TextWrapped("Est. net / tick at today's local prices - 50%% staffing, no labour "
                        "shortage. Capex is not in the bar; see payback.");
@@ -1721,8 +1586,8 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
             // number prints in full beside it (draw_bars has no negative axis).
             const ImVec2 bp = ImGui::GetCursorScreenPos();
             const float  bw = ImGui::GetContentRegionAvail().x;
-            draw_value_bar(cdl, bp, {bp.x + bw, bp.y + bar_h}, c.profit.net(), ceiling,
-                           value_colour(static_cast<double>(c.profit.net())));
+            charts::draw_value_bar(cdl, bp, {bp.x + bw, bp.y + bar_h}, c.profit.net(), ceiling,
+                                   value_colour(static_cast<double>(c.profit.net())));
             ImGui::Dummy({bw, bar_h});
         }
         else if (c.pr.ok() && !c.produces && c.profit.has_data)
@@ -1745,6 +1610,7 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
                 ui.construction.pending_tile   = tile_id;
                 ui.construction.pending_type   = c.type;
                 ui.construction.pending_target = c.target;
+                ui.construction.pending_recipe = c.recipe; // the row's recipe, not the default
             }
             ImGui::EndDisabled();
             if (!affordable)

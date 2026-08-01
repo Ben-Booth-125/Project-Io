@@ -6823,9 +6823,9 @@
       "difficulty": 3,
       "importance": "B",
       "evaluated_difficulty": 3,
-      "status": "pending",
-      "resolved": null,
-      "resolution": "PARTIALLY DELIVERED 2026-08-01. The chart itself landed and works, but an independent review found that three parts of the item did not, and that two rows below had been marked complete on evidence that could not have been produced. Corrected rather than left standing. See R3/R6/R7.",
+      "status": "complete",
+      "resolved": "2026-08-01",
+      "resolution": "Complete. Partially delivered 2026-08-01, reopened the same day by an independent review that found three parts undelivered (R3 estimator location, R6 the ledger closing itself, R7 per-recipe rows) and two rows marked complete on evidence that could not have been produced. All three were then delivered and evidenced: the estimator moved to src/world/ with a 26-assertion headless harness cross-checking it against economy_system's own arithmetic, processing expanded to one row per recipe with the recipe surviving to construction, and the ledger now survives the build it initiated.",
       "promoted_from": "BL-162 (tile construction panel)",
       "batch": "v0.1.0 cut set (2026-07-31)",
       "rows": [
@@ -6857,9 +6857,9 @@
             "code: src/ui/selection_panel.cpp",
             "build: ProjectIo"
           ],
-          "status": "failed",
-          "result_metric": "FALSE AS ORIGINALLY WRITTEN. The design (BL-162 § 1) mandates a new world-layer sibling `estimate_prospective_profit` in src/world/building_profit.{hpp,cpp} — and states explicitly that `estimate_building_profit` CANNOT be used, since it requires an existing building_component and a realised economy_report row. The slice instead put ~80 lines of new profit maths in a file-local anonymous namespace inside the UI TU, and `estimate_building_profit` is never called.",
-          "notes": "My own error twice over: the agent brief told it to reuse estimate_building_profit (which the design had already ruled out), and this row was then marked complete with the metric \"no new profit maths in the UI layer\", which was never checked. The maths itself was independently verified correct against economy_system; only its LOCATION is wrong. Consequence: the estimator that ranks the player's build recommendations sits outside src/world/, so no tools/verify harness can link it and it has zero headless coverage."
+          "status": "complete",
+          "result_metric": "CORRECTED 2026-08-01. The estimator now lives in the world layer as `estimate_prospective_profit` (src/world/building_profit.cpp), the exported sibling the design mandates, returning the same `building_profit` struct; selection_panel.cpp calls it and holds no profit maths. `draw_value_bar` likewise moved to `charts::draw_value_bar` (src/ui/charts.cpp) as the reusable narrow-list idiom. Behaviour unchanged — the body, including the depletion taper added by the same review, moved verbatim. Now that it links, tools/verify/prospective_profit_harness.cpp covers it: 26/26 assertions PASS, including estimated extraction revenue == run_economy_step's realised output x market price, processing revenue == run_processing's realised output x price, opex == compute_building_opex, and has_data == false on a missing tile / unresolved market.",
+          "notes": "The harness is registered by the CTest glob in CMakeLists.txt (no hand-declaration needed) and passes as test 28/36. It is NOT yet named in the verifier-headless skill — modifying a skill needs Ben's permission, so that is left for him. One thing the harness surfaced and had to accommodate: cross-checking against a live tick requires pinning workforce_auto=false / workforce_target=100 on the built building, because BL-181 auto-solves that dial on the first tick (moving realised output to 2x on the extraction case). That is a LATER decision than the moment the ledger prices, not an error in the estimate; the fixture documents it."
         },
         {
           "id": "R4",
@@ -6887,21 +6887,23 @@
           "requirement": "The two adjacent defects BL-162 names as in-scope are both fixed: the lying affordability gate, AND the ledger closing itself on every build.",
           "verification": [
             "code: src/core/app.cpp",
-            "visual: scripts/verify/tile_build_ledger.lua"
+            "visual: scripts/verify/tile_build_ledger_survives.lua"
           ],
-          "status": "failed",
-          "result_metric": "HALF DELIVERED. The affordability gate is fixed and verified (capex parity with construct_building reproduced term for term). The ledger-closing defect is untouched: on construction_result::placed, app.cpp sets m_ui.selected_entity to the new BUILDING id, so next frame sel_is_tile is false and show_build_ledger goes false — the ledger vanishes and the player must reselect the tile to place a second building.",
-          "notes": "Named explicitly in the item design (\"Two adjacent defects that the chart makes intolerable are fixed in the same pass\"). Was covered by no requirement row until this correction, which is how it passed unnoticed."
+          "status": "complete",
+          "result_metric": "CORRECTED 2026-08-01. Both fixed. The affordability gate was already right (capex parity with construct_building, term for term). The ledger-closing defect is now fixed: app.cpp suppresses the `m_ui.selected_entity = built` reassignment when `m_ui.show_build_ledger` is true, leaving the canvas-placement path unchanged. Evidenced by the new scripts/verify/tile_build_ledger_survives.lua — captures 02 and 03 show the ledger still open on tile [57, 34] after TWO consecutive builds placed through it, with no reselection, and verify.log_buildings reports two player buildings on (57,34).",
+          "notes": "\"Construction started.\" is now visible for the first time (it is drawn inside the ledger that used to close). The check drives the real seam: verify.ledger_build writes exactly the fields the Build button writes and lets app::render drain them — build_first_valid / build_at deliberately bypass that seam and so could never have caught this."
         },
         {
           "id": "R7",
           "requirement": "Processing candidates enumerate ONE ROW PER RECIPE, with the pending_recipe / construct_building(recipe) seam, so each recipe is priced on its own economics.",
           "verification": [
-            "code: src/ui/selection_panel.cpp"
+            "code: src/ui/selection_panel.cpp",
+            "visual: scripts/verify/tile_build_ledger.lua",
+            "headless: tools/verify/prospective_profit_harness.cpp"
           ],
-          "status": "failed",
-          "result_metric": "NOT DELIVERED. A single \"Processing Facility\" row remains, priced on steel. The slice documented the deferral in a code comment only.",
-          "notes": "The design calls the single steel-priced row \"a load-bearing figure silently misreporting\". On a tile where food_rations clears well and steel does not, the one row shows a red bar and sorts below every extraction candidate — telling the player processing loses money where it does not."
+          "status": "complete",
+          "result_metric": "CORRECTED 2026-08-01. Processing enumerates one row per recipe over reg.recipe_count(processing_facility) = 3, named via a file-local pretty_recipe(). Capture tile_build_ledger_land shows \"Processing: Refined Fuel\" (+99, payback ~9 ticks) sorting ABOVE \"Processing: Steel\" — the exact misreport the design named. The seam is additive and defaulted: ui_state gains pending_recipe = no_recipe, construct_building gains a trailing recipe = no_recipe falling back to reg.recipe_id(\"steel\"), and app.cpp's drain passes it and clears it with pending_tile. No save-format change (building_component.recipe is already serialised).",
+          "notes": "Seam verified at both ends. Headless: prospective_profit_harness P.R5 asserts construct_building seeds the CHOSEN recipe, and P.R6 asserts two recipes give genuinely different nets (so per-recipe rows are load-bearing rather than cosmetic). In-app: tile_build_ledger_survives.lua queues the food_rations row (logged as recipe id 2, not the steel default) and the build lands. All 36 pre-existing construct_building call sites are unchanged by the default argument."
         }
       ]
     },

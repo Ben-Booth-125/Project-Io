@@ -66,6 +66,18 @@ void draw_bars(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
                const bar* bars, std::size_t count,
                float ceiling, const char* fmt = "%.1f", float bar_cap = 0.0f);
 
+/// One horizontal magnitude bar inside [@p mn, @p mx], for a narrow list where a
+/// clustered vertical chart cannot fit (draw_bars reserves gutter + a 190px legend,
+/// exceeding the fold-out column's ~278px row width). Length = |value| / ceiling;
+/// colour is the caller's; the signed value prints right-aligned and is NEVER elided.
+///
+/// The reusable narrow-list idiom (BL-162's construction ledger is the first caller;
+/// BL-176's building table wants the same shape). draw_bars cannot serve on two counts:
+/// its gutter + legend exceed the row width outright, and its y_of() inverts the rect
+/// for a negative value, drawing outside the clip box.
+void draw_value_bar(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
+                    float value, float ceiling, ImU32 colour, const char* fmt = "%+.0f");
+
 /// A horizontal threshold marker across the plot, with a right-aligned caption.
 /// Used to show a gate on the same axis as the values it judges — the retention
 /// shoreline, the mobile-lid band, the combustion floor.
