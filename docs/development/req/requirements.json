@@ -6691,6 +6691,412 @@
           "notes": ""
         }
       ]
+    },
+    {
+      "brief": "font-glyph-range",
+      "title": "Font glyph range — UI codepoints above Latin-1 actually render (BL-234)",
+      "difficulty": 1,
+      "importance": "C",
+      "evaluated_difficulty": 1,
+      "status": "complete",
+      "resolved": "2026-07-31",
+      "resolution": "Complete. font_glyph_harness proves the atlas carries all 7 codepoints; the same probe against the pre-fix fonts.cpp fails 9 of 11 with the two Latin-1 controls still passing, so the check is not vacuous. Scope was WIDER than the item stated — see R2.",
+      "promoted_from": "BL-234 (font glyph range)",
+      "batch": null,
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: the atlas built by ui::load_ui_font carries a real (non-fallback) glyph for every codepoint above Latin-1 that src/ string literals use.",
+          "verification": [
+            "headless: tools/verify/font_glyph_harness.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "12/12 PASS (11 probed codepoints + load_ui_font returns a font)",
+          "notes": "Uses FindGlyphNoFallback, not FindGlyph — the latter substitutes the fallback glyph and would pass vacuously for every codepoint."
+        },
+        {
+          "id": "R2",
+          "requirement": "The fix covers the REAL site set, not the item's stated one. BL-234 claimed 26 sites across 2 codepoints (em-dash, >=); a full survey must be run and the glyph range must cover whatever it finds.",
+          "verification": [
+            "code: src/ui/fonts.cpp k_glyph_ranges",
+            "headless: tools/verify/font_glyph_harness.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "Survey found 43 sites across 7 codepoints in 3 Unicode blocks — 26 hex-escaped em-dash + 11 RAW em-dash in literals, 1 >=, 4 nav arrows, 1 ~=. Ranges widened to the whole blocks (General Punctuation, Arrows, Mathematical Operators).",
+          "notes": "The item's design undercounted: it missed the raw (unescaped) literals and the app.cpp nav-hint arrows entirely. Whole blocks rather than the exact 7 so a sibling character typed later does not silently regress."
+        },
+        {
+          "id": "R3",
+          "requirement": "The bundled DejaVuSans actually has the glyphs — the fix must not request a range the font cannot supply.",
+          "verification": [
+            "headless: tools/verify/font_glyph_harness.cpp",
+            "code: assets/fonts/DejaVuSans.ttf cmap"
+          ],
+          "status": "complete",
+          "result_metric": "cmap (format 12) coverage: General Punctuation 107/112, Arrows 112/112, Mathematical Operators 256/256. All 7 used codepoints present.",
+          "notes": ""
+        },
+        {
+          "id": "R4",
+          "requirement": "The ProggyClean fallback path must not inherit a range it cannot satisfy.",
+          "verification": [
+            "code: src/ui/fonts.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "cfg.GlyphRanges reset to nullptr before AddFontDefault.",
+          "notes": "Latin-1-only pixel font; requesting three extra blocks would build atlas space for glyphs it cannot supply."
+        }
+      ]
+    },
+    {
+      "brief": "terrain-combat-modifiers",
+      "title": "Terrain combat modifiers adopted into the history ladder (BL-233)",
+      "difficulty": 3,
+      "importance": "B",
+      "evaluated_difficulty": 3,
+      "status": "complete",
+      "resolved": "2026-07-31",
+      "resolution": "Complete. is_barrier deleted; barrier_q is now graded land resistance + a separately-weighted ocean term (weight 750, chosen by sweep, Ben's call). Kepler's political map holds at 30 nations; Pallas's flat-zero barrier field is fixed. history_ladder_harness and world_audit green.",
+      "promoted_from": "BL-233 (terrain combat modifiers)",
+      "batch": null,
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: the ladder prices conquest from the GRADED terrain field, not a bool. is_barrier is deleted so there is exactly one source of truth for 'does this ground resist an army'.",
+          "verification": [
+            "code: src/world/history_ladder.cpp",
+            "headless: tools/verify/history_ladder_harness.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "is_barrier removed; barrier_q = mean(terrain_resistance) over land + ocean_share * 750/1000. history_ladder_harness ALL PASS.",
+          "notes": "terrain_defence/terrain_attrition/terrain_resistance landed earlier as the measurement-only commit; this adopts them."
+        },
+        {
+          "id": "R2",
+          "requirement": "Water enters as its own weighted term, not folded into the terrain signal — the measurement found 588 of Kepler's 730 binary barrier tiles were simply ocean.",
+          "verification": [
+            "code: src/world/history_ladder.cpp k_ocean_barrier_weight",
+            "headless: tools/verify/world_audit.cpp S5"
+          ],
+          "status": "complete",
+          "result_metric": "Kepler barrier_q now decomposes as land 281 + ocean 588 x0.75 = 722 (was 732 binary, of which 588 was ocean).",
+          "notes": "Ben's design call 2026-07-31, chosen over folding water in at zero or at full weight."
+        },
+        {
+          "id": "R3",
+          "requirement": "The political-map consequence is MEASURED and put to Ben before any constant is locked — the item forbids silently tuning to preserve an outcome.",
+          "verification": [
+            "headless: tools/verify/world_audit.cpp S5",
+            "manual: ocean-weight sweep put to Ben"
+          ],
+          "status": "complete",
+          "result_metric": "Sweep across w=0/250/500/750/1000 gave Kepler 17/17/17/30/36 nations (23/23/26/33/50 realms) against a binary baseline of 30/37. Ben chose 750.",
+          "notes": "Recorded in the k_ocean_barrier_weight doc comment so a later re-tune knows continuity was a deliberate choice, not an accident."
+        },
+        {
+          "id": "R4",
+          "requirement": "The grading defects the item was filed for are actually fixed: a metallic high-attrition body no longer reads as open ground, and land tiles differentiate.",
+          "verification": [
+            "headless: tools/verify/world_audit.cpp S5"
+          ],
+          "status": "complete",
+          "result_metric": "Pallas barrier_q 0 -> 325 (was a flat zero: no mountain/canyon and compositions outside the barren/icy pair). Per-body land means now differ: defence 80/88/130/135, attrition 509/694/696/777.",
+          "notes": "The per-body defence/attrition means are retained in S5 as the standing tuning guard — a change that flattens the field shows as the means collapsing together."
+        },
+        {
+          "id": "R5",
+          "requirement": "No serialisation-seam change, no new stored field, and determinism intact.",
+          "verification": [
+            "headless: tools/verify/determinism_harness.cpp",
+            "headless: tools/verify/world_determinism.cpp",
+            "build: ctest"
+          ],
+          "status": "complete",
+          "result_metric": "determinism_harness + world_determinism PASS; 33/34 ctest green (the one failure is BL-252, pre-existing and unrelated).",
+          "notes": "terrain_combat exposes pure functions of (composition, landform) — nothing stored, nothing serialised."
+        }
+      ]
+    },
+    {
+      "brief": "tile-construction-profit-chart",
+      "title": "Tile construction ledger — per-candidate expected-profit chart (BL-162)",
+      "difficulty": 3,
+      "importance": "B",
+      "evaluated_difficulty": 3,
+      "status": "pending",
+      "resolved": null,
+      "resolution": "PARTIALLY DELIVERED 2026-08-01. The chart itself landed and works, but an independent review found that three parts of the item did not, and that two rows below had been marked complete on evidence that could not have been produced. Corrected rather than left standing. See R3/R6/R7.",
+      "promoted_from": "BL-162 (tile construction panel)",
+      "batch": "v0.1.0 cut set (2026-07-31)",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: every buildable candidate in the tile construction ledger carries an expected-profit magnitude bar drawn on a ceiling SHARED across the list, so candidates are visually comparable.",
+          "verification": [
+            "visual: scripts/verify/tile_build_ledger.lua"
+          ],
+          "status": "complete",
+          "result_metric": "Capture shows Extraction: Agricultural Produce +1261 vs Processing Facility +83 on one shared ceiling; the difference reads at a glance.",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "requirement": "The 56x56 grey placeholder (and its road twin) is gone.",
+          "verification": [
+            "visual: scripts/verify/tile_build_ledger.lua",
+            "code: src/ui/selection_panel.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "No placeholder box in any capture; rows render name, cost, payback and bar.",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "requirement": "The estimate reuses the existing world-layer profit estimator rather than inventing a second answer to the same question.",
+          "verification": [
+            "code: src/ui/selection_panel.cpp",
+            "build: ProjectIo"
+          ],
+          "status": "failed",
+          "result_metric": "FALSE AS ORIGINALLY WRITTEN. The design (BL-162 § 1) mandates a new world-layer sibling `estimate_prospective_profit` in src/world/building_profit.{hpp,cpp} — and states explicitly that `estimate_building_profit` CANNOT be used, since it requires an existing building_component and a realised economy_report row. The slice instead put ~80 lines of new profit maths in a file-local anonymous namespace inside the UI TU, and `estimate_building_profit` is never called.",
+          "notes": "My own error twice over: the agent brief told it to reuse estimate_building_profit (which the design had already ruled out), and this row was then marked complete with the metric \"no new profit maths in the UI layer\", which was never checked. The maths itself was independently verified correct against economy_system; only its LOCATION is wrong. Consequence: the estimator that ranks the player's build recommendations sits outside src/world/, so no tools/verify harness can link it and it has zero headless coverage."
+        },
+        {
+          "id": "R4",
+          "requirement": "The panel is honest about the estimate's assumptions — a magnitude bar must not imply precision the estimator lacks.",
+          "verification": [
+            "visual: scripts/verify/tile_build_ledger.lua"
+          ],
+          "status": "complete",
+          "result_metric": "Caveat line renders: \"Est. net / tick at today's local prices - 50% staffing, no labour shortage. Capex is not in the bar; see payback.\"",
+          "notes": ""
+        },
+        {
+          "id": "R5",
+          "requirement": "The working parts of the ledger are untouched — enumeration, cost, reason-coded validity, and the Build action.",
+          "verification": [
+            "visual: scripts/verify/tile_build_ledger.lua",
+            "build: ctest"
+          ],
+          "status": "complete",
+          "result_metric": "Build buttons present and the ledger still enumerates per-resource extraction plus the facility set; 34/35 ctest green.",
+          "notes": ""
+        },
+        {
+          "id": "R6",
+          "requirement": "The two adjacent defects BL-162 names as in-scope are both fixed: the lying affordability gate, AND the ledger closing itself on every build.",
+          "verification": [
+            "code: src/core/app.cpp",
+            "visual: scripts/verify/tile_build_ledger.lua"
+          ],
+          "status": "failed",
+          "result_metric": "HALF DELIVERED. The affordability gate is fixed and verified (capex parity with construct_building reproduced term for term). The ledger-closing defect is untouched: on construction_result::placed, app.cpp sets m_ui.selected_entity to the new BUILDING id, so next frame sel_is_tile is false and show_build_ledger goes false — the ledger vanishes and the player must reselect the tile to place a second building.",
+          "notes": "Named explicitly in the item design (\"Two adjacent defects that the chart makes intolerable are fixed in the same pass\"). Was covered by no requirement row until this correction, which is how it passed unnoticed."
+        },
+        {
+          "id": "R7",
+          "requirement": "Processing candidates enumerate ONE ROW PER RECIPE, with the pending_recipe / construct_building(recipe) seam, so each recipe is priced on its own economics.",
+          "verification": [
+            "code: src/ui/selection_panel.cpp"
+          ],
+          "status": "failed",
+          "result_metric": "NOT DELIVERED. A single \"Processing Facility\" row remains, priced on steel. The slice documented the deferral in a code comment only.",
+          "notes": "The design calls the single steel-priced row \"a load-bearing figure silently misreporting\". On a tile where food_rations clears well and steel does not, the one row shows a red bar and sorts below every extraction candidate — telling the player processing loses money where it does not."
+        }
+      ]
+    },
+    {
+      "brief": "frame-budget-hud",
+      "title": "Frame-budget HUD (BL-249)",
+      "difficulty": 3,
+      "importance": "B",
+      "evaluated_difficulty": 3,
+      "status": "complete",
+      "resolved": "2026-07-31",
+      "resolution": "Complete. Reports last/avg/max/1% low against ROADMAP targets with a worst-frame breakdown; off by default; honest about the sub-measure it cannot take.",
+      "promoted_from": "BL-249 (frame budget HUD)",
+      "batch": "v0.1.0 cut set (2026-07-31)",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: a toggleable HUD reports last / avg / max / 1% low frame time against the ROADMAP targets (avg < 8 ms, max < 16.7 ms).",
+          "verification": [
+            "visual: scripts/verify/frame_budget_hud.lua"
+          ],
+          "status": "complete",
+          "result_metric": "All four figures render with their targets; breached figures colour red. CORRECTED 2026-08-01 after review: the figures are now scored on work_ms (wall clock minus the present wait), not total_ms.",
+          "notes": "As first written this was wrong in a way that made the instrument useless. VSync is on by default (app.cpp SDL_SetRenderVSync(m_renderer, 1)), so present_ms absorbs the wait for the refresh and total_ms is floored at the refresh interval. Scored on total, avg would read ~16.7 ms in permanent red against an 8 ms target on any 60 Hz display, and spike_cause — which tested present FIRST — would name \"GPU present / VSync wait\" as the cause of essentially every frame. The ROADMAP question (does the UI build cost more than 8 ms panning 15,120 tiles?) was unanswerable from it."
+        },
+        {
+          "id": "R2",
+          "requirement": "OFF BY DEFAULT — an audit instrument must not contaminate any other golden in the suite.",
+          "verification": [
+            "visual: scripts/verify/frame_budget_hud.lua"
+          ],
+          "status": "complete",
+          "result_metric": "Capture frame_hud_absent_by_default is an ordinary frame with no HUD present.",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "requirement": "On a spike the HUD says WHERE the time went, and does not fabricate a sub-measure it cannot take.",
+          "verification": [
+            "visual: scripts/verify/frame_budget_hud.lua"
+          ],
+          "status": "complete",
+          "result_metric": "Worst-frame panel splits build / submit / present / other with vertex + draw-command counts; prints \"allocation churn: not instrumented\" rather than a number. On capture it correctly attributed a 196 ms frame to event pump + simulation step (other 185.78 ms), not to rendering. CORRECTED 2026-08-01: spike_cause now tests the app-controlled phases (build / submit / other) FIRST against work, and names present last and only as \"present / VSync pacing (not app cost)\".",
+          "notes": "The ROADMAP named allocation churn as a spike cause; it is not obtainable from inside the frame loop, so it is declared rather than invented."
+        },
+        {
+          "id": "R4",
+          "requirement": "Toggle rule (io-standing-rules): pressing the control while active puts it away.",
+          "verification": [
+            "visual: scripts/verify/frame_budget_hud.lua",
+            "code: src/core/app.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "F11 flips show_frame_hud; capture frame_hud_dismissed leaves no residue.",
+          "notes": ""
+        },
+        {
+          "id": "R5",
+          "requirement": "Drawn on both frame paths (pre-play early-return branch and in-game) without being double-drawn.",
+          "verification": [
+            "code: src/core/app.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "Two call sites at app.cpp:2372 and :3072, in mutually exclusive branches separated by the return at :2388.",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "brief": "econ-tick-scaling",
+      "title": "Econ-tick scaling instrument (BL-250)",
+      "difficulty": 2,
+      "importance": "B",
+      "evaluated_difficulty": 2,
+      "status": "complete",
+      "resolved": "2026-07-31",
+      "resolution": "Complete. Per-tick timing plus a six-rung bodies x corps sweep; exponent 1.28 against a 1.5 tolerance; found and named the super-linear term.",
+      "promoted_from": "BL-250 (econ-tick scaling)",
+      "batch": "v0.1.0 cut set (2026-07-31)",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: econ_stability reports per-tick time and asserts the prototype-scale tick is well under the 1 ms ROADMAP target.",
+          "verification": [
+            "headless: tools/verify/econ_stability.cpp R5"
+          ],
+          "status": "complete",
+          "result_metric": "mean 0.0018 ms, p95 0.0021 ms, max 0.0409 ms — 555x headroom. PASS.",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "requirement": "Tick cost is confirmed to grow no faster than linearly in bodies x corps.",
+          "verification": [
+            "headless: tools/verify/econ_stability.cpp R6"
+          ],
+          "status": "complete",
+          "result_metric": "32x size -> 83.1x time => size^1.28, against tolerance size^1.5. Worst single doubling 3.17x against a 4.0x quadratic-signature ceiling. PASS.",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "requirement": "The timing assertions must not be flaky on a loaded or shared machine.",
+          "verification": [
+            "headless: tools/verify/econ_stability.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "Growth is read off the MIN per-tick time (preemption can only add time), with 20 warm-up ticks discarded; mean/p95 printed but not asserted on. HARDENED 2026-08-01 after review: R5 now asserts on min() rather than mean() — the prototype run gets no warm-up, so a single scheduler stall in 100 ticks could add 0.25 ms to the mean and fail it spuriously. The sweep growth denominator is also guarded against a zero-granularity min.",
+          "notes": "This is what makes the shape check machine-independent; the absolute bound is deliberately generous."
+        },
+        {
+          "id": "R4",
+          "requirement": "Timing is strictly additive — every pre-existing assertion and output line survives unchanged.",
+          "verification": [
+            "headless: tools/verify/econ_stability.cpp R1-R4"
+          ],
+          "status": "complete",
+          "result_metric": "R1-R4 all still PASS with identical semantics; ALL PASS, 0 failures.",
+          "notes": ""
+        },
+        {
+          "id": "R5",
+          "requirement": "Where the curve bends, the instrument NAMES the cause rather than reporting a bare number.",
+          "verification": [
+            "headless: tools/verify/econ_stability.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "Output names run_corp_strategic_step's O(corps x tiles) candidate scan as the super-linear term. Filed as BL-253.",
+          "notes": ""
+        }
+      ]
+    },
+    {
+      "brief": "data-creep-instrument",
+      "title": "Data-creep instrument (BL-251)",
+      "difficulty": 3,
+      "importance": "B",
+      "evaluated_difficulty": 3,
+      "status": "complete",
+      "resolved": "2026-07-31",
+      "resolution": "Complete. ~30 counters + RSS over 1500 ticks of the real world, all exercised counters plateau; harness self-reported its vacuous coverage (BL-254).",
+      "promoted_from": "BL-251 (data-creep instrument)",
+      "batch": "v0.1.0 cut set (2026-07-31)",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: entity/pool/market/convoy counters and RSS are sampled over a long run and asserted to PLATEAU, not climb.",
+          "verification": [
+            "headless: tools/verify/data_creep_harness.cpp R1, R2"
+          ],
+          "status": "complete",
+          "result_metric": "Five marks to 1500 ticks; every exercised counter identical from 500 to 1500 (entities 34769, tiles 34440, buildings 259, markets 6, nations 30, pools 8); RSS flat at 13980 KiB. PASS. HARDENED 2026-08-01 after review: the harness now refuses a run with fewer than two samples, which previously compared a sample against itself and reported a green plateau.",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "requirement": "The subject is the REAL generated world, not a toy — an unbounded structure is a property of the real data model.",
+          "verification": [
+            "headless: tools/verify/data_creep_harness.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "Runs make_hard_coded_world(); world gen 0.15 s + 1500 ticks in 7.19 s.",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "requirement": "\"Plateau\" is defined numerically in the output rather than left to the reader.",
+          "verification": [
+            "headless: tools/verify/data_creep_harness.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "Tolerance stated in-output; the delta column reports per-counter change between mid and final sample.",
+          "notes": ""
+        },
+        {
+          "id": "R4",
+          "requirement": "When a counter climbs, the harness NAMES the structure — that naming is the instrument.",
+          "verification": [
+            "headless: tools/verify/data_creep_harness.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "Per-counter delta column plus a GROWTH FINDINGS section. No asserted counter climbed this run.",
+          "notes": ""
+        },
+        {
+          "id": "R5",
+          "requirement": "Coverage is reported honestly — a counter that was never exercised must not be presented as a passing plateau.",
+          "verification": [
+            "headless: tools/verify/data_creep_harness.cpp COVERAGE"
+          ],
+          "status": "complete",
+          "result_metric": "Harness declares world.convoys / world.trade_routes / world.body_last_glimpse_tick plateaus VACUOUS (no convoy dispatched all run) and names trade_route as never-erased by construction. Filed as BL-254.",
+          "notes": "The harness found and reported its own blind spot rather than passing quietly — the behaviour to preserve in future instruments."
+        }
+      ]
     }
   ]
 }

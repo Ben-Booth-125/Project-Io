@@ -10,6 +10,135 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## Session — closing the v0.1.0 cut set: terrain combat, font glyphs, and the three audit instruments (2026-07-31)
+
+**Runtime.** ~3h. Full (Batch Delivery — four worktree sub-agents, two items delivered in the main
+session, six closed out, six filed). Cloud session on Linux, which is itself most of the story.
+
+**The ask.** "Work on some non-blocked items for the next sprint — what's achievable in one
+multi-agent session?" The answer was the **v0.1.0 cut set**: four open items carrying
+`version_goal: v0.1.0`, which is the last build gate before the prototype cut. Ben also chose to
+file *and build* the three quality-audit instruments in the same block.
+
+**Linux builds now, and that unlocked everything.** The container's HTTPS egress is repo-scoped, so
+every `codeload.github.com` tarball in `CMakeLists.txt` 403s — but `git` to the same repos works.
+Cloning SDL3 / Lua / sol2 / ImGui and pointing `FETCHCONTENT_SOURCE_DIR_*` at them configures and
+builds the whole thing, `ProjectIo` included. Headless `--verify` capture works under
+`SDL_VIDEODRIVER=offscreen`. No repo change was needed for any of it.
+
+**What landed.**
+
+- **BL-233 (terrain combat modifiers).** The measurement commit already existed; this adopted it.
+  `is_barrier` is deleted and `barrier_q` is now `mean(terrain_resistance)` over land plus a
+  separately-weighted ocean term. Ben chose water-as-its-own-term over folding it in at zero or at
+  full weight, then chose the weight from a sweep: w = 0/250/500/750/1000 gives Kepler 17/17/17/30/36
+  nations against a binary baseline of 30. **750** holds the political map while the land term still
+  fixes the defect — Pallas's barrier field was a flat *zero* (no mountain or canyon, compositions
+  outside the barren/icy pair) and is now 325.
+- **BL-234 (font glyph range).** Filed as "26 sites, two codepoints"; a survey found **43 sites
+  across seven**, in three Unicode blocks — the item had missed 11 *raw* (unescaped) em-dashes in
+  string literals and the four nav-hint arrows in `app.cpp` entirely.
+- **BL-249/250/251** — the three audit instruments, built by three of the four sub-agents.
+- **BL-162 (tile construction panel)** — the fourth agent; per-candidate profit bars on a shared
+  ceiling replacing the grey placeholder.
+
+**In-session decisions.**
+
+1. **Water is a third term, at weight 750.** Both halves are Ben's, taken against numbers rather
+   than prose. The weight is recorded in the constant's own doc comment as a *deliberate choice of
+   continuity* — the item's "driven, not narrated" rule makes it important that a later re-tune
+   knows this was chosen, not inherited.
+2. **BL-226 was already built.** Its work landed 2026-07-30; the item was never closed out. Rather
+   than trust the commit message it was re-verified against a fresh capture (plate tints
+   categorically distinguishable, boundaries on a separate channel, strip glyph active), then
+   closed and its stale `requires: BL-210` cleared — a completed v0.1.0 item had been reading as
+   blocked on design-owed post-prototype work.
+3. **Three items sat at status `landed`, which is not terminal** per `backlog_lint`
+   (`TERMINAL = complete|shipped`). BL-230/231/232 were finished work still counting as open in
+   every status query. Closed out.
+4. **The goldens are platform-dependent, and we did not touch them.** See below.
+
+**What the instruments found, which is the point of instruments.**
+
+- `econ_stability`'s sweep: tick cost grows as **size^1.28**, not linearly, because
+  `run_corp_strategic_step` rescans every tile for every due corp — O(corps × tiles), a rounding
+  error to ~64 corps and about half the tick by 256. Filed **BL-253**. Not a cut blocker: prototype
+  scale is 0.0018 ms/tick, 555× headroom.
+- `data_creep_harness`: **no unbounded structure** among everything it exercises — ~30 counters and
+  RSS all flat from tick 500 to 1500. But it **reported its own blind spot**: no convoy is
+  dispatched in the rollout, so three plateaus pass *vacuously*, and `trade_route` is never-erased
+  by construction. Filed **BL-254** as a v0.1.0 item, since it is a hole in a cut gate.
+- The frame HUD, on its first real spike, correctly attributed a 196 ms frame to *event pump +
+  simulation step* rather than to rendering.
+
+**BL-252 — the finding we deliberately did not act on.** First full-suite run on Linux:
+`ai_skill_harness` fails 8 golden bands while its **own determinism tier passes completely** (state
+hash, net-worth curve and action tallies byte-identical across two same-seed runs), and every visual
+golden diffs 9–57%. Both sets were blessed on Windows/MSVC. Two candidate causes — cross-platform
+float divergence amplified over 300 ticks of a feedback-coupled economy, versus simply stale
+goldens — and they are *not yet distinguished*; telling them apart needs a Windows re-run at the
+same commit. Ben's call was to file, not fix: re-blessing from Linux would only move the redness to
+the other machine. It matters because the v0.1.0 done-definition says "headless harnesses green",
+which currently has no single truth value.
+
+**Method notes.**
+
+- **Sub-agents cannot compile UI slices**, because the SDL3/ImGui toolchain only exists in the main
+  checkout — the two UI agents worked by compile-by-inspection. Both compiled clean on merge, but
+  the integration gap they left is instructive: the BL-249 slice's comment claimed "a verify script
+  can park it open" while never adding the `show_panel` binding that would allow it. Hotspot wiring
+  staying in the main session is what caught that.
+- **A throwaway probe became a permanent harness.** Proving BL-234 needed an atlas-level check;
+  rather than leave it in the scratchpad it became `tools/verify/font_glyph_harness.cpp` — the
+  first harness to link ImGui (still no SDL, no Lua; the atlas builds on the CPU). It uses
+  `FindGlyphNoFallback`, since `FindGlyph` substitutes the fallback glyph and would pass vacuously
+  for every codepoint, and it was validated by running it against the *pre-fix* `fonts.cpp`: 9 of
+  11 fail there while the two Latin-1 controls still pass.
+
+**The review barrier earned its place, and two of its findings were mine.** A cold `verifier-review`
+pass over the integrated diff returned **FIX FIRST**. Compile-by-inspection came back clean — no
+symbol, arity or include defect in either UI slice — but it found four real defects the compiler
+could never have caught, and two of them were bookkeeping I had overclaimed:
+
+- **The frame HUD scored the wrong quantity.** All four figures were `total_ms`, measured
+  begin-to-begin, while VSync is **on by default** (`app.cpp` `SDL_SetRenderVSync(m_renderer, 1)`).
+  `present_ms` absorbs the wait for the refresh, so on any 60 Hz display `avg` would sit at ~16.7 ms
+  in permanent red against an 8 ms target, and `spike_cause` — which tested present *first* — would
+  blame the GPU for every frame. The instrument could not answer the one question it exists for.
+  Now scored on `work_ms()` (wall clock minus present), with wall shown separately and present
+  named last and only as *pacing, not app cost*.
+- **The profit estimate ignored `resource_remaining`.** It priced extraction off `resource_deposit`
+  — richness, a fixed tile property — and never the per-tile reserve. Demolish a worked-out mine,
+  reselect the tile, and the ledger ranked that resource **first with the tallest green bar**, for a
+  building that returns `exhausted` on its first tick. The original reasoning ("extracted-to-date is
+  zero for a building that does not exist") confused per-building with per-tile. `run_extraction`'s
+  taper is now applied, and its two constants were promoted out of `economy_system.cpp`'s anonymous
+  namespace into the header so there is one depletion curve, not two.
+- **BL-162 is reopened, not complete.** Three parts of its own design did not land: the world-layer
+  `estimate_prospective_profit` seam (the estimator sits in a file-local anonymous namespace inside
+  the UI TU, so no `tools/verify` harness can link it), one row per recipe, and the ledger-closes-on-
+  build fix that the design names as in scope. **Requirement R3 is marked `failed`** — its metric
+  ("no new profit maths in the UI layer") was false, and I had marked it complete without checking.
+  My agent brief also told the slice to reuse `estimate_building_profit`, which the design had
+  already ruled out as unusable on an empty tile.
+
+Hardening from the same pass: `econ_stability` R5 now asserts on `min()` rather than `mean()` (the
+prototype run gets no warm-up, so one scheduler stall in 100 ticks could fail it), the sweep growth
+denominator is guarded against a zero-granularity min, and `data_creep_harness` now **refuses** a
+run with fewer than two samples instead of comparing a sample against itself and reporting a green
+plateau. **BL-255** filed for the build-type and ctest-timeout hazards.
+
+The lesson worth keeping: four cold agents produced code that compiled clean and looked right, and
+the defects were all in *judgement* — what to measure, which field to read, which half of a
+two-part item to do. Compilation and a green suite were never going to find any of them.
+
+**Left open.** `verifier-headless`'s SKILL.md does not yet name the three new harnesses
+(`font_glyph_harness`, `data_creep_harness`, and `econ_stability`'s new sections) — skill edits need
+Ben's authorisation. `scripts/verify/frame_budget_hud.lua` is capture-only with no blessed golden,
+which is correct until the platform-golden policy (BL-252) is settled.
+
+---
+
 ## Session — BL-214/BL-247/BL-248 (drill-through UI): narrow-by-default disclosure design, and a mid-session tree wipe (2026-07-31)
 
 **Runtime.** ~2h. Full (design session — four parallel HTML exemplars, two rounds of live

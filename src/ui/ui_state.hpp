@@ -185,6 +185,14 @@ struct ui_state
     bool show_system_menu     = false; ///< Whether the corner system-menu popup is open.
     bool confirm_exit_pending = false; ///< Within the popup, whether Exit is armed to the "Really quit?" confirm.
 
+    // --- frame-budget HUD (BL-249) ---
+    // The v0.1.0 quality audit's frame-time instrument, toggled by F11 (app.cpp
+    // handle_key_down) and by its own close button. An AUDIT INSTRUMENT, not shipped
+    // chrome: it starts closed, so every golden capture renders without it. Lives
+    // here rather than as an app member so the toggle sits with the other show_*
+    // flags — and so a verify script can park it open. See ui/frame_stats.hpp.
+    bool show_frame_hud = false; ///< Whether the frame-budget HUD is drawn.
+
     /// Per-frame list of on-canvas markers (buildings, market centres). Cleared at
     /// the top of body_surface_canvas each frame and rebuilt during the draw pass
     /// so click/hover handling can hit-test in priority order. See marker_hit_zone.

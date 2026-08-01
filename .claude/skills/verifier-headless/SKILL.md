@@ -29,6 +29,34 @@ in `tools/verify/README.md`.
   prices stay in the `[0.25×, 4×]` band, no NaN/Inf, deposit reserves decrease
   monotonically, balances stay bounded. Links the same TUs as `econ_harness`
   (`world.cpp`, `economy_system.cpp`, `market_clearing.cpp`, `budget_system.cpp`).
+  **Also the econ-tick scaling instrument (BL-250, v0.1.0 quality audit):** prints
+  per-tick mean/p95/max, asserts the prototype tick is well under the 1 ms ROADMAP
+  target (R5), and runs a six-rung bodies × corps sweep asserting growth is no worse
+  than `size^1.5` (R6). Growth is read off the **min** per-tick time — preemption can
+  only ever *add* time, so the fastest tick is the cleanest estimate and the shape
+  survives a loaded machine. Reading the sweep: the exponent sitting above 1.0 is
+  `run_corp_strategic_step`'s O(corps × tiles) candidate scan (BL-253), not a
+  regression.
+- **`data_creep_harness`** — data-creep instrument (BL-251, v0.1.0 quality audit).
+  Runs the **real** generated world (`make_hard_coded_world`) for 1500 ticks, sampling
+  ~30 counters (entities, every component store, pools, markets, convoys, trade routes,
+  AI decision ring) plus process RSS at five marks, and asserts each **plateaus**
+  between the mid and final sample rather than climbing. When one climbs it *names the
+  structure* — that naming is the instrument. Links the world superset (as `world_audit`).
+  **Read its COVERAGE section, not just the verdict:** counters never exercised by the
+  rollout are declared **vacuous** rather than reported as passing, and today the convoy /
+  trade-route / glimpse plateaus are exactly that (BL-254). Slowest harness in the tier
+  at ~7 s.
+- **`font_glyph_harness`** — font glyph-range guard (BL-234). The one harness here that
+  links **ImGui** rather than `world/*`: the defect it guards lives in the `ImFontConfig`
+  handed to `AddFontFromFileTTF` in `src/ui/fonts.cpp`. It still links no SDL and no Lua —
+  ImGui builds a font atlas on the CPU with no renderer, window or backend — so it stays
+  in the fast tier (~10 ms). Builds the atlas through the real `ui::load_ui_font` and
+  probes each codepoint the UI's string literals use, via `FindGlyphNoFallback`
+  (`FindGlyph` substitutes the fallback glyph and would pass vacuously for *every*
+  codepoint). Two Latin-1 controls are probed alongside: if either fails, the harness is
+  broken rather than the font range. Hand-declared in `CMakeLists.txt` above the glob so
+  it links `src/ui/fonts.cpp` instead of the world superset.
 - **`world_audit`** — builds the hard-coded world and audits Kepler biome balance
   (forest + wetland fraction), extraction-asset placement, deposit-reserve seeding,
   the reusable `placement_rules::can_place` seam (placed assets pass it; ocean /

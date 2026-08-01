@@ -110,18 +110,30 @@ int main()
     std::printf("  BL-231 R1 every landform generation can produce appears somewhere: %s\n",
                 landform_absent == 0 ? "PASS" : "FAIL");
 
-    // --- S5 (BL-233): terrain combat value, binary vs graded ---
-    // MEASUREMENT ONLY — history_ladder.cpp is untouched and still uses its own
-    // is_barrier bool. This reports what the ladder's barrier field looks like today
-    // against what the graded terrain_resistance would give, so the political-map
-    // consequence can be seen BEFORE anything is switched over. barrier_q is a share
-    // of ALL tiles (n = gw*gh, ocean included), so the ocean split below matters: if
-    // water dominates the field, terrain is barely driving the political map at all.
+    // --- S5 (BL-233): terrain combat value, as the ladder now prices it ---
+    // ADOPTED 2026-07-31 — history_ladder.cpp no longer has an is_barrier bool. Its
+    // barrier_q is now two terms:
+    //     barrier_q = mean(terrain_resistance) over LAND
+    //               + ocean_share * k_ocean_barrier_weight / 1000
+    // with the weight at 750 (Ben's call; chosen by sweep to hold the political map
+    // while the land term fixes the grading defect).
+    //
+    // This section keeps reporting the retired binary alongside it. That is deliberate
+    // and NOT dead weight: the binary is the only fixed reference point for how far the
+    // field has moved, and the per-body defence/attrition means are the tuning guard the
+    // item asked for — a change that flattens the graded field shows up here as means
+    // collapsing toward each other, which no assertion elsewhere would catch.
+    //
+    // Denominators differ between the two by design, and the labels say so: the binary
+    // was a share of ALL tiles (ocean included), the graded land term is a mean over
+    // LAND only, because water is now priced by its own term rather than smuggled into
+    // the terrain signal.
     //
     // Downstream, exactly as the ladder computes it:
     //   fragmentation_q = (barrier_q*6 + cradle_q*4)/10   -> d_frag  = 0.6 * d_barrier
     //   polity_seeds    = cradles + fragmentation_q*12/1000 -> d_seeds = 12 * d_frag / 1000
-    std::printf("\nTerrain combat value (BL-233; binary is_barrier vs graded terrain_resistance)\n");
+    constexpr int k_ocean_barrier_weight = 750; // Mirrors history_ladder.cpp.
+    std::printf("\nTerrain combat value (BL-233; retired binary vs the ADOPTED graded + ocean field)\n");
     for (const auto& [bid, bc] : w.bodies)
     {
         if (bc.grid_width <= 0 || bc.grid_height <= 0)
@@ -157,18 +169,21 @@ int main()
             continue;
 
         const int bin_q = std::clamp((bin_barrier * 1000) / total_n, 0, 1000);
-        // Graded, on the same denominator so the two are comparable. Ocean contributes
-        // zero resistance here — it is a MODE, and the ladder prices it separately via
-        // the coastal term in exit_cost_q.
-        const int grd_q = std::clamp(graded_sum / total_n, 0, 1000);
 
-        const int  d_barrier = grd_q - bin_q;
+        // The ADOPTED field, computed exactly as history_ladder.cpp Pass 1/3 does:
+        // graded resistance averaged over LAND, plus the ocean share at its own weight.
+        const int ocean_q     = std::clamp((bin_ocean * 1000) / total_n, 0, 1000);
+        const int land_res_q  = land_n ? std::clamp(graded_sum / land_n, 0, 1000) : 0;
+        const int adopted_q   = std::clamp(
+            land_res_q + (ocean_q * k_ocean_barrier_weight) / 1000, 0, 1000);
+
+        const int  d_barrier = adopted_q - bin_q;
         const float d_frag   = 0.6f * static_cast<float>(d_barrier);
         const float d_seeds  = 12.0f * d_frag / 1000.0f;
 
-        std::printf("  %-12s barrier_q binary %4d (of which ocean %4d)  graded %4d  delta %+5d\n",
-                    bc.name.c_str(), bin_q,
-                    std::clamp((bin_ocean * 1000) / total_n, 0, 1000), grd_q, d_barrier);
+        std::printf("  %-12s barrier_q was %4d (binary, ocean %4d)  now %4d (land %4d + ocean %4d x%.2f)  delta %+5d\n",
+                    bc.name.c_str(), bin_q, ocean_q, adopted_q, land_res_q, ocean_q,
+                    k_ocean_barrier_weight / 1000.0, d_barrier);
         std::printf("                -> fragmentation_q %+.1f, polity_seeds %+.2f | land means: defence %d, attrition %d\n",
                     static_cast<double>(d_frag), static_cast<double>(d_seeds),
                     land_n ? static_cast<int>(def_sum / land_n) : 0,

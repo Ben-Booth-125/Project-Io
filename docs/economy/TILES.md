@@ -211,6 +211,31 @@ The prototype bodies are generated against the full model by the six-pass pipeli
 | Canyon | 0.1% | 0.4% | ×1.5 |
 | Rift | 0.1% | 0.3% | ×1.6 |
 
+**Terrain has a graded combat value (BL-233, 2026-07-31).** SYSTEMS.md § Environment has always
+assigned terrain "the difficulty of military operations", but the only code expressing it was a
+single boolean in the history ladder, so a mountain and a barren plain scored identically and a
+forest scored nothing. `src/world/terrain_combat.{hpp,cpp}` replaces it with two pure functions of
+`(composition, landform)` — parallel in shape to `landform_logistics_cost`, with no stored field
+and nothing on the serialisation seam:
+
+| Function | Range | What it answers | Dominated by |
+|---|---|---|---|
+| `terrain_defence` | 0–1000 | How well the ground holds against an attacker | Landform |
+| `terrain_attrition` | 0–1000 | What crossing costs an army, with no defender at all | Composition |
+| `terrain_resistance` | 0–1000 | The combined "this resists an army" quantity | Defence-weighted |
+
+**Water is deliberately not a third scalar.** Open water is a movement *mode*, not a magnitude, so
+all three functions return 0 for ocean and callers branch on it — the same way logistics already
+branches land/sea. The history ladder consumes this as `barrier_q = mean(terrain_resistance) over
+land + ocean_share × 0.75`, the ocean weight being a tuning knob independent of terrain.
+
+This adds **no** combat resolution, units, unit stats, fortifications or AI — all still excluded by
+`TECH_FOUNDATIONS.md` § Prototype scope. Today's only consumer is generation-time; a later combat
+layer reads the same two functions rather than inventing a third answer. Measured effect, `world_audit`
+§ S5: Pallas's barrier field was a flat **0** (no mountain or canyon, and compositions outside the
+barren/icy pair) and is now **325**; per-body land means now separate (defence 80–135, attrition
+509–777) where the boolean gave one bit.
+
 **Runs are bridged, not repeated (BL-232, 2026-07-31).** A contiguous run of the same linear landform draws as **one** spanning marker rather than the same glyph stamped on each tile — mountain as a chain of peaks, rift as one continuous fissure, canyon as paired rims. Crater never spans; a basin is a blob, not a line. A lone tile keeps its centred glyph. Contiguity was measured first (`world_audit` § S4): 71% of mountain and 81% of rift tiles have a same-landform cardinal neighbour and modal run length is 2–3, so bridging fires on the majority; **no** tile anywhere has all four, so the designed "filled interior" case was cancelled before it was written. The **hover card** now names the landform in every variant and states its cost, so the glyph vocabulary is learnable without clicking through to the Selection panel.
 
 > **Discrepancy: the "Build cost modifier" column above is not implemented (recorded 2026-07-31, BL-232).**

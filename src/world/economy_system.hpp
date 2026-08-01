@@ -12,6 +12,19 @@
 /// Per-building observability record produced by one economy step. Read by the
 /// economy panel (idle/active state, output rate, limiting input) — held by the
 /// app between econ ticks and not otherwise persisted.
+// Each deposit carries a finite reserve (tile_component.resource_remaining, seeded
+// at generation to richness × a reserve factor). Extraction draws the reserve down;
+// as it nears empty the output tapers, then the building reports "out of resources".
+// Hard-coded sensible estimates, iterated by playtest — not derived.
+//
+// PUBLIC because the prospective-profit estimate behind the tile construction
+// ledger (BL-162) has to apply the SAME taper. It previously ignored the reserve
+// entirely and priced a spent tile as though it were untouched, which put the
+// tallest bar on the one candidate guaranteed to earn nothing. Two copies of a
+// depletion curve is exactly how that divergence happens, so there is one.
+constexpr float deposit_taper_ticks = 8.0f;  ///< Output tapers over the last ~8 ticks of nominal yield.
+constexpr float deposit_min_taper   = 0.05f; ///< Below 5% of nominal the reserve reads as exhausted.
+
 struct building_report
 {
     entity_id     building = null_entity;

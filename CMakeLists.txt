@@ -345,6 +345,28 @@ target_link_libraries(persona_counsel_harness PRIVATE lua54)
 target_compile_features(persona_counsel_harness PRIVATE cxx_std_20)
 target_compile_options(persona_counsel_harness PRIVATE ${IO_WARNING_FLAGS})
 
+# font_glyph_harness (BL-234) is the one harness that links ImGui rather than
+# ${IO_WORLD_SOURCES}: the defect it guards is the ImFontConfig handed to
+# AddFontFromFileTTF, which lives in src/ui/fonts.cpp, not in world/*. It still
+# links no SDL and no Lua — ImGui builds its font atlas on the CPU with no
+# renderer or backend — so it stays in the fast headless tier. Declared before
+# the foreach so the `if(NOT TARGET ...)` guard skips it while the unconditional
+# add_test still registers it.
+#
+# Note it links the imgui target (which carries SDL3::SDL3 as a PUBLIC dep for
+# its backends) but never opens a window: main() only builds an atlas.
+add_executable(font_glyph_harness
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/font_glyph_harness.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/fonts.cpp"
+)
+target_include_directories(font_glyph_harness PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/ui"
+)
+target_link_libraries(font_glyph_harness PRIVATE imgui)
+target_compile_features(font_glyph_harness PRIVATE cxx_std_20)
+target_compile_options(font_glyph_harness PRIVATE ${IO_WARNING_FLAGS})
+
 file(GLOB IO_VERIFY_HARNESSES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/*.cpp")
 foreach(harness_src ${IO_VERIFY_HARNESSES})
     get_filename_component(harness_name "${harness_src}" NAME_WE)
