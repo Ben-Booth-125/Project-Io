@@ -95,6 +95,43 @@ which currently has no single truth value.
   for every codepoint, and it was validated by running it against the *pre-fix* `fonts.cpp`: 9 of
   11 fail there while the two Latin-1 controls still pass.
 
+**The review barrier earned its place, and two of its findings were mine.** A cold `verifier-review`
+pass over the integrated diff returned **FIX FIRST**. Compile-by-inspection came back clean — no
+symbol, arity or include defect in either UI slice — but it found four real defects the compiler
+could never have caught, and two of them were bookkeeping I had overclaimed:
+
+- **The frame HUD scored the wrong quantity.** All four figures were `total_ms`, measured
+  begin-to-begin, while VSync is **on by default** (`app.cpp` `SDL_SetRenderVSync(m_renderer, 1)`).
+  `present_ms` absorbs the wait for the refresh, so on any 60 Hz display `avg` would sit at ~16.7 ms
+  in permanent red against an 8 ms target, and `spike_cause` — which tested present *first* — would
+  blame the GPU for every frame. The instrument could not answer the one question it exists for.
+  Now scored on `work_ms()` (wall clock minus present), with wall shown separately and present
+  named last and only as *pacing, not app cost*.
+- **The profit estimate ignored `resource_remaining`.** It priced extraction off `resource_deposit`
+  — richness, a fixed tile property — and never the per-tile reserve. Demolish a worked-out mine,
+  reselect the tile, and the ledger ranked that resource **first with the tallest green bar**, for a
+  building that returns `exhausted` on its first tick. The original reasoning ("extracted-to-date is
+  zero for a building that does not exist") confused per-building with per-tile. `run_extraction`'s
+  taper is now applied, and its two constants were promoted out of `economy_system.cpp`'s anonymous
+  namespace into the header so there is one depletion curve, not two.
+- **BL-162 is reopened, not complete.** Three parts of its own design did not land: the world-layer
+  `estimate_prospective_profit` seam (the estimator sits in a file-local anonymous namespace inside
+  the UI TU, so no `tools/verify` harness can link it), one row per recipe, and the ledger-closes-on-
+  build fix that the design names as in scope. **Requirement R3 is marked `failed`** — its metric
+  ("no new profit maths in the UI layer") was false, and I had marked it complete without checking.
+  My agent brief also told the slice to reuse `estimate_building_profit`, which the design had
+  already ruled out as unusable on an empty tile.
+
+Hardening from the same pass: `econ_stability` R5 now asserts on `min()` rather than `mean()` (the
+prototype run gets no warm-up, so one scheduler stall in 100 ticks could fail it), the sweep growth
+denominator is guarded against a zero-granularity min, and `data_creep_harness` now **refuses** a
+run with fewer than two samples instead of comparing a sample against itself and reporting a green
+plateau. **BL-255** filed for the build-type and ctest-timeout hazards.
+
+The lesson worth keeping: four cold agents produced code that compiled clean and looked right, and
+the defects were all in *judgement* — what to measure, which field to read, which half of a
+two-part item to do. Compilation and a green suite were never going to find any of them.
+
 **Left open.** `verifier-headless`'s SKILL.md does not yet name the three new harnesses
 (`font_glyph_harness`, `data_creep_harness`, and `econ_stability`'s new sections) — skill edits need
 Ben's authorisation. `scripts/verify/frame_budget_hud.lua` is capture-only with no blessed golden,

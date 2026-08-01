@@ -15,6 +15,11 @@ float frame_sample::other_ms() const
     return std::max(0.0f, total_ms - measured);
 }
 
+float frame_sample::work_ms() const
+{
+    return std::max(0.0f, total_ms - present_ms);
+}
+
 namespace {
 
 /// Milliseconds between two steady-clock stamps.
@@ -43,15 +48,26 @@ const char* spike_cause(const frame_sample& s)
     if (s.total_ms <= 0.0f)
         return "no frames sampled";
 
-    const float floor_ms = s.total_ms * dominance_share;
-    if (s.present_ms >= floor_ms)
-        return "GPU present / VSync wait";
-    if (s.submit_ms >= floor_ms)
-        return "draw-call submission";
-    if (s.build_ms >= floor_ms)
-        return "UI build (panels + canvases)";
-    if (s.other_ms() >= floor_ms)
-        return "event pump + simulation step";
+    // Attribute against WORK, and test the app-controlled phases FIRST. Present is
+    // tested last and named as pacing, because with VSync on (the default —
+    // app.cpp SDL_SetRenderVSync(m_renderer, 1)) present absorbs the wait for the
+    // refresh: it is the largest phase on almost every idle frame while costing the
+    // app nothing. Testing it first, against total, made "GPU present / VSync wait"
+    // the answer to every question the HUD was asked.
+    const float floor_ms = s.work_ms() * dominance_share;
+    if (floor_ms > 0.0f)
+    {
+        if (s.build_ms >= floor_ms)
+            return "UI build (panels + canvases)";
+        if (s.submit_ms >= floor_ms)
+            return "draw-call submission";
+        if (s.other_ms() >= floor_ms)
+            return "event pump + simulation step";
+    }
+    // Nothing the app controls dominates. Only then is present worth naming, and
+    // only as pacing rather than as a cost.
+    if (s.present_ms >= s.total_ms * dominance_share)
+        return "present / VSync pacing (not app cost)";
     return "no single dominant phase";
 }
 
@@ -152,7 +168,7 @@ const frame_sample& frame_stats::worst() const
 
     std::size_t worst_index = 0;
     for (std::size_t i = 1; i < m_count; ++i)
-        if (m_samples[i].total_ms > m_samples[worst_index].total_ms)
+        if (m_samples[i].work_ms() > m_samples[worst_index].work_ms())
             worst_index = i;
     return m_samples[worst_index];
 }
@@ -164,13 +180,13 @@ float frame_stats::average_ms() const
 
     float sum = 0.0f;
     for (std::size_t i = 0; i < m_count; ++i)
-        sum += m_samples[i].total_ms;
+        sum += m_samples[i].work_ms();
     return sum / static_cast<float>(m_count);
 }
 
 float frame_stats::max_ms() const
 {
-    return worst().total_ms;
+    return worst().work_ms();
 }
 
 float frame_stats::low_1pct_ms() const
@@ -180,7 +196,7 @@ float frame_stats::low_1pct_ms() const
 
     std::array<float, capacity> totals{};
     for (std::size_t i = 0; i < m_count; ++i)
-        totals[i] = m_samples[i].total_ms;
+        totals[i] = m_samples[i].work_ms();
 
     // Slowest 1% of the window, at least one frame — so a short window still
     // reports a tail rather than silently reporting nothing.
@@ -208,17 +224,29 @@ void draw_frame_budget_hud(const frame_stats& stats, ImVec2 first_pos, bool& ope
                      ImGuiWindowFlags_NoNav))
     {
         // --- the four scored figures ---
-        budget_row("last",   stats.last().total_ms, 0.0f);
-        budget_row("avg",    stats.average_ms(),    frame_stats::target_avg_ms);
-        budget_row("max",    stats.max_ms(),        frame_stats::target_max_ms);
-        budget_row("1% low", stats.low_1pct_ms(),   frame_stats::target_max_ms);
+        // Scored on WORK (frame time minus the present wait), not wall clock. With
+        // VSync on, wall clock is pinned at the refresh interval no matter how cheap
+        // the frame is, so scoring it would paint avg permanently red against the
+        // 8 ms target and tell us nothing about what the app costs. Work is the
+        // quantity the ROADMAP question is actually about.
+        budget_row("last",   stats.last().work_ms(), 0.0f);
+        budget_row("avg",    stats.average_ms(),     frame_stats::target_avg_ms);
+        budget_row("max",    stats.max_ms(),         frame_stats::target_max_ms);
+        budget_row("1% low", stats.low_1pct_ms(),    frame_stats::target_max_ms);
+
+        // Wall clock alongside, unscored: it is what the player experiences, and the
+        // gap between it and "last" IS the pacing wait.
+        ImGui::PushStyleColor(ImGuiCol_Text, palette::text_secondary);
+        ImGui::Text("wall %.2f ms (incl. present %.2f)",
+                    stats.last().total_ms, stats.last().present_ms);
+        ImGui::PopStyleColor();
 
         // --- why the worst frame was the worst ---
         ImGui::SeparatorText("Worst frame");
         const frame_sample& w = stats.worst();
         // ASCII only in the drawn strings — the UI font's glyph range is still an
         // open item (BL-234), so a typographic dash here would risk a tofu box.
-        ImGui::Text("%.2f ms - %s", w.total_ms, spike_cause(w));
+        ImGui::Text("%.2f ms work (%.2f wall) - %s", w.work_ms(), w.total_ms, spike_cause(w));
         ImGui::Text("build %.2f  submit %.2f  present %.2f  other %.2f ms",
                     w.build_ms, w.submit_ms, w.present_ms, w.other_ms());
         ImGui::Text("%d verts / %d draw cmds", w.vertices, w.draw_cmds);

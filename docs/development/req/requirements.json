@@ -6823,9 +6823,9 @@
       "difficulty": 3,
       "importance": "B",
       "evaluated_difficulty": 3,
-      "status": "complete",
-      "resolved": "2026-07-31",
-      "resolution": "Complete. Placeholder replaced by a shared-ceiling profit bar per candidate; verified on capture via tile_build_ledger.lua.",
+      "status": "pending",
+      "resolved": null,
+      "resolution": "PARTIALLY DELIVERED 2026-08-01. The chart itself landed and works, but an independent review found that three parts of the item did not, and that two rows below had been marked complete on evidence that could not have been produced. Corrected rather than left standing. See R3/R6/R7.",
       "promoted_from": "BL-162 (tile construction panel)",
       "batch": "v0.1.0 cut set (2026-07-31)",
       "rows": [
@@ -6857,9 +6857,9 @@
             "code: src/ui/selection_panel.cpp",
             "build: ProjectIo"
           ],
-          "status": "complete",
-          "result_metric": "Builds and links clean against the existing estimator; no new profit maths in the UI layer.",
-          "notes": ""
+          "status": "failed",
+          "result_metric": "FALSE AS ORIGINALLY WRITTEN. The design (BL-162 § 1) mandates a new world-layer sibling `estimate_prospective_profit` in src/world/building_profit.{hpp,cpp} — and states explicitly that `estimate_building_profit` CANNOT be used, since it requires an existing building_component and a realised economy_report row. The slice instead put ~80 lines of new profit maths in a file-local anonymous namespace inside the UI TU, and `estimate_building_profit` is never called.",
+          "notes": "My own error twice over: the agent brief told it to reuse estimate_building_profit (which the design had already ruled out), and this row was then marked complete with the metric \"no new profit maths in the UI layer\", which was never checked. The maths itself was independently verified correct against economy_system; only its LOCATION is wrong. Consequence: the estimator that ranks the player's build recommendations sits outside src/world/, so no tools/verify harness can link it and it has zero headless coverage."
         },
         {
           "id": "R4",
@@ -6881,6 +6881,27 @@
           "status": "complete",
           "result_metric": "Build buttons present and the ledger still enumerates per-resource extraction plus the facility set; 34/35 ctest green.",
           "notes": ""
+        },
+        {
+          "id": "R6",
+          "requirement": "The two adjacent defects BL-162 names as in-scope are both fixed: the lying affordability gate, AND the ledger closing itself on every build.",
+          "verification": [
+            "code: src/core/app.cpp",
+            "visual: scripts/verify/tile_build_ledger.lua"
+          ],
+          "status": "failed",
+          "result_metric": "HALF DELIVERED. The affordability gate is fixed and verified (capex parity with construct_building reproduced term for term). The ledger-closing defect is untouched: on construction_result::placed, app.cpp sets m_ui.selected_entity to the new BUILDING id, so next frame sel_is_tile is false and show_build_ledger goes false — the ledger vanishes and the player must reselect the tile to place a second building.",
+          "notes": "Named explicitly in the item design (\"Two adjacent defects that the chart makes intolerable are fixed in the same pass\"). Was covered by no requirement row until this correction, which is how it passed unnoticed."
+        },
+        {
+          "id": "R7",
+          "requirement": "Processing candidates enumerate ONE ROW PER RECIPE, with the pending_recipe / construct_building(recipe) seam, so each recipe is priced on its own economics.",
+          "verification": [
+            "code: src/ui/selection_panel.cpp"
+          ],
+          "status": "failed",
+          "result_metric": "NOT DELIVERED. A single \"Processing Facility\" row remains, priced on steel. The slice documented the deferral in a code comment only.",
+          "notes": "The design calls the single steel-priced row \"a load-bearing figure silently misreporting\". On a tile where food_rations clears well and steel does not, the one row shows a red bar and sorts below every extraction candidate — telling the player processing loses money where it does not."
         }
       ]
     },
@@ -6903,8 +6924,8 @@
             "visual: scripts/verify/frame_budget_hud.lua"
           ],
           "status": "complete",
-          "result_metric": "All four figures render with their targets; breached figures colour red.",
-          "notes": ""
+          "result_metric": "All four figures render with their targets; breached figures colour red. CORRECTED 2026-08-01 after review: the figures are now scored on work_ms (wall clock minus the present wait), not total_ms.",
+          "notes": "As first written this was wrong in a way that made the instrument useless. VSync is on by default (app.cpp SDL_SetRenderVSync(m_renderer, 1)), so present_ms absorbs the wait for the refresh and total_ms is floored at the refresh interval. Scored on total, avg would read ~16.7 ms in permanent red against an 8 ms target on any 60 Hz display, and spike_cause — which tested present FIRST — would name \"GPU present / VSync wait\" as the cause of essentially every frame. The ROADMAP question (does the UI build cost more than 8 ms panning 15,120 tiles?) was unanswerable from it."
         },
         {
           "id": "R2",
@@ -6923,7 +6944,7 @@
             "visual: scripts/verify/frame_budget_hud.lua"
           ],
           "status": "complete",
-          "result_metric": "Worst-frame panel splits build / submit / present / other with vertex + draw-command counts; prints \"allocation churn: not instrumented\" rather than a number. On capture it correctly attributed a 196 ms frame to event pump + simulation step (other 185.78 ms), not to rendering.",
+          "result_metric": "Worst-frame panel splits build / submit / present / other with vertex + draw-command counts; prints \"allocation churn: not instrumented\" rather than a number. On capture it correctly attributed a 196 ms frame to event pump + simulation step (other 185.78 ms), not to rendering. CORRECTED 2026-08-01: spike_cause now tests the app-controlled phases (build / submit / other) FIRST against work, and names present last and only as \"present / VSync pacing (not app cost)\".",
           "notes": "The ROADMAP named allocation churn as a spike cause; it is not obtainable from inside the frame loop, so it is declared rather than invented."
         },
         {
@@ -6988,7 +7009,7 @@
             "headless: tools/verify/econ_stability.cpp"
           ],
           "status": "complete",
-          "result_metric": "Growth is read off the MIN per-tick time (preemption can only add time), with 20 warm-up ticks discarded; mean/p95 printed but not asserted on.",
+          "result_metric": "Growth is read off the MIN per-tick time (preemption can only add time), with 20 warm-up ticks discarded; mean/p95 printed but not asserted on. HARDENED 2026-08-01 after review: R5 now asserts on min() rather than mean() — the prototype run gets no warm-up, so a single scheduler stall in 100 ticks could add 0.25 ms to the mean and fail it spuriously. The sweep growth denominator is also guarded against a zero-granularity min.",
           "notes": "This is what makes the shape check machine-independent; the absolute bound is deliberately generous."
         },
         {
@@ -7032,7 +7053,7 @@
             "headless: tools/verify/data_creep_harness.cpp R1, R2"
           ],
           "status": "complete",
-          "result_metric": "Five marks to 1500 ticks; every exercised counter identical from 500 to 1500 (entities 34769, tiles 34440, buildings 259, markets 6, nations 30, pools 8); RSS flat at 13980 KiB. PASS.",
+          "result_metric": "Five marks to 1500 ticks; every exercised counter identical from 500 to 1500 (entities 34769, tiles 34440, buildings 259, markets 6, nations 30, pools 8); RSS flat at 13980 KiB. PASS. HARDENED 2026-08-01 after review: the harness now refuses a run with fewer than two samples, which previously compared a sample against itself and reported a green plateau.",
           "notes": ""
         },
         {

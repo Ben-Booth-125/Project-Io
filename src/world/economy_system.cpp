@@ -15,13 +15,6 @@
 namespace {
 
 // --- Deposit depletion constants (backlog.json § Environment, settled 2026-06-15) ---
-// Each deposit carries a finite reserve (tile_component.resource_remaining, seeded
-// at generation to richness × a reserve factor). Extraction draws the reserve down;
-// as it nears empty the output tapers, then the building reports "out of resources".
-// Hard-coded sensible estimates, iterated by playtest — not derived.
-constexpr float deposit_taper_ticks = 8.0f;  ///< Output tapers over the last ~8 ticks of nominal yield.
-constexpr float deposit_min_taper   = 0.05f; ///< Below 5% of nominal the reserve reads as exhausted.
-
 /// Body that a building sits on (via its tile). null_entity if the tile is gone.
 entity_id building_body(const world& w, const building_component& b)
 {

@@ -461,9 +461,22 @@ int main(int argc, char* argv[])
     for (const auto& s : samples) std::printf("%10d", s.tick);
     std::printf("%14s\n", "delta(mid->end)");
 
+    // A plateau is a comparison between two DISTINCT samples. With a single sample
+    // (e.g. `data_creep_harness 100`, which collapses the mark list to one entry)
+    // mid_i == end_i, every delta is trivially 0, and R1 would report a green
+    // plateau having compared a sample against itself. Refuse instead: a vacuous
+    // pass from an instrument built to catch silent growth is the worst outcome
+    // available to it.
+    if (samples.size() < 2)
+    {
+        std::printf("\nFAILURES (1)\n  [FAIL] R0 need at least two samples to test a plateau"
+                    " (got %zu; raise the tick ceiling)\n", samples.size());
+        return 1;
+    }
+
     // Locate T_mid = 500 (or the sample nearest half the run if 500 is absent).
     std::size_t mid_i = 0;
-    for (std::size_t i = 0; i < samples.size(); ++i)
+    for (std::size_t i = 0; i + 1 < samples.size(); ++i)
         if (samples[i].tick <= 500) mid_i = i;
     const std::size_t end_i = samples.size() - 1;
 

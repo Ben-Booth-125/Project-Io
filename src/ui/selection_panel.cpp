@@ -1353,8 +1353,14 @@ namespace {
 //     has not joined the labour pool yet, so assume no shortage and say so;
 //   * today's local prices, flat. No supply-response elasticity, no deposit sharing
 //     with existing sites (run_extraction gives every building the full richness, so
-//     no adjustment is the correct model), and no depletion taper (extracted-to-date
-//     is zero for a building that does not exist). Do not "improve" these silently.
+//     no adjustment is the correct model). Do not "improve" these silently.
+//
+//     The depletion taper IS applied, and the original reasoning for omitting it —
+//     "extracted-to-date is zero for a building that does not exist" — was wrong: it
+//     confused per-BUILDING with per-TILE. `resource_remaining` is the tile's reserve,
+//     drawn down by every site that ever worked it, so a tile can be spent before this
+//     candidate exists. Without the taper the ledger put its tallest bar on a
+//     worked-out deposit.
 //
 // corp_ai.cpp's build scorer keeps its own cruder inline duplicate (it omits
 // habitability-scaled wages). Switching it would change AI build scoring, hence world
@@ -1415,8 +1421,32 @@ building_profit prospective_profit(const world& w, const recipe_registry& reg,
     if (type == building_type::extraction_site)
     {
         const std::size_t ri = static_cast<std::size_t>(target);
-        out.revenue = econ.base_rate * tc.resource_deposit[ri] * wf
-                      * (1.0f - tc.hazard_level) * price(target);
+        const float nominal = econ.base_rate * tc.resource_deposit[ri] * wf
+                              * (1.0f - tc.hazard_level);
+
+        // Apply run_extraction's depletion taper (economy_system.cpp § run_extraction).
+        // resource_deposit is RICHNESS — a fixed property of the tile — while
+        // resource_remaining is the reserve, drained by any extraction site that has
+        // ever worked this tile. Pricing off richness alone valued a spent tile as
+        // though it were untouched: demolish a worked-out mine, reselect the tile, and
+        // the ledger ranked that resource FIRST with the tallest bar, for a building
+        // that returns `exhausted` on its first tick and earns nothing ever.
+        //
+        // The estimate is per-tile because the reserve is per-tile. This is the one
+        // place the "a building that does not exist has extracted nothing" reasoning
+        // does not hold.
+        const float taper_band = deposit_taper_ticks * nominal;
+        const float taper      = taper_band > 0.0f
+            ? std::clamp(tc.resource_remaining[ri] / taper_band, 0.0f, 1.0f)
+            : 0.0f;
+
+        // Below the floor run_extraction reports `exhausted` and yields nothing. No
+        // special flag is needed to say so: revenue 0 against maintenance and wages
+        // that still fall due gives a NEGATIVE net, so the candidate draws a red bar
+        // and sorts last — which is exactly the truth about building there.
+        out.revenue = (nominal > 0.0f && taper < deposit_min_taper)
+            ? 0.0f
+            : nominal * taper * price(target);
     }
     else if (type == building_type::processing_facility)
     {

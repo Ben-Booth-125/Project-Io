@@ -29,6 +29,17 @@ struct frame_sample
     ///
     /// @return Unattributed milliseconds, clamped at zero.
     float other_ms() const;
+
+    /// The frame's own cost — wall clock minus the present wait. This is the
+    /// quantity the audit targets are scored against.
+    ///
+    /// `present_ms` absorbs the block on the display's refresh whenever VSync is
+    /// on, which it is by default. That wait is not work the app did and not work
+    /// it can remove: on an idle frame it IS almost the whole of `total_ms`.
+    /// Scoring wall clock therefore measures the monitor, not the game.
+    ///
+    /// @return Milliseconds of app-controlled frame work, clamped at zero.
+    float work_ms() const;
 };
 
 /// Rolling frame-time instrument behind the frame-budget HUD (BL-249, the v0.1.0
@@ -67,6 +78,13 @@ public:
 
     /// v0.1.0 audit targets (ROADMAP.md § v0.1.0 — Audit instruments): average
     /// frame under 8 ms, worst frame inside one 60 Hz refresh.
+    ///
+    /// These are scored against `frame_sample::work_ms()`, NOT wall clock. VSync is
+    /// on by default (app.cpp `SDL_SetRenderVSync(m_renderer, 1)`), which floors
+    /// wall clock at the refresh interval — ~16.7 ms on a 60 Hz display however
+    /// cheap the frame is. Scoring wall clock would put `avg` permanently in the red
+    /// against the 8 ms target and name the GPU as the cause of every frame, which
+    /// is precisely the misreading this instrument exists to prevent.
     static constexpr float target_avg_ms = 8.0f;
     static constexpr float target_max_ms = 16.7f;
 
@@ -98,21 +116,21 @@ public:
     ///         first frame closes.
     const frame_sample& last() const;
 
-    /// @return The retained sample with the largest `total_ms` — the spike the
+    /// @return The retained sample with the largest `work_ms()` — the spike the
     ///         HUD attributes; a zeroed sample when nothing is retained.
     const frame_sample& worst() const;
 
-    /// @return Mean `total_ms` over the retained window, or 0 when empty.
+    /// @return Mean `work_ms()` over the retained window, or 0 when empty.
     float average_ms() const;
 
-    /// @return Largest retained `total_ms`, or 0 when empty.
+    /// @return Largest retained `work_ms()`, or 0 when empty.
     float max_ms() const;
 
     /// Mean of the slowest 1% of retained frames (at least one), the conventional
     /// "1% low" expressed as a duration rather than a frame rate. It reports the
     /// sustained tail, which a lone `max` cannot distinguish from a one-off hitch.
     ///
-    /// @return The 1%-low frame time in ms, or 0 when empty.
+    /// @return The 1%-low frame WORK time in ms, or 0 when empty.
     float low_1pct_ms() const;
 
 private:
