@@ -47,7 +47,10 @@
         "Estimate at the auto-solved workforce instead, and caption it as such. Most accurate for the player's own corp, but it stops mirroring construction.cpp and diverges from what a background corp would actually get."
       ],
       "recommendation": "Option 2. The chart's job is ranking and it already does that correctly; a two-word change stops the magnitude reading as a ceiling when it is a floor. Option 3 buys accuracy at the cost of the estimate no longer describing the building that is actually created, which is the property that makes it verifiable against economy_system.",
-      "files": ["src/ui/selection_panel.cpp", "src/world/building_profit.cpp"],
+      "files": [
+        "src/ui/selection_panel.cpp",
+        "src/world/building_profit.cpp"
+      ],
       "resolution": null
     },
     {
@@ -65,7 +68,10 @@
         "Leave it; accept the inconsistency."
       ],
       "recommendation": "Needs your intent before anyone acts. If the header genuinely aggregates over a quarter then it is reporting a different quantity and option 2 is right; if it is just an older label for the same per-tick figure, option 1. Worth checking which it actually computes before choosing — I did not verify that, only the labels.",
-      "files": ["src/core/app.cpp", "docs/GLOSSARY.md"],
+      "files": [
+        "src/core/app.cpp",
+        "docs/GLOSSARY.md"
+      ],
       "resolution": null
     },
     {
@@ -83,7 +89,9 @@
         "Leave it."
       ],
       "recommendation": "Option 2 if the wording fits the row width, otherwise option 1. Either is a one-line change; it is here rather than in the backlog because it is too small to file and too easy to lose.",
-      "files": ["src/ui/selection_panel.cpp"],
+      "files": [
+        "src/ui/selection_panel.cpp"
+      ],
       "resolution": null
     },
     {
@@ -101,7 +109,11 @@
         "Neither yet — revisit when the Era 1 transition is actually built."
       ],
       "recommendation": "Option 1 or 3 on current evidence — this looks intended rather than broken, given Era 0 is explicitly terrestrial. But it is worth writing down either way: an instrument had to work around it, which is the signal that the premise is undocumented rather than merely unimplemented.",
-      "files": ["docs/economy/MARKETS.md", "docs/economy/ERAS.md", "src/world/hard_coded_world.cpp"],
+      "files": [
+        "docs/economy/MARKETS.md",
+        "docs/economy/ERAS.md",
+        "src/world/hard_coded_world.cpp"
+      ],
       "resolution": null
     },
     {
@@ -119,7 +131,9 @@
         "Tier 2 only — skip the characterisation globe and accept that the globe appears later in the wizard."
       ],
       "recommendation": "Option 1 as filed. The reason to keep Tier 1 even if Tier 2 proves cheap is that the early rounds genuinely have not decided the landmass, and showing invented continents there would be the generation equivalent of a lying figure. The item requires the tier be captioned so the player knows which they are looking at.",
-      "files": ["docs/development/backlog.json"],
+      "files": [
+        "docs/development/backlog.json"
+      ],
       "resolution": null
     },
     {
@@ -138,7 +152,9 @@
         "A deliberate MIX with a rule (e.g. planets mythological, moons descriptive), so the mixing is legible rather than random."
       ],
       "recommendation": "Option 4 is the deepest and probably the most characterful — a rule the player can half-perceive reads as a world with a history of being named, rather than a bag drawn from. But this is squarely your call; the item is written so the pool can be swapped without touching the identity work.",
-      "files": ["docs/development/backlog.json"],
+      "files": [
+        "docs/development/backlog.json"
+      ],
       "resolution": null
     },
     {
@@ -152,7 +168,12 @@
       "why_it_matters": "Re-blessing is routine per the standing convention, but two of these blesses moved a baseline that no human has looked at since, and the third quietly narrowed what a requirement claims to verify. None is hard to reverse; all are easy to forget.",
       "options": [],
       "recommendation": "No action needed unless you disagree. One value is worth your eye: data_creep_harness now runs 42.95 s in a Debug build against its 120 s timeout — 2.8x headroom, below the >=3x the tier was sized for, because BL-254 added 1500 seeded convoys after that sizing. It passes comfortably and is nowhere near hang territory, so nothing was changed; it is the value that would want revisiting if that rollout grows again.",
-      "files": ["tools/verify/ai_skill_harness.cpp", "scripts/verify/golden/", "docs/development/req/requirements.json", "CMakeLists.txt"],
+      "files": [
+        "tools/verify/ai_skill_harness.cpp",
+        "scripts/verify/golden/",
+        "docs/development/req/requirements.json",
+        "CMakeLists.txt"
+      ],
       "resolution": null
     },
     {
@@ -170,8 +191,165 @@
         "Leave them."
       ],
       "recommendation": "Option 1, as a five-minute cleanup by whoever next touches the backlog tooling. They were left alone this session because both belong to other people's items and flipping someone else's status silently is worse than the warning.",
-      "files": ["docs/development/backlog.json", "docs/development/req/requirements.json"],
+      "files": [
+        "docs/development/backlog.json",
+        "docs/development/req/requirements.json"
+      ],
       "resolution": null
+    },
+    {
+      "raised": "2026-08-01",
+      "status": "open",
+      "source": "Session 2026-08-01 (disclosure spine — BL-214 / BL-247 / BL-248, commit d143aa4)",
+      "options": [
+        "Keep it. A full-screen mode needs a keyboard exit, and the ordering preserves Decision 10's real concern.",
+        "Revert to Decision 10 as written — Esc does not fold; the chevron is the only way out.",
+        "Keep the rung but move it ABOVE the drills, so Esc leaves the overlay first and the drill state is discarded."
+      ],
+      "recommendation": "Keep it. This is documented in LAYOUT.md § Drill-through with the reasoning stated inline, so a future reader sees the override rather than a silent contradiction.",
+      "files": [
+        "src/core/app.cpp",
+        "docs/ui/LAYOUT.md"
+      ],
+      "resolution": null,
+      "id": "NR-009",
+      "kind": "decision-taken",
+      "title": "The fold overlay joins the Esc ladder, against BL-214's Decision 10",
+      "what": "BL-214 Decision 10 states explicitly that the depth control takes no keyboard binding and does NOT join the Esc ladder, because card_stack (the subject axis) already owns that unwind and a second one would re-merge the two axes at the keyboard. I overrode it: Esc now folds the overlay, one rung BELOW the subject drills. Order is exit-confirm -> system menu -> pop card_stack -> pop corp_rollup_drill -> fold -> hide selection -> open menu, so one press never both unwinds a drill and closes the overlay hosting it.",
+      "why_it_matters": "Decision 10's reasoning is sound for what it was reasoning about — an IN-PLACE stepper, where a level genuinely is not a dismissal. Your binary supersession changed the thing being reasoned about: expanded became a full-screen MODE that covers the entire window. A mode with no keyboard exit is a usability defect rather than a principle, and the ordering fix (below the drills) answers the actual objection Decision 10 raised. But it is still me overturning a written decision of yours, so it should be your call to keep."
+    },
+    {
+      "raised": "2026-08-01",
+      "status": "open",
+      "source": "Session 2026-08-01 (disclosure spine — BL-214 / BL-247 / BL-248, commit d143aa4)",
+      "options": [
+        "Keep optional. A missing pair reads as a review signal, not a render defect.",
+        "Make it mandatory — every chart must carry a pair, enforced by a headless check that fails on an unlabelled chart.",
+        "Keep optional but add a report: a verify pass that LISTS unlabelled charts without failing."
+      ],
+      "recommendation": "Option 3 if you want the audit teeth without the ceremony — it gives you the roster of unlabelled charts to review, which is what the design-facing use actually needs.",
+      "files": [
+        "src/ui/detail_level.cpp",
+        "src/ui/generation_charts.cpp"
+      ],
+      "resolution": null,
+      "id": "NR-010",
+      "kind": "decision-taken",
+      "title": "BL-247's three open questions, settled without you",
+      "what": "The item explicitly left three questions 'open for the promoting session' and I answered all three. (1) Is a question/why pair REQUIRED on every chart? Answered: OPTIONAL — a chart with no authored pair draws no toggle at all. (2) Does the note's open state persist for the session? Answered: NO — one note open at a time, reset closed by any expand/fold. (3) Does it belong as a per-chart parameter on the shared chart helper, or a separate wrapper call site? Answered: a per-chart parameter, which was the item's own recommendation.",
+      "why_it_matters": "(1) is the one worth your eye. Making the pair mandatory would have been a real design position — it would turn the log into an audit that every chart must pass, which is the 'design-facing' use you described (a chart that cannot state a question probably has not earned its place). I made it optional so an unlabelled chart costs nothing, which means the audit is advisory rather than enforced. If you want the stricter reading, the change is small: log or assert on a chart drawn without a pair."
+    },
+    {
+      "raised": "2026-08-01",
+      "status": "open",
+      "source": "Session 2026-08-01 (disclosure spine — BL-214 / BL-247 / BL-248, commit d143aa4)",
+      "options": [
+        "Keep it in detail_level.",
+        "Move it to charts.cpp as filed and thread ui_state through."
+      ],
+      "recommendation": "Keep it. charts:: staying free of ui_state is worth more than matching a scope line written before the seam was known.",
+      "files": [
+        "src/ui/detail_level.hpp",
+        "src/ui/detail_level.cpp"
+      ],
+      "resolution": null,
+      "id": "NR-011",
+      "kind": "decision-taken",
+      "title": "why_note lives in detail_level.{hpp,cpp}, not charts.cpp as BL-247's file scope named",
+      "what": "BL-247's filed file scope names src/ui/charts.cpp for the question-log helper. I put it in src/ui/detail_level.{hpp,cpp} instead, alongside the fold idiom.",
+      "why_it_matters": "The helper needs ui_state (to hold which note is open), and charts:: is deliberately a pure draw-primitive namespace whose header includes only imgui and cstdint — it knows nothing about UI state and threading ui_state into it would have been the first crack in that separation. The two affordances are also the same family: both are disclosure controls the player asks for. Minor, but it is a departure from a filed scope, and those are worth seeing."
+    },
+    {
+      "raised": "2026-08-01",
+      "status": "open",
+      "source": "Session 2026-08-01 (disclosure spine — BL-214 / BL-247 / BL-248, commit d143aa4)",
+      "options": [
+        "Both fine — red verdicts are the alert, and the table was a duplicate.",
+        "Reinstate an alerts concept as its own backlog item for when there is more than three things to alert on.",
+        "The all-corporations table was doing something the Economy panel's Corps view does not; restore it somewhere."
+      ],
+      "recommendation": "Option 2 if alerts matter to you later — it is a real feature, not chrome, and deserves its own item rather than a card slot.",
+      "files": [
+        "docs/ui/MENU.md",
+        "src/ui/corporation_dashboard.cpp"
+      ],
+      "resolution": null,
+      "id": "NR-012",
+      "kind": "decision-taken",
+      "title": "MENU.md's 'alert' concept was dropped rather than built, and the all-corporations table was deleted",
+      "what": "Two calls inside BL-248. (1) MENU.md's Slot 1 MVP named ALERTS as one of four roll-ups (idle buildings, unsold output, negative cashflow) and noted it introduces an 'alert' concept. Your 2026-07-31 call replaced the MVP four with the exemplar's Production/Trade/Workforce/Finance, which has no alerts card — I did not reintroduce one. An idle building and a negative net now read as red verdicts on their own cards instead. (2) src/ui/corporation_panel.{hpp,cpp} was DELETED, not left dormant — it drew an all-corporations balance table that duplicated the Economy panel's Corps view.",
+      "why_it_matters": "(1) quietly retires a named concept. Red verdicts give the same signal without a second mechanism to maintain, but 'alerts' as a first-class thing the player can enumerate is a different feature, and dropping it by omission is exactly the failure mode BL-214 was raised to fix. (2) is a file deletion — recoverable from git, but worth knowing it happened rather than discovering the table is gone."
+    },
+    {
+      "raised": "2026-08-01",
+      "status": "open",
+      "source": "Session 2026-08-01 (disclosure spine — BL-214 / BL-247 / BL-248, commit d143aa4)",
+      "options": [
+        "Settle BL-254's open question — seed markets on non-home bodies so lanes exist from the start.",
+        "Leave it; the card fills in as soon as the player builds toward another body, which is the intended arc.",
+        "Have the empty Trade card say WHY it is empty rather than showing zero."
+      ],
+      "recommendation": "Option 3 is cheap and honest regardless of how the design question lands; it does not pre-empt option 1.",
+      "files": [
+        "src/ui/corporation_dashboard.cpp"
+      ],
+      "resolution": null,
+      "id": "NR-013",
+      "kind": "observation",
+      "title": "The Trade roll-up reads '0 lanes' because every market seeds on one body",
+      "what": "The Corporation dashboard's Trade card is wired to w.trade_routes and correctly reports zero, because the generated world seeds every market on the single tiled body, so there is no inter-body pair to record a route against. BL-254 surfaced exactly this and deliberately did not settle it, calling out 'whether non-home bodies should have markets at campaign start' as an open design question.",
+      "why_it_matters": "It was a harness blind spot before; it is now a player-facing card that reads empty on a fresh campaign. That raises the cost of leaving the question open — a dashboard quarter that always says nothing teaches the player the surface is dead. Not a defect in the dashboard; the card is honest."
+    },
+    {
+      "raised": "2026-08-01",
+      "status": "open",
+      "source": "Session 2026-08-01 (disclosure spine — BL-214 / BL-247 / BL-248, commit d143aa4)",
+      "options": [],
+      "recommendation": "No action now — carry it into BL-215 (text-wrap render audit) as a known case.",
+      "files": [
+        "src/ui/tile_inspector.cpp"
+      ],
+      "resolution": null,
+      "id": "NR-014",
+      "kind": "observation",
+      "title": "Full-screen still does not fit the History Tiles table's 23 resource columns",
+      "what": "Expanding the Tiles view was the single biggest win of the fold — the table goes from permanently horizontally scrolled in a 380 px column to reading across the screen (capture: fold_history_tiles_expanded). But at 1280 wide the last ~17 resource columns are still squeezed to single-letter headers. 6 identity columns + 23 resources does not fit any screen at this column width.",
+      "why_it_matters": "This is BL-215's territory, not BL-214's — the seam BL-214's design states flatly is 'BL-214 decides WHETHER a string is drawn; BL-215 decides HOW a string that is drawn fits'. Flagging it so BL-215's audit has the case pre-identified rather than rediscovering it, and so the fold is not mistaken for having solved this table."
+    },
+    {
+      "raised": "2026-08-01",
+      "status": "open",
+      "source": "Session 2026-08-01 (disclosure spine — BL-214 / BL-247 / BL-248, commit d143aa4)",
+      "options": [
+        "Leave the space. It is calm, and the wizard is not short of screen.",
+        "Let the chart region shrink to its content, floating the preference block and footer up.",
+        "Open the round's FIRST stage expanded by default, so the screen shows one full stage plus the other three as verdicts.",
+        "Use the freed space for something else — the world summary, or the globe preview (BL-256)."
+      ],
+      "recommendation": "Option 2 as the safe layout fix; option 4 is the interesting one, since BL-256 (rotating globe on the generation screen) is already designed and now has somewhere to live.",
+      "files": [
+        "src/core/app.cpp"
+      ],
+      "resolution": null,
+      "id": "NR-015",
+      "kind": "question",
+      "title": "The wizard's chart region is now mostly empty when its stages are folded",
+      "what": "With per-stage folding, a wizard round's four stages occupy four lines at the top of a chart region sized for full charts, leaving a large empty band above the preference block (capture: fold_wizard_stages_folded). The layout reserves height for charts that are no longer drawn at rest.",
+      "why_it_matters": "You chose per-stage folding, and the result reads well — the whole chain is legible at a glance for the first time. But the screen now looks under-filled, and this is the first surface a new player sees. It is a layout question I did not want to answer unilaterally, since 'first impression' is your stated framing for this screen."
+    },
+    {
+      "raised": "2026-08-01",
+      "status": "open",
+      "source": "Session 2026-08-01 (disclosure spine — BL-214 / BL-247 / BL-248, commit d143aa4)",
+      "options": [],
+      "recommendation": "Next session: launch windowed on monitor 2, select a tile with deposits, and try the chevron on the band, the History Chain, and each of the four roll-ups.",
+      "files": [],
+      "resolution": null,
+      "id": "NR-016",
+      "kind": "observation",
+      "title": "Three surfaces changed shape and want your eyes on the live app",
+      "what": "The batch is golden-verified, but three surfaces changed enough that captures are not a substitute for using them: (1) the Selection band's metric card gained a chevron and a full-screen view; (2) the History ledger's Chain view lost its accordions for verdict lines; (3) nav slot 1 is an entirely new dashboard. The fold gesture in particular is only really judgeable by clicking it.",
+      "why_it_matters": "Standing practice is to open the live app whenever your judgement on visuals is wanted. Not done this session because you were about to restart the machine to test dispatch."
     }
   ]
 }

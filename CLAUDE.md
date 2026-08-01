@@ -168,6 +168,21 @@ Every non-trivial task states its **mode**:
   integration seam, spans more than ~2 files of real logic, or carries determinism risk. Run the
   Delivery lifecycle below.
 
+**Rule 0c — log reviews as you go; do not save them for a closing summary.** Anything that
+wants Ben's judgement — an open question, a call taken on his behalf, an observation he
+should see — goes into **`docs/development/NEEDS_REVIEW.json`** *at the moment it arises*,
+not into the end-of-session message. A closing summary is read once and then gone; the
+session ends, the context is dropped, and an unrecorded delegated decision becomes
+indistinguishable from a decision Ben made. Write the entry when the decision is taken,
+while the reasoning is still in hand.
+
+The end-of-session message then **points at** the log rather than reproducing it: say what
+landed, and that the review notes carry N entries. Keep the prose summary short — the
+durable record is the file. (Ben, 2026-08-01.) The three homes, per their own `_note`
+blocks: `NEEDS_REVIEW.json` = questions, decisions-taken and observations (non-blocking);
+`review.json` = blocked on a visual artifact only Ben can produce; `backlog.json` = actual
+work. If an answer creates work, file the backlog item and resolve the entry with its id.
+
 **Rule 0b — ambiguous measurements: report the current numbers first.** When a sizing or layout
 request has more than one reading ("a bit smaller", "3/5 the size" — of the width, the height, or
 both?), do **not** guess and do **not** ask an open question. State the **exact current
@@ -187,6 +202,7 @@ backlog**, or **B) implement now** (smoke-test, then ask before committing).
 | Backlog **design prose** for an open item | `docs/development/backlog.json` (`design` field) | Design authority *while the item is open*; `BACKLOG.md` is drained (pointer stubs only, 2026-07-31). |
 | **Active worklist** (promoted tasks) | `docs/development/REFINED.md` | Transient; empty between work blocks. |
 | **Blocker triage** (items awaiting a UI/visual artifact from Ben) | `docs/development/review.json` | Companion to the backlog, not a replacement — see its own `_note`. |
+| **Review log** (open questions, decisions taken on Ben's behalf, observations) | `docs/development/NEEDS_REVIEW.json` | Non-blocking. Written **as work happens** (Rule 0c), never deferred to a closing summary. |
 | **Ben's review queue** (open questions + decisions taken on his behalf) | `docs/development/NEEDS_REVIEW.json` (view: `NEEDS_REVIEW.md`) | Not work and not blocking. **Append here rather than dropping a judgement call** — especially a `decision-taken`, since an unrecorded delegated decision is indistinguishable from one Ben made. |
 | **Player-intent coverage** (user stories) | `docs/development/user_stories.json` (view: `USER_STORIES.md`) | The second route — intent axis; companion to the backlog, consumed by BL-098's review. |
 | **Method** (lifecycle, depth verbs, batch, worktrees) | `docs/development/DELIVERY.md` | The long-form of this section. |
