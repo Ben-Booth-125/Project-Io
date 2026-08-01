@@ -1,5 +1,10 @@
 #!/usr/bin/env node
-// ship_items.js — mark backlog items as shipped in backlog.json
+// ship_items.js — mark backlog items terminal (status: complete) in backlog.json
+//
+// `complete` is the single terminal status (2026-08-01). The old `shipped` value this
+// script used to write was a synonym with no defined difference; the six items carrying
+// it were normalised. Readers still tolerate it — see the TERMINAL sets in gyre.py,
+// backlog_view.js, backlog_lint.js, story_check.js, status.ps1.
 //
 // Usage:
 //   node tools/session/ship_items.js BL-XXX [BL-YYY ...]
@@ -29,14 +34,14 @@ for (const id of ids) {
         missing++;
         continue;
     }
-    if (item.status === 'shipped') {
-        console.log(`  SKIP  ${id} — already shipped`);
+    if (item.status === 'complete') {
+        console.log(`  SKIP  ${id} — already complete`);
         skipped++;
         continue;
     }
     const prev = item.status;
-    item.status = 'shipped';
-    console.log(`  SHIP  ${id}  (${prev} → shipped)  ${item.title}`);
+    item.status = 'complete';
+    console.log(`  SHIP  ${id}  (${prev} → complete)  ${item.title}`);
     updated++;
 }
 

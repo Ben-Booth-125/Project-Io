@@ -32,13 +32,13 @@ if (sc.delivered_items && sc.delivered_items.length > 0) {
     for (const entry of sc.delivered_items) {
         const item = bl.items.find(i => i.id === entry.id);
         if (!item) { console.warn(`  MISS  ${entry.id}`); continue; }
-        if (item.status === 'shipped') { console.log(`  SKIP  ${entry.id}`); continue; }
-        item.status = 'shipped';
+        if (item.status === 'complete') { console.log(`  SKIP  ${entry.id}`); continue; }
+        item.status = 'complete';
         console.log(`  SHIP  ${entry.id}  ${item.title}`);
         n++;
     }
     fs.writeFileSync(BL_PATH, JSON.stringify(bl, null, 2) + '\n');
-    console.log(`  → ${n} shipped\n`);
+    console.log(`  → ${n} completed\n`);
 }
 
 // 2. Close requirement groups -------------------------------------------------
