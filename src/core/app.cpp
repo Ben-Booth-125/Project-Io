@@ -1438,20 +1438,43 @@ int app::run_verify(const std::string& script_path, bool bless)
             SDL_Log("verify.ledger_build: selection is not a tile");
             return;
         }
+        // Unrecognised input REFUSES rather than falling through to a default. A typo'd
+        // type would otherwise silently build an extraction site, and a typo'd recipe
+        // would resolve to no_recipe and be turned into steel by construct_building —
+        // so the script would report a green pass while proving nothing about the very
+        // seam this hook exists to exercise.
         building_type bt = building_type::extraction_site;
-        if      (type == "processing") bt = building_type::processing_facility;
+        if      (type == "extraction") bt = building_type::extraction_site;
+        else if (type == "processing") bt = building_type::processing_facility;
         else if (type == "port")       bt = building_type::port;
         else if (type == "launchpad")  bt = building_type::launchpad;
         else if (type == "hub")        bt = building_type::inland_logistics_hub;
+        else
+        {
+            SDL_Log("verify.ledger_build: unrecognised type '%s' — refusing", type.c_str());
+            return;
+        }
 
         const resource_type tgt =
             target.empty() ? resource_type::iron_ore : resource_from_name(target);
 
+        std::uint16_t rec = no_recipe;
+        if (!recipe.empty())
+        {
+            rec = m_registry.recipe_id(recipe);
+            if (rec == no_recipe)
+            {
+                SDL_Log("verify.ledger_build: unrecognised recipe '%s' — refusing "
+                        "(it would have silently become the construct_building default)",
+                        recipe.c_str());
+                return;
+            }
+        }
+
         m_ui.construction.pending_tile   = m_ui.selected_entity;
         m_ui.construction.pending_type   = bt;
         m_ui.construction.pending_target = tgt;
-        m_ui.construction.pending_recipe =
-            recipe.empty() ? no_recipe : m_registry.recipe_id(recipe);
+        m_ui.construction.pending_recipe = rec;
         SDL_Log("verify.ledger_build: queued %s (recipe id %u) on the selected tile",
                 type.c_str(), static_cast<unsigned>(m_ui.construction.pending_recipe));
     });

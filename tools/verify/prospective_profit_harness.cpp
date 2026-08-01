@@ -16,14 +16,13 @@
 // Kept outside src/ so the CMake glob does not pull it into the real build; the CTest
 // block in CMakeLists.txt picks it up automatically and links the world superset.
 //
-// Build (from repo root, after sourcing vcvars64):
-//   cl /nologo /std:c++20 /EHsc /I src tools\verify\prospective_profit_harness.cpp ^
-//      src\world\world.cpp src\world\building_profit.cpp src\world\budget_system.cpp ^
-//      src\world\economy_system.cpp src\world\market_clearing.cpp ^
-//      src\world\construction.cpp src\world\placement_rules.cpp ^
-//      /Fo:build_gen\verify\prospective_profit_harness\ ^
-//      /Fe:build_gen\verify\prospective_profit_harness.exe
-// Run: .\build_gen\verify\prospective_profit_harness.exe
+// Build (from repo root, after sourcing vcvars64) — via the CMake target, NOT a
+// hand-written cl line. This harness calls run_economy_step, and economy_system.cpp
+// includes corp_ai.hpp and workforce.hpp, so the TU list is wider than it looks and
+// grows with world/*. An explicit list here would LNK2019 the first time either of
+// those gained a dependency; see tools/verify/README.md on why the glob is preferred.
+//   cmake --build build --target prospective_profit_harness
+// Run: .\build\prospective_profit_harness.exe
 
 #include "world/budget_system.hpp"
 #include "world/building_profit.hpp"

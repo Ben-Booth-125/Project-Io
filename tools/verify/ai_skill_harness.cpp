@@ -302,7 +302,14 @@ constexpr int ticks_per_seed = 300;
 // The visual goldens answer differently and are Windows-authoritative (pixel
 // output additionally depends on font rasterisation and GPU/driver) — see
 // docs/development/DEVELOPMENT_PRACTICES.md § Goldens.
-#if defined(_MSC_VER)
+// Clang is tested FIRST and deliberately: it defines __GNUC__ (and clang-cl defines
+// _MSC_VER), so an ordinary MSVC/GCC pair would let a Clang build silently inherit a
+// set it was never blessed against — the exact outcome this structure exists to stop.
+#if defined(__clang__)
+#error "ai_skill_harness: no blessed golden band set for Clang (BL-252). Clang defines \
+__GNUC__, so it would otherwise inherit the GCC set and assert it against different \
+float output. Bless a set from a fresh Clang run and add its own block."
+#elif defined(_MSC_VER)
 // --- Windows / MSVC — blessed 2026-08-01, values in the table above. ---
 const std::vector<seed_golden> goldens = {
     { 0, {120000.0f, 290000.0f}, { 40000.0f,  95000.0f}, 12, {0.45f, 0.95f},  5, 200 },

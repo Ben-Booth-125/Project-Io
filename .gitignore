@@ -3,6 +3,7 @@ build/
 build-web/
 build_gen/
 build_live/
+build_vs/
 out/
 dist/
 .cmake/
