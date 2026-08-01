@@ -7180,6 +7180,50 @@
           "notes": "Worth a follow-up decision: whether market seeding on non-home bodies is intended to be absent at campaign start."
         }
       ]
+    },
+    {
+      "brief": "harness-build-type-and-timeouts",
+      "title": "Harness build type and test timeouts (BL-255)",
+      "difficulty": 2,
+      "importance": "C",
+      "evaluated_difficulty": 2,
+      "status": "complete",
+      "resolved": "2026-08-01",
+      "resolution": "Complete, all rows met. CMakeLists.txt now defaults CMAKE_BUILD_TYPE to Release on single-config generators only when the user has not chosen one, and every ctest test carries an explicit TIMEOUT (60s default, 120s for corp_terrain_matrix/econ_stability/data_creep_harness). Verified on WSL2/Ubuntu (Ninja) since the defect is single-config-generator-specific; MSVC/Windows is multi-config and was never affected. Note: this checkout's tools/verify/ tree predates BL-250's econ_stability timing sweep and does not contain data_creep_harness.cpp or font_glyph_harness.cpp at all (see resolution note on R3) - the long-timeout list names them anyway so they inherit the safe tier the moment they land, and cannot be measured here.",
+      "promoted_from": "BL-255 (harness build type and timeouts)",
+      "batch": null,
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: a single-config generator (Ninja/Unix Makefiles) configured with no -DCMAKE_BUILD_TYPE now builds Release (optimised) rather than an unspecified/no-flags build; a multi-config generator is untouched.",
+          "verification": [
+            "headless: WSL2 Ubuntu, `cmake -B build_default -G Ninja` with no CMAKE_BUILD_TYPE flag, then `grep CMAKE_BUILD_TYPE build_default/CMakeCache.txt`"
+          ],
+          "status": "complete",
+          "result_metric": "CMAKE_BUILD_TYPE:STRING=Release resolved automatically; full build (`cmake --build build_default -j16`) succeeded (1256/1256 targets, exit 0).",
+          "notes": "Guarded on GENERATOR_IS_MULTI_CONFIG so MSVC (check.bat's --config Release path) is unaffected."
+        },
+        {
+          "id": "R2",
+          "requirement": "An explicit user choice of build type is never overridden, including a deliberate Debug configure.",
+          "verification": [
+            "headless: WSL2 Ubuntu, `cmake -B build_debug -G Ninja -DCMAKE_BUILD_TYPE=Debug`, then `grep CMAKE_BUILD_TYPE build_debug/CMakeCache.txt`"
+          ],
+          "status": "complete",
+          "result_metric": "CMAKE_BUILD_TYPE:STRING=Debug preserved (not overwritten to Release); build succeeded (1256/1256 targets, exit 0).",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "requirement": "Every registered ctest test carries a TIMEOUT: 60s default (>=3x headroom over every measured Debug/-O0 runtime bar the named long-runners), 120s for the harnesses that are structurally long-running (corp_terrain_matrix, econ_stability, data_creep_harness) rather than just slow to build.",
+          "verification": [
+            "headless: WSL2 Ubuntu, `grep -c TIMEOUT build_default/CTestTestfile.cmake` (33/33 tests carry a TIMEOUT); `ctest --test-dir build_default --output-on-failure` on both the Release and a from-scratch Debug configure"
+          ],
+          "status": "complete",
+          "result_metric": "33/33 tests carry TIMEOUT. Release suite: 32/33 pass (8.64s total; only ai_skill_harness fails, on golden bands - BL-252, pre-existing and out of scope). Debug/-O0 suite: same 32/33 pass (64.94s total); slowest per-test times were corp_terrain_matrix 20.16s, ai_skill_harness 11.00s, history_ladder_harness 8.18s, planetology_harness 7.45s, road_generation_harness 5.80s - all well inside their assigned TIMEOUT (>=2.6x headroom on the tightest, corp_terrain_matrix at 120s/20.16s). data_creep_harness and font_glyph_harness (named in the BL-255 design text as already-landed BL-251/BL-234 harnesses) do not exist in this checkout's tools/verify/ tree and were not built or measured; the econ_stability source here also predates BL-250's timing-sweep additions the design text describes. Flagged for the integrating session - see final report.",
+          "notes": "Timeout values apply uniformly via the tools/verify/*.cpp glob loop, which is also where pregame_balance_harness/persona_counsel_harness/survey_harness/etc. register their add_test call despite being hand-declared executables above it."
+        }
+      ]
     }
   ]
 }
