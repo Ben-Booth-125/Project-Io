@@ -4,6 +4,31 @@ project(ProjectIo LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# ---------------------------------------------------------------------------
+# Default build type (BL-255)
+# ---------------------------------------------------------------------------
+# Multi-config generators (Visual Studio, Ninja Multi-Config) are unaffected
+# by this: check.bat/build_app.bat pass --config Release explicitly and the
+# generator carries every config's flags simultaneously.
+#
+# A single-config generator (Ninja, Unix Makefiles — every Linux/WSL/cloud
+# configure that doesn't pass -DCMAKE_BUILD_TYPE) is different: with no
+# CMAKE_BUILD_TYPE set, CMake adds NO optimisation flags at all (effectively
+# -O0), and a later --config is silently ignored because there is only ever
+# one config. The econ_stability timing assertions (BL-250) were measured at
+# -O2 with real but thin margins, so an accidental -O0 configure fails them
+# for build-configuration reasons, not economy regressions.
+#
+# Set a default only when the generator is single-config AND the user has
+# not already chosen a build type — never override an explicit choice
+# (including an explicit Debug, which stays honoured for its own tradeoffs).
+get_property(IO_IS_MULTI_CONFIG GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+if(NOT IO_IS_MULTI_CONFIG AND NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the build type" FORCE)
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
+        "Debug" "Release" "RelWithDebInfo" "MinSizeRel")
+endif()
+
 include(FetchContent)
 
 # ---------------------------------------------------------------------------
@@ -346,6 +371,44 @@ target_compile_features(persona_counsel_harness PRIVATE cxx_std_20)
 target_compile_options(persona_counsel_harness PRIVATE ${IO_WARNING_FLAGS})
 
 file(GLOB IO_VERIFY_HARNESSES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/*.cpp")
+
+# ---------------------------------------------------------------------------
+# Test timeouts (BL-255)
+# ---------------------------------------------------------------------------
+# No harness previously carried a ctest TIMEOUT, so a hang (e.g. a future
+# infinite loop reached by an economy-loop change) blocked the whole suite on
+# ctest's 1500s default instead of failing fast. Sized against a Debug/-O0
+# build, not the fast Release numbers - a plain configure with no
+# CMAKE_BUILD_TYPE used to mean -O0 (see the build-type default above), and
+# even now nothing stops a contributor from configuring Debug on purpose.
+#
+# Measured 2026-08-01, WSL2/Ubuntu, Ninja, 16 threads, full suite:
+#             Release   Debug(-O0)
+#   corp_terrain_matrix   1.80s    20.16s   <- slowest harness
+#   history_ladder_harness 1.45s    8.18s
+#   planetology_harness    1.30s    7.45s
+#   ai_skill_harness        1.07s   11.00s  (fails on goldens - BL-252, not a
+#                                            timing issue; timing is incidental)
+#   road_generation_harness 1.01s    5.80s
+#   world_determinism      0.73s    4.34s
+#   every other harness    <1s      <2s
+#
+# IO_TEST_TIMEOUT_DEFAULT covers every harness above at 3x-6000x headroom
+# over its Debug time. IO_TEST_TIMEOUT_LONG is for the harnesses that are
+# structurally long-running (a multi-second generation/sweep/simulation
+# loop, not just a slow build) and named explicitly rather than inferred
+# from a one-off measurement - corp_terrain_matrix (measured above) plus
+# econ_stability and data_creep_harness, whose long-running sweep/1500-tick
+# passes are not yet present in this checkout (see BL-255 report) but land
+# on the same fast-tier build these values must already tolerate.
+set(IO_TEST_TIMEOUT_DEFAULT 60)
+set(IO_TEST_TIMEOUT_LONG 120)
+set(IO_TEST_LONG_HARNESSES
+    corp_terrain_matrix
+    econ_stability
+    data_creep_harness
+)
+
 foreach(harness_src ${IO_VERIFY_HARNESSES})
     get_filename_component(harness_name "${harness_src}" NAME_WE)
     if(NOT TARGET ${harness_name})
@@ -355,4 +418,9 @@ foreach(harness_src ${IO_VERIFY_HARNESSES})
         target_compile_options(${harness_name} PRIVATE ${IO_WARNING_FLAGS})
     endif()
     add_test(NAME ${harness_name} COMMAND ${harness_name})
+    if(harness_name IN_LIST IO_TEST_LONG_HARNESSES)
+        set_tests_properties(${harness_name} PROPERTIES TIMEOUT ${IO_TEST_TIMEOUT_LONG})
+    else()
+        set_tests_properties(${harness_name} PROPERTIES TIMEOUT ${IO_TEST_TIMEOUT_DEFAULT})
+    endif()
 endforeach()
