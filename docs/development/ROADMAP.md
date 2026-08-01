@@ -117,22 +117,46 @@ record `DEVLOG.md`.
 
 *Theme: make it read cleanly, prove it holds up, then ship.* The legibility strands have landed —
 the 2026-07-08 lens/UI review batch, the legibility cut-blockers, and roads with them (§ Where we
-are). The live cut set (`version_goal: v0.1.0`, status 2026-07-31) is the **terrain/landform
-strand** plus two owed surfaces: BL-231/232 (landform render + spanning markers — landed),
-BL-226 (continent lens — first cut landed 2026-07-30, item open), BL-233 (terrain combat
-modifiers — owed), BL-234 (font glyph range — owed), and BL-162 (tile construction panel —
-owed). Then the **quality audit** — three instruments — and the cut.
+are). **The terrain/landform strand is closed (2026-07-31).** BL-231/232 (landform render +
+spanning markers), BL-226 (continent lens), BL-233 (terrain combat modifiers), BL-234 (font glyph
+range) and BL-162 (tile construction panel) are all complete; BL-230 (hover glance-then-stick) was
+closed out with them. Three of those had already landed and were simply never flipped off the
+non-terminal `landed` status, so they had been reading as open work.
 
-**Audit instruments** — no new systems:
+Two of the five were more than bookkeeping. **BL-233** deleted `is_barrier` and re-priced conquest
+from the graded terrain field, with water as its own weighted term (weight 750, chosen by sweep to
+hold the political map at 30 Kepler nations while fixing the grading defect — Pallas's barrier
+field was a flat *zero*). **BL-234** turned out to be wider than filed: 43 sites across 7
+codepoints, not 26 across 2.
 
-- **Frame budget.** Frame-time HUD: last / avg / max ms + 1% lows. Targets: **avg < 8 ms,
-  max < 16.7 ms** panning the full Kepler tile grid (15,120 tiles). If max spikes the HUD says
-  why — GPU present, draw-call volume, or allocation churn.
-- **Econ-tick scaling.** Extend `econ_stability` to print tick time. Target: **well under 1 ms**
-  for the prototype world; confirm it does not grow faster than linearly in bodies × corps.
-- **Data creep.** Entity/pool/market/convoy counters + RSS memory readout run long (100→1000+
-  ticks): counts and memory must **plateau**, not climb. A steady climb on an idle run names the
-  unbounded structure.
+Then the **quality audit** — three instruments, now built — and the cut.
+
+**Audit instruments** — no new systems. **All three built 2026-07-31** (BL-249/250/251); they were
+named here from the start but never itemised, so nothing owned them. Results:
+
+- **Frame budget** (BL-249, `src/ui/frame_stats.{hpp,cpp}`, F11, off by default). Reports last /
+  avg / max / 1% low against the targets — **avg < 8 ms, max < 16.7 ms** panning the full Kepler
+  grid (15,120 tiles) — and breaks a spike into build / submit / present / other with ImGui's
+  vertex and draw-command counts. Allocation churn is **declared not instrumented** rather than
+  invented; it is not obtainable from inside the frame loop. *The targets themselves remain a
+  human-in-the-loop measurement against the real app — headless capture has no vsync and no real
+  present, so its numbers say nothing about them.*
+- **Econ-tick scaling** (BL-250, extends `econ_stability`). Prototype scale **0.0018 ms/tick mean**
+  — 555× headroom against the 1 ms target. A six-rung bodies × corps sweep gives **32× size →
+  83.1× time, i.e. size^1.28**, inside a size^1.5 tolerance; the largest swept world (128×
+  prototype) still ticks under 1 ms. It **named the bend**: `run_corp_strategic_step` rescans every
+  tile per due corp, an O(corps × tiles) term — filed as **BL-253**, not a cut blocker.
+- **Data creep** (BL-251, `tools/verify/data_creep_harness.cpp`). ~30 counters + RSS over **1500
+  ticks of the real generated world**. Every exercised counter is flat from tick 500 to 1500 and
+  RSS plateaus at 13,980 KiB — **no unbounded structure found**. It also reported its own blind
+  spot: no convoy is dispatched in the rollout, so the convoy / trade-route / glimpse plateaus pass
+  **vacuously**, and `trade_route` is never-erased by construction — filed as **BL-254**, which is
+  a v0.1.0 item because it closes a hole in a cut gate.
+
+**Still owed before the cut:** BL-254 (convoy-exercising data-creep scenario), the frame-budget
+targets measured against the real app, and **BL-252** — the goldens are Windows-blessed, so the
+suite cannot be green on Windows and Linux at once and "headless harnesses green" below has no
+single truth value until that policy is settled.
 
 Plus hygiene: warning-clean build, one-off static-analysis (cppcheck), headless harnesses green.
 Final verification pass against the done-definition below, then the Cut.

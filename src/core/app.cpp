@@ -1029,6 +1029,7 @@ int app::run_verify(const std::string& script_path, bool bless)
         else if (name == "balance")      m_ui.show_balance_ledger = open;
         else if (name == "corporation")  m_ui.show_corporation_panel = open;
         else if (name == "build")        m_ui.show_build_ledger = open; // tile construction ledger (BL-162)
+        else if (name == "frame_hud")    m_ui.show_frame_hud = open;    // frame-budget HUD (BL-249)
     });
 
     // Park a fold-out ledger on one of its button-strip views (BL-117 sweep), so a
