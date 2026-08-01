@@ -1,0 +1,177 @@
+{
+  "_schema": "Ben's review queue. Canonical store; NEEDS_REVIEW.md is the readable mirror. Entry fields: id, title, raised (ISO date), kind, status, source, what, why_it_matters, options (array, only where there is a genuine fork), recommendation, files, resolution (null until Ben answers).",
+  "_note": [
+    "Companion to backlog.json and review.json, NOT a replacement for either.",
+    "",
+    "PURPOSE: things awaiting BEN'S JUDGEMENT. Two kinds live here:",
+    "  - 'question'        — an open call nobody has made yet, usually surfaced by",
+    "                        doing adjacent work. Not blocking, or it would be a",
+    "                        backlog item with blocked_on set.",
+    "  - 'decision-taken'  — a call made ON BEN'S BEHALF so work could continue.",
+    "                        Recorded here so it can be OVERTURNED rather than",
+    "                        quietly becoming precedent. This is the important half:",
+    "                        an unrecorded delegated decision is indistinguishable",
+    "                        from a decision Ben made.",
+    "  - 'observation'     — something noticed in passing that is too small or too",
+    "                        cross-cutting to file, but which a human should see.",
+    "",
+    "HOW IT DIFFERS FROM review.json: review.json is a BLOCKER list — items blocked",
+    "on a visual artifact only Ben can produce (a mockup, an annotated screenshot).",
+    "Work there cannot proceed at all. Entries here are not blocking; they are",
+    "questions and reversible calls. If an entry turns out to need a mockup, move it",
+    "to review.json and leave a resolution here pointing at it.",
+    "",
+    "HOW IT DIFFERS FROM backlog.json: an entry here is not work. If Ben's answer",
+    "creates work, file a backlog item and resolve the entry with that item's id.",
+    "",
+    "LIFECYCLE: entries are appended as they arise and NEVER silently deleted —",
+    "set status to 'resolved' and write the resolution, so the reasoning survives.",
+    "Prune resolved entries only in a deliberate sweep, once the answer has landed",
+    "in an authority doc.",
+    "",
+    "SEEDED 2026-08-01 at Ben's request, populated from that session."
+  ],
+  "items": [
+    {
+      "id": "NR-001",
+      "title": "The construction ledger says \"50% staffing\", but the player's own corp auto-solves the dial on the first tick",
+      "raised": "2026-08-01",
+      "kind": "question",
+      "status": "open",
+      "source": "BL-162 (tile construction ledger) — surfaced by prospective_profit_harness",
+      "what": "The ledger caption reads \"Est. net / tick at today's local prices - 50% staffing, no labour shortage.\" The estimate uses workforce_assigned = 0.5, which mirrors construction.cpp exactly, so it correctly describes the building at the instant it is created. But BL-181 gives player buildings workforce_auto = true by default, and the dial is auto-solved for maximum profit on the first tick. tools/verify/prospective_profit_harness.cpp measured realised extraction at 2x the estimate for exactly this reason, and had to pin workforce_auto = false to make its cross-check meaningful.",
+      "why_it_matters": "The number is honest for the moment it is shown and dishonest as a prediction — and a player reads a profit bar as a prediction. Every candidate is understated by the same factor, so the RANKING (which is what the chart is for) is unaffected; the magnitude is not.",
+      "options": [
+        "Leave it. The figure is defensible and the ranking is correct; adding caveats to a caption costs legibility.",
+        "Say it is a floor — e.g. 'at least +1243 / tick' or append 'before auto-staffing'. One or two words, no geometry change.",
+        "Estimate at the auto-solved workforce instead, and caption it as such. Most accurate for the player's own corp, but it stops mirroring construction.cpp and diverges from what a background corp would actually get."
+      ],
+      "recommendation": "Option 2. The chart's job is ranking and it already does that correctly; a two-word change stops the magnitude reading as a ceiling when it is a floor. Option 3 buys accuracy at the cost of the estimate no longer describing the building that is actually created, which is the property that makes it verifiable against economy_system.",
+      "files": ["src/ui/selection_panel.cpp", "src/world/building_profit.cpp"],
+      "resolution": null
+    },
+    {
+      "id": "NR-002",
+      "title": "The header reads \"/ qtr\" while the ledger beside it reads \"/ tick\" — GLOSSARY defines Tick and does not define qtr",
+      "raised": "2026-08-01",
+      "kind": "observation",
+      "status": "open",
+      "source": "Noticed while inspecting the BL-162 goldens",
+      "what": "The app header prints NET +3.2k / qtr. The construction ledger, the Selection band's profitability read, and draw_building_profit all print / tick. GLOSSARY.md defines Tick ('the fixed period between economy updates'); 'qtr' is not a defined term.",
+      "why_it_matters": "The standing rules say that if a term is defined in GLOSSARY, do not substitute an alternative. This is a live violation sitting a few inches from figures that get it right, on the screen a new player reads first. It is also pre-existing and entirely outside BL-162's scope, which is why it was flagged rather than fixed — changing a header figure's units is a call about what the header is FOR, not a typo.",
+      "options": [
+        "Change the header to / tick, matching every other surface and the glossary.",
+        "Keep / qtr and define Quarter in GLOSSARY as a real term, if the header is deliberately reporting a different (longer) period than a tick.",
+        "Leave it; accept the inconsistency."
+      ],
+      "recommendation": "Needs your intent before anyone acts. If the header genuinely aggregates over a quarter then it is reporting a different quantity and option 2 is right; if it is just an older label for the same per-tick figure, option 1. Worth checking which it actually computes before choosing — I did not verify that, only the labels.",
+      "files": ["src/core/app.cpp", "docs/GLOSSARY.md"],
+      "resolution": null
+    },
+    {
+      "id": "NR-003",
+      "title": "A payback faster than one tick prints \"payback ~0 ticks\", which reads as free rather than immediate",
+      "raised": "2026-08-01",
+      "kind": "observation",
+      "status": "open",
+      "source": "BL-162 — visible in the blessed golden tile_build_ledger_land",
+      "what": "Extraction: Agricultural Produce shows '686 cr - payback ~0 ticks' (capex 686, net +1243/tick, so true payback ~0.55 ticks). The integer format rounds it to 0.",
+      "why_it_matters": "Cosmetic, but '~0 ticks' is the one value in the row that could be read as an error or as 'costs nothing'. The intended meaning — it pays for itself inside the first tick — is stronger than what it prints.",
+      "options": [
+        "Floor the display at 1 ('payback ~1 tick').",
+        "Special-case sub-tick paybacks with wording, e.g. 'pays back within 1 tick'.",
+        "Leave it."
+      ],
+      "recommendation": "Option 2 if the wording fits the row width, otherwise option 1. Either is a one-line change; it is here rather than in the backlog because it is too small to file and too easy to lose.",
+      "files": ["src/ui/selection_panel.cpp"],
+      "resolution": null
+    },
+    {
+      "id": "NR-004",
+      "title": "Should non-home bodies have markets at campaign start? Today none do, and it makes inter-body trade unrepresentable",
+      "raised": "2026-08-01",
+      "kind": "question",
+      "status": "open",
+      "source": "BL-254 (data-creep convoy scenario) — reported by the harness itself",
+      "what": "The generated world seeds all six markets on the single tiled body (Kepler). A trade_route is body-level, so intra-body lanes record nothing — meaning the generated world CANNOT record a trade route however long it runs, regardless of the launchpad gate. The data-creep harness had to author three stub markets pre-run to give its convoy lanes endpoints at all. This is a second, independent cause of the blind spot BL-254 was filed for; the filed item only named the launchpad gate.",
+      "why_it_matters": "This is not a harness problem, it is a world-premise question. If no other body has a market at start, then inter-body trade — one of the two pillars every system is supposed to feed — has no destination on turn one, and the activity fog (BL-089), persistent trade routes (BL-088) and the supply lens all describe machinery with nothing to act on yet. It may well be intended (Era 0 is terrestrial; space access is gated), in which case it should be stated somewhere rather than being an emergent property of market seeding.",
+      "options": [
+        "Intended — Era 0 has no off-world markets by design; record it in ERAS.md / MARKETS.md so it stops looking like an omission.",
+        "Seed a minimal market on at least one other body at start, so the inter-body machinery has a destination from turn one.",
+        "Neither yet — revisit when the Era 1 transition is actually built."
+      ],
+      "recommendation": "Option 1 or 3 on current evidence — this looks intended rather than broken, given Era 0 is explicitly terrestrial. But it is worth writing down either way: an instrument had to work around it, which is the signal that the premise is undocumented rather than merely unimplemented.",
+      "files": ["docs/economy/MARKETS.md", "docs/economy/ERAS.md", "src/world/hard_coded_world.cpp"],
+      "resolution": null
+    },
+    {
+      "id": "NR-005",
+      "title": "BL-256 (generation globe): which fidelity tier, and is running the continents pass in the wizard preview affordable?",
+      "raised": "2026-08-01",
+      "kind": "question",
+      "status": "open",
+      "source": "BL-256, filed 2026-08-01",
+      "what": "The wizard preview runs the planetology chain only (resolve_preferences + preview_system), so at wizard time there is no height field, no ocean mask and no terrain for a map-like globe to sample. The item is written with two tiers: Tier 1 a characterisation globe from the planetology scalars, Tier 2 a real-landmass globe that also runs the deterministic continents pass plus enough of tile Pass 1 to get a height/ocean field.",
+      "why_it_matters": "Tier 2 is the one you actually asked for — the planet you are about to play. But the preview re-runs on EVERY control move, and the continents pass is the expensive half, so Tier 2 may not be affordable per-move. The cost has not been measured yet; the item says to measure before adopting.",
+      "options": [
+        "Build both tiers as filed, measure Tier 2's cost, and fall back to a short debounce if it is too slow per-move.",
+        "Tier 1 only for now — cheap, always available, and honest for the early rounds where landmass genuinely is not decided.",
+        "Tier 2 only — skip the characterisation globe and accept that the globe appears later in the wizard."
+      ],
+      "recommendation": "Option 1 as filed. The reason to keep Tier 1 even if Tier 2 proves cheap is that the early rounds genuinely have not decided the landmass, and showing invented continents there would be the generation equivalent of a lying figure. The item requires the tier be captioned so the player knows which they are looking at.",
+      "files": ["docs/development/backlog.json"],
+      "resolution": null
+    },
+    {
+      "id": "NR-006",
+      "title": "BL-257 (generated body names): which naming register?",
+      "raised": "2026-08-01",
+      "kind": "question",
+      "status": "open",
+      "source": "BL-257, filed 2026-08-01 — the item's one genuinely open design call",
+      "what": "The current five bodies mix three registers: mythological (Helios, Selene), descriptive (Cinder) and scientist-eponym (Kepler). A generated pool has to pick deliberately, because a pool drawn at random from all three reads as noise rather than as a naming convention.",
+      "why_it_matters": "This is the half of BL-257 that determines whether the result reads as a real system or a shuffle, and it is taste, not engineering. The other half (moving identity off the display string) is unambiguous and can proceed without this answer.",
+      "options": [
+        "Mythological — consistent with Helios/Selene, reads classical and matches the near-future-corporate tone by contrast.",
+        "Scientist-eponym — consistent with Kepler; reads as a surveyed, catalogued system, which fits a corporate 4X.",
+        "Descriptive — consistent with Cinder; names describe the body, which doubles as player information.",
+        "A deliberate MIX with a rule (e.g. planets mythological, moons descriptive), so the mixing is legible rather than random."
+      ],
+      "recommendation": "Option 4 is the deepest and probably the most characterful — a rule the player can half-perceive reads as a world with a history of being named, rather than a bag drawn from. But this is squarely your call; the item is written so the pool can be swapped without touching the identity work.",
+      "files": ["docs/development/backlog.json"],
+      "resolution": null
+    },
+    {
+      "id": "NR-007",
+      "title": "Decisions taken on your behalf 2026-08-01, each reversible",
+      "raised": "2026-08-01",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "Session 2026-08-01 (v0.1.0 cut set completion)",
+      "what": "Four calls were made so work could continue. Each is recorded so it can be overturned rather than becoming precedent by default. (1) The Windows ai_skill_harness bands were RE-BLESSED. BL-252 said not to re-bless before knowing which cause was at work; the diagnostic established staleness, so this was the sanctioned action, but it is still a bless nobody reviewed. (2) The four tile_build_ledger goldens were re-blessed on Windows after inspection. (3) BL-162's requirement R7 had its 'visual' verification leg REMOVED, because this item staled that golden by construction and a row must not read complete on a red leg — the code and headless legs stand alone. (4) ctest timeout tiers were set at 60s default / 120s for three named long-runners, chosen against measured Debug runtimes.",
+      "why_it_matters": "Re-blessing is routine per the standing convention, but two of these blesses moved a baseline that no human has looked at since, and the third quietly narrowed what a requirement claims to verify. None is hard to reverse; all are easy to forget.",
+      "options": [],
+      "recommendation": "No action needed unless you disagree. One value is worth your eye: data_creep_harness now runs 42.95 s in a Debug build against its 120 s timeout — 2.8x headroom, below the >=3x the tier was sized for, because BL-254 added 1500 seeded convoys after that sizing. It passes comfortably and is nowhere near hang territory, so nothing was changed; it is the value that would want revisiting if that rollout grows again.",
+      "files": ["tools/verify/ai_skill_harness.cpp", "scripts/verify/golden/", "docs/development/req/requirements.json", "CMakeLists.txt"],
+      "resolution": null
+    },
+    {
+      "id": "NR-008",
+      "title": "backlog_lint's two standing warnings are pre-existing and nobody owns them",
+      "raised": "2026-08-01",
+      "kind": "observation",
+      "status": "open",
+      "source": "backlog_lint, every run this session",
+      "what": "Two warnings survive every clean run: BL-114's requirement group is marked complete while row R3 is still pending, and BL-190's group is complete while the item itself is still status 'designed' (it should be terminal). Both predate this session and neither is a fail.",
+      "why_it_matters": "A lint that always prints the same two warnings trains everyone to skim past the warning section, which is where a real new warning will appear. That is the same failure mode as a permanently-red test.",
+      "options": [
+        "Resolve both — flip BL-190 terminal, and back-fill or explicitly note BL-114 R3.",
+        "Suppress them with a recorded justification, so the warning list returns to empty.",
+        "Leave them."
+      ],
+      "recommendation": "Option 1, as a five-minute cleanup by whoever next touches the backlog tooling. They were left alone this session because both belong to other people's items and flipping someone else's status silently is worse than the warning.",
+      "files": ["docs/development/backlog.json", "docs/development/req/requirements.json"],
+      "resolution": null
+    }
+  ]
+}

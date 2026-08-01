@@ -187,6 +187,7 @@ backlog**, or **B) implement now** (smoke-test, then ask before committing).
 | Backlog **design prose** for an open item | `docs/development/backlog.json` (`design` field) | Design authority *while the item is open*; `BACKLOG.md` is drained (pointer stubs only, 2026-07-31). |
 | **Active worklist** (promoted tasks) | `docs/development/REFINED.md` | Transient; empty between work blocks. |
 | **Blocker triage** (items awaiting a UI/visual artifact from Ben) | `docs/development/review.json` | Companion to the backlog, not a replacement — see its own `_note`. |
+| **Ben's review queue** (open questions + decisions taken on his behalf) | `docs/development/NEEDS_REVIEW.json` (view: `NEEDS_REVIEW.md`) | Not work and not blocking. **Append here rather than dropping a judgement call** — especially a `decision-taken`, since an unrecorded delegated decision is indistinguishable from one Ben made. |
 | **Player-intent coverage** (user stories) | `docs/development/user_stories.json` (view: `USER_STORIES.md`) | The second route — intent axis; companion to the backlog, consumed by BL-098's review. |
 | **Method** (lifecycle, depth verbs, batch, worktrees) | `docs/development/DELIVERY.md` | The long-form of this section. |
 | **Requirements** (data + history) | `docs/development/req/requirements.json` (policy `docs/development/req/REQUIREMENTS.md`) | |

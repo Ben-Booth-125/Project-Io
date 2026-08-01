@@ -16,7 +16,9 @@
     "backlog.json as normal and remove it from this file (or mark 'resolved').",
     "",
     "SEEDED 2026-07-28, EMPTY: Ben asked for this file to exist; which items",
-    "actually belong here is still his call, not populated yet."
+    "actually belong here is still his call, not populated yet.",
+    "",
+    "NOT THE SAME AS NEEDS_REVIEW.json (added 2026-08-01). This file is for work that is BLOCKED on a visual artifact only Ben can produce. NEEDS_REVIEW.json is for open questions and for decisions taken on Ben's behalf — neither of which blocks anything. If an entry there turns out to need a mockup, move it here."
   ],
   "items": []
 }
