@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*20 entries — 1 open, 19 resolved.*
+*21 entries — 2 open, 19 resolved.*
 
 ---
 
@@ -43,6 +43,21 @@ With the per-tile table removed, the tab labelled "Tiles" holds two things: a bu
 > **Recommendation:** Option 2 reads best to me and is worth your eye rather than my call. Story and Chain both answer "how did this world come to be"; a current-state view has never belonged in a HISTORY ledger, and both its sections have better homes that already exist. That would also retire the history_tiles fold surface and simplify drill_through_fold.lua, which currently uses this table as its example of the fold’s biggest win.
 
 *Files: `src/ui/tile_inspector.cpp`, `scripts/verify/drill_through_fold.lua`, `scripts/verify/history_ledger_and_comms.lua`*
+
+### NR-021 — BL-217/218/219 were silently lost from backlog.json by a stale-base merge, and have been restored
+*decision taken on your behalf · raised 2026-08-02 · from Found while ordering the design-owed items for the batch-delivery design pass, 2026-08-02*
+
+SPRINTS.md § Sprint 2 records that BL-210 was split into BL-217 (checkpoint/branch data model), BL-218 (Nations rewrite) and BL-219 (Corporations rewrite), and BL-210’s own design prose still names all three as its decomposition. None of the three existed in backlog.json — the id sequence jumped 216 → 220. Tracing the file’s history: the three items were filed at 18c86c0 (2026-07-29), survived through 8542e4b (2026-07-31), and are absent from eaa0d23 (“On sync/origin-main-20260731: wip before Sprint3 merge”) onward. I recovered all three objects verbatim from 8542e4b and re-inserted them ahead of BL-220. Purely additive (+76 lines); backlog_lint clean; design prose intact (2082 / 2630 / 2315 chars).
+
+**Why it matters.** This is the stale-base worktree revert pattern, not a deliberate retirement — no commit message mentions removing them, and every surviving document still refers to them as live. Three design-owed items disappearing silently means a whole sprint’s decomposition evaporated while the docs claimed it existed; BL-210 would have been re-decomposed from scratch. Worth knowing that the same merge may have dropped other rows: I verified only the 216→220 gap, not the whole file against its history. A full row-level audit of backlog.json against eaa0d23’s parents is the thorough version and is not done.
+
+- Accept the restoration as-is (what I did).
+- Accept, and additionally run a full row-level audit of backlog.json against the pre-eaa0d23 tree to find any other rows the same merge dropped.
+- Reject — the three were meant to be retired, in which case BL-210’s design prose and SPRINTS.md § Sprint 2 both need correcting instead.
+
+> **Recommendation:** Option 2. The restoration itself is safe and clearly right — nothing in the corpus argues these were retired on purpose. But a merge that dropped three consecutive rows without comment is unlikely to have dropped exactly three, and the check is cheap next to discovering a fourth loss months from now. Note this is the second instance of the hazard; the parallel-worktree coherence guidance in DELIVERY.md exists because of the first.
+
+*Files: `docs/development/backlog.json`, `docs/development/SPRINTS.md`*
 
 ---
 
