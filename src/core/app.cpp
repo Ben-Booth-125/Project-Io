@@ -1419,6 +1419,43 @@ int app::run_verify(const std::string& script_path, bool bless)
         m_ui.selection_hidden_for = m_ui.selected_entity;
     });
 
+    // Press the construction ledger's Build button on the CURRENT tile selection
+    // (verify harness). Writes exactly the fields draw_construction_ledger's button
+    // writes — pending_tile / pending_type / pending_target / pending_recipe — and
+    // nothing else, so the request drains through app::render's real construct_building
+    // path on the next frame, including the BL-162 rule that the ledger survives the
+    // build it initiated. build_first_valid / build_at deliberately BYPASS this seam
+    // (they call construct_building directly and reselect the result), so neither can
+    // exercise it.
+    //
+    // @param type   "extraction" / "processing" / "port" / "launchpad" / "hub".
+    // @param target Extraction target resource name (ignored for other types).
+    // @param recipe Processing recipe name, or "" for construct_building's default.
+    v.set_function("ledger_build", [this](const std::string& type, const std::string& target,
+                                          const std::string& recipe) {
+        if (m_ui.selected_entity == null_entity || m_world.tiles.count(m_ui.selected_entity) == 0)
+        {
+            SDL_Log("verify.ledger_build: selection is not a tile");
+            return;
+        }
+        building_type bt = building_type::extraction_site;
+        if      (type == "processing") bt = building_type::processing_facility;
+        else if (type == "port")       bt = building_type::port;
+        else if (type == "launchpad")  bt = building_type::launchpad;
+        else if (type == "hub")        bt = building_type::inland_logistics_hub;
+
+        const resource_type tgt =
+            target.empty() ? resource_type::iron_ore : resource_from_name(target);
+
+        m_ui.construction.pending_tile   = m_ui.selected_entity;
+        m_ui.construction.pending_type   = bt;
+        m_ui.construction.pending_target = tgt;
+        m_ui.construction.pending_recipe =
+            recipe.empty() ? no_recipe : m_registry.recipe_id(recipe);
+        SDL_Log("verify.ledger_build: queued %s (recipe id %u) on the selected tile",
+                type.c_str(), static_cast<unsigned>(m_ui.construction.pending_recipe));
+    });
+
     // select_body picks a body by name, exactly as a single-click on the Solar /
     // Circumplanetary canvas would (sets selected_entity to the body). Lets a
     // script stage the selection-aware descend gesture (BL-165).
@@ -2858,7 +2895,7 @@ void app::render()
         const construction_result r = construct_building(
             m_world, m_registry, m_world.player_entity,
             m_ui.construction.pending_tile, m_ui.construction.pending_type,
-            m_ui.construction.pending_target, built);
+            m_ui.construction.pending_target, built, m_ui.construction.pending_recipe);
         switch (r)
         {
             case construction_result::placed:
@@ -2867,8 +2904,18 @@ void app::render()
                 // it is done — the Selection card carries the live rate / ETA / paused
                 // status from here on.
                 m_ui.construction.last_message    = "Construction started.";
-                m_ui.selected_entity              = built;        // inspect the new building
-                m_ui.selection_hidden_for         = null_entity;  // re-show the panel
+                // BL-162: the construction ledger must SURVIVE the build it initiated.
+                // Reselecting the new building makes the selection non-tile, which forces
+                // show_build_ledger false above — the ledger vanishes and the player has to
+                // reselect the tile to place a second building on it (a rich tile stacks up
+                // to 4 extraction sites). It also hid "Construction started.", which is drawn
+                // inside the ledger. So reselect only when some OTHER surface (a placement-mode
+                // canvas click) initiated the build.
+                if (!m_ui.show_build_ledger)
+                {
+                    m_ui.selected_entity      = built;        // inspect the new building
+                    m_ui.selection_hidden_for = null_entity;  // re-show the panel
+                }
                 break;
             case construction_result::invalid_tile:
                 m_ui.construction.last_message = "Can't build there."; break;
@@ -2881,7 +2928,8 @@ void app::render()
             default:
                 m_ui.construction.last_message = "Construction failed."; break;
         }
-        m_ui.construction.pending_tile = null_entity; // consume the request
+        m_ui.construction.pending_tile   = null_entity; // consume the request
+        m_ui.construction.pending_recipe = no_recipe;   // and the recipe it carried
     }
 
     // Execute any road-placement request queued this frame by the build front door's Track/Road/

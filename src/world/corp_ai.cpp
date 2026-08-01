@@ -310,6 +310,12 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             if (static_cast<int>(sites.size()) > p.top_m_sites)
                 sites.resize(static_cast<std::size_t>(p.top_m_sites));
 
+            // Known accepted divergence (BL-162): estimate_prospective_profit
+            // (world/building_profit.hpp) is the same model done properly — it takes
+            // opex through compute_building_opex, so it carries habitability-scaled
+            // wages and the depletion taper, which the inline scorer below omits.
+            // Deliberately NOT switched: it would move AI build scoring, hence world
+            // evolution, hence every blessed golden, for no player-visible gain.
             const building_economics& ex = reg.economics(building_type::extraction_site);
             for (const site& s : sites)
             {

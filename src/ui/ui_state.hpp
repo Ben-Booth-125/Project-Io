@@ -74,6 +74,12 @@ struct construction_state
     building_type pending_type   = building_type::extraction_site;
     resource_type pending_target = resource_type::iron_ore;
 
+    /// Processing recipe the request was priced on (BL-162). The construction ledger
+    /// lists one row per recipe, so the recipe the player chose has to survive to
+    /// `construct_building`; `no_recipe` (the default, and what a canvas placement
+    /// leaves) falls back to the seeded "steel". Cleared with `pending_tile`.
+    std::uint16_t pending_recipe = no_recipe;
+
     /// Pending road-placement request (BL-147 core, BL-172 tier) — set by the build front door's
     /// Track/Road/Highway affordances and executed by `app::render` via `place_road` (a road is a
     /// per-tile mutation, not a building, so it takes a distinct path from `pending_tile`).

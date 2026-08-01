@@ -8,7 +8,8 @@
 construction_result construct_building(world& w, const recipe_registry& reg,
                                        entity_id corp, entity_id tile,
                                        building_type type, resource_type target,
-                                       entity_id& out_building)
+                                       entity_id& out_building,
+                                       std::uint16_t recipe)
 {
     out_building = null_entity;
 
@@ -93,9 +94,12 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     }
     else if (type == building_type::processing_facility)
     {
-        // Seed the default recipe so a freshly built processor is productive; the
-        // player reconfigures it via building management. Mirrors app::load_economy.
-        bc.recipe = reg.recipe_id("steel");
+        // Seed the caller's recipe when one was chosen (BL-162: the construction
+        // ledger prices one row per recipe, so the built processor must run the recipe
+        // the player's bar described). Otherwise the historic default, so a freshly
+        // built processor is still productive; the player reconfigures it via building
+        // management. Mirrors app::load_economy.
+        bc.recipe = (recipe != no_recipe) ? recipe : reg.recipe_id("steel");
     }
 
     w.buildings[bld_id]  = bc;

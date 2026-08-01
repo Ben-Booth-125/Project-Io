@@ -410,6 +410,30 @@ void draw_time_series(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
     }
 }
 
+void draw_value_bar(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
+                    float value, float ceiling, ImU32 colour, const char* fmt)
+{
+    dl->AddRectFilled(mn, mx, IM_COL32(48, 50, 58, 255), 2.0f); // track
+
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), fmt, static_cast<double>(value));
+    const ImVec2 ts = ImGui::CalcTextSize(buf);
+
+    // Reserve the figure's measured width (never under 52 px) so it can be neither
+    // truncated nor collided with by the bar.
+    const float plot_w = (mx.x - mn.x) - std::max(52.0f, ts.x) - 6.0f;
+    const float frac   = (ceiling > 0.0f)
+                         ? std::clamp(std::fabs(value) / ceiling, 0.0f, 1.0f) : 0.0f;
+    // A 2 px stub at the origin when the value (or the ceiling) is zero, so zero reads
+    // as zero rather than as an absent bar.
+    const float fill_w = std::min(std::max(plot_w * frac, 2.0f), std::max(plot_w, 0.0f));
+    if (plot_w > 0.0f)
+        dl->AddRectFilled(mn, {mn.x + fill_w, mx.y}, colour, 2.0f);
+
+    dl->AddText({mx.x - ts.x, mn.y + (mx.y - mn.y - ts.y) * 0.5f},
+                IM_COL32(225, 228, 235, 255), buf);
+}
+
 void threshold_line(ImDrawList* dl, ImVec2 mn, ImVec2 mx,
                     float value, float ceiling, ImU32 colour, const char* caption)
 {

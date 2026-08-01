@@ -39,11 +39,16 @@ enum class construction_result : uint8_t
 /// @param type         Building type to construct.
 /// @param target       Extraction target (ignored for non-extraction types).
 /// @param out_building Set to the new building id on success; null_entity otherwise.
+/// @param recipe       Processing recipe to seed (BL-162). `no_recipe` (the default,
+///                     so no existing caller changes) keeps the historic "steel" seed;
+///                     the construction ledger passes the recipe its row was priced on,
+///                     so the estimate and the built building describe the same thing.
 /// @return             `placed` on success, else the reason it was refused.
 construction_result construct_building(world& w, const recipe_registry& reg,
                                        entity_id corp, entity_id tile,
                                        building_type type, resource_type target,
-                                       entity_id& out_building);
+                                       entity_id& out_building,
+                                       std::uint16_t recipe = no_recipe);
 
 /// Remove @p building from the world entirely, freeing its tile (Ben's 2026-07-22
 /// call: "how can I remove the building and build something else").
