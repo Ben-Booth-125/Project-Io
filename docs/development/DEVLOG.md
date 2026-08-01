@@ -10,6 +10,116 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## Session — the last four v0.1.0 items, and the goldens finally have one truth value (2026-08-01)
+
+**Runtime.** ~2h. Full (Batch Delivery — three worktree sub-agents, one item delivered in the main
+session, one cold review pass, two items filed from Ben's new policy, two defects filed from
+verification).
+
+**The ask.** Bring PR #28 local, understand what it sets up, then run a multi-agent session on it.
+PR #28 closed the terrain/landform strand and built the three audit instruments, leaving exactly
+four open `version_goal: v0.1.0` items. Those were the session.
+
+### Split
+
+BL-162 (tile construction ledger, reopened), BL-254 (convoy data-creep) and BL-255 (build type +
+timeouts) went to worktree agents; **BL-252 (goldens) stayed in the main session because it needed
+Windows**, and Windows is where the goldens were blessed. BL-162 went to one agent rather than two
+despite having three separable parts, because all three land in `selection_panel.cpp` — splitting
+would have bought parallelism and paid for it at the merge.
+
+### BL-252 — the item asked "which cause?", and the answer was "both"
+
+The item named two candidates and said to distinguish them before re-blessing anything. Doing so
+took three runs:
+
+1. **Windows at the same commit failed 5 assertions** — on the platform its own bands were blessed
+   on. That alone kills the pure-platform-divergence hypothesis. `git log 8542e4b..HEAD -- src/world/`
+   named the cause precisely: the bands were authored in the commit that *added* the harness, and
+   **BL-203 (Corp AI stage B)**, BL-221 and BL-233 all landed after. The AI was being scored against
+   goldens set for a different AI. So: stale, and explained.
+2. **Linux/GCC at the same commit** gave seed 0 = 395,143 against Windows' 206,245, and seed 4 =
+   182,746 against 392,148. So cross-platform divergence is real *as well*, and large.
+3. **MSVC /O2 vs MSVC Debug** — byte-identical on all five seeds. That removed the confound and
+   pinned the cause to the toolchain rather than the optimisation level. Worth the extra build; it
+   is the difference between a diagnosis and a guess.
+
+Widening the bands was then rejected **on measurement**, not assumption: one band holding both
+platforms spans ~±100% and detects nothing. Ben chose pinned-per-toolchain for headless and
+Windows-authoritative for visual — deliberately different answers, because pixel output depends on
+font rasterisation and driver as well as compiler. Both platforms now `ALL PASS`.
+
+**A defect in my own work, caught by the review:** the `#error` guarding a third toolchain did not
+catch Clang, which defines `__GNUC__`. A `clang++` build would have silently inherited GCC's bands —
+the exact outcome the comment beside it claimed was prevented.
+
+### What the instruments found, which is the point of having them
+
+- **BL-254** closed its own vacuous plateaus and then found a *second* cause of the blind spot the
+  filed item never mentioned: the generated world seeds all six markets on the single tiled body, so
+  it holds no inter-body market pair and **cannot record a trade route however long it runs**.
+  Whether non-home bodies should have markets at campaign start is now an open design question.
+- **BL-258 filed** from the integrating run: `econ_stability`'s absolute 1 ms bound fails on Windows
+  because that tree is deliberately Debug. R5 passes with 19× headroom and every growth-shape
+  assertion holds, so the fix is to gate the one absolute assertion on an optimised build and *say
+  so loudly* — following the data-creep instrument's precedent of reporting a meaningless check as
+  skipped rather than passing it. Explicitly not widening the bound, which would gut it in Release.
+
+### Two stale-base incidents, both self-reported
+
+Two of the three agents were cut from `origin/main`, which predated the batch — one lacked
+`data_creep_harness.cpp` entirely, the other lacked BL-255 itself and re-filed it, producing a
+duplicate id that `backlog_lint` caught on merge. Both agents *noticed and said so*, which is what
+made reconciliation cheap. The BL-255 agent's honest "I could not measure these three harnesses"
+caveat was replaced post-merge with real integrated numbers.
+
+### The review barrier earned its place again
+
+A cold `verifier-review` over the integrated diff returned **GO COMPILE** — it verified the moved
+estimator is token-for-token identical, all 13 `construct_building` call sites are arity-correct,
+and the recipe index really is the global registry id. Everything it *did* find was judgement, not
+compilation: the Clang hole above; a `cl` recipe in the new harness that would `LNK2019`; a
+`verify.ledger_build` hook that silently substituted steel for a typo'd recipe name, so a broken
+script would report green while proving nothing about the seam it exists to test; and two
+requirement rows justified by evidence that could not have been produced (R7 cited
+`building_component.recipe` as "already serialised" — there is no flat-binary path in `src/` at
+all; and R7 listed a visual leg that this very item staled by construction).
+
+### Goldens: the number meant something different than assumed
+
+The four owed re-blesses were inspected before blessing. `tile_build_ledger_land_select`, which has
+**no ledger open**, diffed 21.69% against the with-ledger capture's 22.04% — so only ~0.35% was
+BL-162's row change and ~21.7% was whole-canvas world-generation drift from BL-221/BL-233. Same
+root cause as the stale bands, one layer down. All four now pass at 0.0000%.
+
+### Filed from Ben's new policy
+
+**BL-256** (rotating globe on the generation screen) and **BL-257** (generated body names). Both
+carry a crux that would have bitten during implementation: the wizard preview runs the *planetology*
+chain only, so there is no height field for a globe to sample (hence two fidelity tiers); and
+several sites — `hard_coded_world.cpp:256` plus three harnesses — use a body's **display name** as
+an identity test, so randomising names without first moving identity onto the entity id breaks them
+silently.
+
+### Verification
+
+Linux/Release **35/35**. Windows **35/36** (the one failure is BL-258). Build clean, warning-clean in
+every file touched. `backlog_lint`: 0 fails, 2 warnings, both pre-existing. Visual: the four
+tile-build-ledger goldens re-blessed and passing; `tile_build_ledger_survives` confirms two
+consecutive builds from one ledger, with "Construction started." visible for the first time.
+
+### Open for Ben
+
+- The ledger caption says "50% staffing", but `workforce_auto` defaults on for the player's corp and
+  auto-solves the dial on the first tick — realised extraction measured **2× the estimate**. Honest
+  for the moment it is shown; should the caption say it is a floor?
+- The header reads `NET +3.2k / qtr` while the ledger reads `/ tick`. GLOSSARY defines **Tick** and
+  does not define "qtr". Pre-existing and outside BL-162's scope, but it is a standing-rule
+  violation sitting two inches from a figure that gets it right.
+- Sub-tick paybacks print `payback ~0 ticks`, which reads as "free" rather than "immediate".
+
+---
+
 ## Session — closing the v0.1.0 cut set: terrain combat, font glyphs, and the three audit instruments (2026-07-31)
 
 **Runtime.** ~3h. Full (Batch Delivery — four worktree sub-agents, two items delivered in the main

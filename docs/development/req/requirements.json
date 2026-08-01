@@ -7298,7 +7298,7 @@
           ],
           "status": "complete",
           "result_metric": "Declared Windows-authoritative (Ben's call): blessed and diffed on Windows only; Linux captures inspected by eye, never golden-diffed. Rationale recorded — pixel output depends on font rasterisation and GPU/driver, so a per-platform pin would force a re-bless on every driver update for no detection gain.",
-          "notes": "Still owed and deliberately outside this item: the four scripts/verify/*.lua goldens made stale by BL-162 row-anatomy changes need re-blessing on Windows."
+          "notes": "The owed re-bless was completed in the same session: the four tile_build_ledger goldens were inspected, re-blessed on Windows, and now pass at 0.0000%. The inspection reframed the number — the no-ledger capture diffed 21.69% against the with-ledger 22.04%, so ~21.7% was world-generation drift (BL-221/BL-233) and only ~0.35% was the BL-162 row change."
         }
       ]
     }

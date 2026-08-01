@@ -153,10 +153,35 @@ named here from the start but never itemised, so nothing owned them. Results:
   **vacuously**, and `trade_route` is never-erased by construction — filed as **BL-254**, which is
   a v0.1.0 item because it closes a hole in a cut gate.
 
-**Still owed before the cut:** BL-254 (convoy-exercising data-creep scenario), the frame-budget
-targets measured against the real app, and **BL-252** — the goldens are Windows-blessed, so the
-suite cannot be green on Windows and Linux at once and "headless harnesses green" below has no
-single truth value until that policy is settled.
+**The four remaining v0.1.0 items all landed 2026-08-01**, which leaves the cut gate itself in
+a state it has not been in before: *the suite is green on both platforms at the same commit.*
+
+- **BL-254** (convoy data-creep scenario) — the three vacuous plateaus now bind. Convoys drain
+  (1500 seeded, 1496 credited and retired), trade routes saturate at their structural bound of 18
+  by tick 36 and hold flat for the remaining 1464, glimpse stamps are overwritten in place. It
+  surfaced a second cause of its own blind spot, independent of the launchpad gate: the generated
+  world seeds every market on the single tiled body, so it holds no inter-body pair and cannot
+  record a route at all. **Whether non-home bodies should have markets at campaign start is an open
+  design question** this item deliberately did not settle.
+- **BL-252** (goldens) — both candidate causes turned out to be real. The bands were stale (blessed
+  in the commit that added the harness, before BL-203 rewrote the Corp AI) *and* cross-platform
+  divergence is genuine (seed 4 finals at 392,148 under MSVC, 182,746 under GCC). Widening was
+  measured and rejected — one band holding both spans ~±100%. Headless bands are now **pinned per
+  toolchain**; visual goldens are **Windows-authoritative** (DEVELOPMENT_PRACTICES.md §
+  Cross-platform goldens). Optimisation level was excluded as a cause: MSVC /O2 reproduces MSVC
+  Debug value for value.
+- **BL-255** (build type + timeouts) and **BL-162** (tile construction ledger, reopened by review
+  and now complete: world-layer estimator, per-recipe rows, ledger survives a build).
+
+**"Headless harnesses green" now has a single truth value.** Linux/Release **35/35**;
+Windows **35/36**, the one failure being `econ_stability`'s absolute 1 ms tick bound at the largest
+swept rung — filed as **BL-258**, and a build-configuration artefact rather than a regression: the
+Windows tree is deliberately Debug, R5 still passes with 19× headroom, and every growth-shape
+assertion holds.
+
+**Still owed before the cut:** **BL-258** (gate the absolute timing bound on an optimised build),
+and the **frame-budget targets measured against the real app** — headless capture has no vsync and
+no real present, so its numbers cannot speak to them. That last one needs a human at the keyboard.
 
 Plus hygiene: warning-clean build, one-off static-analysis (cppcheck), headless harnesses green.
 Final verification pass against the done-definition below, then the Cut.
