@@ -11,6 +11,23 @@ is how a new headless check becomes a permanent, reusable asset.
 
 Compile and run from the repo root, after sourcing the VS BuildTools `vcvars64`.
 
+**Prefer the CMake target where one exists.** The hand-written `cl` recipes below name their
+translation units explicitly, and that list **drifts stale as `world/*` grows** — a harness that
+link-fails with `LNK2019` usually needs a TU added here, not a code fix (grep `src/world/*.cpp`
+for the unresolved symbol's definition). The CMake tree cannot drift, because it globs:
+
+```bat
+cmake --build build --target <harness_name>
+.\build\<harness_name>.exe
+```
+
+Use that route for anything linking the world superset — `world_audit`, `ai_skill_harness`,
+`history_ladder_harness`, `data_creep_harness`, `corp_terrain_matrix` — and for
+`font_glyph_harness`, which links ImGui and is hand-declared in `CMakeLists.txt` above the glob.
+Those five have deliberately **no** `cl` recipe below: writing one would be inventing a TU list
+with a short shelf life. The recipes that remain are the small, stable-link harnesses where the
+`cl` line is genuinely quicker than a CMake configure.
+
 **Output goes to `build_gen\verify\` — never `%TEMP%`, never the repo root.** Every recipe below
 passes both `/Fe:` (exe) and `/Fo:` (objects, trailing `\` required); `cl` defaults both to the
 current directory, so dropping either scatters artifacts across the tree. Keep the harness's

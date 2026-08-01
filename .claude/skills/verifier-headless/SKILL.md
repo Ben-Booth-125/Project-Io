@@ -44,9 +44,20 @@ in `tools/verify/README.md`.
   between the mid and final sample rather than climbing. When one climbs it *names the
   structure* — that naming is the instrument. Links the world superset (as `world_audit`).
   **Read its COVERAGE section, not just the verdict:** counters never exercised by the
-  rollout are declared **vacuous** rather than reported as passing, and today the convoy /
-  trade-route / glimpse plateaus are exactly that (BL-254). Slowest harness in the tier
-  at ~7 s.
+  rollout are declared **vacuous** rather than reported as passing. The convoy /
+  trade-route / glimpse plateaus **were** exactly that until BL-254 (2026-08-01) drove
+  convoy traffic through the rollout; they now bind, and R4 fails the run outright if
+  those three structures are ever un-exercised again, so the vacuous green pass cannot
+  come back silently. All three plateau: convoys hold steady and drain (1500 seeded,
+  1496 credited and retired), trade routes saturate at their structural bound of 18 by
+  tick 36 and stay flat for the remaining 1464, glimpse stamps are overwritten in place.
+  A `STILL UNEXERCISED` block names what the rollout genuinely does not touch —
+  `dispatch_convoys` auto-dispatch never fires, so what is under test is the credit /
+  upsert / retire path, not the dispatch decision. It also reports a **second** cause of
+  the original blind spot, independent of the launchpad gate: the generated world seeds
+  every market on the single tiled body, so it holds no inter-body market pair and cannot
+  record a trade route at all without the stub markets the harness authors pre-run.
+  Slowest harness in the tier at ~7 s.
 - **`font_glyph_harness`** — font glyph-range guard (BL-234). The one harness here that
   links **ImGui** rather than `world/*`: the defect it guards lives in the `ImFontConfig`
   handed to `AddFontFromFileTTF` in `src/ui/fonts.cpp`. It still links no SDL and no Lua —
