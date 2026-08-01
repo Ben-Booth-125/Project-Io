@@ -82,6 +82,19 @@ void draw_tile_inspector(const world& w, ui_state& s,
     nav_button("Chain", view_chain, view, p_open);
     ImGui::SameLine();
     nav_button("Tiles", view_tiles, view, p_open);
+
+    // The view-level fold control (BL-214). Story and Tiles are single blocks, so
+    // the chevron gives the whole view the screen — which is the honest fix for the
+    // Tiles table, whose 29 columns have always overflowed a 380 px column. Chain
+    // does NOT take one: its stages carry their own, and a second control governing
+    // all four at once would re-merge what the per-stage fold separates.
+    if (view != view_chain)
+    {
+        ImGui::SameLine(ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX()
+                        - ImGui::GetFrameHeight());
+        fold_chevron(s, (view == view_story) ? detail_surface::history_story
+                                             : detail_surface::history_tiles, 0);
+    }
     ImGui::Separator();
 
     const body_component& sel_body = w.bodies.at(selected_body);
@@ -127,12 +140,15 @@ void draw_tile_inspector(const world& w, ui_state& s,
     // ("generation history, not a live event log").
     if (view == view_story)
     {
-        if (!entry || entry->state.history.empty())
-        {
-            ImGui::TextDisabled("No recorded history for this body.");
-        }
-        else
-        {
+        // Drawn into whichever host is active — the column at rest, the full-screen
+        // overlay when expanded — rather than twice. One body, two hosts, so the two
+        // cannot show different things.
+        auto story_body = [&]() {
+            if (!entry || entry->state.history.empty())
+            {
+                ImGui::TextDisabled("No recorded history for this body.");
+                return;
+            }
             ImGui::TextDisabled("%s - %s to present",
                 archetype_name(entry->state.archetype),
                 format_history_date(entry->state.history.front().years_before_epoch).c_str());
@@ -154,6 +170,16 @@ void draw_tile_inspector(const world& w, ui_state& s,
                     ImGui::Unindent();
                 }
             }
+        };
+
+        if (ui::fold_overlay_begin(s, detail_surface::history_story, 0, sel_body.name.c_str()))
+        {
+            story_body();
+            ui::fold_overlay_end(s);
+        }
+        else
+        {
+            story_body();
         }
         ui::foldout_end();
         return;
@@ -204,25 +230,15 @@ void draw_tile_inspector(const world& w, ui_state& s,
         const ui::generation_chart_source src{
             chart_bodies.data(), chart_bodies.size(), home };
 
+        // Each stage rests as its verdict line and expands full screen (BL-214).
+        // This replaces the per-stage CollapsingHeader, which was this surface's own
+        // private disclosure idiom — the fourth one the item exists to retire. It
+        // also fixes what the accordion could not: four stages of charts never fit
+        // this 380 px column, so "open" here always meant "scroll", while the
+        // overlay gives every chart the width it was drawn for.
         for (int si = static_cast<int>(cr.first); si <= static_cast<int>(cr.last); ++si)
-        {
-            const chain_stage stage = static_cast<chain_stage>(si);
-            // Name only in the header: the column truncates anything longer, and a
-            // half-shown question ("What did this nebula have to...") is worse than
-            // none. The question is restated in full inside the open section.
-            const char* head = chain_stage_name(stage);
-            // Only the round's first stage opens by default: the column is narrow,
-            // and four expanded stages is a scroll rather than a read.
-            const ImGuiTreeNodeFlags flags =
-                (si == static_cast<int>(cr.first)) ? ImGuiTreeNodeFlags_DefaultOpen : 0;
-            ImGui::PushID(si);
-            if (ImGui::CollapsingHeader(head, flags))
-            {
-                ImGui::TextWrapped("%s", chain_stage_title(stage));
-                ui::draw_stage_charts(src, stage, false);
-            }
-            ImGui::PopID();
-        }
+            ui::draw_stage_fold(src, static_cast<chain_stage>(si), s,
+                                detail_surface::history_chain);
 
         ui::foldout_end();
         return;
@@ -231,6 +247,14 @@ void draw_tile_inspector(const world& w, ui_state& s,
     // --- Tiles: what the chain left on the ground ---
     // Section comment: columns map 1:1 to tile_component fields so this
     // table doubles as the specification for the production tile canvas.
+    //
+    // Expanding (BL-214) opens the overlay HERE, so everything below draws into the
+    // full screen instead of the column without being restated. This view is the
+    // one the fold helps most: 6 + 23 columns have never fitted a 380 px ledger, so
+    // the horizontal scroll was permanent rather than exceptional.
+    const bool tiles_full =
+        ui::fold_overlay_begin(s, detail_surface::history_tiles, 0, sel_body.name.c_str());
+
     constexpr ImGuiTableFlags table_flags =
         ImGuiTableFlags_BordersOuter  |
         ImGuiTableFlags_BordersInnerV |
@@ -376,6 +400,8 @@ void draw_tile_inspector(const world& w, ui_state& s,
     if (!any_market)
         ImGui::TextDisabled("No market.");
 
+    if (tiles_full)
+        ui::fold_overlay_end(s);
     ui::foldout_end();
 }
 

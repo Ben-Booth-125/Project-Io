@@ -55,6 +55,18 @@ ProjectIo --verify scripts/verify/<name>.lua
 
 - **Deterministic:** fixed window size, seeded world (`make_hard_coded_world`), sim
   paused — so a captured frame is reproducible.
+- **Settle before you capture — use `shot(name)`, not `verify.capture(name)`.**
+  `verify.capture` composites **exactly one** frame, while ImGui settles auto-layout
+  over the following frame or two: a child's content region, a table's column widths
+  and a fresh window's scroll state are all *provisional* on the frame they first
+  appear. So a capture taken immediately after a window opens, a ledger view switches,
+  or a layout changes records a **half-laid-out frame**. `shot(name, frames)`
+  (`scripts/verify/lib.lua`, auto-loaded) renders settle frames first.
+  The trap is that the unsettled frame is **deterministic**: it blesses cleanly and
+  re-passes at 0.0000% forever, so a stable golden of the *wrong picture* is never
+  flagged by anything. Found 2026-08-01 (Ben) — four of ten BL-214 fold captures moved
+  once settled. A bare `verify.capture` is still correct for a capture taken with no
+  preceding state change.
 - **Driver:** the script drives view and overlay state through the `verify` Lua API
   (`goto_surface`, `set_overlay`, `set_zoom`, `set_pan`, `add_pan`,
   `center_tile(col,row[,zoom])`, `command(name)`, `capture`, `buildings`,

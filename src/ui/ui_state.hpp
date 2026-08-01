@@ -1,5 +1,6 @@
 #pragma once
 
+#include "detail_level.hpp"     // fold_state — the drill-through disclosure target (BL-214)
 #include "world/components.hpp" // building_type / resource_type / sell_order
 #include "world/entity.hpp"
 
@@ -176,6 +177,26 @@ struct ui_state
     /// History ledger: 0=Story (the body's biography), 1=Chain (the generation
     /// charts), 2=Tiles (the tile/building/market tables). BL-211.
     int  history_view = 0;
+
+    // --- drill-through disclosure (BL-214 / BL-247) ---
+    // The one idiom every dense surface obeys: folded (a verdict line + a chevron)
+    // or expanded (a full-screen overlay showing everything at once). Because
+    // expanded IS an overlay, only one thing can be expanded at a time, so this is a
+    // single target rather than a level per surface. VIEW state — not serialised,
+    // and deliberately not remembered: which card was last open is a display
+    // preference, not something to restore. See ui/detail_level.hpp.
+    fold_state expanded{};
+
+    /// Which row of the expanded Corporation-dashboard roll-up is drilled into
+    /// (BL-248); -1 = the roll-up itself. One index is enough because only one card
+    /// can be expanded at a time, and a drill can only be reached from inside an
+    /// expanded card. Cleared whenever a card folds.
+    int        corp_rollup_drill = -1;
+
+    /// The one open "why this chart" note (BL-247), by ImGui id; 0 = none open.
+    /// Reset by ui::expand / ui::fold, so a note never survives into a view the
+    /// player has just opened — it is meant to be read once.
+    ImGuiID    why_note_open = 0;
 
     /// Within the History ledger's Chain view, which chain round's stages are
     /// listed (0..chain_round_count-1). Held here rather than as a function-local

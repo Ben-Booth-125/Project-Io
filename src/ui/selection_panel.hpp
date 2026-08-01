@@ -5,7 +5,46 @@
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
 
+#include <string>
+#include <vector>
+
 namespace ui {
+
+/// One page of the tile Selection band's metric accordion — a single comparable
+/// figure for the selected tile against a reference (the top-decile tile for a
+/// deposited resource, the body average for habitability / hazard).
+///
+/// Extracted from `draw_tile_selection` (BL-214) so the in-band chart and the
+/// full-screen fold overlay chart the *same* page rather than two lists built by
+/// imitation. The pager index into a `tile_metrics` vector is also the fold key,
+/// which is what makes "expand THIS metric" addressable.
+struct tile_metric
+{
+    std::string label;
+    float       tile_val  = 0.0f;
+    float       ref_val   = 0.0f;
+    const char* ref_label = "";
+    float       ceiling   = 1.0f;
+    int         resource_index = -1; ///< -1 = not drillable (no time-series history kept).
+};
+
+/// Every metric page for @p tile, in pager order: each deposited resource, then the
+/// tile's own habitability and hazard. Empty when @p tile is not a tile.
+std::vector<tile_metric> tile_metrics(const world& w, entity_id tile);
+
+/// Draw one metric page's clustered two-column chart into [@p mn, @p mx]. Shared by
+/// the in-band accordion and the fold overlay, so the two cannot drift apart.
+void draw_tile_metric_chart(ImDrawList* dl, ImVec2 mn, ImVec2 mx, const tile_metric& m);
+
+/// Per-building profitability readout (BL-074) — the building's estimated net
+/// per-tick contribution and the lines that make it up.
+///
+/// Declared here (it was previously an undeclared file-local definition) so the
+/// Corporation dashboard's Production drill can show a building's economics through
+/// the SAME builder the Selection band uses, rather than re-deriving the same sums
+/// a second time and letting the two answers drift.
+void draw_building_profit(const world& w, const recipe_registry& reg,
+                          const economy_report& report, entity_id id);
 
 /// Draw the **Selection content** — the polymorphic detail of the current
 /// selection (ui_state::selected_entity), emitted into whatever window the caller

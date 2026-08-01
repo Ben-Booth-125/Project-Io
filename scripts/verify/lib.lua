@@ -8,6 +8,24 @@
 -- script with hand-computed pans. See docs/development/DEVELOPMENT_PRACTICES.md
 -- § Visual verification.
 
+-- Settle, then capture. Use this instead of a bare `verify.capture` after anything
+-- that OPENS or RESIZES a window, switches a ledger view, or changes a layout.
+--
+-- Why (Ben, 2026-08-01, from a real miss): `verify.capture` composites exactly ONE
+-- frame, while ImGui settles auto-layout over the following frame or two — a child's
+-- content region, a table's column widths and a fresh window's scroll state are all
+-- provisional on the frame they first appear. Capturing immediately therefore records
+-- a half-laid-out frame, and because that frame is *deterministic* it blesses and
+-- re-passes at 0.0000% forever: a stable golden of the wrong picture. Four of the ten
+-- BL-214 fold captures moved once settled, which is how this was found.
+--
+--   name   : capture name, as verify.capture.
+--   frames : optional settle frames before the shot (default 4).
+function shot(name, frames)
+    verify.frames(frames or 4)
+    verify.capture(name)
+end
+
 -- Frame a Planetary tile: set the zoom and centre the tile using the canvas's own
 -- transform (verify.center_tile). Replaces the hand-computed
 -- pan = (grid_centre - tile_local) * zoom that early scripts carried.

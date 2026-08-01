@@ -39,45 +39,126 @@ focused agents, not a hard disjointness gate. Agents build and commit on their o
 worktree branch; the integrating session merges, builds, and verifies. See
 [`DELIVERY.md`](DELIVERY.md) § Sub-agents & worktrees for the authoritative model.
 
-## Landform render (promoted from backlog.json § BL-231) — **COMPLETE**
+---
 
-All six tasks landed 2026-07-31. Build clean, **CTest 29/29** (determinism intact),
-`world_audit` S3 PASS, `landform_relief.lua` 7 captures blessed. Requirements
-`requirements.json § landform-render` R1–R4 all complete. Per-item detail and the
-measured distribution: backlog.json BL-231 `resolution`, TILES.md § Implementation note.
-Follow-up raised by Ben on delivery — bridge contiguous landform runs into one spanning
-marker — filed separately rather than folded in. Summary retained one cycle.
+# The disclosure spine (2026-08-01) — **COMPLETE**
 
-Requirements: requirements.json § landform-render (R1–R4).
-Goal: draw the landform axis. `terrain_colour` keys on composition only, so six of seven
-landforms render as flat hexes — while landform drives build cost ×1.0–×2.0, hazard,
-habitability and mineral richness.
+All fifteen tasks landed. Build clean, **CTest 35/36** (the one failure is the
+pre-existing `econ_stability` Debug timing bound, BL-258 — not a regression), and
+**23 goldens blessed and passing at 0.0000%** across the three new/rewritten visual
+checks. Requirements `requirements.json` § drill-through-fold (R1–R7),
+§ chart-question-log (R1–R5), § corp-dashboard-rollups (R1–R5) are all complete.
+Per-item detail: backlog.json BL-214 / BL-247 / BL-248 `resolution`; the idiom's
+authority is now `docs/ui/LAYOUT.md` § Drill-through and `docs/ui/MENU.md` § Slot 1.
 
-**A gated everything else**, and its numbers changed the design: the measured mix is 95%
-plains+valley with every dramatic landform ≤1.5%, so there is no continuous elevation gradient
-to contour. Relief collapsed to a two-step tint (highland lift / valley sink); the glyph set
-grew from 3 to 4 (mountain, canyon, crater, rift — the ≤1.5%, cost-≥×1.3 set where an invisible
-surprise is expensive).
+Raised on delivery and **filed separately rather than absorbed**: the visual-golden
+suite has been stale since 2026-07-31 — most checks fail on *world content* (terrain,
+generated names, balances) because `src/world/` moved after the 07-30 bless and the
+visual half of the cut gate was never re-established. **BL-259**. Summary retained one
+cycle; the task detail below is the record of how the batch was decomposed.
 
-- **[1] A — Measurement gate: per-body + system landform histogram over land tiles, with an
-  every-landform-appears assertion.** Files: `tools/verify/world_audit.cpp`. Deps: foundation.
-  Satisfies: R1. **DONE** — PASS; numbers recorded in backlog.json BL-231 and requirement R1.
-- **[2] B — Four landform glyphs.** Files: `src/ui/icons.{hpp,cpp}`. Deps: A (A decides the set
-  is 4, not 3). Parallel-safe with C. Satisfies: R2.
-- **[2] C — Relief tint + contrast ink helpers; correct the false landform comment.**
-  Files: `src/ui/hex_render.{hpp,cpp}`. Deps: A. Parallel-safe with B. Satisfies: R4.
-- **[2] D — Canvas wiring: composite relief AFTER the lens tints so it survives them; draw the
-  glyph on unbuilt revealed tiles.** Files: `src/ui/body_surface_canvas.cpp`. Deps: B, C.
-  Satisfies: R2, R3, R4.
-- **[1] E — Docs: ICONS.md glyph rows, CANVASES.md landform-channel section, TILES.md render
-  note.** Files: `docs/ui/ICONS.md`, `docs/ui/CANVASES.md`, `docs/economy/TILES.md`. Deps: D.
-  Satisfies: authority propagation.
-- **[1] F — Visual check.** Files: `scripts/verify/landform_relief.lua`. Deps: D.
-  Satisfies: R2, R3, R4.
+Three items promoted as one Batch Delivery: **BL-214** (drill-through idiom) →
+**BL-247** (chart question log) → **BL-248** (corporation dashboard roll-ups). A
+dependency chain, not a fan-out: BL-214's shared control is the thing the other two
+call, and BL-214/BL-247 share four files. **Run main-session-serial** — worktree
+agents would collide on `generation_charts.cpp` and `selection_panel.cpp` for no
+wall-clock gain on a chain.
 
-Parallelisation note: A → {B ∥ C} → D → {E ∥ F}. Run main-session-serial — B and C are small,
-adjacent, and D integrates both immediately; worktree fan-out would cost more than the two
-small files save.
+**Two design calls taken with Ben, 2026-08-01, asked with the measurements (Rule 0b):**
+
+1. **The Selection band opens expanded-in-place.** Folding its metric card to one line
+   would leave ~220 px of a *fixed* 260 px rect empty — the objection the superseded
+   three-level design raised against "Glance everywhere", which the binary note never
+   resolved. Fixed-rect surfaces therefore rest showing their chart; the chevron opens
+   the combined full-screen view. Folded-by-default governs scrolling ledger cards.
+2. **The wizard folds per chain stage.** Each stage rests as its verdict line and
+   expands to that stage's full view — the wizard becomes the teacher of the idiom, as
+   BL-214's Decision 5 argued, without a first-time player meeting one long scroll.
+
+**One decision taken on Ben's behalf:** the fold overlay **joins the Esc ladder**, one
+rung below the BL-196 drill (order: exit-confirm → system menu → pop drill → fold
+overlay → hide selection → open menu). BL-214's Decision 10 kept depth off the ladder,
+but it reasoned about an *in-place stepper*; a full-screen mode with no keyboard exit is
+a defect, not a principle. Recorded here and in LAYOUT.md rather than silently taken.
+
+## Drill-through fold (promoted from backlog.json § BL-214)
+
+Requirements: requirements.json § drill-through-fold (R1–R7).
+
+Goal: one binary idiom — **folded** (a verdict line + a chevron) and **expanded** (a true
+full-screen overlay showing everything at once). Supersedes the three-level
+Glance/Read/Study stepper per Ben's 2026-07-31 post-exemplar note.
+
+**A gates everything.** The state model falls out of *expanded is an overlay*: only one
+thing can be expanded at a time, so the state is a single `(surface, key)` target rather
+than a per-surface remembered level.
+
+- **[2] A — Foundation: the fold module + its one line of state.** `detail_surface`,
+  `fold_state`, `is_expanded / expand / fold`, `fold_chevron`, `fold_overlay_begin/end`,
+  and BL-247's `why_note` (same disclosure family, same `ui_state` dependency).
+  Files: `src/ui/detail_level.{hpp,cpp}`, `src/ui/ui_state.hpp`. Deps: foundation.
+  Satisfies: BL-214 R1, R3; BL-247 R2, R3.
+- **[2] B — Esc ladder gains the fold rung.** Files: `src/core/app.cpp`. Deps: A.
+  Satisfies: R4.
+- **[2] C — Selection band: chevron on the metric card's pager row; the overlay hosts the
+  chart, its legend and the BL-196 drill.** Files: `src/ui/selection_panel.cpp`,
+  `src/ui/selection_card.cpp`. Deps: A. Satisfies: R1, R2, R5.
+- **[3] D — History ledger: Chain stages fold to a verdict line; Story and Tiles take the
+  chevron.** Files: `src/ui/tile_inspector.cpp`. Deps: A. Satisfies: R1.
+- **[3] E — Wizard: per-stage fold.** Files: `src/core/app.cpp`,
+  `src/ui/generation_charts.{hpp,cpp}`. Deps: A. Satisfies: R6.
+- **[1] F — LAYOUT.md § Drill-through** — the binary model, the one-expanded-at-a-time
+  invariant, the Esc rung, and the extension recipe. Files: `docs/ui/LAYOUT.md`.
+  Deps: C, D, E. Satisfies: R7.
+- **[1] G — Visual check.** Files: `scripts/verify/drill_through_fold.lua`. Deps: C, D, E.
+  Satisfies: R1, R2, R5, R6.
+
+Parallelisation note: A → {B ∥ C ∥ D ∥ E} → {F ∥ G}. Serial in the main session; C/E
+share files with the BL-247 group below.
+
+## Chart question log (promoted from backlog.json § BL-247)
+
+Requirements: requirements.json § chart-question-log (R1–R5).
+
+Goal: a chart declares, on request, the question it answers and why that evidence
+justifies it — two lines, closed by default, never a tutorial that tells the player what
+to ask. `why_note` itself lands in task A above; these tasks author the pairs.
+
+- **[1] H — `chart_row` takes an optional question/why pair; author one per generation
+  chart.** Files: `src/ui/generation_charts.{hpp,cpp}`. Deps: A, E.
+  Satisfies: R1, R4, R5.
+- **[1] I — Pairs on the Selection band's production chart and the drill time-series.**
+  Files: `src/ui/selection_panel.cpp`, `src/ui/selection_card.cpp`. Deps: C.
+  Satisfies: R1, R4.
+- **[1] J — Visual check.** Files: `scripts/verify/chart_question_log.lua`. Deps: H, I.
+  Satisfies: R1, R3.
+
+Parallelisation note: H ∥ I → J. Both are call-site edits over task A's helper.
+
+## Corporation dashboard roll-ups (promoted from backlog.json § BL-248)
+
+Requirements: requirements.json § corp-dashboard-rollups (R1–R5).
+
+Goal: nav slot 1 becomes the real dashboard — Production / Trade / Workforce / Finance as
+four roll-up cards on the fold model, each with a card-specific drill and a question log.
+The exemplar's *interaction* transfers; its numbers do not.
+
+- **[3] K — Data layer: the four roll-up summaries, derived from `world` +
+  `economy_report`.** Files: `src/ui/corporation_dashboard.{hpp,cpp}`. Deps: A.
+  Satisfies: R2.
+- **[3] L — The four cards, their drills, and their question logs.**
+  Files: `src/ui/corporation_dashboard.cpp`. Deps: K, A, H. Satisfies: R1, R3, R4.
+- **[1] M — Wire slot 1; retire the duplicate all-corporations table.** The Economy
+  panel's Corps view already carries it. Files: `src/core/app.cpp`,
+  `src/ui/corporation_panel.{hpp,cpp}` (removed). Deps: L. Satisfies: R5.
+- **[1] N — MENU.md § Slot 1.** Files: `docs/ui/MENU.md`. Deps: M. Satisfies: R5.
+- **[2] O — Checks: headless roll-up arithmetic + the visual pass.**
+  Files: `tools/verify/corp_dashboard_harness.cpp`, `scripts/verify/corp_dashboard.lua`.
+  Deps: M. Satisfies: R1, R2, R3, R4.
+
+Parallelisation note: K → L → M → {N ∥ O}. The chain is real — L draws what K derives.
+
+---
 
 ## <Group name> (promoted from BACKLOG § <item>)
 

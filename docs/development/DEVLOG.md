@@ -10,6 +10,124 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## Session — the disclosure spine: one fold idiom, and the surfaces stop inventing their own (2026-08-01)
+
+**Runtime.** ~2h. Full (Batch Delivery — three items, main-session-serial by design; two design
+calls put to Ben with measurements, one taken alone and recorded; one defect filed).
+
+**The ask.** "Are there further items we can batch deliver?" — then, from the four candidate
+groupings offered, **the disclosure spine**: BL-214 (drill-through idiom) → BL-247 (chart question
+log) → BL-248 (corporation dashboard roll-ups).
+
+### No fan-out, and that was the call
+
+A dependency chain, not a fan-out. BL-214's shared control is the thing the other two *call*, and
+BL-214/BL-247 share four files — worktree agents would have collided on `generation_charts.cpp` and
+`selection_panel.cpp` for no wall-clock gain. BL-214's own design had already reached the same
+conclusion about its sibling BL-215 and said so.
+
+### The design was superseded, and the supersession had a hole
+
+BL-214 was designed around a three-level Glance/Read/Study stepper, then superseded on 2026-07-31
+by Ben's binary fold model after he reviewed four live HTML exemplars. The binary note says
+*"folded (one line, the only default for every surface)"*.
+
+Applied literally that breaks the Selection band, and the superseded design had already said why:
+**a fixed-rect container cannot shrink.** The band is a derived 260 px
+(`minimap_height + chrome_margin`), so folding its metric card to one line spends ~220 px on
+emptiness — the exact objection the three-level design raised against "Glance everywhere", which
+the binary note never revisited. Reported the measurements and asked rather than guessed
+(Rule 0b). **Ben: the band opens expanded-in-place**; its chevron means *give this the whole
+screen*, and folded-by-default governs scrolling containers, where a fold buys real room back.
+Second call: **the wizard folds per chain stage** — round 1's four gates now read as
+`System all passed` / `Accretion Lost here: Pallas` / `Air Lost here: Cinder, Selene` /
+`Engine all passed` on one screen, which is the chain finally legible rather than a scroll.
+
+### The state model fell out of the change rather than being imposed
+
+Because expanded is a full-screen **overlay**, only one thing can be expanded at a time. So the
+state is a single `(surface, key)` target, not the superseded design's per-surface remembered
+level — and "fold" is never ambiguous because there is exactly one thing to fold. The remembered
+level was load-bearing for an in-place stepper and is meaningless for a mode switch.
+
+**One decision taken alone, and recorded rather than slipped in:** the overlay **joins the Esc
+ladder**, one rung below the subject drills. BL-214's Decision 10 explicitly kept depth *off* the
+ladder — but it reasoned about an in-place stepper, where a level is not a dismissal. A
+full-screen mode with no keyboard exit is a defect, not a principle.
+
+### What the captures changed
+
+The first run was not a pass. Two real defects only visible by looking: the overlay's
+`SetNextWindowBgAlpha(0.97f)` scrim let the entire shell read through it — a deliberate mode
+switch looking like a ghost drawn over the game — and zero-inset content sat jammed in the
+top-left corner of a 1280 px screen. Fixed to an opaque background and a 36×28 inset. The band's
+expanded chart was also drawing two 580 px ribbons; capped, because `draw_bars` pins columns at
+34 px and extra height was buying size, not legibility.
+
+The question log reserves its **measured** height (`CalcTextSize` at the wrap width) before
+opening its fixed-size, scrollbar-less chart row — so this item does not create the fitting defect
+BL-215 is queued to audit.
+
+### Ben's catch: a stable golden of the wrong picture
+
+Mid-session Ben pointed out that a capture can fail because the screenshot is taken **before the
+frame has fully rendered**. Tested rather than assumed, and he was right about the new captures:
+`verify.capture` composites exactly **one** frame, while ImGui settles auto-layout over the next
+frame or two — a child's content region, a table's column widths and a fresh window's scroll state
+are all provisional on the frame they first appear. **Four of the ten fold captures moved once
+given settle frames**, most visibly the History Tiles table, which only reads across the full
+screen after settling.
+
+The insidious part is that the unsettled frame is *deterministic*: it blesses cleanly and re-passes
+at 0.0000% forever. A stable golden of the wrong picture is worse than a flaky one, because nothing
+ever flags it.
+
+Fixed as a **reusable asset rather than three script edits**: `shot(name, frames)` in
+`scripts/verify/lib.lua` (auto-loaded, so every future check gets it) settles before capturing,
+with the reasoning in the comment so it is not dropped as noise. All 23 goldens re-blessed settled.
+
+The same hypothesis does **not** explain the pre-existing suite failures — `chat_panel` still
+differs 40.9% with eight settle frames, and its golden shows *21 nations* against today's *20*,
+plus an entirely different starting corporation. That is world generation, which is why BL-259
+stands.
+
+### Retired, not added
+
+The History Chain's per-stage `CollapsingHeader` is gone. It was that surface's own private
+disclosure idiom — the fourth one this item exists to kill — and "open" there always meant
+"scroll", because four stages of charts have never fitted a 380 px column. The all-corporations
+balance table at nav slot 1 is gone too (`corporation_panel.{hpp,cpp}` deleted): it was a
+cross-corp comparison surface, not "the player corporation at a glance", and the Economy panel's
+Corps view already carries it.
+
+### The verify harness grew, because the idiom was otherwise unverifiable
+
+`verify.fold(surface, key)`, `verify.rollup_drill(row)` and `verify.why_note(on)` — without them
+every capture would show the resting state and the whole item would be untestable. `why_note` uses
+a **sentinel** (`why_note_first`) claimed by the first log drawn, because a Lua script cannot
+compute an ImGui id: they are stack-dependent and exist only mid-frame.
+
+### Filed, not absorbed
+
+The full `scripts/verify` sweep fails golden diff on most checks — including many this batch never
+touched. The diff images settle it: the differing pixels are **world content** (terrain colour,
+generated corporation names, balances, nation names in comms), not layout. The goldens were
+blessed 2026-07-30; `src/world/` moved on 07-31 (BL-233 re-priced conquest from the graded terrain
+field and reshaped the political map) and 08-01. BL-252 re-established the *headless* bands per
+toolchain; the visual suite was never re-established after the world moved, so the cut gate's
+visual half has been quietly false for two days.
+
+Mass-blessing it inside this commit would have buried a pre-existing regression in an unrelated
+change. **Filed as BL-259** (v0.1.0 — it closes a hole in a cut gate), including the missing
+discipline that would stop it recurring: a `src/world/` change that moves generated content owes a
+visual re-bless in the *same* commit, the way a headless band change already does.
+
+**Left open.** BL-259. The Trade roll-up reads `0 lanes` because the generated world seeds every
+market on the single tiled body — the open design question BL-254 deliberately did not settle, now
+visible on a player-facing surface.
+
+---
+
 ## Session — the last four v0.1.0 items, and the goldens finally have one truth value (2026-08-01)
 
 **Runtime.** ~2h. Full (Batch Delivery — three worktree sub-agents, one item delivered in the main

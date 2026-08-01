@@ -1,8 +1,12 @@
 #pragma once
 
+#include "detail_level.hpp" // detail_surface — the fold target (BL-214)
 #include "world/planetology.hpp"
 
+struct ui_state;
+
 #include <cstddef>
+#include <string>
 
 // ---------------------------------------------------------------------------
 // Generation stage charts — the chain's visual half, drawn from one place
@@ -16,7 +20,9 @@
 //
 // The charts are a pure function of the per-body planetology_state, so both
 // callers hand in the same shape and get the same picture by construction
-// rather than by imitation. Nothing here reads app or world state.
+// rather than by imitation. Nothing here reads app or world state — draw_stage_fold
+// takes ui_state, but only for the shared disclosure target (BL-214), never for
+// anything the charts themselves plot.
 //
 // Design authority: docs/generation/GENERATION_LEDGER.md, backlog.json BL-211.
 // ---------------------------------------------------------------------------
@@ -70,6 +76,14 @@ const chain_round& chain_round_at(int r);
 /// they do, not just which bar moved.
 const char* stage_explainer(chain_stage s);
 
+/// The stage's verdict in one line — what a FOLDED stage rests as (BL-214).
+///
+/// "Lost here: Cinder, Pallas" when the gate killed something, "all passed"
+/// otherwise. This is the whole content of a folded stage row, which is why it is
+/// derived here rather than at each call site: the wizard and the History ledger
+/// must agree on what a stage's one line says.
+std::string stage_verdict(const generation_chart_source& src, chain_stage s);
+
 /// Draw one chain stage's charts into the current ImGui window.
 ///
 /// Lays out two charts per row when the region is wide enough and one when it is
@@ -82,6 +96,26 @@ const char* stage_explainer(chain_stage s);
 /// @param heading When true, prefixes a `SeparatorText` naming the stage and the
 ///                question it answers — the wizard wants it, the ledger does not
 ///                (its collapsing header already carries the name).
-void draw_stage_charts(const generation_chart_source& src, chain_stage s, bool heading);
+/// @param log_ui  When non-null, each chart draws its BL-247 question log toggle.
+///                Null suppresses them — a chart row in the 380 px ledger column
+///                has no line to spare, and the logs are an expanded-view affordance.
+void draw_stage_charts(const generation_chart_source& src, chain_stage s, bool heading,
+                       ui_state* log_ui = nullptr);
+
+/// One chain stage on the fold model (BL-214) — both of its states, in one call.
+///
+/// FOLDED (the resting state): a chevron, the stage name, and its one-line verdict.
+/// EXPANDED: the full-screen overlay carrying that stage's explainer, casualties and
+/// every chart, with the room they never had in a 380 px ledger column.
+///
+/// The wizard and the History ledger both call this, which is the point: a chain
+/// stage reads and behaves identically wherever the player meets it. They differ
+/// only in the @p surface they pass, so expanding a stage in one does not expand it
+/// in the other.
+///
+/// @param ui      UI state — the fold target and the open question-log note.
+/// @param surface `generation_stage` from the wizard, `history_chain` from the ledger.
+void draw_stage_fold(const generation_chart_source& src, chain_stage s,
+                     ui_state& ui, detail_surface surface);
 
 } // namespace ui

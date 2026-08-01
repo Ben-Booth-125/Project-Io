@@ -376,6 +376,96 @@ A few cross-cutting notes:
 
 ---
 
+## Drill-through (BL-214)
+
+**One disclosure idiom, obeyed by every dense surface.** Before this, each surface had
+invented its own way of showing more — a collapsing header in the History Chain, a pager
+in the Selection band, a permanent horizontal scroll in the Tiles table, nothing at all in
+the wizard. Drill-through is the single idiom that replaces them, and it has exactly **two**
+states:
+
+| State | What it is | Control |
+|---|---|---|
+| **Folded** | A verdict line — a figure, a label, a glyph. No sentences. | a single chevron, pointing down |
+| **Expanded** | A **true full-screen overlay** showing everything the surface has at once — chart, legend, prose, and any drill opened from it. | the same chevron, pointing up |
+
+Expanded is a **real mode switch**, not an in-place grow. That was Ben's call (2026-07-31)
+after reviewing four live exemplars that prototyped the alternative, and it **supersedes**
+the three-level Glance / Read / Study stepper the item was originally designed around.
+
+### Three axes, never conflated
+
+The four competing idioms were never four answers to one question — they were three
+different questions wearing one costume. Naming the three is most of the fix:
+
+| Axis | Question | Gesture | State |
+|---|---|---|---|
+| **Depth** | *How much of this subject do I want?* | the chevron | `ui_state::expanded` |
+| **Subject** (BL-196) | *What am I looking at?* | click the element; breadcrumb + back | `ui_state::card_stack`, `corp_rollup_drill` |
+| **Host** (SELECTION.md) | *Where does this properly live?* | `[>]` go-to | `ui::focus_on_entity` |
+
+BL-196 is therefore the **sibling axis**, not a competitor and not folded in.
+
+### The invariants
+
+1. **One thing is expanded at a time.** This falls out of expanded being an overlay rather
+   than being imposed: the state is a single `(surface, key)` target
+   (`fold_state`, `src/ui/detail_level.hpp`), not a remembered level per surface. Expanding
+   a second card folds the first, so folding is never ambiguous.
+2. **The level is not remembered.** A full-screen overlay is a transient mode, and which
+   card was last open is a display preference — so it is view state, never serialised, and
+   reset by `ui::fold`.
+3. **A fixed-rect container does not fold to one line.** The Selection band's rect is a
+   *derived* 260 px (`selection_band_height`) that cannot shrink, so folding its metric card
+   would spend ~220 px on emptiness. Fixed-rect surfaces therefore rest **expanded in place**
+   and their chevron means *give this the whole screen* (Ben, 2026-08-01, asked with the
+   measurements). Folded-by-default governs **scrolling** containers, where a fold buys real
+   room back.
+4. **Drill-through adds no tenth container.** The nine kinds above say *how text fits*; this
+   says *how much of it there is*. The overlay is container **1**'s policy (wrap, vertical
+   scroll) at screen size.
+
+### The controls
+
+- **The chevron** (`ui::fold_chevron`) sits on the surface's title row, right-aligned,
+  immediately left of the `[>]` / `[x]` cluster. It **is** a toggle — re-clicking while
+  expanded folds — unlike the superseded three-segment stepper, which was exempt precisely
+  because its set had no null member to undo to. The standing toggle rule therefore applies
+  here with no exemption owed.
+- **Esc** folds the overlay, one rung **below** the subject drills: exit-confirm → system
+  menu → pop `card_stack` → pop `corp_rollup_drill` → **fold** → hide selection → open menu.
+  A single press never both unwinds a drill and closes the overlay hosting it. *(This
+  departs from BL-214's Decision 10, which kept depth off the ladder — that decision
+  reasoned about an in-place stepper; a full-screen mode with no keyboard exit is a defect,
+  not a principle.)*
+
+### The chart question log (BL-247)
+
+Any chart may carry a closed-by-default **"Why this chart"** toggle
+(`ui::why_note`) revealing exactly two lines — **Answers:** the question this chart
+answers, **Because:** why this evidence settles it. It is **not a tutorial**: it never
+suggests what to look at next, it documents on request what a chart that already exists is
+for. It is distinct from a *derivation caption*, which answers how a number was computed;
+a chart may want both and they must not be merged into one blob.
+
+The pair is **optional** — a chart with no authored pair draws no toggle, so an unlabelled
+chart costs nothing and reads as a review signal rather than a render defect. **One note is
+open at a time**, and it resets closed whenever a surface expands or folds.
+
+### The surfaces, and the extension recipe
+
+On the ladder today: the Selection band's metric card, the History ledger's Story / Chain /
+Tiles views, the wizard's chain stages (per stage — Ben, 2026-08-01), and the Corporation
+dashboard's four roll-ups.
+
+Adding surface #N is **two edits**: an enumerator in `detail_surface`, and a
+`fold_chevron` + `fold_overlay_begin` pair at the call site. Nothing else — no new control,
+no new state, no new container kind. A surface with many foldable blocks needs **one**
+enumerator, not one per block: the `key` disambiguates instances (a chain stage, a roll-up
+card).
+
+---
+
 ## UI popup elements
 
 Beyond the persistent chrome, the production UI will use **transient popup elements** — context menus, confirmation dialogs, hover cards, and action prompts that appear in response to a click or hover and dismiss on action or click-away. Examples: right-clicking a unit for an order menu, a "confirm purchase" dialog.

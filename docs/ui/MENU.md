@@ -76,14 +76,33 @@ Notes on the mapping:
   Market and Tile ledgers; Supply (Layer 5 logistics) folds into Construction/Market when it
   exists; Conflict has no broad ledger yet. The rail scales with *systems that have a broad
   surface*, per the menus-are-broad-ledgers rule.
-- **Slot 1 — Corporation overview dashboard (design settled 2026-06-15, [B3]).** A top-level
-  roll-up opened as a **floating window** at the time of the design — like the whole family it
-  now folds out into the shell column (2026-07-31 note). The MVP surfaces four roll-ups: **balance + last-tick delta**, a **holdings roll-up**
-  (building count / bodies present — this is where the player reads *their own* buildings; see
-  the buildings note below), **workforce contention**, and **alerts** (idle buildings, unsold
-  output, negative cashflow — note this introduces an *alert* concept). A **fuller dashboard
-  design pass is flagged for v0.1.1** — the four roll-ups are the MVP set, not the final
-  composition. Its lines are intended to **click through** into the relevant per-system ledger.
+- **Slot 1 — Corporation overview dashboard (built 2026-08-01, BL-248).** Four roll-up cards —
+  **Production**, **Trade**, **Workforce**, **Finance** — folded out into the shell column
+  (`src/ui/corporation_dashboard.{hpp,cpp}`). Each card **rests as one verdict line** and
+  expands, through the shared drill-through chevron (BL-214, `LAYOUT.md` § Drill-through), to a
+  **full-screen view** carrying its chart, that chart's **question log** (BL-247), and a
+  **per-item drill** with a breadcrumb back to the roll-up.
+
+  The four drills are deliberately four *different shapes*, not one generic detail panel: a
+  building's operating economics (through the shared `draw_building_profit` builder), a lane's
+  completed convoys and recency, a building's assigned-against-effective labour, and — for
+  Finance, whose subject is not per-item — the budget's five flows. Every figure is derived from
+  the live world and the last `economy_report`; nothing is carried over from the exemplar's
+  invented scenario data.
+
+  > **Supersedes the MVP set (Ben, 2026-07-31).** The original design named **balance + last-tick
+  > delta**, a **holdings roll-up**, **workforce contention** and **alerts**, with a fuller
+  > dashboard pass flagged for v0.1.1. This *is* that pass, and Ben chose the exemplar's four
+  > roll-ups over the MVP four when asked directly. The MVP's **click-through into the relevant
+  > per-system ledger** is not lost — it survives as the **host axis** (`[>]` / `focus_on_entity`),
+  > available *alongside* the drill rather than instead of it, the two being orthogonal per
+  > BL-214's three-axis model. The **alert** concept the MVP introduced is not built: an idle
+  > building and a negative net read as red verdicts on their own cards, which is the same signal
+  > without a second mechanism to maintain.
+
+  The slot previously drew an **all-corporations balance table**, which was neither this nor the
+  MVP — a cross-corp comparison surface, and a duplicate of the **Economy panel's Corps view**
+  that still carries it. It was retired with this item rather than left as a second home.
 
 - **Buildings have no dedicated ledger (settled 2026-06-15, [F4]).** A standalone buildings
   overview proved more "good to know" than goal-driving, so it is **dropped as a reserved slot**.

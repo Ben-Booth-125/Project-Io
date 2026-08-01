@@ -2,6 +2,7 @@
 
 #include "charts.hpp"
 
+#include "detail_level.hpp"   // fold_chevron — the drill-through idiom (BL-214)
 #include "foldout_column.hpp" // shell fold-out column host (shared with the ledgers)
 #include "hex_render.hpp"      // draw_tile_neighbourhood — the card's zoomed tile view
 #include "icons.hpp"
@@ -321,6 +322,55 @@ void draw_activity_section(const world& w, entity_id body_id)
 
 } // namespace
 
+// --- The tile metric pages (BL-214) ------------------------------------------
+// Lifted out of draw_tile_selection so the in-band accordion and the full-screen
+// fold overlay chart the SAME page list. Two call sites building the list
+// separately is exactly how the two would drift, and the pager index is the fold
+// key — "expand this metric" is only addressable if both agree what page N is.
+
+std::vector<tile_metric> tile_metrics(const world& w, entity_id tile_id)
+{
+    std::vector<tile_metric> pages;
+    const auto tit = w.tiles.find(tile_id);
+    if (tit == w.tiles.end())
+        return pages;
+    const tile_component& tile = tit->second;
+
+    // Every deposited resource: this tile's hazard-adjusted yield against the
+    // top-decile tile for that resource.
+    for (std::size_t r = 0; r < resource_count; ++r)
+    {
+        if (tile.resource_deposit[r] <= 0.0f)
+            continue;
+        const float a   = tile_production(tile, r);
+        const float p90 = top_decile_production(w, r);
+        const resource_presentation& rp = presentation_of(static_cast<resource_type>(r));
+        pages.push_back({ rp.name, a, p90, "Top 10%",
+                          nice_ceil(std::max(a, p90) > 0.0f ? std::max(a, p90) : 1.0f),
+                          static_cast<int>(r) });
+    }
+
+    // Then the tile's own scalars against the body average, so a barren tile still
+    // has something to page through.
+    float sum_hab = 0.0f, sum_haz = 0.0f;
+    int   n = 0;
+    for (const auto& [id, t] : w.tiles)
+        if (t.body == tile.body) { sum_hab += t.habitability; sum_haz += t.hazard_level; ++n; }
+    const float avg_hab = n > 0 ? sum_hab / static_cast<float>(n) : 0.0f;
+    const float avg_haz = n > 0 ? sum_haz / static_cast<float>(n) : 0.0f;
+    pages.push_back({ "Habitability", tile.habitability, avg_hab, "Body avg", 1.0f, -1 });
+    pages.push_back({ "Hazard",       tile.hazard_level, avg_haz, "Body avg", 1.0f, -1 });
+
+    return pages;
+}
+
+void draw_tile_metric_chart(ImDrawList* dl, ImVec2 mn, ImVec2 mx, const tile_metric& m)
+{
+    constexpr ImU32 tile_col = IM_COL32(150, 235, 160, 255); // this tile's value (green)
+    constexpr ImU32 ref_col  = IM_COL32(150, 160, 190, 255); // reference value (muted)
+    draw_production_chart(dl, mn, mx, m.tile_val, m.ref_val, m.ceiling,
+                          tile_col, ref_col, m.ref_label);
+}
 
 // Per-building profitability readout (BL-074): the selected player building's
 // estimated net per-tick contribution and its component lines. Realised last-tick
@@ -617,9 +667,6 @@ void draw_tile_selection(world& w, ui_state& ui)
     const float right_w  = avail * 0.25f;
     const float center_w = std::max(80.0f, avail - left_w - right_w - 2.0f * spacing);
 
-    constexpr ImU32 tile_col = IM_COL32(150, 235, 160, 255); // this tile's value (green)
-    constexpr ImU32 ref_col  = IM_COL32(150, 160, 190, 255); // reference value (muted)
-
     // ── Left quarter: zoomed hex neighbourhood ──
     {
         const ImVec2 p  = ImGui::GetCursorScreenPos();
@@ -640,40 +687,7 @@ void draw_tile_selection(world& w, ui_state& ui)
     // are NOT modelled today (population lives on population centres, not
     // arbitrary tiles), so they have no page here yet — noted, not faked.
     {
-        struct metric_page
-        {
-            std::string label;
-            float       tile_val;
-            float       ref_val;
-            const char* ref_label;
-            float       ceiling;
-            int         resource_index; // -1 = not drillable (no time-series history kept)
-        };
-        std::vector<metric_page> pages;
-
-        std::vector<std::size_t> deposits;
-        for (std::size_t r = 0; r < resource_count; ++r)
-            if (tile.resource_deposit[r] > 0.0f)
-                deposits.push_back(r);
-        for (std::size_t r : deposits)
-        {
-            const float a   = tile_production(tile, r);
-            const float p90 = top_decile_production(w, r);
-            const resource_presentation& rp = presentation_of(static_cast<resource_type>(r));
-            pages.push_back({ rp.name, a, p90, "Top 10%",
-                              nice_ceil(std::max(a, p90) > 0.0f ? std::max(a, p90) : 1.0f),
-                              static_cast<int>(r) });
-        }
-        {
-            float sum_hab = 0.0f, sum_haz = 0.0f;
-            int   n = 0;
-            for (const auto& [id, t] : w.tiles)
-                if (t.body == tile.body) { sum_hab += t.habitability; sum_haz += t.hazard_level; ++n; }
-            const float avg_hab = n > 0 ? sum_hab / static_cast<float>(n) : 0.0f;
-            const float avg_haz = n > 0 ? sum_haz / static_cast<float>(n) : 0.0f;
-            pages.push_back({ "Habitability", tile.habitability, avg_hab, "Body avg", 1.0f, -1 });
-            pages.push_back({ "Hazard",       tile.hazard_level, avg_haz, "Body avg", 1.0f, -1 });
-        }
+        const std::vector<tile_metric> pages = tile_metrics(w, sel);
 
         ImGui::BeginChild("##tile_accordion", {center_w, total_h}, true,
                           ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollbar);
@@ -681,9 +695,16 @@ void draw_tile_selection(world& w, ui_state& ui)
         int&      page = ui.card_resource_page;
         const int n    = static_cast<int>(pages.size());
         page = std::clamp(page, 0, n - 1);
-        const metric_page& mp = pages[static_cast<std::size_t>(page)];
+        const tile_metric& mp = pages[static_cast<std::size_t>(page)];
 
-        // Pager row: ‹  Metric (i/N)  ›
+        // Pager row: ‹  Metric (i/N)  ›  ⌄
+        //
+        // The band rests EXPANDED-IN-PLACE (Ben, 2026-08-01): its rect is a fixed
+        // 260 px that cannot shrink, so a folded one-liner here would spend ~220 px
+        // on emptiness — the objection the superseded three-level design raised
+        // against Glance-everywhere. The chevron therefore does not fold this card
+        // away; it opens the same metric FULL SCREEN, where the chart has ten times
+        // the height and can carry its question log (BL-247).
         const float aw = ImGui::GetContentRegionAvail().x;
         ImGui::BeginDisabled(page == 0);
         if (ImGui::ArrowButton("##res_prev", ImGuiDir_Left)) --page;
@@ -697,12 +718,15 @@ void draw_tile_selection(world& w, ui_state& ui)
         ImGui::SameLine(std::max(frame_h + style.ItemSpacing.x, (aw - name_w) * 0.5f));
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", hdr);
 
-        ImGui::SameLine(aw - frame_h);
+        ImGui::SameLine(aw - 2.0f * frame_h - style.ItemSpacing.x);
         ImGui::BeginDisabled(page == n - 1);
         if (ImGui::ArrowButton("##res_next", ImGuiDir_Right)) ++page;
         ImGui::EndDisabled();
         if (ImGui::IsItemHovered() && page < n - 1)
             ImGui::SetTooltip("Next");
+
+        ImGui::SameLine(aw - frame_h);
+        fold_chevron(ui, detail_surface::selection_metric, page);
 
         // The current page's graph, filling the rest of the container. Deposited
         // resources are click-drillable into their time series (BL-196);
@@ -738,9 +762,7 @@ void draw_tile_selection(world& w, ui_state& ui)
                                   mp.label.c_str(), static_cast<double>(mp.tile_val),
                                   static_cast<double>(mp.ref_val), mp.ref_label);
         }
-        draw_production_chart(ImGui::GetWindowDrawList(), p, {p.x + cw, p.y + gh},
-                              mp.tile_val, mp.ref_val, mp.ceiling, tile_col, ref_col,
-                              mp.ref_label);
+        draw_tile_metric_chart(ImGui::GetWindowDrawList(), p, {p.x + cw, p.y + gh}, mp);
 
         ImGui::EndChild();
     }

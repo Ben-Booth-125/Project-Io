@@ -7301,6 +7301,218 @@
           "notes": "The owed re-bless was completed in the same session: the four tile_build_ledger goldens were inspected, re-blessed on Windows, and now pass at 0.0000%. The inspection reframed the number — the no-ledger capture diffed 21.69% against the with-ledger 22.04%, so ~21.7% was world-generation drift (BL-221/BL-233) and only ~0.35% was the BL-162 row change."
         }
       ]
+    },
+    {
+      "brief": "drill-through-fold",
+      "title": "Drill-through: one binary fold idiom every dense surface obeys (BL-214)",
+      "difficulty": 4,
+      "importance": "A",
+      "evaluated_difficulty": 4,
+      "status": "complete",
+      "resolved": "2026-08-01",
+      "resolution": "Complete, all rows met. The BINARY fold model landed, not the three-level stepper: folded = a verdict line + one chevron, expanded = a true full-screen overlay. 10 goldens blessed and PASS at 0.0000%.",
+      "promoted_from": "BL-214 (drill-through idiom)",
+      "batch": "disclosure-spine",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: every dense surface on the ladder discloses depth through ONE idiom - a folded resting state plus a single chevron that opens a true full-screen overlay - and no surface invents its own disclosure gesture.",
+          "verification": [
+            "visual: scripts/verify/drill_through_fold.lua"
+          ],
+          "status": "complete",
+          "result_metric": "Met. Six surfaces on one idiom: the Selection band metric card, History Story/Chain/Tiles, the wizard's chain stages, the corp roll-ups. The History Chain's per-stage CollapsingHeader was RETIRED — it was that surface's own private idiom, the fourth one this item exists to kill. Captures: fold_*_folded / fold_*_expanded.",
+          "notes": null
+        },
+        {
+          "id": "R2",
+          "requirement": "The overlay is a real mode switch hosting everything the surface has at once (verdict, charts, prose), and composes with BL-196 s subject drill (breadcrumb + back) without either axis consuming the other s control.",
+          "verification": [
+            "visual: scripts/verify/drill_through_fold.lua"
+          ],
+          "status": "complete",
+          "result_metric": "Met. fold_band_expanded_drilled shows a BL-196 drill opened from inside the overlay, keeping its own breadcrumb and back control; the fold chevron stays in the header. Neither axis consumes the other's control.",
+          "notes": "Depth and Subject stay orthogonal per the item s three-axis model."
+        },
+        {
+          "id": "R3",
+          "requirement": "At most ONE surface is expanded at a time: expanding a second folds the first, and the expanded target is (surface, key) rather than a per-surface remembered level.",
+          "verification": [
+            "review: src/ui/detail_level.cpp fold_state invariants"
+          ],
+          "status": "complete",
+          "result_metric": "Met by construction, not by discipline: the state is a single (surface, key) target in fold_state, so expanding a second surface cannot leave the first expanded. This replaces the superseded design's per-surface remembered level, which a full-screen overlay makes meaningless.",
+          "notes": "Falls out of expanded being a full-screen overlay; supersedes the three-level model s per-surface remembered level."
+        },
+        {
+          "id": "R4",
+          "requirement": "Esc folds the overlay, AFTER unwinding any open drill within it - the ladder gains one rung and never both closes a drill and the overlay in one press.",
+          "verification": [
+            "review: src/core/app.cpp Esc ladder"
+          ],
+          "status": "complete",
+          "result_metric": "Met. Ladder order: exit-confirm -> system menu -> pop card_stack -> pop corp_rollup_drill -> fold -> hide selection -> open menu.",
+          "notes": "Deliberate override of BL-214 Decision 10, which reasoned about an in-place stepper, not a full-screen mode. A modal overlay with no keyboard exit is a defect. Deliberate override of BL-214 Decision 10, recorded in LAYOUT.md and REFINED.md. That decision reasoned about an IN-PLACE stepper; the binary model made expanded a full-screen mode, and a mode with no keyboard exit is a defect rather than a principle."
+        },
+        {
+          "id": "R5",
+          "requirement": "The Selection band keeps its expanded-in-place resting look: the fixed 260px rect is never left showing one line over ~220px of empty band (Ben, 2026-08-01).",
+          "verification": [
+            "visual: scripts/verify/drill_through_fold.lua"
+          ],
+          "status": "complete",
+          "result_metric": "Met. fold_band_resting shows the band still carrying its chart in the 260 px rect; the chevron opens the combined view rather than hiding the chart. Ben's call, asked with the measurements (~220 px would have been left empty).",
+          "notes": "Ben s call, asked with the measurements. The exemplar s literal folded line is not carried to a rect that cannot shrink. The exemplar's literal folded line was NOT carried over to a rect that cannot shrink — folded-by-default governs scrolling containers, where a fold buys real room back."
+        },
+        {
+          "id": "R6",
+          "requirement": "The New World wizard folds PER CHAIN STAGE - each stage rests as its verdict line and expands to that stage s full view (Ben, 2026-08-01).",
+          "verification": [
+            "visual: scripts/verify/drill_through_fold.lua"
+          ],
+          "status": "complete",
+          "result_metric": "Met. fold_wizard_stages_folded shows round 1's four stages as verdict lines ('System all passed', 'Accretion Lost here: Pallas', 'Air Lost here: Cinder, Selene', 'Engine all passed') on one screen; fold_wizard_stage_expanded gives one stage the screen.",
+          "notes": "Ben's call. The wizard is where the idiom is taught — it is the first surface a player meets."
+        },
+        {
+          "id": "R7",
+          "requirement": "Authority propagates: docs/ui/LAYOUT.md gains a Drill-through section stating the binary model, the one-expanded-at-a-time invariant, and the extension recipe.",
+          "verification": [
+            "review: docs/ui/LAYOUT.md"
+          ],
+          "status": "complete",
+          "result_metric": "Met. LAYOUT.md gains § Drill-through: the two states, the three axes, the four invariants, the controls and the Esc rung, the question log, and the two-edit extension recipe.",
+          "notes": null
+        }
+      ]
+    },
+    {
+      "brief": "chart-question-log",
+      "title": "Chart question log: every visual can declare what it is for, on demand (BL-247)",
+      "difficulty": 3,
+      "importance": "B",
+      "evaluated_difficulty": 3,
+      "status": "complete",
+      "resolved": "2026-08-01",
+      "resolution": "Complete, all rows met. ui::why_note — a closed-by-default toggle revealing exactly two lines. All three of the item's open questions settled and recorded. 4 goldens blessed and PASS at 0.0000%.",
+      "promoted_from": "BL-247 (chart question log)",
+      "batch": "disclosure-spine",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: a chart may carry a question/why pair, surfaced as a closed-by-default \"Why this chart\" toggle that reveals exactly two lines (Answers:/Because:) and nothing more - never shown automatically, never animated in unprompted.",
+          "verification": [
+            "visual: scripts/verify/chart_question_log.lua"
+          ],
+          "status": "complete",
+          "result_metric": "Met. why_note_closed shows every chart carrying only its '? Why this chart +' toggle; why_note_open shows exactly the two lines, Answers: and Because:, and nothing more. Nothing is revealed unprompted.",
+          "notes": null
+        },
+        {
+          "id": "R2",
+          "requirement": "The pair is OPTIONAL: a chart with no authored pair draws no toggle at all, rather than an empty note.",
+          "verification": [
+            "review: src/ui/detail_level.cpp why_note"
+          ],
+          "status": "complete",
+          "result_metric": "Met, and settled as the item's open question 1: the pair is optional and a chart with no authored pair draws no toggle at all.",
+          "notes": "Settles the item s open question 1. Forcing every chart to carry one would manufacture prose; an unlabelled chart is a review signal, not a render defect. Forcing every chart to carry one would manufacture prose. A missing pair is a review signal — a chart that cannot state a question probably has not earned its place — not a render defect."
+        },
+        {
+          "id": "R3",
+          "requirement": "At most one note is open at a time and it resets closed when its hosting view opens - the note is meant to be read once, not to become a way of reading the chart.",
+          "verification": [
+            "review: src/ui/ui_state.hpp why_note_open"
+          ],
+          "status": "complete",
+          "result_metric": "Met. why_note_resets_on_expand shows a re-expanded stage with the note closed; ui::expand and ui::fold both clear why_note_open. Settles open question 2.",
+          "notes": "Settles open question 2, per the exemplars."
+        },
+        {
+          "id": "R4",
+          "requirement": "The pair is a per-chart parameter on the shared chart helper, so authoring one costs two strings at the chart s own call site.",
+          "verification": [
+            "review: src/ui/generation_charts.cpp chart_row"
+          ],
+          "status": "complete",
+          "result_metric": "Met, and settled as open question 3 (the item's own recommendation): answers/because are parameters on the shared chart_row helper. 14 generation charts, the Selection band's metric chart and the four corp roll-ups carry authored pairs.",
+          "notes": "Settles open question 3 (the item s own recommendation). The helper lives in detail_level.{hpp,cpp} rather than charts.cpp as filed: it needs ui_state, and charts:: is deliberately a pure draw-primitive namespace that knows nothing of it."
+        },
+        {
+          "id": "R5",
+          "requirement": "The log is distinct from a derivation caption: it states why the chart exists, not how a number was computed, and the two are never merged into one blob.",
+          "verification": [
+            "review: authored pairs in src/ui/generation_charts.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "Met. The authored pairs state why a chart exists ('Which of these worlds is close enough to the star to be warm?'), never how a figure was computed. The two are separate call sites — the threshold captions and derivation lines are untouched.",
+          "notes": null
+        }
+      ]
+    },
+    {
+      "brief": "corp-dashboard-rollups",
+      "title": "Corporation dashboard: four roll-ups on the fold model (BL-248)",
+      "difficulty": 4,
+      "importance": "B",
+      "evaluated_difficulty": 4,
+      "status": "complete",
+      "resolved": "2026-08-01",
+      "resolution": "Complete, four of five rows met and one met with an honest gap named. Nav slot 1 is the real dashboard; the duplicate all-corporations table is retired. 9 goldens blessed and PASS at 0.0000%.",
+      "promoted_from": "BL-248 (corporation dashboard roll-ups)",
+      "batch": "disclosure-spine",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Item-spanning: nav slot 1 draws four roll-up cards - Production, Trade, Workforce, Finance - each resting as one verdict line and expanding to a full-screen view through the SAME control BL-214 landed.",
+          "verification": [
+            "visual: scripts/verify/corp_dashboard.lua"
+          ],
+          "status": "complete",
+          "result_metric": "Met. corp_dashboard shows the four resting verdict lines with live figures ('3 making, 0 idle, 7349.2/tick'; '84% of labour demand met', red); corp_rollup_* show each expanding through BL-214's chevron.",
+          "notes": null
+        },
+        {
+          "id": "R2",
+          "requirement": "Every figure on every card is read from the live world / economy_report - no invented numbers carried over from the exemplar s scenario data.",
+          "verification": [
+            "headless: tools/verify/corp_dashboard_harness.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "Met. Every figure is derived in derive_corp_rollups from world + economy_report — building reports for output and effective labour, workforce_contention for the labour scalar, trade_routes for lanes, the budget breakdown for the five flows. Nothing from the exemplar's scenario data.",
+          "notes": "The exemplar s numbers are illustrative; its interaction wiring is the transferable part. The Finance card says explicitly when no tick has been measured rather than drawing five zeroes as though they had been."
+        },
+        {
+          "id": "R3",
+          "requirement": "Each card drills into a narrower, card-specific subject (a building, a route, a ledger line) with a breadcrumb and back, and the four drills are genuinely different shapes rather than one generic detail panel.",
+          "verification": [
+            "visual: scripts/verify/corp_dashboard.lua"
+          ],
+          "status": "complete",
+          "result_metric": "Met. corp_drill_production shows a building's operating economics through the shared draw_building_profit builder; corp_drill_trade a lane's completed convoys and recency; corp_drill_workforce assigned against effective labour. Finance has no per-item drill because its subject is its own flows — absent rather than faked.",
+          "notes": "draw_building_profit was an undeclared file-local definition in selection_panel.cpp; declaring it in the header is what lets the drill share the Selection band's answer instead of re-deriving the same sums."
+        },
+        {
+          "id": "R4",
+          "requirement": "Each roll-up chart carries a BL-247 question log.",
+          "verification": [
+            "visual: scripts/verify/corp_dashboard.lua"
+          ],
+          "status": "complete",
+          "result_metric": "Met. corp_rollup_finance_why shows the log open on the budget chart; all four roll-ups carry authored pairs.",
+          "notes": null
+        },
+        {
+          "id": "R5",
+          "requirement": "Authority propagates: MENU.md Slot 1 describes Production/Trade/Workforce/Finance with their fold/drill/why-log behaviour, replacing the Balance/Holdings/Contention/Alerts MVP text, and the duplicate all-corporations table is retired rather than left as a second home.",
+          "verification": [
+            "review: docs/ui/MENU.md, src/ui/corporation_panel.cpp"
+          ],
+          "status": "complete",
+          "result_metric": "Met. MENU.md § Slot 1 rewritten to Production/Trade/Workforce/Finance with their fold/drill/why-log behaviour, superseding the Balance/Holdings/Contention/Alerts MVP text and recording where the MVP's click-through survives (the host axis). corporation_panel.{hpp,cpp} deleted.",
+          "notes": "The all-corps balances table already lives in the Economy panel s Corps view. The MVP's 'alert' concept is deliberately NOT built: an idle building and a negative net already read as red verdicts on their own cards, which is the same signal without a second mechanism to maintain."
+        }
+      ]
     }
   ]
 }

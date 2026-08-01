@@ -12,8 +12,9 @@
 #include "ui/charts.hpp"
 #include "ui/circumplanetary_canvas.hpp"
 #include "ui/construction_panel.hpp"
+#include "ui/detail_level.hpp" // the drill-through fold idiom (BL-214)
 #include "ui/balance_ledger.hpp"
-#include "ui/corporation_panel.hpp"
+#include "ui/corporation_dashboard.hpp" // nav slot 1, the four roll-ups (BL-248)
 #include "ui/economy_panel.hpp"
 #include "ui/market_ledger.hpp"
 #include "ui/chat_panel.hpp"
@@ -1042,6 +1043,40 @@ int app::run_verify(const std::string& script_path, bool bless)
         else if (name == "market")        m_ui.market_ledger_view = view;
     });
 
+    // Park a surface's drill-through disclosure state (BL-214) so a capture can show
+    // the EXPANDED full-screen view, not just the folded verdict line. Without this
+    // the fold idiom is unverifiable — every capture would show the resting state.
+    // Names mirror the detail_surface enumerators; an unknown name folds everything,
+    // which is also what fold() with no argument means.
+    v.set_function("fold", [this](sol::optional<std::string> name, sol::optional<int> key) {
+        if (!name)
+        {
+            ui::fold(m_ui);
+            return;
+        }
+        const std::string& n = *name;
+        detail_surface s = detail_surface::none;
+        if      (n == "selection_metric") s = detail_surface::selection_metric;
+        else if (n == "history_story")    s = detail_surface::history_story;
+        else if (n == "history_chain")    s = detail_surface::history_chain;
+        else if (n == "history_tiles")    s = detail_surface::history_tiles;
+        else if (n == "generation_stage") s = detail_surface::generation_stage;
+        else if (n == "corp_rollup")      s = detail_surface::corp_rollup;
+        if (s == detail_surface::none) ui::fold(m_ui);
+        else                           ui::expand(m_ui, s, key.value_or(0));
+    });
+
+    // Drill one row into the expanded Corporation-dashboard roll-up (BL-248), or
+    // -1 to return to the roll-up itself.
+    v.set_function("rollup_drill", [this](int row) { m_ui.corp_rollup_drill = row; });
+
+    // Open a chart's question log (BL-247). A script cannot name a specific chart —
+    // ImGui ids are stack-dependent and exist only mid-frame — so this arms the
+    // sentinel and the first log drawn claims it. `verify.why_note(false)` closes.
+    v.set_function("why_note", [this](sol::optional<bool> on) {
+        m_ui.why_note_open = on.value_or(true) ? why_note_first : 0u;
+    });
+
     // Open the Layer 4 construction / building-management panel so a capture shows
     // the building surface. The scaffold panel takes no economy state to populate.
     v.set_function("show_construction", [this]() {
@@ -1897,9 +1932,18 @@ void app::handle_key_down(const SDL_KeyboardEvent& key)
     // corner gear button. Handled before the ImGui keyboard guard so it works even
     // while the popup (or another panel) holds focus. Precedence, highest first: an
     // armed exit-confirm backs out; an open system menu closes; an open sticky
-    // detail card unwinds one drill level, then hides (BL-194/196 — Esc reaches the
-    // menu only once the card is fully closed, so a single press never both closes
-    // the card and opens the menu); otherwise the menu opens.
+    // detail card unwinds one drill level; an open fold overlay folds up (BL-214);
+    // then the card hides (BL-194/196 — Esc reaches the menu only once the card is
+    // fully closed, so a single press never both closes the card and opens the
+    // menu); otherwise the menu opens.
+    //
+    // The fold rung is a deliberate departure from BL-214's Decision 10, which kept
+    // depth off this ladder. That decision reasoned about an in-place stepper, where
+    // a level is not a dismissal and `card_stack` already owned the unwind. The
+    // binary model made expanded a full-screen MODE, and a mode with no keyboard exit
+    // is a defect rather than a principle. It sits BELOW the drill so one press never
+    // both unwinds a drill and closes the overlay hosting it — the same rule that put
+    // the drill above the card.
     if (key.scancode == SDL_SCANCODE_ESCAPE)
     {
         // Mirror the card's own draw gate exactly (selection_card.cpp): a valid,
@@ -1915,6 +1959,10 @@ void app::handle_key_down(const SDL_KeyboardEvent& key)
             m_ui.show_system_menu = false;
         else if (card_open && !m_ui.card_stack.empty())
             m_ui.card_stack.pop_back();                       // unwind one drill level
+        else if (m_ui.corp_rollup_drill >= 0)
+            m_ui.corp_rollup_drill = -1;                      // back to the roll-up (BL-248)
+        else if (ui::any_expanded(m_ui))
+            ui::fold(m_ui);                                   // fold the full-screen overlay
         else if (card_open)
             m_ui.selection_hidden_for = m_ui.selected_entity; // hide, not destroy
         else
@@ -2298,8 +2346,15 @@ void app::draw_generation_screen()
         // stopped clicking between the links. Each stage measures its own column
         // metric from the region it is handed, so the same call fits here and in the
         // History ledger's much narrower fold-out.
+        // Each stage rests as one verdict line and expands to its full view (Ben,
+        // 2026-08-01). The wizard is where the fold idiom is TAUGHT — it is the first
+        // surface a player meets, so the gesture is learned before the first ledger
+        // opens. It also turns a long scroll into a readable chain: the round's
+        // stages fit on one screen as verdicts, and the player opens the ones the
+        // roll made interesting.
         for (int s = static_cast<int>(wr.first); s <= static_cast<int>(wr.last); ++s)
-            ui::draw_stage_charts(chart_src, static_cast<chain_stage>(s), true);
+            ui::draw_stage_fold(chart_src, static_cast<chain_stage>(s), m_ui,
+                                detail_surface::generation_stage);
 
         ImGui::EndChild();
 
@@ -2867,7 +2922,12 @@ void app::render()
         ui::draw_balance_ledger(m_world, m_registry, m_last_econ_report, bhist,
                                 prior_rank, m_ui, m_ui.show_balance_ledger);
     }
-    ui::draw_corporation_panel(m_world, m_ui, m_ui.show_corporation_panel);
+    // Corporation dashboard (BL-248) — nav slot 1, MENU.md's long-named surface.
+    // Replaces the all-corporations balance table that used to occupy this slot: a
+    // comparison table is not "the player corporation at a glance", and the Economy
+    // panel's Corps view already carries it.
+    ui::draw_corporation_dashboard(m_world, m_registry, m_last_econ_report, m_ui,
+                                   m_ui.show_corporation_panel);
 
     // Selection band (BL-213 — supersedes the BL-194/195 Selection band) — a FIXED
     // rect at the bottom of the screen, sandwiched between the shell column and

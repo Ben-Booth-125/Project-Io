@@ -405,7 +405,7 @@ void draw_selected_section(world& w, const recipe_registry& reg,
 // Answers "what do I own, and how's it doing?" — every player building in one
 // table (name/type, body/tile, workforce, per-quarter profit, status), row
 // selection driving the same selected-entity idiom used elsewhere (e.g.
-// corporation_panel.cpp's roster table); the inline detail below reuses
+// corporation_dashboard.cpp's roll-ups); the inline detail below reuses
 // draw_selected_section for whichever building that leaves selected. "Group
 // policies" is a stub only — same disabled-TODO treatment as BL-142.
 void draw_buildings_tab(world& w, const recipe_registry& reg,
