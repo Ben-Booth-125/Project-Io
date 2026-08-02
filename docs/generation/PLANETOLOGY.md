@@ -10,7 +10,7 @@ from a hand-picked input box to a measured, strict floor with reject-and-reroll 
 § Implementation. What remains open is listed in § Open calls; those are still Ben's and are not
 settled.
 
-**Contents** *(status per section, 2026-07-31)*:
+**Contents** *(status per section, 2026-08-02)*:
 
 | Section | Status |
 |---|---|
@@ -22,7 +22,7 @@ settled.
 | Mapping history onto Io's resource list | settled |
 | Presentation (biography, dated lines) | settled |
 | Determinism & cost | settled |
-| Implementation (incl. Continents, preferences, verification) | settled |
+| Implementation (incl. Continents, preferences, checkpoints, verification) | settled |
 | Open calls | open (3, 4, 7, 8, 10 remain) |
 | Known weaknesses | recorded — one half-closed 2026-07-30 |
 
@@ -780,11 +780,71 @@ axes with no viability consequence, which is exactly right. The worst is `interi
 mobile lid, so the second oxygenation never fires and it stalls at a Boring Billion. The reroll
 absorbs it rather than the model hiding it.
 
+### Checkpoints — branch decisions as a first-class record (BL-217)
+
+**Settled 2026-08-02.** Preferences narrow a *sampling range* within one round; they never touch
+*which branch a checkpoint proposes*. BL-217 (GENERATION_CHECKPOINT_BRANCH_MODEL) generalises the
+mechanism so a lean can also narrow the **candidate set** at a genuine branch point — the S5–S8
+biological die-offs today, a second checkpoint class once BL-218's historical rupture lands — while
+keeping the same reject-and-reroll discipline this doc has used since the homeworld rule.
+
+**What counts as a checkpoint, and what does not.** A checkpoint is a point where the chain's
+*outcome distribution genuinely branches* — two runs from the same prior state can diverge into
+materially different worlds. It is **not** every point where something narratively interesting
+happens. An interesting event that does not change what the world *can become* is a history-log
+entry (BL-208, not yet built), not a checkpoint. Applying that rule: the S5–S8 mass-extinction
+die-offs qualify (Sterile vs. Microbial vs. Mat World are different worlds); a settlement-stage
+collapse/war/revolution will qualify (BL-218's job); a body's day-length or axial tilt rolling one
+way or another does not, because nothing downstream reads it as a fork. Exactly **two** checkpoint
+classes exist today — **biological mass-extinction** (built, this item) and **historical rupture**
+(named, built by BL-218) — and no third is needed before those two land.
+
+**The record.** `checkpoint_record { stage_id, branch_taken, seed_used, viability_result }`
+(`src/world/planetology.hpp`), held in an **append-only, ordered** `planetology_state::checkpoints`
+list. No random-access map keyed by stage, and no mutable last-branch-wins field — either would
+make a later move into BL-208's eventual world-history-log a conversion project instead of a move.
+`seed_used` is mandatory: a branch that cannot be replayed in isolation from its own seed is not
+debuggable.
+
+**A lean is an eligibility filter, never a weight.** It only removes candidates from the proposal
+set (`checkpoint_branch::eligible`); the choice among the survivors stays the existing **uniform**
+reject-and-reroll — the same discipline § Preferences, not parameters already documents for
+sampling ranges. So a lean can make an outcome *impossible* and can never make one *more likely by a
+tunable amount*: there is no slider to expose, no weight to tune. **Corollary, built in rather than
+discovered:** if a lean's filter excludes every candidate, that is itself a viability failure and the
+whole checkpoint rerolls — it must never silently fall back to an ineligible branch. Without this,
+a lean would stop mattering in exactly the cases where it was most specific, which is the worst
+failure available: the player's preference *appears* honoured and is not.
+
+**One mechanism, per-checkpoint-class floor.** `resolve_checkpoint` (`src/world/planetology.hpp`,
+a template so it stays class-agnostic) takes a `propose` callback (builds this attempt's candidate
+list), an `apply` callback (mutates caller-owned state), and a `floor_ok` predicate — the
+checkpoint class's own viability floor, evaluated *after* `apply`, reroll on false. This generalises
+`homeworld_viability` exactly: one global floor cannot work, because a biological extinction's
+question ("can this biosphere still reach sapience?") and a historical rupture's ("is there still a
+civilisation left to industrialise?") are not the same question, so each checkpoint class supplies
+its own — but the *mechanism* invoking them is one function, uniform across classes. The homeworld
+rule still governs throughout: a floor rejects and rerolls; it never edits a result into viability.
+
+**The S5–S8 retrofit is legibility only.** The biology itself is unchanged — `run_planetology` still
+computes exactly the same abiogenesis/GOE/NOE/land/fire decisions it always did. What BL-217 adds is
+a `checkpoint_record` push alongside each of those decisions (Spark's abiogenesis-or-not, Breath's
+GOE and NOE, Green's land colonisation and fire threshold), so the branch the biology already takes
+is now legible as data rather than only as a `died_at`/`archetype` read. No real lean filters a
+biology candidate today — the eligibility-filter half of the mechanism is proven by a synthetic
+checkpoint class in the harness, ready for BL-218 to be the first real second user.
+
+**Nothing here hardcodes "four biology stages."** `resolve_checkpoint` takes a `chain_stage` value
+to tag its record, but never enumerates which stages exist or how many checkpoints a body has;
+BL-218 registers its own checkpoint (candidates, apply, floor) at the settlement stage without
+touching this item's code, which is the whole point of building the mechanism ahead of its second
+user.
+
 ### Verification
 
 `tools/verify/planetology_harness.cpp`, auto-registered as a CTest. The groups this doc owns (the
 harness also carries R9–R11, which belong to the endemic-goods and market items, and reserves R12
-for BL-209's molecular trace and R13 for BL-217's rarity bands):
+for BL-209's molecular trace):
 
 | | Asserts |
 |---|---|
@@ -796,6 +856,7 @@ for BL-209's molecular trace and R13 for BL-217's rarity bands):
 | R6 | **Wizard stability** — a decision at stage N never rewrites the history of a stage before N |
 | R7 | Every new knob demonstrably moves its own outcome |
 | R8 | **Preferences and reroll** — resolution is pure in (preferences, seed); a reroll redraws its own round and leaves earlier ones alone; **every** resolved homeworld clears the strict floor across 400 preference combinations; a dimmer star pulls the orbit inward |
+| R13 | **The checkpoint model** (BL-217) — same seed → identical `checkpoints`, different seed → different; the S5–S8 checkpoints mirror what `died_at`/`archetype` already encode; a synthetic checkpoint class proves an all-ineligible candidate set forces a reroll rather than a silent fallback |
 | R14 | **The dated timestamp** (BL-220) — the conversions from Gya and from a calendar year, every display band *and both edges of every band*, total oldest-first ordering, and a historical line interleaving between deep time and the epoch |
 
 R6 is what makes the wizard's Back/Continue safe, and R8 is what makes the rejection sampling a
@@ -932,3 +993,11 @@ Recorded so nobody later mistakes design choices for derived physics.
 - **[[BL-170]]** — rivers already encode the bulk-transport argument S8 arrives at independently.
 - **[[BL-166]]** / **[[BL-168]]** — habitability and arable share are downstream of S7/S8.
 - **`DISCOVERY.md`** — the survey fog is the natural gate on the planet report (§ Open calls 7).
+- **[[BL-217]]** (§ Checkpoints — branch decisions as a first-class record) — the checkpoint/branch/
+  eligibility-filter foundation this session builds; the S5–S8 mass-extinction retrofit is its first
+  checkpoint class.
+- **[[BL-218]]** — the settlement-stage historical-rupture checkpoint, meant to register as this
+  mechanism's second class without changing BL-217's code.
+- **[[BL-208]]** (world-history-log, design-owed, v0.3.0) — `checkpoint_record`'s append-only,
+  ordered shape is deliberately identical to this future log, so migrating checkpoints into it is a
+  move, not a rewrite, once it lands.

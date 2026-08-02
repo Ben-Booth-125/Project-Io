@@ -128,6 +128,143 @@ enum class abiogenesis_depth : uint8_t
     coded,         ///< DNA, proofreading, and a genome that can grow.
 };
 
+// ---------------------------------------------------------------------------
+// Checkpoints — where a branch decision lives, and how a lean narrows it
+// (BL-217, GENERATION_CHECKPOINT_BRANCH_MODEL). This is the class-agnostic
+// mechanism; PLANETOLOGY.md's S5-S8 mass-extinction points are the first
+// checkpoint class to use it, and a second (BL-218's historical rupture, at
+// the settlement stage) is meant to reuse this file's types unchanged.
+//
+// See PLANETOLOGY.md's "Checkpoints" section for the full design rationale —
+// this header only carries the settled shape.
+// ---------------------------------------------------------------------------
+
+/// One resolved branch decision. Held in an APPEND-ONLY, ORDERED, TAGGED list
+/// on `planetology_state` (`checkpoints`, below) — deliberately shaped to
+/// match BL-208's eventual world-history-log so migrating into it is a MOVE,
+/// not a rewrite, once that lands. BL-208 is not built yet and this struct
+/// must not depend on it.
+///
+/// No random-access map keyed by stage, and no mutable last-branch-wins
+/// field: either would make BL-208 a conversion project instead of a move.
+///
+/// `seed_used` is mandatory, not diagnostic — a branch that cannot be
+/// replayed in isolation from its own seed is not debuggable, and any future
+/// sweep tool or bug report needs to re-run exactly this decision. Within
+/// `run_planetology`, the per-body `seed` argument plus `stage_id` is enough
+/// to reconstruct the sub-stream a checkpoint drew from (each checkpoint
+/// class owns a fixed stage-tag table), so `seed_used` is recorded as that
+/// per-body seed rather than an internal RNG state.
+struct checkpoint_record
+{
+    chain_stage stage_id = chain_stage::system; ///< Which gate this checkpoint sits at.
+    std::string branch_taken;                   ///< Human-readable outcome label.
+    uint32_t    seed_used = 0;                   ///< The seed this decision is replayable from.
+    bool        viability_result = true;         ///< Did the resulting state clear its floor?
+};
+
+/// A deterministic splitmix64 sub-stream, public (unlike planetology.cpp's
+/// internal `rng`) so a checkpoint resolver OUTSIDE planetology.cpp — a
+/// future checkpoint class such as BL-218's historical rupture — draws from
+/// the SAME RNG mechanism rather than inventing a second one
+/// (PLANETOLOGY.md § Determinism & cost).
+struct checkpoint_rng
+{
+    uint64_t s;
+    explicit checkpoint_rng(uint32_t seed, uint32_t stage_tag);
+
+    /// Uniform in [0,1). Mantissa-mapped, matching planetology.cpp's `rng`.
+    float unit();
+
+    /// Uniform integer in [0, count). `count` must be > 0.
+    int index(int count);
+};
+
+/// One branch a checkpoint could take, and whether a lean's eligibility
+/// filter allows it to be proposed this attempt.
+///
+/// A LEAN IS AN ELIGIBILITY FILTER, NEVER A WEIGHT (BL-217, settled
+/// 2026-08-02): it only removes candidates from this list. The choice among
+/// the survivors stays the existing uniform reject-and-reroll — a lean must
+/// never make a branch more likely, only impossible.
+struct checkpoint_branch
+{
+    const char* label = "";     ///< `branch_taken` text if this one is chosen.
+    bool        eligible = true;
+};
+
+/// Resolve one checkpoint, class-agnostically.
+///
+/// @param stage_id     Which chain_stage this checkpoint sits at (recorded,
+///                     not interpreted by this function).
+/// @param seed         The body's per-body seed (recorded as `seed_used`).
+/// @param stage_tag    This checkpoint's fixed RNG sub-stream tag.
+/// @param max_attempts Reroll cap — a pathological all-ineligible lean must
+///                     not spin forever.
+/// @param propose      `(checkpoint_rng&, uint32_t attempt) ->
+///                     std::vector<checkpoint_branch>`. Builds this attempt's
+///                     candidate list; a lean's eligibility filter sets
+///                     `eligible = false` on the entries it excludes.
+/// @param apply        `(checkpoint_rng&, const checkpoint_branch&) -> void`.
+///                     Applies the chosen branch to caller-owned state
+///                     (mutate via the caller's own closure capture).
+/// @param floor_ok     `() -> bool`. The checkpoint class's own viability
+///                     predicate, evaluated AFTER `apply` — reroll on false,
+///                     per the homeworld rule (constrain inputs, never clamp
+///                     outputs).
+/// @param out          Receives exactly one checkpoint_record per attempt, so
+///                     the whole reroll history is visible, not just the
+///                     final winner.
+/// @return true once a branch clears `floor_ok` within `max_attempts`.
+///
+/// If EVERY candidate at an attempt is ineligible, that attempt is itself a
+/// viability failure — the loop rerolls rather than falling back to an
+/// ineligible branch (the corollary BL-217 calls out explicitly).
+///
+/// GENERIC ACROSS CHECKPOINT CLASSES: nothing here names "biology" or the
+/// four S5-S8 stages — a future checkpoint class reuses this unchanged by
+/// supplying its own propose/apply/floor_ok.
+template <typename Propose, typename Apply, typename FloorOk>
+bool resolve_checkpoint(chain_stage stage_id, uint32_t seed, uint32_t stage_tag,
+                        uint32_t max_attempts,
+                        Propose propose, Apply apply, FloorOk floor_ok,
+                        std::vector<checkpoint_record>& out)
+{
+    for (uint32_t attempt = 0; attempt < max_attempts; ++attempt)
+    {
+        checkpoint_rng r(seed, stage_tag ^ (attempt * 0x2545F491u));
+
+        std::vector<checkpoint_branch> candidates = propose(r, attempt);
+
+        int eligible_count = 0;
+        for (const auto& c : candidates) if (c.eligible) ++eligible_count;
+
+        if (eligible_count == 0)
+        {
+            // The lean's eligibility filter excluded every candidate. That IS
+            // a viability failure — never silently fall back to an
+            // ineligible branch.
+            out.push_back(checkpoint_record{ stage_id, "(no eligible branch — rerolled)", seed, false });
+            continue;
+        }
+
+        int pick = r.index(eligible_count);
+        const checkpoint_branch* chosen = nullptr;
+        for (const auto& c : candidates)
+        {
+            if (!c.eligible) continue;
+            if (pick == 0) { chosen = &c; break; }
+            --pick;
+        }
+
+        apply(r, *chosen);
+        const bool ok = floor_ok();
+        out.push_back(checkpoint_record{ stage_id, chosen->label, seed, ok });
+        if (ok) return true;
+    }
+    return false;
+}
+
 /// The calendar year the campaign opens in — 1 January 1960 (ERAS.md § Era 0),
 /// and the zero point every `history_event` counts backwards from.
 ///
@@ -392,6 +529,14 @@ struct planetology_state
     /// The readable history. Short for a failed world — the brevity IS the
     /// characterisation, and it is never padded.
     std::vector<history_event> history;
+
+    /// Every checkpoint branch decision this body's chain resolved, in the
+    /// order it resolved them (BL-217). APPEND-ONLY — see checkpoint_record.
+    /// Today's only checkpoint class is the S5-S8 biological mass-extinction
+    /// retrofit; it does not change the biology itself, only makes the branch
+    /// legible. A failed reroll attempt (see resolve_checkpoint) also appends
+    /// a record, so this can hold more entries than there are gates.
+    std::vector<checkpoint_record> checkpoints;
 };
 
 /// Run the full ten-stage chain for one body.

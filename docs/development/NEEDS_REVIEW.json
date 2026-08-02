@@ -568,6 +568,41 @@
         "docs/development/ROADMAP.md",
         "src/ui/frame_stats.hpp",
         "src/ui/frame_stats.cpp"
+],
+      "resolution": null
+    },
+    {
+      "id": "NR-027",
+      "title": "BL-217 checkpoint retrofit: S8/Legacy has no branch point, so no checkpoint was added there",
+      "raised": "2026-08-02",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "Session 2026-08-02 (BL-217 checkpoint/branch/lean foundation)",
+      "what": "The task brief pointed at S8/Legacy (~line 1116+ in the pre-change planetology.cpp) as one of four biological die-off points to wrap in a checkpoint_record, alongside S5 Spark, S6 Breath and S7 Green. Reading the code, S8 Legacy has no die()/branch decision at all — it is a deterministic resource-endowment calculation over whatever life_stage the chain already reached. No checkpoint was added there.",
+      "why_it_matters": "BL-217's own admission rule (settled in backlog.json) says a checkpoint is a point where the outcome distribution genuinely branches, not every point where something interesting happens. S8 fails that test — two runs reaching the same peak life_stage always produce the same Legacy endowment shape, so a checkpoint there would violate the rule this session's design explicitly wrote in. Five checkpoints were recorded instead (Spark: 1, Breath: GOE + NOE, Green: land colonisation + fire threshold), matching every genuine branch S5-S8 actually contains.",
+      "options": [],
+      "recommendation": "No action needed unless a future S8 mechanic (e.g. a stochastic Legacy-stage roll) introduces a real fork — at that point it would earn its own checkpoint under the same admission rule.",
+      "files": [
+        "src/world/planetology.cpp",
+        "src/world/planetology.hpp",
+        "docs/generation/PLANETOLOGY.md"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-028",
+      "title": "BL-217 verification: fresh worktree could not configure CMake (FetchContent blocked), fell back to hand-compiled cl",
+      "raised": "2026-08-02",
+      "kind": "observation",
+      "status": "open",
+      "source": "Session 2026-08-02 (BL-217 checkpoint/branch/lean foundation)",
+      "what": "cmake -S . -B build in this worktree failed at the SDL3 FetchContent step: codeload.github.com's TLS handshake fails with CRYPT_E_NO_REVOCATION_CHECK (confirmed independently with a direct curl to the same URL, same error) — a network/certificate-revocation-check block, not a project misconfiguration. Per the task's documented fallback, planetology_harness and planetology_sweep were instead hand-compiled with cl (mirroring creeds_harness's world-superset TU list from tools/verify/README.md) and both ran clean: 121/121 PASS on the harness (19 of them the new R13 checkpoint assertions) and the sweep's R1-R3 metrics reproduced the doc's committed numbers exactly (77.4% acceptance, 1.29 mean attempts, interior=low at 2.57 draws). The full ProjectIo target and the whole-suite ctest (~37/37 expected) could NOT be run this session for the same reason.",
+      "why_it_matters": "This is the known fresh-worktree FetchContent issue CLAUDE.md already anticipates, not a defect in this change. Flagging so a future session (or one with working network access) runs the full ctest suite once, to confirm nothing outside the planetology TU graph regressed — inspection of every consumer of planetology_state (src/core/app.hpp, src/ui/generation_charts.hpp, src/world/hard_coded_world.hpp) found only by-value/by-pointer holds with no field-enumeration that an appended struct field could break, but that is inspection, not a compile.",
+      "options": [],
+      "recommendation": "Next session with network access (or the main non-worktree checkout): run build_app.bat then ctest --test-dir build --output-on-failure once to close this out.",
+      "files": [
+        "src/world/planetology.cpp",
+        "src/world/planetology.hpp"
       ],
       "resolution": null
     }

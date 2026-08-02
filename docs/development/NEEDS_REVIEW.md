@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*26 entries — 7 open, 19 resolved.*
+*28 entries — 9 open, 19 resolved.*
 
 ---
 
@@ -131,6 +131,28 @@ ROADMAP.md names the frame-budget targets (avg < 8ms, max < 16.7ms panning the f
 > **Recommendation:** Open the app (F11 for the frame-stats overlay), pan the full Kepler tile grid, and confirm avg < 8ms / max < 16.7ms. If it passes, v0.1.0 is done bar hygiene (warning-clean build, cppcheck pass) and the cut can be tagged.
 
 *Files: `docs/development/ROADMAP.md`, `src/ui/frame_stats.hpp`, `src/ui/frame_stats.cpp`*
+
+### NR-027 — BL-217 checkpoint retrofit: S8/Legacy has no branch point, so no checkpoint was added there
+*decision taken on your behalf · raised 2026-08-02 · from Session 2026-08-02 (BL-217 checkpoint/branch/lean foundation)*
+
+The task brief pointed at S8/Legacy (~line 1116+ in the pre-change planetology.cpp) as one of four biological die-off points to wrap in a checkpoint_record, alongside S5 Spark, S6 Breath and S7 Green. Reading the code, S8 Legacy has no die()/branch decision at all — it is a deterministic resource-endowment calculation over whatever life_stage the chain already reached. No checkpoint was added there.
+
+**Why it matters.** BL-217's own admission rule (settled in backlog.json) says a checkpoint is a point where the outcome distribution genuinely branches, not every point where something interesting happens. S8 fails that test — two runs reaching the same peak life_stage always produce the same Legacy endowment shape, so a checkpoint there would violate the rule this session's design explicitly wrote in. Five checkpoints were recorded instead (Spark: 1, Breath: GOE + NOE, Green: land colonisation + fire threshold), matching every genuine branch S5-S8 actually contains.
+
+> **Recommendation:** No action needed unless a future S8 mechanic (e.g. a stochastic Legacy-stage roll) introduces a real fork — at that point it would earn its own checkpoint under the same admission rule.
+
+*Files: `src/world/planetology.cpp`, `src/world/planetology.hpp`, `docs/generation/PLANETOLOGY.md`*
+
+### NR-028 — BL-217 verification: fresh worktree could not configure CMake (FetchContent blocked), fell back to hand-compiled cl
+*observation · raised 2026-08-02 · from Session 2026-08-02 (BL-217 checkpoint/branch/lean foundation)*
+
+cmake -S . -B build in this worktree failed at the SDL3 FetchContent step: codeload.github.com's TLS handshake fails with CRYPT_E_NO_REVOCATION_CHECK (confirmed independently with a direct curl to the same URL, same error) — a network/certificate-revocation-check block, not a project misconfiguration. Per the task's documented fallback, planetology_harness and planetology_sweep were instead hand-compiled with cl (mirroring creeds_harness's world-superset TU list from tools/verify/README.md) and both ran clean: 121/121 PASS on the harness (19 of them the new R13 checkpoint assertions) and the sweep's R1-R3 metrics reproduced the doc's committed numbers exactly (77.4% acceptance, 1.29 mean attempts, interior=low at 2.57 draws). The full ProjectIo target and the whole-suite ctest (~37/37 expected) could NOT be run this session for the same reason.
+
+**Why it matters.** This is the known fresh-worktree FetchContent issue CLAUDE.md already anticipates, not a defect in this change. Flagging so a future session (or one with working network access) runs the full ctest suite once, to confirm nothing outside the planetology TU graph regressed — inspection of every consumer of planetology_state (src/core/app.hpp, src/ui/generation_charts.hpp, src/world/hard_coded_world.hpp) found only by-value/by-pointer holds with no field-enumeration that an appended struct field could break, but that is inspection, not a compile.
+
+> **Recommendation:** Next session with network access (or the main non-worktree checkout): run build_app.bat then ctest --test-dir build --output-on-failure once to close this out.
+
+*Files: `src/world/planetology.cpp`, `src/world/planetology.hpp`*
 
 ---
 

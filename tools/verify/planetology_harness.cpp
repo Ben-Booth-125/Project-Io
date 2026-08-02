@@ -27,13 +27,25 @@
 //       reaches a land biosphere and always retains liquid water — the
 //       guarantee is on the INPUTS, so no knob combination may break it.
 //
+//   R13 THE CHECKPOINT MODEL (BL-217, GENERATION_CHECKPOINT_BRANCH_MODEL).
+//       Asserts (a) same seed -> identical checkpoints vector, different seed
+//       -> different; (b) the S5-S8 checkpoints correctly mirror what
+//       died_at/archetype already encode; (c) resolve_checkpoint's
+//       eligibility filter forces a reroll when every candidate is excluded,
+//       never a silent fallback to an ineligible branch — exercised against a
+//       small synthetic checkpoint class, since neither of the two real
+//       classes has an easy all-excluded scenario to hand.
+//       NOTE: this reuses the R13 number this file's own comment previously
+//       reserved for "BL-217 rarity" — that description was written ahead of
+//       BL-217's actual settled scope (checkpoint/branch/lean, not rarity
+//       bands) and is corrected here rather than left stale.
+//
 //   R14 THE DATED TIMESTAMP (BL-220). history_event carries an integer year
 //       before the campaign epoch, so ONE ordered biography spans 4.5 Gya and
 //       1687 CE. Asserts exact construction, the magnitude-picking display
 //       format, total oldest-first ordering, and that a historical line
 //       interleaves into the deep-time list — the foundation the HISTORY.md
-//       ladder (BL-221/BL-222) is built on. R12 is reserved by BL-209 and R13
-//       by BL-217, so this group takes the next free number.
+//       ladder (BL-221/BL-222) is built on. R12 is reserved by BL-209.
 //
 // HONEST SCOPE NOTE: this validates the deterministic skeleton and the gate
 // ordering. The model has more free parameters (~40 tuning constants) than it
@@ -539,6 +551,162 @@ int main()
             std::printf(" 0x%08X", seeds_ok[i]);
         std::printf("\n");
         check(with > 0, "R11 the player can open with a processing facility to manage");
+    }
+
+    // --- R13 the checkpoint model (BL-217) ------------------------------------
+    {
+        auto checkpoints_equal = [](const std::vector<checkpoint_record>& a,
+                                    const std::vector<checkpoint_record>& b) {
+            if (a.size() != b.size()) return false;
+            for (std::size_t i = 0; i < a.size(); ++i)
+            {
+                if (a[i].stage_id != b[i].stage_id) return false;
+                if (a[i].branch_taken != b[i].branch_taken) return false;
+                if (a[i].seed_used != b[i].seed_used) return false;
+                if (a[i].viability_result != b[i].viability_result) return false;
+            }
+            return true;
+        };
+
+        // (a) determinism: same seed -> identical checkpoints, different seed
+        // -> different (Kepler always resolves at least the Spark/Breath/Green
+        // checkpoints, so an all-empty vector could not hide a regression).
+        const planetology_state k2 = run_planetology(kepler(), def, 0xE471001u);
+        const planetology_state k3 = run_planetology(kepler(), def, 0xE471002u);
+        check(!k.checkpoints.empty(), "R13 Kepler resolves at least one checkpoint");
+        check(checkpoints_equal(k.checkpoints, k2.checkpoints),
+              "R13 same seed -> identical checkpoints vector");
+        check(!checkpoints_equal(k.checkpoints, k3.checkpoints),
+              "R13 different seed -> different checkpoints vector");
+
+        // (b) the S5-S8 checkpoints mirror what died_at/archetype already
+        // encode. Cinder dies at Air (S2) but the Spark code path still runs
+        // for an already-terminated body (a subsurface ocean is the one
+        // branch that can still carry life past an airless verdict), so
+        // Cinder records exactly ONE checkpoint — a failing Spark, since
+        // Cinder has no ice_shell_hint to make it a subsurface-ocean
+        // candidate — and it dies there, so it never reaches Breath or
+        // Green. Pallas returns before the Spark section even runs (the
+        // core_fragment early-return at S1), so it records none at all.
+        check(p.checkpoints.empty(),
+              "R13 a core fragment (returns at S1, before Spark) records no checkpoint");
+        check(c.checkpoints.size() == 1
+                  && c.checkpoints.front().stage_id == chain_stage::spark
+                  && !c.checkpoints.front().viability_result,
+              "R13 Cinder (dies at Air) still records one failing Spark checkpoint");
+        bool kepler_all_ok = !k.checkpoints.empty();
+        bool kepler_all_biological = !k.checkpoints.empty();
+        for (const checkpoint_record& r : k.checkpoints)
+        {
+            if (!r.viability_result) kepler_all_ok = false;
+            if (r.stage_id != chain_stage::spark && r.stage_id != chain_stage::breath
+                && r.stage_id != chain_stage::green)
+                kepler_all_biological = false;
+        }
+        check(kepler_all_ok,
+              "R13 a Cradle's checkpoints all report viability_result == true");
+        check(kepler_all_biological,
+              "R13 every Kepler checkpoint sits at Spark, Breath or Green");
+
+        // A world that fails partway (Mat World: dies at Breath's GOE branch)
+        // should record a Spark success followed by a Breath failure, and
+        // stop there — no Green checkpoint, since the chain already died.
+        //
+        // GOE fails (goe_fires == false) when goe_at <= 0.15 Gya, theta is
+        // too hot (>= 2.4), or water_fraction is too low. Starving the time
+        // BUDGET (a young system_age_gyr) turns out NOT to isolate this:
+        // Spark itself requires age >= 1.5 Gyr to fire at all (its own
+        // time_budget gate), and at exactly that floor goe_at still clears
+        // 0.15 for every dial value — the budget floor and the GOE floor
+        // are too close together to split with age alone. theta is the
+        // reliable lever instead: max out `radiogenic` so the interior runs
+        // hot enough (theta >= 2.4) that GOE fails on ITS OWN condition
+        // regardless of the timing arithmetic, while age stays >= 1.5 so
+        // Spark still succeeds first.
+        bool found_mat_world = false;
+        for (float age_gyr = 1.55f; age_gyr < 2.10f && !found_mat_world; age_gyr += 0.1f)
+        {
+            planetology_params mat = def;
+            mat.system_age_gyr = age_gyr;
+            mat.radiogenic = 2.2f; // clamp ceiling — pushes theta well past 2.4
+            for (uint32_t seed = 1; seed < 64 && !found_mat_world; ++seed)
+            {
+                const planetology_state trial = run_planetology(kepler(), mat, seed);
+                if (trial.archetype != body_archetype::mat_world) continue;
+                found_mat_world = true;
+                bool saw_spark_ok = false, saw_breath_fail = false, saw_green = false;
+                for (const checkpoint_record& r : trial.checkpoints)
+                {
+                    if (r.stage_id == chain_stage::spark && r.viability_result) saw_spark_ok = true;
+                    if (r.stage_id == chain_stage::breath && !r.viability_result) saw_breath_fail = true;
+                    if (r.stage_id == chain_stage::green) saw_green = true;
+                }
+                check(saw_spark_ok,
+                      "R13 a Mat World still records a successful Spark checkpoint");
+                check(saw_breath_fail,
+                      "R13 a Mat World records a failing Breath checkpoint");
+                check(!saw_green,
+                      "R13 a Mat World records no Green checkpoint (the chain already died)");
+            }
+        }
+        check(found_mat_world, "R13 a Mat World is reachable within the trial age/seed sweep");
+
+        // (c) resolve_checkpoint's eligibility filter: an all-ineligible
+        // candidate set is itself a viability failure and forces a reroll,
+        // never a silent fallback to an ineligible branch. Neither of the two
+        // real checkpoint classes has an easy all-excluded scenario to hand
+        // (biology's own candidates are never lean-filtered today), so this
+        // exercises a small synthetic checkpoint class built only for this
+        // test: three candidates, the middle one is excluded on attempt 0 but
+        // present from attempt 1 onward, and floor_ok is deliberately always
+        // true so only the eligibility corollary is under test.
+        {
+            std::vector<checkpoint_record> synth;
+            const char* chosen_label = nullptr;
+            const bool resolved = resolve_checkpoint(
+                chain_stage::spark, 0xABCDu, 0x5A5Au, /*max_attempts=*/8,
+                [&](checkpoint_rng&, uint32_t attempt) {
+                    std::vector<checkpoint_branch> cs;
+                    cs.push_back({ "alpha", false });
+                    cs.push_back({ "beta", false }); // both ineligible on attempt 0
+                    cs.push_back({ "gamma", false });
+                    if (attempt >= 1)
+                        cs[1].eligible = true; // "beta" becomes eligible from attempt 1
+                    return cs;
+                },
+                [&](checkpoint_rng&, const checkpoint_branch& b) { chosen_label = b.label; },
+                [&]() { return true; },
+                synth);
+
+            check(resolved, "R13 resolve_checkpoint eventually resolves once a branch is eligible");
+            check(chosen_label != nullptr && std::string(chosen_label) == "beta",
+                  "R13 resolve_checkpoint only ever picks an ELIGIBLE branch");
+            check(synth.size() >= 2,
+                  "R13 the ineligible attempt(s) are recorded, not silently skipped");
+            check(!synth.empty() && !synth.front().viability_result,
+                  "R13 an all-ineligible attempt records viability_result == false");
+            check(!synth.empty() && synth.front().branch_taken.find("no eligible branch") != std::string::npos,
+                  "R13 an all-ineligible attempt's record says so, not a chosen branch's label");
+            check(synth.back().viability_result,
+                  "R13 the attempt that finally resolves records viability_result == true");
+
+            // And the never-eligible degenerate case: if NOTHING is ever
+            // eligible, the checkpoint exhausts max_attempts and reports
+            // failure rather than fabricating a winner.
+            std::vector<checkpoint_record> never;
+            const bool never_resolved = resolve_checkpoint(
+                chain_stage::spark, 0xDEADu, 0x5A5Au, /*max_attempts=*/4,
+                [&](checkpoint_rng&, uint32_t) {
+                    return std::vector<checkpoint_branch>{ { "x", false }, { "y", false } };
+                },
+                [&](checkpoint_rng&, const checkpoint_branch&) {},
+                [&]() { return true; },
+                never);
+            check(!never_resolved,
+                  "R13 a checkpoint with no eligible branch EVER exhausts its reroll cap and fails");
+            check(never.size() == 4,
+                  "R13 it records exactly one attempt per reroll, not a partial or doubled count");
+        }
     }
 
     // --- R14 the dated timestamp (BL-220) -------------------------------------
