@@ -19,6 +19,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const A = require('./archive_store');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const P = (rel) => path.join(ROOT, rel);
@@ -139,6 +140,40 @@ for (const item of items.values()) {
     if (!hasBody) {
       fail(`${item.id}: design is "@BACKLOG.md" but no "${item.id}" body or tombstone exists in ${BACKLOG_MD} — dead pointer; inline the prose or tombstone.`);
     }
+  }
+}
+
+// ---- Invariant 7: archive pointer integrity (the hot/cold split) ----
+// A landed item's prose lives in the cold store (tools/session/archive_store.js) and
+// the hot item keeps only an `archived` pointer. A pointer with no record behind it is
+// data loss wearing a reference's clothes — the same defect class as a dead @BACKLOG.md
+// pointer, and a hard FAIL for the same reason.
+{
+  const cache = new Map();
+  for (const item of items.values()) {
+    if (!item.archived) continue;
+    if (!fs.existsSync(P(item.archived))) {
+      fail(`${item.id}: archived → ${item.archived}, but that cold file does not exist.`);
+      continue;
+    }
+    const back = A.resolve(item, ROOT, cache);
+    if (back === item || !A.NARRATIVE.some((f) => back[f] != null)) {
+      fail(`${item.id}: archived → ${item.archived}, but it holds no record for this id — dead pointer.`);
+    }
+    if (!A.TERMINAL.has(item.status)) {
+      fail(`${item.id}: status "${item.status}" is not terminal but its prose is archived — restore it (archive_designs.js --restore ${item.id}).`);
+    }
+  }
+}
+
+// ---- Invariant 8: cold fraction — frozen history still sitting in the hot file ----
+// backlog.json is read ACROSS items far more often than INTO one; every byte of a
+// landed item's prose is paid for by every reader. Past a third of the file, the
+// close-out step has been skipped often enough to matter.
+{
+  const { cold, total, fraction } = A.coldFraction(backlog);
+  if (fraction > 0.30) {
+    warn(`backlog.json is ${(fraction * 100).toFixed(0)}% frozen history (${(cold / 1024).toFixed(0)} KB of ${(total / 1024).toFixed(0)} KB is prose on landed items) — run tools/session/archive_designs.js.`);
   }
 }
 

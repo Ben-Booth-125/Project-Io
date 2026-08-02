@@ -186,6 +186,23 @@ large); for a `design-owed` item, **Design** is the implied first step.
    can no longer pass silently; it exists because a 2026-07-04 currency audit found ~30 such loose
    ends.
 
+   **Then shed the weight (added 2026-08-02).** A landed item's design prose, resolution and
+   completion notes are frozen history: read when you look *at* that item, never when you look
+   *across* the backlog. Run **`node tools/session/archive_designs.js`** to move them into
+   `docs/development/archive/backlog-design-<quarter>.json`, leaving the item's `design` field as an
+   `@`-pointer and an `archived` field beside it. This is the physical form of the authority
+   time-slice CLAUDE.md already states — `backlog.json` owns the item while it is open, the subject's
+   authority doc owns it once the work lands. Nothing is lost: `backlog_query.js --full` and
+   `backlog_view.js` resolve the pointer transparently, `--restore` reverses the move, and
+   `backlog_lint.js` fails on a pointer with no record behind it. The first run took `backlog.json`
+   from 1.22 MB to 710 KB.
+
+   Two more close-out checks, both cheap and both catching a class of drift that used to pass:
+   **`node tools/session/mirror_check.js`** re-renders every generated Markdown mirror and reports
+   any that had drifted from its canonical JSON, and **`node tools/session/devlog_index.js`**
+   regenerates [`DEVLOG_INDEX.md`](DEVLOG_INDEX.md) so the session you just wrote is findable
+   without loading the log.
+
    **Commit-format scope (recorded 2026-07-31).** The `Tasks:`/`Requirements:` trailer applies to
    **Full-mode item deliveries**; Light, measurement, and filing commits carry a plain descriptive
    body — matching actual practice (e.g. the BL-233 terrain-combat measurement and the

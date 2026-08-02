@@ -2,7 +2,12 @@
 
 Project Io is a near-future space-based 4X grand strategy game. The player controls a corporate entity competing through resource extraction, trade, and military conflict across an Earth-like solar system. The project is in prototype phase, solo-developed in C++ with Lua scripting.
 
-Read the documents below before responding to any request. They are the authoritative source for all design and technical decisions.
+The documents below are the authoritative source for all design and technical decisions. Read the
+ones your request touches — **not all of them**: the set is now ~600K tokens (measure it with
+`node tools/doc_weight.js`), so "read everything first" stopped being an instruction anyone could
+follow. Read for **traversal**: find the doc that owns the question and read that. Where a doc has
+an index or a query tool — `DEVLOG_INDEX.md`, `backlog_query.js`, `actions_query.js`,
+`ACTIONS_INDEX.json` — use it instead of loading the file.
 
 ## Response style
 
@@ -38,10 +43,17 @@ The milestone map from the current state through v0.1.0 (the finished prototype)
 **`docs/development/DEVELOPMENT_PRACTICES.md`**
 Testing framework (Catch2), naming conventions, documentation standards, the per-milestone ImGui panel rule, the standing development constraints, the tone/approach guidance, and how to cut a release. Read this alongside TECH_FOUNDATIONS when working on implementation.
 
-**`docs/development/DEVLOG.md`**
+**`docs/development/DEVLOG_INDEX.md`** and **`docs/development/DEVLOG.md`**
 Running session log — chronological record of what was built each session and
 in-session decisions. Consult when asked about prior work, open items, or why
 a specific implementation choice was made.
+
+**Start at the index, not the log.** `DEVLOG_INDEX.md` is one generated line per session
+(date, title, the `BL-` ids it touched, which volume holds it) across every volume — find the
+session you want there, then open only that entry. `DEVLOG.md` holds the live sessions;
+sessions before 2026-07 live in `docs/development/archive/DEVLOG-2026.md`. Regenerate the
+index with `node tools/session/devlog_index.js` after adding an entry; roll older entries out
+with `--rollover <YYYY-MM>`.
 
 **`docs/development/SPRINTS.md`**
 Weekly goal + retro rhythm layered over the backlog — a goal stated at the week's start, a retro
@@ -60,6 +72,15 @@ subject's authority doc once the work lands. **`REFINED.md`** is the *active wor
 item is **promoted** into file-scoped tasks when we act on it. **`DELIVERY.md`** is the method
 authority — the Delivery lifecycle, design-state model, depth verbs, and worktree sub-agent model.
 Read DELIVERY.md before promoting or executing backlog work.
+
+**Query the backlog; do not load it.** `backlog.json` is ~700 KB. Use
+`node tools/session/backlog_query.js` — it defaults to index fields only (id, short_name, status,
+priority, version_goal) over open items, and takes `--status`, `--priority`, `--version`,
+`--category`, `--touches <path>`, `--grep`, `--fields`, `--table`, `--count`. Add `--full` (or name
+an id) to pull one item's prose. That time-slice above is now **physical**: when an item lands, its
+design/resolution/completion prose moves to `docs/development/archive/backlog-design-<quarter>.json`
+via `tools/session/archive_designs.js`, and the item keeps a pointer. `--full` and `backlog_view.js`
+resolve it transparently; amend a landed item's prose **in the cold file**, not in `backlog.json`.
 
 **`docs/development/user_stories.json`** and **`docs/development/USER_STORIES.md`**
 The user-story catalogue — the game decomposed by **player intent** (what the player is *trying to
@@ -211,7 +232,8 @@ backlog**, or **B) implement now** (smoke-test, then ask before committing).
 | **Method** (lifecycle, depth verbs, batch, worktrees) | `docs/development/DELIVERY.md` | The long-form of this section. |
 | **Requirements** (data + history) | `docs/development/req/requirements.json` (policy `docs/development/req/REQUIREMENTS.md`) | |
 | **Standing invariants** | `.claude/rules/io-standing-rules.md` | Always-on; the "do not" rules. |
-| What was built / why | `docs/development/DEVLOG.md` | |
+| Backlog **design prose** for a **landed** item | `docs/development/archive/backlog-design-<quarter>.json` | The cold store. Moved there on landing by `archive_designs.js`; amend it **here**, not in `backlog.json`. |
+| What was built / why | `docs/development/DEVLOG_INDEX.md` → `DEVLOG.md` (live) / `archive/DEVLOG-<year>.md` | Find the session in the index; open only that entry. |
 | **Weekly goal / retro** (feedback for Ben) | `docs/development/SPRINTS.md` | Not an authority — pacing signal only. |
 
 ### The Delivery lifecycle (Full mode)

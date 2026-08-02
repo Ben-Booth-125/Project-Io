@@ -32,7 +32,12 @@ const outPath = outArg >= 0 && argv[outArg + 1]
 
 // ---- Load + derive ----
 const backlogPath = path.join(repo, 'docs', 'development', 'backlog.json');
-const items = JSON.parse(fs.readFileSync(backlogPath, 'utf8')).items;
+// Landed items keep their prose in the cold store (tools/session/archive_store.js);
+// resolve it back so the "design prose" fold-out reads the same for every item.
+const archiveStore = require('./session/archive_store');
+const resolveCache = new Map();
+const items = JSON.parse(fs.readFileSync(backlogPath, 'utf8')).items
+  .map(it => archiveStore.resolve(it, repo, resolveCache));
 
 const TERMINAL = new Set(['complete', 'shipped', 'delivered']);
 const PRI_ORDER = ['SSS', 'S', 'A', 'B', 'C', 'F'];

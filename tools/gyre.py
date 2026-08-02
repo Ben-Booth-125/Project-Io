@@ -37,7 +37,9 @@ PRIORITY_ORDER = ["SSS", "S", "A", "B", "C", "F"]  # highest first
 TERMINAL_STATUS = {"delivered", "complete", "shipped"}
 
 def load_backlog():
-    with open(BACKLOG) as f:
+    # Explicit utf-8: the file carries ✓/~ glyphs and em dashes, and Windows'
+    # default cp1252 decode blows up on them (these tools were written on Linux).
+    with open(BACKLOG, encoding="utf-8") as f:
         return json.load(f)
 
 def git(*args):

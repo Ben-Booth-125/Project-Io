@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*31 entries — 10 open, 21 resolved.*
+*39 entries — 16 open, 23 resolved.*
 
 ---
 
@@ -43,21 +43,6 @@ With the per-tile table removed, the tab labelled "Tiles" holds two things: a bu
 > **Recommendation:** Option 2 reads best to me and is worth your eye rather than my call. Story and Chain both answer "how did this world come to be"; a current-state view has never belonged in a HISTORY ledger, and both its sections have better homes that already exist. That would also retire the history_tiles fold surface and simplify drill_through_fold.lua, which currently uses this table as its example of the fold’s biggest win.
 
 *Files: `src/ui/tile_inspector.cpp`, `scripts/verify/drill_through_fold.lua`, `scripts/verify/history_ledger_and_comms.lua`*
-
-### NR-021 — BL-217/218/219 were silently lost from backlog.json by a stale-base merge, and have been restored
-*decision taken on your behalf · raised 2026-08-02 · from Found while ordering the design-owed items for the batch-delivery design pass, 2026-08-02*
-
-SPRINTS.md § Sprint 2 records that BL-210 was split into BL-217 (checkpoint/branch data model), BL-218 (Nations rewrite) and BL-219 (Corporations rewrite), and BL-210’s own design prose still names all three as its decomposition. None of the three existed in backlog.json — the id sequence jumped 216 → 220. Tracing the file’s history: the three items were filed at 18c86c0 (2026-07-29), survived through 8542e4b (2026-07-31), and are absent from eaa0d23 (“On sync/origin-main-20260731: wip before Sprint3 merge”) onward. I recovered all three objects verbatim from 8542e4b and re-inserted them ahead of BL-220. Purely additive (+76 lines); backlog_lint clean; design prose intact (2082 / 2630 / 2315 chars).
-
-**Why it matters.** This is the stale-base worktree revert pattern, not a deliberate retirement — no commit message mentions removing them, and every surviving document still refers to them as live. Three design-owed items disappearing silently means a whole sprint’s decomposition evaporated while the docs claimed it existed; BL-210 would have been re-decomposed from scratch. Worth knowing that the same merge may have dropped other rows: I verified only the 216→220 gap, not the whole file against its history. A full row-level audit of backlog.json against eaa0d23’s parents is the thorough version and is not done.
-
-- Accept the restoration as-is (what I did).
-- Accept, and additionally run a full row-level audit of backlog.json against the pre-eaa0d23 tree to find any other rows the same merge dropped.
-- Reject — the three were meant to be retired, in which case BL-210’s design prose and SPRINTS.md § Sprint 2 both need correcting instead.
-
-> **Recommendation:** Option 2. The restoration itself is safe and clearly right — nothing in the corpus argues these were retired on purpose. But a merge that dropped three consecutive rows without comment is unlikely to have dropped exactly three, and the check is cheap next to discovering a fourth loss months from now. Note this is the second instance of the hazard; the parallel-worktree coherence guidance in DELIVERY.md exists because of the first.
-
-*Files: `docs/development/backlog.json`, `docs/development/SPRINTS.md`*
 
 ### NR-022 — BL-262 (scoring) — I answered all six of your open calls as one interlocking package; ratify or overturn
 *decision taken on your behalf · raised 2026-08-02 · from Design-owed sweep, 2026-08-02*
@@ -130,6 +115,8 @@ ROADMAP.md names the frame-budget targets (avg < 8ms, max < 16.7ms panning the f
 
 > **Recommendation:** Open the app (F11 for the frame-stats overlay), pan the full Kepler tile grid, and confirm avg < 8ms / max < 16.7ms. If it passes, v0.1.0 is done bar hygiene (warning-clean build, cppcheck pass) and the cut can be tagged.
 
+> **RESOLVED.** Superseded 2026-08-02: the premise was wrong — nothing in src/ forces a dummy driver under --verify, so a scripted run uses the real renderer and the build's real vsync. The measurement no longer needs a human: scripts/verify/pan_perf.lua (via the new verify.frame_csv tap on the BL-249 instrument) ran the exact ROADMAP check. Result: the target FAILS today — Debug 41-53 ms work/frame (every frame over 16.7), Release 11.3 ms at play zoom (passes 16.7, misses 8) and 16.8-17.6 ms at whole-grid zoom. Cause and fix are BL-268 (planetary canvas cull + cache); BL-267 (GPU/multicore) records the full verdict. Re-run pan_perf after BL-268 to close the cut-gate check.
+
 *Files: `docs/development/ROADMAP.md`, `src/ui/frame_stats.hpp`, `src/ui/frame_stats.cpp`*
 
 ### NR-027 — BL-217 checkpoint retrofit: S8/Legacy has no branch point, so no checkpoint was added there
@@ -172,6 +159,87 @@ world_history_entry's settled shape (per the task's own spec) carries exactly on
 > **Recommendation:** Leave as-is unless a concrete consumer needs source-body filterability on trade_route entries specifically. Route establishment is rare (bounded by the body-pair count, not convoy traffic), so the miss is small in practice, and neither alternative is clearly better than the gap it would close.
 
 *Files: `src/world/supply_system.cpp`, `src/world/world.hpp`*
+
+### NR-032 — Pan-stutter measurement: added a verify frame-timing tap (frame_reset/frame_csv/window + pan_perf.lua) and configured a Ninja Release tree (build_rel/)
+*decision taken on your behalf · raised 2026-08-02 · from Session 2026-08-02 (stutter-while-panning report)*
+
+To measure the reported panning stutter with real numbers, three verify functions were added to app.cpp (frame_reset / frame_csv — a CSV dump of the BL-249 frame-stats ring — and window(w,h) to measure at the live 1720x1080 rather than the 1280x720 golden size), frame_stats gained sample(i)/reset() accessors, the BL-249 instrument's function-local static was lifted to a file-local accessor so the verify tap can reach it, and scripts/verify/pan_perf.lua scripts a 300-frame sustained pan at three zooms against a no-pan baseline. Separately, build_rel/ was configured as a Ninja Release tree (same pinned 14.44 toolchain; ninja.exe found bundled under BuildTools' CMake) to quantify the Debug-vs-Release gap without touching the daily build/ Debug cache. All uncommitted as of writing.
+
+**Why it matters.** The tap is a permanent measurement asset (any future perf question is a Lua script away), but it adds three verify functions and a new build tree Ben did not ask for by name. The measurement route itself was a delegated call: desktop-automation of the live app was abandoned (its app resolver cannot see a non-Start-menu exe) in favour of instrumenting --verify, which was verified to run on the real renderer with real vsync.
+
+> **Recommendation:** Keep the tap and commit it (it is pure instrumentation — no world/* contact, no determinism surface); keep build_rel/ as the standing play/perf build alongside the Debug dev build. A build_rel.bat mirroring build_app.bat's toolchain pinning would make it one keystroke.
+
+*Files: `src/core/app.cpp`, `src/ui/frame_stats.hpp`, `src/ui/frame_stats.cpp`, `scripts/verify/pan_perf.lua`*
+
+### NR-033 — The daily-driver build is unoptimised Debug (/Od /RTC1) — and the stale claim that --verify uses a dummy video driver is wrong
+*observation · raised 2026-08-02 · from Session 2026-08-02 (stutter-while-panning measurement)*
+
+build/ (the exe _run.bat launches and Ben plays) is CMAKE_BUILD_TYPE=Debug with /Ob0 /Od /RTC1 — zero optimisation plus runtime checks. Measured pan cost: 41-53 ms of work per frame (every frame over the 16.7 ms refresh budget; ~19-24 fps). The same code built Release measures 11-18 ms — 3.6x faster; at play zoom it is 11.3 ms with zero budget misses. Separately, scripts/verify/frame_budget_hud.lua's header claims verify numbers are meaningless because --verify runs an offscreen/dummy driver; grep shows nothing in src/ sets any such driver — verify runs the real renderer with the build's real vsync, which is exactly why the pan_perf measurement is valid. That stale comment should be corrected so future sessions do not route around a measurement path that works.
+
+**Why it matters.** The 'engine starting to thrash' impression is substantially an artefact of playing an unoptimised Debug binary. No engine-architecture conclusion (GPU port, multithreading) should be drawn from Debug frame times.
+
+> **Recommendation:** Play from a Release build; keep Debug for debugging. Fix the frame_budget_hud.lua header comment when next touched.
+
+*Files: `build_app.bat`, `scripts/verify/frame_budget_hud.lua`*
+
+### NR-034 — The word-based milestone (generation via words, then gameplay) has no ROADMAP slot yet — Ben calls it 'the whole process', not one item
+*question · raised 2026-08-02 · from BL-270 (action dictionary) filing — Ben's elicitation answers, 2026-08-02*
+
+Ben, promoting BL-270: it 'blocks the next most important milestone, which is a word-based procedural generation and later gameplay', and — on the difficulty-level motivation — 'To consider what the difficulty level will be, we need this item. That is not really one item, it's the whole process of gameplay/development.' The dictionary is filed and promoted (v0.1.1, SSS), and its design names the consumer sequence (word-driven generation first, word-driven play after; a text-play harness item to follow). But ROADMAP.md currently carries no minor themed on word-based play, and 'the whole process' suggests a version-arc-level commitment (v0.1.1? v0.2.0 alongside the AI opponent?) rather than a feature.
+
+**Why it matters.** ROADMAP owns sequence; standing rule: do not implement a milestone that depends on an earlier one not yet complete. The dictionary lands either way, but the harness item, the word-driven wizard item, and the difficulty-level work all need a named slot in the version sequence before they can be filed with honest version goals — and the v0.2.0 AI-opponent arc already exists and overlaps ('the model that will eventually run on-machine').
+
+- Theme v0.1.1 as the word-interface minor: dictionary + text-play harness + cloud Sonnet/Opus experiment; word-driven generation and difficulty land later in the arc.
+- Fold it into the existing v0.2.0 AI-opponent arc: the dictionary is v0.1.1 groundwork, everything word-driven ships with the opponent.
+- Name it as its own post-v0.1.0 arc in ROADMAP with an explicit stage list (dictionary -> harness -> word generation -> difficulty), since Ben calls it 'the whole process'.
+
+> **Recommendation:** Option 1 for the near term — it matches 'dictionary now, generation and play consume it in sequence' without pre-committing the whole arc; revisit the arc naming when the harness exists and the cloud experiment has produced its first evidence.
+
+*Files: `docs/development/ROADMAP.md`*
+
+### NR-035 — Corp asset PLACEMENT still anchors to the nation, not to the home province BL-219 reads its focus from
+*decision taken on your behalf · raised 2026-08-02 · from BL-219 (corporations history rewrite) build, 2026-08-02*
+
+BL-219's settled design says a corporation's focus follows 'the industrialisation history of the province it is anchored to'. As built, the corp picks a home PROVINCE and derives its focus from that province - but Pass 3 then places its starting holdings with the existing nation-wide focus-scored anchor search, not inside that province. So the province decides WHAT the corp is; it does not yet decide WHERE it is.
+
+**Why it matters.** The derivation is honest either way (the province is genuinely chosen first and genuinely determines the focus), but the phrase 'anchored to' promises more than the code delivers, and a player reading a coastal trade corp's holdings 400 tiles inland would be reading a real inconsistency. Constraining placement to the province is a small change to place_starting_assets, but it interacts with the tuned holdings-clustering and terrain-viability behaviour that corp_terrain_matrix guards, so it was not done blind at the end of a large build.
+
+> **Recommendation:** Shipped the focus derivation without constraining placement, and documented the gap in CORPORATION_GENERATION.md rather than letting the doc imply the stronger claim. Recommend (a) - constrain Pass 3's anchor search to the home province window and re-run corp_terrain_matrix - as a small follow-on, since the doc's 'anchored to' wording is otherwise writing a cheque the code does not cash.
+
+*Files: `src/world/corporation_generation.cpp`, `docs/generation/CORPORATION_GENERATION.md`*
+
+### NR-036 — BL-054's territorial-fragmentation half was folded into BL-218 but is not demonstrated - no exclave is asserted anywhere
+*observation · raised 2026-08-02 · from BL-218 (nations settlement rewrite) build, 2026-08-02*
+
+BL-218's settled design folds BL-054's exclave/disputed-zone half in on the argument that 'a real settlement sim produces them for free - a growth front that crosses a strait and stalls leaves an exclave without anyone authoring one', and calls that the single best argument for the deeper option over the cheap alternative. The pass is built and the seeds are now province anchors, but nothing measures whether exclaves actually appear: Pass 2b (orphan-island assignment) still hands every water-disconnected component to its nearest neighbour, which is precisely the mechanism that would MANUFACTURE an exclave - or hide the absence of one. settlement_harness does not assert it and I did not add an assertion, because I could not tell from the code alone whether the exclaves that exist are the sim's or Pass 2b's.
+
+**Why it matters.** It is the load-bearing justification for having chosen the expensive option, and it is currently unverified. If the fragmentation is really Pass 2b's, the argument for the deeper path was made on a capability the deeper path did not supply - which is worth knowing before BL-054's remaining half is reasoned about.
+
+> **Recommendation:** Recommend (a): the assertion is cheap and it is the only way to know whether the argument that chose the expensive path was sound. Do not mark BL-054's territorial half complete until it exists.
+
+*Files: `src/world/settlement.cpp`, `src/world/nation_generation.cpp`, `tools/verify/settlement_harness.cpp`*
+
+### NR-037 — ai_skill_harness MSVC goldens re-blessed and history_ladder_harness H4 narrowed - both under BL-218, both explained upward
+*decision taken on your behalf · raised 2026-08-02 · from BL-218/BL-219 build, 2026-08-02*
+
+BL-218 changes the political map on every seed (nation seeds are now province anchors) and BL-219 changes the corporate mix, so two harnesses moved. (1) ai_skill_harness: 9 assertions failed on the old MSVC bands. Verified against a stashed baseline that they passed BEFORE the change, so this is genuinely caused by this work rather than pre-existing. Every divergence is UPWARD - net worth rose on seeds 0/2/4, dial counts crept past the old ceiling on 0/1/4 - while solvency and survival stayed in band on all five seeds, which reads as corps anchoring to provinces that actually industrialised rather than as a skill regression. Re-blessed the MSVC block only, per that file's own rule; the GCC block is untouched and will need a fresh Linux run. (2) history_ladder_harness H4: its stage-ordering assertion demanded every line in the recorded-history window be strictly older than the next, which only held while the ladder owned that window alone. Narrowed it to assert the ladder's own causal claim (granary before charter before accord) directly on the three stage lines.
+
+**Why it matters.** Re-blessing a golden is the project's routine convention ('bless routinely, flag only an UNEXPLAINED divergence'), and narrowing an assertion is not - it weakens a check. Both are recorded so the weakening is visible and so the stale GCC set is not forgotten.
+
+> **Recommendation:** Recommend (b) then (c): re-bless GCC on the next Linux run so the two platforms stop drifting, and treat tagging the ladder's lines with their own stage as the real fix for H4 - text-matching a line is exactly the fragility that assertion was narrowed around.
+
+*Files: `tools/verify/ai_skill_harness.cpp`, `tools/verify/history_ladder_harness.cpp`*
+
+### NR-038 — CLAUDE.md no longer says "read every document before responding" — the doc set outgrew the instruction
+*decision taken on your behalf · raised 2026-08-02 · from Documentation-compression pass (hot/cold backlog split, DEVLOG index, doc_weight.js)*
+
+CLAUDE.md opened with "Read the documents below before responding to any request." tools/doc_weight.js measures that reading order at ~606,000 tokens across 40 files — several times any usable context, so in practice the instruction was already being ignored, silently and unevenly. The opening was rewritten to instruct traversal instead: read the doc that owns the question, and prefer an index or query tool (DEVLOG_INDEX.md, backlog_query.js, actions_query.js) over loading a file whole.
+
+**Why it matters.** An instruction that cannot be followed is worse than a narrower one that can: it makes every session's actual reading undocumented and unpredictable. Recorded here rather than assumed because it changes the contract at the top of CLAUDE.md, which is the one document every session reads.
+
+> **Recommendation:** If you disagree, the alternative is to shrink the reading order to fit a real budget (doc_weight.js --budget takes a ceiling and exits non-zero when the named set is over it) rather than to restore the old wording.
+
+*Files: `CLAUDE.md`, `tools/doc_weight.js`*
 
 ---
 
@@ -490,6 +558,23 @@ Ben declined both options for the payback wording on a principle rather than on 
 
 *Files: `src/ui/selection_panel.cpp`, `src/ui/corporation_dashboard.cpp`, `docs/CONCEPT.md`*
 
+### NR-021 — BL-217/218/219 were silently lost from backlog.json by a stale-base merge, and have been restored
+*decision taken on your behalf · raised 2026-08-02 · from Found while ordering the design-owed items for the batch-delivery design pass, 2026-08-02*
+
+SPRINTS.md § Sprint 2 records that BL-210 was split into BL-217 (checkpoint/branch data model), BL-218 (Nations rewrite) and BL-219 (Corporations rewrite), and BL-210’s own design prose still names all three as its decomposition. None of the three existed in backlog.json — the id sequence jumped 216 → 220. Tracing the file’s history: the three items were filed at 18c86c0 (2026-07-29), survived through 8542e4b (2026-07-31), and are absent from eaa0d23 (“On sync/origin-main-20260731: wip before Sprint3 merge”) onward. I recovered all three objects verbatim from 8542e4b and re-inserted them ahead of BL-220. Purely additive (+76 lines); backlog_lint clean; design prose intact (2082 / 2630 / 2315 chars).
+
+**Why it matters.** This is the stale-base worktree revert pattern, not a deliberate retirement — no commit message mentions removing them, and every surviving document still refers to them as live. Three design-owed items disappearing silently means a whole sprint’s decomposition evaporated while the docs claimed it existed; BL-210 would have been re-decomposed from scratch. Worth knowing that the same merge may have dropped other rows: I verified only the 216→220 gap, not the whole file against its history. A full row-level audit of backlog.json against eaa0d23’s parents is the thorough version and is not done.
+
+- Accept the restoration as-is (what I did).
+- Accept, and additionally run a full row-level audit of backlog.json against the pre-eaa0d23 tree to find any other rows the same merge dropped.
+- Reject — the three were meant to be retired, in which case BL-210’s design prose and SPRINTS.md § Sprint 2 both need correcting instead.
+
+> **Recommendation:** Option 2. The restoration itself is safe and clearly right — nothing in the corpus argues these were retired on purpose. But a merge that dropped three consecutive rows without comment is unlikely to have dropped exactly three, and the check is cheap next to discovering a fourth loss months from now. Note this is the second instance of the hazard; the parallel-worktree coherence guidance in DELIVERY.md exists because of the first.
+
+> **RESOLVED.** Ben chose Option 2 (2026-08-02). Ran the full row-level audit: diffed backlog.json's item-id set at 8542e4b (pre-drop) against eaa0d23 (the merge). Exactly BL-217/218/219 were dropped — no other ids present at 8542e4b are missing from eaa0d23. All three are confirmed present in the current file post-restoration. No further loss found; closing.
+
+*Files: `docs/development/backlog.json`, `docs/development/SPRINTS.md`*
+
 ### NR-028 — BL-217 verification: fresh worktree could not configure CMake (FetchContent blocked), fell back to hand-compiled cl
 *observation · raised 2026-08-02 · from Session 2026-08-02 (BL-217 checkpoint/branch/lean foundation)*
 
@@ -515,4 +600,17 @@ This worktree's HEAD was the merge-base with main, 24 commits behind (missing BL
 > **RESOLVED.** Closed 2026-08-02 in the main (network-connected) checkout. build_app.bat (full ProjectIo target, including the new app.cpp include/call) and ctest --test-dir build --output-on-failure both run clean: 38/38 green, including history_log_harness (30/30) and the extended determinism_harness (all checks, +2 new). app.cpp's new code compiles and links in the real GUI build, closing the one gap the hand-compiled harnesses could not reach. tools/verify/README.md's river_generation.cpp TU-ripple gap (also flagged this item) is left open as its own small fix, not blocking.
 
 *Files: `src/core/app.cpp`, `tools/verify/README.md`*
+
+### NR-039 — C-route design session: Ben overrode the milestone-sequencing rule, and the design carves a new exception into the determinism standing rule
+*observation · raised 2026-08-02 · from Sprint-planning session, 2026-08-02 — asked whether the backlog was sprint-ready*
+
+Two standing-rule interactions in one session, both Ben's explicit call rather than mine, recorded here for traceability since they change durable authority docs. (1) C-route is v0.2.0 scope and v0.1.0 has not cut yet (ROADMAP.md: BL-258 + a human frame-budget pass still owed) — the sequencing rule in io-standing-rules.md says to flag this rather than design ahead; I flagged it, Ben said proceed anyway. (2) The resulting design (AI_OPPONENT.md §7a) has C-route's LLM calls live and NOT replay-logged, because Ben wants post-generation play to carry some genuine non-determinism the way generation itself does not — this required adding a new scoped exception to the determinism rule in io-standing-rules.md (mirrors how BL-079/BL-181 carved narrow exceptions into the no-AI-agency rule).
+
+**Why it matters.** Neither is a mistake — both are recorded, deliberate calls Ben made in chat, and the standing-rules file itself now documents the determinism exception so it reads as intentional rather than a regression. Logged here mainly so a future session tracing 'why is the sim non-deterministic in one spot' or 'why was v0.2.0 designed before v0.1.0 cut' finds the reasoning in one place rather than archaeology.
+
+> **Recommendation:** No action needed — both calls stand as made. BL-205's design field and AI_OPPONENT.md §7a carry the full decomposition; io-standing-rules.md carries the determinism carve-out inline.
+
+> **RESOLVED.** Recorded as an observation at the time both calls were made (2026-08-02); no open question remains.
+
+*Files: `.claude/rules/io-standing-rules.md`, `docs/ai/AI_OPPONENT.md`, `docs/development/backlog.json`*
 

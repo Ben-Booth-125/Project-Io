@@ -1,0 +1,32 @@
+{
+  "_schema": "backlog-archive/io-v1",
+  "_note": [
+    "Cold store for backlog items that landed in undated.",
+    "Written by tools/session/archive_designs.js; read by backlog_query.js --full.",
+    "Records here are FROZEN history. The live index is docs/development/backlog.json,",
+    "which points at this file via each item's `archived` field. To amend a landed",
+    "item's prose, edit it HERE — the hot file no longer carries a copy."
+  ],
+  "bucket": "undated",
+  "records": {
+    "BL-038": {
+      "completion_note": "Folded into BL-039; inter-body market coupling lands with convoy delivery (credit_arrived_convoys injects into market.supply). Complete 2026-06-17."
+    },
+    "BL-039": {
+      "completion_note": "Supply convoys, logistics, and inter-body market coupling (R1-R9) complete — supply_system.{hpp,cpp}, supply_lens.lua golden. 2026-06-17."
+    },
+    "BL-040": {
+      "design": "**Scope: v0.2 (post-prototype) -- deferred, NOT implemented.** The prototype targets v0.1.0 (ROADMAP); full-set deposit authoring is outside the current arc, so per the standing scope rule it is not built now.\n\n**Direction settled (2026-06-15); mechanics settle with the v0.2 tile-generation brief.** A **seeded per-resource rarity scalar** -- a decimal in [0, 1] (0 = trace/absent, 1 = near-universal ambient), **raw-tier resources only** (refined and product goods are made, not mined, so carry no deposits). The scalar **modulates deposit frequency and magnitude** on top of the existing terrain affinity, so a low scalar keeps a good sparse even on affine terrain and a high one approaches the every-tile ambient floor; it is **seeded** so a campaign's exact distribution varies while the rarity *ordering* (consistent with each good's RESOURCES.md base-price rarity) stays stable. The generation *mechanics* that consume the scalar are the tile-generation brief (BL-051), the same v0.2 pass. Settled into docs/economy/RESOURCES.md § Deposit rarity & scarcity and docs/generation/TILE_GENERATION.md § Deferred. Touches the deposit pass in src/world/tile_generation.cpp (data-only -- the deposit arrays already carry full enum width). src/-changing -> a headless deposit-distribution audit requirement at promotion. Status stays design-owed: direction is settled but the item is not promote-ready until the v0.2 pass is scheduled.\n\n**Record note (2026-07-04 reconciliation).** The 2026-07-01 'pointer repaired' note was wrong -- a full BL-040 body *did* survive in BACKLOG.md (richer than the reconstruction it replaced). That body is folded in above and tombstoned in BACKLOG.md.\n\n### Corrected 2026-07-21 (Sprint 1 procgen review)\nFound already **implemented**, not design-owed: `tile_generation.cpp` (BL-040 markers ~line 535, 645-657, 899-919) carries the full seeded-rarity-scalar deposit pass on an independent `rare_rng` stream exactly as designed above, and `docs/economy/RESOURCES.md` § Deposit rarity & scarcity documents it as implemented, guarded by the `world_audit` headless harness (R1). Flipped `design-owed` → `complete`; this was pure backlog bookkeeping drift, no new work done."
+    },
+    "BL-045": {
+      "completion_note": "Folded into BL-039; logistics cost constants in economy.lua, loaded via recipe_registry. Complete 2026-06-17."
+    },
+    "BL-046": {
+      "design": "Umbrella index only -- no design of its own; the design lives in the child items it decomposed into (2026-06-15). [Pointer repaired 2026-07-04 reconciliation: the prior @BACKLOG.md pointer dangled -- the BACKLOG.md body was removed without a tombstone when the item closed.]"
+    },
+    "BL-230": {
+      "design": "Ben (2026-07-30): \"make sure tooltips do not stick when initially open, and take 1/2 a second before they appear, then 2 seconds before they stick. From cursor pov they are behind tiles until they stick, but from a rendering pov they are always in front.\"\n\n**Landed.** Splits BL-228's single freeze-on-summon hover card into two phases: a GLANCE (kHoverAppearDelay = 30 frames @ 60 Hz = 0.5 s) that tracks the live cursor like an ordinary tooltip, then a STUCK freeze (kHoverStickDelay = 150 frames total = 2.5 s, i.e. 2 s after appearing) that stops tracking and is dismissed only once the pointer leaves its bounds + the existing exit pad. The window keeps ImGuiWindowFlags_NoInputs and the Tooltip flag throughout both phases, so it always draws above every other window (rendering pov) but never captures the pointer (cursor pov) — canvas hover/click always resolves to whatever tile or marker is beneath it, in either phase; nothing new was needed here since NoInputs already gave that property.\n\nscripts/verify/hover_freeze.lua rewritten from 3 to 5 captures to exercise both phases (glance-appears, glance-tracks-cursor, stuck, pinned-after-nudge-while-stuck, dismissed-on-exit); goldens re-blessed.",
+      "resolution": "COMPLETE 2026-07-31 (closed out). The hover glance-then-stick behaviour landed earlier and ROADMAP § v0.1.1 already records it as \"already landed\", but the item carried status \"landed\" -- not a terminal status per backlog_lint (TERMINAL = complete|shipped) -- and no resolution note, so it still counted as open work in every status query.\n\nVerified present by re-running scripts/verify/hover_freeze.lua on a Linux build: all five captures render (glance tracks cursor, stuck, pinned after nudge, dismissed on exit)."
+    }
+  }
+}
