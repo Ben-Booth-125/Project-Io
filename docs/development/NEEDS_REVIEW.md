@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*31 entries — 11 open, 20 resolved.*
+*31 entries — 10 open, 21 resolved.*
 
 ---
 
@@ -172,17 +172,6 @@ world_history_entry's settled shape (per the task's own spec) carries exactly on
 > **Recommendation:** Leave as-is unless a concrete consumer needs source-body filterability on trade_route entries specifically. Route establishment is rare (bounded by the body-pair count, not convoy traffic), so the miss is small in practice, and neither alternative is clearly better than the gap it would close.
 
 *Files: `src/world/supply_system.cpp`, `src/world/world.hpp`*
-
-### NR-031 — BL-208 verification: fresh worktree was also a STALE base (pre-BL-217) and could not configure CMake; integrated main, then hand-compiled with cl
-*observation · raised 2026-08-02 · from Session 2026-08-02 (BL-208 world history log)*
-
-This worktree's HEAD was the merge-base with main, 24 commits behind (missing BL-217's checkpoint_record/planetology_state.checkpoints — this item's own hard dependency — plus BL-166/168, BL-170 rivers, and a backlog/doc sweep). Stashed the in-progress BL-208 edits, fast-forwarded the branch to main (clean, no conflicts bar an auto-merged app.cpp), then popped the stash back (also clean). Separately, cmake -S . -B build hit the same FetchContent/TLS block NR-028 already named (codeload.github.com, CRYPT_E_NO_REVOCATION_CHECK) — confirmed by direct reproduction, not assumed from NR-028. Fell back to hand-compiled cl per the task's documented contingency: the new history_log_harness (27/27 PASS), an extended determinism_harness (2 new checks, 25/25 PASS), and a 7-harness regression sweep across every file this item touched (corp_ai_harness, ai_skill_harness, trade_routes_harness, commercial_fog_harness, supply_advance, econ_stability, blackboard_harness — all green, 0 failures) all built and ran clean. Also found tools/verify/README.md's hand-written world-superset recipes are one file short of linking (hard_coded_world.cpp now includes river_generation.hpp, from the BL-170 rivers pass that landed on main) — documented as a TU-ripple note in the README rather than silently worked around.
-
-**Why it matters.** Confirms the same fresh-worktree network block NR-028 named, on a second worktree — worth a standing note if it recurs a third time. Separately, the full ProjectIo GUI target and the whole-suite ctest could not be run this session for the same network reason; every headless/logic-level surface this item touches was verified by hand-compiled harnesses instead, but the GUI build itself (src/core/app.cpp's new #include and setup_world call) was only compiled by inspection, not by a real link, since no headless harness touches app.cpp.
-
-> **Recommendation:** Next session with network access (or the main non-worktree checkout, per this item's own closing instructions): run build_app.bat (default ProjectIo target) then ctest --test-dir build --output-on-failure once, to close this out and to confirm app.cpp's new include/call compiles and links inside the real GUI build.
-
-*Files: `src/core/app.cpp`, `tools/verify/README.md`*
 
 ---
 
@@ -513,4 +502,17 @@ cmake -S . -B build in this worktree failed at the SDL3 FetchContent step: codel
 > **RESOLVED.** Closed 2026-08-02 in the main (non-worktree) checkout, which already had network access and a configured build/ tree. build_app.bat (full ProjectIo target) and ctest --test-dir build --output-on-failure both run clean: 37/37 green, including planetology_harness (121/121, 19 new R13 checkpoint assertions) and planetology_sweep (R1-R3 metrics reproduced exactly). No regression outside the planetology TU graph, confirming the inspection this entry already did.
 
 *Files: `src/world/planetology.cpp`, `src/world/planetology.hpp`*
+
+### NR-031 — BL-208 verification: fresh worktree was also a STALE base (pre-BL-217) and could not configure CMake; integrated main, then hand-compiled with cl
+*observation · raised 2026-08-02 · from Session 2026-08-02 (BL-208 world history log)*
+
+This worktree's HEAD was the merge-base with main, 24 commits behind (missing BL-217's checkpoint_record/planetology_state.checkpoints — this item's own hard dependency — plus BL-166/168, BL-170 rivers, and a backlog/doc sweep). Stashed the in-progress BL-208 edits, fast-forwarded the branch to main (clean, no conflicts bar an auto-merged app.cpp), then popped the stash back (also clean). Separately, cmake -S . -B build hit the same FetchContent/TLS block NR-028 already named (codeload.github.com, CRYPT_E_NO_REVOCATION_CHECK) — confirmed by direct reproduction, not assumed from NR-028. Fell back to hand-compiled cl per the task's documented contingency: the new history_log_harness (27/27 PASS), an extended determinism_harness (2 new checks, 25/25 PASS), and a 7-harness regression sweep across every file this item touched (corp_ai_harness, ai_skill_harness, trade_routes_harness, commercial_fog_harness, supply_advance, econ_stability, blackboard_harness — all green, 0 failures) all built and ran clean. Also found tools/verify/README.md's hand-written world-superset recipes are one file short of linking (hard_coded_world.cpp now includes river_generation.hpp, from the BL-170 rivers pass that landed on main) — documented as a TU-ripple note in the README rather than silently worked around.
+
+**Why it matters.** Confirms the same fresh-worktree network block NR-028 named, on a second worktree — worth a standing note if it recurs a third time. Separately, the full ProjectIo GUI target and the whole-suite ctest could not be run this session for the same network reason; every headless/logic-level surface this item touches was verified by hand-compiled harnesses instead, but the GUI build itself (src/core/app.cpp's new #include and setup_world call) was only compiled by inspection, not by a real link, since no headless harness touches app.cpp.
+
+> **Recommendation:** Next session with network access (or the main non-worktree checkout, per this item's own closing instructions): run build_app.bat (default ProjectIo target) then ctest --test-dir build --output-on-failure once, to close this out and to confirm app.cpp's new include/call compiles and links inside the real GUI build.
+
+> **RESOLVED.** Closed 2026-08-02 in the main (network-connected) checkout. build_app.bat (full ProjectIo target, including the new app.cpp include/call) and ctest --test-dir build --output-on-failure both run clean: 38/38 green, including history_log_harness (30/30) and the extended determinism_harness (all checks, +2 new). app.cpp's new code compiles and links in the real GUI build, closing the one gap the hand-compiled harnesses could not reach. tools/verify/README.md's river_generation.cpp TU-ripple gap (also flagged this item) is left open as its own small fix, not blocking.
+
+*Files: `src/core/app.cpp`, `tools/verify/README.md`*
 

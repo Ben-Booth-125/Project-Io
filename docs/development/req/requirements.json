@@ -7747,7 +7747,7 @@
       "difficulty": 5,
       "importance": "C",
       "evaluated_difficulty": 5,
-      "status": "active",
+      "status": "complete",
       "promoted_from": "BL-208 (world history log), pulled forward ahead of BL-218/219 per Ben 2026-08-02",
       "batch": "sprint2-oral-history",
       "rows": [
@@ -7757,8 +7757,8 @@
           "verification": [
             "headless: tools/verify/history_log_harness.cpp (new)"
           ],
-          "status": "pending",
-          "result_metric": null,
+          "status": "complete",
+          "result_metric": "Met — world::history_log (world.hpp), history_topic/world_history_entry, following the trade_routes precedent.",
           "notes": null
         },
         {
@@ -7767,8 +7767,8 @@
           "verification": [
             "headless: tools/verify/history_log_harness.cpp"
           ],
-          "status": "pending",
-          "result_metric": null,
+          "status": "complete",
+          "result_metric": "Met — seed_genesis_history bridges generation_report per-body history/checkpoints into world at setup_world; confirmed new plumbing (R1/R2 harness assertions).",
           "notes": null
         },
         {
@@ -7777,8 +7777,8 @@
           "verification": [
             "headless: tools/verify/history_log_harness.cpp"
           ],
-          "status": "pending",
-          "result_metric": null,
+          "status": "complete",
+          "result_metric": "Met — decision/agency/trade_route entries logged additively at existing emission sites; trade_route logs only on first establishment, repeat completions do not duplicate; body_activity_visibility and export_corp_blackboard confirmed unchanged (R6).",
           "notes": null
         },
         {
@@ -7787,8 +7787,8 @@
           "verification": [
             "headless: tools/verify/history_log_harness.cpp"
           ],
-          "status": "pending",
-          "result_metric": null,
+          "status": "complete",
+          "result_metric": "Met — write_history_log/read_history_log, magic+version header (BL-107), round-trip field-identical, rejects wrong-magic/wrong-version/truncated streams without misreading.",
           "notes": null
         },
         {
@@ -7797,8 +7797,8 @@
           "verification": [
             "headless: tools/verify/history_log_harness.cpp, tools/verify/determinism_harness.cpp"
           ],
-          "status": "pending",
-          "result_metric": null,
+          "status": "complete",
+          "result_metric": "Met — determinism_harness gains 2 checks: genesis+checkpoint chapter size and field-identity across two generations.",
           "notes": null
         },
         {
@@ -7807,8 +7807,8 @@
           "verification": [
             "headless: tools/verify/history_log_harness.cpp, existing ai_skill_harness/determinism_harness"
           ],
-          "status": "pending",
-          "result_metric": null,
+          "status": "complete",
+          "result_metric": "Met — export_corp_blackboard and body_activity_visibility behave identically, confirmed by dedicated R6 harness assertions.",
           "notes": null
         },
         {
@@ -7817,11 +7817,13 @@
           "verification": [
             "review: docs/ai/AI_OPPONENT.md, docs/generation/GENERATION_LEDGER.md"
           ],
-          "status": "pending",
-          "result_metric": null,
+          "status": "complete",
+          "result_metric": "Met — AI_OPPONENT.md gains §8a; GENERATION_LEDGER.md states the disposable/tuning vs durable/narrative lifetime split.",
           "notes": null
         }
-      ]
+      ],
+      "resolved": "2026-08-02",
+      "resolution": "All 7 rows met. history_log_harness 30/30, determinism_harness 38/38 total (2 new checks), full CTest 38/38 in the main checkout (network-connected, confirming app.cpp compiles/links in the real GUI build)."
     }
   ]
 }
