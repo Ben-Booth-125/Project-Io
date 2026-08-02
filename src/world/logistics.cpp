@@ -1,4 +1,5 @@
 #include "logistics.hpp"
+#include "river_generation.hpp"
 
 #include <algorithm>
 #include <functional>
@@ -192,7 +193,15 @@ logistics_path intra_body_path(world& w, entity_id body, entity_id src_tile, ent
             if (!n_tc)
                 continue; // absent grid cell — impassable
 
-            const float edge = 0.5f * (cur_cost + tile_traversal_cost(*n_tc));
+            // River discount (BL-170): a river-adjacent edge is cheaper, stacking
+            // MULTIPLICATIVELY with the road-tier discount already folded into
+            // tile_traversal_cost above. The A* neighbour walk is 4-cardinal on the
+            // raster grid; hex_side_for_offset maps that cardinal move to the hex
+            // side (0-5) river tracing recorded on `cur`'s tile.
+            const int hex_side = hex_side_for_offset(off_dc[i], off_dr[i], (cur.row & 1) != 0);
+            const float river_mult = (hex_side >= 0) ? river_edge_discount(*cur_tc, hex_side) : 1.0f;
+
+            const float edge = 0.5f * (cur_cost + tile_traversal_cost(*n_tc)) * river_mult;
             const float nd   = dist[static_cast<std::size_t>(idx)] + edge;
             if (nd < dist[static_cast<std::size_t>(nidx)])
             {

@@ -416,6 +416,45 @@ goods happens in `hard_coded_world.cpp`'s market authoring, not here.
 
 ---
 
+## Rivers (BL-170, landed)
+
+A **sibling pass** (BL-051 convention), `generate_rivers` (`src/world/river_generation.{hpp,cpp}`),
+runs after `generate_body_tiles` returns for Kepler — it needs Pass 2's ocean placement and the
+Pass 5 landform set for source-tile candidacy, so it is not spliced into the six-pass core.
+
+**A river is an EDGE, never a tile** — no lake or other tile-occupying water feature is implied.
+Each tile carries two `std::uint8_t` bitmasks (`tile_component::river_edges` /
+`river_downstream`, `src/world/components.hpp`): bit *i* of `river_edges` marks that the tile's
+hex side *i* carries a river crossing (side order 0=E, 1=NE, 2=NW, 3=W, 4=SW, 5=SE, odd-r offset);
+the same bit in `river_downstream` marks whether that side is the outflow (set) or inflow (clear)
+direction. `tile_borders_river(tc)` reads `river_edges != 0` — the water-adjacency signal
+BL-166/168-style farming predicates want, wired as a follow-on task, not by this pass.
+
+**Trace algorithm.** Source candidates are non-ocean tiles carrying a `mountain` or `highland`
+landform, sorted by (height descending, raster index ascending) so candidate order is a pure
+function of the height field and grid shape. A seeded `std::mt19937` (`seed ^ 0x52495645u`,
+"RIVE") picks `clamp(gw*gh / 1800, 3, 24)` sources by striding the sorted list with a jittered
+offset per stride. Each source then walks its 6 hex neighbours, always stepping to the
+strictly-lowest-height neighbour available; a step onto an `ocean` tile ends the trace there, and
+a tile with no lower neighbour ends the trace as a **basin** (no lake tile is created — out of
+scope). Height strictly decreases every step, so termination and cycle-freedom follow by
+construction — no explicit visited-set is needed.
+
+**Logistics discount.** `river_edge_discount(from, side)` (`river_generation.hpp`) returns a
+per-edge multiplier — 1.0 (no discount) if that side of `from` carries no river, else 0.75
+downstream / 0.85 upstream — folded into the intra-body A* edge cost in
+`src/world/logistics.cpp` alongside the road-tier discount (stacking **multiplicatively**, not a
+new resource or market good). See `docs/economy/SUPPLY.md` § Logistical cost for the stacking
+rule against the road ladder. `hex_side_for_offset(dc, dr, odd_row)` is the shared mapping from a
+cardinal A*-grid step to the hex side river tracing recorded, since the A* neighbour walk is
+4-cardinal on the raster grid while river sides are the full 6-neighbour hex.
+
+Verified by `tools/verify/river_generation_harness.cpp` (determinism, mutual edge consistency,
+monotonic descent / no cycles, discount ordering) and a bitmask-identity check folded into
+`tools/verify/determinism_harness.cpp`.
+
+---
+
 ## Deferred
 
 The following are noted here as future work. None are in scope for the prototype. **Each is a
