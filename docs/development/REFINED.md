@@ -1,96 +1,39 @@
 # Project Io — REFINED (active worklist)
 
-# Sprint 5 — Era −1 history sim: foundation wave (2026-08-02) — **IN PROGRESS**
+# Sprint 5 — Era −1 history sim: foundation wave (2026-08-02) — **COMPLETE**
 
-Requirements: `req/requirements.json` § unit-doctrine-combat (BL-272), § province-demography
-(BL-273). Both promoted from `designed` items with no unmet dependencies (BL-233 and BL-218 both
-already landed) and **disjoint file scopes** — run as two parallel worktree-isolated agents, no
-shared-file collision. Wave 2 (BL-274, era rosters) needs BL-272 landed in `main` first; wave 3
-(BL-271, the sim loop) needs all three landed; not promoted yet.
+Both items landed as two parallel worktree-isolated agents (disjoint files, no collision), merged
+into `doc-compression` then fast-forwarded into `main`. Full CTest suite 41/41 green post-merge
+(also the first real build/test pass on the previously-uncommitted BL-218/219 settlement backend).
 
-## Combat engine (BL-272) — promoted, in progress.
+**Combat engine (BL-272) — COMPLETE.** Files: `src/world/combat.{hpp,cpp}` (new),
+`src/world/components.hpp` (`unit_component.type`), `tools/verify/combat_harness.cpp` (new).
+unit-doctrine-combat R1–R4 all met; `combat_harness` 15/15 PASS. `resolve_battle` is the shared
+entry point for the future Era −1 sim and the existing 1960+ era path.
 
-- **[4] A — Typed unit stacks + doctrine-parameter combat resolve.** Files:
-  `src/world/combat.hpp` (new), `src/world/combat.cpp` (new), `src/world/components.hpp`
-  (`unit_component` gains a type field), `src/world/terrain_combat.{hpp,cpp}` (read-only consumer
-  — do not change its scalars, only call them). Deps: foundation. Satisfies: R1, R2, R3, R4.
-  Read `docs/lore/HISTORY.md` § BL-272 design (the "Settled at filing" block) before starting —
-  it fixes the shape: class-pair matchup matrix + doctrine modifiers, integer arithmetic with
-  explicit tie-breaks throughout (no floats in the outcome path), one `resolve_battle`-shaped
-  entry point callable from both the future Era −1 sim and the existing 1960+ era path. Build a
-  `tools/verify/combat_harness.cpp` alongside proving R1–R4.
+**Province demography (BL-273) — COMPLETE.** Files: `src/world/settlement.{hpp,cpp}` (extended),
+`docs/economy/POPULATION.md`, `tools/verify/demography_harness.cpp` (new). province-demography
+R1–R4 all met; `demography_harness` 20/20 PASS; `settlement_harness` re-verified clean (21/21)
+against the extended `province` struct.
 
-Parallelisation note: single root, no internal split — the resolve function's passes share files
-per the codebase convention, so this stays one agent working sequentially.
-
-## Province demography (BL-273) — promoted, in progress.
-
-- **[3] A — Province population growth + manpower.** Files: `src/world/settlement.{hpp,cpp}`
-  (extend the BL-218 province struct with a population field and a year-tick update),
-  `docs/economy/POPULATION.md` (mark this as its first real consumer). Deps: foundation, disjoint
-  from BL-272's files. Satisfies: R1, R2, R3, R4. Read `docs/lore/HISTORY.md` § BL-273 design
-  before starting — logistic growth in integer fixed-point keyed to the existing `farm_q`
-  endowment, war/plague drawdown (plague reuses BL-217's checkpoint-eligibility mechanism, never a
-  bare weighted roll), manpower as a bounded fraction of population that armies deplete. Build a
-  `tools/verify/demography_harness.cpp` alongside proving R1–R4, following `settlement_harness`'s
-  S1a/S1b determinism-pair pattern (two same-seed generations, compare population trajectories
-  field for field).
-
-Parallelisation note: single root, parallel-safe with BL-272 (disjoint files — `settlement.{hpp,cpp}`
-vs `combat.{hpp,cpp}`/`components.hpp`/`terrain_combat.{hpp,cpp}`). Both agents build and commit
-on their own worktree branch; the main session merges, builds, and verifies before promoting
-BL-274.
+**Next:** wave 2 (BL-274, era-keyed unit rosters) needs BL-272 landed in `main` — now true — and
+is ready to promote. Wave 3 (BL-271, the sim loop) needs all three; not promoted yet.
 
 ---
 
-
-> Drained 2026-07-31 (doc sweep): thirteen stale COMPLETE sections removed per the
-> retain-one policy — their record lives in DEVLOG.md and req/requirements.json.
-
-# BL-270 (action dictionary) — **COMPLETE** (2026-08-02). Tasks T1–T6 all complete,
-none cancelled (T1's roster and T2–T4's authoring ran as five parallel family agents
-rather than sequential tasks — same coverage, one pass); action-dictionary R1–R4 all
-met. 114 entries in `docs/ai/ACTIONS.{json,md}`; renderer doubles as the shape check.
-Two truth catches: LENSES.md's stale supply-routes unreachability note (corrected) and
-the seven-rung Esc ladder (transcribed in `chrome.esc`).
+> Drained 2026-08-02: BL-270 (action dictionary) and BL-268 (planetary canvas cull + cache),
+> both COMPLETE, removed per the retain-one policy — their record lives in DEVLOG.md and
+> req/requirements.json (§ action-dictionary, § planetary-pan-perf).
 
 ---
 
-# BL-268 (planetary canvas cull + cache) — **COMPLETE** (2026-08-02). Tasks T0–T5 all
-complete, none cancelled; planetary-pan-perf R1–R4 all met (play-zoom pan Release
-11.26 → 4.98 ms, Debug 41.21 → 6.74 ms; six goldens pixel-identical un-blessed).
-Whole-grid residual filed as BL-269 (zoomed-out LOD / terrain draw cache).
-
----
-
-# Sprint 2 — BL-210 (oral-history pivot): the settlement rewrite (2026-08-02) — **IN PROGRESS**
-
-Requirements: `req/requirements.json` § checkpoint-branch-model (BL-217), and two not-yet-added
-groups for BL-218/BL-219 (added when each is promoted — strict dependency chain, not a fan-out:
-BL-218 needs BL-217 landed in `main`; BL-219 needs BL-218 landed). Each runs as its own
-worktree-isolated agent, sequenced rather than parallel, since each reads the previous item's
-actual code (not just its design).
-
-## Checkpoint/branch model (BL-217) — **COMPLETE.** Files: `src/world/planetology.{hpp,cpp}`,
-`tools/verify/planetology_harness.cpp`, `docs/generation/PLANETOLOGY.md`. checkpoint-branch-model
-R1-R6 all complete; full CTest 37/37.
-
-## World history log (BL-208) — **COMPLETE.** Files: `src/world/history_log.{hpp,cpp}` (new),
-`src/world/world.hpp`, `src/world/corp_ai.cpp`, `src/world/economy_system.cpp`,
-`src/world/supply_system.cpp`, `src/core/app.cpp`, `tools/verify/history_log_harness.cpp` (new),
-`docs/ai/AI_OPPONENT.md`, `docs/generation/GENERATION_LEDGER.md`. world-history-log R1-R7 all
-complete; full CTest 38/38. The project's first flat-binary serialiser (magic+version header,
-BL-107); genesis+checkpoint chapter bridges generation output into `world` for the first time.
-
-## Nations settlement rewrite (BL-218) — not yet promoted; depends on BL-208 landing.
-
-## Corporations history rewrite (BL-219) — not yet promoted; depends on BL-218 landing.
-
----
-
-> Drained 2026-08-02: Sprint 1 (procgen v1's food cluster — BL-166/168/170, all complete) removed
-> per the retain-one policy — record lives in backlog.json `resolution` fields and
-> requirements.json § hydroponics-bay / § fishing-wharf / § river-generation.
+> Drained 2026-08-02: Sprint 2 (BL-210 oral-history pivot: BL-217 checkpoint/branch model, BL-208
+> world history log, BL-218 nations settlement rewrite, BL-219 corporations history rewrite — all
+> four `complete` in backlog.json, BL-218/219's code landed via commit 0b9351d) and Sprint 1
+> (procgen v1's food cluster — BL-166/168/170, all complete) removed per the retain-one policy —
+> record lives in DEVLOG.md, backlog.json `resolution` fields, and requirements.json
+> § checkpoint-branch-model / § world-history-log / § settlement-history-rewrite /
+> § hydroponics-bay / § fishing-wharf / § river-generation.
 
 The **active, prioritised, actionable worklist** (formerly TASKS.md). Unlike the backlog
 ([`backlog.json`](backlog.json) metadata + [`BACKLOG.md`](BACKLOG.md) design bodies), every

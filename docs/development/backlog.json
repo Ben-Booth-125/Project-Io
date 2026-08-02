@@ -5892,7 +5892,7 @@
       "short_name": "UNIT_DOCTRINE_COMBAT_MODEL",
       "category": "Environment",
       "title": "Typed units + doctrine-parameter combat - one engine for simulated history AND the main era (overturns the abstract-war decision)",
-      "status": "designed",
+      "status": "complete",
       "glyph": "✓",
       "priority": "B",
       "difficulty": 4,
@@ -5911,14 +5911,15 @@
       ],
       "authority_doc": "docs/lore/HISTORY.md",
       "summary": "OVERTURNED DECISION, recorded here at Ben's instruction rather than parked in NEEDS_REVIEW (Ben, 2026-08-02): since BL-221 the rule has been that simulated-history wars resolve as ABSTRACT scalar comparisons (record_tribal_conflict, the rupture war branch - zeal/dominion/terrain numbers, no units). Ben overturns the abstract half: simulated history uses REAL ancient units and real military tactics, as typed unit types that later exist in the main era. The 'drives, does not narrate' half SURVIVES untouched - battles still move borders, abundance and the record. The strongest argument for the overturn: unit_component in the 1960 game is a stub (count=50, nothing else), so the sandbox does not borrow the main era's military model - it DEFINES it. One combat engine, era-keyed rosters (BL-274), and the 1960 game inherits a mil-sim with two thousand years of regression tests behind it.",
-      "design": "## Settled at filing (2026-08-02 brainstorm)\n\n**'Real tactics' means doctrine parameters, never battlefields.** This is the load-bearing constraint everything else prices off. 2000 years x ~40 nations x a seed spread is millions of engagements; if a battle is a tactical simulation, the sweep is dead on arrival. The workable shape:\n\n- An **army is a stack of typed units** (unit_component grows a type; a stack is a vector of (type, count) pairs).\n- A **battle is ONE deterministic evaluation**: unit-type matchup matrix x formation doctrine x BL-233's terrain scalars (terrain_defence / terrain_attrition / terrain_resistance, landed 2026-07-31 - and this is finally their intended consumer, per HISTORY.md's BL-224 note) x supply state x season.\n- **Tactics are data, not manoeuvres**: a doctrine row reads like 'phalanx - devastating frontal, brittle flank, useless in mountain'. Rock-paper-scissors with historical teeth: a doctrine is a set of modifiers against the matchup matrix and the terrain scalars, nothing more.\n- **Integer arithmetic with explicit tie-breaks** throughout - battle outcomes are gate-path decisions (they move borders), so the float ban applies.\n\n**Engine parity contract:** the same resolve function serves the Era -1 sim and the 1960+ era; only the roster table (BL-274) and the doctrine table differ. No sandbox-only combat rules - anything the sandbox needs, the main era gets.\n\n## Open questions\n\n1. Matchup matrix size: per unit-type pair, or per class pair (infantry / cavalry / ranged / siege / naval) with type-level modifiers? (Lean: class pair + modifiers - the matrix stays readable and rosters stay cheap to extend.)\n2. Naval combat: same engine with a sea 'terrain', or deferred? (Sea-cheap logistics makes navies strategically decisive before they are tactically interesting - lean: strategic-only naval presence first, engine extension later.)\n3. Sieges/attrition vs field battles: the ancient norm is that attrition and supply kill more than battle does. Does the first cut model sieges as a doctrine ('assault' vs 'invest') or as a separate resolution path?"
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
       "id": "BL-273",
       "short_name": "PROVINCE_DEMOGRAPHY",
       "category": "Environment",
       "title": "Province demography - population growth, war/plague drawdown, and manpower as the army budget (POPULATION.md's first honest consumer)",
-      "status": "designed",
+      "status": "complete",
       "glyph": "✓",
       "priority": "B",
       "difficulty": 3,
@@ -5935,7 +5936,8 @@
       ],
       "authority_doc": "docs/economy/POPULATION.md",
       "summary": "Armies are population, and the Era -1 sim (BL-271) is unanchored without a manpower model: population centres currently carry a static scale and no growth, so 2000 years of army sizes would float free of anything. This item gives each PROVINCE (the BL-218 unit) a population that grows and is drawn down - the deferred POPULATION.md design finding its first honest consumer, at the coarse granularity the year-tick needs rather than the full agglomeration model the 1960 game eventually wants.",
-      "design": "## Settled at filing (2026-08-02 brainstorm)\n\n- **Logistic growth per province**, integer fixed-point, carrying capacity derived from the province's farm endowment (the world-relative farm_q BL-218 already computes) - the ground feeds who it can feed. Growth modulated by war (drawdown at battles fought on or by the province) and by rare plague events (a checkpoint-class draw reusing BL-217's mechanism - eligibility-filtered, recorded, never a weight).\n- **Manpower is the army budget**: a nation's recruitable stock is a fraction of its provinces' population, and units raised deplete it. This closes the loop that makes 2000-year wars self-limiting - the reason ancient hegemonies stall is manpower exhaustion, and the sim should reproduce that from the model rather than from a cap.\n- **Feeds the existing surfaces on graduation**: at the 1960 handoff the province populations seed the population-centre scales (today drawn from a weighted distribution), so the demography the sim earned replaces a die roll - the same pattern as every other BL-210-era rewrite.\n\n## Open questions\n\n1. Granularity: population per province only, or with an urban/rural split? (Lean: province total first; the split is a refinement the 1960 agglomeration model can add.)\n2. Plague as global events (Antonine-plague-shaped, hitting connected provinces harder - trade connectivity as the vector, which makes the sea lanes double-edged) or as local draws? The connectivity version is more interesting and reads straight off the logistics graph.\n3. Does carrying capacity move when industrialisation arrives? Almost certainly yes - Stage 4's fossil-fuel escape from the organic economy IS a carrying-capacity jump - but the magnitude wants tuning against BL-275's sweep."
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     },
     {
       "id": "BL-274",

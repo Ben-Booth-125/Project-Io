@@ -8034,7 +8034,7 @@
       "difficulty": 4,
       "importance": "S",
       "evaluated_difficulty": 4,
-      "status": "active",
+      "status": "complete",
       "promoted_from": "BL-272, promoted 2026-08-02 as Sprint 5's foundation wave (no unmet dependencies beyond BL-233, already landed)",
       "batch": "sprint5-history-sim",
       "rows": [
@@ -8044,8 +8044,8 @@
           "verification": [
             "headless: combat_harness"
           ],
-          "status": "pending",
-          "result_metric": "",
+          "status": "complete",
+          "result_metric": "Met - unit_component gained a uint16_t type field; army_stack_entry{type_id, unit_class, count, type_power_mod}, an army is a std::vector<army_stack_entry>. combat_harness 15/15 PASS.",
           "notes": ""
         },
         {
@@ -8054,8 +8054,8 @@
           "verification": [
             "headless: combat_harness"
           ],
-          "status": "pending",
-          "result_metric": "",
+          "status": "complete",
+          "result_metric": "Met - resolve_battle takes both army stacks, doctrine rows, terrain, season and supply and returns a deterministic battle_outcome; tie broken toward defender. All-integer/per-mille arithmetic; harness asserts identical inputs -> identical outputs and a terrain-flips-the-outcome scenario.",
           "notes": "This is BL-233's terrain scalars' intended consumer per HISTORY.md's BL-224 note - first real use, not a new terrain model."
         },
         {
@@ -8064,8 +8064,8 @@
           "verification": [
             "headless: combat_harness"
           ],
-          "status": "pending",
-          "result_metric": "",
+          "status": "complete",
+          "result_metric": "Met - doctrine_row{frontal_bonus, flank_fragility, mountain_penalty, siege_stance} is pure data; harness instantiates two distinct doctrine_row values driving the same resolve_battle to opposite outcomes on different terrain.",
           "notes": ""
         },
         {
@@ -8075,8 +8075,8 @@
             "headless: combat_harness",
             "headless: ctest full suite"
           ],
-          "status": "pending",
-          "result_metric": "",
+          "status": "complete",
+          "result_metric": "Met - resolve_battle carries no Era-(-1)-sim-only coupling; naval entries contribute zero tactical power (strategic-only lean). Full CTest suite 41/41 green after merge to main, including world_audit and the existing generation-tier harnesses.",
           "notes": "Only the roster table (BL-274) and doctrine table are expected to differ by era, never the resolve function itself."
         }
       ]
@@ -8087,7 +8087,7 @@
       "difficulty": 3,
       "importance": "S",
       "evaluated_difficulty": 3,
-      "status": "active",
+      "status": "complete",
       "promoted_from": "BL-273, promoted 2026-08-02 as Sprint 5's foundation wave (needs only BL-218, already landed)",
       "batch": "sprint5-history-sim",
       "rows": [
@@ -8097,8 +8097,8 @@
           "verification": [
             "headless: demography_harness"
           ],
-          "status": "pending",
-          "result_metric": "",
+          "status": "complete",
+          "result_metric": "Met - province gains population (int64_t), last_demography_year, manpower_stock; province_carrying_capacity(farm_q) is linear off farm_q; advance_province_demography does integer fixed-point logistic growth. demography_harness 20/20 PASS, including growth ordering across two different farm_q values.",
           "notes": ""
         },
         {
@@ -8107,8 +8107,8 @@
           "verification": [
             "headless: demography_harness"
           ],
-          "status": "pending",
-          "result_metric": "",
+          "status": "complete",
+          "result_metric": "Met - advance_province_demography takes war_pressure_q for drawdown; resolve_plague_event draws through resolve_checkpoint (planetology.hpp), asserted to actually filter ineligible candidates, not just reduce population. Plague-connectivity lean: grid (Chebyshev) proximity via existing col/row fields, not the full logistics/trade graph (not reachable at this generation stage) - noted in POPULATION.md and the header.",
           "notes": ""
         },
         {
@@ -8117,8 +8117,8 @@
           "verification": [
             "headless: demography_harness"
           ],
-          "status": "pending",
-          "result_metric": "",
+          "status": "complete",
+          "result_metric": "Met - manpower_ceiling/replenish_manpower/raise_manpower give a bounded stock; raise_manpower asserted to clamp rather than go negative/unbounded when raised past availability.",
           "notes": "This is the mechanism that is meant to make 2000-year wars stall on manpower exhaustion, per the item's design rationale."
         },
         {
@@ -8128,8 +8128,8 @@
             "headless: demography_harness",
             "headless: ctest full suite"
           ],
-          "status": "pending",
-          "result_metric": "",
+          "status": "complete",
+          "result_metric": "Met - S1a/S1b-style determinism pair test over N simulated years, all fields identical. settlement_harness re-verified clean against the extended province struct (21/21). Full CTest suite 41/41 green after merge to main.",
           "notes": "Same determinism discipline as settlement_harness S1a/S1b."
         }
       ]

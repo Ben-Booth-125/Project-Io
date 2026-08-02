@@ -40,7 +40,7 @@ and/or a version goal (v0.1.1 etc.).
 | 2b | BL-210 oral-history pivot (nations/corps rewrite) | **Closed** — all four rungs built (BL-217, BL-208, BL-218, BL-219) |
 | 3 | Corp AI stage B + skill harness | **Closed** — BL-203, BL-204 both landed |
 | 4 | Communication surface (BL-205 chat log) | **Mostly landed** — slice 1 (window, channels, agency feed) complete 2026-07-26/28; only the C-route remainder (§7 Stage C) stays open, unstaffed |
-| 5 | Era −1 history sim, 0–2000 CE (BL-271–275) | **In progress** — foundation wave (BL-272, BL-273) promoted to REFINED.md 2026-08-02 |
+| 5 | Era −1 history sim, 0–2000 CE (BL-271–275) | **In progress** — foundation wave (BL-272, BL-273) landed 2026-08-02; wave 2 (BL-274) ready to promote |
 
 **Next up:** Sprint 2b is closed — BL-218 (nations settlement rewrite) and BL-219 (corporations
 history rewrite) both landed 2026-08-02. What remains of BL-210's umbrella is its batch-sweep
@@ -99,9 +99,9 @@ wave, run in parallel**. BL-274 (era-keyed rosters) needs BL-272. BL-271 (the si
 three. BL-275 (the seed sweep) needs BL-271.
 
 **Planned.**
-- BL-272 — unit/doctrine combat engine (foundation wave)
-- BL-273 — province demography + manpower (foundation wave)
-- BL-274 — era-keyed unit rosters (wave 2, needs BL-272)
+- BL-272 — unit/doctrine combat engine (foundation wave) — **complete 2026-08-02**
+- BL-273 — province demography + manpower (foundation wave) — **complete 2026-08-02**
+- BL-274 — era-keyed unit rosters (wave 2, needs BL-272 — dependency now satisfied)
 - BL-271 — the year-tick sim loop (wave 3, needs BL-272/273/274)
 - BL-275 — the seed-spread sweep (wave 4, needs BL-271)
 
