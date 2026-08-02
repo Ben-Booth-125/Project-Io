@@ -10,6 +10,71 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## Session — the design-owed sweep: thirty items settled, and three recovered from a merge (2026-08-02)
+
+**Runtime.** ~2h. Full (Design depth verb across the whole design-owed set; no code, no authority-doc
+edits — settlements land in `backlog.json` and stop there).
+
+**The ask.** "Let's work through the design-owed items... prioritise items in sprint 1 > 2 > 3... if
+items are marked as deferred, or they await later items, just promote them now. We want to prepare
+for a batch delivery of tons of the latest design work."
+
+### The ordering was ambiguous, and asking cost less than guessing
+
+`SPRINTS.md` has **two entries numbered Sprint 2**, and only ~8 of the then-28 design-owed items map
+onto any named sprint. Put the real state up with the three readings and let Ben pick: **version
+goal**. That gave a clean 28-item order and took one question.
+
+### Three items had been silently deleted
+
+Ordering the set surfaced that **BL-217/218/219 did not exist** — the id sequence jumped 216 → 220 —
+while `SPRINTS.md` § Sprint 2 and BL-210's own design prose both name them as BL-210's decomposition.
+Traced the file's history: filed at `18c86c0` (2026-07-29), present through `8542e4b`, absent from
+`eaa0d23` ("wip before Sprint3 merge") onward. No commit message mentions retiring them.
+
+This is the **stale-base worktree revert** pattern for the second time. Recovered all three verbatim
+from `8542e4b`, +76 lines, lint clean (NR-021 — which also flags that a merge dropping three
+consecutive rows is unlikely to have dropped exactly three; a full row-level audit is *not* done).
+
+### The real finding: items were waiting on each other, not on design
+
+Roughly a third of the set settled by **redistribution** rather than new design. Settling one item
+dissolved the next:
+
+- **BL-263** (markets never disappear, they go dormant) → **BL-131** stops being "player-driven market
+  destruction" and becomes player-induced dormancy; its hard catchment question evaporates. 4 → 2.
+- **BL-155 / BL-158 / BL-218** → **BL-054** loses three of its four parts. Tax and the licence gate are
+  laws; sentiment is BL-158; fragmentation folded into BL-218. 5 → 3.
+- **BL-157** (a unit is positioned by *tile id*) → **BL-189**'s data half needs no schema change at all.
+- **BL-217/218/219** → **BL-210** becomes a pure umbrella with a three-part closing condition. 5 → 2.
+- **BL-262** (capital standing feeds credit terms) → **BL-225**'s "credit access" needs no new channel.
+
+Two items were **stale bookkeeping, not open design**: BL-087's status claimed an owed set remained
+two lines above the section resolving it, and BL-098's method had been settled since 2026-07-05.
+
+### Three calls worth Ben's eye
+
+- **NR-022** — BL-262 (scoring): all six open calls answered as one interlocking package, because they
+  are not independent. Recorded for ratification, not adopted silently.
+- **NR-024** — BL-155 surfaced a contradiction: BL-171 confirmed **Tax** as a player lever, but every
+  law in the ten-law list is an instrument of public authority and the player is a *corporation*.
+  Settled that laws are enacted by nations and the player is a law **subject** until BL-094.
+- **NR-025** — BL-223's "three-doc" Era disagreement is **four-way**; its table omits BL-087's reframe,
+  which is newer and governs. With it there is no contradiction — a *past* averted rupture and a
+  *future* seeded one, doing different jobs. **CONCEPT.md:51 is right and survives unamended**, which
+  reverses the item's own owed action.
+
+### Left open on purpose
+
+**BL-229** (building selection) is the only remaining design-owed item, and deliberately so — it
+carries Ben's written "do not guess the layout, Ben designs this one". Q5 and sequencing settled;
+Q1–Q4 restated against measured column widths (135 / 254 / 135 px at the 1280×720 floor, 260 px band)
+so they can be answered against numbers rather than prose (NR-023).
+
+**Backlog: 61 designed, 1 design-owed.** Review queue carries 6 open entries.
+
+---
+
 ## Session — the disclosure spine: one fold idiom, and the surfaces stop inventing their own (2026-08-01)
 
 **Runtime.** ~2h. Full (Batch Delivery — three items, main-session-serial by design; two design
