@@ -605,6 +605,66 @@
         "src/world/planetology.hpp"
       ],
       "resolution": "Closed 2026-08-02 in the main (non-worktree) checkout, which already had network access and a configured build/ tree. build_app.bat (full ProjectIo target) and ctest --test-dir build --output-on-failure both run clean: 37/37 green, including planetology_harness (121/121, 19 new R13 checkpoint assertions) and planetology_sweep (R1-R3 metrics reproduced exactly). No regression outside the planetology TU graph, confirming the inspection this entry already did."
+    },
+    {
+      "id": "NR-029",
+      "title": "BL-208 checkpoint-log timestamp: no exact 1:1 pairing between checkpoint_record entries and history_event lines at a stage — resolved with a documented simplification",
+      "raised": "2026-08-02",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "BL-208 (world history log) — the checkpoint-migration bridge, src/world/history_log.cpp's resolve_checkpoint_timestamp",
+      "what": "checkpoint_record carries no timestamp of its own (by design — see planetology.hpp, changing its shape now has a ripple cost the item explicitly said to avoid). The task asked me to resolve one by matching a checkpoint to its body's dated history_event lines at the same chain_stage. Inspecting planetology.cpp showed this is NOT a clean 1:1 pairing: some checkpoints (e.g. a body that already terminated at an earlier stage still records a failing Spark checkpoint) have NO dedicated history_event line at their stage at all; others share a stage with a sibling checkpoint that DOES have its own line (Green resolves up to two checkpoints — 'land colonised' then 'combustion cleared/failed' — against up to three Green-tagged history lines, with no code-level tag distinguishing which line belongs to which checkpoint). Replicating planetology.cpp's branch logic in the log bridge to pair them exactly would duplicate logic in a second place it could silently drift from.",
+      "why_it_matters": "The chosen rule is simple and always produces A resolved, non-fabricated timestamp, but is coarser than the true per-line correspondence in the double-checkpoint case: every checkpoint at a stage resolves to that stage's LAST dated line at or before it (i.e. multiple checkpoints at the same stage can share one timestamp, and the true finer-grained moment for e.g. a combustion-threshold checkpoint is sometimes an adjacent line rather than the exact one). This affects only display ordering/precision within a handful of lines per body, not correctness of the underlying planetology chain or its archetype/died_at outcome.",
+      "options": [
+        "Keep the simplification (current state): last-dated-line-at-or-before-stage, documented inline and here.",
+        "Duplicate planetology.cpp's per-branch call sequence in history_log.cpp to pair checkpoints exactly 1:1 with their originating say() call — more precise, but a second place the biology narrative logic lives, which is exactly the kind of drift risk PLANETOLOGY.md's own determinism-and-cost section warns against.",
+        "Add an explicit timestamp field to checkpoint_record after all, accepting the save-format ripple the task asked me to avoid unless there was no other reasonable option."
+      ],
+      "recommendation": "Keep option 1. The genesis+checkpoint chapter is presentation-scoped (an oral-history line, not a simulation input), and history_log_harness.cpp's R2 already asserts every checkpoint gets a real, non-fallback-zero timestamp and the count matches exactly — the property that actually matters for BL-218/BL-219 building on this substrate. Precision to the exact narrated line is a polish item, not a correctness one; revisit only if a later consumer reads checkpoint timestamps at sub-stage granularity.",
+      "files": [
+        "src/world/history_log.cpp",
+        "src/world/planetology.hpp",
+        "tools/verify/history_log_harness.cpp"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-030",
+      "title": "BL-208 trade_route log entries: the struct's single `body` tag cannot carry a two-body event's both endpoints",
+      "raised": "2026-08-02",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "BL-208 (world history log) — src/world/supply_system.cpp's credit_arrived_convoys, the trade_route-topic push site",
+      "what": "world_history_entry's settled shape (per the task's own spec) carries exactly one body tag and one corp tag. A newly-established trade route is inherently a TWO-body event (src_body <-> dest_body). I tagged the entry with dest_body (the pool credited that tick) and named BOTH endpoints in the narration text, so the information is not lost, but a future body-scoped filter over history_log (e.g. 'show me everything that happened at body X') would miss this entry for the SOURCE body specifically.",
+      "why_it_matters": "This is a real, if narrow, gap in the 'tag each entry so it's filterable into either view' design goal for exactly one topic (trade_route) and exactly one axis (the non-tagged endpoint). It does not affect the corp view (the dispatching corp is tagged correctly) or the body view for the tagged endpoint.",
+      "options": [
+        "Leave as-is (dest_body tagged, both names in text) — the current state.",
+        "Push two entries per new route, one tagged per endpoint, both with the same narration — doubles trade_route log volume for a rare event (route establishment, not every convoy) and duplicates data for a single event.",
+        "Widen world_history_entry with a second optional body tag (e.g. body_b) used only by this one topic — a shape change to a struct four other call sites now depend on, for one topic's need."
+      ],
+      "recommendation": "Leave as-is unless a concrete consumer needs source-body filterability on trade_route entries specifically. Route establishment is rare (bounded by the body-pair count, not convoy traffic), so the miss is small in practice, and neither alternative is clearly better than the gap it would close.",
+      "files": [
+        "src/world/supply_system.cpp",
+        "src/world/world.hpp"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-031",
+      "title": "BL-208 verification: fresh worktree was also a STALE base (pre-BL-217) and could not configure CMake; integrated main, then hand-compiled with cl",
+      "raised": "2026-08-02",
+      "kind": "observation",
+      "status": "open",
+      "source": "Session 2026-08-02 (BL-208 world history log)",
+      "what": "This worktree's HEAD was the merge-base with main, 24 commits behind (missing BL-217's checkpoint_record/planetology_state.checkpoints — this item's own hard dependency — plus BL-166/168, BL-170 rivers, and a backlog/doc sweep). Stashed the in-progress BL-208 edits, fast-forwarded the branch to main (clean, no conflicts bar an auto-merged app.cpp), then popped the stash back (also clean). Separately, cmake -S . -B build hit the same FetchContent/TLS block NR-028 already named (codeload.github.com, CRYPT_E_NO_REVOCATION_CHECK) — confirmed by direct reproduction, not assumed from NR-028. Fell back to hand-compiled cl per the task's documented contingency: the new history_log_harness (27/27 PASS), an extended determinism_harness (2 new checks, 25/25 PASS), and a 7-harness regression sweep across every file this item touched (corp_ai_harness, ai_skill_harness, trade_routes_harness, commercial_fog_harness, supply_advance, econ_stability, blackboard_harness — all green, 0 failures) all built and ran clean. Also found tools/verify/README.md's hand-written world-superset recipes are one file short of linking (hard_coded_world.cpp now includes river_generation.hpp, from the BL-170 rivers pass that landed on main) — documented as a TU-ripple note in the README rather than silently worked around.",
+      "why_it_matters": "Confirms the same fresh-worktree network block NR-028 named, on a second worktree — worth a standing note if it recurs a third time. Separately, the full ProjectIo GUI target and the whole-suite ctest could not be run this session for the same network reason; every headless/logic-level surface this item touches was verified by hand-compiled harnesses instead, but the GUI build itself (src/core/app.cpp's new #include and setup_world call) was only compiled by inspection, not by a real link, since no headless harness touches app.cpp.",
+      "options": [],
+      "recommendation": "Next session with network access (or the main non-worktree checkout, per this item's own closing instructions): run build_app.bat (default ProjectIo target) then ctest --test-dir build --output-on-failure once, to close this out and to confirm app.cpp's new include/call compiles and links inside the real GUI build.",
+      "files": [
+        "src/core/app.cpp",
+        "tools/verify/README.md"
+      ],
+      "resolution": null
     }
   ]
 }

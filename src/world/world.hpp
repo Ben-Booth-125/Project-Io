@@ -43,6 +43,66 @@ struct logistics_path
     std::vector<entity_id> tiles;
 };
 
+// ---------------------------------------------------------------------------
+// World history log (BL-208) — the append-only, serialised world log
+// ---------------------------------------------------------------------------
+// A SINGLE INTERLEAVED log, not per-body/per-corp logs: those fail on a corp
+// acting on a body (every interesting event) and would need a join with no
+// shared ordering. Tagged instead, so it projects into either view by
+// filtering. Four sources feed it, all additive to their existing consumers:
+//   - genesis    — PLANETOLOGY's per-body dated history_event lines, copied in
+//                  once at world setup (see seed_genesis_history, history_log.hpp).
+//   - checkpoint — planetology_state::checkpoints, migrated alongside genesis
+//                  (BL-217 deliberately shaped checkpoint_record so this is a
+//                  move, not a rewrite).
+//   - decision   — corp_decision_ring's entries (BL-202), additionally logged
+//                  (non-evicting) at their push site in corp_ai.cpp.
+//   - agency     — agency_event's emission sites (BL-079 reflex tier in
+//                  economy_system.cpp; BL-202 strategic tier in corp_ai.cpp).
+//   - trade_route — credit_arrived_convoys in supply_system.cpp, only when a
+//                  body-pair lane is FIRST established (never on a repeat
+//                  completion, which only bumps the existing trade_route).
+// See docs/ai/AI_OPPONENT.md for the settled shape and docs/generation/
+// GENERATION_LEDGER.md for why this stays a separate mechanism from the ledger
+// (disposable/tuning vs. durable/narrative — same instinct, incompatible
+// lifetimes). Serialisation lives in history_log.{hpp,cpp}.
+
+/// What kind of event a `world_history_entry` records. Each topic is a
+/// filterable view over the one interleaved log (docs/ai/AI_OPPONENT.md).
+enum class history_topic : uint8_t
+{
+    genesis,     ///< A PLANETOLOGY dated history_event line, copied at world setup.
+    checkpoint,  ///< A planetology_state::checkpoints branch decision, migrated alongside genesis.
+    decision,    ///< A BL-202 strategic corp_decision (the AI's command + rationale).
+    agency,      ///< A BL-079/BL-202 agency_event (reflex or strategic tier).
+    trade_route, ///< A trade_route's FIRST establishment (not repeat traffic on an existing lane).
+};
+
+/// One entry in `world::history_log`. `timestamp`'s UNIT DEPENDS ON TOPIC —
+/// deliberately, on the same "one field spans two regimes for display reasons"
+/// precedent `history_event::years_before_epoch` already establishes (see
+/// planetology.hpp): `genesis`/`checkpoint` entries reuse that exact
+/// years-before-the-1960-epoch value (positive = the deep/historical past, 0 =
+/// epoch) so the genesis chapter merges in on its EXISTING timestamps with no
+/// conversion; `decision`/`agency`/`trade_route` entries — which only ever
+/// occur DURING the live simulation, strictly after the genesis+checkpoint
+/// bulk-insert at world setup — instead carry the sim day tick (a small
+/// non-negative int) they were emitted at. A reader must branch on `topic` to
+/// know which clock it is reading; nothing in the log itself needs the two
+/// clocks to compare numerically, because the vector's append order is
+/// already the true chronological order end-to-end (genesis/checkpoint are
+/// bulk-inserted once at setup, before any tick runs; everything else is
+/// appended strictly in tick order thereafter).
+struct world_history_entry
+{
+    int64_t       timestamp = 0;
+    history_topic topic     = history_topic::genesis;
+    entity_id     body      = null_entity; ///< Tag; null_entity if not applicable.
+    entity_id     corp      = null_entity; ///< Tag; null_entity if not applicable.
+    std::string   event;                   ///< Left column — what happened.
+    std::string   consequence;              ///< Right column — what it left behind (may be empty).
+};
+
 /// ECS registry. Entities are plain integer IDs; components are stored in
 /// per-type maps. The registry owns all component data for the lifetime of
 /// the simulation.
@@ -138,9 +198,21 @@ struct world
     /// has run (BL-088). Upserted by credit_arrived_convoys when a convoy completes
     /// a lane; never erased (aging to 'stale' is a read-time concern owned by the
     /// commercial-sphere fog, BL-089). A std::vector mirroring `convoys`; insertion
-    /// order, stable between ticks. Joins the flat-binary serialisation seam
-    /// symmetrically when that path exists (none is wired in world/* yet).
+    /// order, stable between ticks. The flat-binary serialisation seam now exists
+    /// (`history_log` below, BL-208) but `trade_routes` itself does not join it
+    /// directly — only a derived `world_history_entry` (topic=trade_route) is
+    /// written, and only when a lane is FIRST established.
     std::vector<trade_route> trade_routes;
+
+    /// The append-only world history log (BL-208) — see the `history_topic` /
+    /// `world_history_entry` doc comments above for the four sources and the
+    /// per-topic timestamp convention. THIS is the project's first flat-binary
+    /// serialisation seam (history_log.{hpp,cpp}); everything else in `world`
+    /// remains unserialised. Populated once at world setup with the genesis +
+    /// checkpoint chapters (seed_genesis_history), then appended to live as the
+    /// simulation runs. Never erased or evicted — unlike `ai_decisions`'s 256-cap
+    /// ring, this is meant to grow for the life of a campaign.
+    std::vector<world_history_entry> history_log;
 
     /// Proximity-glimpse stamps (BL-099) — the sim day tick at which a player convoy
     /// last passed within `glimpse_radius_au_default` (AU) of this body while completing

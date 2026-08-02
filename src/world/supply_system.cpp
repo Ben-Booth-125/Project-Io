@@ -5,8 +5,10 @@
 #include <algorithm>
 #include <cmath>
 #include <numbers>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 
 void advance_convoys(world& w)
 {
@@ -67,6 +69,29 @@ void credit_arrived_convoys(world& w, int tick)
                 route.last_tick    = tick;
                 route.convoy_count = 1;
                 w.trade_routes.push_back(route);
+
+                // World history log (BL-208): only on FIRST establishment of this
+                // body-pair lane, never on a repeat completion (which only bumps
+                // the trade_route above — untouched, byte-for-byte, by this log
+                // entry). Self-contained — history_topic/world::history_log are
+                // already visible via world.hpp (this file already includes it
+                // via supply_system.hpp), so no new translation-unit dependency
+                // for the existing tools/verify/README.md hand-written recipes
+                // that link supply_system.cpp. The struct carries one body tag;
+                // dest_body is used (the pool credited this tick), and both
+                // endpoints are named in the narration so neither is lost.
+                const auto src_it  = w.bodies.find(src_body);
+                const auto dest_it = w.bodies.find(dest_body);
+                world_history_entry e;
+                e.timestamp = tick;
+                e.topic     = history_topic::trade_route;
+                e.body      = dest_body;
+                e.corp      = convoy.corp;
+                e.event     = std::string("New trade route established: ") +
+                              (src_it != w.bodies.end() ? src_it->second.name : "?") +
+                              " <-> " +
+                              (dest_it != w.bodies.end() ? dest_it->second.name : "?");
+                w.history_log.push_back(std::move(e));
             }
             else
             {

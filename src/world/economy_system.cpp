@@ -9,7 +9,9 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <string>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 namespace {
@@ -20,6 +22,23 @@ entity_id building_body(const world& w, const building_component& b)
 {
     const auto it = w.tiles.find(b.tile);
     return (it != w.tiles.end()) ? it->second.body : null_entity;
+}
+
+/// World history log (BL-208): push an additional, non-evicting `agency`-topic
+/// entry for a BL-079 reflex-tier action. Self-contained — history_topic and
+/// world::history_log are already visible via world.hpp (this file already
+/// includes it through economy_system.hpp), so this adds no new translation-
+/// unit dependency for the existing tools/verify/README.md hand-written recipes
+/// that link economy_system.cpp.
+void log_reflex_agency(world& w, entity_id corp, entity_id body, const char* what)
+{
+    world_history_entry e;
+    e.timestamp = w.current_day_tick;
+    e.topic     = history_topic::agency;
+    e.body      = body;
+    e.corp      = corp;
+    e.event     = std::string("Corp ") + std::to_string(corp) + " " + what;
+    w.history_log.push_back(std::move(e));
 }
 
 /// Extraction: credit the (corp, body) pool with the target resource and draw the
@@ -739,6 +758,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
                             b.loss_streak         = 0; // give the new recipe a chance before idling
                             report.agency_events.push_back(
                                 {corp, bid, agency_event::kind::recipe_switch, b.recipe});
+                            log_reflex_agency(w, corp, building_body(w, b), "switched recipe (floored output)");
                             continue;
                         }
                     }
@@ -754,6 +774,7 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
                         b.decommissioned = true;
                         report.agency_events.push_back(
                             {corp, bid, agency_event::kind::idled, 0});
+                        log_reflex_agency(w, corp, building_body(w, b), "idled a loss-making building");
                     }
                 }
                 else

@@ -20,6 +20,7 @@
 
 #include "world/world.hpp"
 #include "world/hard_coded_world.hpp"
+#include "world/history_log.hpp"
 
 #include <algorithm>
 #include <cstdio>
@@ -116,6 +117,36 @@ int main()
             }
         }
         check(river_ok, "river edge/downstream bitmasks identical across two generations");
+    }
+
+    // World history log genesis+checkpoint chapter (BL-208) — seed_genesis_history
+    // bridges PLANETOLOGY's per-body dated history + checkpoints into
+    // world::history_log at world setup. Self-contained (its own generation pair,
+    // with a generation_report captured) since seed_genesis_history mutates the
+    // world and `a`/`b` above are const and were generated without a report.
+    // Body tags are compared directly across the two independent generations —
+    // valid because entity-id assignment is itself asserted deterministic above
+    // (sorted_keys(a.bodies) == sorted_keys(b.bodies) etc.).
+    {
+        generation_report rep_a, rep_b;
+        world wa = make_hard_coded_world({}, &rep_a);
+        world wb = make_hard_coded_world({}, &rep_b);
+        seed_genesis_history(wa, rep_a);
+        seed_genesis_history(wb, rep_b);
+
+        const bool same_size = wa.history_log.size() == wb.history_log.size();
+        check(same_size, "history-log genesis+checkpoint chapter size identical across two generations");
+
+        bool same = same_size;
+        for (std::size_t i = 0; same && i < wa.history_log.size(); ++i)
+        {
+            const world_history_entry& ea = wa.history_log[i];
+            const world_history_entry& eb = wb.history_log[i];
+            same = ea.timestamp == eb.timestamp && ea.topic == eb.topic &&
+                   ea.body == eb.body && ea.corp == eb.corp &&
+                   ea.event == eb.event && ea.consequence == eb.consequence;
+        }
+        check(same, "history-log genesis+checkpoint chapter is field-identical, entry-for-entry, in order");
     }
 
     // (corp,body) stockpile-pool keys.

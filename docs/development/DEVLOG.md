@@ -10,6 +10,76 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## Session — the world history log: the project's first serialisation seam (2026-08-02)
+
+**Runtime.** ~3h. Full (touches the economy/serialisation seam, spans well over 2 logic files,
+carries a genuine determinism/reconciliation risk — earns the lifecycle by Rule 0).
+
+**The ask.** Build BL-208 (world history log): the append-only, tagged, single-interleaved world
+log the item's design settled on 2026-08-02, laying the project's first flat-binary serialisation
+path ahead of BL-218 (nations rewrite) and BL-219 (corporations rewrite), which are expected to
+write into this same substrate.
+
+### What was built
+
+`history_topic` + `world_history_entry` on `world::history_log` (`src/world/world.hpp`); the
+genesis+checkpoint bridge `seed_genesis_history` (new `src/world/history_log.{hpp,cpp}`), called
+from `app::setup_world` right after `make_hard_coded_world` — the first time PLANETOLOGY's
+per-body dated history and checkpoint decisions ever reach `world` state rather than staying
+presentation-only in `generation_report`; and the serialiser itself
+(`write_history_log`/`read_history_log`) with a leading magic+version header (BL-107's own rule),
+field-identical round-trip, and rejection — not misreading — of a corrupt/wrong-magic/wrong-
+version/truncated stream. The three live sources wired additively at their existing emission
+sites: `corp_ai.cpp` (decision + agency, strategic tier), `economy_system.cpp` (agency, the BL-079
+reflex tier), `supply_system.cpp` (trade_route, gated to first establishment of a body-pair lane —
+verified NOT to duplicate on repeat traffic). None of `ai_decisions`, `agency_events`,
+`trade_routes`, or `body_activity_visibility` changed at all.
+
+### Two judgment calls flagged rather than silently picked
+
+`checkpoint_record` carries no timestamp of its own (by design, and changing its shape now has a
+ripple cost the item said to avoid); resolving one against a body's dated history lines is not a
+clean 1:1 pairing in every case (a body that already terminated earlier can record a checkpoint
+with no dated line at its stage at all; Green can resolve two checkpoints against up to three
+Green-tagged lines with no code-level tag distinguishing which belongs to which). Took the
+simplest defensible rule — the stage's LAST dated line at or before it — documented inline and
+filed as **NR-029** rather than replicating `planetology.cpp`'s branch logic a second place it
+could drift from. Separately, a newly-established trade route is a two-body event but
+`world_history_entry` carries one `body` tag (the settled shape); tagged the destination body and
+named both endpoints in the narration text, filed as **NR-030** since a body-scoped filter over
+the log would miss the entry for the untagged source body specifically.
+
+### The worktree was a stale base, twice over in one session
+
+This worktree's HEAD sat at the merge-base with `main`, 24 commits behind — missing BL-217
+(`checkpoint_record`/`planetology_state.checkpoints`), which this item hard-depends on, plus
+BL-166/168, BL-170 (rivers), and a backlog/doc sweep. Stashed the in-progress edits, fast-forwarded
+to `main` (clean; only `app.cpp` auto-merged), popped the stash back (also clean) — no manual
+conflict resolution needed. `cmake -S . -B build` then hit the same FetchContent/TLS block a prior
+session already named (BL-217's own NR-028): confirmed by direct reproduction rather than assumed.
+Fell back to hand-compiled `cl` per the documented contingency — the new
+`tools/verify/history_log_harness.cpp` (27/27 PASS, built over the real generated world, mirroring
+`history_ladder_harness`'s style rather than hand-fabricating log entries), two added checks in
+`determinism_harness.cpp` (25/25 PASS), and a seven-harness regression sweep across every touched
+file (`corp_ai_harness`, `ai_skill_harness`, `trade_routes_harness`, `commercial_fog_harness`,
+`supply_advance`, `econ_stability`, `blackboard_harness` — all green, 0 failures). Also found
+`tools/verify/README.md`'s hand-written world-superset recipes are one file short of linking since
+BL-170 landed (`hard_coded_world.cpp` now needs `river_generation.cpp`); documented as a TU-ripple
+note rather than silently patched around. Filed **NR-031** — the full `ProjectIo` GUI target and
+whole-suite `ctest` are owed from a network-enabled session (app.cpp's new include/call was only
+verified by inspection, since no headless harness touches it).
+
+### Docs
+
+`docs/ai/AI_OPPONENT.md` gains § 8a recording the log's final shape (the struct, the topic enum,
+the four sources, the magic+version header). `docs/generation/GENERATION_LEDGER.md` gains a
+section explaining why it stays a separate mechanism from the log — disposable/tuning-scoped
+breadcrumbs vs. durable/narrative-scoped history, same instinct, incompatible lifetimes.
+
+**Backlog: BL-208 lands complete.** Review queue carries 3 new entries (NR-029/030/031, all open).
+
+---
+
 ## Session — the design-owed sweep: thirty items settled, and three recovered from a merge (2026-08-02)
 
 **Runtime.** ~2h. Full (Design depth verb across the whole design-owed set; no code, no authority-doc

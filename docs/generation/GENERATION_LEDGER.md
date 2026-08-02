@@ -28,6 +28,28 @@ See also: [`docs/ui/SELECTION.md`](../ui/SELECTION.md) and the deferred hover-ca
 item in [`docs/development/BACKLOG.md`](../development/BACKLOG.md) — the per-tile breadcrumb
 is a natural section of a tile's rich card, so the content builder is shared (below).
 
+**Why this stays separate from the world history log (BL-208, landed 2026-08-02).** Both this
+ledger and `src/world/history_log.{hpp,cpp}` answer the same instinct — explain what happened and
+why — and it would be reasonable to ask why they are not one mechanism. They differ on the axis
+that matters for storage: **lifetime**.
+
+- **The ledger is DISPOSABLE.** Per-tile derivation breadcrumbs — height, band, moisture,
+  composition, landform, deposits — regenerate on demand from `generate_body_tiles(..., &record)`
+  (see § Data lifetime below); they are never persisted, scoped to **tuning**, and the developer
+  (or the History slot's Chain view) recomputes them per body on open. Storing one per tile for
+  every generated body would be pure bloat when a single deterministic call rebuilds it exactly.
+- **The log is DURABLE.** `world::history_log` is a persisted, append-only record — genesis
+  chapter, checkpoint decisions, strategic AI commands, agency actions, and trade-route
+  establishment — scoped to **narrative**. It is designed to be recited, told, and partially lost
+  between agents (an oral history), which only works if it is real, serialised, communicated
+  content, never something regenerable on demand from a seed.
+
+Merging them would force one lifetime onto both: either persisting per-tile breadcrumbs for every
+tile of every body (the ledger deliberately refused this), or making the narrative log
+regenerable-only (which defeats a history a player — or another agent — can actually be told
+about, past the point where the original seed and engine are still at hand). Same instinct,
+incompatible lifetimes — two mechanisms, not a duplication.
+
 ---
 
 ## The data seam

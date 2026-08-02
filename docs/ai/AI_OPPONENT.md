@@ -377,6 +377,81 @@ primitives (the AI authors the same policy objects via commands).
 
 ---
 
+## 8a. The world history log (BL-208, landed 2026-08-02)
+
+The project's first flat-binary serialisation seam (`src/world/history_log.{hpp,cpp}`),
+answering backlog.json § BL-208's settled design: a **single interleaved, append-only, tagged,
+serialised** world log — not per-body/per-corp logs, which fail the moment a corporation acts on
+a body (every interesting event) and would need a join with no shared ordering.
+
+**The shape**, in `src/world/world.hpp`:
+
+```cpp
+enum class history_topic : uint8_t { genesis, checkpoint, decision, agency, trade_route };
+
+struct world_history_entry {
+    int64_t        timestamp;   // unit depends on topic — see below
+    history_topic  topic;
+    entity_id      body = null_entity;  // tag, null_entity if not applicable
+    entity_id      corp = null_entity;  // tag, null_entity if not applicable
+    std::string    event;
+    std::string    consequence;         // may be empty
+};
+
+std::vector<world_history_entry> history_log;  // on `world`
+```
+
+**Timestamp is topic-scoped, deliberately.** `genesis`/`checkpoint` entries reuse
+`history_event::years_before_epoch` exactly (positive = the deep/historical past, 0 = the 1960
+epoch) — no conversion, per the item's own settled design. `decision`/`agency`/`trade_route`
+entries — which only ever occur during the live simulation, strictly after the genesis chapter's
+one-time bulk-insert at world setup — instead carry the sim day tick. A reader branches on
+`topic` to know which clock it is reading; nothing needs the two to compare numerically, because
+the vector's append order is already the true chronological order end-to-end.
+
+**The four sources, all additive to their existing consumers** (no behaviour change to anything
+that already read `ai_decisions`, `agency_events`, or `trade_routes`):
+
+- **genesis** — `seed_genesis_history(world&, const generation_report&)` copies each body's dated
+  `history_event` lines into the log at world setup (`app::setup_world`, right after
+  `make_hard_coded_world`), tagged by that body's entity id. This is the first bridge from
+  `generation_report` (presentation-only; per `hard_coded_world.hpp` it never otherwise reaches
+  `world`) into world state.
+- **checkpoint** — the same call migrates `planetology_state::checkpoints` alongside genesis, per
+  body, merged and stable-sorted into one chronological run. `checkpoint_record` carries no
+  timestamp of its own; the resolution rule (a documented simplification, not an exact per-line
+  pairing — see `history_log.cpp`'s `resolve_checkpoint_timestamp` and the NEEDS_REVIEW entry it
+  cites) takes the LAST dated history line at or before the checkpoint's own chain stage.
+- **decision** — `corp_ai.cpp`'s strategic-tier push site additionally logs a one-line narration of
+  each applied `corp_decision` (verb + reason + score). `corp_decision_ring` (the existing 256-cap
+  ring) is untouched.
+- **agency** — both the BL-079 reflex tier (`economy_system.cpp`'s recipe-rescue and idle-a-loser
+  sites) and the BL-202 strategic tier (`corp_ai.cpp`) additionally log a narrated `agency` entry.
+  `economy_report::agency_events` (the chat feed's existing source) is untouched.
+- **trade_route** — `supply_system.cpp`'s `credit_arrived_convoys` logs an entry only when a
+  body-pair lane is **first established** (the `rit == w.trade_routes.end()` branch), never on a
+  repeat completion (which only bumps the existing `trade_route`). `world::trade_routes` and
+  `body_activity_visibility` are untouched, byte-for-byte.
+
+**Serialisation** (`write_history_log`/`read_history_log`): a leading 4-byte magic (`"IOHL"`) plus
+a `uint32_t` version (BL-107's "first thing to add when the serialiser lands" rule), then an entry
+count, then each entry length-prefixed. `read_history_log` rejects — rather than misreads — a
+wrong magic, an unsupported version, an unknown topic byte, or a truncated stream, leaving the
+destination world's `history_log` untouched on any rejection. Round-trip is field-identical.
+Verified by `tools/verify/history_log_harness.cpp` (mirrors `history_ladder_harness.cpp`'s style:
+built over the real generated world, not hand-fabricated entries) and an added determinism check
+in `tools/verify/determinism_harness.cpp` (two identical-seed generations produce an identical
+genesis+checkpoint chapter).
+
+Not built (deliberately out of scope, per the item's brief): a save-game menu/UI. The serialiser
+is a library function a harness exercises; the one live hook is the genesis-chapter bridge at
+world setup.
+
+BL-218 (nations rewrite) and BL-219 (corporations rewrite) are expected to write into this same
+log — the substrate this item exists to hand them, per the item's own resequencing rationale.
+
+---
+
 ## 9. Citations
 
 Sources gathered by the deep-research harness (2026-07-23). Each supports the claim noted.

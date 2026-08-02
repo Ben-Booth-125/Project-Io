@@ -12,6 +12,8 @@
 #include <cmath>
 #include <cstdio>
 #include <ostream>
+#include <string>
+#include <utility>
 
 namespace {
 
@@ -28,6 +30,105 @@ entity_id tile_body(const world& w, entity_id tile)
 {
     const auto it = w.tiles.find(tile);
     return (it != w.tiles.end()) ? it->second.body : null_entity;
+}
+
+// ---------------------------------------------------------------------------
+// World history log (BL-208) — decision + agency narration for the strategic
+// tier. Deliberately self-contained (no history_log.hpp include): both new
+// world_history_entry fields it needs (history_topic, world::history_log) are
+// already visible via world.hpp, which this file already includes, so wiring
+// the log here adds no new translation-unit dependency for the existing
+// hand-written tools/verify/README.md recipes that link corp_ai.cpp.
+// ---------------------------------------------------------------------------
+
+/// Body tag for a corp_command's log entry, resolved BEFORE apply_corp_command
+/// runs (a demolish erases its subject from w.buildings, so resolving after
+/// would silently lose the tag).
+entity_id resolve_command_body(const world& w, const corp_command& cmd)
+{
+    switch (cmd.verb)
+    {
+        case corp_verb::build:
+        case corp_verb::place_road:
+            return tile_body(w, cmd.tile);
+        case corp_verb::survey:
+            return cmd.subject; // subject IS the body for this verb
+        default:
+        {
+            const auto bit = w.buildings.find(cmd.subject);
+            return (bit != w.buildings.end()) ? tile_body(w, bit->second.tile) : null_entity;
+        }
+    }
+}
+
+const char* corp_verb_label(corp_verb v)
+{
+    switch (v)
+    {
+        case corp_verb::build:         return "build";
+        case corp_verb::demolish:      return "demolish";
+        case corp_verb::set_recipe:    return "recipe change";
+        case corp_verb::set_workforce: return "workforce change";
+        case corp_verb::idle:          return "idle";
+        case corp_verb::resume:        return "resume";
+        case corp_verb::place_road:    return "road placement";
+        case corp_verb::survey:        return "survey";
+    }
+    return "action";
+}
+
+const char* corp_decision_reason_label(corp_decision_reason r)
+{
+    switch (r)
+    {
+        case corp_decision_reason::best_build:     return "best available build site";
+        case corp_decision_reason::dial_workforce: return "workforce margin";
+        case corp_decision_reason::dial_recipe:    return "recipe margin";
+        case corp_decision_reason::dial_idle:      return "sustained losses";
+        case corp_decision_reason::dial_resume:    return "now profitable";
+        case corp_decision_reason::survey_expand:  return "discovery within budget";
+    }
+    return "unspecified";
+}
+
+/// One-line narration of a strategic decision for the log's `event` column.
+std::string narrate_corp_decision(const corp_decision& d)
+{
+    char buf[96];
+    std::snprintf(buf, sizeof buf, " (%s, score %.2f vs %.2f)",
+                  corp_decision_reason_label(d.reason), d.winning_score, d.runner_up);
+    std::string s = "Corp ";
+    s += std::to_string(d.corp);
+    s += " ordered a ";
+    s += corp_verb_label(d.command.verb);
+    s += buf;
+    return s;
+}
+
+const char* agency_kind_label(agency_event::kind k)
+{
+    switch (k)
+    {
+        case agency_event::kind::recipe_switch:     return "switched recipe";
+        case agency_event::kind::idled:              return "idled a loss-making building";
+        case agency_event::kind::built:               return "built a new facility";
+        case agency_event::kind::demolished:          return "demolished a facility";
+        case agency_event::kind::workforce_set:       return "adjusted workforce";
+        case agency_event::kind::resumed:             return "resumed an idled facility";
+        case agency_event::kind::road_placed:         return "placed a road";
+        case agency_event::kind::survey_dispatched:   return "dispatched a survey";
+    }
+    return "took an agency action";
+}
+
+/// One-line narration of an agency_event for the log's `event` column.
+std::string narrate_agency_event(const agency_event& ev)
+{
+    std::string s = "Corp ";
+    s += std::to_string(ev.corp);
+    s += " ";
+    s += agency_kind_label(ev.what);
+    return s;
 }
 
 /// Price the market at `tile` would pay for resource `r` right now — last
@@ -543,6 +644,11 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                 w.corporations.at(corp).balance - committed - c.spend <= required_floor)
                 continue;
 
+            // Resolve the log's body tag BEFORE the command mutates the world —
+            // a demolish erases its subject from w.buildings, so resolving
+            // after apply_corp_command would silently lose the tag.
+            const entity_id log_body = resolve_command_body(w, c.cmd);
+
             entity_id built = null_entity;
             if (apply_corp_command(w, reg, c.cmd, &built) != corp_command_result::applied)
                 continue; // a seam rejection mutates nothing; just skip it
@@ -567,6 +673,19 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             d.runner_up     = (i + 1 < cands.size()) ? cands[i + 1].score : 0.0f;
             d.reason        = c.reason;
             w.ai_decisions.push(d);
+
+            // World history log (BL-208): an additional, non-evicting copy of
+            // the same decision — the ring above is unchanged and keeps its
+            // existing readers.
+            {
+                world_history_entry log_entry;
+                log_entry.timestamp = tick;
+                log_entry.topic     = history_topic::decision;
+                log_entry.body      = log_body;
+                log_entry.corp      = corp;
+                log_entry.event     = narrate_corp_decision(d);
+                w.history_log.push_back(std::move(log_entry));
+            }
 
             // Agency event so the chat feed can render the command (BL-205).
             agency_event ev{};
@@ -593,6 +712,18 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     ev.what = agency_event::kind::survey_dispatched; ev.tile = c.cmd.subject; break;
             }
             report.agency_events.push_back(ev);
+
+            // World history log (BL-208): additive; economy_report's own
+            // agency_events flow (chat feed, BL-205) is untouched.
+            {
+                world_history_entry log_entry;
+                log_entry.timestamp = tick;
+                log_entry.topic     = history_topic::agency;
+                log_entry.body      = log_body;
+                log_entry.corp      = corp;
+                log_entry.event     = narrate_agency_event(ev);
+                w.history_log.push_back(std::move(log_entry));
+            }
         }
     }
 }

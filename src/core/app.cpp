@@ -39,6 +39,7 @@
 #include "world/budget_system.hpp"
 #include "world/construction.hpp"
 #include "world/corp_ai.hpp"
+#include "world/history_log.hpp"
 #include "world/placement_rules.hpp"
 #include "world/survey_system.hpp"
 #include "world/hard_coded_world.hpp"
@@ -748,6 +749,12 @@ void app::setup_world(world_params params)
 
     m_generation_report = generation_report{};
     m_world = make_hard_coded_world(params, &m_generation_report, gen_cfg);
+
+    // Bridge PLANETOLOGY's per-body dated history + checkpoints into the world
+    // history log's genesis + checkpoint chapters (BL-208). generation_report is
+    // presentation-only and never otherwise reaches `world` — this is that bridge,
+    // and it must run exactly once per generation (not idempotent).
+    seed_genesis_history(m_world, m_generation_report);
 
     // Open the comms log with a deterministic epoch line (BL-205): the Public
     // channel exists from campaign start, so the panel is never an empty shell.

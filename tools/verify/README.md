@@ -264,6 +264,46 @@ use, so no hand-declared target is needed.
 needs `corp_ai.cpp corp_command.cpp construction.cpp placement_rules.cpp
 survey_system.cpp building_profit.cpp` — the older TU lists above predate this.
 
+**BL-170 TU ripple (found while building BL-208's harness, 2026-08-02):**
+`hard_coded_world.cpp` now includes `river_generation.hpp`, so ANY harness
+linking `hard_coded_world.cpp` also needs `river_generation.cpp` — every
+world-superset recipe above that predates the rivers pass is one file short of
+linking clean (link error names an unresolved `run_rivers`-family symbol).
+Prefer the CMake target where one exists (its glob cannot drift); this note is
+for the hand-`cl` fallback only.
+
+```bat
+:: World history log (BL-208) — the append-only, tagged, serialised world log.
+:: R1/R2: seed_genesis_history bridges PLANETOLOGY's per-body dated history +
+:: checkpoints into world::history_log, tagged by body, over the REAL generated
+:: world (not hand-fabricated entries). R3: decision/agency entries appear over
+:: a short bot-vs-bot run; a trade_route entry fires once per lane, on FIRST
+:: establishment only. R4/R5: write_history_log/read_history_log round-trip
+:: field-identically and reject a wrong-magic/wrong-version/truncated stream.
+:: R6: export_corp_blackboard / body_activity_visibility (neither touched by
+:: this item) still behave. Links the full SDL/Lua-free world superset (every
+:: src\world\*.cpp except recipe_registry.cpp/tech_tree.cpp/world_gen_config.cpp,
+:: including history_log.cpp and river_generation.cpp) — mirror CMakeLists'
+:: IO_WORLD_SOURCES glob if this list drifts.
+cl /nologo /std:c++20 /EHsc /I src tools\verify\history_log_harness.cpp ^
+   src\world\budget_system.cpp src\world\building_profit.cpp src\world\chemistry_tables.cpp ^
+   src\world\city_names.cpp src\world\construction.cpp src\world\continents.cpp ^
+   src\world\corp_ai.cpp src\world\corp_command.cpp src\world\corporation_generation.cpp ^
+   src\world\creeds.cpp src\world\economy_system.cpp src\world\hard_coded_world.cpp ^
+   src\world\history_ladder.cpp src\world\history_log.cpp src\world\logistics.cpp ^
+   src\world\market_clearing.cpp src\world\nation_generation.cpp src\world\orbital_system.cpp ^
+   src\world\placement_rules.cpp src\world\planetology.cpp src\world\population_generation.cpp ^
+   src\world\river_generation.cpp src\world\road_generation.cpp src\world\supply_system.cpp ^
+   src\world\survey_system.cpp src\world\terrain_combat.cpp src\world\tile_generation.cpp ^
+   src\world\world.cpp ^
+   /Fo:build_gen\verify\history_log_harness\ /Fe:build_gen\verify\history_log_harness.exe
+.\build_gen\verify\history_log_harness.exe
+```
+
+On Windows via CMake (no need to hand-list sources): `cmake --build build --target history_log_harness`
+then `.\build\history_log_harness.exe` — picked up by the generic `tools/verify/*.cpp` glob batch
+at the foot of `CMakeLists.txt`, the same path `creeds_harness`/`continents_harness` use.
+
 Each exits non-zero on a failed assertion. The economy *panel* (the visual class)
 is verified separately via `ProjectIo --verify scripts/verify/economy_panel.lua`
 (the `verifier-visual` skill).
