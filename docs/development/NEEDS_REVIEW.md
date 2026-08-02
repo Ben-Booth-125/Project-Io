@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*21 entries — 2 open, 19 resolved.*
+*23 entries — 4 open, 19 resolved.*
 
 ---
 
@@ -58,6 +58,37 @@ SPRINTS.md § Sprint 2 records that BL-210 was split into BL-217 (checkpoint/bra
 > **Recommendation:** Option 2. The restoration itself is safe and clearly right — nothing in the corpus argues these were retired on purpose. But a merge that dropped three consecutive rows without comment is unlikely to have dropped exactly three, and the check is cheap next to discovering a fourth loss months from now. Note this is the second instance of the hazard; the parallel-worktree coherence guidance in DELIVERY.md exists because of the first.
 
 *Files: `docs/development/backlog.json`, `docs/development/SPRINTS.md`*
+
+### NR-022 — BL-262 (scoring) — I answered all six of your open calls as one interlocking package; ratify or overturn
+*decision taken on your behalf · raised 2026-08-02 · from Design-owed sweep, 2026-08-02*
+
+BL-262 says the six calls are yours, all of them. I proposed one coherent answer to all six rather than leaving six blanks, because they are not independent — call 4 nearly forces call 3, which shapes call 2, which dissolves call 1 stated expiry. The package: a coarse publicly-published PROFILE of four axes (reach / production / capital / market share) with NO total ever; computed from VISIBLE information, not ground truth; published diegetically by the market, so your own figures are exact and every rival shows as a BAND; scoring corporations on axes that are actor-agnostic and so survive the BL-094 nation pivot; meaningful only within a campaign (no cross-seed leaderboard); feeding credit terms (BL-073) and counterparty routing (BL-037), but deliberately NOT unified with BL-202 AI utility. Item flipped to designed on that basis.
+
+**Why it matters.** This is the largest single set of calls I have taken on your behalf, and it decides what the game measures — close to CONCEPT-level. Two of the six are close to forced by the existing corpus (visible-information, because ground truth would make both discovery fogs decorative; and within-campaign-only, because cross-seed normalisation is meaningless with no end-game screen). The other four are genuine judgement and you may well want them differently. The one most worth your eye is DIEGETIC: it is the expensive answer, and I chose it partly on your standing preference for the deeper option over the cheaper one — which is exactly the kind of inference that should be checked rather than assumed.
+
+- Ratify the package as written; it promotes as-is.
+- Ratify the shape but swap DIEGETIC for META — much cheaper, loses the credit/counterparty feedback in call 5, and the score stops being a thing the world can react to.
+- Ratify but collapse the profile to ONE number — simpler and more legible, at the cost of implying a single race, which is the end-game framing CONCEPT forbids.
+- Overturn and design it with me from scratch.
+
+> **Recommendation:** Ratify as written. The package hangs together and each answer is load-bearing for the others — in particular, banded rival figures are what let a comparison surface show every corporation without violating BL-068, which the restored NR-012 table could not do. If you want one thing cheaper, option 2 is the least damaging cut, but it costs call 5 entirely and the number becomes chrome, which the item itself warns against. Still open regardless of your answer: the band boundaries (tuning, wants a running campaign) and where the profile lives on screen (a layout call, yours).
+
+*Files: `docs/development/backlog.json`, `docs/CONCEPT.md`, `docs/ui/DISCOVERY.md`*
+
+### NR-023 — BL-229 (building selection) — four layout questions, now with the real column widths; it is the one item I left design-owed
+*question · raised 2026-08-02 · from Design-owed sweep, 2026-08-02*
+
+BL-229 carries your written instruction "do not guess the layout, Ben designs this one". I honoured it: questions 1-4 are untouched and the item is the only one in the v0.1.1 set still design-owed. What I did settle is question 5 (rival buildings degrade IN PLACE — same three-column skeleton with internal pages absent rather than blanked, matching how the BL-089 activity fog already degrades content without swapping surfaces) and the sequencing (it now depends on BL-265, not the landed BL-214). I also measured the actual budget so you can answer against numbers rather than prose.
+
+**Why it matters.** The measurements change what the questions mean. At the 1280x720 floor the three columns are 135 / 254 / 135 px inside a band fixed at 260 px tall, giving ~212 px of usable column height. So the tile element 3x2 action grid is living in 135 x 212 px — about 44 px per button row — and that 135 px is the real budget for any answer to Q1 (what fills the left quarter) and Q4 (what fills six action slots). A combo box at 135 px is tight and a slider at 135 px is very tight, which is the constraint bearing on Q3 (where the recipe and workforce levers go). At 1920x1080 the columns are 294 / 572 / 294. Band height is 260 at both and stays 260 until the display smaller dimension exceeds 1200.
+
+- Answer Q1-Q4 in one pass with the live app open (the standing rule for visual questions).
+- Sketch the sibling layout as a mockup, as you did for the tile element — its proportions came from yours.
+- Delegate Q1-Q4 to me now that the numbers are on the table, accepting I will be guessing at a layout you reserved.
+
+> **Recommendation:** Option 1 or 2 — this is the item where guessing is worst value, because the tile element it must match came from your own mockup and a near-miss sibling reads worse than an obvious difference. BL-265 relieves some of the pressure: a full-canvas accordion shows every page scrolled, so the centre column no longer has to fit everything, which makes Q2 less constrained than it looks. Everything else on the item is finished and waiting.
+
+*Files: `docs/development/backlog.json`, `src/ui/selection_panel.cpp`, `docs/ui/SELECTION.md`*
 
 ---
 
