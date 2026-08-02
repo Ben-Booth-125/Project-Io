@@ -7665,6 +7665,79 @@
       ],
       "resolved": "2026-08-02",
       "resolution": "All 5 rows met. river_generation_harness + determinism_harness pass; CTest 37/37."
+    },
+    {
+      "brief": "checkpoint-branch-model",
+      "title": "Checkpoint/branch/lean data-model foundation (BL-217)",
+      "difficulty": 3,
+      "importance": "C",
+      "evaluated_difficulty": 3,
+      "status": "active",
+      "promoted_from": "BL-217 (generation checkpoint/branch model)",
+      "batch": "sprint2-oral-history",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "checkpoint_record {stage_id, branch_taken, seed_used, viability_result} exists as an append-only ordered list on planetology_state.",
+          "verification": [
+            "headless: extends tools/verify/planetology_sweep.cpp"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R2",
+          "requirement": "A lean acts as an eligibility filter over candidate branches, never a weight; if a lean excludes every candidate the checkpoint rerolls rather than falling back to an ineligible branch.",
+          "verification": [
+            "headless: extends tools/verify/planetology_sweep.cpp"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R3",
+          "requirement": "The existing S5-S8 mass-extinction die-off points are retrofitted as checkpoint_records without changing their biology/physics logic.",
+          "verification": [
+            "headless: extends tools/verify/planetology_sweep.cpp"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R4",
+          "requirement": "Per-checkpoint-class viability floor with uniform signature (state)->bool, evaluated after the branch applies, reroll on false — generalised from homeworld_viability, not a parallel concept.",
+          "verification": [
+            "headless: extends tools/verify/planetology_sweep.cpp"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R5",
+          "requirement": "No regression: existing planetology_sweep R1/R2/R3 (acceptance rate, no-dead-lean, variety-survives-floor) still pass; determinism preserved (same seed identical checkpoints, different seed differs).",
+          "verification": [
+            "headless: tools/verify/planetology_sweep.cpp",
+            "headless: tools/verify/determinism_harness.cpp"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R6",
+          "requirement": "PLANETOLOGY.md documents the checkpoint/branch/lean-as-eligibility-filter model and the admission rule for a future third checkpoint class.",
+          "verification": [
+            "review: docs/generation/PLANETOLOGY.md"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        }
+      ]
     }
   ]
 }

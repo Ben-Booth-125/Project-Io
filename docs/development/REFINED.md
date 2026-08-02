@@ -3,6 +3,24 @@
 > Drained 2026-07-31 (doc sweep): thirteen stale COMPLETE sections removed per the
 > retain-one policy — their record lives in DEVLOG.md and req/requirements.json.
 
+# Sprint 2 — BL-210 (oral-history pivot): the settlement rewrite (2026-08-02) — **IN PROGRESS**
+
+Requirements: `req/requirements.json` § checkpoint-branch-model (BL-217), and two not-yet-added
+groups for BL-218/BL-219 (added when each is promoted — strict dependency chain, not a fan-out:
+BL-218 needs BL-217 landed in `main`; BL-219 needs BL-218 landed). Each runs as its own
+worktree-isolated agent, sequenced rather than parallel, since each reads the previous item's
+actual code (not just its design).
+
+## Checkpoint/branch model (BL-217) — Files: `src/world/planetology.{hpp,cpp}`,
+harness extending `tools/verify/planetology_sweep.cpp`, `docs/generation/PLANETOLOGY.md`.
+Satisfies checkpoint-branch-model R1-R6. **In progress.**
+
+## Nations settlement rewrite (BL-218) — not yet promoted; depends on BL-217 landing.
+
+## Corporations history rewrite (BL-219) — not yet promoted; depends on BL-218 landing.
+
+---
+
 # Sprint 1 — Procedural generation v1: the food cluster (2026-08-02) — **COMPLETE**
 
 All three items landed: BL-166 (Hydroponics Bay), BL-168 (Fishing Wharf), BL-170 (rivers &
