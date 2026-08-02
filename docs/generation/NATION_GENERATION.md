@@ -56,7 +56,43 @@ The ladder **drives** the political map rather than narrating one it was handed 
 2026-07-30). A world with no cradles (below a land biosphere) leaves the caller's defaults
 untouched. Full stage design: `../lore/HISTORY.md`.
 
+### Pass 0b — Settlement & industrialisation (landed 2026-08-02, BL-218 nations rewrite)
+
+Between the ladder and the seeds sits `run_settlement` (`src/world/settlement.cpp`), which turns
+the ladder's cradles and the creeds' pantheons into **provinces** — the unit that actually gets
+settled, industrialised, fought over, and read by corporation generation.
+
+Per province it records: the anchor tile, the **culture it inherits** (its nearest cradle's, so
+the pantheon distribution is a map of who walked where rather than a per-province re-roll), its
+**ancient endowment** (farm / ore / energy / harbour, surveyed once over the anchor's window), a
+founding year derived from how strongly the ground invited settlement, and — where the ground can
+pay for it — the year its furnaces lit.
+
+Two details are load-bearing:
+
+- **The endowment scores are world-relative, not absolute.** A province scores 500 on a class when
+  it holds the world's average of it, 1000 at twice the average. "Ore country" only means something
+  next to the rest of the map, and the relative form also survives the `deposit_scalar` abundance
+  tier without re-tuning — a lean world still has its own ore provinces, they are simply poorer in
+  absolute terms. The industrialisation gate is *above-average* fuel, so an average province does
+  not industrialise.
+- **The creed and the deposit are the same fact seen twice.** A culture raises a forge god only
+  where its cradle window held ore (`../lore/CREEDS.md`), so a province whose people kept that god
+  *and* sits on ore lights its furnaces earlier. The charter culture's oath god buys a smaller
+  bonus — Stage 3's contract law reaching capital.
+
 ### Pass 1 — Seed placement
+
+**Since BL-218 the seeds are the province anchors.** `nation_params::seed_tiles` is filled from
+`settlement_seed_tiles` and consumed verbatim; the random placement described below is the
+fallback, kept intact for any body with no settlement pass and therefore bit-for-bit identical to
+pre-BL-218 behaviour there.
+
+This is the rewrite's cost answer in one line — *seeding changes, expansion does not*. Pass 1b/2's
+growth machinery is already tuned for size variance (BL-053) and discarding it would have
+regressed a property that works; reusing the mechanism and replacing its **inputs** keeps the
+tuned behaviour while making the variance **emerge** from where people actually settled rather
+than being dialled in.
 
 A set of nation seeds are placed across the body's landmass tiles. The seed count is **derived
 from the habitable landmass, as modulated by the ladder** (Pass 0): one seed per
@@ -126,6 +162,57 @@ weighted by composition type. The result is a read-only descriptor — `iron_ore
 economically for diplomacy initialisation and corporation generation.
 
 ### Pass 4 — Political character assignment
+
+**Rewritten 2026-08-02 (BL-218): the three axes are OUTPUTS of the settlement record, not an
+independent draw.** `derive_national_character` (`src/world/settlement.cpp`) runs immediately
+after `generate_nations` — it has to, because every derivation needs the political outcome — and
+overwrites what the random pass drew. The random draw survives only as the fallback for bodies
+with no settlement pass.
+
+| Axis | Derived from | Rule |
+|---|---|---|
+| `expansionism` | the **border-contest integral** | Shared-border share of a nation's territory, plus the settled weight pressed against it (rival provinces within 12 tiles). A nation that expanded into empty land scores near zero on both; one that grew by pressing against neighbours scores high. ≥600 aggressive, ≥280 moderate, else passive. |
+| `economic_focus` | the dominant class of the provinces settled **during industrialisation** | Not of the tiles it merely holds — what a nation built on is what it becomes known for. Ore/farm → extraction, energy → processing, harbour → trade. An early first-mover's extraction reads as processing instead (see below). |
+| `ideology` | **industrialisation timing against neighbours** | A rank, not an absolute: earliest tercile → mercantile, middle → technocratic, latest → authoritarian (late catch-up under competitive pressure trends statist/directed). A nation that never industrialised reads isolationist. |
+
+None of the three needs a new roll — each is computable from the run's own record, which is the
+standing requirement that generation produces consequences rather than dice.
+
+### Pass 4b — The historical ruptures (BL-218, BL-217's second checkpoint class)
+
+`resolve_historical_ruptures` then fires a bounded set of ruptures over the most-contested
+nations, reusing `planetology.hpp`'s class-agnostic `resolve_checkpoint` rather than inventing a
+second branch mechanism. Branch eligibility is a **filter, never a weight** (BL-217's rule): a
+nation with no land neighbour cannot go to war, a single-province nation cannot collapse. Every
+attempt appends a `checkpoint_record`, failures included.
+
+Each branch is a **transform on state**; the line it appends is a *record of* the transform, never
+a substitute for it:
+
+- **Collapse** — the two most peripheral provinces pass to a bordering neighbour and their
+  industrial clock resets; abundance falls 20%. Ideology unchanged.
+- **War** — the contested border redraws toward the stronger (bounded at a quarter of the loser's
+  territory, so BL-224's non-hegemony invariant is respected rather than spent); the loser's
+  posture rises to aggressive (grievance is the point of the axis); both lose abundance; **the
+  victor's gods travel with the border**, and part of the loser's record is **destroyed** — see
+  below.
+- **Revolution** — territory untouched, the ideology axis flips, abundance takes a one-off hit.
+  The cheapest transform and the one that most changes how the nation later behaves.
+
+**The record is not safe.** Where a war takes a province, the lines naming it are erased and a
+dated **lacuna** is left in their place — "what the *X* wrote of itself does not survive the *Y*
+occupation", with a count of the lines lost. The hole is visible rather than silent, which is the
+difference between a history that was fought over and one that was merely written. A conquered
+province keeps its founders in `founding_culture` and its conquerors in `culture`, so the erasure
+is of the *record*, never of the fact — which is exactly the pair a later religion or population
+layer needs to describe a grievance.
+
+Across a six-seed spread, four worlds lost part of their record to a war.
+
+---
+
+The pre-BL-218 random pass, kept as the fallback path and as the description of the axes
+themselves:
 
 Each nation receives a set of parametric political attributes drawn from a seeded random
 pass. These seed the sentiment graph and the starting tone of diplomatic interactions.

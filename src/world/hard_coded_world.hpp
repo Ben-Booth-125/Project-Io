@@ -2,6 +2,7 @@
 
 #include "continents.hpp"
 #include "planetology.hpp"
+#include "settlement.hpp"
 #include "world.hpp"
 #include "world_gen_config.hpp"
 
@@ -66,6 +67,18 @@ struct generation_report
         /// of this struct: it never enters `world`, so it stays off the
         /// serialisation seam.
         continent_state continents;
+
+        /// What the settlement/industrialisation pass computed for this body
+        /// (BL-218/BL-219). Its `history` is empty here for the same reason
+        /// `continents.history` is — those lines were merged into
+        /// `state.history` at generation. What is kept is the province set (who
+        /// settled where, whose gods they keep, which ancient deposits they sit
+        /// on, when their furnaces lit), the rupture `checkpoints`, and the
+        /// `lacunae` count — the holes the wars left in the record. Nothing
+        /// else records any of it. Presentation data, like the rest of this
+        /// struct: it never enters `world`, so it stays off the serialisation
+        /// seam.
+        settlement_state settlement;
     };
 
     world_preferences       preferences{}; ///< What the player asked for.

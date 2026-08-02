@@ -721,11 +721,32 @@ std::vector<entity_id> generate_nations(
         return {};
 
     // --- Pass 1: seed placement ---
+    // Historical seeds win when the caller supplies them (BL-218): the cores are
+    // the settlement pass's province anchors, so the political map grows out of
+    // places people settled rather than out of a random draw. The RNG stream is
+    // still constructed and left unconsumed on this path, which keeps every
+    // *later* pass's stream identical to the random-placement path.
     std::mt19937 seed_rng(seed_seeds);
-    const std::vector<int> seeds = place_seeds(
-        is_ocean, comp, gw, gh,
-        seed_target, params.min_seed_separation,
-        seed_rng);
+    std::vector<int> seeds;
+    if (!params.seed_tiles.empty())
+    {
+        std::vector<bool> taken(static_cast<std::size_t>(total), false);
+        for (int idx : params.seed_tiles)
+        {
+            if (idx < 0 || idx >= total) continue;
+            if (is_ocean[static_cast<std::size_t>(idx)]) continue;
+            if (taken[static_cast<std::size_t>(idx)]) continue;
+            taken[static_cast<std::size_t>(idx)] = true;
+            seeds.push_back(idx);
+        }
+    }
+    if (seeds.empty())
+    {
+        seeds = place_seeds(
+            is_ocean, comp, gw, gh,
+            seed_target, params.min_seed_separation,
+            seed_rng);
+    }
 
     const int seed_count = static_cast<int>(seeds.size());
     if (seed_count == 0)

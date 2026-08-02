@@ -61,10 +61,26 @@ the old tongues survive in the names of gods.
 
 ## Honest scope
 
-- The culture unit is the **cradle**; BL-218 (culture regions) will refine it
-  into clustered sub-national regions rather than replace it.
-- Pantheons currently write history and drive fragmentation only — no live
-  religion mechanic, no player surface. The Population lens / diplomacy layer
-  are the intended future readers.
+- The culture unit is the **cradle**; BL-218 refined it into **provinces**
+  (landed 2026-08-02, `src/world/settlement.cpp`) rather than replacing it — a
+  province inherits its nearest cradle's culture, so a pantheon is now mapped
+  onto specific ground and specific ancient deposits. See `HISTORY.md`
+  § Implementation — Stages 3–4.
+- Pantheons now do three things: write history, drive fragmentation, and — since
+  BL-218 — **bias industrialisation timing** (a forge culture's ore provinces
+  light up earlier, the charter culture's oath god buys a smaller bonus). Still
+  no live religion mechanic and no player surface. The Population lens /
+  diplomacy layer are the intended future readers, and BL-218 hands them the
+  pair they need: a conquered province records its founders in
+  `founding_culture` and its conquerors in `culture`.
+- **Conquest spreads a pantheon.** A won rupture-war plants the victor's gods on
+  the provinces it takes and rededicates their shrines — and destroys part of
+  the loser's written record in the process. The gods travel with the border.
 - The tribal wars are single-round pairwise marches, not a campaign
   simulation; BL-219's sweep is the tuning window for how often they weld.
+- **Abstract war is on notice (2026-08-02).** Ben overturned the
+  scalar-comparison half of the war rule: simulated history is to fight with
+  **real typed units and real tactics**, the same engine the main era later
+  inherits — BL-272 (unit/doctrine combat model) owns the replacement, and
+  BL-271 (Era −1 sim) is where these one-shot marches become a running
+  campaign simulation. "Drives, not narrates" survives untouched.

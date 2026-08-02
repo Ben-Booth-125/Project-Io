@@ -188,10 +188,34 @@ int main()
         check(ordered, "H4 the ladder lines sort into the biography, oldest first");
 
         // Stage 0 must predate Stages 1-2 — a charter cannot precede the farms.
-        bool staged = true;
-        for (std::size_t i = 1; i < ladder.size(); ++i)
-            if (ladder[i - 1]->years_before_epoch <= ladder[i]->years_before_epoch) staged = false;
-        check(ladder.size() < 2 || staged,
+        //
+        // NARROWED 2026-08-02 (BL-218). This used to demand that EVERY line in
+        // the recorded-history window be strictly older than the next, which
+        // only held while the ladder owned that window alone. It no longer
+        // does: the creeds (BL-235) and now the settlement pass (BL-218) write
+        // into the same window, and two provinces founded in the same year are
+        // a fact about the world, not a stage-ordering violation. The
+        // whole-biography ORDER is already asserted just above; what belongs
+        // here is the ladder's own causal claim, so it is asserted directly on
+        // the three stage lines by their text.
+        const history_event* granary = nullptr;
+        const history_event* charter = nullptr;
+        const history_event* accord  = nullptr;
+        for (const history_event* h : ladder)
+        {
+            if (!granary && h->event.find("granary") != std::string::npos) granary = h;
+            if (!charter && h->event.find("Charter Act") != std::string::npos) charter = h;
+            // Stage 2 writes one line or the other — the accord or the hegemon
+            // — and H5 below is what pins which; either satisfies the ordering.
+            if (!accord && (h->event.find("Great Accord") != std::string::npos
+                         || h->event.find("absorbed the rest") != std::string::npos)) accord = h;
+        }
+        check(granary && charter && accord,
+              "H4 all three ladder stages emitted their line");
+        const bool staged =
+            (!granary || !charter || granary->years_before_epoch > charter->years_before_epoch)
+         && (!charter || !accord  || charter->years_before_epoch > accord->years_before_epoch);
+        check(staged,
               "H4 the stages are strictly ordered: surplus, then charter, then borders");
     }
 

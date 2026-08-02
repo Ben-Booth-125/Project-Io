@@ -22,10 +22,12 @@ cmake --build build --target <harness_name>
 ```
 
 Use that route for anything linking the world superset — `world_audit`, `ai_skill_harness`,
-`history_ladder_harness`, `data_creep_harness`, `corp_terrain_matrix` — and for
-`font_glyph_harness`, which links ImGui and is hand-declared in `CMakeLists.txt` above the glob.
-Those five have deliberately **no** `cl` recipe below: writing one would be inventing a TU list
-with a short shelf life. The recipes that remain are the small, stable-link harnesses where the
+`history_ladder_harness`, **`settlement_harness`**, `data_creep_harness`, `corp_terrain_matrix`,
+`trade_routes_harness` — and for `font_glyph_harness`, which links ImGui and is hand-declared in
+`CMakeLists.txt` above the glob. These have deliberately **no** `cl` recipe below: writing one
+would be inventing a TU list with a short shelf life — which is exactly how `trade_routes_harness`
+stopped linking when BL-170 landed rivers (fixed 2026-08-02 by deleting its hand-declaration, not
+by patching its list). The recipes that remain are the small, stable-link harnesses where the
 `cl` line is genuinely quicker than a CMake configure.
 
 **Output goes to `build_gen\verify\` — never `%TEMP%`, never the repo root.** Every recipe below

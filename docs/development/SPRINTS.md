@@ -37,14 +37,19 @@ and/or a version goal (v0.1.1 etc.).
 |---|---|---|
 | 1 | Procedural generation v1 | **Closed** — goal met (food cluster landed 2026-08-02, see amendment) |
 | 2a | Close out the v0.1.0 cut set | **Closed** — all four planned items landed |
-| 2b | BL-210 oral-history pivot (nations/corps rewrite) | **In progress** — BL-217 + BL-208 built; BL-218/BL-219 queued |
+| 2b | BL-210 oral-history pivot (nations/corps rewrite) | **Closed** — all four rungs built (BL-217, BL-208, BL-218, BL-219) |
 | 3 | Corp AI stage B + skill harness | **Closed** — BL-203, BL-204 both landed |
 | 4 | Communication surface (BL-205 chat log) | **Not started** — `designed`, no dependency |
-| 5 | Persona audit (BL-207) + file Stage C | **Not started** |
+| 5 | Era −1 history sim, 0–2000 CE (BL-271–275; re-themed 2026-08-02) + persona audit riding along | **Not started** — all five items filed `designed` |
 
-**Next up:** promote BL-218 (nations settlement rewrite) — its dependency BL-208 (world history
-log) is now in `main`. Unplanned v0.1.1 work has begun in parallel (BL-270, the action
-dictionary); if that continues it wants a sprint of its own rather than riding on 2b.
+**Next up:** Sprint 2b is closed — BL-218 (nations settlement rewrite) and BL-219 (corporations
+history rewrite) both landed 2026-08-02. What remains of BL-210's umbrella is its batch-sweep
+extension and TILE_GENERATION.md's share of the propagation. The natural successors are
+**BL-223 (averted rupture)**, which now has real settlement history to define the diplomacy origin
+against, and the four v0.1.2–v0.1.5 stubs (BL-155/156/157/158) that were sequenced *behind* this
+rewrite precisely so they would not be designed against Voronoi blobs — nations now have the
+history to hang policy, military and politics off. Unplanned v0.1.1 work (BL-270, the action
+dictionary) still wants a sprint of its own rather than riding on 2b.
 
 ---
 
@@ -214,8 +219,45 @@ questions were settled and the item **built**, not just designed.
 - **BL-219 (corporations history rewrite) — not promoted.** Depends on BL-218.
 - **BL-210** stays open as the umbrella closing condition.
 
-**Retro** — *pending; closes when BL-218 and BL-219 land and BL-210's authority-doc propagation
-is done.*
+**Progress (2026-08-02, later the same day) — the chain's last two rungs landed.** Ben's steer:
+"complete 2b, and finish with the backend of history implementation… as long as there is a way to
+map belief systems onto existing and warring civilisations", and explicitly "don't be afraid to
+have parts of the record erased when two nations go to war."
+
+- **BL-218 (nations settlement rewrite) — complete.** `src/world/settlement.{hpp,cpp}`: the
+  province becomes the unit that carries belief, ancient endowment and industrial timing at once.
+  Nation seeds are now province anchors (seeding changes, expansion does not); the three political
+  axes are derived outputs; the historical ruptures are BL-217's second checkpoint class, with
+  collapse/war/revolution as real transforms.
+- **BL-219 (corporations history rewrite) — complete.** Focus derives from the corp's home
+  province plus the movement up the value chain; the authored table is retired and diversity
+  becomes a world-level reject-and-reroll.
+- **The erasure landed as asked.** A won war plants the victor's pantheon on the provinces taken
+  and destroys the lines naming them, leaving a dated lacuna with a count. Four of six seeds lost
+  part of their record.
+- Verified by a new `settlement_harness` (S1–S8); full CTest **39/39**, which needed two harness
+  follow-ons (`history_ladder_harness` H4 narrowed, `ai_skill_harness` MSVC goldens re-blessed —
+  every divergence upward) plus one unrelated pre-existing fix (`trade_routes_harness` had not
+  linked since BL-170 landed rivers).
+
+**Retro** (closed 2026-08-02).
+
+- **Landed against the goal: the whole chain.** BL-217 → BL-208 → BL-218 → BL-219 are all
+  `complete`, and the authority-doc propagation went with them rather than being deferred.
+  BL-210's umbrella is down to its batch-sweep extension and TILE_GENERATION.md's share.
+- **What the decomposition bought.** The sprint's stated goal was decomposition *only* — "not yet
+  in scope: actually settling BL-217/218/219's open questions or touching any `src/`". All of that
+  happened anyway, and cheaply, because the decomposition had already named the real dependency
+  order. The design passes settled in one session each because they were asking answerable
+  questions.
+- **Feedback: the "not yet in scope" line was overtaken twice.** Once on 2026-08-02 morning
+  (BL-217/BL-208 built) and again the same afternoon (BL-218/BL-219). A sprint whose scope is
+  overtaken twice in a day was scoped as a plan when it was really a queue — which is the same
+  observation Sprint 3's retro made about numbering being a theme label, not a schedule.
+- **Feedback: a whole-world change moves goldens, and the suite says so honestly.** Two harnesses
+  moved and both were verified against a stashed pre-change baseline rather than assumed
+  pre-existing. Worth keeping as the habit: the cost of checking was one stash and one target
+  rebuild, and it turned "probably already broken" into a known, explained divergence.
 
 ---
 
@@ -261,9 +303,31 @@ one theme per sprint.
 
 **Planned.** BL-205 (diff 3).
 
-### Sprint 5 — persona audit + naming the natural-language tier (BL-207 + new item)
+### Sprint 5 — RE-THEMED (2026-08-02): the Era −1 history sim (BL-271–275)
 
-**Goal.** Two threads. First, reconcile a likely stale status: REFINED.md's 2026-07-27 "AI
+**Ben's steer (2026-08-02 brainstorm, recorded in the items themselves):** run the "Rome as
+sandbox" plan as Sprint 5. Once generation produces a spread of earth-like planets, refine the
+worlds' philosophical development by getting tons of examples running 0 CE → 2000 CE — and,
+overturning the abstract-war rule, simulated history fights with **real units and real tactics**,
+as typed unit types the main era later inherits (BL-272 records the overturn).
+
+**Goal.** The settlement world (BL-218) promoted from a one-shot generation pass to a year-tick
+simulation, with a combat engine the 1960 era will share.
+
+**Planned.** BL-271 (Era −1 sim, diff 4) · BL-272 (unit/doctrine combat model, diff 4) ·
+BL-273 (province demography, diff 3) · BL-274 (era-keyed unit rosters, diff 3) ·
+BL-275 (history sweep distributions, diff 3 — also closes BL-210's last scope item).
+Dependency order: 272 → 274, 218 → 273, all → 271, 271 → 275.
+
+**Consumers this unblocks:** BL-054's parked runtime nation-AI half, the BL-155/156
+diplomacy/war stubs (sequenced behind the rewrite for exactly this), and BL-223 (averted
+rupture), which gets designed against simulated near-ruptures instead of lore.
+
+**The previous Sprint 5 theme (persona audit + Stage C naming) rides along as its original
+small scope** — a diff 1–2 reconciliation plus filing one design-owed item — rather than
+holding the slot:
+
+**Old goal.** Two threads. First, reconcile a likely stale status: REFINED.md's 2026-07-27 "AI
 constituents batch" already logged BL-207 R1–R3 as covered (persona packs C1, loader/runtime C2,
 Counsel channel C3, `persona_counsel_harness` C4) and marked the batch **COMPLETE**, but
 `backlog.json` still carries BL-207 as `designed`, not `complete` — verify against the harness and

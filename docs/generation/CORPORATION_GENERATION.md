@@ -63,9 +63,40 @@ Each corporation receives a primary `industrial_focus`:
 | `processing` | Refiners and converters | Processing building near an extraction cluster |
 | `trade` | Logistics and market operators | Warehouse or depot near a high-traffic zone |
 
-Focus is drawn with weighted probability shaped by the home nation's `economic_focus`
-and by the current distribution of already-generated corporations, providing diversity
-without enforcing a strict quota.
+**Rewritten 2026-08-02 (BL-219): focus is DERIVED from the corporation's home province, and the
+authored weighting table is retired.** When `generate_corporations` is handed a `settlement_state`
+(Kepler; every other body keeps the old path unchanged), the corp first picks a **home province**
+among its home nation's provinces, and its focus follows that province's history:
+
+- **The ancient endowment sets the base tier.** An ore or farm province emits extraction, an
+  energy province processing, a harbour province trade.
+- **Movement up the value chain sets the shift.** The specific post-war pattern being modelled is
+  that *early industrialisers moved up the chain and late ones stayed extraction-heavy*: a
+  province that lit its furnaces before the world median moves one tier up (extraction →
+  processing → trade); one that industrialised late, or never, stays raw. This reads the same
+  industrialisation-timing scalar BL-218 already produces for the ideology axis, so it is one
+  mapping rather than new machinery — and the coupling is itself a good outcome, since a late
+  statist industrialiser with raw-heavy corporations is a recognisable, coherent thing.
+
+**Per-province, not per-nation, and that is the point.** A nation average would make every
+corporation in a nation alike and destroy the specialists premise. Two corps in the same nation
+differ because their provinces differ, while each stays internally coherent.
+
+**Diversity survives as a floor on the SET, not a quota on any member.** Rather than keeping the
+authored table as a per-corp fallback bias — two mechanisms deciding one field is how that field
+becomes unexplainable — the check is a world-level **reject-and-reroll**: derive every focus
+emergently, then, if any focus class is wholly unrepresented, reroll which provinces the corps
+anchor to. It never patches an individual corp. This is the same reject-and-reroll idiom as
+BL-167's viability floors and BL-217's checkpoints, so it adds no new concept. The floor does not
+apply when there are fewer corps than classes (unmeetable by construction), and an unmet floor
+after the attempt cap stands as-is — an honest unmet floor beats a hand-fixed corporation.
+
+**Player-corp parity is unchanged**: the player's corporation goes through the same province read,
+the same emergent focus, and the same world-level reroll, with no special case.
+
+The pre-BL-219 path, still used for any body with no settlement pass: focus is drawn with weighted
+probability shaped by the home nation's `economic_focus` and by the current distribution of
+already-generated corporations, providing diversity without enforcing a strict quota.
 
 ### Pass 3 — Starting asset placement
 
@@ -225,10 +256,12 @@ or **prefer generated franchises** across borders, is open — it couples nation
 clustering frame (holdings cluster to the home nation today) and to the Franchise item below.
 Cross-doc item — also in `GENERATION_STRATEGY.md`.
 
-**Post-WW2 industrial grounding for the asset mix.** The focus→asset-mix patterns should be
-grounded in research on the post-WW2 industries that led to space-related capability, so a
-specialist's holdings read as a plausible pathway toward off-world reach. Cross-doc item — also
-in `GENERATION_STRATEGY.md`.
+**Post-WW2 industrial grounding for the asset mix.** *Half-closed 2026-08-02 (BL-219).* The
+**focus** half is now grounded in a named pattern — early industrialisers moved up the value
+chain, late ones stayed extraction-heavy — derived from the province's industrialisation timing
+(§ Pass 2). What remains open is the **asset-mix** half: the per-focus building patterns in Pass 3
+are still authored, and grounding *those* in the post-war pathway toward off-world reach is
+untouched. Cross-doc item — also in `GENERATION_STRATEGY.md`.
 
 **Franchise generation.** A franchising model is a candidate alternative origin for some
 corporations: rather than generating all corporations as independent entities, some could
@@ -242,6 +275,13 @@ investing in required or promising industries that the private sector has not fi
 A nation with high `extraction` focus and underserved petroleum deposits might seed a
 state-adjacent extraction corporation. This is an open behavioural design item that
 interacts with both the nation system and the tax/licence layer.
+
+> *The hook arrived 2026-08-02 (BL-219); the mechanism did not.* The underserved-industry
+> condition is now precisely **expressible** — an industrialised province with no corporation
+> operating in its resource class — where before the rewrite there was no way to state it at all.
+> Building it stays a follow-on: nations seeding corporations at runtime is nation *behaviour*,
+> which the standing rules bound, and the generation-time version is a different feature from the
+> runtime one.
 
 **Tax as an automated layer.** The working model is that taxation is an automated
 background layer: corporations pay a percentage of revenue or profit to their home

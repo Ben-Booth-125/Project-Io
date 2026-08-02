@@ -8,6 +8,7 @@
 #include "orbital_system.hpp"
 #include "population_generation.hpp"
 #include "road_generation.hpp"
+#include "settlement.hpp"
 #include "tile_generation.hpp"
 #include "river_generation.hpp"
 
@@ -240,9 +241,52 @@ world make_hard_coded_world(world_params params, generation_report* report,
                    /*seed=*/params.seed ^ 0xC4EED5u);
     record_tribal_conflict(kepler_creeds, kepler_hist, /*seed=*/params.seed ^ 0xC4EED5u);
 
-    generate_nations(w, kepler, kepler_tiles, 180, 84,
-        nation_params_from_ladder(kepler_hist, nation_params{ .min_seed_separation = 5 }),
-        /*seed=*/params.seed ^ 0x4A71012u);
+    // Settlement & industrialisation (BL-218, docs/lore/HISTORY.md Stages 3-4).
+    // Provinces are placed BEFORE the political map and become its seeds, so
+    // nation borders grow out of ground people settled rather than out of a
+    // random draw — "seeding changes, expansion does not". Each province
+    // inherits its nearest cradle's culture, so the pantheons the creeds pass
+    // raised are now mapped onto specific ground and specific ancient deposits.
+    settlement_state kepler_settlement;
+    nation_params kepler_np =
+        nation_params_from_ladder(kepler_hist, nation_params{ .min_seed_separation = 5 });
+    {
+        // Aim the province budget at the political pass's own seed budget, so
+        // the two agree by construction rather than by a tuned constant.
+        int kepler_land = 0;
+        for (const entity_id tid : kepler_tiles)
+        {
+            const auto it = w.tiles.find(tid);
+            if (it != w.tiles.end() && it->second.composition != terrain_composition::ocean)
+                ++kepler_land;
+        }
+        const int budget = std::max(1, kepler_land / std::max(1, kepler_np.land_tiles_per_seed));
+
+        kepler_settlement = run_settlement(kepler_pl, kepler_hist, kepler_creeds, w,
+                                           kepler_tiles, 180, 84, budget,
+                                           /*seed=*/params.seed ^ 0x5E77EDu);
+        kepler_np.seed_tiles = settlement_seed_tiles(kepler_settlement);
+    }
+
+    const std::vector<entity_id> kepler_nations =
+        generate_nations(w, kepler, kepler_tiles, 180, 84, kepler_np,
+                         /*seed=*/params.seed ^ 0x4A71012u);
+
+    // The political axes are OUTPUTS now (BL-218): expansionism from the
+    // border-contest integral, economic_focus from the resource class of the
+    // provinces settled during industrialisation, ideology from
+    // industrialisation timing against neighbours. This overwrites the random
+    // Pass 4 draw, which stays as the fallback for bodies with no settlement.
+    derive_national_character(kepler_settlement, kepler_creeds, w,
+                              kepler_nations, kepler_tiles, 180, 84);
+
+    // The historical ruptures: collapse, war and revolution as transforms on
+    // territory, character and abundance — and, where a war is won, the
+    // victor's gods travel with the border and part of the loser's record is
+    // destroyed rather than merely contradicted.
+    resolve_historical_ruptures(kepler_settlement, kepler_creeds, w,
+                                kepler_nations, kepler_tiles, 180, 84,
+                                /*seed=*/params.seed ^ 0x80174E5u);
 
     // Stages 1-2 can only be written now: the Charter Act names a nation and
     // the border accord counts them, and neither existed a moment ago. The
@@ -259,6 +303,14 @@ world make_hard_coded_world(world_params params, generation_report* report,
                                std::make_move_iterator(kepler_creeds.history.end()));
     kepler_creeds.history.clear(); // moved-from; the ladder owns the lines now.
 
+    // The settlement/industrialisation record joins the same biography — after
+    // the ruptures have had their chance to destroy part of it, so what merges
+    // is the record as it SURVIVED, lacunae included.
+    kepler_hist.history.insert(kepler_hist.history.end(),
+                               std::make_move_iterator(kepler_settlement.history.begin()),
+                               std::make_move_iterator(kepler_settlement.history.end()));
+    kepler_settlement.history.clear(); // moved-from; the ladder owns the lines now.
+
     if (report)
     {
         for (generation_report::body_entry& be : report->bodies)
@@ -266,6 +318,10 @@ world make_hard_coded_world(world_params params, generation_report* report,
             if (be.name != "Kepler") continue;
             be.state.history.insert(be.state.history.end(),
                                     kepler_hist.history.begin(), kepler_hist.history.end());
+            // The province set / checkpoints / lacunae travel with the report
+            // (its `history` is already merged above and stays empty here,
+            // matching the continents convention).
+            be.settlement = kepler_settlement;
             std::stable_sort(be.state.history.begin(), be.state.history.end(),
                 [](const history_event& a, const history_event& b)
                 { return a.years_before_epoch > b.years_before_epoch; });
@@ -467,8 +523,11 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // the player's (which sets w.player_entity). Runs after the nations exist and
     // after the pre-authored Kepler installations are in w.buildings, so corporate
     // asset placement collision-avoids those tiles. See CORPORATION_GENERATION.md.
+    // BL-219: the settlement record is handed over so each corp's focus is a
+    // consequence of the province it anchors to — its ancient endowment plus
+    // how early that province industrialised — rather than a table lookup.
     generate_corporations(w, corporation_params{ .corporation_count = gen_cfg.corporation_count },
-        /*seed=*/params.seed ^ 0x4A71012u);
+        /*seed=*/params.seed ^ 0x4A71012u, &kepler_settlement);
 
     // Player unit stub on Kepler.
     const entity_id kepler_unit = w.create_entity();

@@ -263,19 +263,15 @@ target_compile_features(workforce_harness PRIVATE cxx_std_20)
 # ---------------------------------------------------------------------------
 # Exercises credit_arrived_convoys' persistent-route upsert (correct body-pair,
 # last_tick stamp, no duplicate on a repeat/reverse lane, intra-body records
-# nothing) and body_of_market resolution. Links only world + supply_system.
-add_executable(trade_routes_harness
-    "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/trade_routes_harness.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/world.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/supply_system.cpp"
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/world/logistics.cpp"
-)
-
-target_include_directories(trade_routes_harness PRIVATE
-    "${CMAKE_CURRENT_SOURCE_DIR}/src"
-)
-
-target_compile_features(trade_routes_harness PRIVATE cxx_std_20)
+# nothing) and body_of_market resolution.
+#
+# trade_routes_harness is NOT declared here — the same rot as econ_bankruptcy and
+# corp_terrain_matrix, and caught 2026-08-02. Its hand-picked list linked
+# logistics.cpp but not river_generation.cpp, so BL-170 (rivers) broke it the
+# moment intra_body_path started reading river_edge_discount / hex_side_for_offset,
+# exactly as the econ_bankruptcy commit predicted the remaining hand-declared
+# targets would. The generic batch at the foot of this file builds it against the
+# whole ${IO_WORLD_SOURCES} superset, which cannot drift this way.
 
 # ---------------------------------------------------------------------------
 # Headless commercial-fog harness (BL-089; no SDL / Lua / ImGui)

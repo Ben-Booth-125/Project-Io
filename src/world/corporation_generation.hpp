@@ -60,10 +60,23 @@ struct corporation_params
 ///               w.player_entity is set before this function returns.
 /// @param params Tunable generation parameters.
 /// @param seed   Per-run RNG seed for independent, reproducible results.
+/// @param settle Optional settlement/industrialisation record for the home body
+///               (BL-219). When supplied, Pass 2 stops drawing a focus from the
+///               authored weighting table and DERIVES it from the province the
+///               corporation is anchored to: a province that industrialised
+///               around ore emits extraction/processing corps, a coastal trade
+///               province emits trade-focused ones, and an early industrialiser
+///               skews one tier further up the value chain. Diversity then comes
+///               from a world-level reject-and-reroll against a floor on the
+///               SET — never a quota on any member — so Pass 2's
+///               diversity-without-quota property survives the rewrite. Null
+///               (the default) keeps the pre-BL-219 authored table, so a body
+///               with no settlement pass generates exactly as before.
 /// @return       Corporation entity IDs in generation order (one per corporation
 ///               created). The entry whose corporation_component::is_player is
 ///               true equals w.player_entity.
 std::vector<entity_id> generate_corporations(
     world& w,
     const corporation_params& params,
-    uint32_t seed);
+    uint32_t seed,
+    const struct settlement_state* settle = nullptr);

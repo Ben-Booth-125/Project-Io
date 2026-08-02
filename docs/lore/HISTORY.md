@@ -39,8 +39,10 @@ Stages are ordered and causal: each consumes the output of the one before. The p
 gate chain hands off at Stage 0. Era 0 gameplay begins at the top of the ladder.
 
 > **Stages 0–2 are BUILT** (BL-221, landed 2026-07-30) — `src/world/history_ladder.{hpp,cpp}`,
-> verified by `tools/verify/history_ladder_harness.cpp` (H1–H5). Stages 3–4 remain design only
-> (BL-222, industrial ladder — designed). **Stages 5–6 as written are SUPERSEDED** — rejected
+> verified by `tools/verify/history_ladder_harness.cpp` (H1–H5). **Stages 3–4 are now BUILT too**
+> (BL-218 nations rewrite + BL-219 corporations rewrite, landed 2026-08-02) —
+> `src/world/settlement.{hpp,cpp}`, verified by `tools/verify/settlement_harness.cpp` (S1–S8);
+> see § Implementation — Stages 3–4. **Stages 5–6 as written are SUPERSEDED** — rejected
 > 2026-07-30, replacement owed to BL-223 (averted rupture, design-owed); see their banners.
 > See § Implementation (after Stage 6) for what the code actually does and what it stands in for.
 
@@ -108,6 +110,12 @@ ancestors that didn't were outcompeted.
 credit access). Progressive loss instead of a lose screen mirrors the historical norm:
 sovereigns squeezed companies far more often than they destroyed them.
 
+**Built, partially (BL-218, 2026-08-02).** The stage's *mechanism* — credit disciplining the
+sovereign — is not simulated. What landed is its two legible consequences: the charter culture's
+**sealed-oath god** buys its provinces an industrialisation-date bonus (contract law reaching
+capital, one stage early), and the **war** rupture branch costs both belligerents abundance
+rather than paying the winner. The seizure-cost half is still owed to BL-223 (averted rupture).
+
 ### Stage 4 — Energy transition
 
 **What happens.** Fossil fuels break the organic-economy ceiling; growth compounds; wealth
@@ -120,6 +128,14 @@ conquest's return-on-investment collapses relative to trade's, which changes wha
 ore accessibility on owned tiles should let the history pass *name* which nation industrialised
 first, purely from tile data. Each seed gets its own Britain.
 History line: `"YYYY: {nation} lights the first coke furnaces of the {region} basin."`
+
+**BUILT (BL-218, landed 2026-08-02).** The hook is closed: `run_settlement` scores each
+province's ancient fuel endowment against the world's own mean, gates industrialisation on
+*above-average* fuel, and `derive_national_character` names the three earliest furnaces once
+nations exist. Each seed does get its own Britain, chosen from tile data alone. The creed sits
+on top of the endowment rather than beside it — a people who raised a forge god did so because
+their cradle held ore (`CREEDS.md`), so that god's provinces light up earlier. Endowment, not
+virtue, in both directions.
 
 ### Stage 5 — The Rupture (hegemony fails its final audition)
 
@@ -223,6 +239,71 @@ but unreached. Ben asked to *see* failure cases, so this is a tuning target for 
 
 ---
 
+## Implementation — Stages 3–4 *(BL-218 + BL-219, landed 2026-08-02)*
+
+`src/world/settlement.{hpp,cpp}`, sequenced between the creeds and the political map:
+
+```
+run_history_ladder            ->  cradles, fragmentation
+run_creeds / tribal conflict  ->  one pantheon per cradle; welding
+run_settlement                ->  PROVINCES: culture, ancient endowment, furnaces
+generate_nations                  seeded on the province anchors
+derive_national_character     ->  the three axes, as outputs
+resolve_historical_ruptures   ->  collapse / war / revolution, and the erasure
+generate_corporations         ->  focus from the corp's home province
+```
+
+**The province is the new unit, and it exists to carry two things at once.** A cradle was a
+*people*; a nation is a *territory*; neither can say "these particular fields, under these
+particular gods, sitting on this particular ore". The province can, which is why belief,
+endowment and industrial timing all hang off it and why BL-219 could read corporate focus
+straight out of it without a new mechanism.
+
+**Pantheons are mapped, not re-rolled.** A province inherits its nearest cradle's culture, so
+the distribution of gods across the map is a record of who walked where. That mapping then feeds
+back into the material history: a forge god only exists where the cradle window held ore, so
+"the forge god's country industrialises early" is not flavour laid over the data — it is the
+same fact read twice, one stage apart.
+
+**Scores are world-relative.** Every endowment class scores 500 at the world's mean and 1000 at
+twice it. An absolute gain either saturates one class or never fires another (the first
+implementation classified all 75 provinces `farm`); relative scoring also survives the
+`deposit_scalar` abundance tier without re-tuning.
+
+**Seeding changes, expansion does not.** `nation_params::seed_tiles` carries the province
+anchors into Pass 1 and the BL-053-tuned growth machinery is reused untouched. The size variance
+now emerges from where people settled instead of being dialled in — and the cheap alternative
+(keep Voronoi, narrate over it) was rejected as the lying-figure problem: prose asserting a
+settlement history the territory does not reflect.
+
+**The record is destructible, and the hole is visible.** A won war plants the victor's pantheon
+on the provinces taken and erases the lines naming them, leaving a dated lacuna with a count of
+what was lost (Ben, 2026-08-02). A conquered province keeps its founders in `founding_culture`
+and its conquerors in `culture` — the erasure is of the record, never of the fact, which is the
+pair a later religion or diplomacy layer needs to describe a grievance. Across a six-seed spread,
+four worlds lost part of their record to a war.
+
+**BL-217's mechanism, reused unchanged.** The ruptures are the second checkpoint class, drawing
+through `resolve_checkpoint` with eligibility as a filter and never a weight — exactly what
+BL-217 predicted this pass would need, so no second branch mechanism was written.
+
+**Honest scope.** A green harness means the pass is self-consistent, deterministic and wired
+into the political map — *not* that its dates or thresholds are calibrated against anything.
+Rarity tuning is still BL-219's sweep. The ruptures are bounded to the six most-contested
+nations, so their count is a property of the design rather than of the map size.
+
+> **Successor filed (2026-08-02): the Era −1 history sim.** Ben's steer, same day this landed:
+> promote this one-shot pass to a **running year-tick simulation from 0 CE to the campaign
+> epoch**, as the proving ground for the nation AI and the mil-sim, tuned against a seed spread
+> of earth-like worlds. And an **overturned decision**: simulated wars stop resolving as
+> abstract scalar comparisons and fight with **real typed units and doctrine-parameter tactics**
+> — the same combat engine the main era inherits ("drives, not narrates" survives; the *abstract*
+> half does not). Filed as **BL-271 (Era −1 sim)** · **BL-272 (unit/doctrine combat — records
+> the overturn)** · **BL-273 (province demography)** · **BL-274 (era-keyed unit rosters)** ·
+> **BL-275 (history sweep — BL-210's batch-sweep payload)**; Sprint 5's theme.
+
+---
+
 ## The compact thesis
 
 > **Markets scale where no one can dominate, and no one dominates where exit is cheap** — a
@@ -239,12 +320,14 @@ Kepler learned, and when, is BL-223's to restate.
   (BL-221): `run_history_ladder` writes the granary-cities line from arable share + cradles.
 - [x] Nation generation reads final nation count back into Stage 2 narrative text — **landed**
   (BL-221): `record_institutional_history` counts surviving realms into the accord line.
-- [ ] History pass names the first-industrialiser nation from tile fossil/ore data (Stage 4) —
-  owed to **BL-222 (industrial ladder, designed)**.
+- [x] History pass names the first-industrialiser nation from tile fossil/ore data (Stage 4) —
+  **landed** (BL-218): `derive_national_character` names the three earliest furnaces from the
+  province endowment scores. BL-222 (industrial ladder) is thereby substantially overtaken.
 - [ ] Charter Age line names the player corporation's home-nation legal tradition (Stage 1) —
   the nation-naming half landed with BL-221 (the Charter Act names the charter cradle's
-  nation); the *player-corp* linkage is owed to **BL-222** and is complicated by **BL-094
-  (player-nation pivot)**.
+  nation), and BL-218 added the creed half (the charter culture's sealed-oath god buys its
+  provinces an industrialisation bonus); the *player-corp* linkage remains owed, and is
+  complicated by **BL-094 (player-nation pivot)**.
 - [ ] Rupture event text (Era 0 → Era 1 transition) — the Stage 5 framing rule it referenced
   is superseded; owed to **BL-223 (averted rupture, design-owed)**.
 - [ ] Asset-seizure mechanics carry a sentiment/credit cost consistent with Stage 3 — owed to

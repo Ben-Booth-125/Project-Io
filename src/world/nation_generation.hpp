@@ -51,6 +51,24 @@ struct nation_params
     /// (43 nations at the current default seed). Halve the habitable area and
     /// the count still roughly halves with it.
     int min_nation_tiles = 80;
+
+    /// **Explicit seed tiles** (raster indices, `row * gw + col`) — when this is
+    /// non-empty Pass 1's random placement is SKIPPED and these are used verbatim,
+    /// in order, as the nation cores.
+    ///
+    /// This is the whole of BL-218's "seeding changes, expansion does not": the
+    /// settlement pass (`src/world/settlement.{hpp,cpp}`) places provinces on
+    /// ground people would actually have settled and hands the anchors over here,
+    /// so the BFS/growth machinery BL-053 tuned is reused untouched and only its
+    /// starting points become historical. Empty (the default) preserves the
+    /// pre-BL-218 random placement bit-for-bit for every body without a
+    /// settlement pass.
+    ///
+    /// Entries outside the grid, on ocean, or duplicated are dropped by Pass 1;
+    /// `min_seed_separation` is NOT re-applied to them (the settlement pass owns
+    /// its own separation rule and re-filtering here would silently discard
+    /// history).
+    std::vector<int> seed_tiles;
 };
 
 /// Generate nations over the tile map of one body and register all results in @p w.

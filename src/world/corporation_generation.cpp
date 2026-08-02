@@ -1,6 +1,7 @@
 #include "corporation_generation.hpp"
 
 #include "world/placement_rules.hpp"
+#include "world/settlement.hpp"
 
 #include <algorithm>
 #include <array>
@@ -763,7 +764,8 @@ hq_designation designate_hq(const world& w, const std::vector<entity_id>& assets
 std::vector<entity_id> generate_corporations(
     world& w,
     const corporation_params& params,
-    uint32_t seed)
+    uint32_t seed,
+    const settlement_state* settle)
 {
     if (w.nations.empty())
         return {};
@@ -821,19 +823,91 @@ std::vector<entity_id> generate_corporations(
 
     std::vector<industrial_focus> corp_focuses(static_cast<std::size_t>(corp_count));
 
-    for (int c = 0; c < corp_count; ++c)
+    // home_province_idx[c] = index into settle->provinces, or -1. Only the
+    // BL-219 path fills it; it is what makes two corps in the SAME nation differ
+    // — a nation average would make every corp in a nation alike and destroy
+    // the specialists premise this rewrite is required to preserve.
+    std::vector<int> home_province_idx(static_cast<std::size_t>(corp_count), -1);
+
+    if (settle && !settle->provinces.empty())
     {
-        const entity_id home_nid = nation_ids[static_cast<std::size_t>(
-            home_nation_idx[static_cast<std::size_t>(c)])];
+        // BL-219 — focus DERIVED from the corp's home province, then a
+        // world-level reject-and-reroll against a diversity floor. A floor on
+        // the SET is not a quota on any MEMBER, so no individual corporation's
+        // focus ever becomes inexplicable; the reroll re-picks which provinces
+        // the corps anchor to, it never patches a corp's focus directly.
+        constexpr int max_attempts = 6;
+        for (int attempt = 0; attempt < max_attempts; ++attempt)
+        {
+            std::mt19937 attempt_rng(seed_focus ^ (static_cast<uint32_t>(attempt) * 0x9E3779B1u));
+            focus_counts = { 0, 0, 0 };
 
-        const auto it = w.nations.find(home_nid);
-        const economic_focus nation_ef = (it != w.nations.end())
-            ? it->second.focus
-            : economic_focus::extraction;
+            for (int c = 0; c < corp_count; ++c)
+            {
+                const entity_id home_nid = nation_ids[static_cast<std::size_t>(
+                    home_nation_idx[static_cast<std::size_t>(c)])];
 
-        const industrial_focus focus = pick_focus(nation_ef, focus_counts, focus_rng);
-        corp_focuses[static_cast<std::size_t>(c)] = focus;
-        focus_counts[static_cast<std::size_t>(focus)]++;
+                // The provinces this corp could anchor to, in placement order.
+                std::vector<int> options;
+                for (std::size_t pi = 0; pi < settle->provinces.size(); ++pi)
+                {
+                    const province& p = settle->provinces[pi];
+                    if (p.nation < 0 || p.nation >= nation_count) continue;
+                    if (nation_ids[static_cast<std::size_t>(p.nation)] != home_nid) continue;
+                    options.push_back(static_cast<int>(pi));
+                }
+
+                if (options.empty())
+                {
+                    // A nation the settlement pass never reached (all its land
+                    // arrived by conquest or orphan assignment). Fall back to
+                    // the national character rather than inventing a province.
+                    const auto it = w.nations.find(home_nid);
+                    const economic_focus ef = (it != w.nations.end())
+                        ? it->second.focus : economic_focus::extraction;
+                    corp_focuses[static_cast<std::size_t>(c)] =
+                        static_cast<industrial_focus>(static_cast<uint8_t>(ef));
+                    focus_counts[static_cast<std::size_t>(corp_focuses[static_cast<std::size_t>(c)])]++;
+                    continue;
+                }
+
+                std::uniform_int_distribution<int> pick(0, static_cast<int>(options.size()) - 1);
+                const int pi = options[static_cast<std::size_t>(pick(attempt_rng))];
+                home_province_idx[static_cast<std::size_t>(c)] = pi;
+
+                const industrial_focus f = focus_from_province(
+                    settle->provinces[static_cast<std::size_t>(pi)],
+                    settle->median_industrial_year);
+                corp_focuses[static_cast<std::size_t>(c)] = f;
+                focus_counts[static_cast<std::size_t>(f)]++;
+            }
+
+            // The floor: no focus class wholly unrepresented across the world.
+            // With fewer corps than classes the floor is unmeetable by
+            // construction, so it does not apply.
+            if (corp_count < 3) break;
+            if (focus_counts[0] > 0 && focus_counts[1] > 0 && focus_counts[2] > 0) break;
+            // Otherwise: reroll the whole set. The last attempt's emergent set
+            // stands rather than being patched — an unmet floor is honest, a
+            // hand-fixed corp is not.
+        }
+    }
+    else
+    {
+        for (int c = 0; c < corp_count; ++c)
+        {
+            const entity_id home_nid = nation_ids[static_cast<std::size_t>(
+                home_nation_idx[static_cast<std::size_t>(c)])];
+
+            const auto it = w.nations.find(home_nid);
+            const economic_focus nation_ef = (it != w.nations.end())
+                ? it->second.focus
+                : economic_focus::extraction;
+
+            const industrial_focus focus = pick_focus(nation_ef, focus_counts, focus_rng);
+            corp_focuses[static_cast<std::size_t>(c)] = focus;
+            focus_counts[static_cast<std::size_t>(focus)]++;
+        }
     }
 
     // ---------------------------------------------------------------------------

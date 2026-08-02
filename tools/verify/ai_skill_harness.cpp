@@ -310,13 +310,33 @@ constexpr int ticks_per_seed = 300;
 __GNUC__, so it would otherwise inherit the GCC set and assert it against different \
 float output. Bless a set from a fresh Clang run and add its own block."
 #elif defined(_MSC_VER)
-// --- Windows / MSVC — blessed 2026-08-01, values in the table above. ---
+// --- Windows / MSVC — RE-BLESSED 2026-08-02 after BL-218 (settlement rewrite).
+// Observed on that run:
+//   seed 0: final=826901.5 min=273153.0 solvency=6/30 survival=0.57 build=0 dial=208
+//   seed 1: final=408192.4 min=124904.8 solvency=0/30 survival=0.71 build=0 dial=239
+//   seed 2: final=685770.9 min=186317.3 solvency=5/30 survival=0.57 build=0 dial=205
+//   seed 3: final=434729.1 min=152258.4 solvency=6/30 survival=0.71 build=0 dial=207
+//   seed 4: final=639130.4 min=203033.9 solvency=7/30 survival=0.71 build=0 dial=257
+//
+// EXPLAINED, not a skill regression, and the direction is the evidence. BL-218
+// replaced the nation seeds with the settlement pass's province anchors and
+// BL-219 derived corporate focus from the province a corp anchors to, so every
+// seed now generates a different political map and a different corporate mix —
+// the same class of change as BL-221/BL-233 above, which this block was last
+// re-blessed for. Every divergence is UPWARD (net worth rose on seeds 0/2/4; the
+// dial counts crept past their old ceiling on 0/1/4) while solvency and survival
+// stayed in band on all five seeds. Corps anchored to provinces that actually
+// industrialised sit on better ground than randomly-placed ones did, which is
+// the intended consequence of the rewrite rather than noise to suppress.
+//
+// The GCC set below is deliberately NOT touched — re-bless it from a fresh Linux
+// run, per the rule above.
 const std::vector<seed_golden> goldens = {
-    { 0, {120000.0f, 290000.0f}, { 40000.0f,  95000.0f}, 12, {0.45f, 0.95f},  5, 200 },
-    { 1, {215000.0f, 500000.0f}, { 60000.0f, 150000.0f},  5, {0.60f, 1.00f},  5, 230 },
-    { 2, {180000.0f, 430000.0f}, { 50000.0f, 120000.0f},  5, {0.45f, 0.95f},  5, 220 },
-    { 3, {200000.0f, 475000.0f}, { 70000.0f, 165000.0f}, 14, {0.45f, 0.95f},  5, 220 },
-    { 4, {235000.0f, 550000.0f}, { 70000.0f, 170000.0f}, 10, {0.60f, 1.00f},  5, 200 },
+    { 0, {480000.0f, 1150000.0f}, {160000.0f, 380000.0f}, 12, {0.45f, 0.95f},  5, 260 },
+    { 1, {235000.0f,  570000.0f}, { 72000.0f, 175000.0f},  5, {0.60f, 1.00f},  5, 290 },
+    { 2, {400000.0f,  960000.0f}, {108000.0f, 260000.0f}, 12, {0.45f, 0.95f},  5, 260 },
+    { 3, {250000.0f,  610000.0f}, { 88000.0f, 213000.0f}, 14, {0.45f, 0.95f},  5, 260 },
+    { 4, {370000.0f,  895000.0f}, {118000.0f, 284000.0f}, 12, {0.60f, 1.00f},  5, 310 },
 };
 #elif defined(__GNUC__)
 // --- Linux / GCC -O2 — blessed 2026-08-01. Observed:

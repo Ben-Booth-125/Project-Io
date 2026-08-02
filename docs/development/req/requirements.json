@@ -7932,6 +7932,101 @@
       ],
       "resolved": "2026-08-02",
       "resolution": "All 4 rows met. 114 entries across five families, authored by five parallel agents and merged with per-fragment validation. Two truth catches during authoring: the LENSES.md supply-routes unreachability note was stale against code (fixed in LENSES.md, and the entry transcribes the code truth); Esc's real precedence ladder has seven rungs (chrome.esc transcribes it; the canvas duplicate was dropped at merge)."
+    },
+    {
+      "brief": "settlement-history-rewrite",
+      "title": "Nations & corporations as outputs of a simulated settlement/industrialisation history (BL-218 + BL-219, HISTORY.md Stages 3-4)",
+      "difficulty": 4,
+      "importance": "SS",
+      "evaluated_difficulty": 4,
+      "status": "complete",
+      "promoted_from": "BL-218 (nations settlement rewrite) + BL-219 (corporations history rewrite), promoted 2026-08-02 on Ben's instruction to complete Sprint 2b and finish the history backend",
+      "batch": "Sprint 2b close-out",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "The settlement pass is a pure deterministic function of (seed, tiles, ladder, creeds): two generations of the same seed produce an identical province set, culture assignment, industrialisation dates, checkpoint list and lacuna count.",
+          "verification": [
+            "headless: settlement_harness S1a/S1b"
+          ],
+          "status": "complete",
+          "result_metric": "Met - S1b compares every province field plus checkpoints across two make_hard_coded_world runs. Integer scoring throughout, explicit index tie-breaks, fresh stage tags (0x5E77 / 0xF0F6 / 0x8017), no transcendentals.",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "requirement": "Belief is mapped onto ground: every province carries the culture of its NEAREST cradle (not a per-province re-roll), more than one pantheon reaches the map, and the ancient deposits separate provinces into more than one endowment class.",
+          "verification": [
+            "headless: settlement_harness S2a/S2b/S2c"
+          ],
+          "status": "complete",
+          "result_metric": "Met - seed 0 yields 27 farm / 20 ore / 8 energy / 20 port over 75 provinces across multiple cultures. Required a mid-build correction: the first absolute-gain scoring saturated all 75 provinces to `farm`, and was replaced with world-relative scoring (500 = the world's own mean), which is also immune to the deposit_scalar abundance tier.",
+          "notes": "The creed/endowment coupling is the point: a forge god only exists where the cradle window held ore, so its provinces industrialising early is one fact read twice."
+        },
+        {
+          "id": "R3",
+          "requirement": "The three political axes are OUTPUTS of the settlement record, not an independent draw: expansionism from the border-contest integral, economic_focus from the dominant class of provinces settled during industrialisation, ideology from industrialisation timing ranked against neighbours.",
+          "verification": [
+            "headless: settlement_harness S3a/S3b/S3c"
+          ],
+          "status": "complete",
+          "result_metric": "Met - all three axes vary across nations and the contest integral reaches the expansionism axis. The random Pass 4 draw survives only as the fallback for bodies with no settlement pass.",
+          "notes": "Asserted as variation rather than as a per-nation value, because the harness reads the generation_report and provinces store an index into generate_nations' return order that the report does not carry."
+        },
+        {
+          "id": "R4",
+          "requirement": "Seeding changes, expansion does not: nation_params::seed_tiles is filled from the province anchors and consumed verbatim, the BL-053-tuned growth machinery is unmodified, and the world stays multipolar.",
+          "verification": [
+            "headless: settlement_harness S4a/S4b",
+            "headless: world_audit",
+            "headless: world_determinism"
+          ],
+          "status": "complete",
+          "result_metric": "Met - the vast majority of province anchors end up owned, the political map stays multipolar, and both world_audit and world_determinism pass unchanged.",
+          "notes": "The cheap alternative (keep Voronoi, narrate over it) was surfaced and rejected per BL-210's discipline as the lying-figure problem."
+        },
+        {
+          "id": "R5",
+          "requirement": "Ruptures are transforms, not narration: collapse/war/revolution each mutate territory, character or abundance; every attempt appends a checkpoint_record (failures included); branch eligibility is a filter and never a weight; and no rupture leaves a nation with zero tiles.",
+          "verification": [
+            "headless: settlement_harness S6a/S6b"
+          ],
+          "status": "complete",
+          "result_metric": "Met - reuses planetology.hpp's class-agnostic resolve_checkpoint unchanged, which is exactly the second checkpoint class BL-217 was designed to serve. Six ruptures fire on seed 0; branch labels are drawn only from the three designed ones.",
+          "notes": "Bounded to the six most-contested nations so the rupture count is a property of the design rather than of the map size."
+        },
+        {
+          "id": "R6",
+          "requirement": "The record can be destroyed and the hole stays visible: a won war erases the lines naming the provinces it took, replaces them with a dated lacuna carrying a count of what was lost, plants the victor's pantheon on those provinces, and keeps the founders recorded in founding_culture.",
+          "verification": [
+            "headless: settlement_harness S5a/S5b/S5c"
+          ],
+          "status": "complete",
+          "result_metric": "Met - 4 of 6 worlds in the seed spread lost part of their record to a war. A conquered province is asserted to keep a founding_culture distinct from its (conquered) culture, so the erasure is of the record, never of the fact.",
+          "notes": "Ben, 2026-08-02: 'don't be afraid to have parts of the record erased when two nations go to war'."
+        },
+        {
+          "id": "R7",
+          "requirement": "Corporate focus derives from the corp's HOME PROVINCE (ancient endowment plus the movement up the value chain for early industrialisers), the authored focus-weighting table is retired on that path, and diversity is a world-level reject-and-reroll against a floor on the SET rather than a quota on any member.",
+          "verification": [
+            "headless: settlement_harness S7a/S7b/S7c/S7d",
+            "headless: corp_terrain_matrix"
+          ],
+          "status": "complete",
+          "result_metric": "Met - the three tier rules assert directly on focus_from_province, and the world-level floor holds across the generated corporation set (5 extraction / 1 processing / 2 trade on seed 0). corp_terrain_matrix passes, so every generated corp is still terrain-viable. Player-corp parity is unchanged - same province read, same reroll, no special case.",
+          "notes": "Per-province rather than per-nation deliberately: a nation average would make every corp in a nation alike and destroy the specialists premise."
+        },
+        {
+          "id": "R8",
+          "requirement": "No regression across the logic tier, and any divergence in the AI skill goldens is explained rather than suppressed.",
+          "verification": [
+            "headless: ctest full suite"
+          ],
+          "status": "complete",
+          "result_metric": "Met - 39/39 CTest green. Two harnesses needed work: history_ladder_harness's H4 stage-ordering assertion was NARROWED (it demanded every line in the recorded-history window be strictly older than the next, which only held while the ladder owned that window alone), and ai_skill_harness's MSVC golden set was RE-BLESSED. Every AI divergence was upward - net worth rose on seeds 0/2/4 while solvency and survival stayed in band - which is the intended consequence of corps anchoring to provinces that actually industrialised.",
+          "notes": "A pre-existing unrelated break was also fixed: trade_routes_harness's hand-declared CMake link set never picked up river_generation.cpp after BL-170 landed, so it failed to link. Removed the hand-declaration per the file's own guidance on that rot."
+        }
+      ]
     }
   ]
 }
