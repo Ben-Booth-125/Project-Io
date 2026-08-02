@@ -529,6 +529,29 @@
         "src/ui/ui_state.hpp"
       ],
       "resolution": null
+    },
+    {
+      "id": "NR-025",
+      "title": "CONCEPT.md:51 is right after all — the Era rupture disagreement was four-way, and the fourth doc dissolves it",
+      "raised": "2026-08-02",
+      "kind": "observation",
+      "status": "open",
+      "source": "Settling BL-223 (averted rupture) during the design-owed sweep, 2026-08-02",
+      "what": "BL-223 tabulates a three-doc disagreement about the Era 0 rupture — CONCEPT.md:51 (a future WW3-scale event during play), ERAS.md (three purely mechanical gate conditions, no event), HISTORY.md Stage 5 (a past event) — and its owed action 2 was to amend CONCEPT.md. There is a fourth doc it omits: BL-087 Era reframe of 2026-07-08, which says Eras ARE catastrophic seeded events on the world clock and explicitly re-reads the ERAS.md Rocketry/Launchpad/propellant condition set as gating a QUEST TREE rather than an Era. That is dated later than the ERAS.md model, so under newest-dated-wins it governs. With it in the table the contradiction dissolves: there are TWO ruptures doing different jobs — a PAST averted near-miss (backstory, sets starting diplomatic posture) and a FUTURE seeded event that ends Era 0 during play. CONCEPT.md needs no amendment; only ERAS.md does, and BL-087 already owns that edit when its work lands.",
+      "why_it_matters": "The item was about to amend a CONCEPT.md line that is correct, on the strength of a table that was missing a doc. CONCEPT.md is the top of the corpus and the hardest place to undo a wrong edit — a claim removed there stops being available as a premise everywhere downstream. It is also a small warning about the reconciliation method: BL-223 built its table by reading the three docs that talk about Eras by name, and missed the design that changed what an Era IS because it lives in a backlog item rather than a doc. The 2026-07-31 doc-truth sweep would not have caught this either, for the same reason.",
+      "options": [
+        "Accept the reading: two ruptures, CONCEPT.md unamended, ERAS.md corrected by BL-087 when it lands (what I recorded).",
+        "Accept the reading but correct ERAS.md now rather than waiting on BL-087, since it is currently the one doc stating something the design has superseded.",
+        "Disagree — you intended only one rupture, in which case say which one, and HISTORY.md Stage 5 or CONCEPT.md:51 goes rather than both standing."
+      ],
+      "recommendation": "Option 1, and the two-rupture reading is worth keeping for its own sake rather than just as a reconciliation: the rupture that was averted then is not averted this time. The backstory establishes that these powers can pull back from the brink, and the Era 0 exit is the occasion they do not — which is a stronger premise than either event alone and costs nothing, since both were already written. Option 2 is defensible if the ERAS.md line is bothering you, but it edits an authority doc ahead of the work, which the time-slice rule exists to prevent.",
+      "files": [
+        "docs/CONCEPT.md",
+        "docs/economy/ERAS.md",
+        "docs/lore/HISTORY.md",
+        "docs/development/backlog.json"
+      ],
+      "resolution": null
     }
   ]
 }

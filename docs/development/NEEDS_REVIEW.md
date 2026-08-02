@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*24 entries — 5 open, 19 resolved.*
+*25 entries — 6 open, 19 resolved.*
 
 ---
 
@@ -105,6 +105,21 @@ BL-171 added Tax and Wages tier selectors to the player Budget ledger as stubbed
 > **Recommendation:** Option 1, but option 4 is worth a moment because it is the one that keeps your original intent AND makes it coherent — a negotiated rate fits the chartered-corporation identity the history ladder (BL-223) is building toward, and it would make Tax the first place diplomacy touches the economy. It costs a negotiation mechanic that does not exist, so it is not a prototype answer; if it appeals, the honest move is option 1 now and option 4 filed for v0.2.0. Either way the Tax control as currently drawn should not ship promising a lever the player does not have.
 
 *Files: `docs/development/backlog.json`, `src/ui/balance_ledger.cpp`, `src/ui/ui_state.hpp`*
+
+### NR-025 — CONCEPT.md:51 is right after all — the Era rupture disagreement was four-way, and the fourth doc dissolves it
+*observation · raised 2026-08-02 · from Settling BL-223 (averted rupture) during the design-owed sweep, 2026-08-02*
+
+BL-223 tabulates a three-doc disagreement about the Era 0 rupture — CONCEPT.md:51 (a future WW3-scale event during play), ERAS.md (three purely mechanical gate conditions, no event), HISTORY.md Stage 5 (a past event) — and its owed action 2 was to amend CONCEPT.md. There is a fourth doc it omits: BL-087 Era reframe of 2026-07-08, which says Eras ARE catastrophic seeded events on the world clock and explicitly re-reads the ERAS.md Rocketry/Launchpad/propellant condition set as gating a QUEST TREE rather than an Era. That is dated later than the ERAS.md model, so under newest-dated-wins it governs. With it in the table the contradiction dissolves: there are TWO ruptures doing different jobs — a PAST averted near-miss (backstory, sets starting diplomatic posture) and a FUTURE seeded event that ends Era 0 during play. CONCEPT.md needs no amendment; only ERAS.md does, and BL-087 already owns that edit when its work lands.
+
+**Why it matters.** The item was about to amend a CONCEPT.md line that is correct, on the strength of a table that was missing a doc. CONCEPT.md is the top of the corpus and the hardest place to undo a wrong edit — a claim removed there stops being available as a premise everywhere downstream. It is also a small warning about the reconciliation method: BL-223 built its table by reading the three docs that talk about Eras by name, and missed the design that changed what an Era IS because it lives in a backlog item rather than a doc. The 2026-07-31 doc-truth sweep would not have caught this either, for the same reason.
+
+- Accept the reading: two ruptures, CONCEPT.md unamended, ERAS.md corrected by BL-087 when it lands (what I recorded).
+- Accept the reading but correct ERAS.md now rather than waiting on BL-087, since it is currently the one doc stating something the design has superseded.
+- Disagree — you intended only one rupture, in which case say which one, and HISTORY.md Stage 5 or CONCEPT.md:51 goes rather than both standing.
+
+> **Recommendation:** Option 1, and the two-rupture reading is worth keeping for its own sake rather than just as a reconciliation: the rupture that was averted then is not averted this time. The backstory establishes that these powers can pull back from the brink, and the Era 0 exit is the occasion they do not — which is a stronger premise than either event alone and costs nothing, since both were already written. Option 2 is defensible if the ERAS.md line is bothering you, but it edits an authority doc ahead of the work, which the time-slice rule exists to prevent.
+
+*Files: `docs/CONCEPT.md`, `docs/economy/ERAS.md`, `docs/lore/HISTORY.md`, `docs/development/backlog.json`*
 
 ---
 
