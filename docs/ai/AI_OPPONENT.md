@@ -357,6 +357,21 @@ Two properties matter for the AI use:
 The catalogue axes, for orientation: `user_stories.json` = player **intent**;
 `UX_QUESTIONS` (BL-260) = what a readout **answers**; `ACTIONS` = what a press **does**.
 
+**Consumption model (Ben, 2026-08-02).** A language agent never absorbs the store
+whole: it holds the generated **`ACTIONS_INDEX.json`** (`[id, surface]` per action)
+in context and fetches full entries on demand via
+`tools/session/actions_query.js` (by id, family, or keyword) — the lookup the
+word-play harness wraps as the LLM's dictionary tool.
+
+**Priority is NOT dictionary material (Ben, 2026-08-02).** Entries deliberately
+carry no urgency or importance score. The live AI scores each *candidate* action
+on a **2D urgency × importance map** at decision time, against blackboard state —
+urgency (how much each tick of delay costs *now*) and importance (how much the
+outcome matters to the strategy) are properties of the situation, not of the
+verb. A static per-entry score was considered and rejected the same day: it
+would claim `idle` is always urgent, when it is urgent only for a building
+hemorrhaging cash. The dictionary supplies meaning; the policy supplies priority.
+
 ---
 
 ## 7. Communication & diplomacy — the chat principle (Ben, 2026-07-26)

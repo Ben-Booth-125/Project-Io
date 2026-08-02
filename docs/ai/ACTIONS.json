@@ -4,7 +4,9 @@
     "The third catalogue axis: user_stories.json = intent, UX_QUESTIONS (BL-260) = information, ACTIONS = action.",
     "The gameplay family is TRANSCRIBED from src/world/corp_command.hpp (verbs, typed args, corp_command_result rejections) — where dictionary and seam disagree, the dictionary is wrong and the fix is mechanical.",
     "Deliberately absent fields (Ben, 2026-08-02): cost/spend (world state the blackboard reports, not dictionary material) and backlog provenance (UX_QUESTIONS’ axis, not this one).",
-    "Any change to a control, binding, lens, ledger or panel must update its entry here — a stale entry misleads the AI player the way a stale golden misleads a visual check."
+    "Any change to a control, binding, lens, ledger or panel must update its entry here — a stale entry misleads the AI player the way a stale golden misleads a visual check.",
+    "Consumption model (Ben, 2026-08-02): a language agent holds the generated ACTIONS_INDEX.json ([id, surface] per action) in context and fetches full entries via tools/session/actions_query.js — it never absorbs this file whole.",
+    "Deliberately NO urgency/importance fields (Ben, 2026-08-02): the live AI scores candidate actions on a 2D urgency x importance map at decision time, against blackboard state. Priority is situational; the dictionary supplies meaning. See AI_OPPONENT.md § 6a."
   ],
   "entries": [
     {
