@@ -1492,6 +1492,13 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
         if (tile.resource_deposit[static_cast<std::size_t>(er)] > 0.0f)
             cands.push_back({building_type::extraction_site, er,
                              std::string("Extraction: ") + resource_name(er)});
+    // Fishing Wharf (BL-168): agricultural_produce has no terrestrial deposit here,
+    // so the loop above skips it — but a coastal tile can still work it. Without this,
+    // the ledger never offers the one candidate whose whole point is a zero-deposit tile.
+    if (tile.resource_deposit[static_cast<std::size_t>(resource_type::agricultural_produce)] <= 0.0f
+        && placement_rules::is_coastal(w, tile_id))
+        cands.push_back({building_type::extraction_site, resource_type::agricultural_produce,
+                         std::string("Extraction: ") + resource_name(resource_type::agricultural_produce)});
     // One processing row per recipe, each priced on its own economics.
     for (int ri = 0; ri < reg.recipe_count(building_type::processing_facility); ++ri)
         cands.push_back({building_type::processing_facility, resource_type::iron_ore,
