@@ -371,13 +371,17 @@ struct population_centre_component
     int   growth_accumulator = 0;    ///< Ticks of qualifying growth; resets on level-up.
 };
 
-/// Deployable unit stub. Combat rules, faction AI, and transport are deferred;
-/// this struct exists so the field-level data model is in place.
+/// Deployable unit stub. Faction AI and transport are deferred; the combat
+/// engine (BL-272, see world/combat.hpp) reads `type` when a stack is
+/// resolved into an army_stack_entry for resolve_battle. `type` is an opaque
+/// index into whichever roster table the current era supplies (BL-274 owns
+/// rosters, not this file) — unit_component itself does not interpret it.
 struct unit_component
 {
-    entity_id body;  ///< Body where the unit is currently located.
-    entity_id owner; ///< Corporation or faction entity that controls this unit.
-    int       count; ///< Number of units in the group.
+    entity_id body;      ///< Body where the unit is currently located.
+    entity_id owner;     ///< Corporation or faction entity that controls this unit.
+    int       count;     ///< Number of units in the group.
+    uint16_t  type = 0;  ///< Opaque roster-type index; see combat.hpp's army_stack_entry.
 };
 
 // ---------------------------------------------------------------------------
