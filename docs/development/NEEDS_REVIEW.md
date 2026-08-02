@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*39 entries — 16 open, 23 resolved.*
+*40 entries — 17 open, 23 resolved.*
 
 ---
 
@@ -240,6 +240,21 @@ CLAUDE.md opened with "Read the documents below before responding to any request
 > **Recommendation:** If you disagree, the alternative is to shrink the reading order to fit a real budget (doc_weight.js --budget takes a ceiling and exits non-zero when the named set is over it) rather than to restore the old wording.
 
 *Files: `CLAUDE.md`, `tools/doc_weight.js`*
+
+### NR-040 — C-route walk-back: not a shipped LLM API integration — the real ask is human-in-the-loop play via computer-use, plumbing still unscoped
+*question · raised 2026-08-02 · from Same sprint-planning session as NR-039, immediately after — Ben corrected the direction once he saw the concrete design (HTTP client choice, API key storage, threading)*
+
+Asked to design C-route's implementation, I produced a full in-process design: an HTTP client dependency, a live Anthropic API call per corp per econ tick, and a determinism-rule carve-out (recorded as NR-039). Presenting the concrete choices this required (which HTTP library, how to store an API key, whether the call blocks the sim tick) surfaced that this wasn't the intent. Ben: 'I never intended for this to be an item. We still need the plumbing for in-place sessions to make decisions. The best way is just to use Claude on my PC to actually visually play the game with mouse and keyboard input.' All three doc changes from NR-039 (AI_OPPONENT.md §7a, the io-standing-rules.md determinism exception, BL-205's design field) have been reverted; §7's original Stage-C description (unchanged since 2026-07-26) is the standing design again.
+
+**Why it matters.** The actual near-term want is a human-in-the-loop workflow — Claude (this kind of session, with computer-use/screenshot/click tools) playing the game live to make AI-corp decisions or prototype behavior, not a coded feature shipped in ProjectIo.exe. That is much closer to what BL-206 (blackboard export) and BL-270 (the action dictionary) already exist for — an AI-consumable read/write interface — than to a new LLM-API integration. What's still unclear: what 'plumbing' is actually missing. Claude already has computer-use tools (screenshot, click, type) and the `run` skill can launch the app; BL-206's state export and BL-270's action dictionary already give a language-agent read/write surface. It's possible nothing new needs building at all, or the ask is a thin harness that surfaces ACTIONS_INDEX.json + the blackboard export in a form easier for a live session to drive. Filed as a question rather than closed, since guessing further without Ben's steer risks a third build-the-wrong-thing pass.
+
+- Nothing needs building — BL-206 + BL-270 + existing computer-use tools already cover it; next session just tries actually playing the game this way and see what's missing in practice.
+- A small harness is needed: something that packages the blackboard export + action dictionary into a form a live session reads faster than raw JSON (e.g. a single 'what can I do right now' summary).
+- Something else — Ben has a more specific plumbing gap in mind that hasn't been named yet.
+
+> **Recommendation:** Try option 1 first, cheaply: next session, actually attempt to drive the game via computer-use using what already exists (BL-206 export + BL-270 actions), and only design new plumbing against a concrete friction point hit during that attempt. Building infrastructure ahead of the first real attempt is exactly the mistake NR-039 just made at a different layer.
+
+*Files: `docs/ai/AI_OPPONENT.md`, `docs/development/backlog.json`, `docs/ai/ACTIONS.json`, `docs/development/req/requirements.json`*
 
 ---
 
@@ -608,9 +623,9 @@ Two standing-rule interactions in one session, both Ben's explicit call rather t
 
 **Why it matters.** Neither is a mistake — both are recorded, deliberate calls Ben made in chat, and the standing-rules file itself now documents the determinism exception so it reads as intentional rather than a regression. Logged here mainly so a future session tracing 'why is the sim non-deterministic in one spot' or 'why was v0.2.0 designed before v0.1.0 cut' finds the reasoning in one place rather than archaeology.
 
-> **Recommendation:** No action needed — both calls stand as made. BL-205's design field and AI_OPPONENT.md §7a carry the full decomposition; io-standing-rules.md carries the determinism carve-out inline.
+> **Recommendation:** Superseded within the same session — see NR-040. The determinism carve-out and the §7a design were both reverted once Ben clarified the actual intent.
 
-> **RESOLVED.** Recorded as an observation at the time both calls were made (2026-08-02); no open question remains.
+> **RESOLVED.** Superseded (2026-08-02, same session) — Ben clarified C-route was never meant to be a shipped in-process API call; the sequencing override still stands as a fact of what happened, but the resulting design and the determinism-rule exception it justified were both wrong and have been reverted. See NR-040.
 
 *Files: `.claude/rules/io-standing-rules.md`, `docs/ai/AI_OPPONENT.md`, `docs/development/backlog.json`*
 

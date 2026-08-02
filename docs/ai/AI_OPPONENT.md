@@ -398,6 +398,14 @@ players, so the medium is actor-agnostic.
 - **Player input**: a message box posts to the selected channel. It has **no mechanical effect
   yet** — it is the hook the C-route consumes (the player negotiating with AI corps in language).
 
+> **2026-08-02 note:** a design pass explored C-route as a shipped in-process feature (a live
+> Anthropic API call per corp per econ tick) and got as far as a full decomposition before Ben
+> clarified that isn't the intent — see NR-039/NR-040 in `NEEDS_REVIEW.json` for the walk-back.
+> The actual near-term plan is closer to a human-in-the-loop session (Claude driving the game
+> visually via mouse/keyboard, the way a player would) than a coded runtime API integration; what
+> "plumbing" that needs, if any, is still being scoped. Treat § 7's Stage C description above as
+> the standing design; nothing below it is settled.
+
 ---
 
 ## 8. Follow-on decomposition (filed 2026-07-26)
