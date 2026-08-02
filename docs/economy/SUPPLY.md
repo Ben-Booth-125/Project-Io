@@ -89,6 +89,20 @@ Roads are a land cost-reducer over a **three-tier ladder** (BL-172; BL-146/BL-14
 
 "Throughput" here is *cost-discount*, not a capacity cap — per-node throughput remains out of prototype scope (below). The **generated road network** landed as **BL-146** and gained the third tier in **BL-172** (`src/world/road_generation.cpp`, `generate_roads`): after nations + population centres exist, each nation's centres are joined by an MST + relative-neighbour-redundancy backbone over terrain-weighted A* costs; each edge's tier is chosen from the two centres' scales — **Highway** between two major centres (population `scale ≥ 3`), **Road** when at least one endpoint is Town+ (`scale ≥ 2`), **Track** otherwise — rasterised along the A* path (ocean skipped), with one **Track** border link between the nearest centre pair of each territorially-adjacent nation. Generation measures the lanes road-free (to lay the network out), then clears `world.astar_cost_cache` so gameplay dispatch recomputes against the stamped roads. **Player placement** (BL-147 core, BL-172 tiers): the tile build front door offers all three tiers (`place_road(tile, tier)`, cost `economy.roads.{track,road,highway}`); placement is **upgrade-in-place** — valid when the chosen tier strictly exceeds the tile's current `road_level`, so a Track can be raised to a Highway but the same-or-lower tier is refused. The on-canvas render (PLANETARY.md) draws each roaded tile's own half of every shared edge, so a road **spans symmetrically** between the two tiles it joins with no "from vs to" asymmetry, weighted by tier. Determinism + connectivity + the 3-tier ceiling are pinned by `tools/verify/road_generation_harness.cpp`; placement + upgrade by `tools/verify/logistics_harness.cpp` (T10). A distinct **railroad** *mode* (not a road tier) is deferred to BL-173.
 
+**River discount (BL-170, landed).** A river is generated as a directed **edge** across one of a
+tile's 6 hex sides (never a tile-occupying feature — see `docs/generation/TILE_GENERATION.md`
+§ Rivers), traced downhill from high ground to ocean/basin over Kepler's Pass-1 heightmap
+(`src/world/river_generation.cpp`, `generate_rivers`). Where the intra-body A* path
+(`src/world/logistics.cpp`) crosses a river-carrying edge, `river_edge_discount` applies a
+further multiplier — **0.75× downstream, 0.85× upstream** — folded into the edge cost
+**alongside**, and **multiplicatively with**, the road-tier discount above: a Highway that also
+runs downstream compounds to `0.40 × 0.75 = 0.30`. No new resource or market good is involved;
+this is a pure logistics-cost effect, sized to sit within the road ladder's scale (Track 0.67 …
+Highway 0.40) rather than outstrip it — a river is a bonus lane, not a road-network replacement.
+`tile_component::river_edges` / `river_downstream` (`src/world/components.hpp`) carry the per-side
+bitmasks; `tile_borders_river` reads water-adjacency as a secondary consequence of the same
+bitmask (consumed by a separate BL-166/168-style farming task, not wired here).
+
 Per-node throughput capacity (a larger Port or Orbital Port carrying more cargo per Tick) is the natural infrastructure tuning lever but is out of prototype scope.
 
 ---
@@ -102,6 +116,7 @@ shipped layer.
 **Landed:**
 - Convoy component, per-Tick advance, destination crediting + market supply injection
 - Terrain-weighted A* intra-body routing with roads and the node discount (BL-077 planetary logistics; BL-146–149; BL-172 road tiers)
+- River generation + logistics discount, stacking multiplicatively with the road ladder (BL-170)
 - Auto-dispatch of shortfall-filling convoys, intra- **and** inter-body (launchpad-gated)
 - Persistent trade-route recording (BL-088) + the proximity-glimpse peek (BL-099)
 

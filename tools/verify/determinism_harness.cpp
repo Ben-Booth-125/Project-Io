@@ -97,6 +97,27 @@ int main()
     check(sorted_pairs(a.tile_to_nation)         == sorted_pairs(b.tile_to_nation),         "tile->nation mapping identical");
     check(sorted_pairs(a.population_centre_tile) == sorted_pairs(b.population_centre_tile), "pop-centre->tile mapping identical");
 
+    // River edges (BL-170) — the sibling pass writes tile_component::river_edges /
+    // river_downstream on Kepler; assert both bitmasks are byte-identical for every
+    // tile across the two generations (a divergence here would mean the river trace
+    // itself leaked non-determinism, distinct from river_generation_harness's
+    // synthetic-body checks).
+    {
+        bool river_ok = true;
+        for (const auto& [tid, tc] : a.tiles)
+        {
+            const auto bit = b.tiles.find(tid);
+            if (bit == b.tiles.end()
+                || bit->second.river_edges != tc.river_edges
+                || bit->second.river_downstream != tc.river_downstream)
+            {
+                river_ok = false;
+                break;
+            }
+        }
+        check(river_ok, "river edge/downstream bitmasks identical across two generations");
+    }
+
     // (corp,body) stockpile-pool keys.
     {
         std::vector<std::pair<entity_id, entity_id>> ka, kb;

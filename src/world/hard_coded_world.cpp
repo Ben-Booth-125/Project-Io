@@ -9,6 +9,7 @@
 #include "population_generation.hpp"
 #include "road_generation.hpp"
 #include "tile_generation.hpp"
+#include "river_generation.hpp"
 
 #include <algorithm>
 #include <array>
@@ -194,8 +195,17 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // records its margin, and still writes its line.
     std::vector<float> kepler_bias;
     const planetology_state kepler_pl = plan(1, 180, 84, kepler_bias);
+    // A non-null generation_record is requested here so the river pass below can read the
+    // Pass-1 heightmap it captures; this is a pure capture (TILE_GENERATION.md § Generation
+    // history hook) and does not perturb the deterministic tile surface itself.
+    generation_record kepler_record;
     auto kepler_tiles = generate_body_tiles(w, kepler, 180, 84, kepler_pl.profile,
-        /*seed=*/params.seed ^ 0xE471001u, deposit_scalar, &kepler_pl, nullptr, &kepler_bias);
+        /*seed=*/params.seed ^ 0xE471001u, deposit_scalar, &kepler_pl, &kepler_record, &kepler_bias);
+
+    // Rivers (BL-170) — sibling pass (BL-051 convention) over the same heightmap Pass 2
+    // already thresholded; needs Kepler's ocean placement done, so it runs after
+    // generate_body_tiles returns rather than being spliced into the six-pass core.
+    generate_rivers(w, kepler_tiles, 180, 84, kepler_record.height, /*seed=*/params.seed ^ 0x52490001u);
 
     // Kepler is the only body with a political layer in the prototype; its nation
     // count is derived, not authored. Selene/Cinder/Pallas stay unclaimed.
