@@ -42,6 +42,15 @@ static void check(bool cond, const char* what)
         ++g_failures;
 }
 
+/// Reports an assertion as deliberately skipped rather than silently passing —
+/// used when the check's truth depends on build configuration (BL-258): an
+/// absolute wall-clock bound is meaningless at -O0, but staying silent would
+/// teach the reader to trust a green result that measured nothing.
+static void check_skip(const char* what, const char* why)
+{
+    std::printf("  SKIP  %s  -  %s\n", what, why);
+}
+
 static std::size_t ri(resource_type r) { return static_cast<std::size_t>(r); }
 
 static bool finite_ok(float v) { return std::isfinite(v); }
@@ -455,8 +464,13 @@ int main()
           "R6 tick cost grows no faster than size^1.5 in bodies x corps (quadratic reads 2.0)");
     check(rungs_ok,
           "R6 no single doubling of bodies x corps costs 4x or more (the quadratic signature)");
+#ifndef NDEBUG
+    check_skip("R6 the largest swept world (8 bodies, 256 corps, 128x prototype) still ticks under 1 ms",
+               "unoptimised build, absolute timing is not meaningful (BL-258)");
+#else
     check(sweep.back().min_ms < 1.0,
           "R6 the largest swept world (8 bodies, 256 corps, 128x prototype) still ticks under 1 ms");
+#endif
 
     std::printf("\n%s  (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES",
                 g_failures, g_failures == 1 ? "" : "s");
