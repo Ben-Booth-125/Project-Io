@@ -112,6 +112,14 @@ public:
     /// @return Samples retained, saturating at `capacity`.
     std::size_t count() const { return m_count; }
 
+    /// @return The i-th retained sample, oldest first; @p i must be < count().
+    const frame_sample& sample(std::size_t i) const;
+
+    /// Drop all retained samples and the in-flight frame, so a measurement
+    /// window starts clean (the scripted pan-perf harness brackets a pan run
+    /// with this — see scripts/verify/pan_perf.lua).
+    void reset();
+
     /// @return The most recently completed sample; a zeroed sample before the
     ///         first frame closes.
     const frame_sample& last() const;

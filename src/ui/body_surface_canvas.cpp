@@ -1022,15 +1022,27 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
     }
 
-    // Spatial index: tile id keyed by its packed (col, row) on the active body,
-    // so the Faction-lens border pass can find a tile's grid neighbours without
-    // scanning w.tiles. Key packs row-major: row * gw + col (col < gw always).
-    std::unordered_map<long long, entity_id> tile_at;
-    for (const auto& [id, tile] : w.tiles)
-    {
-        if (tile.body == state.active_body)
-            tile_at[static_cast<long long>(tile.grid_y) * gw + tile.grid_x] = id;
-    }
+    // Spatial index (BL-268): the per-body raster logistics already caches on
+    // world.body_tile_index (grid_y*gw + grid_x -> tile entity, null_entity for an
+    // absent cell). app::render ensures it is built for the active body before this
+    // draw, so the const world& here just reads it — replacing the per-frame
+    // unordered_map rebuild that scanned every body's tiles each frame. An absent
+    // entry (a tileless body) yields an empty raster, which draws nothing — loud
+    // in a golden, never a silent slow path.
+    static const std::vector<entity_id> no_raster;
+    const auto raster_it = w.body_tile_index.find(state.active_body);
+    const std::vector<entity_id>& raster =
+        raster_it != w.body_tile_index.end() ? raster_it->second : no_raster;
+    const bool raster_ok = raster.size() == static_cast<std::size_t>(gw) * gh;
+
+    // Grid-coordinate lookup into the raster; bounds-checked so callers can pass
+    // an out-of-range row (rows do not wrap) and get null_entity, exactly as the
+    // old map's find-miss did.
+    auto tile_at_rc = [&](int col, int row) -> entity_id {
+        if (!raster_ok || col < 0 || col >= gw || row < 0 || row >= gh)
+            return null_entity;
+        return raster[static_cast<std::size_t>(row) * gw + col];
+    };
 
     // Nation owner of a tile, or null_entity when the tile is absent from
     // tile_to_nation (unclaimed). Used by the border pass to compare adjacent
@@ -1368,12 +1380,12 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                         if (nrow < 0 || nrow >= gh) continue;
                         int ncol = (t.grid_x + off[k][0]) % gw;
                         if (ncol < 0) ncol += gw;
-                        const auto nb = tile_at.find(static_cast<long long>(nrow) * gw + ncol);
-                        if (nb == tile_at.end()) continue;
-                        if (seen.insert(nb->second).second)
+                        const entity_id nb = tile_at_rc(ncol, nrow);
+                        if (nb == null_entity) continue;
+                        if (seen.insert(nb).second)
                         {
-                            next.push_back(nb->second);
-                            float& v = beam_intensity[nb->second]; if (inten > v) v = inten;
+                            next.push_back(nb);
+                            float& v = beam_intensity[nb]; if (inten > v) v = inten;
                         }
                     }
                 }
@@ -1427,26 +1439,46 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     const float visible_left  = grid_area_origin.x - hit_r;
     const float visible_right = grid_area_origin.x + grid_area_size.x + hit_r;
 
-    // Draw the active body's tiles in a deterministic order. `w.tiles` is an
-    // unordered_map, whose iteration order varies between process runs (hash
-    // seeding) — that reorders overlapping antialiased hex edges and markers and
-    // makes full-body golden captures flake by ~1–2%. Sorting the tile ids fixes
-    // the draw order so a capture is reproducible run-to-run. (`tile_at` already
-    // holds exactly the active body's tiles, keyed by packed grid coordinate.)
-    std::vector<entity_id> draw_order;
-    draw_order.reserve(tile_at.size());
-    for (const auto& [key, tid] : tile_at)
-        draw_order.push_back(tid);
-    std::sort(draw_order.begin(), draw_order.end());
+    // Draw the active body's tiles in a deterministic order — row-major over the
+    // raster. This IS the old sorted-by-id order (tile generation creates each
+    // body's tiles rows-outer with sequential create_entity ids), so overlapping
+    // antialiased hex edges and markers land exactly as before and no golden
+    // moves. BL-268 replaces the old per-frame collect-and-sort with the cached
+    // raster, and culls to the visible ROW band before any per-tile work: rows do
+    // not wrap, so the band falls straight out of the clip rect, mirroring the
+    // ±hit_r margin the horizontal wrap-window below already uses. Column
+    // visibility is the wrap-window test itself, hoisted to the top of the loop
+    // body — an off-screen tile costs one bounds test and one multiply-compare.
+    const float row_pitch = 1.5f * hex_size; // hex_local_centre's vertical pitch
+    const int row_lo = raster_ok ? std::max(
+        0, static_cast<int>(std::floor(
+               ((grid_area_origin.y - hit_r - view_origin.y) / zoom + grid_cy) / row_pitch)))
+        : 0;
+    const int row_hi = raster_ok ? std::min(
+        gh - 1, static_cast<int>(std::ceil(
+               ((grid_area_origin.y + grid_area_size.y + hit_r - view_origin.y) / zoom + grid_cy) / row_pitch)))
+        : -1;
 
-    for (const entity_id id : draw_order)
+    for (int t_row = row_lo; t_row <= row_hi; ++t_row)
+    for (int t_col = 0; t_col < gw; ++t_col)
     {
-        const tile_component& tile = w.tiles.at(id);
-        if (tile.body != state.active_body)
+        const entity_id id = raster[static_cast<std::size_t>(t_row) * gw + t_col];
+        if (id == null_entity)
             continue;
+        const tile_component& tile = w.tiles.at(id);
 
         const ImVec2 lc   = hex_local_centre(tile.grid_x, tile.grid_y, hex_size);
         const ImVec2 sc   = to_screen(lc);
+
+        // Column cull: the horizontal wrap-window (computed once here, reused by
+        // the draw below). No wrap copy of this tile lands inside the canvas —
+        // skip before the built/owner/lens work, which is the expensive part.
+        const int k_min = (period_px > 0.0f)
+            ? static_cast<int>(std::ceil((visible_left  - sc.x) / period_px)) : 0;
+        const int k_max = (period_px > 0.0f)
+            ? static_cast<int>(std::floor((visible_right - sc.x) / period_px)) : 0;
+        if (k_min > k_max)
+            continue;
 
         // Does this tile carry a building, and who owns it? Resolved before the fill
         // so a built tile can start from its owner plate instead of terrain, and so
@@ -1656,12 +1688,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 fill = lerp_colour(fill, IM_COL32(8, 10, 16, 255), 0.5f * (1.0f - vision));
         }
 
-        // Range of wrap copies that land inside the canvas horizontally.
-        const int k_min = (period_px > 0.0f)
-            ? static_cast<int>(std::ceil((visible_left  - sc.x) / period_px)) : 0;
-        const int k_max = (period_px > 0.0f)
-            ? static_cast<int>(std::floor((visible_right - sc.x) / period_px)) : 0;
-
+        // Wrap copies inside the canvas: k_min/k_max were computed at the top of
+        // the loop body (BL-268), where they double as the column cull.
         for (int k = k_min; k <= k_max; ++k)
         {
             const float cx = sc.x + static_cast<float>(k) * period_px;
@@ -1712,10 +1740,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     if (ncol < 0)
                         ncol += gw;
 
-                    const auto nb_it = tile_at.find(static_cast<long long>(nrow) * gw + ncol);
-                    if (nb_it == tile_at.end())
+                    const entity_id nb_id = tile_at_rc(ncol, nrow);
+                    if (nb_id == null_entity)
                         continue;
-                    const auto nb_tile_it = w.tiles.find(nb_it->second);
+                    const auto nb_tile_it = w.tiles.find(nb_id);
                     if (nb_tile_it == w.tiles.end() || nb_tile_it->second.road_level == 0)
                         continue;
                     if (!survey_tile_visible(body.survey, gw, gh, ncol, nrow))
@@ -1767,8 +1795,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     if (ncol < 0)
                         ncol += gw;
 
-                    const auto nb_it = tile_at.find(static_cast<long long>(nrow) * gw + ncol);
-                    if (nb_it == tile_at.end())
+                    if (tile_at_rc(ncol, nrow) == null_entity)
                         continue;
                     if (!survey_tile_visible(body.survey, gw, gh, ncol, nrow))
                         continue;
@@ -1837,10 +1864,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     if (ncol < 0)
                         ncol += gw;
 
-                    const auto nb_it = tile_at.find(static_cast<long long>(nrow) * gw + ncol);
-                    if (nb_it == tile_at.end())
+                    const entity_id nb_id = tile_at_rc(ncol, nrow);
+                    if (nb_id == null_entity)
                         continue;
-                    if (nation_of(nb_it->second) == own_nation)
+                    if (nation_of(nb_id) == own_nation)
                         continue; // Same owner: interior edge, no border.
 
                     // Draw the shared edge via the midpoint-perpendicular method:
@@ -1994,10 +2021,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                         if (ncol < 0)
                             ncol += gw;
 
-                        const auto nb_it = tile_at.find(static_cast<long long>(nrow) * gw + ncol);
-                        if (nb_it == tile_at.end())
+                        const entity_id nb_id = tile_at_rc(ncol, nrow);
+                        if (nb_id == null_entity)
                             continue;
-                        const auto nb_tile_it = w.tiles.find(nb_it->second);
+                        const auto nb_tile_it = w.tiles.find(nb_id);
                         if (nb_tile_it == w.tiles.end()
                             || nb_tile_it->second.landform != tile.landform)
                             continue;

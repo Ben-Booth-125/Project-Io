@@ -43,6 +43,7 @@
 #include "world/placement_rules.hpp"
 #include "world/survey_system.hpp"
 #include "world/hard_coded_world.hpp"
+#include "world/logistics.hpp"
 #include "world/market_clearing.hpp"
 #include "world/orbital_system.hpp"
 #include "world/supply_system.hpp"
@@ -870,6 +871,21 @@ void app::setup_world(world_params params)
     m_last_survey_day = 0;
 }
 
+namespace {
+
+/// Frame-budget instrument (BL-249), shared by render()'s phase marks and the
+/// verify API's frame_csv tap. A file-local static rather than an app member for
+/// the same reason it was a function-local one: the instrument stays one include
+/// plus a handful of calls, liftable after the v0.1.0 audit without touching
+/// app's declared state.
+ui::frame_stats& frame_stats_instance()
+{
+    static ui::frame_stats s;
+    return s;
+}
+
+} // namespace
+
 int app::run_verify(const std::string& script_path, bool bless)
 {
     // Deterministic, non-interactive setup: fixed window (resized to verify_w/
@@ -948,6 +964,31 @@ int app::run_verify(const std::string& script_path, bool bless)
         const int count = std::max(1, n.value_or(1));
         for (int i = 0; i < count; ++i)
             render();
+    });
+
+    // Perf-measurement tap (BL-249's instrument, scripted): reset the retained
+    // frame window, then dump it as CSV after a scripted pan, so pan cost is
+    // measured on the real renderer with the build's real vsync setting rather
+    // than eyeballed off the HUD. Not a golden check — no captures involved.
+    v.set_function("frame_reset", []() { frame_stats_instance().reset(); });
+    v.set_function("frame_csv", [](const std::string& out_path) {
+        const ui::frame_stats& fs = frame_stats_instance();
+        std::ofstream f(out_path);
+        f << "total_ms,build_ms,submit_ms,present_ms,other_ms,work_ms,"
+             "vertices,draw_cmds\n";
+        for (std::size_t i = 0; i < fs.count(); ++i)
+        {
+            const ui::frame_sample& s = fs.sample(i);
+            f << s.total_ms << ',' << s.build_ms << ',' << s.submit_ms << ','
+              << s.present_ms << ',' << s.other_ms() << ',' << s.work_ms() << ','
+              << s.vertices << ',' << s.draw_cmds << '\n';
+        }
+    });
+    // Resize the live window mid-script, so a perf run can measure at the real
+    // interactive resolution instead of the fixed verify capture size.
+    v.set_function("window", [this](int w, int h) {
+        SDL_SetWindowSize(m_window, w, h);
+        SDL_SyncWindow(m_window);
     });
 
     // BL-061: scriptable cursor override — sets the app-owned mouse source so a
@@ -2462,14 +2503,11 @@ void app::draw_generation_screen()
 
 void app::render()
 {
-    // Frame-budget instrument (BL-249). A function-local static rather than an app
-    // member: every call site — the phase marks and the HUD draw — sits inside
-    // render(), so the whole instrument is one include plus a handful of calls,
-    // liftable after the v0.1.0 audit without touching app's declared state.
-    // begin_frame() closes out the PREVIOUS frame, so the period it stamps covers the
-    // event pump and the sim step as well as this function; see ui/frame_stats.hpp
-    // § Sampling model.
-    static ui::frame_stats s_frame_stats;
+    // Frame-budget instrument (BL-249) — the file-local instance above run_verify,
+    // shared with the verify frame_csv tap. begin_frame() closes out the PREVIOUS
+    // frame, so the period it stamps covers the event pump and the sim step as
+    // well as this function; see ui/frame_stats.hpp § Sampling model.
+    ui::frame_stats& s_frame_stats = frame_stats_instance();
     s_frame_stats.begin_frame();
 
     ImGui_ImplSDLRenderer3_NewFrame();
@@ -2509,6 +2547,13 @@ void app::render()
         s_frame_stats.mark_present_end();
         return;
     }
+
+    // BL-268 (planetary canvas cull + cache): make sure logistics' per-body raster
+    // cache covers the active body before the canvas draws. The canvas holds
+    // const world& and reads world.body_tile_index directly, so the one mutable
+    // ensure lives here — after the first build this is a single hash lookup.
+    if (m_ui.active_body != null_entity)
+        body_tile_grid(m_world, m_ui.active_body);
 
     // Live-mode mouse feed: copy the real OS cursor into ui_state so canvases read
     // a single app-owned source (BL-061). Skipped in --verify (m_golden_dir set) so

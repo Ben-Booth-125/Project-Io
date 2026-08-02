@@ -94,6 +94,29 @@ Beyond the base grid and the chrome in the table above, the draw pass
 - **Hover/selection chrome** — the highlight convention, the glance-then-stick
   hover card ([TOOLTIP.md](TOOLTIP.md)), and the construction placement ghost.
 
+### Draw-loop cost model (BL-268, 2026-08-02)
+
+The per-tile loop is **culled and cached**, not all-tiles-per-frame:
+
+- The spatial index is the per-body raster logistics already caches on
+  `world.body_tile_index` (`body_tile_grid`, BL-077); `app::render` ensures it
+  for the active body, and the canvas — holding `const world&` — only reads it.
+  Nothing per-frame rebuilds a tile map or sorts a draw list.
+- Iteration is **row-major over the raster**, which *is* the old sorted-by-id
+  order (tile generation creates each body's tiles rows-outer with sequential
+  ids) — so draw order, and therefore every golden, is unchanged.
+- **Row band cull:** rows don't wrap, so the visible row range falls straight
+  out of the clip rect (± the hex circumradius margin). **Column cull:** the
+  horizontal wrap-window (`k_min`/`k_max`) is computed at the top of the loop
+  body — a tile with no visible wrap copy costs one multiply-compare, before
+  any built/owner/lens work.
+
+Measured (pan_perf, 1720×1080, 60 Hz vsync): play-zoom pan went 11.3 → 5.0 ms
+work/frame in Release and 41.2 → 6.7 ms in Debug. The remaining heavy case is
+the whole-grid view (all 15,120 hexes genuinely visible, ~155k vertices): 12.1 ms
+Release — vertex-emission-bound, owned by the zoomed-out LOD/draw-cache follow-on
+(BL-269), not by this loop.
+
 ## Cell sizing and coordinate mapping
 
 ```

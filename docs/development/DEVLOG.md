@@ -10,6 +10,58 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## Session — "the engine is thrashing": measured, diagnosed, and fixed in one pass (2026-08-02)
+
+**Runtime.** ~2.5h. Full (BL-268 — the planetary canvas hot loop; earns the lifecycle by
+touching the project's single most-drawn code path, though it spans only two logic files).
+
+**The ask.** Ben: the build is "starting to thrash" — how hard would GPU + multicore be?
+Then: stutter while panning; "go and report the numbers, then let's work on the solution."
+
+### What the measurement found (BL-267, GPU & multicore — its own named first step)
+
+Built a scripted tap on BL-249's frame instrument — `verify.frame_reset`/`frame_csv`/`window`
+plus `scripts/verify/pan_perf.lua` (300-frame sustained pan, three zooms, pan-vs-static) —
+after discovering the "verify runs a dummy driver" belief was **wrong**: nothing in `src/`
+sets one, so `--verify` measures the real renderer with real vsync. Findings, 1720×1080:
+
+- **The daily build is unoptimised Debug** (`/Od /RTC1`): 41–53 ms work/frame at every
+  zoom — every frame over the 16.7 ms refresh, ~20 fps always. Panning adds nothing
+  (pan ≡ static); motion just makes 20 fps visible.
+- **The cost was one flat O(all-tiles) canvas overhead**: `tile_at` hash map rebuilt per
+  frame by scanning every body's tiles, a 15k-id sort per frame, and full lens/colour work
+  for all 15,120 tiles before any cull (no vertical cull existed).
+- **Neither GPU nor multicore is implicated**: sim + event pump 0.01–0.04 ms; submit/present
+  small. BL-267's two architectural forks both declined at prototype scale; item kept open
+  only as the post-fix re-measure gate.
+
+### What was built (BL-268, planetary canvas cull + cache — filed and landed same session)
+
+The canvas now reads the per-body raster **logistics already caches** on
+`world.body_tile_index` (`body_tile_grid`, BL-077) — `app::render` ensures it, the canvas
+stays `const world&`. Iteration is row-major over the raster (provably the old sorted-by-id
+draw order: generation creates tiles rows-outer with sequential ids — so **pixel-identical**),
+culled to the visible row band, with the horizontal wrap-window hoisted above the per-tile
+lens work as the column cull. Verified: six goldens exit 0 **un-blessed** against a
+baseline-blessed set; play-zoom pan **11.26 → 4.98 ms** (Release), **41.21 → 6.74 ms**
+(Debug). Whole-grid residual (155k verts, genuinely all visible) filed as BL-269
+(zoomed-out LOD / terrain draw cache).
+
+### Calls taken on Ben's behalf (NR-032/033; NR-026 superseded)
+
+The stale-golden discovery: every full-grid golden had been failing since BL-170's river
+generation shifted the world RNG — nobody re-blessed. Re-blessed all 40 from the unmodified
+baseline (stash round-trip) so R1's un-blessed pass isolates the refactor exactly; committed
+separately from the item. `build_rel/` (Ninja Release, same pinned 14.44 toolchain — ninja
+ships inside BuildTools' CMake) now stands beside the Debug tree as the play/perf build;
+Ben should play Release from here on. The frame_budget_hud.lua header's dummy-driver claim
+corrected in place.
+
+**Open.** BL-269 (zoomed-out draw cache, B). BL-267 re-measure gate closes when Ben confirms
+the live feel. A `build_rel.bat` convenience wrapper was recommended in NR-032 but not built.
+
+---
+
 ## Session — the world history log: the project's first serialisation seam (2026-08-02)
 
 **Runtime.** ~3h. Full (touches the economy/serialisation seam, spans well over 2 logic files,

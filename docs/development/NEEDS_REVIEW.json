@@ -569,7 +569,7 @@
         "src/ui/frame_stats.hpp",
         "src/ui/frame_stats.cpp"
       ],
-      "resolution": null
+      "resolution": "Superseded 2026-08-02: the premise was wrong — nothing in src/ forces a dummy driver under --verify, so a scripted run uses the real renderer and the build's real vsync. The measurement no longer needs a human: scripts/verify/pan_perf.lua (via the new verify.frame_csv tap on the BL-249 instrument) ran the exact ROADMAP check. Result: the target FAILS today — Debug 41-53 ms work/frame (every frame over 16.7), Release 11.3 ms at play zoom (passes 16.7, misses 8) and 16.8-17.6 ms at whole-grid zoom. Cause and fix are BL-268 (planetary canvas cull + cache); BL-267 (GPU/multicore) records the full verdict. Re-run pan_perf after BL-268 to close the cut-gate check."
     },
     {
       "id": "NR-027",
@@ -665,6 +665,42 @@
         "tools/verify/README.md"
       ],
       "resolution": "Closed 2026-08-02 in the main (network-connected) checkout. build_app.bat (full ProjectIo target, including the new app.cpp include/call) and ctest --test-dir build --output-on-failure both run clean: 38/38 green, including history_log_harness (30/30) and the extended determinism_harness (all checks, +2 new). app.cpp's new code compiles and links in the real GUI build, closing the one gap the hand-compiled harnesses could not reach. tools/verify/README.md's river_generation.cpp TU-ripple gap (also flagged this item) is left open as its own small fix, not blocking."
+    },
+    {
+      "id": "NR-032",
+      "title": "Pan-stutter measurement: added a verify frame-timing tap (frame_reset/frame_csv/window + pan_perf.lua) and configured a Ninja Release tree (build_rel/)",
+      "raised": "2026-08-02",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "Session 2026-08-02 (stutter-while-panning report)",
+      "what": "To measure the reported panning stutter with real numbers, three verify functions were added to app.cpp (frame_reset / frame_csv — a CSV dump of the BL-249 frame-stats ring — and window(w,h) to measure at the live 1720x1080 rather than the 1280x720 golden size), frame_stats gained sample(i)/reset() accessors, the BL-249 instrument's function-local static was lifted to a file-local accessor so the verify tap can reach it, and scripts/verify/pan_perf.lua scripts a 300-frame sustained pan at three zooms against a no-pan baseline. Separately, build_rel/ was configured as a Ninja Release tree (same pinned 14.44 toolchain; ninja.exe found bundled under BuildTools' CMake) to quantify the Debug-vs-Release gap without touching the daily build/ Debug cache. All uncommitted as of writing.",
+      "why_it_matters": "The tap is a permanent measurement asset (any future perf question is a Lua script away), but it adds three verify functions and a new build tree Ben did not ask for by name. The measurement route itself was a delegated call: desktop-automation of the live app was abandoned (its app resolver cannot see a non-Start-menu exe) in favour of instrumenting --verify, which was verified to run on the real renderer with real vsync.",
+      "options": [],
+      "recommendation": "Keep the tap and commit it (it is pure instrumentation — no world/* contact, no determinism surface); keep build_rel/ as the standing play/perf build alongside the Debug dev build. A build_rel.bat mirroring build_app.bat's toolchain pinning would make it one keystroke.",
+      "files": [
+        "src/core/app.cpp",
+        "src/ui/frame_stats.hpp",
+        "src/ui/frame_stats.cpp",
+        "scripts/verify/pan_perf.lua"
+      ],
+      "resolution": null
+    },
+    {
+      "id": "NR-033",
+      "title": "The daily-driver build is unoptimised Debug (/Od /RTC1) — and the stale claim that --verify uses a dummy video driver is wrong",
+      "raised": "2026-08-02",
+      "kind": "observation",
+      "status": "open",
+      "source": "Session 2026-08-02 (stutter-while-panning measurement)",
+      "what": "build/ (the exe _run.bat launches and Ben plays) is CMAKE_BUILD_TYPE=Debug with /Ob0 /Od /RTC1 — zero optimisation plus runtime checks. Measured pan cost: 41-53 ms of work per frame (every frame over the 16.7 ms refresh budget; ~19-24 fps). The same code built Release measures 11-18 ms — 3.6x faster; at play zoom it is 11.3 ms with zero budget misses. Separately, scripts/verify/frame_budget_hud.lua's header claims verify numbers are meaningless because --verify runs an offscreen/dummy driver; grep shows nothing in src/ sets any such driver — verify runs the real renderer with the build's real vsync, which is exactly why the pan_perf measurement is valid. That stale comment should be corrected so future sessions do not route around a measurement path that works.",
+      "why_it_matters": "The 'engine starting to thrash' impression is substantially an artefact of playing an unoptimised Debug binary. No engine-architecture conclusion (GPU port, multithreading) should be drawn from Debug frame times.",
+      "options": [],
+      "recommendation": "Play from a Release build; keep Debug for debugging. Fix the frame_budget_hud.lua header comment when next touched.",
+      "files": [
+        "build_app.bat",
+        "scripts/verify/frame_budget_hud.lua"
+      ],
+      "resolution": null
     }
   ]
 }

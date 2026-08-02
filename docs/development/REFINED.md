@@ -3,6 +3,13 @@
 > Drained 2026-07-31 (doc sweep): thirteen stale COMPLETE sections removed per the
 > retain-one policy — their record lives in DEVLOG.md and req/requirements.json.
 
+# BL-268 (planetary canvas cull + cache) — **COMPLETE** (2026-08-02). Tasks T0–T5 all
+complete, none cancelled; planetary-pan-perf R1–R4 all met (play-zoom pan Release
+11.26 → 4.98 ms, Debug 41.21 → 6.74 ms; six goldens pixel-identical un-blessed).
+Whole-grid residual filed as BL-269 (zoomed-out LOD / terrain draw cache).
+
+---
+
 # Sprint 2 — BL-210 (oral-history pivot): the settlement rewrite (2026-08-02) — **IN PROGRESS**
 
 Requirements: `req/requirements.json` § checkpoint-branch-model (BL-217), and two not-yet-added

@@ -154,6 +154,22 @@ void frame_stats::mark_present_end()
     m_pending.present_ms = elapsed_ms(m_phase_begin, clock::now());
 }
 
+const frame_sample& frame_stats::sample(std::size_t i) const
+{
+    // Oldest-first: the ring's oldest element sits m_count steps behind the
+    // write cursor.
+    return m_samples[(m_next + capacity - m_count + i) % capacity];
+}
+
+void frame_stats::reset()
+{
+    m_samples       = {};
+    m_next          = 0;
+    m_count         = 0;
+    m_pending       = frame_sample{};
+    m_pending_valid = false;
+}
+
 const frame_sample& frame_stats::last() const
 {
     if (m_count == 0)

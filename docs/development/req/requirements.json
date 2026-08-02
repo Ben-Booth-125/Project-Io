@@ -7824,6 +7824,60 @@
       ],
       "resolved": "2026-08-02",
       "resolution": "All 7 rows met. history_log_harness 30/30, determinism_harness 38/38 total (2 new checks), full CTest 38/38 in the main checkout (network-connected, confirming app.cpp compiles/links in the real GUI build)."
+    },
+    {
+      "brief": "planetary-pan-perf",
+      "title": "Planetary canvas cull + cache: stop paying O(all 15,120 tiles) per frame (BL-268)",
+      "difficulty": 3,
+      "importance": "S",
+      "evaluated_difficulty": null,
+      "status": "complete",
+      "promoted_from": "BL-268 (planetary canvas cull + cache), the executable half of BL-267's (GPU/multicore) measurement verdict, 2026-08-02",
+      "batch": null,
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "The refactor is pixel-identical: a representative golden subset (default_lens, corporation_lens, roads, continents_terrain, landform_relief, built_tile_render) passes with NO --bless.",
+          "verification": [
+            "visual: existing scripts/verify goldens, un-blessed"
+          ],
+          "status": "complete",
+          "result_metric": "Met — all six scripts exit 0 un-blessed against goldens freshly blessed from the UNMODIFIED baseline (stash round-trip), so the diff isolates this refactor exactly. Note: the pre-existing source goldens were stale — last blessed before BL-170's river generation shifted the world RNG — and failed ~22% on ANY current build; re-blessed from baseline as routine policy, committed separately.",
+          "notes": "Draw order preserved by construction: raster row-major == ascending tile id (tile_generation creates rows-outer with sequential ids)."
+        },
+        {
+          "id": "R2",
+          "requirement": "Release play-zoom budget met: pan_perf.lua z11 sustained-pan avg work_ms < 8 (the ROADMAP v0.1.0 target). Baseline 11.26 ms.",
+          "verification": [
+            "visual: scripts/verify/pan_perf.lua on build_rel, CSV summarised"
+          ],
+          "status": "complete",
+          "result_metric": "Met — 4.98 ms avg (p99 6.42, max 6.86); 0/299 frames over 8 ms. Mid zoom (z3): 6.11 ms avg.",
+          "notes": null
+        },
+        {
+          "id": "R3",
+          "requirement": "Debug play-zoom playable: pan_perf.lua z11 sustained-pan avg work_ms < 16.7 (the dev build stops missing every refresh). Baseline 41.21 ms.",
+          "verification": [
+            "visual: scripts/verify/pan_perf.lua on build (Debug), CSV summarised"
+          ],
+          "status": "complete",
+          "result_metric": "Met — 6.74 ms avg (max 8.84), under even the 8 ms Release target; 6.1x faster than baseline. Mid zoom (z3): 10.43 ms, still inside refresh.",
+          "notes": null
+        },
+        {
+          "id": "R4",
+          "requirement": "Whole-grid (z0.9) numbers recorded before/after; if Release still misses 8 ms there (vertex-emission-bound, ~155k verts), the zoomed-out LOD/draw-cache follow-on named in BL-267 is filed rather than stretched into this item.",
+          "verification": [
+            "review: pan_perf CSVs + BL-267 re-measure gate"
+          ],
+          "status": "complete",
+          "result_metric": "Recorded — Release z0.9 pan: 17.61 -> 12.10 ms avg (0/299 over 16.7 now, was 211); still over 8 ms, vertex-bound as predicted (~155k verts unchanged, all hexes genuinely visible). Follow-on filed as BL-269 (zoomed-out LOD / terrain draw cache).",
+          "notes": null
+        }
+      ],
+      "resolved": "2026-08-02",
+      "resolution": "All 4 rows met. Play-zoom pan: Release 11.26 -> 4.98 ms, Debug 41.21 -> 6.74 ms work/frame; six goldens pixel-identical un-blessed against a baseline-blessed set. Whole-grid residual owned by BL-269."
     }
   ]
 }

@@ -1,11 +1,13 @@
 -- Visual verification for the BL-249 frame-budget HUD — the first of ROADMAP § v0.1.0's
 -- three quality-audit instruments.
 --
--- What is being checked, and what deliberately is NOT. The NUMBERS the HUD reports are
--- meaningless under --verify: headless capture runs against SDL's offscreen/dummy driver
--- with no vsync and no real GPU present, so the frame times here say nothing about the
--- 8 ms / 16.7 ms ROADMAP targets. Those targets are measured by running the real app and
--- panning the full Kepler grid, which is a human-in-the-loop measurement, not a golden.
+-- What is being checked, and what deliberately is NOT. The NUMBERS the HUD reports in
+-- THIS script's captures are transient one-frame samples — meaningless as budget
+-- evidence, so no golden pins them. (An earlier version of this header claimed --verify
+-- runs an offscreen/dummy driver with no vsync; that was wrong — nothing in src/ sets
+-- any such driver, and a --verify run uses the real renderer with the build's real
+-- vsync. The ROADMAP budget targets are measured by scripts/verify/pan_perf.lua, which
+-- exists because the real-renderer property holds. Corrected 2026-08-02, BL-268.)
 --
 -- What this script DOES pin is everything else, which is what regresses silently:
 --   * the HUD is OFF by default — capture 1 is a normal frame with no HUD anywhere, so
