@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*25 entries — 6 open, 19 resolved.*
+*26 entries — 7 open, 19 resolved.*
 
 ---
 
@@ -120,6 +120,17 @@ BL-223 tabulates a three-doc disagreement about the Era 0 rupture — CONCEPT.md
 > **Recommendation:** Option 1, and the two-rupture reading is worth keeping for its own sake rather than just as a reconciliation: the rupture that was averted then is not averted this time. The backstory establishes that these powers can pull back from the brink, and the Era 0 exit is the occasion they do not — which is a stronger premise than either event alone and costs nothing, since both were already written. Option 2 is defensible if the ERAS.md line is bothering you, but it edits an authority doc ahead of the work, which the time-slice rule exists to prevent.
 
 *Files: `docs/CONCEPT.md`, `docs/economy/ERAS.md`, `docs/lore/HISTORY.md`, `docs/development/backlog.json`*
+
+### NR-026 — Frame-budget targets (BL-249) still need a human at the keyboard
+*observation · raised 2026-08-02 · from Closing out v0.1.0's remaining items (BL-258 landed 2026-08-02)*
+
+ROADMAP.md names the frame-budget targets (avg < 8ms, max < 16.7ms panning the full Kepler grid) as "still owed before the cut" alongside BL-258. BL-258 (the optimised-build timing gate) is now landed and the harness suite is 36/36 green. The frame-budget check cannot be automated the same way: headless capture has no vsync and no real present, so its numbers say nothing about the real frame budget. It needs Ben to launch the live app (F11 overlay), pan the full Kepler grid, and read the numbers off the real render loop.
+
+**Why it matters.** This is the last named item standing between the current state and declaring the v0.1.0 done-definition met — everything else in ROADMAP.md § v0.1.0 is already checked off.
+
+> **Recommendation:** Open the app (F11 for the frame-stats overlay), pan the full Kepler tile grid, and confirm avg < 8ms / max < 16.7ms. If it passes, v0.1.0 is done bar hygiene (warning-clean build, cppcheck pass) and the cut can be tagged.
+
+*Files: `docs/development/ROADMAP.md`, `src/ui/frame_stats.hpp`, `src/ui/frame_stats.cpp`*
 
 ---
 

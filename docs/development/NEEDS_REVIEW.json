@@ -552,6 +552,24 @@
         "docs/development/backlog.json"
       ],
       "resolution": null
+    },
+    {
+      "id": "NR-026",
+      "title": "Frame-budget targets (BL-249) still need a human at the keyboard",
+      "raised": "2026-08-02",
+      "kind": "observation",
+      "status": "open",
+      "source": "Closing out v0.1.0's remaining items (BL-258 landed 2026-08-02)",
+      "what": "ROADMAP.md names the frame-budget targets (avg < 8ms, max < 16.7ms panning the full Kepler grid) as \"still owed before the cut\" alongside BL-258. BL-258 (the optimised-build timing gate) is now landed and the harness suite is 36/36 green. The frame-budget check cannot be automated the same way: headless capture has no vsync and no real present, so its numbers say nothing about the real frame budget. It needs Ben to launch the live app (F11 overlay), pan the full Kepler grid, and read the numbers off the real render loop.",
+      "why_it_matters": "This is the last named item standing between the current state and declaring the v0.1.0 done-definition met — everything else in ROADMAP.md § v0.1.0 is already checked off.",
+      "options": [],
+      "recommendation": "Open the app (F11 for the frame-stats overlay), pan the full Kepler tile grid, and confirm avg < 8ms / max < 16.7ms. If it passes, v0.1.0 is done bar hygiene (warning-clean build, cppcheck pass) and the cut can be tagged.",
+      "files": [
+        "docs/development/ROADMAP.md",
+        "src/ui/frame_stats.hpp",
+        "src/ui/frame_stats.cpp"
+      ],
+      "resolution": null
     }
   ]
 }

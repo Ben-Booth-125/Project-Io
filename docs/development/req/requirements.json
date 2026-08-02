@@ -7513,6 +7513,152 @@
           "notes": "The all-corps balances table already lives in the Economy panel s Corps view. The MVP's 'alert' concept is deliberately NOT built: an idle building and a negative net already read as red verdicts on their own cards, which is the same signal without a second mechanism to maintain."
         }
       ]
+    },
+    {
+      "brief": "hydroponics-bay",
+      "title": "Hydroponics Bay: controlled-environment agricultural_produce building (BL-166)",
+      "difficulty": 3,
+      "importance": "C",
+      "evaluated_difficulty": 3,
+      "status": "active",
+      "promoted_from": "BL-166 (agriculture interplanetary split)",
+      "batch": "sprint1-generation",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "A Hydroponics Bay recipe exists (processing_facility) producing agricultural_produce from refined inputs (energy + water + a structural good), registered alongside the Farm/Food-Processor chain with no new market good.",
+          "verification": [
+            "headless: tools/verify/construction_harness.cpp"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R2",
+          "requirement": "Placement predicate: a Hydroponics Bay is only placeable on tiles that LACK the terrestrial Farm affinity (no seeded agricultural_produce deposit) — habitability/terrain gated, not era-gated (ERAS.md stays untouched).",
+          "verification": [
+            "headless: tools/verify/construction_harness.cpp"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R3",
+          "requirement": "Authority doc updated: RESOURCES.md / PRODUCTION.md record the Hydroponics Bay as agricultural_produce's second producer.",
+          "verification": [
+            "review: docs/economy/RESOURCES.md, docs/economy/PRODUCTION.md"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        }
+      ]
+    },
+    {
+      "brief": "fishing-wharf",
+      "title": "Fishing Wharf: coastal-adjacency agricultural_produce extraction (BL-168)",
+      "difficulty": 3,
+      "importance": "C",
+      "evaluated_difficulty": 3,
+      "status": "active",
+      "promoted_from": "BL-168 (coastal fishing)",
+      "batch": "sprint1-generation",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "A Fishing Wharf (extraction_site) produces agricultural_produce, placeable only on tiles where the existing is_coastal() runtime neighbor predicate is true (land tile bordering an ocean tile).",
+          "verification": [
+            "headless: tools/verify/construction_harness.cpp"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R2",
+          "requirement": "Fishing Wharf shares the agricultural_produce good (three producers total: Farm, Hydroponics Bay, Fishing Wharf) — no market fragmentation, no new resource_type.",
+          "verification": [
+            "headless: tools/verify/econ_harness.cpp"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R3",
+          "requirement": "Authority doc updated: PRODUCTION.md records the Fishing Wharf and its coastal-adjacency placement rule.",
+          "verification": [
+            "review: docs/economy/PRODUCTION.md"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        }
+      ]
+    },
+    {
+      "brief": "river-generation",
+      "title": "Rivers: edge-trace surface hydrology + logistics discount (BL-170)",
+      "difficulty": 4,
+      "importance": "C",
+      "evaluated_difficulty": 4,
+      "status": "active",
+      "promoted_from": "BL-170 (rivers & freshwater generation)",
+      "batch": "sprint1-generation",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "A deterministic sibling pass traces rivers as downhill walks over the Pass-1 height field from high ground to ocean/basin, recording each crossed EDGE (not tile) via a per-tile bitmask of which of its 6 hex sides border a river, plus a per-edge upstream/downstream direction.",
+          "verification": [
+            "headless: tools/verify/road_generation_harness.cpp (or a new river_generation_harness.cpp)"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R2",
+          "requirement": "Determinism: same seed produces an identical river-edge set; different seeds differ (folds into world_determinism / determinism_harness).",
+          "verification": [
+            "headless: tools/verify/determinism_harness.cpp"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R3",
+          "requirement": "A tile bordering a river edge gets a cheaper traversal weight stacking multiplicatively with the existing road_level tier discount in tile_traversal_cost / the edge-cost average in logistics.cpp; downstream crossing is cheaper than upstream (asymmetric).",
+          "verification": [
+            "headless: tools/verify/logistics_harness.cpp"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R4",
+          "requirement": "No new resource/market good is introduced — the river is purely a generation + logistics mechanic (water-adjacency for BL-166/168 farming is a secondary read of the same bitmask, not a new good).",
+          "verification": [
+            "review: src/world/tile_generation.cpp, src/world/components.hpp"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R5",
+          "requirement": "Authority doc updated: TILE_GENERATION.md documents the sibling pass; SUPPLY.md documents the river discount and its stacking rule with the road-tier table.",
+          "verification": [
+            "review: docs/generation/TILE_GENERATION.md, docs/economy/SUPPLY.md"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        }
+      ]
     }
   ]
 }

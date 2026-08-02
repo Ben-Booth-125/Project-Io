@@ -3,6 +3,31 @@
 > Drained 2026-07-31 (doc sweep): thirteen stale COMPLETE sections removed per the
 > retain-one policy — their record lives in DEVLOG.md and req/requirements.json.
 
+# Sprint 1 — Procedural generation v1: the food cluster (2026-08-02)
+
+Requirements: `req/requirements.json` § hydroponics-bay, § fishing-wharf, § river-generation.
+Three items, promoted together (SPRINTS.md Sprint 1), run as **worktree-isolated agents** since
+BL-166/BL-168 collide on shared files (`scripts/recipes.lua`, `scripts/economy.lua`,
+`src/world/placement_rules.cpp`) while BL-170 is file-disjoint from both (tile_generation.cpp,
+logistics.cpp). Main session merges each worktree branch, integrates, builds, verifies.
+
+## Hydroponics Bay (BL-166) — Files: `scripts/recipes.lua`, `scripts/economy.lua`,
+`src/world/placement_rules.{hpp,cpp}`, `docs/economy/RESOURCES.md`, `docs/economy/PRODUCTION.md`.
+Satisfies hydroponics-bay R1-R3.
+
+## Fishing Wharf (BL-168) — Files: `scripts/recipes.lua`, `scripts/economy.lua`,
+`src/world/placement_rules.{hpp,cpp}`, `docs/economy/PRODUCTION.md`.
+Satisfies fishing-wharf R1-R3.
+
+## Rivers (BL-170) — Files: `src/world/tile_generation.{hpp,cpp}`, `src/world/components.hpp`,
+`src/world/logistics.{hpp,cpp}`, `tools/verify/river_generation_harness.cpp` (new),
+`docs/generation/TILE_GENERATION.md`, `docs/economy/SUPPLY.md`.
+Satisfies river-generation R1-R5.
+
+Parallelisation: BL-170 ∥ (BL-166 → BL-168, same files, sequenced in one worktree to avoid a
+same-agent-pair collision). Main session merges BL-170 first (clean), then the food-building
+branch, builds, runs `ctest`, commits per item.
+
 The **active, prioritised, actionable worklist** (formerly TASKS.md). Unlike the backlog
 ([`backlog.json`](backlog.json) metadata + [`BACKLOG.md`](BACKLOG.md) design bodies), every
 entry here is a concrete, file-scoped, individually-buildable step ready to execute. Tasks are
