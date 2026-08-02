@@ -31,7 +31,29 @@ and/or a version goal (v0.1.1 etc.).
 
 ---
 
-## Sprint 2 — Close out the v0.1.0 cut set (opened 2026-07-31)
+## Where things stand (2026-08-02)
+
+| Sprint | Theme | State |
+|---|---|---|
+| 1 | Procedural generation v1 | **Closed** — goal met (food cluster landed 2026-08-02, see amendment) |
+| 2a | Close out the v0.1.0 cut set | **Closed** — all four planned items landed |
+| 2b | BL-210 oral-history pivot (nations/corps rewrite) | **In progress** — BL-217 + BL-208 built; BL-218/BL-219 queued |
+| 3 | Corp AI stage B + skill harness | **Closed** — BL-203, BL-204 both landed |
+| 4 | Communication surface (BL-205 chat log) | **Not started** — `designed`, no dependency |
+| 5 | Persona audit (BL-207) + file Stage C | **Not started** |
+
+**Next up:** promote BL-218 (nations settlement rewrite) — its dependency BL-208 (world history
+log) is now in `main`. Unplanned v0.1.1 work has begun in parallel (BL-270, the action
+dictionary); if that continues it wants a sprint of its own rather than riding on 2b.
+
+---
+
+> **Numbering note (2026-08-02).** Two entries below were both opened as "Sprint 2" on
+> 2026-07-31 — the v0.1.0 cut set and the BL-210 decomposition. They are kept under their
+> original headings (renamed 2a / 2b) rather than renumbered, since commit messages
+> ("Sprint 2 promotion: BL-217") already point at 2b.
+
+## Sprint 2a — Close out the v0.1.0 cut set (opened 2026-07-31, closed 2026-08-02)
 
 *(Goal set by the assistant during the 2026-07-31 doc sweep — Ben to amend.)*
 
@@ -44,7 +66,18 @@ surface finished, terrain's combat consequence in, the tooltip text rendering cl
 - BL-234 — font glyph range (defect: `fonts.cpp` atlas misses U+2014/U+2265; 26 strings show "?")
 - BL-226 — continent lens: finish the settled option-B follow-on (still open, `designed`)
 
-**Retro** — *pending.*
+**Retro** (closed 2026-08-02).
+- **Landed: all four.** BL-162 (tile construction panel), BL-233 (terrain combat modifiers),
+  BL-234 (font glyph range) and BL-226 (continent lens) are all `complete` in `backlog.json`.
+  The goal — unblock the v0.1.0 cut — was met in full.
+- **Landed beyond plan:** the three v0.1.0 audit instruments (frame-budget HUD BL-249,
+  econ-tick scaling, data-creep BL-251), the harness build-type/ctest-timeout fix (BL-255),
+  the planetary canvas cull + cache (BL-268), and the action dictionary (BL-270, v0.1.1).
+- **Slipped:** nothing from the plan.
+- **Runtime:** not summed — the timer gap carried from Sprint 1 is still unfixed.
+- **Feedback:** a four-item sprint with every item already `designed` closed cleanly and
+  absorbed six unplanned items on top. The pattern holds: sprints scoped to promote-ready
+  work land; sprints scoped to a theme (Sprint 1) drift.
 
 ---
 
@@ -120,9 +153,20 @@ factual from git log + backlog.json, amend freely*).
 - *(Carried note: session Runtime tracking hit a real gap this sprint — the wall-clock timer
   conflated an idle/interruption gap with work time; worth fixing before relying on it.)*
 
+**Amendment (2026-08-02) — the slipped set landed after all.** The retro above was written on
+2026-07-31 while the cluster sat at post-v0.1.0. It was re-promoted the next working day and
+built: BL-170 (rivers & freshwater, incl. the directed-river render + chevrons), BL-166
+(Hydroponics Bay), BL-168 (Fishing Wharf, plus a construction-ledger visibility fix) and
+BL-190 (food demand) are all `complete`; the full grid goldens were re-blessed after river
+generation shifted the world. Sprint 1's goal is therefore **met**, not slipped — the
+deprioritisation was a ten-day deferral, not a drop. The feedback point still stands: this
+file did not notice the version-goal change in either direction.
+
 ---
 
-## Sprint 2 — BL-210 decomposition: the Nations/Corporations history rewrite (opened 2026-07-31)
+## Sprint 2b — BL-210 decomposition → the Nations/Corporations history rewrite (opened 2026-07-31)
+
+**Status 2026-08-02: IN PROGRESS** — decomposition done, and the chain's first two rungs built.
 
 **Goal.** Take BL-210's umbrella pivot (design-owed, difficulty 5, "the biggest remaining piece"
 per DEVLOG 2026-07-28) from one unactionable mega-item to a sequenced set of promote-ready design
@@ -158,8 +202,20 @@ needs a real design conversation — see each item's `design` field) or touching
 sprint's goal was decomposition only (the Design depth verb's first half); running BL-217's design
 conversation is the natural Sprint 3 candidate once Ben is ready to work through its open questions.
 
-**Retro** — *pending, fill in once BL-217's design conversation happens or Sprint 2 is otherwise
-closed out.*
+**Progress (2026-08-02).** The "not yet in scope" line above was overtaken — BL-217's design
+questions were settled and the item **built**, not just designed.
+- **BL-217 (checkpoint/branch model) — complete.** Append-only `checkpoint_record` + a generic
+  eligibility-filter mechanism in `planetology.{hpp,cpp}`; R1–R6 met, CTest 37/37.
+- **BL-208 (world history log) — complete**, resequenced ahead of BL-218/219 because both need
+  somewhere to write their history. The project's first flat-binary serialiser (BL-107's seam);
+  the genesis + checkpoint chapters bridge generation output into `world` for the first time.
+- **BL-218 (nations settlement rewrite) — not promoted.** Still `designed`; the strict chain
+  means it starts once BL-208 is in `main` (it now is).
+- **BL-219 (corporations history rewrite) — not promoted.** Depends on BL-218.
+- **BL-210** stays open as the umbrella closing condition.
+
+**Retro** — *pending; closes when BL-218 and BL-219 land and BL-210's authority-doc propagation
+is done.*
 
 ---
 
@@ -186,6 +242,14 @@ primitive, AI_OPPONENT.md §8). Both require only BL-202 (complete) — no block
 **Planned.** BL-203 (diff 4), BL-204 (diff 3). Promote together — BL-204's goldens are the natural
 acceptance check for BL-203's behaviour change, so building them in the same batch is cheaper than
 sequencing.
+
+**Retro** (closed 2026-07-31 — landed early, ahead of Sprint 2b's chain).
+- **Landed: both.** BL-203 (corp AI stage B: strategy layer, priority buckets, predictive
+  spending) and BL-204 (AI skill-regression harness: seed-set bot-vs-bot goldens + tick-boundary
+  state hash) are both `complete`. BL-235 (creeds) landed alongside, wired into CTest.
+- **Feedback:** Sprint 3 overtook Sprint 2b rather than following it — the planned sequence and
+  the actual order diverged, which is fine but means "Sprint N" here reads as a *theme label*,
+  not a schedule. Treat the numbering that way.
 
 ### Sprint 4 — the communication surface (BL-205)
 
