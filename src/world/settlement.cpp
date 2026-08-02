@@ -45,6 +45,8 @@ constexpr uint32_t tag_rupture  = 0x8017u; // The historical-rupture checkpoints
 
 int clampi(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
 
+int64_t clampi64(int64_t v, int64_t lo, int64_t hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
 int wrapc(int col, int gw) { return ((col % gw) + gw) % gw; }
 
 int raster(int col, int row, int gw) { return wrapc(col, gw) + row * gw; }
@@ -1060,4 +1062,146 @@ industrial_focus focus_from_province(const province& p, int64_t median)
         else if (f == industrial_focus::processing) f = industrial_focus::trade;
     }
     return f;
+}
+
+// ---------------------------------------------------------------------------
+// Demography (BL-273) — population growth, war/plague drawdown, manpower.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// Fixed-point rate table, all in thousandths (1000 = 1.0). Named constants
+// rather than inline magic numbers so the tuning surface is one place.
+constexpr int64_t demog_capacity_floor    = 5000;  // Headcount at farm_q = 0.
+constexpr int64_t demog_capacity_per_q    = 500;   // Extra headcount per farm_q point.
+constexpr int64_t demog_growth_rate_q     = 12;     // ~1.2%/yr logistic rate, low-density.
+constexpr int64_t demog_war_drawdown_q    = 40;     // Up to ~4%/yr loss at war_pressure_q = 1000.
+constexpr int64_t demog_manpower_frac_q   = 50;     // Ceiling: 5% of population under arms at once.
+constexpr int64_t demog_manpower_recover_q = 250;   // Stock closes 25% of the ceiling gap per step.
+constexpr int64_t demog_plague_core_q     = 250;    // Epicentre loses up to 25% of its population.
+constexpr int64_t demog_plague_falloff_q  = 60;     // Per grid step of distance, the loss tapers.
+constexpr int      demog_plague_radius    = 6;      // Neighbours beyond this feel nothing.
+
+} // namespace
+
+int64_t province_carrying_capacity(int farm_q)
+{
+    const int q = clampi(farm_q, 0, 1000);
+    return demog_capacity_floor + static_cast<int64_t>(q) * demog_capacity_per_q;
+}
+
+int64_t manpower_ceiling(int64_t population)
+{
+    if (population <= 0) return 0;
+    return (population * demog_manpower_frac_q) / 1000;
+}
+
+void replenish_manpower(province& p)
+{
+    const int64_t ceiling = manpower_ceiling(p.population);
+    if (p.manpower_stock > ceiling) { p.manpower_stock = ceiling; return; } // Losses shrink the ceiling too.
+    const int64_t gap = ceiling - p.manpower_stock;
+    p.manpower_stock += (gap * demog_manpower_recover_q) / 1000;
+    p.manpower_stock = clampi64(p.manpower_stock, 0, ceiling);
+}
+
+int64_t raise_manpower(province& p, int64_t want)
+{
+    if (want <= 0 || p.manpower_stock <= 0) return 0;
+    const int64_t raised = std::min(want, p.manpower_stock);
+    p.manpower_stock -= raised; // Bounded by construction: never negative, never over-drawn.
+    return raised;
+}
+
+void advance_province_demography(province& p, int years, int war_pressure_q)
+{
+    if (years <= 0) return;
+    const int wq = clampi(war_pressure_q, 0, 1000);
+    const int64_t K = province_carrying_capacity(p.farm_q);
+
+    for (int y = 0; y < years; ++y)
+    {
+        if (p.population <= 0) { p.population = 0; continue; } // Nothing to grow from.
+
+        const int64_t P = p.population;
+        // Logistic growth term: dP = r * P * (K - P) / K, all integer.
+        const int64_t delta = (demog_growth_rate_q * P * (K - P)) / (K * 1000);
+        int64_t next = P + delta;
+
+        if (wq > 0)
+        {
+            const int64_t loss = (next * static_cast<int64_t>(wq) * demog_war_drawdown_q) / (1000 * 1000);
+            next -= loss;
+        }
+
+        p.population = clampi64(next, 0, K);
+    }
+
+    p.last_demography_year += years;
+    replenish_manpower(p);
+}
+
+bool resolve_plague_event(std::vector<province>& provinces,
+                          std::vector<checkpoint_record>& checkpoints,
+                          uint32_t seed, uint32_t stage_tag, int gw)
+{
+    if (provinces.empty()) return false;
+
+    bool applied = false;
+    return resolve_checkpoint(
+        chain_stage::spend, seed, stage_tag,
+        /*max_attempts=*/4,
+        // propose — one branch per province; eligibility is a FILTER
+        // (BL-217's rule), never a weight: a province with nobody left
+        // cannot be an epicentre.
+        [&](checkpoint_rng&, uint32_t) {
+            // Each label is the address of that province's OWN name buffer
+            // (a std::string's storage is per-object even when empty via
+            // SSO), so identity comparison in apply() below is exact and
+            // survives duplicate name text.
+            std::vector<checkpoint_branch> b;
+            b.reserve(provinces.size());
+            for (const province& p : provinces)
+                b.push_back({ p.name.c_str(), p.population > 0 });
+            return b;
+        },
+        // apply — the chosen province is the epicentre; nearby provinces
+        // (grid-proximity connectivity proxy, see the header comment on why
+        // not the full trade graph) lose population too, tapering with
+        // distance.
+        [&](checkpoint_rng&, const checkpoint_branch& chosen) {
+            if (applied) return; // A reroll must not stack losses.
+
+            // Identity, not content, comparison: `chosen.label` is the address
+            // of a specific province's own `name.c_str()` (set in propose,
+            // same call), so a pointer match is exact even when two
+            // provinces share a name string (region-word collisions do
+            // happen — see settle-name generation in run_settlement).
+            int epicentre = -1;
+            for (std::size_t i = 0; i < provinces.size(); ++i)
+                if (provinces[i].name.c_str() == chosen.label) { epicentre = static_cast<int>(i); break; }
+            if (epicentre < 0) return;
+
+            const province& origin = provinces[static_cast<std::size_t>(epicentre)];
+            for (province& p : provinces)
+            {
+                if (p.population <= 0) continue;
+                const int dist = grid_dist(p.col, p.row, origin.col, origin.row, gw);
+                if (dist > demog_plague_radius) continue;
+
+                const int64_t falloff = static_cast<int64_t>(dist) * demog_plague_falloff_q;
+                const int64_t loss_q = clampi64(demog_plague_core_q - falloff, 0, 1000);
+                if (loss_q <= 0) continue;
+
+                const int64_t loss = (p.population * loss_q) / 1000;
+                p.population = clampi64(p.population - loss, 0, p.population);
+                replenish_manpower(p); // The ceiling just fell with the population.
+            }
+            applied = true;
+        },
+        // floor_ok — a plague never has to leave anyone alive to be viable;
+        // it is not a nation-level checkpoint, so there is no floor beyond
+        // the bounded, non-negative arithmetic above already guaranteeing.
+        [&]() { return true; },
+        checkpoints);
 }

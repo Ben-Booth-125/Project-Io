@@ -105,6 +105,25 @@ struct province
 
     int nation = -1;   ///< Index into the nation-id list, once the political pass has run.
     int contest_q = 0; ///< 0-1000 — how hard this province's frontier was pressed.
+
+    // --- Demography (BL-273) ----------------------------------------------
+    // The province is the unit of population as well as of settlement — see
+    // demography.md's section header below for the model. Left at zero here;
+    // seeding an initial headcount is the graduation pass's job (BL-271), not
+    // this item's (design: "you don't need to wire that graduation path").
+
+    /// Integer headcount. Zero until a caller seeds it — a demography step
+    /// from zero stays zero (nothing to grow from), which is the logistic
+    /// model's own edge case, not a special case coded around it.
+    int64_t population = 0;
+    /// Calendar year `advance_province_demography` last advanced this
+    /// province to — bookkeeping so repeated calls compose (each step only
+    /// covers the years since the last one), never re-read for anything else.
+    int64_t last_demography_year = 0;
+    /// Recruitable manpower currently banked — the army budget BL-273 closes
+    /// the loop with. A bounded fraction of `population` (`manpower_ceiling`),
+    /// refilled gradually by `replenish_manpower`, spent by `raise_manpower`.
+    int64_t manpower_stock = 0;
 };
 
 /// What the settlement pass computed for one body.
@@ -210,3 +229,97 @@ int nearest_province(const settlement_state& ss, int col, int row, int gw);
 /// @param p        The corporation's home province.
 /// @param median   `settlement_state::median_industrial_year` (0 = nobody did).
 industrial_focus focus_from_province(const province& p, int64_t median);
+
+// ---------------------------------------------------------------------------
+// Demography (BL-273) — population growth, war/plague drawdown, manpower.
+//
+// Feeds the eventual Era -1 history sim (BL-271, not built by this item) and,
+// on graduation to the 1960 era, the population-centre scale distribution
+// (POPULATION.md) — neither consumer is wired up here; this is the
+// province-level model only, correct and self-contained per the item's own
+// scope note.
+//
+// INTEGER FIXED-POINT THROUGHOUT. Every rate below is a "_q" quantity in
+// thousandths (1000 = 1.0), following PLANETOLOGY.md's "no floats in a gate
+// path" convention — population feeds manpower, which is itself a budget
+// other deterministic systems will draw against, so it is a gate path too.
+// ---------------------------------------------------------------------------
+
+/// The population a province's farm endowment can support, in raw headcount
+/// — "the ground feeds who it can feed" (BL-273 design). A linear function of
+/// `farm_q` (0-1000, world-relative per settlement.cpp's `score_against`) off
+/// a subsistence floor, so even a farm_q=0 province holds a small population.
+///
+/// NOT industrialisation-aware in this first cut (BL-273 design: carrying
+/// capacity "does NOT need to move with industrialisation" yet) — a future
+/// item can add an industrial-era term without changing this signature.
+int64_t province_carrying_capacity(int farm_q);
+
+/// Advance one province's population by `years` simulated years: logistic
+/// growth toward `province_carrying_capacity(p.farm_q)`, war drawdown scaled
+/// by `war_pressure_q`, then a manpower-stock replenishment pass. Integer
+/// fixed-point throughout; no RNG — growth/drawdown are not a checkpoint
+/// draw (only `resolve_plague_event` is, per the design's explicit call-out).
+///
+/// Pure function of `p`'s own fields and the two arguments: two calls with
+/// identical inputs produce identical outputs, so a caller replaying the
+/// same (years, war_pressure_q) sequence over the same starting province
+/// reproduces the same trajectory — the determinism the sim harness checks.
+///
+/// @param p               Province to advance, mutated in place.
+/// @param years            Simulated years this step covers; <= 0 is a no-op.
+/// @param war_pressure_q   0-1000, this step's battle intensity on `p` (0 =
+///                         no war). The caller derives it from combat/
+///                         checkpoint records — this function only spends it.
+void advance_province_demography(province& p, int years, int war_pressure_q);
+
+/// The manpower ceiling a province's CURRENT population can support — a
+/// bounded fraction (`manpower_ceiling`'s own constant), not additive, so a
+/// province cannot bank more than its living population could ever field.
+int64_t manpower_ceiling(int64_t population);
+
+/// Move `manpower_stock` a fraction of the way toward its ceiling. Called
+/// once per `advance_province_demography` step (after growth/drawdown update
+/// `population`) — recovery is gradual, not an instant snap-to-ceiling, so a
+/// province that just spent its levy stays weak for a few years, not one.
+void replenish_manpower(province& p);
+
+/// Raise up to `want` manpower from `p.manpower_stock`. Returns the amount
+/// actually raised: `0 <= raised <= min(want, manpower_stock)`, so raising
+/// past what is available is bounded rather than going negative or
+/// unbounded — the self-limiting close BL-273 asks for (ancient hegemonies
+/// stall on manpower exhaustion rather than being capped by fiat).
+int64_t raise_manpower(province& p, int64_t want);
+
+/// Resolve one plague-event checkpoint over a body's settled provinces,
+/// reusing `resolve_checkpoint`'s class-agnostic mechanism from
+/// planetology.hpp exactly as BL-217 named it to be reused a second time —
+/// eligibility is a FILTER, never a weight. Each candidate branch is a
+/// possible epicentre province; a province is ELIGIBLE only if it still has
+/// population to strike (`population > 0`).
+///
+/// SIMPLIFICATION, noted per the design's own fallback clause: severity uses
+/// a GRID-PROXIMITY connectivity proxy (nearby provinces by `col`/`row`, via
+/// the same Chebyshev distance settlement.cpp already computes) rather than
+/// reading the full logistics/trade graph — that graph is built at a later
+/// generation stage than settlement and is not reachable here without
+/// pulling in the logistics module, which the design's fallback explicitly
+/// allows trading for cheapness. A true trade-linked read is a future
+/// refinement, not this item's job.
+///
+/// Mutates `provinces` in place (population loss at the epicentre and its
+/// grid neighbours) and appends exactly one `checkpoint_record` per attempt
+/// to `checkpoints` (failed/ineligible attempts included, per BL-217's rule).
+///
+/// @param provinces    The body's provinces; indices double as branch ids.
+/// @param checkpoints  Receives one record per attempt (see BL-217 shape).
+/// @param seed         Per-body seed (recorded as the checkpoint's seed_used).
+/// @param stage_tag    This call's RNG sub-stream tag — vary per plague-check
+///                      opportunity so repeat calls draw independently.
+/// @param gw            Grid width, for the column-wrapped distance metric.
+/// @return true once a branch was applied and cleared its floor; false if
+///         every province was ineligible (nobody left to strike) within the
+///         attempt budget.
+bool resolve_plague_event(std::vector<province>& provinces,
+                          std::vector<checkpoint_record>& checkpoints,
+                          uint32_t seed, uint32_t stage_tag, int gw);
