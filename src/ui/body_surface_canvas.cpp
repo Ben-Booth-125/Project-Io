@@ -1735,6 +1735,82 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 dl->AddCircleFilled({cx, cy}, std::max(1.5f, thick * 0.75f), col);
             }
 
+            // Rivers (BL-170 data; this render is new, 2026-08-02). Always-on terrain like
+            // roads. Drawn ONCE per edge from the UPSTREAM tile only — river_downstream bit
+            // set on a side means that side is this tile's outflow direction, so checking
+            // both river_edges and river_downstream picks exactly one of the two tiles
+            // sharing the edge as its drawer, and the line direction (this tile -> neighbour)
+            // is always the true flow direction with no separate lookup needed.
+            if (tile.river_edges != 0)
+            {
+                static const int r_even_off[6][2] =
+                    {{+1, 0}, {0, -1}, {-1, -1}, {-1, 0}, {-1, +1}, {0, +1}};
+                static const int r_odd_off[6][2] =
+                    {{+1, 0}, {+1, -1}, {0, -1}, {-1, 0}, {0, +1}, {+1, +1}};
+                const int (*r_off)[2] = (tile.grid_y & 1) ? r_odd_off : r_even_off;
+
+                const ImU32 river_col    = IM_COL32(90, 160, 235, 235);
+                const ImU32 chevron_col  = IM_COL32(220, 235, 255, 245);
+                const float river_thick  = std::max(1.5f, draw_r * 0.16f);
+
+                for (int side = 0; side < 6; ++side)
+                {
+                    const auto bit = static_cast<std::uint8_t>(1u << side);
+                    if (!(tile.river_edges & bit) || !(tile.river_downstream & bit))
+                        continue; // no river here, or this tile is the downstream half (already drawn from upstream)
+
+                    const int nrow = tile.grid_y + r_off[side][1];
+                    if (nrow < 0 || nrow >= gh)
+                        continue;
+                    const int raw_col = tile.grid_x + r_off[side][0];
+                    int ncol = raw_col % gw;
+                    if (ncol < 0)
+                        ncol += gw;
+
+                    const auto nb_it = tile_at.find(static_cast<long long>(nrow) * gw + ncol);
+                    if (nb_it == tile_at.end())
+                        continue;
+                    if (!survey_tile_visible(body.survey, gw, gh, ncol, nrow))
+                        continue;
+
+                    ImVec2 nb_sc = to_screen(hex_local_centre(ncol, nrow, hex_size));
+                    nb_sc.x += static_cast<float>(k) * period_px;
+                    if (raw_col >= gw)      nb_sc.x += period_px;
+                    else if (raw_col < 0)   nb_sc.x -= period_px;
+
+                    float dirx = nb_sc.x - cx;
+                    float diry = nb_sc.y - cy;
+                    const float len = std::sqrt(dirx * dirx + diry * diry);
+                    if (len <= 0.0f)
+                        continue;
+                    dirx /= len;
+                    diry /= len;
+                    const float px = -diry;
+                    const float py =  dirx;
+
+                    dl->AddLine({cx, cy}, nb_sc, river_col, river_thick);
+
+                    // Chevron cadence ("every 2 tiles"): no per-edge distance-from-source is
+                    // stored (generate_rivers traces tile-by-tile with no persisted path
+                    // index), so this approximates the cadence with the upstream tile's grid
+                    // parity — cheap, deterministic, and roughly-alternating rather than an
+                    // exact along-river count.
+                    if (((tile.grid_x + tile.grid_y) & 1) == 0)
+                    {
+                        const float mx   = (cx + nb_sc.x) * 0.5f;
+                        const float my   = (cy + nb_sc.y) * 0.5f;
+                        const float chev = std::max(2.5f, draw_r * 0.3f);
+                        const ImVec2 tip   = {mx + dirx * chev * 0.5f, my + diry * chev * 0.5f};
+                        const ImVec2 wing1 = {mx - dirx * chev * 0.3f + px * chev * 0.55f,
+                                              my - diry * chev * 0.3f + py * chev * 0.55f};
+                        const ImVec2 wing2 = {mx - dirx * chev * 0.3f - px * chev * 0.55f,
+                                              my - diry * chev * 0.3f - py * chev * 0.55f};
+                        dl->AddLine(wing1, tip, chevron_col, river_thick * 0.9f);
+                        dl->AddLine(wing2, tip, chevron_col, river_thick * 0.9f);
+                    }
+                }
+            }
+
             // Nation borders (Country lens only). Draw a dark line on every hex
             // edge shared with a neighbour of a different owner — including the
             // claimed/unclaimed boundary. The grid is odd-r offset, so the six
