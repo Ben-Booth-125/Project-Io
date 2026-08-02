@@ -7672,7 +7672,7 @@
       "difficulty": 3,
       "importance": "C",
       "evaluated_difficulty": 3,
-      "status": "active",
+      "status": "complete",
       "promoted_from": "BL-217 (generation checkpoint/branch model)",
       "batch": "sprint2-oral-history",
       "rows": [
@@ -7682,8 +7682,8 @@
           "verification": [
             "headless: extends tools/verify/planetology_sweep.cpp"
           ],
-          "status": "pending",
-          "result_metric": null,
+          "status": "complete",
+          "result_metric": "Met — checkpoint_record{stage_id,branch_taken,seed_used,viability_result} append-only on planetology_state::checkpoints.",
           "notes": null
         },
         {
@@ -7692,8 +7692,8 @@
           "verification": [
             "headless: extends tools/verify/planetology_sweep.cpp"
           ],
-          "status": "pending",
-          "result_metric": null,
+          "status": "complete",
+          "result_metric": "Met — resolve_checkpoint template treats lean as eligibility filter only; all-ineligible forces reroll (R13 assertions).",
           "notes": null
         },
         {
@@ -7702,8 +7702,8 @@
           "verification": [
             "headless: extends tools/verify/planetology_sweep.cpp"
           ],
-          "status": "pending",
-          "result_metric": null,
+          "status": "complete",
+          "result_metric": "Met — S5 Spark, S6 Breath (GOE+NOE), S7 Green (land-colonisation+fire-threshold) retrofitted; S8 Legacy correctly excluded, no branch decision exists there (NR-027).",
           "notes": null
         },
         {
@@ -7712,8 +7712,8 @@
           "verification": [
             "headless: extends tools/verify/planetology_sweep.cpp"
           ],
-          "status": "pending",
-          "result_metric": null,
+          "status": "complete",
+          "result_metric": "Met — per-checkpoint viability_result generalises homeworld_viability, uniform (state)->bool signature.",
           "notes": null
         },
         {
@@ -7723,8 +7723,8 @@
             "headless: tools/verify/planetology_sweep.cpp",
             "headless: tools/verify/determinism_harness.cpp"
           ],
-          "status": "pending",
-          "result_metric": null,
+          "status": "complete",
+          "result_metric": "Met — planetology_sweep R1-R3 unchanged (77.4% acceptance, 1.29 mean attempts); determinism confirmed same/different seed.",
           "notes": null
         },
         {
@@ -7733,11 +7733,13 @@
           "verification": [
             "review: docs/generation/PLANETOLOGY.md"
           ],
-          "status": "pending",
-          "result_metric": null,
+          "status": "complete",
+          "result_metric": "Met — PLANETOLOGY.md gains a Checkpoints subsection.",
           "notes": null
         }
-      ]
+      ],
+      "resolved": "2026-08-02",
+      "resolution": "All 6 rows met. planetology_harness 121/121 pass (19 new R13); planetology_sweep unchanged; full CTest 37/37."
     },
     {
       "brief": "world-history-log",

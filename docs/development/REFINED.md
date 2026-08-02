@@ -11,9 +11,9 @@ BL-218 needs BL-217 landed in `main`; BL-219 needs BL-218 landed). Each runs as 
 worktree-isolated agent, sequenced rather than parallel, since each reads the previous item's
 actual code (not just its design).
 
-## Checkpoint/branch model (BL-217) — Files: `src/world/planetology.{hpp,cpp}`,
-harness extending `tools/verify/planetology_sweep.cpp`, `docs/generation/PLANETOLOGY.md`.
-Satisfies checkpoint-branch-model R1-R6. **In progress.**
+## Checkpoint/branch model (BL-217) — **COMPLETE.** Files: `src/world/planetology.{hpp,cpp}`,
+`tools/verify/planetology_harness.cpp`, `docs/generation/PLANETOLOGY.md`. checkpoint-branch-model
+R1-R6 all complete; full CTest 37/37.
 
 ## World history log (BL-208) — Files: `src/world/history_log.{hpp,cpp}` (new), `src/world/world.hpp`,
 `src/world/corp_ai.cpp`, `src/world/economy_system.cpp`, `src/world/supply_system.cpp`,

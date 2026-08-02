@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*28 entries — 9 open, 19 resolved.*
+*28 entries — 8 open, 20 resolved.*
 
 ---
 
@@ -142,17 +142,6 @@ The task brief pointed at S8/Legacy (~line 1116+ in the pre-change planetology.c
 > **Recommendation:** No action needed unless a future S8 mechanic (e.g. a stochastic Legacy-stage roll) introduces a real fork — at that point it would earn its own checkpoint under the same admission rule.
 
 *Files: `src/world/planetology.cpp`, `src/world/planetology.hpp`, `docs/generation/PLANETOLOGY.md`*
-
-### NR-028 — BL-217 verification: fresh worktree could not configure CMake (FetchContent blocked), fell back to hand-compiled cl
-*observation · raised 2026-08-02 · from Session 2026-08-02 (BL-217 checkpoint/branch/lean foundation)*
-
-cmake -S . -B build in this worktree failed at the SDL3 FetchContent step: codeload.github.com's TLS handshake fails with CRYPT_E_NO_REVOCATION_CHECK (confirmed independently with a direct curl to the same URL, same error) — a network/certificate-revocation-check block, not a project misconfiguration. Per the task's documented fallback, planetology_harness and planetology_sweep were instead hand-compiled with cl (mirroring creeds_harness's world-superset TU list from tools/verify/README.md) and both ran clean: 121/121 PASS on the harness (19 of them the new R13 checkpoint assertions) and the sweep's R1-R3 metrics reproduced the doc's committed numbers exactly (77.4% acceptance, 1.29 mean attempts, interior=low at 2.57 draws). The full ProjectIo target and the whole-suite ctest (~37/37 expected) could NOT be run this session for the same reason.
-
-**Why it matters.** This is the known fresh-worktree FetchContent issue CLAUDE.md already anticipates, not a defect in this change. Flagging so a future session (or one with working network access) runs the full ctest suite once, to confirm nothing outside the planetology TU graph regressed — inspection of every consumer of planetology_state (src/core/app.hpp, src/ui/generation_charts.hpp, src/world/hard_coded_world.hpp) found only by-value/by-pointer holds with no field-enumeration that an appended struct field could break, but that is inspection, not a compile.
-
-> **Recommendation:** Next session with network access (or the main non-worktree checkout): run build_app.bat then ctest --test-dir build --output-on-failure once to close this out.
-
-*Files: `src/world/planetology.cpp`, `src/world/planetology.hpp`*
 
 ---
 
@@ -470,4 +459,17 @@ Ben declined both options for the payback wording on a principle rather than on 
 > **RESOLVED.** SHARPENED BY BEN (2026-08-01): "I am contradicting myself there. The important thing is that we do not make the decisions for the player. Score does not really give anything more actionable than a metric." So the test is NOT whether a surface computes something — it is whether the surface makes the CHOICE. A metric the player interprets is fine; a surface that picks for them is not. BL-262 (scoring system) therefore survives the principle without needing a special argument: a standing is a metric, not an instruction. Practical reading for future work: publish quantities, do not publish recommendations. Rank orders and best-candidate highlighting are the borderline, since a ranking is a computation that behaves like a choice; BL-162 keeps its ranked profit chart because Ben left it alone in NR-003, not because it clearly passes. Nothing is unwound.
 
 *Files: `src/ui/selection_panel.cpp`, `src/ui/corporation_dashboard.cpp`, `docs/CONCEPT.md`*
+
+### NR-028 — BL-217 verification: fresh worktree could not configure CMake (FetchContent blocked), fell back to hand-compiled cl
+*observation · raised 2026-08-02 · from Session 2026-08-02 (BL-217 checkpoint/branch/lean foundation)*
+
+cmake -S . -B build in this worktree failed at the SDL3 FetchContent step: codeload.github.com's TLS handshake fails with CRYPT_E_NO_REVOCATION_CHECK (confirmed independently with a direct curl to the same URL, same error) — a network/certificate-revocation-check block, not a project misconfiguration. Per the task's documented fallback, planetology_harness and planetology_sweep were instead hand-compiled with cl (mirroring creeds_harness's world-superset TU list from tools/verify/README.md) and both ran clean: 121/121 PASS on the harness (19 of them the new R13 checkpoint assertions) and the sweep's R1-R3 metrics reproduced the doc's committed numbers exactly (77.4% acceptance, 1.29 mean attempts, interior=low at 2.57 draws). The full ProjectIo target and the whole-suite ctest (~37/37 expected) could NOT be run this session for the same reason.
+
+**Why it matters.** This is the known fresh-worktree FetchContent issue CLAUDE.md already anticipates, not a defect in this change. Flagging so a future session (or one with working network access) runs the full ctest suite once, to confirm nothing outside the planetology TU graph regressed — inspection of every consumer of planetology_state (src/core/app.hpp, src/ui/generation_charts.hpp, src/world/hard_coded_world.hpp) found only by-value/by-pointer holds with no field-enumeration that an appended struct field could break, but that is inspection, not a compile.
+
+> **Recommendation:** Next session with network access (or the main non-worktree checkout): run build_app.bat then ctest --test-dir build --output-on-failure once to close this out.
+
+> **RESOLVED.** Closed 2026-08-02 in the main (non-worktree) checkout, which already had network access and a configured build/ tree. build_app.bat (full ProjectIo target) and ctest --test-dir build --output-on-failure both run clean: 37/37 green, including planetology_harness (121/121, 19 new R13 checkpoint assertions) and planetology_sweep (R1-R3 metrics reproduced exactly). No regression outside the planetology TU graph, confirming the inspection this entry already did.
+
+*Files: `src/world/planetology.cpp`, `src/world/planetology.hpp`*
 

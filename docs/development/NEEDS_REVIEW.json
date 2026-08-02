@@ -568,7 +568,7 @@
         "docs/development/ROADMAP.md",
         "src/ui/frame_stats.hpp",
         "src/ui/frame_stats.cpp"
-],
+      ],
       "resolution": null
     },
     {
@@ -594,7 +594,7 @@
       "title": "BL-217 verification: fresh worktree could not configure CMake (FetchContent blocked), fell back to hand-compiled cl",
       "raised": "2026-08-02",
       "kind": "observation",
-      "status": "open",
+      "status": "resolved",
       "source": "Session 2026-08-02 (BL-217 checkpoint/branch/lean foundation)",
       "what": "cmake -S . -B build in this worktree failed at the SDL3 FetchContent step: codeload.github.com's TLS handshake fails with CRYPT_E_NO_REVOCATION_CHECK (confirmed independently with a direct curl to the same URL, same error) — a network/certificate-revocation-check block, not a project misconfiguration. Per the task's documented fallback, planetology_harness and planetology_sweep were instead hand-compiled with cl (mirroring creeds_harness's world-superset TU list from tools/verify/README.md) and both ran clean: 121/121 PASS on the harness (19 of them the new R13 checkpoint assertions) and the sweep's R1-R3 metrics reproduced the doc's committed numbers exactly (77.4% acceptance, 1.29 mean attempts, interior=low at 2.57 draws). The full ProjectIo target and the whole-suite ctest (~37/37 expected) could NOT be run this session for the same reason.",
       "why_it_matters": "This is the known fresh-worktree FetchContent issue CLAUDE.md already anticipates, not a defect in this change. Flagging so a future session (or one with working network access) runs the full ctest suite once, to confirm nothing outside the planetology TU graph regressed — inspection of every consumer of planetology_state (src/core/app.hpp, src/ui/generation_charts.hpp, src/world/hard_coded_world.hpp) found only by-value/by-pointer holds with no field-enumeration that an appended struct field could break, but that is inspection, not a compile.",
@@ -604,7 +604,7 @@
         "src/world/planetology.cpp",
         "src/world/planetology.hpp"
       ],
-      "resolution": null
+      "resolution": "Closed 2026-08-02 in the main (non-worktree) checkout, which already had network access and a configured build/ tree. build_app.bat (full ProjectIo target) and ctest --test-dir build --output-on-failure both run clean: 37/37 green, including planetology_harness (121/121, 19 new R13 checkpoint assertions) and planetology_sweep (R1-R3 metrics reproduced exactly). No regression outside the planetology TU graph, confirming the inspection this entry already did."
     }
   ]
 }
