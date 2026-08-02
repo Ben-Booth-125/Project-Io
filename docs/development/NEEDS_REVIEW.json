@@ -701,6 +701,26 @@
         "scripts/verify/frame_budget_hud.lua"
       ],
       "resolution": null
+    },
+    {
+      "id": "NR-034",
+      "title": "The word-based milestone (generation via words, then gameplay) has no ROADMAP slot yet — Ben calls it 'the whole process', not one item",
+      "raised": "2026-08-02",
+      "kind": "question",
+      "status": "open",
+      "source": "BL-270 (action dictionary) filing — Ben's elicitation answers, 2026-08-02",
+      "what": "Ben, promoting BL-270: it 'blocks the next most important milestone, which is a word-based procedural generation and later gameplay', and — on the difficulty-level motivation — 'To consider what the difficulty level will be, we need this item. That is not really one item, it's the whole process of gameplay/development.' The dictionary is filed and promoted (v0.1.1, SSS), and its design names the consumer sequence (word-driven generation first, word-driven play after; a text-play harness item to follow). But ROADMAP.md currently carries no minor themed on word-based play, and 'the whole process' suggests a version-arc-level commitment (v0.1.1? v0.2.0 alongside the AI opponent?) rather than a feature.",
+      "why_it_matters": "ROADMAP owns sequence; standing rule: do not implement a milestone that depends on an earlier one not yet complete. The dictionary lands either way, but the harness item, the word-driven wizard item, and the difficulty-level work all need a named slot in the version sequence before they can be filed with honest version goals — and the v0.2.0 AI-opponent arc already exists and overlaps ('the model that will eventually run on-machine').",
+      "options": [
+        "Theme v0.1.1 as the word-interface minor: dictionary + text-play harness + cloud Sonnet/Opus experiment; word-driven generation and difficulty land later in the arc.",
+        "Fold it into the existing v0.2.0 AI-opponent arc: the dictionary is v0.1.1 groundwork, everything word-driven ships with the opponent.",
+        "Name it as its own post-v0.1.0 arc in ROADMAP with an explicit stage list (dictionary -> harness -> word generation -> difficulty), since Ben calls it 'the whole process'."
+      ],
+      "recommendation": "Option 1 for the near term — it matches 'dictionary now, generation and play consume it in sequence' without pre-committing the whole arc; revisit the arc naming when the harness exists and the cloud experiment has produced its first evidence.",
+      "files": [
+        "docs/development/ROADMAP.md"
+      ],
+      "resolution": null
     }
   ]
 }

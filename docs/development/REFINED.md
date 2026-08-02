@@ -3,6 +3,32 @@
 > Drained 2026-07-31 (doc sweep): thirteen stale COMPLETE sections removed per the
 > retain-one policy — their record lives in DEVLOG.md and req/requirements.json.
 
+# BL-270 (action dictionary) — promoted 2026-08-02 — **IN PROGRESS**
+
+Requirements: `req/requirements.json` § action-dictionary. Design: backlog.json § BL-270
+(Ben's four elicitation settlements, same day). The store is `docs/ai/ACTIONS.{json,md}`;
+scope is EVERY control including chrome; entries carry typed args + preconditions +
+expected_output + reason_to_select. Authoring is parallelisable by surface family
+(worktree agents, one per family) once T1's roster exists; T1 and T5 stay in the main
+session.
+
+- [ ] T1 — roster sweep: enumerate every interactive control (canvas clicks, the
+  `canvas_command` binding table in `src/core/app.cpp`, nav rail, ledger tabs/sub-views,
+  lens strip, selectors, time controls, system menu, construction flow, Selection band,
+  comms dock, wizard) into skeleton entries in `docs/ai/ACTIONS.json`.
+- [ ] T2 — author the 8 corp-verb entries, transcribed from `src/world/corp_command.hpp`
+  + the seams it dispatches to (preconditions = the rejection enum's semantics).
+- [ ] T3 — author canvas/navigation/lens/time entries (sources: CANVASES.md, LENSES.md,
+  SELECTION.md, the binding table).
+- [ ] T4 — author ledger/panel/wizard/chrome entries (sources: LAYOUT.md, STARTUP.md,
+  per-panel TUs).
+- [ ] T5 — `tools/session/render_actions.js` (modelled on `render_needs_review.js`) +
+  the generated `ACTIONS.md` mirror.
+- [ ] T6 — doc wiring: AI_OPPONENT.md authority pointer; CLAUDE.md § Documents entry for
+  the pair; DEVLOG entry. Draft entries are Ben-reviewable via NEEDS_REVIEW, not final.
+
+---
+
 # BL-268 (planetary canvas cull + cache) — **COMPLETE** (2026-08-02). Tasks T0–T5 all
 complete, none cancelled; planetary-pan-perf R1–R4 all met (play-zoom pan Release
 11.26 → 4.98 ms, Debug 41.21 → 6.74 ms; six goldens pixel-identical un-blessed).
