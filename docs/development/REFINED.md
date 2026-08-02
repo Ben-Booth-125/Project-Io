@@ -15,7 +15,19 @@ actual code (not just its design).
 harness extending `tools/verify/planetology_sweep.cpp`, `docs/generation/PLANETOLOGY.md`.
 Satisfies checkpoint-branch-model R1-R6. **In progress.**
 
-## Nations settlement rewrite (BL-218) — not yet promoted; depends on BL-217 landing.
+## World history log (BL-208) — Files: `src/world/history_log.{hpp,cpp}` (new), `src/world/world.hpp`,
+`src/world/corp_ai.cpp`, `src/world/economy_system.cpp`, `src/world/supply_system.cpp`,
+`src/core/app.cpp`, `tools/verify/history_log_harness.cpp` (new), `docs/ai/AI_OPPONENT.md`,
+`docs/generation/GENERATION_LEDGER.md`. Satisfies world-history-log R1-R7.
+
+**Resequenced ahead of BL-218/BL-219 (Ben, 2026-08-02).** Originally slotted after both in BL-210's
+umbrella; pulled forward because persisted, communicable history is the actual research premise
+(testing NL-agent coordination through communication alone), not an optimisation — BL-218's rupture
+branches should write into the real substrate from day one, not a placeholder converted later.
+Depends on BL-217 landing (consumes its `checkpoint_record` shape for the genesis chapter).
+**Not yet dispatched — queued behind BL-217.**
+
+## Nations settlement rewrite (BL-218) — not yet promoted; depends on BL-208 landing.
 
 ## Corporations history rewrite (BL-219) — not yet promoted; depends on BL-218 landing.
 

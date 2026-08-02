@@ -7738,6 +7738,88 @@
           "notes": null
         }
       ]
+    },
+    {
+      "brief": "world-history-log",
+      "title": "World history log: single interleaved, serialised, append-only substrate (BL-208)",
+      "difficulty": 5,
+      "importance": "C",
+      "evaluated_difficulty": 5,
+      "status": "active",
+      "promoted_from": "BL-208 (world history log), pulled forward ahead of BL-218/219 per Ben 2026-08-02",
+      "batch": "sprint2-oral-history",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "world::history_log exists as a single interleaved, append-only vector of world_history_entry {timestamp, topic, body, corp, event, consequence}, following the trade_routes precedent for non-entity world-level state.",
+          "verification": [
+            "headless: tools/verify/history_log_harness.cpp (new)"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R2",
+          "requirement": "Genesis chapter: PLANETOLOGY per-body dated history_event lines (and BL-217 checkpoint_records once landed) are merged into world::history_log at world setup, on their existing timestamps — this is new plumbing (generation_report is presentation-only and never reached world before).",
+          "verification": [
+            "headless: tools/verify/history_log_harness.cpp"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R3",
+          "requirement": "corp_decision_ring pushes, agency_events, and trade_route establishment each additionally narrate an entry into the log at their existing emission sites — without changing corp_decision_ring/agency_event/trade_routes' own existing consumers (body_activity_visibility, BL-206 blackboard export) at all.",
+          "verification": [
+            "headless: tools/verify/history_log_harness.cpp"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R4",
+          "requirement": "A flat-binary serialize/deserialize pair for the log, with a leading magic + version header (BL-107 — the first thing to add when the serialiser lands, per TECH_FOUNDATIONS.md) that rejects a corrupt/wrong-magic buffer rather than silently misreading it. Round-trip is field-identical.",
+          "verification": [
+            "headless: tools/verify/history_log_harness.cpp"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R5",
+          "requirement": "Determinism: two identical-seed generations produce identical genesis-chapter log entries.",
+          "verification": [
+            "headless: tools/verify/history_log_harness.cpp, tools/verify/determinism_harness.cpp"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R6",
+          "requirement": "No regression: BL-206 blackboard export (export_corp_blackboard, corp_ai.cpp) and body_activity_visibility keep working unchanged — consumers query a derived snapshot, never the raw log directly, per the settled design.",
+          "verification": [
+            "headless: tools/verify/history_log_harness.cpp, existing ai_skill_harness/determinism_harness"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        },
+        {
+          "id": "R7",
+          "requirement": "Authority docs updated: AI_OPPONENT.md (this item's authority doc) records the log's final shape; GENERATION_LEDGER.md states explicitly why it stays a separate mechanism (disposable/tuning vs durable/narrative lifetimes).",
+          "verification": [
+            "review: docs/ai/AI_OPPONENT.md, docs/generation/GENERATION_LEDGER.md"
+          ],
+          "status": "pending",
+          "result_metric": null,
+          "notes": null
+        }
+      ]
     }
   ]
 }
