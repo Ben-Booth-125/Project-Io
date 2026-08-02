@@ -169,6 +169,36 @@ is exactly where a real new warning will appear. Same failure mode as a permanen
 > because both belong to other people's items, and flipping someone else's status silently is worse
 > than the warning.
 
+### NR-027 — BL-217 checkpoint retrofit: S8/Legacy has no branch point, so no checkpoint was added there
+*decision-taken · from BL-217 (checkpoint/branch/lean foundation)*
+
+The task brief named S8/Legacy as one of four biological die-off points to wrap in a
+`checkpoint_record`, alongside Spark, Breath and Green. Reading the code, S8 Legacy has no
+`die()`/branch decision at all — it is a deterministic resource-endowment calculation over
+whatever `life_stage` the chain already reached. No checkpoint was added there.
+
+BL-217's own admission rule says a checkpoint is a point where the outcome distribution genuinely
+branches, not every point where something interesting happens; S8 fails that test. Five checkpoints
+were recorded instead — Spark (1), Breath (GOE + NOE), Green (land colonisation + fire threshold) —
+matching every genuine branch S5–S8 actually contains.
+
+> **No action needed** unless a future S8 mechanic introduces a real fork, at which point it would
+> earn its own checkpoint under the same rule.
+
+### NR-028 — BL-217 verification: fresh worktree could not configure CMake, fell back to hand-compiled `cl`
+*observation · from BL-217 (checkpoint/branch/lean foundation)*
+
+`cmake -S . -B build` in this worktree failed at the SDL3 FetchContent step — `codeload.github.com`'s
+TLS handshake fails with `CRYPT_E_NO_REVOCATION_CHECK` (confirmed independently with a direct `curl`
+to the same URL). Per the task's documented fallback, `planetology_harness` and `planetology_sweep`
+were hand-compiled with `cl` instead (mirroring `creeds_harness`'s world-superset TU list) and both
+ran clean: 121/121 PASS (19 of them the new R13 checkpoint assertions), and the sweep's metrics
+reproduced the doc's committed numbers exactly. The full `ProjectIo` target and the whole-suite
+`ctest` (~37/37 expected) could not be run this session for the same reason.
+
+> **Recommendation:** next session with network access (or the main non-worktree checkout), run
+> `build_app.bat` then `ctest --test-dir build --output-on-failure` once to close this out.
+
 ---
 
 ## Resolved

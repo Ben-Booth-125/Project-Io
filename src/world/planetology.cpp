@@ -58,6 +58,34 @@ struct rng
     float range(float lo, float hi) { return lo + (hi - lo) * unit(); }
 };
 
+} // namespace
+
+// checkpoint_rng is PUBLIC (declared in planetology.hpp) so a checkpoint
+// resolver outside this file can draw from the same deterministic mechanism
+// rather than inventing a second one. Implemented in terms of the same
+// splitmix64 core as the file-local `rng` above — one RNG mechanism, two
+// thin wrappers (BL-217).
+checkpoint_rng::checkpoint_rng(uint32_t seed, uint32_t stage_tag)
+    : s(splitmix64((static_cast<uint64_t>(seed) << 32) ^ (stage_tag * 0x9E3779B1u)))
+{
+}
+
+float checkpoint_rng::unit()
+{
+    s = splitmix64(s);
+    return static_cast<float>((s >> 40) & 0xFFFFFFull) * (1.0f / 16777216.0f);
+}
+
+int checkpoint_rng::index(int count)
+{
+    if (count <= 1) return 0;
+    const float u = unit();
+    int i = static_cast<int>(u * static_cast<float>(count));
+    return i >= count ? count - 1 : i;
+}
+
+namespace {
+
 // --- Deterministic maths helpers -------------------------------------------
 
 float clampf(float v, float lo, float hi) { return v < lo ? lo : (v > hi ? hi : v); }
@@ -550,6 +578,17 @@ planetology_state run_planetology(const body_inputs& in,
         st.archetype = a;
     };
 
+    // Records the S5-S8 mass-extinction checkpoint retrofit (BL-217): makes a
+    // branch decision the biology stages already make LEGIBLE, without
+    // changing the biology itself. `seed_used` is the body's own per-body
+    // seed, which combined with `stage_id` and this checkpoint class's own
+    // (undocumented-elsewhere, fixed) stage-tag table is enough to replay the
+    // decision. `ok` is "did the chain survive this checkpoint" — the
+    // per-checkpoint-class viability floor for biological mass-extinction.
+    auto checkpoint = [&](chain_stage where, std::string branch, bool ok) {
+        st.checkpoints.push_back(checkpoint_record{ where, std::move(branch), seed, ok });
+    };
+
     const float age = clampf(p.system_age_gyr, 1.0f, 10.0f);
 
     // =======================================================================
@@ -856,6 +895,11 @@ planetology_state run_planetology(const body_inputs& in,
             say(age - 1.0f, chain_stage::spark,
                 "Life at the vents, under the ice",
                 "chemical energy in abundance, and no way to reach it");
+            checkpoint(chain_stage::spark, "subsurface life at the vents", true);
+        }
+        else
+        {
+            checkpoint(chain_stage::spark, "no subsurface life", false);
         }
     }
     else if (!(cycling_venue && st.profile.geology >= geological_activity::low && time_budget
@@ -870,6 +914,10 @@ planetology_state run_planetology(const body_inputs& in,
         die(chain_stage::spark,
             st.profile.water_fraction >= 0.92f ? body_archetype::waterworld
                                                : body_archetype::relict_wet);
+        checkpoint(chain_stage::spark,
+            st.profile.water_fraction >= 0.92f ? "no cycling venue - waterworld"
+                                               : "no cycling venue - relict wet world",
+            false);
     }
     else
     {
@@ -877,6 +925,7 @@ planetology_state run_planetology(const body_inputs& in,
         say(age - 1.0f, chain_stage::spark,
             "Serpentinising vents; abiogenesis",
             "an Fe-oxidising biosphere - banded iron begins");
+        checkpoint(chain_stage::spark, "abiogenesis fired", true);
     }
 
     // =======================================================================
@@ -930,6 +979,7 @@ planetology_state run_planetology(const body_inputs& in,
                 "Oxygen never accumulated - the reductant flux won",
                 fmt("%.0f Myr of ferruginous ocean, and counting", st.ferruginous_gyr * 1000.0f));
             die(chain_stage::breath, body_archetype::mat_world);
+            checkpoint(chain_stage::breath, "GOE fails - Mat World", false);
         }
         else
         {
@@ -937,6 +987,7 @@ planetology_state run_planetology(const body_inputs& in,
             say(goe_at, chain_stage::breath,
                 "Oxygen begins to accumulate",
                 fmt("methane greenhouse destroyed - a %.1f Gyr glaciation", 0.3f));
+            checkpoint(chain_stage::breath, "GOE fires", true);
 
             // The Boring Billion lock: ferruginous oceans scavenge phosphate onto
             // iron oxyhydroxides, capping productivity, capping burial, keeping
@@ -959,6 +1010,7 @@ planetology_state run_planetology(const body_inputs& in,
                     "Phosphate locked onto iron oxyhydroxides; productivity capped",
                     "oxygen present and useless - below the ozone threshold");
                 die(chain_stage::breath, body_archetype::boring_billion);
+                checkpoint(chain_stage::breath, "NOE fails - Boring Billion", false);
             }
             else
             {
@@ -968,6 +1020,7 @@ planetology_state run_planetology(const body_inputs& in,
                     "Deep ocean oxidises; banded iron ceases",
                     fmt2("%.0f Myr window -> iron x%.2f", st.ferruginous_gyr * 1000.0f,
                          1.0f + st.ferruginous_gyr * 0.85f));
+                checkpoint(chain_stage::breath, "NOE fires", true);
             }
         }
     }
@@ -1000,10 +1053,14 @@ planetology_state run_planetology(const body_inputs& in,
                 "no coal, no soil, no timber");
             die(chain_stage::green,
                 land_frac < 0.12f ? body_archetype::waterworld : body_archetype::boring_billion);
+            checkpoint(chain_stage::green,
+                land_frac < 0.12f ? "no land to colonise" : "ozone column never closed",
+                false);
         }
         else
         {
             st.stage = st.peak = life_stage::land;
+            checkpoint(chain_stage::green, "land colonised", true);
 
             // Land colonisation lands earlier on a world that oxygenated early —
             // the other arm of the iron/coal trade.
@@ -1045,6 +1102,11 @@ planetology_state run_planetology(const body_inputs& in,
                     "And nothing on it would ever burn",
                     fmt("%.0f%% oxygen - below the combustion floor", st.o2_fraction * 100.0f));
                 die(chain_stage::green, body_archetype::boring_billion);
+                checkpoint(chain_stage::green, "green world cannot burn", false);
+            }
+            else
+            {
+                checkpoint(chain_stage::green, "combustion threshold cleared", true);
             }
 
             // Above ~21% fire suppresses forest cover — a high-oxygen world is
