@@ -36,12 +36,15 @@ Continent the eighth); "off the bar" lenses are reached by the keyboard lens-cyc
 | `industry` | off the bar | Substrate-throughput amber tint + key (BL-084) | built |
 | `supply` | off the bar | Solar per-convoy lines · Circumplanetary convoy-count badge · Planetary per-tile convoy glyph | built — Layer 5 convoys are live |
 | `reach` | off the bar | Planetary key listing the active body's trade-route endpoints by recency (BL-011, landed 2026-07-08) | built |
-| `supply_routes` | off the bar | Planetary key of aggregated lanes, log-scaled thickness (BL-014, landed 2026-07-08) | built — **but see access note** |
+| `supply_routes` | off the bar | Planetary key of aggregated lanes, log-scaled thickness (BL-014, landed 2026-07-08) | built |
 
-> **Access note (2026-07-31).** `overlay_mode_count` in `canvas_command.cpp` is
-> still 13; BL-226 (continent lens) inserted `continent` *before* `supply_routes`
-> in the enum without bumping it, so the keyboard cycle never reaches the
-> Supply-routes lens. Reach and Continent cycle fine. One-line code fix owed.
+> **Access note (2026-07-31) — RESOLVED (2026-08-02).** The stale
+> `overlay_mode_count` this note reported is fixed in code:
+> `canvas_command.cpp` anchors the count to the last enumerator
+> (`supply_routes` + 1 = 14) with a `static_assert` naming the re-anchor rule,
+> so the keyboard cycle reaches every lens including Supply-routes. Caught
+> stale during the BL-270 action-dictionary sweep, which transcribes access
+> paths from code rather than from this table.
 
 > **Status.** All lenses are built except where a section names a gating
 > dependency. **BL-226** (2026-07-30) added the **Continent** lens — the
@@ -87,8 +90,7 @@ strip; see [MINIMAP.md](MINIMAP.md)) — presents a **curated subset** in this o
 (BL-013, trimmed BL-093, extended BL-226): **Corporation → Country → Resource →
 Market → Population → Opportunity → Production → Continent**. **Scarcity** and
 **Industry** are off the bar, reached by **keyboard lens-cycle only** — joining
-**Supply**, **Reach** and **Supply-routes**, which do not fit the strip (and
-Supply-routes is currently unreachable — see the roster's access note). The campaign
+**Supply**, **Reach** and **Supply-routes**, which do not fit the strip. The campaign
 opens on **no lens** (`overlay_mode::none`, the plain canvas) — a click only updates
 the Selection element and never re-skins the canvas, so the canvas starts unskinned
 and the player picks a lens deliberately (reverses BL-013's Corporation-default,
@@ -769,9 +771,9 @@ thin sliver; heavy repeat traffic saturates rather than dominating linearly),
 recency-tier colour shared with Reach. The Solar-canvas graph rendering the
 design specifies is owed.
 
-**Glyph / access.** Reuses `icons::supply`; off the strip. **Currently
-unreachable by the keyboard cycle** — the stale `overlay_mode_count` (see the
-roster's access note, 2026-07-31).
+**Glyph / access.** Reuses `icons::supply`; off the strip, reached by the
+keyboard lens-cycle (the 2026-07-31 unreachability note is resolved — see the
+roster's access note).
 
 ## Placement-suitability surface *(BL-010 — not a strip lens)*
 

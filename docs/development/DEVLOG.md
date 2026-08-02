@@ -10,6 +10,48 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## Session — the action dictionary: 114 controls, five agents, one afternoon (2026-08-02)
+
+**Runtime.** ~1.5h wall (agent authoring ran in parallel). Full (BL-270 — new AI-facing
+store, five-file doc surface, promoted with requirements per the lifecycle).
+
+**The ask.** Ben, same day: promote the "complete dictionary of every button press —
+A) expected output, B) reason to select" so an AI plays via words; "not really one item,
+it's the whole process of gameplay/development." Design settled by elicitation (four
+calls: every control including chrome; + typed args and preconditions, cost and
+provenance deliberately out; docs/ai/ home; both consumers — generation then play).
+Multi-agent fan-out explicitly requested.
+
+### What was built
+
+`docs/ai/ACTIONS.{json,md}` — 114 entries across five families (11 gameplay / 24 canvas /
+15 lens / 36 ledger / 28 chrome), each `{press, typed args, preconditions,
+expected_output, reason_to_select}`. **Five parallel agents authored the families** into
+disjoint fragment files (no worktrees needed — disjoint write-sets by construction); the
+main session merged with per-fragment validation, wrote `tools/session/render_actions.js`
+(mirror generator = shape check: required fields, family-prefixed ids, no dupes, no extra
+fields), and wired AI_OPPONENT.md § 6a + the CLAUDE.md § Documents entry with the
+keep-entries-current rule. The gameplay family is *transcribed* from `corp_command.hpp` —
+verbs, typed args (workforce [0,200], road_tier [1,3]), rejection semantics — not authored.
+
+### What the sweep caught (transcribe-from-code pays immediately)
+
+- **LENSES.md's supply-routes access note was stale**: it claimed `overlay_mode_count`
+  was still 13 and the lens unreachable; code anchors the count to `supply_routes`+1=14
+  with a static_assert. Doc corrected in three places; the entry records code truth.
+- **Esc's precedence ladder has seven rungs**, not the six the summaries state (the corp
+  roll-up drill reset, BL-248, sits between card-unwind and fold-up). `chrome.esc`
+  transcribes all seven; the canvas family's duplicate was dropped at merge.
+- Smaller honesty wins: no settings row exists for the frame HUD (F11 only); the budget
+  tier steppers are stubbed (entries say so); buy orders have no player press; sell-order
+  placement lives in the market ledger (BL-159), not the Selection panel.
+
+**Open.** The milestone items this feeds — the text-play harness (blackboard + dictionary
+→ LLM → corp_command) and word-driven generation — are unfiled until NR-034 (the
+milestone's ROADMAP slot) is answered.
+
+---
+
 ## Session — "the engine is thrashing": measured, diagnosed, and fixed in one pass (2026-08-02)
 
 **Runtime.** ~2.5h. Full (BL-268 — the planetary canvas hot loop; earns the lifecycle by

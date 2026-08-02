@@ -7885,7 +7885,7 @@
       "difficulty": 4,
       "importance": "SSS",
       "evaluated_difficulty": null,
-      "status": "in-progress",
+      "status": "complete",
       "promoted_from": "BL-270 (action dictionary), promoted 2026-08-02 on Ben's instruction — blocks the word-based generation/gameplay milestone",
       "batch": null,
       "rows": [
@@ -7895,8 +7895,8 @@
           "verification": [
             "review: roster sweep vs src/ui/*.cpp draw sites + app.cpp binding table"
           ],
-          "status": "pending",
-          "result_metric": null,
+          "status": "complete",
+          "result_metric": "Met — 114 entries (11 gameplay / 24 canvas / 15 lens / 36 ledger / 28 chrome) authored by five parallel family agents, each sweeping its sources and reporting exclusions. Documented exclusions, all deliberate: disabled/reserved rail slots and tile-grid buttons (no valid press), the unreachable legacy economy panel (no rail slot toggles it), the unbuilt why_note toggle (BL-247/260), test-only verify Lua seams, and buy orders (no player press exists). Stubbed-but-pressable controls (budget tier steppers, BL-155) are included with honest no-effect expected_output.",
           "notes": "The docs are the audit (Ben's standing position); the machine consumer finds residual gaps by failing to act."
         },
         {
@@ -7905,8 +7905,8 @@
           "verification": [
             "headless: node tools/session/render_actions.js (parse + generate)"
           ],
-          "status": "pending",
-          "result_metric": null,
+          "status": "complete",
+          "result_metric": "Met — the renderer's shape check (required fields, family whitelist, family-prefixed ids, args/preconditions arrays, duplicate-id rejection) runs clean over all 114 entries; merge script additionally rejected extra fields per fragment.",
           "notes": "Cost and backlog provenance deliberately absent — Ben's exclusion, recorded in BL-270's design."
         },
         {
@@ -7915,8 +7915,8 @@
           "verification": [
             "review: entries vs src/world/corp_command.hpp + the seams it dispatches to"
           ],
-          "status": "pending",
-          "result_metric": null,
+          "status": "complete",
+          "result_metric": "Met — all 8 verbs present with the seam's typed args (workforce [0,200], road_tier [1,3], build's recipe seed) and preconditions naming the rejection enum cases; build's entry is honest about durative pay-as-you-build and the folded material-credit gate (insufficient_materials unreachable per construction.hpp). The UI's direct-write paths for recipe/workforce/idle/resume are noted as such.",
           "notes": null
         },
         {
@@ -7925,13 +7925,13 @@
           "verification": [
             "review: regenerate-and-diff clean; AI_OPPONENT.md section present"
           ],
-          "status": "pending",
-          "result_metric": null,
+          "status": "complete",
+          "result_metric": "Met — ACTIONS.md generated (114 entries, five family sections); AI_OPPONENT.md § 6a names the dictionary the word interface's third leg; CLAUDE.md § Documents carries the pair with the keep-entries-current rule.",
           "notes": null
         }
       ],
-      "resolved": null,
-      "resolution": null
+      "resolved": "2026-08-02",
+      "resolution": "All 4 rows met. 114 entries across five families, authored by five parallel agents and merged with per-fragment validation. Two truth catches during authoring: the LENSES.md supply-routes unreachability note was stale against code (fixed in LENSES.md, and the entry transcribes the code truth); Esc's real precedence ladder has seven rungs (chrome.esc transcribes it; the canvas duplicate was dropped at merge)."
     }
   ]
 }
