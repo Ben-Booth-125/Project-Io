@@ -12,6 +12,7 @@
 
 #include "world/components.hpp"
 #include "world/construction.hpp"
+#include "world/placement_rules.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/world.hpp"
 
@@ -37,6 +38,10 @@ int main()
       building_economics pr; pr.build_cost = 150.0f; reg.set_economics(building_type::processing_facility, pr);
       building_economics po; po.build_cost =  80.0f; reg.set_economics(building_type::port, po); }
     recipe steel; steel.name = "steel"; const uint16_t steel_id = reg.add_recipe(steel);
+    recipe hydro; hydro.name = "hydroponics_bay";
+    hydro.inputs[ri(resource_type::water)] = 1.5f; hydro.inputs[ri(resource_type::steel)] = 0.5f;
+    hydro.outputs[ri(resource_type::agricultural_produce)] = 1.0f;
+    const uint16_t hydro_id = reg.add_recipe(hydro);
 
     world w;
     const entity_id body = w.create_entity(); w.bodies[body] = body_component{};
@@ -46,7 +51,33 @@ int main()
     { tile_component tc{}; tc.body = body; tc.composition = terrain_composition::rocky;
       tc.resource_deposit[ri(resource_type::iron_ore)] = 2.0f; w.tiles[land] = tc; }
     const entity_id sea = w.create_entity();
-    { tile_component tc{}; tc.body = body; tc.composition = terrain_composition::ocean; w.tiles[sea] = tc; }
+    { tile_component tc{}; tc.body = body; tc.composition = terrain_composition::ocean;
+      tc.grid_x = 1; tc.grid_y = 0; w.tiles[sea] = tc; }
+
+    // BL-166/BL-168 fixture tiles (a 3x3 grid so is_coastal's hex-neighbour scan works).
+    w.bodies[body].grid_width = 3;
+    w.bodies[body].grid_height = 3;
+
+    // Hydroponics Bay: a grassland tile with NO agricultural_produce deposit (the
+    // Farm's deposit was not seeded here) -> valid; a grassland tile WITH the
+    // deposit -> invalid (Farm-viable terrain, no hydroponics needed).
+    const entity_id no_deposit_tile = w.create_entity();
+    { tile_component tc{}; tc.body = body; tc.composition = terrain_composition::grassland;
+      tc.grid_x = 2; tc.grid_y = 2; w.tiles[no_deposit_tile] = tc; }
+    const entity_id deposit_tile = w.create_entity();
+    { tile_component tc{}; tc.body = body; tc.composition = terrain_composition::grassland;
+      tc.grid_x = 2; tc.grid_y = 1;
+      tc.resource_deposit[ri(resource_type::agricultural_produce)] = 5.0f; w.tiles[deposit_tile] = tc; }
+
+    // Fishing Wharf: a coastal tile (odd row, neighbour (0,-1) lands on the ocean
+    // tile at (1,0)) with no deposit -> valid; an inland tile with no deposit and
+    // no ocean neighbour -> invalid.
+    const entity_id coastal_tile = w.create_entity();
+    { tile_component tc{}; tc.body = body; tc.composition = terrain_composition::rocky;
+      tc.grid_x = 1; tc.grid_y = 1; w.tiles[coastal_tile] = tc; }
+    const entity_id inland_tile = w.create_entity();
+    { tile_component tc{}; tc.body = body; tc.composition = terrain_composition::rocky;
+      tc.grid_x = 0; tc.grid_y = 2; w.tiles[inland_tile] = tc; }
 
     // Player corp with a modest balance.
     const entity_id corp = w.create_entity();
@@ -118,6 +149,47 @@ int main()
     check(construct_building(w, reg, corp, 99999u, building_type::port,
                              resource_type::iron_ore, x) == construction_result::no_tile,
           "C.R5 unknown tile rejected");
+
+    // --- BL-166: Hydroponics Bay placement (deposit==0 required) -------------
+    check(placement_rules::can_place_in_world(w, no_deposit_tile, building_type::processing_facility,
+                                              resource_type::agricultural_produce).reason
+              == placement_rules::placement_reason::ok,
+          "C.R6 Hydroponics Bay placement succeeds on a deposit==0 tile");
+    check(placement_rules::can_place_in_world(w, deposit_tile, building_type::processing_facility,
+                                              resource_type::agricultural_produce).reason
+              == placement_rules::placement_reason::deposit_present,
+          "C.R6 Hydroponics Bay placement fails on a deposit>0 tile");
+
+    // --- BL-168: Fishing Wharf placement (coastal required) -------------------
+    check(placement_rules::can_place_in_world(w, coastal_tile, building_type::extraction_site,
+                                              resource_type::agricultural_produce).reason
+              == placement_rules::placement_reason::ok,
+          "C.R7 Fishing Wharf placement succeeds on a coastal tile");
+    check(placement_rules::can_place_in_world(w, inland_tile, building_type::extraction_site,
+                                              resource_type::agricultural_produce).reason
+              == placement_rules::placement_reason::not_coastal,
+          "C.R7 Fishing Wharf placement fails on a non-coastal inland tile");
+
+    // --- BL-166/BL-168: both buildings resolve to agricultural_produce --------
+    // R4 above drove the corp's balance down to 100 to test the funds gate;
+    // restore headroom so these placements aren't refused on affordability.
+    w.corporations[corp].balance = 1000.0f;
+    entity_id hydro_built = null_entity;
+    auto r_hydro = construct_building(w, reg, corp, no_deposit_tile, building_type::processing_facility,
+                                      resource_type::agricultural_produce, hydro_built, hydro_id);
+    check(r_hydro == construction_result::placed
+              && w.buildings.count(hydro_built) == 1
+              && w.buildings[hydro_built].recipe == hydro_id
+              && near(reg.get_recipe(w.buildings[hydro_built].recipe)->outputs[ri(resource_type::agricultural_produce)], 1.0f),
+          "C.R8 Hydroponics Bay recipe resolves and produces agricultural_produce");
+
+    entity_id wharf_built = null_entity;
+    auto r_wharf = construct_building(w, reg, corp, coastal_tile, building_type::extraction_site,
+                                      resource_type::agricultural_produce, wharf_built);
+    check(r_wharf == construction_result::placed
+              && w.buildings.count(wharf_built) == 1
+              && w.buildings[wharf_built].target_resource == resource_type::agricultural_produce,
+          "C.R8 Fishing Wharf resolves its extraction target to agricultural_produce");
 
     std::printf("\n%s  (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES",
                 g_failures, g_failures == 1 ? "" : "s");

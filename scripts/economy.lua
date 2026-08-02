@@ -43,6 +43,13 @@ economy = {
     -- with zero ticks elapsed — construction had no time cost at all, letting
     -- the small chartered-company layer outpace the automated population/
     -- substrate economy it's supposed to sit on top of (GENERATION_STRATEGY.md).
+    -- BL-166 / BL-168: Hydroponics Bay and Fishing Wharf are the same generic
+    -- processing_facility / extraction_site types as every other named building
+    -- (Farm, Smelter, ...) — distinguished by recipe/target, not a new
+    -- building_type — so they share the economics entries below rather than
+    -- carrying their own. Placement (not economics) is what sets them apart
+    -- (placement_rules.cpp): Hydroponics Bay only where the Farm's deposit was
+    -- NOT seeded; Fishing Wharf only on a coastal tile.
     buildings = {
         extraction_site = {
             base_rate   = 20.0,

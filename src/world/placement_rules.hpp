@@ -32,7 +32,7 @@ enum class placement_reason : uint8_t
     ok = 0,            ///< Placement is valid.
     ocean,             ///< Tile is water — no building sits on water.
     no_deposit,        ///< Extraction site with no extractable deposit of the target.
-    not_coastal,       ///< Port must sit on a coastal (ocean-adjacent) tile.
+    not_coastal,       ///< Port (or a coastal-only extraction target) must sit next to open water.
     launchpad_exists,  ///< A launchpad already exists on this body (max 1).
     occupied,          ///< Tile already carries a building (reserved vocabulary).
     outside_territory, ///< Tile is outside the player's territory (reserved).
@@ -40,6 +40,7 @@ enum class placement_reason : uint8_t
     slot_full,         ///< A per-type build cap is reached (reserved, generic).
     no_tile,           ///< Tile entity does not exist (defensive; mirrors construction_result::no_tile).
     already_road,      ///< Road placement onto a tile that already carries a road (BL-147).
+    deposit_present,   ///< Hydroponics Bay (BL-166): tile already carries the terrain deposit a Farm would use.
 };
 
 /// Human-readable one-line explanation for a placement reason, for surfacing on
@@ -115,14 +116,22 @@ bool can_place_population_centre(const tile_component& tc);
 ///
 /// - Never on ocean (any building type).
 /// - extraction_site: only on a non-zero deposit of `target`, and `target` must
-///   be a prototype-extractable resource.
-/// - processing_facility / port / none: any non-ocean land tile (`target` ignored).
+///   be a prototype-extractable resource. **Exception (Fishing Wharf, BL-168):**
+///   an `agricultural_produce` target with no deposit still passes this tile-only
+///   check — its coastal requirement needs world access, so it is enforced by
+///   `can_place_in_world` instead of rejected here.
+/// - processing_facility targeting `agricultural_produce` (Hydroponics Bay,
+///   BL-166): only where the terrestrial Farm deposit was NOT seeded
+///   (`resource_deposit[agricultural_produce] == 0`) — the mirror image of the
+///   extraction deposit check. Every other processing target/recipe is
+///   unaffected (any non-ocean land tile).
+/// - port / inland_logistics_hub / none: any non-ocean land tile (`target` ignored).
 ///
 /// @param tc      The candidate tile.
 /// @param type    The building to place.
-/// @param target  The extraction target resource (ignored for non-extraction types).
-/// @return        A placement_result: `ok`, or `ocean` / `no_deposit`. Converts to
-///                bool (true iff ok) for the existing boolean call sites.
+/// @param target  The extraction target resource (ignored for most non-extraction types).
+/// @return        A placement_result: `ok`, `ocean`, `no_deposit`, or `deposit_present`.
+///                Converts to bool (true iff ok) for the existing boolean call sites.
 placement_result can_place(const tile_component& tc, building_type type, resource_type target);
 
 /// True if the tile at `tile_id` is coastal — has at least one ocean neighbour
@@ -136,7 +145,9 @@ bool is_coastal(const world& w, entity_id tile_id);
 /// Full placement check including world-level constraints (BL-043):
 ///  1. Tile-level can_place (ocean / deposit / terrain).
 ///  2. Port: tile must be coastal (is_coastal).
-///  3. Launchpad: at most 1 per body; returns false when one already exists.
+///  3. Fishing Wharf (BL-168): an extraction_site targeting agricultural_produce
+///     with no deposit on the tile must also be coastal (is_coastal).
+///  4. Launchpad: at most 1 per body; returns false when one already exists.
 ///
 /// Use this at player construction time; generation uses can_place directly
 /// (world state is incomplete during generation passes).

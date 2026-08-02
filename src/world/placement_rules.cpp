@@ -19,6 +19,7 @@ const char* placement_reason_text(placement_reason r)
         case placement_reason::slot_full:         return "No build slot free here";
         case placement_reason::no_tile:           return "No such tile";
         case placement_reason::already_road:      return "This tile already has an equal or better road";
+        case placement_reason::deposit_present:   return "This terrain already supports a Farm — no Hydroponics Bay needed here";
     }
     return "Cannot build here";
 }
@@ -98,9 +99,24 @@ placement_result can_place(const tile_component& tc, building_type type, resourc
             if (is_extractable(target)
                 && tc.resource_deposit[static_cast<std::size_t>(target)] > 0.0f)
                 return placement_reason::ok;
+            // Fishing Wharf (BL-168): an agricultural_produce site with no terrestrial
+            // deposit can still work a coastal tile. That needs world access
+            // (is_coastal), so this tile-only check passes it through rather than
+            // rejecting on no_deposit — can_place_in_world enforces the coastal gate.
+            if (target == resource_type::agricultural_produce)
+                return placement_reason::ok;
             return placement_reason::no_deposit;
 
         case building_type::processing_facility:
+            // Hydroponics Bay (BL-166): only where the terrestrial Farm deposit was
+            // NOT seeded — habitability/terrain gated, the mirror image of the
+            // extraction deposit check above. Every other processing target/recipe
+            // (Smelter, Refinery, Food Processor, ...) is unaffected.
+            if (target == resource_type::agricultural_produce
+                && tc.resource_deposit[static_cast<std::size_t>(resource_type::agricultural_produce)] > 0.0f)
+                return placement_reason::deposit_present;
+            return placement_reason::ok;
+
         case building_type::port:
         case building_type::inland_logistics_hub: // BL-149: any non-ocean land tile (the land-network node).
         case building_type::none:
@@ -168,6 +184,14 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
 
     if (type == building_type::port)
     {
+        if (!is_coastal(w, tile_id))
+            return placement_reason::not_coastal;
+    }
+    else if (type == building_type::extraction_site
+             && target == resource_type::agricultural_produce
+             && tc_it->second.resource_deposit[static_cast<std::size_t>(resource_type::agricultural_produce)] <= 0.0f)
+    {
+        // Fishing Wharf (BL-168): no terrestrial deposit here, so it must be coastal.
         if (!is_coastal(w, tile_id))
             return placement_reason::not_coastal;
     }

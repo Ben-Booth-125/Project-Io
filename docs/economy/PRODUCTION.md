@@ -43,6 +43,14 @@ Each building type targets a specific class of resource. Placement is valid only
 | Farm | Agricultural produce | Grassland, wetland, forest-adjacent | 0 |
 | Ice Extractor | Water (from ice deposits) | Icy | 1 |
 | Surface Extractor | Regolith, iron-nickel ore, platinum group metals | Regolith, metallic | 1 |
+| Fishing Wharf (BL-168) | Agricultural produce | Coastal (any composition adjacent to ocean) | 0 |
+
+**Fishing Wharf (BL-168), implemented.** The extraction_site's target resource is again
+`agricultural_produce`, but the placement gate is coastal adjacency rather than a deposit: valid on
+any tile with an ocean neighbour, deposit-agnostic. A tile can satisfy Farm's deposit rule, the
+Fishing Wharf's coastal rule, both, or neither — they are two independent ways the same generic
+extraction_site can reach agricultural_produce, not two building types (`placement_rules.cpp`
+`can_place` / `can_place_in_world`, mirroring the existing Port coastal check via `is_coastal`).
 
 The Mine covers all terrestrial hard-mineral deposits and adjusts its output to whatever the tile holds: the same building type on one volcanic tile yields rare earth ore and on another yields copper ore. The distinction between deposit types is in the tile data, not the building type. Off-world metallic deposits (iron-nickel ore, platinum group metals) are harvested by the Surface Extractor, the Era 1 airless-body counterpart to the Mine; both feed the same smelting chain, so the distinction is one of era and deployment environment, not of downstream product.
 
@@ -122,6 +130,21 @@ On a body with an atmosphere, liquid oxygen is produced in Era 0 by cryogenic ai
 | Inputs | Output | Era |
 |--------|--------|-----|
 | Agricultural produce | Food rations | 0 |
+
+#### Hydroponics Bay (BL-166, implemented)
+
+| Inputs | Output | Era |
+|--------|--------|-----|
+| Water + steel | Agricultural produce | 0 |
+
+A processing_facility recipe (`scripts/recipes.lua` id 3, `hydroponics_bay`) that produces
+`agricultural_produce` from refined inputs instead of a terrain deposit — no "energy" resource
+exists in the prototype set, so water (irrigation) and steel (the bay's own structure) stand in for
+it. Feeds the same Food Processor -> Food rations chain the Farm feeds; no new market good.
+**Placement is terrain-gated the opposite way from the Farm:** only valid where the terrestrial
+Farm deposit was NOT seeded (`resource_deposit[agricultural_produce] == 0`), keyed off the
+processing_facility's target resource in `placement_rules::can_place` (mirror image of the
+extraction deposit check; `deposit_present` is the rejection reason on Farm-viable terrain).
 
 #### Assembly Plant
 
