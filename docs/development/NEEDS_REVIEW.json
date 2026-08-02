@@ -506,6 +506,29 @@
         "docs/ui/SELECTION.md"
       ],
       "resolution": null
+    },
+    {
+      "id": "NR-024",
+      "title": "The Budget ledger Tax control promises something a corporation cannot have — laws are enacted by nations, not by the player",
+      "raised": "2026-08-02",
+      "kind": "decision-taken",
+      "status": "open",
+      "source": "Settling BL-155 (laws & policy) during the design-owed sweep, 2026-08-02",
+      "what": "BL-171 added Tax and Wages tier selectors to the player Budget ledger as stubbed controls, and BL-155 records your confirmed intent that \"Tax = a player-set policy lever (the player picks a tax tier as a deliberate trade-off)\". But every law in BL-155 ten-law list is an instrument of public authority — tax, tariff, cap, embargo, zoning — and the player is a CORPORATION. A corporation is subject to those, it does not enact them. I settled BL-155 on the rule that laws are enacted by NATIONS and the player is a law subject until BL-094 (v0.2.0) pivots them to a nation, and split the two controls accordingly: Wages stays a real lever (a private contract term, not a law — a corporation genuinely sets what it pays, above whatever floor law #8 imposes), and Tax becomes a READ-ONLY display of the tax regime the player home nation currently imposes.",
+      "why_it_matters": "This contradicts a previously confirmed intent of yours, and it changes a control that is already drawn on screen — so it is not a call I should make quietly. It is also load-bearing for the whole laws design: if the player can enact laws, then laws are a player-facing authoring surface with all the UI that implies; if the player cannot, laws are world state the player routes around, and the prototype scope collapses to two enacted laws plus a display. Those are very different amounts of work. The read-only reading is also, I think, the better game — a market shaped by rules you did not choose is a constraint to plan against, which is the Trade dimension doing its job, and it gives the law system a visible surface from day one instead of after BL-094.",
+      "options": [
+        "Accept: Tax becomes a read-only display of the home nation regime; Wages stays a real lever (what I did).",
+        "Accept the rule but remove the Tax control entirely until BL-094, rather than re-presenting it.",
+        "Overturn: the player CAN set their own tax tier — in which case say what it represents in the fiction, since a corporation legislating for itself is incoherent as written.",
+        "Overturn differently: the player is a chartered corporation that negotiates its own tax rate with its home nation, making Tax a real lever with a diegetic story behind it."
+      ],
+      "recommendation": "Option 1, but option 4 is worth a moment because it is the one that keeps your original intent AND makes it coherent — a negotiated rate fits the chartered-corporation identity the history ladder (BL-223) is building toward, and it would make Tax the first place diplomacy touches the economy. It costs a negotiation mechanic that does not exist, so it is not a prototype answer; if it appeals, the honest move is option 1 now and option 4 filed for v0.2.0. Either way the Tax control as currently drawn should not ship promising a lever the player does not have.",
+      "files": [
+        "docs/development/backlog.json",
+        "src/ui/balance_ledger.cpp",
+        "src/ui/ui_state.hpp"
+      ],
+      "resolution": null
     }
   ]
 }
