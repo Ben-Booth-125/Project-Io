@@ -7604,7 +7604,7 @@
       "difficulty": 4,
       "importance": "C",
       "evaluated_difficulty": 4,
-      "status": "active",
+      "status": "complete",
       "promoted_from": "BL-170 (rivers & freshwater generation)",
       "batch": "sprint1-generation",
       "rows": [
@@ -7614,8 +7614,8 @@
           "verification": [
             "headless: tools/verify/road_generation_harness.cpp (or a new river_generation_harness.cpp)"
           ],
-          "status": "pending",
-          "result_metric": null,
+          "status": "complete",
+          "result_metric": "Met — downhill edge trace from mountain/highland to ocean/basin, per-tile 6-side bitmask (river_edges/river_downstream).",
           "notes": null
         },
         {
@@ -7624,8 +7624,8 @@
           "verification": [
             "headless: tools/verify/determinism_harness.cpp"
           ],
-          "status": "pending",
-          "result_metric": null,
+          "status": "complete",
+          "result_metric": "Met — determinism_harness gains a river bitmask identity check; river_generation_harness asserts same/different seed directly.",
           "notes": null
         },
         {
@@ -7634,8 +7634,8 @@
           "verification": [
             "headless: tools/verify/logistics_harness.cpp"
           ],
-          "status": "pending",
-          "result_metric": null,
+          "status": "complete",
+          "result_metric": "Met — river_edge_discount folded into logistics.cpp A* edge cost, downstream 0.75x / upstream 0.85x, stacks multiplicatively with road tier.",
           "notes": null
         },
         {
@@ -7644,8 +7644,8 @@
           "verification": [
             "review: src/world/tile_generation.cpp, src/world/components.hpp"
           ],
-          "status": "pending",
-          "result_metric": null,
+          "status": "complete",
+          "result_metric": "Met — no new resource_type; water-adjacency is a bitmask read, not a good.",
           "notes": null
         },
         {
@@ -7654,11 +7654,13 @@
           "verification": [
             "review: docs/generation/TILE_GENERATION.md, docs/economy/SUPPLY.md"
           ],
-          "status": "pending",
-          "result_metric": null,
+          "status": "complete",
+          "result_metric": "Met — TILE_GENERATION.md gains a Rivers section; SUPPLY.md documents the discount + stacking rule.",
           "notes": null
         }
-      ]
+      ],
+      "resolved": "2026-08-02",
+      "resolution": "All 5 rows met. river_generation_harness + determinism_harness pass; CTest 37/37."
     }
   ]
 }
