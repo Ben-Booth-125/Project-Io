@@ -7520,7 +7520,7 @@
       "difficulty": 3,
       "importance": "C",
       "evaluated_difficulty": 3,
-      "status": "active",
+      "status": "complete",
       "promoted_from": "BL-166 (agriculture interplanetary split)",
       "batch": "sprint1-generation",
       "rows": [
@@ -7530,8 +7530,8 @@
           "verification": [
             "headless: tools/verify/construction_harness.cpp"
           ],
-          "status": "pending",
-          "result_metric": null,
+          "status": "complete",
+          "result_metric": "Met — see construction_harness C.R6-C.R8 output and backlog.json resolution.",
           "notes": null
         },
         {
@@ -7540,8 +7540,8 @@
           "verification": [
             "headless: tools/verify/construction_harness.cpp"
           ],
-          "status": "pending",
-          "result_metric": null,
+          "status": "complete",
+          "result_metric": "Met — see construction_harness C.R6-C.R8 output and backlog.json resolution.",
           "notes": null
         },
         {
@@ -7550,11 +7550,13 @@
           "verification": [
             "review: docs/economy/RESOURCES.md, docs/economy/PRODUCTION.md"
           ],
-          "status": "pending",
-          "result_metric": null,
+          "status": "complete",
+          "result_metric": "Met — see construction_harness C.R6-C.R8 output and backlog.json resolution.",
           "notes": null
         }
-      ]
+      ],
+      "resolved": "2026-08-02",
+      "resolution": "All rows met via construction_harness C.R6-C.R8; full CTest 37/37."
     },
     {
       "brief": "fishing-wharf",
@@ -7562,7 +7564,7 @@
       "difficulty": 3,
       "importance": "C",
       "evaluated_difficulty": 3,
-      "status": "active",
+      "status": "complete",
       "promoted_from": "BL-168 (coastal fishing)",
       "batch": "sprint1-generation",
       "rows": [
@@ -7572,8 +7574,8 @@
           "verification": [
             "headless: tools/verify/construction_harness.cpp"
           ],
-          "status": "pending",
-          "result_metric": null,
+          "status": "complete",
+          "result_metric": "Met — see construction_harness C.R6-C.R8 output and backlog.json resolution.",
           "notes": null
         },
         {
@@ -7582,8 +7584,8 @@
           "verification": [
             "headless: tools/verify/econ_harness.cpp"
           ],
-          "status": "pending",
-          "result_metric": null,
+          "status": "complete",
+          "result_metric": "Met — see construction_harness C.R6-C.R8 output and backlog.json resolution.",
           "notes": null
         },
         {
@@ -7592,11 +7594,13 @@
           "verification": [
             "review: docs/economy/PRODUCTION.md"
           ],
-          "status": "pending",
-          "result_metric": null,
+          "status": "complete",
+          "result_metric": "Met — see construction_harness C.R6-C.R8 output and backlog.json resolution.",
           "notes": null
         }
-      ]
+      ],
+      "resolved": "2026-08-02",
+      "resolution": "All rows met via construction_harness C.R6-C.R8; full CTest 37/37."
     },
     {
       "brief": "river-generation",
