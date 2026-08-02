@@ -73,7 +73,7 @@ Available in Era 0 and all subsequent eras. Found predominantly on habitable or 
 | Silica | Barren, rocky | Silicon dioxide; raw input for semiconductor-grade silicon and bulk construction. |
 | Copper ore | Rocky, volcanic | Primary conductive metal ore. |
 | Rare earth ore | Volcanic, rocky | Suite of critical minerals used in electronics and high-performance magnets. Low deposit concentration; high base price. |
-| Agricultural produce | High-habitability, water-adjacent | Food crop output. Only viable on planets with substantial surface water and habitability above a settlement threshold. |
+| Agricultural produce | High-habitability, water-adjacent | Food crop output. Only viable on planets with substantial surface water and habitability above a settlement threshold. Three producers as of BL-166/BL-168: the Farm (terrain deposit), the Hydroponics Bay (a processing_facility recipe, only where the Farm's deposit was NOT seeded), and the Fishing Wharf (an extraction_site gated on coastal adjacency instead of a deposit) — see `docs/economy/PRODUCTION.md` § Extraction / § Processing. |
 
 ### Space-sourced
 

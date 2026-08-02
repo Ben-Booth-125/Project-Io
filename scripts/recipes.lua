@@ -34,6 +34,18 @@ recipes = {
         inputs  = { agricultural_produce = 2.0 },
         outputs = { food_rations = 1.0 },
     },
+
+    -- id 3 — Hydroponics Bay (BL-166): a processing_facility that produces
+    -- agricultural_produce from refined inputs instead of a terrain deposit,
+    -- feeding the same Food Processor -> Food rations chain the Farm feeds.
+    -- No "energy" resource_type exists in the prototype set, so the recipe uses
+    -- water (life-support/irrigation analog) plus steel (the structural good the
+    -- bay itself is built from) as its two inputs.
+    {
+        name    = "hydroponics_bay",
+        inputs  = { water = 1.5, steel = 0.5 },
+        outputs = { agricultural_produce = 1.0 },
+    },
 }
 
 print(string.format("[Lua] recipes.lua loaded  recipe_count=%d", #recipes))

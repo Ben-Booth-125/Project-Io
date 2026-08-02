@@ -66,9 +66,24 @@ cl /nologo /std:c++20 /EHsc /I src tools\verify\world_audit.cpp ^
 .\build_gen\verify\world_audit.exe
 
 :: Layer 4 player construction — construct_building validation, build-cost spend,
-:: component authoring, and the insufficient-funds / unknown-corp/tile guards.
+:: component authoring, the insufficient-funds / unknown-corp/tile guards, and
+:: (BL-166/BL-168) Hydroponics Bay / Fishing Wharf placement + recipe resolution.
+:: construction.cpp pulls in market_clearing.cpp -> economy_system.cpp, which
+:: pulls in the rest of the non-Lua world/* superset transitively (corp_ai,
+:: corp_command, survey_system, ...) — this drifted stale once (this recipe
+:: previously listed only world/construction/placement_rules and link-failed);
+:: it is now the full world/*.cpp set minus the sol2/Lua-dependent TUs
+:: (recipe_registry.cpp, tech_tree.cpp, world_gen_config.cpp).
 cl /nologo /std:c++20 /EHsc /I src tools\verify\construction_harness.cpp ^
-   src\world\world.cpp src\world\construction.cpp src\world\placement_rules.cpp ^
+   src\world\budget_system.cpp src\world\building_profit.cpp src\world\chemistry_tables.cpp ^
+   src\world\city_names.cpp src\world\construction.cpp src\world\continents.cpp ^
+   src\world\corp_ai.cpp src\world\corp_command.cpp src\world\corporation_generation.cpp ^
+   src\world\creeds.cpp src\world\economy_system.cpp src\world\hard_coded_world.cpp ^
+   src\world\history_ladder.cpp src\world\logistics.cpp src\world\market_clearing.cpp ^
+   src\world\nation_generation.cpp src\world\orbital_system.cpp src\world\placement_rules.cpp ^
+   src\world\planetology.cpp src\world\population_generation.cpp src\world\road_generation.cpp ^
+   src\world\supply_system.cpp src\world\survey_system.cpp src\world\terrain_combat.cpp ^
+   src\world\tile_generation.cpp src\world\world.cpp ^
    /Fo:build_gen\verify\construction_harness\ /Fe:build_gen\verify\construction_harness.exe
 .\build_gen\verify\construction_harness.exe
 
