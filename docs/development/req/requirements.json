@@ -8027,6 +8027,112 @@
           "notes": "A pre-existing unrelated break was also fixed: trade_routes_harness's hand-declared CMake link set never picked up river_generation.cpp after BL-170 landed, so it failed to link. Removed the hand-declaration per the file's own guidance on that rot."
         }
       ]
+    },
+    {
+      "brief": "unit-doctrine-combat",
+      "title": "Typed units + doctrine-parameter combat engine, one resolve function for the Era -1 sim and the 1960+ era (BL-272)",
+      "difficulty": 4,
+      "importance": "S",
+      "evaluated_difficulty": 4,
+      "status": "active",
+      "promoted_from": "BL-272, promoted 2026-08-02 as Sprint 5's foundation wave (no unmet dependencies beyond BL-233, already landed)",
+      "batch": "sprint5-history-sim",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "unit_component carries a type (era-agnostic for this item; BL-274 supplies the era-keyed roster later); an army is a stack of typed (type, count) pairs, never a battlefield of individual units.",
+          "verification": [
+            "headless: combat_harness"
+          ],
+          "status": "pending",
+          "result_metric": "",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "requirement": "A battle is one deterministic evaluation of unit-type matchup x formation doctrine x BL-233's terrain scalars (terrain_defence/terrain_attrition/terrain_resistance) x supply state x season, over integer arithmetic with explicit index tie-breaks (no floats in the outcome path).",
+          "verification": [
+            "headless: combat_harness"
+          ],
+          "status": "pending",
+          "result_metric": "",
+          "notes": "This is BL-233's terrain scalars' intended consumer per HISTORY.md's BL-224 note - first real use, not a new terrain model."
+        },
+        {
+          "id": "R3",
+          "requirement": "Doctrine is expressed purely as modifier data against the matchup matrix and terrain scalars (a doctrine row, not procedural maneuver logic) - adding a doctrine never requires touching the resolve function.",
+          "verification": [
+            "headless: combat_harness"
+          ],
+          "status": "pending",
+          "result_metric": "",
+          "notes": ""
+        },
+        {
+          "id": "R4",
+          "requirement": "The same resolve function is reachable from both the Era -1 sim path and the existing 1960+ era combat path (engine-parity contract) - no sandbox-only combat rule.",
+          "verification": [
+            "headless: combat_harness",
+            "headless: ctest full suite"
+          ],
+          "status": "pending",
+          "result_metric": "",
+          "notes": "Only the roster table (BL-274) and doctrine table are expected to differ by era, never the resolve function itself."
+        }
+      ]
+    },
+    {
+      "brief": "province-demography",
+      "title": "Province population growth, war/plague drawdown, and manpower as the army budget (BL-273)",
+      "difficulty": 3,
+      "importance": "S",
+      "evaluated_difficulty": 3,
+      "status": "active",
+      "promoted_from": "BL-273, promoted 2026-08-02 as Sprint 5's foundation wave (needs only BL-218, already landed)",
+      "batch": "sprint5-history-sim",
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "Each province (the BL-218 settlement unit) carries a population that grows logistically each year-tick in integer fixed-point, with carrying capacity derived from the province's existing farm_q endowment.",
+          "verification": [
+            "headless: demography_harness"
+          ],
+          "status": "pending",
+          "result_metric": "",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "requirement": "Population is drawn down by war (battles fought on or by the province) and by rare plague events reusing BL-217's checkpoint-eligibility mechanism (eligibility-filtered and recorded, never a bare weighted roll).",
+          "verification": [
+            "headless: demography_harness"
+          ],
+          "status": "pending",
+          "result_metric": "",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "requirement": "A nation's recruitable manpower is a bounded fraction of its provinces' population; units raised deplete that stock, so sustained wars become self-limiting from the model rather than from an authored cap.",
+          "verification": [
+            "headless: demography_harness"
+          ],
+          "status": "pending",
+          "result_metric": "",
+          "notes": "This is the mechanism that is meant to make 2000-year wars stall on manpower exhaustion, per the item's design rationale."
+        },
+        {
+          "id": "R4",
+          "requirement": "The function is a pure deterministic function of (seed, tiles, prior province state): two generations of the same seed produce identical population trajectories.",
+          "verification": [
+            "headless: demography_harness",
+            "headless: ctest full suite"
+          ],
+          "status": "pending",
+          "result_metric": "",
+          "notes": "Same determinism discipline as settlement_harness S1a/S1b."
+        }
+      ]
     }
   ]
 }

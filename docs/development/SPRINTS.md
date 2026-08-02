@@ -39,8 +39,8 @@ and/or a version goal (v0.1.1 etc.).
 | 2a | Close out the v0.1.0 cut set | **Closed** — all four planned items landed |
 | 2b | BL-210 oral-history pivot (nations/corps rewrite) | **Closed** — all four rungs built (BL-217, BL-208, BL-218, BL-219) |
 | 3 | Corp AI stage B + skill harness | **Closed** — BL-203, BL-204 both landed |
-| 4 | Communication surface (BL-205 chat log) | **Not started** — `designed`, no dependency |
-| 5 | Era −1 history sim, 0–2000 CE (BL-271–275; re-themed 2026-08-02) + persona audit riding along | **Not started** — all five items filed `designed` |
+| 4 | Communication surface (BL-205 chat log) | **Mostly landed** — slice 1 (window, channels, agency feed) complete 2026-07-26/28; only the C-route remainder (§7 Stage C) stays open, unstaffed |
+| 5 | Era −1 history sim, 0–2000 CE (BL-271–275) | **In progress** — foundation wave (BL-272, BL-273) promoted to REFINED.md 2026-08-02 |
 
 **Next up:** Sprint 2b is closed — BL-218 (nations settlement rewrite) and BL-219 (corporations
 history rewrite) both landed 2026-08-02. What remains of BL-210's umbrella is its batch-sweep
@@ -83,6 +83,32 @@ surface finished, terrain's combat consequence in, the tooltip text rendering cl
 - **Feedback:** a four-item sprint with every item already `designed` closed cleanly and
   absorbed six unplanned items on top. The pattern holds: sprints scoped to promote-ready
   work land; sprints scoped to a theme (Sprint 1) drift.
+
+---
+
+## Sprint 5 — Era −1 history sim (opened 2026-08-02)
+
+**Goal.** Build the 0–2000 CE settlement/mil-sim sandbox (BL-271–275) that proves out the nation
+AI and mil-sim architecture, and tunes the campaign's non-hegemony premise against measured
+distributions rather than lore. Bot-only, behind a harness flag — never in the shipped campaign
+path (BL-271's stated bound).
+
+**Dependency chain.** BL-272 (combat model) and BL-273 (province demography) have no unmet
+dependencies (BL-233 and BL-218 both already landed) and touch disjoint files — **foundation
+wave, run in parallel**. BL-274 (era-keyed rosters) needs BL-272. BL-271 (the sim loop) needs all
+three. BL-275 (the seed sweep) needs BL-271.
+
+**Planned.**
+- BL-272 — unit/doctrine combat engine (foundation wave)
+- BL-273 — province demography + manpower (foundation wave)
+- BL-274 — era-keyed unit rosters (wave 2, needs BL-272)
+- BL-271 — the year-tick sim loop (wave 3, needs BL-272/273/274)
+- BL-275 — the seed-spread sweep (wave 4, needs BL-271)
+
+**A detour, recorded not repeated.** This sprint opened mid-session with a design pass toward a
+different item, BL-205's C-route (in-character LLM chat) — it went as far as a full in-process
+API-call design before Ben clarified that wasn't the intent (human-in-the-loop play via
+computer-use, not a shipped API integration). Reverted cleanly; see NEEDS_REVIEW.json NR-039/NR-040.
 
 ---
 

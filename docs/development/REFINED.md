@@ -1,5 +1,49 @@
 # Project Io — REFINED (active worklist)
 
+# Sprint 5 — Era −1 history sim: foundation wave (2026-08-02) — **IN PROGRESS**
+
+Requirements: `req/requirements.json` § unit-doctrine-combat (BL-272), § province-demography
+(BL-273). Both promoted from `designed` items with no unmet dependencies (BL-233 and BL-218 both
+already landed) and **disjoint file scopes** — run as two parallel worktree-isolated agents, no
+shared-file collision. Wave 2 (BL-274, era rosters) needs BL-272 landed in `main` first; wave 3
+(BL-271, the sim loop) needs all three landed; not promoted yet.
+
+## Combat engine (BL-272) — promoted, in progress.
+
+- **[4] A — Typed unit stacks + doctrine-parameter combat resolve.** Files:
+  `src/world/combat.hpp` (new), `src/world/combat.cpp` (new), `src/world/components.hpp`
+  (`unit_component` gains a type field), `src/world/terrain_combat.{hpp,cpp}` (read-only consumer
+  — do not change its scalars, only call them). Deps: foundation. Satisfies: R1, R2, R3, R4.
+  Read `docs/lore/HISTORY.md` § BL-272 design (the "Settled at filing" block) before starting —
+  it fixes the shape: class-pair matchup matrix + doctrine modifiers, integer arithmetic with
+  explicit tie-breaks throughout (no floats in the outcome path), one `resolve_battle`-shaped
+  entry point callable from both the future Era −1 sim and the existing 1960+ era path. Build a
+  `tools/verify/combat_harness.cpp` alongside proving R1–R4.
+
+Parallelisation note: single root, no internal split — the resolve function's passes share files
+per the codebase convention, so this stays one agent working sequentially.
+
+## Province demography (BL-273) — promoted, in progress.
+
+- **[3] A — Province population growth + manpower.** Files: `src/world/settlement.{hpp,cpp}`
+  (extend the BL-218 province struct with a population field and a year-tick update),
+  `docs/economy/POPULATION.md` (mark this as its first real consumer). Deps: foundation, disjoint
+  from BL-272's files. Satisfies: R1, R2, R3, R4. Read `docs/lore/HISTORY.md` § BL-273 design
+  before starting — logistic growth in integer fixed-point keyed to the existing `farm_q`
+  endowment, war/plague drawdown (plague reuses BL-217's checkpoint-eligibility mechanism, never a
+  bare weighted roll), manpower as a bounded fraction of population that armies deplete. Build a
+  `tools/verify/demography_harness.cpp` alongside proving R1–R4, following `settlement_harness`'s
+  S1a/S1b determinism-pair pattern (two same-seed generations, compare population trajectories
+  field for field).
+
+Parallelisation note: single root, parallel-safe with BL-272 (disjoint files — `settlement.{hpp,cpp}`
+vs `combat.{hpp,cpp}`/`components.hpp`/`terrain_combat.{hpp,cpp}`). Both agents build and commit
+on their own worktree branch; the main session merges, builds, and verifies before promoting
+BL-274.
+
+---
+
+
 > Drained 2026-07-31 (doc sweep): thirteen stale COMPLETE sections removed per the
 > retain-one policy — their record lives in DEVLOG.md and req/requirements.json.
 
