@@ -195,13 +195,30 @@ layer land on positioned ground rather than a greenfield. v0.1.1 is a concrete b
 rest of the band (v0.1.2–v0.1.5) is deliberately design-forward — each now has a placeholder
 `design-owed` item that firms into real design as it is reached.
 
-- **v0.1.1 — Shell & legibility follow-through.** *(Re-themed 2026-07-31: roads — BL-146–149 —
-  landed complete ahead of the v0.1.0 cut, retiring the "roads are an invisible tile attribute"
-  concern; § Where we are.)* The live set is shell and read-surface work: the road tier legend
-  (BL-184) and road fog dimming (BL-185), building stack capacity (BL-193), the drill-through
-  disclosure idiom (BL-214), the text-wrap render audit (BL-215), chat pinning (BL-216), and the
-  building-selection tile format (BL-229); the hover glance-then-stick (BL-230) is already
-  landed. Still the concrete build minor.
+- **v0.1.1 — The word interface, plus shell & legibility follow-through.** *(Re-themed
+  2026-07-31 for roads; **re-themed again 2026-08-03**, NR-034 — Ben named the word interface as
+  this minor's theme.)* Two threads, and it stays the concrete build minor.
+
+  **The word interface (new theme).** The route from docs to a text-driven player: the action
+  dictionary (**BL-270**, complete) supplies meaning, the blackboard export (**BL-206**,
+  complete) supplies state, and the **Io MCP server** (**BL-278**, moved here from v0.2.0 by
+  NR-044) is the socket that makes them drivable by any agent runtime. BL-278 touches no
+  simulation code, and landing it early is what lets a first real text-driven play attempt
+  happen before more gets designed on top of it. Word-driven generation and the difficulty work
+  land later in the arc — deliberately not pre-committed here; the arc gets named once the
+  server exists and the first cloud session has produced evidence. See `docs/ai/AI_OPPONENT.md`
+  § 10.
+
+  **Shell & legibility (the standing set).** The road tier legend (BL-184) and road fog dimming
+  (BL-185), building stack capacity (BL-193), the drill-through disclosure idiom (BL-214), the
+  text-wrap render audit (BL-215), chat pinning (BL-216), and the building-selection tile format
+  (BL-229 — Q1–Q4 answered 2026-08-03, no longer design-owed); the hover glance-then-stick
+  (BL-230) is already landed.
+
+  **Added 2026-08-03 from the review queue.** Retire the History ledger's Tiles view (BL-281),
+  dual-endpoint trade-route log entries (BL-282), corp placement constrained to the home
+  province (BL-283), exclave measurement reopened from BL-054 (BL-284), and harness golden
+  coherence (BL-285).
 - **v0.1.2 — Laws** (**BL-155** law/policy surface design, **BL-186** laws ledger UI). First pass
   at the law / policy surface — what a law *is* as a data object, how it gates or modifies
   economic (and later political) behaviour, and its ledger surface. Design + stub.
@@ -226,9 +243,10 @@ BL-160/161 (auto-exchange policy, counterparty allow/deny).
 *Added 2026-08-03 — the word-interface route.* Ben's direction after the public
 LLM-grand-strategy research sweep (`docs/ai/AI_OPPONENT.md` § 10): the C-route planner gets an
 **MCP** interface and a **small, local** runtime model, with cloud inference used only to
-generate the training corpus. Carried by **BL-278** (Io MCP server) and **BL-279** (AI trace
-corpus). Both sit *above* the deterministic utility core, not in place of it. Sequencing note:
-BL-278 touches no simulation code and could argue for the v0.1.x band instead — NR-044 asks.
+generate the training corpus. **BL-279** (AI trace corpus + the fine-tuning pipeline) carries
+that here; its prerequisite **BL-278** (Io MCP server) sits in **v0.1.1**, where NR-044 placed
+it. Both sit *above* the deterministic utility core, not in place of it — the small local model
+is a macro layer over BL-202/203, never the whole opponent.
 
 *Intended theme, not yet versioned: the refocus — change who the player is.* The player pivots
 from **corporation** to **nation** as the strategic actor — owning research, military, and

@@ -10,6 +10,61 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## Session — clearing the review queue: 14 decisions, six of them overturning what shipped (2026-08-03, later)
+
+**Runtime.** ~1h wall. Full (decision intake + doc/backlog authority; no `src/` change — every
+overturned call is filed as work, not applied in place).
+
+**The ask.** Ben, on mobile, asked what was worth doing from a phone and then took the thorough
+option: work all 14 open forks in `NEEDS_REVIEW.json` rather than the three live ones. Queue
+went **19 open → 6**.
+
+**Ratified as recommended.** NR-022 (BL-262 scoring — the six-call package ratified as written,
+diegetic publication confirmed, rival figures stay banded), NR-029 (BL-208 checkpoint timestamps
+keep the documented simplification), NR-042's arena reading, NR-043 (Ben installs 0 A.D.
+himself), NR-025's two-rupture reading, NR-037's sequencing.
+
+**Overturned — six calls I had taken, reversed.** (1) **NR-024**: Tax is not read-only after
+all; the player is a *chartered* corporation that **negotiates** its rate with its home nation,
+which keeps Ben's original intent and makes it coherent → **BL-280**. (2) **NR-020**: the
+History ledger's Tiles view is **retired**, not renamed — History becomes Story + Chain →
+**BL-281**. (3) **NR-030**: trade-route entries push **two** records, one per endpoint, so a
+body filter sees a route from either side → **BL-282**. (4) **NR-035**: Pass 3 placement is
+**constrained to the home province** rather than softening BL-219's wording → **BL-283**.
+(5) **NR-036**: BL-054's territorial half is **reopened** as its own measurable item rather than
+counted complete on an unmeasured argument → **BL-284**. (6) **NR-042**: **the played civ flips
+to Rome** — Han becomes the rival.
+
+**NR-023 — the reserved item, released.** Ben delegated BL-229's four layout questions rather
+than reserving them further, so they are answered against the measured widths and the item flips
+`design-owed` → `designed`; **v0.1.1 now has no design-owed items**. The answers: hex
+neighbourhood stays in the left quarter (it is the one column needing no rival-degradation
+logic); four accordion pages ordered symptom → cause; the two levers go in a strip *under* the
+accordion, keeping "right quarter = actions" stable across both siblings; the 2×3 grid stays,
+Manage dropped, Demolish bottom-right. Recorded explicitly as a *delegated* design, not a
+matched eye — the recourse if it near-misses is Ben's mockup.
+
+**v0.1.1 re-themed (NR-034 + NR-044).** The minor is now **the word interface** plus the
+standing shell set: BL-270 (dictionary, complete) + BL-206 (export, complete) + **BL-278 (MCP
+server, moved down from v0.2.0)**. Ben took the recommendation that the server land early
+because it touches no simulation code and is what lets a first real text-driven play attempt
+happen. BL-279 (trace corpus) stays v0.2.0.
+
+**Project-Rival flipped to Rome.** `RIVAL-ROME.md` → `RIVAL-HAN.md` (scholarship unchanged — it
+was always two-sided); CLAUDE.md, MISSION.md, ENVIRONMENT.md, CAMPAIGN.md and annals/README.md
+updated. The autostart civ flags swap, the annal register goes classical Chinese → Latin, and
+the rite inherits a real consequence: we now play the side that must *generate* campaigns, so a
+quiet year is a Han success and a Roman embarrassment.
+
+**Also.** ERAS.md's Era 0→1 gate corrected now rather than waiting on BL-087 (NR-025) — the
+three conditions gate a quest tree, not an Era; the two ruptures are distinct and CONCEPT.md
+stands unamended. **BL-285** files the GCC re-bless + the H4 chain_stage fix.
+
+**Left open.** Six entries, all older. One owed check before Rival's Year 1: confirm Pantheon's
+voices corpus has a Latin register — if not, propose one rather than faking it.
+
+---
+
 ## Session — LLM grand strategy: the public field, MCP, and the small-local-model direction (2026-08-03)
 
 **Runtime.** ~1h wall. Full (research + doc authority — no `src/` change; two backlog items,

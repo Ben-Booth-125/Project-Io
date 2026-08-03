@@ -1,4 +1,15 @@
-# The Rival — Rome at year zero (2026-08-03)
+# The Rival — Han at year zero (2026-08-03)
+
+> **Flipped 2026-08-03 (Ben, NR-042).** This dossier was written with Rome as the rival and Han
+> as our voice. Ben reversed it: **we play Rome; Han China is the rival.** The scholarship below
+> is unchanged and needs no reversal — it was always a two-sided dossier, and the mirror-antagonist
+> table works read from either end. What changed is which theology narrates our dispatches
+> (Rome's auspices and *evocatio*) and which is the creed we are set against (Heaven's Mandate
+> and *laihua*). The file's old name, `RIVAL-ROME.md`, now points here.
+>
+> The civilising mission Ben's brief asked us to continue survives the flip intact, and arguably
+> fits better: *parcere subiectis et debellare superbos* is a civilising claim stated as policy,
+> and Rome prosecuted it as one.
 
 The dossier behind the campaign's framing. Sources are the standard ones for the period;
 everything legendary or contested is flagged where it appears, and collected again at the end.
@@ -71,11 +82,15 @@ inferior (33 BC) — the old appeasement *heqin* reversed into ritual subordinat
 famous aggressive stroke, Chen Tang's unauthorized 36 BC expedition, is remembered precisely
 because it was exceptional — and the court debated punishing him for it.
 
-**The civilising mission.** The ideal is *laihua* — the distant "come to be transformed" by the
-emperor's virtue, presenting tribute, receiving richer gifts. The map is imagined as five
-concentric submission zones radiating from the throne: nothing needs conquering, because
-everything already, in principle, belongs to *tianxia* — All under Heaven. This is the mission
-our campaign continues: not conquest, but the world arriving.
+**The civilising mission — theirs.** The ideal is *laihua* — the distant "come to be
+transformed" by the emperor's virtue, presenting tribute, receiving richer gifts. The map is
+imagined as five concentric submission zones radiating from the throne: nothing needs
+conquering, because everything already, in principle, belongs to *tianxia* — All under Heaven.
+
+**And ours.** Rome's is the same claim inverted: *parcere subiectis et debellare superbos*, and
+a world-disc pacified rather than a world arriving. Both are civilising missions; they disagree
+only about who travels. That is the campaign's engine — we go out to transform, they wait to be
+arrived at, and each reads the other's method as impiety.
 
 ## The ideological war
 

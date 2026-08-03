@@ -40,6 +40,22 @@ The Launchpad can be **constructed** during Era 0 (it is a ground installation r
 
 ### Era 0 → Era 1 gate
 
+> **Superseded as an *Era* gate (2026-08-03, Ben — NR-025).** BL-087's Era reframe of 2026-07-08
+> holds that Eras **are catastrophic seeded events on the world clock**, and it explicitly
+> re-reads the three-condition set below as gating a **quest tree**, not an Era. This section is
+> therefore correct as a *condition set* and wrong about what it gates: meeting these three
+> conditions unlocks space access, but the Era 0 → Era 1 transition proper is the rupture on the
+> world clock. Corrected here rather than waiting on BL-087 to land, because this was the one
+> doc still asserting something the design had already superseded — the rename to **Filter**
+> (v0.3.0) is where the vocabulary catches up.
+>
+> The wider reconciliation, for the record: the Era 0 rupture disagreement was **four-way**, not
+> three-way, and the two ruptures are **distinct** — HISTORY.md Stage 5's averted rupture is in
+> the backstory, CONCEPT.md:51's is ahead of the player. CONCEPT.md stands unamended. The
+> reading is deliberate rather than a reconciliation of convenience: the backstory establishes
+> that these powers *can* pull back from the brink, and the Era 0 exit is the occasion they do
+> not.
+
 All three conditions must be met simultaneously:
 
 1. **Rocketry research purchased.** Rocketry is the only technology required for the Era 0→1 transition. In the prototype it is a single standalone unlock with no prerequisite. The full tech tree is a post-prototype feature.
