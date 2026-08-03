@@ -6041,6 +6041,61 @@
    "authority_doc": "docs/lore/HISTORY.md",
    "summary": "Filed at Ben's request (2026-08-03), same session as BL-276 (Mediterranean rift sea). BL-272 resolves a battle once armies meet; nothing yet decides WHERE armies go, what a nation is trying to take, or when it sues for peace. The Era -1 sim (BL-271) needs that strategic layer for its 2000-year wars to produce believable territorial history - and the new near-inevitable Mediterranean makes naval/littoral strategy (a Rome: control the inland sea's coasts) a live concern, not a corner case.",
    "design": "## Intent (design-owed)\n\nThe campaign-level tier above BL-272 (battle resolution): per year-tick, each Era -1 nation picks military objectives and commits manpower. Everything deterministic and mechanical - this is the sandbox for the nation AI, not an LLM seam.\n\nQuestions the design must settle:\n\n1. **Objective selection** - what a nation wants: adjacent rich provinces (farm_q), securing coasts of an enclosed sea (the BL-276 Mediterranean as a strategic prize - a Rome is a nation that closes the ring), punishing a raider, survival. Scored deterministically from province/nation state; no dice-as-strategy (checkpoint-class draws only where BL-217's mechanism applies).\n2. **Force commitment** - how much of the BL-273 manpower stock to raise and where to send it; interaction with attrition and the self-limiting manpower loop so overreach collapses on its own (the hegemony-stall behaviour BL-224 wants emergent).\n3. **Sea crossings** - does Era -1 strategy get naval movement across the inland sea, or coasts-only? The Mediterranean prize argues for at least a crude crossing cost; a full naval layer is almost certainly out of scope.\n4. **Peace and consolidation** - when a war ends, and what territory transfer looks like against BL-218's province model; feeds BL-275's sweep metrics (war frequency, hegemony rates).\n5. **Doctrine choice** - whether a nation's culture/creed leans it toward BL-272 doctrine rows (forge-god cultures fielding aggressive doctrine), reusing the existing creed data rather than new authored tables.\n\nScope guard: strategy for the ERA -1 SANDBOX nations only - the 1960 game's nation behaviour and the corporate AI opponent (BL-054/BL-199 arc) are explicitly untouched; the standing-rules AI-faction prohibition keeps applying to the main era."
+  },
+  {
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-03",
+   "id": "BL-278",
+   "short_name": "IO_MCP_SERVER",
+   "category": "AI",
+   "title": "Io MCP server — expose the blackboard export, action dictionary and corp-command seam over the Model Context Protocol so any agent runtime can play",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "SS",
+   "difficulty": 5,
+   "version_goal": "v0.2.0",
+   "requires": [
+    "BL-206",
+    "BL-270"
+   ],
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "files": [
+    "tools/mcp/",
+    "docs/ai/AI_OPPONENT.md",
+    "docs/ai/ACTIONS.json",
+    "src/world/corp_command.hpp",
+    "docs/development/DEVLOG.md"
+   ],
+   "summary": "Ben, 2026-08-03, on reading the public-field research (AI_OPPONENT.md § 10): \"We can use MCP.\" The wrapper NR-040 was groping for. Io already has all three legs of the word interface — BL-206's blackboard export (read), BL-270's action dictionary (meaning), corp_command (write); MCP is the standard socket that turns them into something any agent runtime drives. Ships no HTTP client and no API key inside ProjectIo.exe — the server is a separate local process, and with nothing attached the game is byte-identical to today. Model-agnostic by construction, which is the whole point: the same server serves a cloud frontier model generating traces (BL-279) and the small local model those traces produce.",
+   "design": "DESIGNED 2026-08-03 (Ben's steer + the § 10 research sweep).\n\n## Why MCP and not something bespoke\n\nMCP (Model Context Protocol) is a JSON-RPC 2.0 protocol over stdio or HTTP: a SERVER exposes\n`tools` (callable functions with typed args), `resources` (fetchable read-only data) and\n`prompts` (reusable templates); a CLIENT is whatever agent runtime is driving. The field\nconverged on it independently — Vox Deorum, civ6-mcp, civStation and CivBench all wrap their\ngame as an MCP server over a fixed verb list. Adopting it costs no originality and buys every\nexisting client (Claude Code/Desktop, Gemini/Codex CLIs, Ollama-backed local loops, bespoke\nharnesses) for free.\n\n## The mapping — near-mechanical, because BL-206 and BL-270 already did the hard parts\n\n| MCP primitive | Io asset |\n|---|---|\n| `tools` | `corp_command.hpp`'s verbs — already typed, already validated, rejections already enumerated in `corp_command_result` |\n| `resources` | `--export-blackboard` JSONL (BL-206) — visibility-honest, deterministic ordering, schema-versioned |\n| `prompts` | `reason_to_select` from `ACTIONS.json` (BL-270) — the design-intent prior |\n| lookup tool | `actions_query.js` over `ACTIONS_INDEX.json` — hold the index, fetch entries on demand |\n\n## Design calls settled by the research (§ 10c.5)\n\n- **Push state, do not make the model pull it.** CivBench's \"sensorium effect\" — agents miss\n  information they never think to query — is the dominant failure of a purely pull-shaped tool\n  surface. The server must lead each turn with the blackboard slice rather than waiting to be\n  asked for it. This is the single cheapest quality win available and it is an interface\n  decision, not a model decision.\n- **Mask to legal primitives.** Only `corp_command` verbs are exposed as tools; the validation\n  path is the player's. Fairness is then a property of the seam, not of tuning — and a rejected\n  command is a typed, loggable event rather than a silent no-op.\n- **Never ask the model to carry world state across turns.** The observation-belief research\n  (§ 10c.4, measured on exactly the open-weight class Io targets) shows belief accuracy degrading\n  with multi-hop reasoning and drifting from coherence over long interactions. Hand it the state\n  every turn.\n- **Coarse cadence.** The model chooses strategy occasionally, not per-tick; the BL-202/203\n  utility core executes tactically underneath. Unchanged from § 2C.\n\n## Scope\n\nIn: the server process, the tool/resource/prompt surface over the three legs, the push-shaped\nturn packet, a smoke path proving an attached client can read state and land a legal command.\n\nOut: the trace/corpus format and the fine-tuning pipeline (BL-279); any in-process API call\n(NR-039 settled that this never ships inside the exe); any change to `corp_command`'s verb set\n— if a verb is missing, that is its own item.\n\n## Determinism\n\nUnaffected. The model is out-of-process, commands still apply at the tick boundary through\nplayer-grade validation, and NR-039's proposed determinism carve-out stays reverted.",
+   "resolution": null
+  },
+  {
+   "parked": false,
+   "blocked_on": [],
+   "written": "2026-08-03",
+   "id": "BL-279",
+   "short_name": "AI_TRACE_CORPUS",
+   "category": "AI",
+   "title": "AI trace corpus — log cloud play as input/output pairs and build the fine-tuning dataset for a small local model",
+   "status": "designed",
+   "glyph": "✓",
+   "priority": "S",
+   "difficulty": 6,
+   "version_goal": "v0.2.0",
+   "requires": [
+    "BL-278"
+   ],
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "files": [
+    "tools/mcp/",
+    "docs/ai/AI_OPPONENT.md",
+    "docs/development/DEVLOG.md"
+   ],
+   "summary": "Ben, 2026-08-03: \"Cloud usage is just going to be finding tons of input and output sets, for when we fine tune a smaller model of our own.\" The runtime target is a SMALL LOCAL model; cloud inference is a corpus generator and never a shipped dependency. A frontier model plays Io through BL-278's MCP server; every decision is logged as the pair that produced it — blackboard state + dictionary slice in, corp_command + rationale out — and those pairs become the supervised fine-tuning set. CivAgent's data-flywheel pattern and Richelieu's no-human-data self-play, on a sim whose deterministic seeds generate the scenarios for free (§ 3).",
+   "design": "DESIGNED 2026-08-03 (Ben's steer + the § 10 research sweep).\n\n## Why this is tractable rather than speculative\n\nThree numbers from the research (AI_OPPONENT.md § 10c.6–7):\n\n- A complete Civ V game cost `gpt-oss-120b` **20.35M input / 555k output tokens**. Read twice:\n  per-tick cloud inference is not a shipping architecture, AND one game yields ~555k output\n  tokens of decision trace. A few hundred logged games is a serious supervised corpus.\n- Reported distillation results in this class: a **1.7B specialist beating a 744B frontier model\n  on its target task**; Llama-3.2-3B going 0.76% → ~55% on GSM8K from frontier traces; 7B/8B SFT\n  reaching 60% accuracy in ~1,000 steps on a card-selection task. On-task specialists beat\n  generalists — which is the whole bet.\n- The bar to clear is **not high**: Vox Deorum's open-weight models matched a tuned algorithmic\n  4X AI (97.5% vs 97.3% survival) with a simple prompt and NO fine-tuning. The fine-tune's job\n  is to get a SMALL model to that bar, not past it. Superhuman play is explicitly not the target\n  and would regress the § \"The goal\" statement.\n\n## The pipeline\n\n1. **Play** — a frontier model drives Io through BL-278's MCP server across a spread of seeds\n   (§ 3's benchmark seed-set is the natural sampling frame: body/terrain/market diversity).\n2. **Log** — one record per decision: `{seed, tick, corp, state_slice, dictionary_slice,\n   command, rationale, result}`. The record is simultaneously the training pair, the replay\n   artifact, and the legibility surface — same artifact, three uses (§ 6's triple-duty argument,\n   extended).\n3. **Filter** — the validator is already built and free: `corp_command_result`'s typed\n   rejections mechanically identify every trace containing an illegal or invalid command. The\n   published recipe's \"rule-based validators for format, schema compliance and novelty\" is, for\n   Io, mostly just this.\n4. **Expand** (optional, per the published recipe) — have the teacher generate in-domain\n   synthetic variants around the collected traces before SFT.\n5. **Fine-tune and evaluate** — the small model is scored on BL-204's seed-set skill harness,\n   the same goldens the utility core answers to. A local model that cannot hold solvency across\n   the benchmark seeds has not passed, whatever a held-out loss says.\n\n## Open, deliberately\n\n- **Which base model.** Depends on what runs acceptably on Ben's machine at the time; the\n  interface is model-agnostic by BL-278's construction, so this is a late decision, not an\n  early one.\n- **Corpus size.** Set empirically — collect, fine-tune, measure on BL-204, collect more.\n- **Whether traces should also come from the deterministic utility core (BL-202/203).** Free to\n  generate and unlimited, but caps the student at the teacher's skill (the behavioural-cloning\n  ceiling, § 1 Area 3). Likely useful as bulk coverage under a thinner layer of frontier traces;\n  not settled.\n\n## Not in scope\n\nThe MCP server itself (BL-278). Any claim that the fine-tuned model ships in v0.2.0 — this item\ndelivers the corpus and the pipeline; whether the resulting model becomes the shipped opponent\nis a later call measured against BL-204.",
+   "resolution": null
   }
  ]
 }

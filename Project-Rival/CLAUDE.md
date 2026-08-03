@@ -2,7 +2,14 @@
 
 Project Rival is the AI-player discipline for Project Io, run as **live play, not shipped code**.
 A session (this kind of session) plays a strategy game through interactive prompts and
-computer-use tooling — screen, mouse, keyboard — never through API hooks or engine patches.
+computer-use tooling — screen, mouse, keyboard.
+
+**Scope of that constraint (amended 2026-08-03).** Computer-use is how Rival plays **0 A.D.**,
+because 0 A.D. exposes no agent interface and patching its engine is out of scope. It is *not* a
+house position that protocol interfaces are forbidden: Io's own direction is now an **MCP server**
+over its existing read/meaning/write legs (`docs/ai/AI_OPPONENT.md` § 10). So the destination is
+a protocol seam even though the near-term arena is a screen. Rival still never patches or hooks
+the game it is playing.
 
 The near-term arena is **0 A.D.** (Wildfire Games' RTS, Release 28), a match set at year zero:
 we play **Han China** on a civilising mission; the target is **Rome**, the era's second great

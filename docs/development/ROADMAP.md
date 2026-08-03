@@ -223,6 +223,13 @@ complete; `src/world/corp_ai.hpp`). Queued: BL-203 (predictive spending), BL-204
 harness), BL-205 (corp chat log), BL-207 (persona counsel packs), and the trade-policy pair
 BL-160/161 (auto-exchange policy, counterparty allow/deny).
 
+*Added 2026-08-03 — the word-interface route.* Ben's direction after the public
+LLM-grand-strategy research sweep (`docs/ai/AI_OPPONENT.md` § 10): the C-route planner gets an
+**MCP** interface and a **small, local** runtime model, with cloud inference used only to
+generate the training corpus. Carried by **BL-278** (Io MCP server) and **BL-279** (AI trace
+corpus). Both sit *above* the deterministic utility core, not in place of it. Sequencing note:
+BL-278 touches no simulation code and could argue for the v0.1.x band instead — NR-044 asks.
+
 *Intended theme, not yet versioned: the refocus — change who the player is.* The player pivots
 from **corporation** to **nation** as the strategic actor — owning research, military, and
 intelligence — while the corporation stays the **economic** actor, prototyped as a single

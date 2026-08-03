@@ -14,6 +14,14 @@ session. The standing-rule relaxation is now earned **for the scoped path only**
 strategic actions via the corp-command seam (BL-202 onward); the player's corp stays untouched
 beyond the BL-181 workforce dial.
 
+**Direction set 2026-08-03 (§ 10).** A second research sweep — the public LLM-grand-strategy
+field — settled the C-route's transport and target. The interface is **MCP** (an out-of-process
+protocol wrapper over the three legs Io already has: blackboard export, action dictionary,
+corp-command seam); the runtime model is **small and local**; **cloud inference is a corpus
+generator, not a runtime**, producing the supervised traces a small model is fine-tuned on.
+Read § 10 before any work on the LLM planner — it supersedes § 7's 2026-08-02 note and answers
+NR-040.
+
 **The goal (unchanged from BL-199).** A computer opponent of **roughly human skill** — a
 genuine rival across Io's loop (extraction, trade, later conflict), **beatable** by a decent
 human, and **legible** (moves read as sensible, not alien or scripted). Explicitly *not* a
@@ -146,6 +154,10 @@ tactically. Gives varied, legible, human-like *personalities* per corp.
   **Determinism:** poor unless the LLM call is cached/replay-logged per decision — mitigate by
   making the LLM choose only coarse strategy occasionally, not per-tick. **Legibility:** high (can
   self-explain). **Skill ceiling:** competitive end-game. **Data:** none (zero/few-shot).
+- **Updated 2026-08-03 (§ 10):** transport is **MCP**, and "API cost/dependency" no longer applies
+  to the shipped runtime — the target model is **local**. Cloud play is a one-off corpus-generation
+  activity (BL-279), not a per-decision dependency. The "Data: none" line still holds for the
+  zero-shot path, but the direction now *chooses* to collect data, to shrink the model.
 
 ### D. Offline RL over logged self-play — **furthest out; only if A–C plateau**
 Deterministic seeds generate massive logged datasets; train an offline-RL policy (CQL-class) as an
@@ -398,13 +410,14 @@ players, so the medium is actor-agnostic.
 - **Player input**: a message box posts to the selected channel. It has **no mechanical effect
   yet** — it is the hook the C-route consumes (the player negotiating with AI corps in language).
 
-> **2026-08-02 note:** a design pass explored C-route as a shipped in-process feature (a live
-> Anthropic API call per corp per econ tick) and got as far as a full decomposition before Ben
-> clarified that isn't the intent — see NR-039/NR-040 in `NEEDS_REVIEW.json` for the walk-back.
-> The actual near-term plan is closer to a human-in-the-loop session (Claude driving the game
-> visually via mouse/keyboard, the way a player would) than a coded runtime API integration; what
-> "plumbing" that needs, if any, is still being scoped. Treat § 7's Stage C description above as
-> the standing design; nothing below it is settled.
+> **2026-08-02 note, superseded 2026-08-03 — see § 10.** A design pass explored C-route as a
+> shipped in-process feature (a live Anthropic API call per corp per econ tick) and got as far as
+> a full decomposition before Ben clarified that isn't the intent — see NR-039/NR-040 in
+> `NEEDS_REVIEW.json` for the walk-back. The interim reading was that the near-term plan meant
+> computer-use play (Claude driving the game visually via mouse/keyboard); the "what plumbing is
+> missing" question NR-040 left open is **answered in § 10**: an MCP server over the three legs
+> that already exist. Stage C's *shape* (out-of-process, coarse-grained, over legal primitives)
+> stands unchanged; its *transport* is now MCP and its *target model* is small and local.
 
 ---
 
@@ -527,3 +540,209 @@ latency, and token cost (the architecture and results are confirmed; the low-lev
 are not); and a numeric per-tick AI CPU budget from Paradox (the tick-task *mechanism* is documented,
 concrete budget values are not published). Both matter for designing Io's option C and should be
 resolved from full-text sources before committing to an LLM-planner build.
+
+> **Resolved 2026-08-03 (§ 10).** The Vox Deorum numbers are now published: **~1 minute per
+> decision** (model-dependent) and **20.35M input / 555k output tokens per complete game** for
+> `gpt-oss-120b`. The Paradox per-tick CPU budget remains unpublished and is now moot for the
+> C-route — the planner runs out-of-process and off the sim's tick budget entirely.
+
+---
+
+## 10. The 2026-08-03 refresh — MCP, the public field, and the small-local-model direction
+
+A wide survey of publicly available LLM-grand-strategy work, run 2026-08-03. It supersedes
+§ 7's 2026-08-02 note, answers NR-040's open "what plumbing?" question, and states the
+direction Ben set on reading it.
+
+### 10a. What MCP is, and why it is the answer here
+
+**MCP (Model Context Protocol)** is an open protocol for connecting a language model to context
+and actions. It is a *cable standard*, not a capability — it does not make a model smarter, it
+standardises the socket a model plugs into.
+
+The shape: a **server** exposes a resource (here, the game); a **client** is whatever agent
+runtime is driving (Claude Code, Claude Desktop, a Gemini/Codex CLI, an Ollama-backed local
+loop, or a bespoke harness). They speak **JSON-RPC 2.0 over stdio** (the server is a
+subprocess) or over HTTP. The server offers three primitives:
+
+- **tools** — functions the model may call, with typed arguments and enumerated failures.
+- **resources** — read-only data the model may fetch by URI.
+- **prompts** — reusable templates that tell the model how to use the above.
+
+Four properties are what make it the right seam for Io:
+
+1. **The model side stays entirely out of process.** `ProjectIo.exe` ships **no HTTP client, no
+   API key, no cloud dependency**. The MCP server is a local process; with no client attached
+   the game is byte-identical to today. This is the exact thing NR-039's walk-back rejected —
+   a live API call inside the econ tick — avoided by construction rather than by discipline.
+2. **Model-agnostic by design.** The same server serves a cloud frontier model today and a
+   locally-hosted small model tomorrow, with no change on the Io side. That swap *is* the
+   direction in § 10d, so the interface must not care which model is attached.
+3. **Fair by construction.** Tools are the only write channel, so the model plays through the
+   same validation and the same visibility rules as the player. The field converged on this
+   independently — `civ6-mcp` routes every agent action through Civilization VI's own
+   rule-enforcing Lua APIs rather than mutating state.
+4. **It is now the field standard.** Vox Deorum, `civ6-mcp`, `civStation` and CivBench all
+   arrived at an MCP wrapper over a fixed verb list, separately. Adopting it costs nothing in
+   originality and buys every existing client for free.
+
+**Io is unusually close to MCP-ready**, because BL-270 (action dictionary) and BL-206
+(blackboard export) already built the hard parts. The mapping is near-mechanical:
+
+| MCP primitive | The Io asset that already fills it |
+|---|---|
+| **tools** | `corp_command.hpp`'s verbs — already typed, already validated, already rejection-enumerated (`corp_command_result`) |
+| **resources** | `--export-blackboard` JSONL (BL-206) — visibility-honest, deterministic ordering, schema-versioned |
+| **prompts** | `reason_to_select` in `ACTIONS.json` (BL-270) — the design-intent prior, in words |
+| the lookup | `ACTIONS_INDEX.json` + `actions_query.js` — already the hold-the-index, fetch-on-demand pattern an MCP tool wraps |
+
+The honest read of NR-040: the plumbing that was missing is **one wrapper**, not a subsystem.
+
+### 10b. The public field
+
+| Project | What it is | The transferable lesson |
+|---|---|---|
+| **Cicero** (Meta, 2022) | LLM dialogue + strategic planner for full-press *Diplomacy*; top-10% on webDiplomacy | Language and planning as **separate modules** with the planner controlling the language model — still the reference architecture for negotiation |
+| **Vox Deorum** | LLM macro-strategy over Civ V + Vox Populi; **2,327 full games** | The load-bearing result — see § 10c.1 |
+| **civ6-mcp / CivBench** | MCP server (76 tools) over Civ VI's FireTuner debug protocol; open benchmark over frontier models | Names the two dominant failure modes (§ 10c.3) |
+| **civStation** | Voice-commanded Civ VI agent over a layered MCP | Human-sets-strategy / agent-executes — the counsel model, not the autopilot model |
+| **CivAgent** (fuxiAIlab) | LLM digital player inside *Unciv*; explicitly built as a **data flywheel** | The play-to-collect-traces pattern Io's § 10d adopts |
+| **CivRealm** (BIGAI) | Freeciv-web env with a server-proxy-client harness, RL *and* LLM agent interfaces | Turn-based pacing suits LLM latency; a proxy is the clean isolation seam |
+| **SAGA** | Scene-graph + tool-augmented planner + dual-horizon feedback, over CivRealm | The best-documented recipe for *fixing* long-horizon play (§ 10c.4) |
+| **Richelieu** | Self-evolving Diplomacy agent: memory, reflection, self-play, **no human data** | Self-play as the corpus source when no expert demonstrations exist — Io's exact position |
+| **Agents of Change / HexMachina** | Catan agents that rewrite their own prompts and player code | Separating environment *discovery* from strategy *refinement* |
+| **DSGBench / WarAgent** | Six-game strategic benchmark; multi-agent WWI/WWII/Warring-States sim | Fine-grained per-dimension scoring beats a single win-rate number |
+
+### 10c. What the research actually says about *strategy*
+
+The question is **not** "can an AI beat a human" — that was settled by AlphaStar and is not Io's
+goal (§ "The goal": roughly human skill, beatable, legible). The useful findings are about *how*
+these agents play, what breaks, and what a **small, local, text-driven** model can be expected
+to do.
+
+**1. Open-weight models already reached parity with a tuned algorithmic 4X AI — with a simple
+prompt and no fine-tuning.** Vox Deorum's 2,327 games ran **`gpt-oss-120b` and `GLM-4.6`**, not
+frontier cloud models: **97.5% survival vs the algorithmic baseline's 97.3%**, with all observed
+differences statistically non-significant. This is the single most encouraging result for Ben's
+plan — the bar Io wants (a genuine, beatable rival) was cleared by open weights, out of the box.
+**The caveat is size, not openness**: 120B-class weights are open but not *small*. The gap to
+close is 120B → a model that runs on Ben's machine, and that is a distillation problem (§ 10c.6),
+not a capability problem.
+
+**2. The LLM should hold only the macro layer.** Every project that worked delegated tactics to
+algorithmic subsystems. Vox Deorum "decapitates" the game's algorithmic AI — replaces its
+top-level strategic module and leaves every micro-tactical system in place. This is exactly the
+A → B utility core with a coarse planner above it that § 2 already recommends; it now has
+2,327 games of evidence behind it rather than one paper.
+
+**3. Personality is emergent and free.** Vox Deorum's two models developed distinguishable
+styles unprompted — `gpt-oss-120b` leaned domination (**+31.5% domination victories** vs
+baseline), `GLM-4.6` weighted conquest and culture evenly. Io does not need to author
+personalities; it needs to *not flatten* the ones that appear. That is a strong argument for
+keeping the strategy prompt thin and letting `focus_weight` (§ 5) supply the bias.
+
+**4. The failure modes are consistent everywhere, and none of them is about raw intelligence.**
+
+- **Myopia / step-wise greed.** Step-by-step reasoning is structurally a *greedy* policy: fine
+  over short horizons, and it makes early commitments that amplify over time and cannot be
+  recovered from. The stated minimum fixes are **explicit future evaluation, backward value
+  propagation, and limited commitment** — and even *one-step lookahead* escapes traps where all
+  step-wise strategies provably fail.
+- **The sensorium effect** (CivBench). Agents miss information they never think to query. A
+  purely *pull*-based tool interface silently punishes an agent for not knowing what to ask.
+- **The knowing-doing gap** (CivBench). Models articulate the right strategy and then fail to
+  execute it. The worked example: Opus-controlled Portugal spent 50 turns planning and executing
+  a nuclear campaign to stop a French cultural victory, struck twice — and lost anyway, to a
+  *diplomatic* victory it had stopped tracking.
+- **The observation-belief and belief-action gaps** (studied on Llama-3.1, Qwen3 and `gpt-oss` —
+  precisely the open-weight class Io is targeting). Models' *internal* beliefs about hidden state
+  are measurably **more accurate than their own verbal reports**; those beliefs degrade with
+  multi-hop reasoning, show primacy and recency bias, and drift away from Bayesian coherence over
+  long interactions. Practical reading: **never ask a small model to carry world state in its
+  head across a campaign — hand it the state, every time.**
+- **Spatial blindness.** Tile maps defeat flat text context. SAGA's fix is a **map-semantic scene
+  graph** that renders typed spatial relations as short per-unit natural-language context,
+  instead of inflating the global token budget with the whole map.
+
+**5. What measurably improves play, cheapest first.** This is the actionable ranking:
+
+1. **Push state to the model rather than making it pull** — kills the sensorium effect outright.
+   Io's blackboard export is already a push artifact; the MCP server should lead with it rather
+   than making the model discover it.
+2. **Pre-render context into words**, including spatial relations (SAGA's scene graph). Io's
+   `expected_output` / `reason_to_select` fields are this, already written.
+3. **Mask to legal primitives.** Universal across every project; Io gets it free from
+   `corp_command`'s validation.
+4. **Add goal persistence with periodic re-evaluation, plus cross-game post-mortem** — SAGA's
+   dual-horizon loop, Richelieu's memory-and-reflection, Agents-of-Change's self-rewriting
+   prompts. This is the documented answer to both myopia and the knowing-doing gap.
+5. **Only then, a bigger model.** Every project reports the scaffolding mattering more than the
+   model tier.
+
+**6. Distilling to a small local model is now a routine recipe, and on-task specialists beat
+generalists.** Reported results in this class: a **1.7B specialist trained from traces beating a
+744B frontier model on its target task**; Llama-3.2-3B going from 0.76% to ~55% on GSM8K purely
+from frontier-model traces; 7B/8B supervised fine-tunes reaching 60% accuracy within ~1,000 steps
+on a card-selection task. The recipe is consistent — **collect teacher traces → have the teacher
+expand them into ~10k in-domain synthetic examples → filter with rule-based validators for
+format, schema and novelty → SFT**. Io's advantage is that the validator is already built and
+free: `corp_command_result`'s typed rejections mechanically identify any trace containing an
+illegal or invalid command.
+
+**7. The cost number that sizes the data plan.** `gpt-oss-120b` averaged **20.35M input tokens
+and 555k output tokens per complete Civ V game**. Read it twice: it is why per-tick cloud
+inference is not a shipping architecture, *and* it is the yield — one game produces ~555k output
+tokens of decision trace. A few hundred logged games is a serious supervised corpus.
+
+### 10d. The accepted direction (Ben, 2026-08-03)
+
+**MCP is sanctioned.** Io gets an MCP server over the three legs that already exist — blackboard
+export (read), action dictionary (meaning), corp-command seam (write). This replaces the
+computer-use reading NR-040 recorded as the interim plan.
+
+**The runtime target is a small, local model.** Not a cloud dependency, not a frontier model —
+a model that runs on Ben's own machine, playing through text. Cloud inference is **not** the
+shipped runtime and never becomes one.
+
+**Cloud's only role is corpus generation.** A frontier model plays Io through the *same* MCP
+interface; every decision is logged as an input/output pair — the blackboard state and dictionary
+slice that went in, the `corp_command` and its rationale that came out. Those pairs are the
+supervised fine-tuning corpus for the local model. This is CivAgent's data-flywheel pattern and
+Richelieu's no-human-data self-play, applied to a game whose deterministic seeds can generate the
+scenarios for free (§ 3).
+
+**The goal remains "fair, beatable, legible", not "strong".** § 10c.1 is what makes this
+credible: parity with a tuned algorithmic 4X AI was reached *without any fine-tuning at all*, so
+the fine-tune's job is to get a **small** model to that bar — not to exceed it. Superhuman play
+is explicitly not the target and would be a regression against the § "The goal" statement.
+
+**What this does not change.** The simulation stays deterministic: the model is out-of-process,
+commands still apply at the tick boundary through player-grade validation, and NR-039's proposed
+determinism carve-out stays reverted. Trace logging gives replay for free — the corpus and the
+replay log are the same artifact.
+
+### 10e. Follow-on items
+
+| Item | Carries |
+|---|---|
+| **BL-278** `IO_MCP_SERVER` | The MCP server over blackboard export + action dictionary + corp-command seam — the § 10a wrapper |
+| **BL-279** `AI_TRACE_CORPUS` | Trace logging, corpus format, and the cloud-play → SFT-dataset pipeline for the small local model (§ 10d) |
+
+### 10f. Sources added 2026-08-03
+
+- Vox Deorum — hybrid LLM architecture for 4X, 2,327 games, open-weight parity, per-game token cost. https://arxiv.org/abs/2512.18564 · https://github.com/CIVITAS-John/vox-deorum
+- CivBench — MCP-driven Civ VI benchmark; the sensorium effect and the knowing-doing gap. https://arxiv.org/html/2604.07733v1 · https://tasolabs.com/blog/ai/introducing-civbench-season-001
+- civ6-mcp — MCP server over Civ VI's FireTuner protocol; rule-enforcing API as the write channel. https://github.com/lmwilki/civ6-mcp
+- civStation — layered MCP, human-sets-strategy/agent-executes. https://github.com/NomaDamas/civStation
+- CivAgent — LLM digital player in Unciv; the data-flywheel framing. https://github.com/fuxiAIlab/CivAgent · https://arxiv.org/html/2502.20807v1
+- CivRealm — Freeciv env with server-proxy-client harness for RL and LLM agents. https://github.com/bigai-ai/civrealm · https://arxiv.org/abs/2401.10568
+- SAGA — scene graph, tool-augmented planner, dual-horizon feedback on CivRealm. https://arxiv.org/abs/2606.29932
+- Richelieu — self-evolving Diplomacy agents; memory, reflection, self-play without human data. https://arxiv.org/abs/2407.06813
+- Agents of Change / HexMachina — self-evolving agents rewriting their own prompts and code. https://arxiv.org/abs/2506.04651
+- Why Reasoning Fails to Plan — step-wise greed, myopic deviation, and the three requirements for long-horizon coherence. https://arxiv.org/abs/2601.22311
+- Why Do LLMs Struggle in Strategic Play? — observation-belief and belief-action gaps in open-weight models. https://arxiv.org/abs/2605.00226
+- DSGBench — six-game strategic benchmark with per-dimension scoring. https://arxiv.org/abs/2503.06047
+- WarAgent — LLM multi-agent simulation of historical conflicts. https://arxiv.org/abs/2311.17227
+- Cicero — human-level full-press Diplomacy; controllable dialogue model + planning engine. https://ai.meta.com/research/cicero/ · https://github.com/facebookresearch/diplomacy_cicero
+- Small Language Models for Efficient Agentic Tool Calling — targeted fine-tunes beating much larger models. https://arxiv.org/abs/2512.15943
+- Model Context Protocol — the specification. https://modelcontextprotocol.io
