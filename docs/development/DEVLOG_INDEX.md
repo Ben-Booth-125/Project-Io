@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 116 entries across 2 volume(s).
+One line per session, newest first — 117 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-08-03 | [Io MCP server: BL-278 built and landed](DEVLOG.md) | BL-206 BL-278 BL-279 | DEVLOG.md |
 | 2026-08-03 | [two direction points: invented names, and the governing body](DEVLOG.md) | BL-094 BL-155 BL-156 BL-157 BL-158 BL-271 BL-277 | DEVLOG.md |
 | 2026-08-03 | [clearing the review queue: 14 decisions, six of them overturning what shipped](DEVLOG.md) | BL-054 BL-087 BL-206 BL-208 BL-219 BL-229 BL-262 BL-270 BL-278 BL-279 BL-280 BL-281 BL-282 BL-283 BL-284 BL-285 | DEVLOG.md |
 | 2026-08-03 | [LLM grand strategy: the public field, MCP, and the small-local-model direction](DEVLOG.md) | BL-206 BL-270 BL-278 BL-279 | DEVLOG.md |

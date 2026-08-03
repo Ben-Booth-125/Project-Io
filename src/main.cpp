@@ -2,6 +2,7 @@
 #include "scripting/lua_state.hpp"
 #include "world/budget_system.hpp"
 #include "world/corp_ai.hpp"
+#include "world/corp_command.hpp"
 #include "world/economy_system.hpp"
 #include "world/hard_coded_world.hpp"
 #include "world/market_clearing.hpp"
@@ -14,10 +15,166 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <iostream>
+#include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace {
+
+/// Parse the ` key=value` tokens of a --serve request line into a lookup map.
+/// The opcode itself (first token) is not included.
+std::unordered_map<std::string, std::string> parse_kv_tokens(std::istringstream& iss)
+{
+    std::unordered_map<std::string, std::string> kv;
+    std::string tok;
+    while (iss >> tok)
+    {
+        const auto eq = tok.find('=');
+        if (eq == std::string::npos)
+            continue;
+        kv[tok.substr(0, eq)] = tok.substr(eq + 1);
+    }
+    return kv;
+}
+
+long kv_get(const std::unordered_map<std::string, std::string>& kv, const char* key, long dflt)
+{
+    const auto it = kv.find(key);
+    if (it == kv.end())
+        return dflt;
+    return std::atol(it->second.c_str());
+}
+
+const char* corp_command_result_name(corp_command_result r)
+{
+    switch (r)
+    {
+        case corp_command_result::applied:          return "applied";
+        case corp_command_result::rejected_no_corp:  return "rejected_no_corp";
+        case corp_command_result::rejected_not_owner: return "rejected_not_owner";
+        case corp_command_result::rejected_invalid:  return "rejected_invalid";
+        case corp_command_result::rejected_placement: return "rejected_placement";
+        case corp_command_result::rejected_funds:    return "rejected_funds";
+        case corp_command_result::rejected_state:    return "rejected_state";
+    }
+    return "rejected_invalid";
+}
+
+// --serve [--ticks N]  (BL-278)
+//
+// Headless, persistent: builds the canonical world once (identical warm-up to
+// --export-blackboard), then reads one request per line from stdin until EOF
+// or `SHUTDOWN`, applying the real per-tick sequence and the player-grade
+// corp_command seam (apply_corp_command — no bypass). This is the process an
+// out-of-process MCP server (tools/mcp/) spawns and talks to; it ships no
+// network code itself; the line protocol below is the whole surface.
+//
+// Requests (space-separated `key=value` tokens after the opcode):
+//   TICK                                            -> advance one tick
+//   BLACKBOARD corp=<id> ticks=<n>                  -> facts as BL-206 JSONL, then END
+//   COMMAND corp=<id> verb=<0-7> subject=<id> tile=<id> type=<0-4> target=<0-22>
+//           recipe=<id> workforce=<n> road_tier=<n>  -> apply_corp_command
+//   SHUTDOWN                                        -> BYE, then exit
+// Responses are one line each except BLACKBOARD, which is N JSONL lines + END.
+int run_serve(int ticks)
+{
+    lua_state lua;
+    lua.load("scripts/recipes.lua");
+    lua.load("scripts/economy.lua");
+    recipe_registry reg;
+    reg.load_from_lua(lua);
+
+    world w = make_hard_coded_world();
+
+    const uint16_t default_recipe = reg.recipe_id("steel");
+    for (auto& [id, b] : w.buildings)
+        if (b.type == building_type::processing_facility && b.recipe == no_recipe)
+            b.recipe = default_recipe;
+
+    int tick = 0;
+    for (int t = 1; t <= ticks; ++t)
+    {
+        tick = t;
+        w.current_day_tick = t;
+        dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
+                         reg.logistics_cost(convoy_mode::space));
+        advance_convoys(w);
+        economy_report report = run_economy_step(w, reg);
+        auto flows = clear_markets(w, reg, report);
+        apply_budget(w, reg, flows, report.workforce_contention, &report.budgets);
+        credit_arrived_convoys(w, t);
+    }
+
+    std::string line;
+    while (std::getline(std::cin, line))
+    {
+        std::istringstream iss(line);
+        std::string op;
+        iss >> op;
+
+        if (op == "SHUTDOWN")
+        {
+            std::cout << "BYE" << std::endl;
+            return 0;
+        }
+        else if (op == "TICK")
+        {
+            ++tick;
+            w.current_day_tick = tick;
+            dispatch_convoys(w, reg, reg.logistics_cost(convoy_mode::land),
+                             reg.logistics_cost(convoy_mode::space));
+            advance_convoys(w);
+            economy_report report = run_economy_step(w, reg);
+            auto flows = clear_markets(w, reg, report);
+            apply_budget(w, reg, flows, report.workforce_contention, &report.budgets);
+            credit_arrived_convoys(w, tick);
+            std::cout << "OK tick=" << tick << std::endl;
+        }
+        else if (op == "BLACKBOARD")
+        {
+            const auto kv = parse_kv_tokens(iss);
+            const entity_id corp = static_cast<entity_id>(kv_get(kv, "corp", 0));
+            const int bb_ticks = static_cast<int>(kv_get(kv, "ticks", tick));
+            const corp_blackboard bb = export_corp_blackboard(w, corp, bb_ticks);
+            std::ostringstream out;
+            to_jsonl(bb, out);
+            std::cout << out.str();
+            std::cout << "END" << std::endl;
+        }
+        else if (op == "COMMAND")
+        {
+            const auto kv = parse_kv_tokens(iss);
+            corp_command cmd;
+            cmd.tick      = tick;
+            cmd.corp      = static_cast<entity_id>(kv_get(kv, "corp", 0));
+            cmd.verb      = static_cast<corp_verb>(kv_get(kv, "verb", 0));
+            cmd.subject   = static_cast<entity_id>(kv_get(kv, "subject", 0));
+            cmd.tile      = static_cast<entity_id>(kv_get(kv, "tile", 0));
+            cmd.type      = static_cast<building_type>(kv_get(kv, "type", 0));
+            cmd.target    = static_cast<resource_type>(kv_get(kv, "target", 0));
+            cmd.recipe    = static_cast<uint16_t>(kv_get(kv, "recipe", no_recipe));
+            cmd.workforce = static_cast<int>(kv_get(kv, "workforce", 100));
+            cmd.road_tier = static_cast<uint8_t>(kv_get(kv, "road_tier", 1));
+
+            entity_id out_building = null_entity;
+            const corp_command_result result = apply_corp_command(w, reg, cmd, &out_building);
+            std::cout << "RESULT result=" << corp_command_result_name(result)
+                      << " building=" << (result == corp_command_result::applied
+                                               ? static_cast<long>(out_building)
+                                               : -1)
+                      << std::endl;
+        }
+        else
+        {
+            std::cout << "ERR unknown op '" << op << "'" << std::endl;
+        }
+    }
+    return 0;
+}
+
+
 
 // --export-blackboard <corp|all> [--out <dir>] [--ticks N]  (BL-206)
 //
@@ -110,6 +267,18 @@ int main(int argc, char* argv[])
                         ticks = std::max(1, std::atoi(argv[j + 1]));
                 }
                 return run_blackboard_export(which, out_dir, ticks);
+            }
+        }
+
+        for (int i = 1; i < argc; ++i)
+        {
+            if (std::string(argv[i]) == "--serve")
+            {
+                int ticks = 12; // matches the app's warm-start (three in-game years)
+                for (int j = i + 1; j < argc; ++j)
+                    if (std::string(argv[j]) == "--ticks" && j + 1 < argc)
+                        ticks = std::max(1, std::atoi(argv[j + 1]));
+                return run_serve(ticks);
             }
         }
 

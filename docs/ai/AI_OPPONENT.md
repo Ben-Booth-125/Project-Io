@@ -725,8 +725,23 @@ replay log are the same artifact.
 
 | Item | Carries |
 |---|---|
-| **BL-278** `IO_MCP_SERVER` | The MCP server over blackboard export + action dictionary + corp-command seam — the § 10a wrapper |
+| **BL-278** `IO_MCP_SERVER` — **landed 2026-08-03** | The MCP server over blackboard export + action dictionary + corp-command seam — the § 10a wrapper |
 | **BL-279** `AI_TRACE_CORPUS` | Trace logging, corpus format, and the cloud-play → SFT-dataset pipeline for the small local model (§ 10d) |
+
+**BL-278, as built.** `ProjectIo --serve [--ticks N]` (`src/main.cpp`) is the new persistent
+headless mode: it builds the canonical world once, then reads one request per line from stdin
+(`TICK`, `BLACKBOARD corp=<id> ticks=<n>`, `COMMAND corp=<id> verb=<0-7> ...`, `SHUTDOWN`) and
+writes one response per line, reusing the existing `export_corp_blackboard`/`to_jsonl` (BL-206)
+and `apply_corp_command` (no bypass) underneath. `tools/mcp/server.js` spawns that process and
+speaks MCP-over-stdio to it — hand-rolled JSON-RPC 2.0 (no SDK dependency; none was installed in
+this repo) covering `initialize`, `tools/list`, `tools/call` (`get_blackboard`, `issue_command`,
+`advance_tick`, `lookup_action`, `list_actions`), `resources/templates/list` and `resources/read`
+(`blackboard://<corp>`). `get_blackboard` always returns the full current-tick blackboard — the
+push-not-pull call from § 10c.5. Smoke-tested end-to-end (tool list, blackboard read, a
+`set_workforce` command applying, a resource read) 2026-08-03; no golden/visual requirement
+applies (doc-only surface, no rendering). Prompts (the `reason_to_select` leg) are not yet
+exposed as MCP `prompts/*` — `lookup_action`/`list_actions` cover the same data via tools for now;
+left as a follow-on rather than blocking the first attach.
 
 ### 10f. Sources added 2026-08-03
 

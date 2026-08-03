@@ -10,6 +10,52 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## Session — Io MCP server: BL-278 built and landed (2026-08-03, latest)
+
+**Runtime.** ~1h wall. Full (new `src/` seam — `main.cpp` + `tools/mcp/`; no save-format or
+economy change, but a new external-process attach surface).
+
+**The ask.** Ben, after pulling the LLM-grand-strategy research session: "let's use this session
+to implement the ideas we just pulled." BL-278 (Io MCP server) was the actionable item — `designed`,
+SS priority, moved into v0.1.1 because it touches no simulation code.
+
+**What was missing.** BL-278's design assumed the three legs (blackboard export, action
+dictionary, corp-command) were ready to wrap. Two were; the write leg wasn't: `apply_corp_command`
+had never been reachable from outside the in-process AI/ImGui callers — no CLI, no stdin, no
+socket. `--export-blackboard` and `--verify` are both one-shot parse-run-exit modes, so neither
+gave a persistent process an MCP server could attach to.
+
+**What was built.** `ProjectIo --serve [--ticks N]` (`src/main.cpp`) — a new persistent headless
+mode: builds the canonical world once (identical warm-up to `--export-blackboard`), then loops
+reading one request per line from stdin (`TICK`, `BLACKBOARD corp=<id> ticks=<n>`,
+`COMMAND corp=<id> verb=<0-7> ...`, `SHUTDOWN`), writing one response per line. `BLACKBOARD`
+reuses `export_corp_blackboard`/`to_jsonl` verbatim (byte-identical JSONL, BL-206's schema
+untouched); `COMMAND` builds a `corp_command` and calls `apply_corp_command` — the same
+player-grade seam, no bypass. `tools/mcp/server.js` spawns that process and speaks MCP-over-stdio
+to it: hand-rolled JSON-RPC 2.0 (no SDK — none was in the repo, and the surface is small enough
+not to need one) covering `initialize`, `tools/list`, `tools/call`
+(`get_blackboard`/`issue_command`/`advance_tick`/`lookup_action`/`list_actions`),
+`resources/templates/list` and `resources/read` (`blackboard://<corp>`).
+
+**Design calls followed, one bug caught.** `get_blackboard` always pushes the full blackboard —
+§ 10c.5's "push state, don't make the model pull it." `issue_command`'s verb enum is exactly
+`corp_command.hpp`'s eight verbs. One real bug surfaced in smoke-testing: the child process's
+`[Lua] ...` startup banner raced the first request and got swallowed into that response's lines —
+fixed by filtering banner lines unconditionally in the line handler rather than gating on
+`pending` alone.
+
+**Verification.** Compiled clean via `build_app.bat` (VS2022 BuildTools/MSVC 14.44, per the pinned
+toolchain). Smoke-tested end-to-end: `tools/list` returns all 5 tools with schemas,
+`get_blackboard` against a live corp id returns real facts, `issue_command`
+(`set_workforce`) returns `result=applied`, `resources/read` on `blackboard://<corp>` round-trips.
+No visual/golden requirement applies — doc-only surface, nothing renders.
+
+**Left open.** `prompts/*` (the `reason_to_select` leg) not yet exposed as MCP prompts —
+`lookup_action`/`list_actions` cover the same data as tools for now. BL-279 (trace corpus) still
+needs a real client attached to this server before it can start.
+
+---
+
 ## Session — two direction points: invented names, and the governing body (2026-08-03, later still)
 
 **Runtime.** ~25m wall. Light-to-Full (doc authority + one standing rule; no `src/` change).
