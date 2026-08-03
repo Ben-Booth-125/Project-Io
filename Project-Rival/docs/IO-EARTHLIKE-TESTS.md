@@ -211,7 +211,45 @@ dominates the budget path.
 **The real driver is `radiogenic`, not age** — and it feeds *both* live clauses, because
 `mobile_lid` also multiplies `arable_share` by 0.72 when stagnant.
 
-### Stage 2 — Knob corridors — **now 2–3 jobs, not 3–5** (gated by Stage 1)
+### Stage 2 — Knob corridors — **BUILT AND RUN, 2026-08-04**
+
+`tools/verify/earthlike_corridor.cpp`. Holds every parameter at its Sol default, steps one across
+its internal clamp range, 96 seeds per step, orbit derived per seed exactly as the generator
+derives it. Draws two things on each axis: where the floor rejects, and where the wizard's `any`
+band actually samples. The gap between them is the whole point.
+
+| knob | `any` band | always-viable span | verdict |
+|---|---|---|---|
+| oxygenation | 0.00–1.00 | **0.31–0.88** | rejects at both ends — the master knob |
+| radiogenic | 0.60–1.80 | **0.66–1.73** | rejects at both ends |
+| home_ocean | 0.42–0.72 | **0.40–0.65** | rejects at the wet end only |
+| system_age_gyr | 3.60–8.00 | 2.12–8.88 | never rejects — headroom both sides |
+| home_mass | 0.72–1.32 | 0.69–1.44 | never rejects — small headroom |
+| star_mass | 0.75–1.25 | **0.60–1.50 (all of it)** | never rejects — large headroom |
+| metallicity | 0.50–1.80 | **0.30–2.20 (all of it)** | never rejects — large headroom |
+| coal_climate | 0.00–1.00 | 0.00–1.00 (all) | never rejects |
+| drawdown | 0.15–0.90 | 0.00–0.95 (all) | never rejects |
+| abiogenesis_ease | pinned 1.0 | — | not a preference |
+
+**Cross-validates C1 exactly.** The four knobs C1 measured at a flat 1.24-draw cost — star, metal,
+coal_basins, drawdown — are precisely the four this atlas shows can never reject. Two independent
+instruments, same answer.
+
+**The variety answer, measured.** `star_mass` and `metallicity` could be widened to their full
+clamp ranges at **zero** acceptance cost, and `system_age_gyr` to roughly 2.1–8.9.
+
+**But not for temperature.** Sweeping star mass 0.60 → 1.50 moves surface temperature only
+282.4 K → 281.1 K, because the orbit is derived to sit in the habitable band and compensates
+exactly. So a brighter star buys no climate variety at all. The only lever on temperature is the
+orbit multiplier `{0.985, 1.400}` in `resolve_preferences` — and widening *that* is the design
+question, not a tuning knob: going below 0.985 puts the homeworld inside the *continuously*
+habitable zone, i.e. doomed as the star brightens. **That is Ben's call.**
+
+**Caveat, stated plainly:** these are one-at-a-time slices with everything else at Sol defaults. A
+knob that never rejects alone may still reject in combination. The pair atlas remains the contingent
+follow-on, and this is exactly the coupling it would test.
+
+### Stage 2 as originally planned — **now 2–3 jobs, not 3–5** (gated by Stage 1)
 
 **Question:** per implicated raw knob — where are the earth-like edges, and what does the
 world die into beyond each edge?
