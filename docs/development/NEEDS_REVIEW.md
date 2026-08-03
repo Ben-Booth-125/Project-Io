@@ -23,73 +23,11 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*44 entries — 19 open, 25 resolved.*
+*45 entries — 7 open, 38 resolved.*
 
 ---
 
 ## Open
-
-### NR-020 — The History ledger’s Tiles tab is now named after the table it no longer contains
-*question · raised 2026-08-02 · from Follow-on from NR-014, 2026-08-01*
-
-With the per-tile table removed, the tab labelled "Tiles" holds two things: a bulleted Buildings list for the selected body, and a Market table (resource / supply / demand / price / base price). Neither is a tile.
-
-**Why it matters.** The same argument that retired the tiles table applies to both, and Ben did not comment on either, so they were left alone rather than swept up. The Buildings list duplicates the Construction panel; the Market table duplicates the Market Ledger, and duplicates it less well (one body, no history, no orders). If the reasoning is "the canvas already shows it", the buildings are on the canvas too. The tab label is also now actively misleading, which is a small thing that a new player meets on the first visit.
-
-- Rename the tab to what it now shows (Body, or Buildings & Market) and keep both sections.
-- Retire the whole view — the History ledger becomes Story + Chain, two views about how the world came to be, which is a cleaner premise than a third view about its current state.
-- Keep it as is; the label is wrong but nobody is harmed.
-
-> **Recommendation:** Option 2 reads best to me and is worth your eye rather than my call. Story and Chain both answer "how did this world come to be"; a current-state view has never belonged in a HISTORY ledger, and both its sections have better homes that already exist. That would also retire the history_tiles fold surface and simplify drill_through_fold.lua, which currently uses this table as its example of the fold’s biggest win.
-
-*Files: `src/ui/tile_inspector.cpp`, `scripts/verify/drill_through_fold.lua`, `scripts/verify/history_ledger_and_comms.lua`*
-
-### NR-022 — BL-262 (scoring) — I answered all six of your open calls as one interlocking package; ratify or overturn
-*decision taken on your behalf · raised 2026-08-02 · from Design-owed sweep, 2026-08-02*
-
-BL-262 says the six calls are yours, all of them. I proposed one coherent answer to all six rather than leaving six blanks, because they are not independent — call 4 nearly forces call 3, which shapes call 2, which dissolves call 1 stated expiry. The package: a coarse publicly-published PROFILE of four axes (reach / production / capital / market share) with NO total ever; computed from VISIBLE information, not ground truth; published diegetically by the market, so your own figures are exact and every rival shows as a BAND; scoring corporations on axes that are actor-agnostic and so survive the BL-094 nation pivot; meaningful only within a campaign (no cross-seed leaderboard); feeding credit terms (BL-073) and counterparty routing (BL-037), but deliberately NOT unified with BL-202 AI utility. Item flipped to designed on that basis.
-
-**Why it matters.** This is the largest single set of calls I have taken on your behalf, and it decides what the game measures — close to CONCEPT-level. Two of the six are close to forced by the existing corpus (visible-information, because ground truth would make both discovery fogs decorative; and within-campaign-only, because cross-seed normalisation is meaningless with no end-game screen). The other four are genuine judgement and you may well want them differently. The one most worth your eye is DIEGETIC: it is the expensive answer, and I chose it partly on your standing preference for the deeper option over the cheaper one — which is exactly the kind of inference that should be checked rather than assumed.
-
-- Ratify the package as written; it promotes as-is.
-- Ratify the shape but swap DIEGETIC for META — much cheaper, loses the credit/counterparty feedback in call 5, and the score stops being a thing the world can react to.
-- Ratify but collapse the profile to ONE number — simpler and more legible, at the cost of implying a single race, which is the end-game framing CONCEPT forbids.
-- Overturn and design it with me from scratch.
-
-> **Recommendation:** Ratify as written. The package hangs together and each answer is load-bearing for the others — in particular, banded rival figures are what let a comparison surface show every corporation without violating BL-068, which the restored NR-012 table could not do. If you want one thing cheaper, option 2 is the least damaging cut, but it costs call 5 entirely and the number becomes chrome, which the item itself warns against. Still open regardless of your answer: the band boundaries (tuning, wants a running campaign) and where the profile lives on screen (a layout call, yours).
-
-*Files: `docs/development/backlog.json`, `docs/CONCEPT.md`, `docs/ui/DISCOVERY.md`*
-
-### NR-023 — BL-229 (building selection) — four layout questions, now with the real column widths; it is the one item I left design-owed
-*question · raised 2026-08-02 · from Design-owed sweep, 2026-08-02*
-
-BL-229 carries your written instruction "do not guess the layout, Ben designs this one". I honoured it: questions 1-4 are untouched and the item is the only one in the v0.1.1 set still design-owed. What I did settle is question 5 (rival buildings degrade IN PLACE — same three-column skeleton with internal pages absent rather than blanked, matching how the BL-089 activity fog already degrades content without swapping surfaces) and the sequencing (it now depends on BL-265, not the landed BL-214). I also measured the actual budget so you can answer against numbers rather than prose.
-
-**Why it matters.** The measurements change what the questions mean. At the 1280x720 floor the three columns are 135 / 254 / 135 px inside a band fixed at 260 px tall, giving ~212 px of usable column height. So the tile element 3x2 action grid is living in 135 x 212 px — about 44 px per button row — and that 135 px is the real budget for any answer to Q1 (what fills the left quarter) and Q4 (what fills six action slots). A combo box at 135 px is tight and a slider at 135 px is very tight, which is the constraint bearing on Q3 (where the recipe and workforce levers go). At 1920x1080 the columns are 294 / 572 / 294. Band height is 260 at both and stays 260 until the display smaller dimension exceeds 1200.
-
-- Answer Q1-Q4 in one pass with the live app open (the standing rule for visual questions).
-- Sketch the sibling layout as a mockup, as you did for the tile element — its proportions came from yours.
-- Delegate Q1-Q4 to me now that the numbers are on the table, accepting I will be guessing at a layout you reserved.
-
-> **Recommendation:** Option 1 or 2 — this is the item where guessing is worst value, because the tile element it must match came from your own mockup and a near-miss sibling reads worse than an obvious difference. BL-265 relieves some of the pressure: a full-canvas accordion shows every page scrolled, so the centre column no longer has to fit everything, which makes Q2 less constrained than it looks. Everything else on the item is finished and waiting.
-
-*Files: `docs/development/backlog.json`, `src/ui/selection_panel.cpp`, `docs/ui/SELECTION.md`*
-
-### NR-024 — The Budget ledger Tax control promises something a corporation cannot have — laws are enacted by nations, not by the player
-*decision taken on your behalf · raised 2026-08-02 · from Settling BL-155 (laws & policy) during the design-owed sweep, 2026-08-02*
-
-BL-171 added Tax and Wages tier selectors to the player Budget ledger as stubbed controls, and BL-155 records your confirmed intent that "Tax = a player-set policy lever (the player picks a tax tier as a deliberate trade-off)". But every law in BL-155 ten-law list is an instrument of public authority — tax, tariff, cap, embargo, zoning — and the player is a CORPORATION. A corporation is subject to those, it does not enact them. I settled BL-155 on the rule that laws are enacted by NATIONS and the player is a law subject until BL-094 (v0.2.0) pivots them to a nation, and split the two controls accordingly: Wages stays a real lever (a private contract term, not a law — a corporation genuinely sets what it pays, above whatever floor law #8 imposes), and Tax becomes a READ-ONLY display of the tax regime the player home nation currently imposes.
-
-**Why it matters.** This contradicts a previously confirmed intent of yours, and it changes a control that is already drawn on screen — so it is not a call I should make quietly. It is also load-bearing for the whole laws design: if the player can enact laws, then laws are a player-facing authoring surface with all the UI that implies; if the player cannot, laws are world state the player routes around, and the prototype scope collapses to two enacted laws plus a display. Those are very different amounts of work. The read-only reading is also, I think, the better game — a market shaped by rules you did not choose is a constraint to plan against, which is the Trade dimension doing its job, and it gives the law system a visible surface from day one instead of after BL-094.
-
-- Accept: Tax becomes a read-only display of the home nation regime; Wages stays a real lever (what I did).
-- Accept the rule but remove the Tax control entirely until BL-094, rather than re-presenting it.
-- Overturn: the player CAN set their own tax tier — in which case say what it represents in the fiction, since a corporation legislating for itself is incoherent as written.
-- Overturn differently: the player is a chartered corporation that negotiates its own tax rate with its home nation, making Tax a real lever with a diegetic story behind it.
-
-> **Recommendation:** Option 1, but option 4 is worth a moment because it is the one that keeps your original intent AND makes it coherent — a negotiated rate fits the chartered-corporation identity the history ladder (BL-223) is building toward, and it would make Tax the first place diplomacy touches the economy. It costs a negotiation mechanic that does not exist, so it is not a prototype answer; if it appeals, the honest move is option 1 now and option 4 filed for v0.2.0. Either way the Tax control as currently drawn should not ship promising a lever the player does not have.
-
-*Files: `docs/development/backlog.json`, `src/ui/balance_ledger.cpp`, `src/ui/ui_state.hpp`*
 
 ### NR-025 — CONCEPT.md:51 is right after all — the Era rupture disagreement was four-way, and the fourth doc dissolves it
 *observation · raised 2026-08-02 · from Settling BL-223 (averted rupture) during the design-owed sweep, 2026-08-02*
@@ -130,36 +68,6 @@ The task brief pointed at S8/Legacy (~line 1116+ in the pre-change planetology.c
 
 *Files: `src/world/planetology.cpp`, `src/world/planetology.hpp`, `docs/generation/PLANETOLOGY.md`*
 
-### NR-029 — BL-208 checkpoint-log timestamp: no exact 1:1 pairing between checkpoint_record entries and history_event lines at a stage — resolved with a documented simplification
-*decision taken on your behalf · raised 2026-08-02 · from BL-208 (world history log) — the checkpoint-migration bridge, src/world/history_log.cpp's resolve_checkpoint_timestamp*
-
-checkpoint_record carries no timestamp of its own (by design — see planetology.hpp, changing its shape now has a ripple cost the item explicitly said to avoid). The task asked me to resolve one by matching a checkpoint to its body's dated history_event lines at the same chain_stage. Inspecting planetology.cpp showed this is NOT a clean 1:1 pairing: some checkpoints (e.g. a body that already terminated at an earlier stage still records a failing Spark checkpoint) have NO dedicated history_event line at their stage at all; others share a stage with a sibling checkpoint that DOES have its own line (Green resolves up to two checkpoints — 'land colonised' then 'combustion cleared/failed' — against up to three Green-tagged history lines, with no code-level tag distinguishing which line belongs to which checkpoint). Replicating planetology.cpp's branch logic in the log bridge to pair them exactly would duplicate logic in a second place it could silently drift from.
-
-**Why it matters.** The chosen rule is simple and always produces A resolved, non-fabricated timestamp, but is coarser than the true per-line correspondence in the double-checkpoint case: every checkpoint at a stage resolves to that stage's LAST dated line at or before it (i.e. multiple checkpoints at the same stage can share one timestamp, and the true finer-grained moment for e.g. a combustion-threshold checkpoint is sometimes an adjacent line rather than the exact one). This affects only display ordering/precision within a handful of lines per body, not correctness of the underlying planetology chain or its archetype/died_at outcome.
-
-- Keep the simplification (current state): last-dated-line-at-or-before-stage, documented inline and here.
-- Duplicate planetology.cpp's per-branch call sequence in history_log.cpp to pair checkpoints exactly 1:1 with their originating say() call — more precise, but a second place the biology narrative logic lives, which is exactly the kind of drift risk PLANETOLOGY.md's own determinism-and-cost section warns against.
-- Add an explicit timestamp field to checkpoint_record after all, accepting the save-format ripple the task asked me to avoid unless there was no other reasonable option.
-
-> **Recommendation:** Keep option 1. The genesis+checkpoint chapter is presentation-scoped (an oral-history line, not a simulation input), and history_log_harness.cpp's R2 already asserts every checkpoint gets a real, non-fallback-zero timestamp and the count matches exactly — the property that actually matters for BL-218/BL-219 building on this substrate. Precision to the exact narrated line is a polish item, not a correctness one; revisit only if a later consumer reads checkpoint timestamps at sub-stage granularity.
-
-*Files: `src/world/history_log.cpp`, `src/world/planetology.hpp`, `tools/verify/history_log_harness.cpp`*
-
-### NR-030 — BL-208 trade_route log entries: the struct's single `body` tag cannot carry a two-body event's both endpoints
-*decision taken on your behalf · raised 2026-08-02 · from BL-208 (world history log) — src/world/supply_system.cpp's credit_arrived_convoys, the trade_route-topic push site*
-
-world_history_entry's settled shape (per the task's own spec) carries exactly one body tag and one corp tag. A newly-established trade route is inherently a TWO-body event (src_body <-> dest_body). I tagged the entry with dest_body (the pool credited that tick) and named BOTH endpoints in the narration text, so the information is not lost, but a future body-scoped filter over history_log (e.g. 'show me everything that happened at body X') would miss this entry for the SOURCE body specifically.
-
-**Why it matters.** This is a real, if narrow, gap in the 'tag each entry so it's filterable into either view' design goal for exactly one topic (trade_route) and exactly one axis (the non-tagged endpoint). It does not affect the corp view (the dispatching corp is tagged correctly) or the body view for the tagged endpoint.
-
-- Leave as-is (dest_body tagged, both names in text) — the current state.
-- Push two entries per new route, one tagged per endpoint, both with the same narration — doubles trade_route log volume for a rare event (route establishment, not every convoy) and duplicates data for a single event.
-- Widen world_history_entry with a second optional body tag (e.g. body_b) used only by this one topic — a shape change to a struct four other call sites now depend on, for one topic's need.
-
-> **Recommendation:** Leave as-is unless a concrete consumer needs source-body filterability on trade_route entries specifically. Route establishment is rare (bounded by the body-pair count, not convoy traffic), so the miss is small in practice, and neither alternative is clearly better than the gap it would close.
-
-*Files: `src/world/supply_system.cpp`, `src/world/world.hpp`*
-
 ### NR-032 — Pan-stutter measurement: added a verify frame-timing tap (frame_reset/frame_csv/window + pan_perf.lua) and configured a Ninja Release tree (build_rel/)
 *decision taken on your behalf · raised 2026-08-02 · from Session 2026-08-02 (stutter-while-panning report)*
 
@@ -182,54 +90,6 @@ build/ (the exe _run.bat launches and Ben plays) is CMAKE_BUILD_TYPE=Debug with 
 
 *Files: `build_app.bat`, `scripts/verify/frame_budget_hud.lua`*
 
-### NR-034 — The word-based milestone (generation via words, then gameplay) has no ROADMAP slot yet — Ben calls it 'the whole process', not one item
-*question · raised 2026-08-02 · from BL-270 (action dictionary) filing — Ben's elicitation answers, 2026-08-02*
-
-Ben, promoting BL-270: it 'blocks the next most important milestone, which is a word-based procedural generation and later gameplay', and — on the difficulty-level motivation — 'To consider what the difficulty level will be, we need this item. That is not really one item, it's the whole process of gameplay/development.' The dictionary is filed and promoted (v0.1.1, SSS), and its design names the consumer sequence (word-driven generation first, word-driven play after; a text-play harness item to follow). But ROADMAP.md currently carries no minor themed on word-based play, and 'the whole process' suggests a version-arc-level commitment (v0.1.1? v0.2.0 alongside the AI opponent?) rather than a feature.
-
-**Why it matters.** ROADMAP owns sequence; standing rule: do not implement a milestone that depends on an earlier one not yet complete. The dictionary lands either way, but the harness item, the word-driven wizard item, and the difficulty-level work all need a named slot in the version sequence before they can be filed with honest version goals — and the v0.2.0 AI-opponent arc already exists and overlaps ('the model that will eventually run on-machine').
-
-- Theme v0.1.1 as the word-interface minor: dictionary + text-play harness + cloud Sonnet/Opus experiment; word-driven generation and difficulty land later in the arc.
-- Fold it into the existing v0.2.0 AI-opponent arc: the dictionary is v0.1.1 groundwork, everything word-driven ships with the opponent.
-- Name it as its own post-v0.1.0 arc in ROADMAP with an explicit stage list (dictionary -> harness -> word generation -> difficulty), since Ben calls it 'the whole process'.
-
-> **Recommendation:** Option 1 for the near term — it matches 'dictionary now, generation and play consume it in sequence' without pre-committing the whole arc; revisit the arc naming when the harness exists and the cloud experiment has produced its first evidence.
-
-*Files: `docs/development/ROADMAP.md`*
-
-### NR-035 — Corp asset PLACEMENT still anchors to the nation, not to the home province BL-219 reads its focus from
-*decision taken on your behalf · raised 2026-08-02 · from BL-219 (corporations history rewrite) build, 2026-08-02*
-
-BL-219's settled design says a corporation's focus follows 'the industrialisation history of the province it is anchored to'. As built, the corp picks a home PROVINCE and derives its focus from that province - but Pass 3 then places its starting holdings with the existing nation-wide focus-scored anchor search, not inside that province. So the province decides WHAT the corp is; it does not yet decide WHERE it is.
-
-**Why it matters.** The derivation is honest either way (the province is genuinely chosen first and genuinely determines the focus), but the phrase 'anchored to' promises more than the code delivers, and a player reading a coastal trade corp's holdings 400 tiles inland would be reading a real inconsistency. Constraining placement to the province is a small change to place_starting_assets, but it interacts with the tuned holdings-clustering and terrain-viability behaviour that corp_terrain_matrix guards, so it was not done blind at the end of a large build.
-
-> **Recommendation:** Shipped the focus derivation without constraining placement, and documented the gap in CORPORATION_GENERATION.md rather than letting the doc imply the stronger claim. Recommend (a) - constrain Pass 3's anchor search to the home province window and re-run corp_terrain_matrix - as a small follow-on, since the doc's 'anchored to' wording is otherwise writing a cheque the code does not cash.
-
-*Files: `src/world/corporation_generation.cpp`, `docs/generation/CORPORATION_GENERATION.md`*
-
-### NR-036 — BL-054's territorial-fragmentation half was folded into BL-218 but is not demonstrated - no exclave is asserted anywhere
-*observation · raised 2026-08-02 · from BL-218 (nations settlement rewrite) build, 2026-08-02*
-
-BL-218's settled design folds BL-054's exclave/disputed-zone half in on the argument that 'a real settlement sim produces them for free - a growth front that crosses a strait and stalls leaves an exclave without anyone authoring one', and calls that the single best argument for the deeper option over the cheap alternative. The pass is built and the seeds are now province anchors, but nothing measures whether exclaves actually appear: Pass 2b (orphan-island assignment) still hands every water-disconnected component to its nearest neighbour, which is precisely the mechanism that would MANUFACTURE an exclave - or hide the absence of one. settlement_harness does not assert it and I did not add an assertion, because I could not tell from the code alone whether the exclaves that exist are the sim's or Pass 2b's.
-
-**Why it matters.** It is the load-bearing justification for having chosen the expensive option, and it is currently unverified. If the fragmentation is really Pass 2b's, the argument for the deeper path was made on a capability the deeper path did not supply - which is worth knowing before BL-054's remaining half is reasoned about.
-
-> **Recommendation:** Recommend (a): the assertion is cheap and it is the only way to know whether the argument that chose the expensive path was sound. Do not mark BL-054's territorial half complete until it exists.
-
-*Files: `src/world/settlement.cpp`, `src/world/nation_generation.cpp`, `tools/verify/settlement_harness.cpp`*
-
-### NR-037 — ai_skill_harness MSVC goldens re-blessed and history_ladder_harness H4 narrowed - both under BL-218, both explained upward
-*decision taken on your behalf · raised 2026-08-02 · from BL-218/BL-219 build, 2026-08-02*
-
-BL-218 changes the political map on every seed (nation seeds are now province anchors) and BL-219 changes the corporate mix, so two harnesses moved. (1) ai_skill_harness: 9 assertions failed on the old MSVC bands. Verified against a stashed baseline that they passed BEFORE the change, so this is genuinely caused by this work rather than pre-existing. Every divergence is UPWARD - net worth rose on seeds 0/2/4, dial counts crept past the old ceiling on 0/1/4 - while solvency and survival stayed in band on all five seeds, which reads as corps anchoring to provinces that actually industrialised rather than as a skill regression. Re-blessed the MSVC block only, per that file's own rule; the GCC block is untouched and will need a fresh Linux run. (2) history_ladder_harness H4: its stage-ordering assertion demanded every line in the recorded-history window be strictly older than the next, which only held while the ladder owned that window alone. Narrowed it to assert the ladder's own causal claim (granary before charter before accord) directly on the three stage lines.
-
-**Why it matters.** Re-blessing a golden is the project's routine convention ('bless routinely, flag only an UNEXPLAINED divergence'), and narrowing an assertion is not - it weakens a check. Both are recorded so the weakening is visible and so the stale GCC set is not forgotten.
-
-> **Recommendation:** Recommend (b) then (c): re-bless GCC on the next Linux run so the two platforms stop drifting, and treat tagging the ladder's lines with their own stage as the real fix for H4 - text-matching a line is exactly the fragility that assertion was narrowed around.
-
-*Files: `tools/verify/ai_skill_harness.cpp`, `tools/verify/history_ladder_harness.cpp`*
-
 ### NR-038 — CLAUDE.md no longer says "read every document before responding" — the doc set outgrew the instruction
 *decision taken on your behalf · raised 2026-08-02 · from Documentation-compression pass (hot/cold backlog split, DEVLOG index, doc_weight.js)*
 
@@ -241,51 +101,21 @@ CLAUDE.md opened with "Read the documents below before responding to any request
 
 *Files: `CLAUDE.md`, `tools/doc_weight.js`*
 
-### NR-042 — Project-Rival seeded: '0AD test environment' read as the RTS 0 A.D. as near-term arena, bridged to BL-271; Han as played civ, Rome as target
-*decision taken on your behalf · raised 2026-08-03 · from Ben's seeding brief for Project-Rival (2026-08-03): 'get a test environment at 0AD, refine the oral history by play... series of prompts every year that affect military strategy and continue a civilising mission... Rome as a target... spin this as if the gods are sending the soldiers to their locations'*
+### NR-045 — Two direction points applied: the sci-fi/fantasy naming rule, and the governing-body aim — BL-094 unparked and raised F → A on my judgement
+*decision taken on your behalf · raised 2026-08-03 · from Ben, 2026-08-03, after the review-queue session — two points from a prompt that did not reach me: (1) "even if we do use real history as an analogy, we should use sci-fi / fantasy random names"; (2) "the aim that we're going for now, is to really play as a governing body. The reason for that is that it allows law, policy and science to use military might - not just economic."*
 
-The brief's '0AD' admits two readings: the Era -1 sim at 0 AD (BL-271, designed, unbuilt, Sprint 5) or the RTS '0 A.D.' (Wildfire Games, installable today, Romans and Han playable). Seeded Project-Rival on the RTS reading as the near-term arena with BL-271 as the destination, because Io has no playable war content at 0 AD yet and the skeleton's own purpose line names computer-use play (the NR-040 steer). Also chosen on Ben's behalf: we play Han China (the self-preservation cosmology carrying the laihua civilising mission) against Rome (Petra bot); campaign year defaults to ~5 minutes of match time; annals voiced in classical Chinese per Pantheon's voices corpus.
+Point 1 is recorded as a standing rule (io-standing-rules § Terms & docs) plus a full section in GENERATION_STRATEGY.md, and stamped onto BL-271 and BL-277, the two items filed off the Rome analogy. Point 2 is recorded in BL-094's design as the stated reason for the pivot. The calls that were MINE, not Ben's: (a) **BL-094 unparked and raised F → A** — 'the aim we're going for now' is not compatible with a parked F item, but Ben did not ask for a re-prioritisation and did not give it a version goal; (b) BL-094's title changed from 'nation as the strategic actor' to 'the player is a GOVERNING BODY (nation)', following his word; (c) I wrote the v0.1.x design test ('does this system reach military as well as economic outcomes?') into BL-094 rather than editing the four stub items (BL-155/156/157/158) directly; (d) I did NOT touch CONCEPT.md's player-identity statement, on the authority time-slice rule, even though it is the doc his point most directly concerns.
 
-**Why it matters.** If Ben meant the internal sim only, the ENVIRONMENT.md install plan and the Han-vs-Rome match template are scaffolding he didn't ask for (though the liturgy, annal format, and Rome dossier transfer unchanged). The civ choice also fixes the campaign's narrative voice; playing Rome instead would invert the theology (auspices/evocatio as our frame rather than the rival's). BL-271's 'Rome as calibration reference, not content' rule was left intact for Io itself - Rival plays actual Rome only in the stand-in arena.
+**Why it matters.** (a) is a real sequencing change — an A-priority unparked item reads as near-term work, and v0.1.1 is the live minor with the word interface just themed into it. If the governing-body pivot is the aim but NOT the next thing built, A may overstate it and a version goal would say more than a priority does. ROADMAP has carried an open question since 2026-07-31 about whether the pivot shares v0.2.0 with the AI-opponent set or takes its own minor; that question is now louder, not answered. (d) matters because CONCEPT.md currently states the player identity as an open corporate-or-nation choice, which his message effectively closes — but closing it in the authority doc ahead of the work is exactly what the time-slice rule forbids, so it stays stated in the item.
 
-- Keep the RTS-arena reading (seed as written)
-- Internal-sim only: drop ENVIRONMENT.md's install plan, keep liturgy/annals/dossier waiting on BL-271
-- Flip the played civ to Rome (expansionist theology as our voice, Han as target)
+- Accept as recorded — BL-094 unparked at A, no version goal yet.
+- Give BL-094 a version goal now (v0.2.0, or its own minor) — that settles the ROADMAP question that has been open since 2026-07-31.
+- Too strong — re-park BL-094 or drop it back down; the direction is recorded either way and the priority was not what Ben asked to change.
+- Also close CONCEPT.md now: amend the player-identity statement ahead of the work, treating this as a concept decision rather than an implementation one.
 
-> **Recommendation:** Keep as seeded; the RTS is scaffolding that comes down when BL-271 lands (MISSION.md says exactly this).
+> **Recommendation:** Option 2. A priority says 'important'; a version goal says 'when', and 'when' is the actual open question — it has been open since 2026-07-31 and Ben's message is the strongest signal yet that it should be answered. Option 4 is defensible too and is arguably not a time-slice violation, since CONCEPT.md owns *player identity* and Ben has now made an identity decision rather than an implementation one; I left it alone because the rule is unambiguous and the cost of waiting is low.
 
-*Files: `Project-Rival/CLAUDE.md`, `Project-Rival/docs/MISSION.md`, `Project-Rival/docs/ENVIRONMENT.md`, `Project-Rival/docs/CAMPAIGN.md`, `Project-Rival/docs/RIVAL-ROME.md`, `Project-Rival/annals/README.md`*
-
-### NR-043 — Project-Rival: approve the 0 A.D. install so Year 1 can open (campaign otherwise ready)
-*question · raised 2026-08-03 · from Project-Rival seeding session close-out (2026-08-03); Ben asked for anything reviewable to be parked here*
-
-The seeded campaign's only blocker is the arena itself: 0 A.D. Release 28 'Boiorix' is not installed (verified 2026-08-03 - no install dir, no user data, no registry entries). Install is a ~1.5 GB download from play0ad.com requiring Ben's action or explicit approval; one first run creates Documents/My Games/0ad. Everything else is in place: the six seed docs (critiqued, 21 findings applied), the yearly rite with R1-R8 conformance checks, the annal format, and annals/campaigns.json as the aggregate.
-
-**Why it matters.** Until the install happens, Project-Rival is a method with no arena - the liturgy, the Rome dossier, and the annal format stay untested against play, which is the project's whole verification model ('play is the verifier'). Also standing behind this: NR-042 (the '0AD = RTS arena' interpretation) - approving the install implicitly ratifies that reading; overturning NR-042 makes this entry moot.
-
-- Ben installs 0 A.D. himself, then opens Year 1 in a Project-Rival session
-- Ben approves the download in-session and Claude runs the install + first-run smoke test
-- Hold until BL-271 (Era -1 sim) exists and skip the external arena entirely (resolves NR-042 to its option 2)
-
-> **Recommendation:** Option 1 or 2, whichever is less friction; the headless rehearsal command in Project-Rival/docs/ENVIRONMENT.md is the smoke test either way.
-
-*Files: `Project-Rival/docs/ENVIRONMENT.md`, `Project-Rival/docs/CAMPAIGN.md`*
-
-### NR-044 — Research-session calls taken on Ben’s behalf: two backlog items filed, the Rival computer-use charter narrowed, and priorities/version goals guessed
-*decision taken on your behalf · raised 2026-08-03 · from LLM-grand-strategy research session, 2026-08-03 — Ben: "please make the necessary changes to indicate our new direction. We can use MCP" + "our aim is just fair, text driven, small and local models" + "Cloud usage is just going to be finding tons of input and output sets, for when we fine tune a smaller model of our own"*
-
-The direction was Ben’s and is recorded verbatim in AI_OPPONENT.md § 10d. Four calls inside it were mine, and none were stated: (1) split the work into TWO items rather than one — BL-278 (MCP server) and BL-279 (trace corpus + fine-tuning pipeline) — on the grounds that the server is useful on its own and the corpus work strictly depends on it; (2) priorities SS and S respectively, and version_goal v0.2.0 for both, inherited from the surrounding AI-opponent set rather than asked for; (3) narrowed Project-Rival’s "never through API hooks" charter (CLAUDE.md line 5, MISSION.md) to "computer-use is how we play 0 A.D., because 0 A.D. has no agent interface" — rather than leaving it reading as a house-wide ban that Io’s own MCP direction now contradicts; (4) left § 2C’s A → B → C staging intact, i.e. the MCP/local-model route still sits ON TOP of the deterministic utility core rather than replacing it.
-
-**Why it matters.** Call (1) is the one worth a second look: if Ben pictures the corpus work as inseparable from the server, two items is bureaucracy. Call (2) sets sequencing — v0.2.0 already carries BL-203/204/205/207 plus the trade-policy pair, so adding two more items to that minor may overload it, and BL-278 in particular could argue for v0.1.x since it is an out-of-process tool with no sim risk. Call (3) edits a project charter, which is exactly the kind of change that should not happen silently. Call (4) is the load-bearing one architecturally: the research supports it (every project that worked delegated tactics to algorithmic subsystems), but it does mean the small local model is never the whole opponent — it is a macro layer over BL-202/203.
-
-- Accept as filed — two items, both v0.2.0.
-- Merge BL-278 and BL-279 into one item (MCP server + corpus pipeline as a single deliverable).
-- Move BL-278 to v0.1.x — it is out-of-process tooling with no sim risk, and landing it early lets the first real play session happen sooner.
-- Something else — the split or the sequencing is wrong in a way not listed.
-
-> **Recommendation:** Accept the split (option 1) but consider option 3 on top: BL-278 touches no simulation code and its whole value is enabling a first real attempt at text-driven play, which is exactly the "try it cheaply before designing more" lesson NR-040 already taught. BL-279 genuinely belongs in v0.2.0 — it cannot start until traces exist.
-
-*Files: `docs/ai/AI_OPPONENT.md`, `docs/development/backlog.json`, `Project-Rival/CLAUDE.md`, `Project-Rival/docs/MISSION.md`*
+*Files: `.claude/rules/io-standing-rules.md`, `docs/generation/GENERATION_STRATEGY.md`, `docs/development/backlog.json`, `docs/development/ROADMAP.md`*
 
 ---
 
@@ -604,6 +434,23 @@ Ben declined both options for the payback wording on a principle rather than on 
 
 *Files: `src/ui/selection_panel.cpp`, `src/ui/corporation_dashboard.cpp`, `docs/CONCEPT.md`*
 
+### NR-020 — The History ledger’s Tiles tab is now named after the table it no longer contains
+*question · raised 2026-08-02 · from Follow-on from NR-014, 2026-08-01*
+
+With the per-tile table removed, the tab labelled "Tiles" holds two things: a bulleted Buildings list for the selected body, and a Market table (resource / supply / demand / price / base price). Neither is a tile.
+
+**Why it matters.** The same argument that retired the tiles table applies to both, and Ben did not comment on either, so they were left alone rather than swept up. The Buildings list duplicates the Construction panel; the Market table duplicates the Market Ledger, and duplicates it less well (one body, no history, no orders). If the reasoning is "the canvas already shows it", the buildings are on the canvas too. The tab label is also now actively misleading, which is a small thing that a new player meets on the first visit.
+
+- Rename the tab to what it now shows (Body, or Buildings & Market) and keep both sections.
+- Retire the whole view — the History ledger becomes Story + Chain, two views about how the world came to be, which is a cleaner premise than a third view about its current state.
+- Keep it as is; the label is wrong but nobody is harmed.
+
+> **Recommendation:** Option 2 reads best to me and is worth your eye rather than my call. Story and Chain both answer "how did this world come to be"; a current-state view has never belonged in a HISTORY ledger, and both its sections have better homes that already exist. That would also retire the history_tiles fold surface and simplify drill_through_fold.lua, which currently uses this table as its example of the fold’s biggest win.
+
+> **RESOLVED.** Answered 2026-08-03: option 2 — **retire the view entirely**. The History ledger becomes Story + Chain, two views sharing one premise (how the world came to be). Renaming was rejected as fixing the label while keeping the real defect. Filed as BL-281, v0.1.1. Two things ride along: `drill_through_fold.lua` currently uses this view's table as its example fold surface and needs a new subject, and the shared per-entity content builders must be checked for a second caller before the Buildings list is removed.
+
+*Files: `src/ui/tile_inspector.cpp`, `scripts/verify/drill_through_fold.lua`, `scripts/verify/history_ledger_and_comms.lua`*
+
 ### NR-021 — BL-217/218/219 were silently lost from backlog.json by a stale-base merge, and have been restored
 *decision taken on your behalf · raised 2026-08-02 · from Found while ordering the design-owed items for the batch-delivery design pass, 2026-08-02*
 
@@ -621,6 +468,59 @@ SPRINTS.md § Sprint 2 records that BL-210 was split into BL-217 (checkpoint/bra
 
 *Files: `docs/development/backlog.json`, `docs/development/SPRINTS.md`*
 
+### NR-022 — BL-262 (scoring) — I answered all six of your open calls as one interlocking package; ratify or overturn
+*decision taken on your behalf · raised 2026-08-02 · from Design-owed sweep, 2026-08-02*
+
+BL-262 says the six calls are yours, all of them. I proposed one coherent answer to all six rather than leaving six blanks, because they are not independent — call 4 nearly forces call 3, which shapes call 2, which dissolves call 1 stated expiry. The package: a coarse publicly-published PROFILE of four axes (reach / production / capital / market share) with NO total ever; computed from VISIBLE information, not ground truth; published diegetically by the market, so your own figures are exact and every rival shows as a BAND; scoring corporations on axes that are actor-agnostic and so survive the BL-094 nation pivot; meaningful only within a campaign (no cross-seed leaderboard); feeding credit terms (BL-073) and counterparty routing (BL-037), but deliberately NOT unified with BL-202 AI utility. Item flipped to designed on that basis.
+
+**Why it matters.** This is the largest single set of calls I have taken on your behalf, and it decides what the game measures — close to CONCEPT-level. Two of the six are close to forced by the existing corpus (visible-information, because ground truth would make both discovery fogs decorative; and within-campaign-only, because cross-seed normalisation is meaningless with no end-game screen). The other four are genuine judgement and you may well want them differently. The one most worth your eye is DIEGETIC: it is the expensive answer, and I chose it partly on your standing preference for the deeper option over the cheaper one — which is exactly the kind of inference that should be checked rather than assumed.
+
+- Ratify the package as written; it promotes as-is.
+- Ratify the shape but swap DIEGETIC for META — much cheaper, loses the credit/counterparty feedback in call 5, and the score stops being a thing the world can react to.
+- Ratify but collapse the profile to ONE number — simpler and more legible, at the cost of implying a single race, which is the end-game framing CONCEPT forbids.
+- Overturn and design it with me from scratch.
+
+> **Recommendation:** Ratify as written. The package hangs together and each answer is load-bearing for the others — in particular, banded rival figures are what let a comparison surface show every corporation without violating BL-068, which the restored NR-012 table could not do. If you want one thing cheaper, option 2 is the least damaging cut, but it costs call 5 entirely and the number becomes chrome, which the item itself warns against. Still open regardless of your answer: the band boundaries (tuning, wants a running campaign) and where the profile lives on screen (a layout call, yours).
+
+> **RESOLVED.** Ratified as written 2026-08-03. Ben took the recommendation without substitution: the four-axis profile (reach / production / capital / market share), no total ever, computed from visible information only, published diegetically by the market so the player's own figures are exact and every rival shows as a band, scored on actor-agnostic axes that survive the BL-094 nation pivot, meaningful only within a campaign. The diegetic route is confirmed over the cheaper meta one, so call 5's credit/counterparty feedback survives. BL-262's design field carries the ratification note; the item is promote-ready.
+
+*Files: `docs/development/backlog.json`, `docs/CONCEPT.md`, `docs/ui/DISCOVERY.md`*
+
+### NR-023 — BL-229 (building selection) — four layout questions, now with the real column widths; it is the one item I left design-owed
+*question · raised 2026-08-02 · from Design-owed sweep, 2026-08-02*
+
+BL-229 carries your written instruction "do not guess the layout, Ben designs this one". I honoured it: questions 1-4 are untouched and the item is the only one in the v0.1.1 set still design-owed. What I did settle is question 5 (rival buildings degrade IN PLACE — same three-column skeleton with internal pages absent rather than blanked, matching how the BL-089 activity fog already degrades content without swapping surfaces) and the sequencing (it now depends on BL-265, not the landed BL-214). I also measured the actual budget so you can answer against numbers rather than prose.
+
+**Why it matters.** The measurements change what the questions mean. At the 1280x720 floor the three columns are 135 / 254 / 135 px inside a band fixed at 260 px tall, giving ~212 px of usable column height. So the tile element 3x2 action grid is living in 135 x 212 px — about 44 px per button row — and that 135 px is the real budget for any answer to Q1 (what fills the left quarter) and Q4 (what fills six action slots). A combo box at 135 px is tight and a slider at 135 px is very tight, which is the constraint bearing on Q3 (where the recipe and workforce levers go). At 1920x1080 the columns are 294 / 572 / 294. Band height is 260 at both and stays 260 until the display smaller dimension exceeds 1200.
+
+- Answer Q1-Q4 in one pass with the live app open (the standing rule for visual questions).
+- Sketch the sibling layout as a mockup, as you did for the tile element — its proportions came from yours.
+- Delegate Q1-Q4 to me now that the numbers are on the table, accepting I will be guessing at a layout you reserved.
+
+> **Recommendation:** Option 1 or 2 — this is the item where guessing is worst value, because the tile element it must match came from your own mockup and a near-miss sibling reads worse than an obvious difference. BL-265 relieves some of the pressure: a full-canvas accordion shows every page scrolled, so the centre column no longer has to fit everything, which makes Q2 less constrained than it looks. Everything else on the item is finished and waiting.
+
+> **RESOLVED.** Answered 2026-08-03: option 3 — Ben **delegated Q1–Q4** rather than reserving them further, so the item flips `design-owed` → `designed` and v0.1.1 has no design-owed items left. The answers, recorded in BL-229's design field: (1) keep the hex neighbourhood in the left quarter, with the stack-capacity line moved under it; (2) four authored accordion pages ordered symptom → cause (Output, Profitability, Input supply, Workforce); (3) the recipe combo and workforce slider go in a fixed two-row strip under the accordion, not in the 135 px right column — keeping 'right quarter = actions' stable across both siblings, and paid for by BL-265's full-canvas accordion; (4) keep the 2×3 grid, filled with Construct / History / Supply / Demolish plus two reserved, Manage dropped as redundant, Demolish bottom-right. Flagged on the item: this is a delegated design, not Ben's mockup — if the built result near-misses the tile element, the recourse is his sketch (option 2).
+
+*Files: `docs/development/backlog.json`, `src/ui/selection_panel.cpp`, `docs/ui/SELECTION.md`*
+
+### NR-024 — The Budget ledger Tax control promises something a corporation cannot have — laws are enacted by nations, not by the player
+*decision taken on your behalf · raised 2026-08-02 · from Settling BL-155 (laws & policy) during the design-owed sweep, 2026-08-02*
+
+BL-171 added Tax and Wages tier selectors to the player Budget ledger as stubbed controls, and BL-155 records your confirmed intent that "Tax = a player-set policy lever (the player picks a tax tier as a deliberate trade-off)". But every law in BL-155 ten-law list is an instrument of public authority — tax, tariff, cap, embargo, zoning — and the player is a CORPORATION. A corporation is subject to those, it does not enact them. I settled BL-155 on the rule that laws are enacted by NATIONS and the player is a law subject until BL-094 (v0.2.0) pivots them to a nation, and split the two controls accordingly: Wages stays a real lever (a private contract term, not a law — a corporation genuinely sets what it pays, above whatever floor law #8 imposes), and Tax becomes a READ-ONLY display of the tax regime the player home nation currently imposes.
+
+**Why it matters.** This contradicts a previously confirmed intent of yours, and it changes a control that is already drawn on screen — so it is not a call I should make quietly. It is also load-bearing for the whole laws design: if the player can enact laws, then laws are a player-facing authoring surface with all the UI that implies; if the player cannot, laws are world state the player routes around, and the prototype scope collapses to two enacted laws plus a display. Those are very different amounts of work. The read-only reading is also, I think, the better game — a market shaped by rules you did not choose is a constraint to plan against, which is the Trade dimension doing its job, and it gives the law system a visible surface from day one instead of after BL-094.
+
+- Accept: Tax becomes a read-only display of the home nation regime; Wages stays a real lever (what I did).
+- Accept the rule but remove the Tax control entirely until BL-094, rather than re-presenting it.
+- Overturn: the player CAN set their own tax tier — in which case say what it represents in the fiction, since a corporation legislating for itself is incoherent as written.
+- Overturn differently: the player is a chartered corporation that negotiates its own tax rate with its home nation, making Tax a real lever with a diegetic story behind it.
+
+> **Recommendation:** Option 1, but option 4 is worth a moment because it is the one that keeps your original intent AND makes it coherent — a negotiated rate fits the chartered-corporation identity the history ladder (BL-223) is building toward, and it would make Tax the first place diplomacy touches the economy. It costs a negotiation mechanic that does not exist, so it is not a prototype answer; if it appeals, the honest move is option 1 now and option 4 filed for v0.2.0. Either way the Tax control as currently drawn should not ship promising a lever the player does not have.
+
+> **RESOLVED.** Overturned 2026-08-03: Ben took option 4 — the player is a **chartered corporation that negotiates its own tax rate with its home nation**. My read-only-Tax call is reversed in intent, though not yet in code: the objection that a corporation cannot legislate for itself stands, and the negotiated-charter framing is what makes the original BL-171/BL-155 intent coherent rather than abandoning it. Filed as BL-280 (negotiated tax rate), v0.1.2, design-owed — the shape is Ben's, the mechanism (what the nation wants in return, where the negotiation happens, renegotiation cadence) still needs designing, and the item flags that a free-money dial with no counterparty cost is the failure mode to avoid. Tax stays read-only in the interim, which is the honest state for an un-negotiated charter.
+
+*Files: `docs/development/backlog.json`, `src/ui/balance_ledger.cpp`, `src/ui/ui_state.hpp`*
+
 ### NR-028 — BL-217 verification: fresh worktree could not configure CMake (FetchContent blocked), fell back to hand-compiled cl
 *observation · raised 2026-08-02 · from Session 2026-08-02 (BL-217 checkpoint/branch/lean foundation)*
 
@@ -634,6 +534,40 @@ cmake -S . -B build in this worktree failed at the SDL3 FetchContent step: codel
 
 *Files: `src/world/planetology.cpp`, `src/world/planetology.hpp`*
 
+### NR-029 — BL-208 checkpoint-log timestamp: no exact 1:1 pairing between checkpoint_record entries and history_event lines at a stage — resolved with a documented simplification
+*decision taken on your behalf · raised 2026-08-02 · from BL-208 (world history log) — the checkpoint-migration bridge, src/world/history_log.cpp's resolve_checkpoint_timestamp*
+
+checkpoint_record carries no timestamp of its own (by design — see planetology.hpp, changing its shape now has a ripple cost the item explicitly said to avoid). The task asked me to resolve one by matching a checkpoint to its body's dated history_event lines at the same chain_stage. Inspecting planetology.cpp showed this is NOT a clean 1:1 pairing: some checkpoints (e.g. a body that already terminated at an earlier stage still records a failing Spark checkpoint) have NO dedicated history_event line at their stage at all; others share a stage with a sibling checkpoint that DOES have its own line (Green resolves up to two checkpoints — 'land colonised' then 'combustion cleared/failed' — against up to three Green-tagged history lines, with no code-level tag distinguishing which line belongs to which checkpoint). Replicating planetology.cpp's branch logic in the log bridge to pair them exactly would duplicate logic in a second place it could silently drift from.
+
+**Why it matters.** The chosen rule is simple and always produces A resolved, non-fabricated timestamp, but is coarser than the true per-line correspondence in the double-checkpoint case: every checkpoint at a stage resolves to that stage's LAST dated line at or before it (i.e. multiple checkpoints at the same stage can share one timestamp, and the true finer-grained moment for e.g. a combustion-threshold checkpoint is sometimes an adjacent line rather than the exact one). This affects only display ordering/precision within a handful of lines per body, not correctness of the underlying planetology chain or its archetype/died_at outcome.
+
+- Keep the simplification (current state): last-dated-line-at-or-before-stage, documented inline and here.
+- Duplicate planetology.cpp's per-branch call sequence in history_log.cpp to pair checkpoints exactly 1:1 with their originating say() call — more precise, but a second place the biology narrative logic lives, which is exactly the kind of drift risk PLANETOLOGY.md's own determinism-and-cost section warns against.
+- Add an explicit timestamp field to checkpoint_record after all, accepting the save-format ripple the task asked me to avoid unless there was no other reasonable option.
+
+> **Recommendation:** Keep option 1. The genesis+checkpoint chapter is presentation-scoped (an oral-history line, not a simulation input), and history_log_harness.cpp's R2 already asserts every checkpoint gets a real, non-fallback-zero timestamp and the count matches exactly — the property that actually matters for BL-218/BL-219 building on this substrate. Precision to the exact narrated line is a polish item, not a correctness one; revisit only if a later consumer reads checkpoint timestamps at sub-stage granularity.
+
+> **RESOLVED.** Answered 2026-08-03: option 1 — **keep as-is**. Ben took the recommendation. The genesis+checkpoint chapter is presentation-scoped (an oral-history line, not a simulation input), and `history_log_harness.cpp`'s R2 already asserts every checkpoint gets a real, non-fallback-zero timestamp and that the count matches exactly — the property BL-218/BL-219 actually need from this substrate. Precision to the exact narrated line stays a polish item, not a correctness one. `resolve_checkpoint_timestamp`'s documented simplification stands, and no save-format change is taken.
+
+*Files: `src/world/history_log.cpp`, `src/world/planetology.hpp`, `tools/verify/history_log_harness.cpp`*
+
+### NR-030 — BL-208 trade_route log entries: the struct's single `body` tag cannot carry a two-body event's both endpoints
+*decision taken on your behalf · raised 2026-08-02 · from BL-208 (world history log) — src/world/supply_system.cpp's credit_arrived_convoys, the trade_route-topic push site*
+
+world_history_entry's settled shape (per the task's own spec) carries exactly one body tag and one corp tag. A newly-established trade route is inherently a TWO-body event (src_body <-> dest_body). I tagged the entry with dest_body (the pool credited that tick) and named BOTH endpoints in the narration text, so the information is not lost, but a future body-scoped filter over history_log (e.g. 'show me everything that happened at body X') would miss this entry for the SOURCE body specifically.
+
+**Why it matters.** This is a real, if narrow, gap in the 'tag each entry so it's filterable into either view' design goal for exactly one topic (trade_route) and exactly one axis (the non-tagged endpoint). It does not affect the corp view (the dispatching corp is tagged correctly) or the body view for the tagged endpoint.
+
+- Leave as-is (dest_body tagged, both names in text) — the current state.
+- Push two entries per new route, one tagged per endpoint, both with the same narration — doubles trade_route log volume for a rare event (route establishment, not every convoy) and duplicates data for a single event.
+- Widen world_history_entry with a second optional body tag (e.g. body_b) used only by this one topic — a shape change to a struct four other call sites now depend on, for one topic's need.
+
+> **Recommendation:** Leave as-is unless a concrete consumer needs source-body filterability on trade_route entries specifically. Route establishment is rare (bounded by the body-pair count, not convoy traffic), so the miss is small in practice, and neither alternative is clearly better than the gap it would close.
+
+> **RESOLVED.** Overturned 2026-08-03: Ben took option 2 — **push two entries, one tagged per endpoint**. My leave-as-is recommendation was on the grounds that route establishment is rare and the miss is small; Ben chose filterability from both sides instead. Filed as BL-282, v0.1.1. The struct keeps its one-body invariant (option 3, widening it, was rejected implicitly), every existing reader stays correct unmodified, and the cost is duplicated narration for a rare event. Design notes the determinism requirement: entry order within the tick must be stable (src before dest), not iteration-order dependent.
+
+*Files: `src/world/supply_system.cpp`, `src/world/world.hpp`*
+
 ### NR-031 — BL-208 verification: fresh worktree was also a STALE base (pre-BL-217) and could not configure CMake; integrated main, then hand-compiled with cl
 *observation · raised 2026-08-02 · from Session 2026-08-02 (BL-208 world history log)*
 
@@ -646,6 +580,62 @@ This worktree's HEAD was the merge-base with main, 24 commits behind (missing BL
 > **RESOLVED.** Closed 2026-08-02 in the main (network-connected) checkout. build_app.bat (full ProjectIo target, including the new app.cpp include/call) and ctest --test-dir build --output-on-failure both run clean: 38/38 green, including history_log_harness (30/30) and the extended determinism_harness (all checks, +2 new). app.cpp's new code compiles and links in the real GUI build, closing the one gap the hand-compiled harnesses could not reach. tools/verify/README.md's river_generation.cpp TU-ripple gap (also flagged this item) is left open as its own small fix, not blocking.
 
 *Files: `src/core/app.cpp`, `tools/verify/README.md`*
+
+### NR-034 — The word-based milestone (generation via words, then gameplay) has no ROADMAP slot yet — Ben calls it 'the whole process', not one item
+*question · raised 2026-08-02 · from BL-270 (action dictionary) filing — Ben's elicitation answers, 2026-08-02*
+
+Ben, promoting BL-270: it 'blocks the next most important milestone, which is a word-based procedural generation and later gameplay', and — on the difficulty-level motivation — 'To consider what the difficulty level will be, we need this item. That is not really one item, it's the whole process of gameplay/development.' The dictionary is filed and promoted (v0.1.1, SSS), and its design names the consumer sequence (word-driven generation first, word-driven play after; a text-play harness item to follow). But ROADMAP.md currently carries no minor themed on word-based play, and 'the whole process' suggests a version-arc-level commitment (v0.1.1? v0.2.0 alongside the AI opponent?) rather than a feature.
+
+**Why it matters.** ROADMAP owns sequence; standing rule: do not implement a milestone that depends on an earlier one not yet complete. The dictionary lands either way, but the harness item, the word-driven wizard item, and the difficulty-level work all need a named slot in the version sequence before they can be filed with honest version goals — and the v0.2.0 AI-opponent arc already exists and overlaps ('the model that will eventually run on-machine').
+
+- Theme v0.1.1 as the word-interface minor: dictionary + text-play harness + cloud Sonnet/Opus experiment; word-driven generation and difficulty land later in the arc.
+- Fold it into the existing v0.2.0 AI-opponent arc: the dictionary is v0.1.1 groundwork, everything word-driven ships with the opponent.
+- Name it as its own post-v0.1.0 arc in ROADMAP with an explicit stage list (dictionary -> harness -> word generation -> difficulty), since Ben calls it 'the whole process'.
+
+> **Recommendation:** Option 1 for the near term — it matches 'dictionary now, generation and play consume it in sequence' without pre-committing the whole arc; revisit the arc naming when the harness exists and the cloud experiment has produced its first evidence.
+
+> **RESOLVED.** Answered 2026-08-03: option 1 — **v0.1.1 is themed as the word-interface minor**. Its word-interface thread is BL-270 (action dictionary, complete) + BL-278 (Io MCP server, moved here from v0.2.0 by NR-044) + the cloud corpus experiment that BL-279 formalises. Word-driven generation and the difficulty work land later in the arc rather than being pre-committed now — the arc naming gets revisited once the server exists and the first cloud play session has produced evidence. ROADMAP.md's v0.1.1 entry now carries both threads: the existing shell/legibility set (BL-184/185/193/214/215/216/229) and the word interface. If the shell set should move out of the minor rather than share it, that is a further call not taken here.
+
+*Files: `docs/development/ROADMAP.md`*
+
+### NR-035 — Corp asset PLACEMENT still anchors to the nation, not to the home province BL-219 reads its focus from
+*decision taken on your behalf · raised 2026-08-02 · from BL-219 (corporations history rewrite) build, 2026-08-02*
+
+BL-219's settled design says a corporation's focus follows 'the industrialisation history of the province it is anchored to'. As built, the corp picks a home PROVINCE and derives its focus from that province - but Pass 3 then places its starting holdings with the existing nation-wide focus-scored anchor search, not inside that province. So the province decides WHAT the corp is; it does not yet decide WHERE it is.
+
+**Why it matters.** The derivation is honest either way (the province is genuinely chosen first and genuinely determines the focus), but the phrase 'anchored to' promises more than the code delivers, and a player reading a coastal trade corp's holdings 400 tiles inland would be reading a real inconsistency. Constraining placement to the province is a small change to place_starting_assets, but it interacts with the tuned holdings-clustering and terrain-viability behaviour that corp_terrain_matrix guards, so it was not done blind at the end of a large build.
+
+> **Recommendation:** Shipped the focus derivation without constraining placement, and documented the gap in CORPORATION_GENERATION.md rather than letting the doc imply the stronger claim. Recommend (a) - constrain Pass 3's anchor search to the home province window and re-run corp_terrain_matrix - as a small follow-on, since the doc's 'anchored to' wording is otherwise writing a cheque the code does not cash.
+
+> **RESOLVED.** Answered 2026-08-03: option (a) — **constrain Pass 3's anchor search to the home province window and re-run `corp_terrain_matrix`**. Ben took the stronger behaviour over softening BL-219's wording: the province should mean something spatially, not just categorically. Filed as BL-283, v0.1.1. The design flags three things to get right — a deterministic fallback ladder when a small home province has no viable anchor, expected movement in the corporation-mix goldens (re-bless deliberately, the way NR-037's BL-218 moves were checked), and no new RNG. CORPORATION_GENERATION.md's honest gap note gets replaced by the real behaviour when it lands.
+
+*Files: `src/world/corporation_generation.cpp`, `docs/generation/CORPORATION_GENERATION.md`*
+
+### NR-036 — BL-054's territorial-fragmentation half was folded into BL-218 but is not demonstrated - no exclave is asserted anywhere
+*observation · raised 2026-08-02 · from BL-218 (nations settlement rewrite) build, 2026-08-02*
+
+BL-218's settled design folds BL-054's exclave/disputed-zone half in on the argument that 'a real settlement sim produces them for free - a growth front that crosses a strait and stalls leaves an exclave without anyone authoring one', and calls that the single best argument for the deeper option over the cheap alternative. The pass is built and the seeds are now province anchors, but nothing measures whether exclaves actually appear: Pass 2b (orphan-island assignment) still hands every water-disconnected component to its nearest neighbour, which is precisely the mechanism that would MANUFACTURE an exclave - or hide the absence of one. settlement_harness does not assert it and I did not add an assertion, because I could not tell from the code alone whether the exclaves that exist are the sim's or Pass 2b's.
+
+**Why it matters.** It is the load-bearing justification for having chosen the expensive option, and it is currently unverified. If the fragmentation is really Pass 2b's, the argument for the deeper path was made on a capability the deeper path did not supply - which is worth knowing before BL-054's remaining half is reasoned about.
+
+> **Recommendation:** Recommend (a): the assertion is cheap and it is the only way to know whether the argument that chose the expensive path was sound. Do not mark BL-054's territorial half complete until it exists.
+
+> **RESOLVED.** Answered 2026-08-03: option (c) — **reopen BL-054's territorial half as its own measurable item**, filed as BL-284, v0.1.1. Stronger than my recommendation, which was only to add the assertion (option a); Ben's version keeps the work formally open until the measurement actually returns, rather than adding a check to something already counted done. BL-284 subsumes the assertion as its first task: count non-contiguous nation components in `world_audit` and attribute each as emergent (the settlement sim, which is what the argument predicted) or Pass 2b orphan assignment (authored, and not evidence). BL-054's design carries a pointer and an explicit 'do not mark complete until BL-284 closes'.
+
+*Files: `src/world/settlement.cpp`, `src/world/nation_generation.cpp`, `tools/verify/settlement_harness.cpp`*
+
+### NR-037 — ai_skill_harness MSVC goldens re-blessed and history_ladder_harness H4 narrowed - both under BL-218, both explained upward
+*decision taken on your behalf · raised 2026-08-02 · from BL-218/BL-219 build, 2026-08-02*
+
+BL-218 changes the political map on every seed (nation seeds are now province anchors) and BL-219 changes the corporate mix, so two harnesses moved. (1) ai_skill_harness: 9 assertions failed on the old MSVC bands. Verified against a stashed baseline that they passed BEFORE the change, so this is genuinely caused by this work rather than pre-existing. Every divergence is UPWARD - net worth rose on seeds 0/2/4, dial counts crept past the old ceiling on 0/1/4 - while solvency and survival stayed in band on all five seeds, which reads as corps anchoring to provinces that actually industrialised rather than as a skill regression. Re-blessed the MSVC block only, per that file's own rule; the GCC block is untouched and will need a fresh Linux run. (2) history_ladder_harness H4: its stage-ordering assertion demanded every line in the recorded-history window be strictly older than the next, which only held while the ladder owned that window alone. Narrowed it to assert the ladder's own causal claim (granary before charter before accord) directly on the three stage lines.
+
+**Why it matters.** Re-blessing a golden is the project's routine convention ('bless routinely, flag only an UNEXPLAINED divergence'), and narrowing an assertion is not - it weakens a check. Both are recorded so the weakening is visible and so the stale GCC set is not forgotten.
+
+> **Recommendation:** Recommend (b) then (c): re-bless GCC on the next Linux run so the two platforms stop drifting, and treat tagging the ladder's lines with their own stage as the real fix for H4 - text-matching a line is exactly the fragility that assertion was narrowed around.
+
+> **RESOLVED.** Answered 2026-08-03: options (b) then (c) — **re-bless GCC first, then tag the ladder lines and restore H4's stricter form**. Filed as BL-285, v0.1.1, with the two tasks in that order. Reasoning recorded on the item: until GCC is re-run, the two platforms' goldens describe different worlds and the next cross-platform failure is ambiguous between a real regression and accumulated drift; and H4's narrowing made it pass without making it right, since matching ladder line *text* means any rewording silently changes what the assertion covers — the failure mode a golden should catch rather than exhibit. The item flags the sequencing interaction with BL-283, which will also move the corporation-mix goldens.
+
+*Files: `tools/verify/ai_skill_harness.cpp`, `tools/verify/history_ladder_harness.cpp`*
 
 ### NR-039 — C-route design session: Ben overrode the milestone-sequencing rule, and the design carves a new exception into the determinism standing rule
 *observation · raised 2026-08-02 · from Sprint-planning session, 2026-08-02 — asked whether the backlog was sprint-ready*
@@ -694,4 +684,56 @@ Swept 500 campaign seeds through Kepler's exact pipeline (planetology -> contine
 > **RESOLVED.** OPTION 4 (Ben, 2026-08-03, same session) - hybrid at ~90%: 'We will also find interesting worlds if it is HARD to form something like Rome. But it will never be impossible to try.' Filed and landed as BL-276 (Mediterranean rift sea): rift-basin + sag-basin mechanism in run_continents, two-bar acceptance gate in hard_coded_world. Measured over 500 seeds: floor (>=30 tiles) 100%, arena (>=300 tiles) 89.6%.
 
 *Files: `tools/verify/mediterranean_sweep.cpp`, `src/world/continents.cpp`, `src/world/tile_generation.cpp`, `docs/generation/TILE_GENERATION.md`*
+
+### NR-042 — Project-Rival seeded: '0AD test environment' read as the RTS 0 A.D. as near-term arena, bridged to BL-271; Han as played civ, Rome as target
+*decision taken on your behalf · raised 2026-08-03 · from Ben's seeding brief for Project-Rival (2026-08-03): 'get a test environment at 0AD, refine the oral history by play... series of prompts every year that affect military strategy and continue a civilising mission... Rome as a target... spin this as if the gods are sending the soldiers to their locations'*
+
+The brief's '0AD' admits two readings: the Era -1 sim at 0 AD (BL-271, designed, unbuilt, Sprint 5) or the RTS '0 A.D.' (Wildfire Games, installable today, Romans and Han playable). Seeded Project-Rival on the RTS reading as the near-term arena with BL-271 as the destination, because Io has no playable war content at 0 AD yet and the skeleton's own purpose line names computer-use play (the NR-040 steer). Also chosen on Ben's behalf: we play Han China (the self-preservation cosmology carrying the laihua civilising mission) against Rome (Petra bot); campaign year defaults to ~5 minutes of match time; annals voiced in classical Chinese per Pantheon's voices corpus.
+
+**Why it matters.** If Ben meant the internal sim only, the ENVIRONMENT.md install plan and the Han-vs-Rome match template are scaffolding he didn't ask for (though the liturgy, annal format, and Rome dossier transfer unchanged). The civ choice also fixes the campaign's narrative voice; playing Rome instead would invert the theology (auspices/evocatio as our frame rather than the rival's). BL-271's 'Rome as calibration reference, not content' rule was left intact for Io itself - Rival plays actual Rome only in the stand-in arena.
+
+- Keep the RTS-arena reading (seed as written)
+- Internal-sim only: drop ENVIRONMENT.md's install plan, keep liturgy/annals/dossier waiting on BL-271
+- Flip the played civ to Rome (expansionist theology as our voice, Han as target)
+
+> **Recommendation:** Keep as seeded; the RTS is scaffolding that comes down when BL-271 lands (MISSION.md says exactly this).
+
+> **RESOLVED.** Answered 2026-08-03: option 3 — **the played civ FLIPS to Rome**; Han China becomes the target. Ben's call, overturning the seeding choice I made on his behalf. The RTS-arena reading itself is kept (BL-271 remains the destination, the RTS is scaffolding that comes down when it lands). Consequences applied the same session: Rome's expansionist theology — imperium sine fine, the auspices, evocatio — becomes the campaign's narrating voice, and Han's cosmology of preservation becomes the rival creed; docs/RIVAL-ROME.md is superseded by docs/RIVAL-HAN.md; CLAUDE.md, MISSION.md, ENVIRONMENT.md and CAMPAIGN.md updated for the flip. The 'civilising mission' framing survives the flip intact — it is arguably a better fit for Rome, whose expansion was explicitly justified as one.
+
+*Files: `Project-Rival/CLAUDE.md`, `Project-Rival/docs/MISSION.md`, `Project-Rival/docs/ENVIRONMENT.md`, `Project-Rival/docs/CAMPAIGN.md`, `Project-Rival/docs/RIVAL-ROME.md`, `Project-Rival/annals/README.md`*
+
+### NR-043 — Project-Rival: approve the 0 A.D. install so Year 1 can open (campaign otherwise ready)
+*question · raised 2026-08-03 · from Project-Rival seeding session close-out (2026-08-03); Ben asked for anything reviewable to be parked here*
+
+The seeded campaign's only blocker is the arena itself: 0 A.D. Release 28 'Boiorix' is not installed (verified 2026-08-03 - no install dir, no user data, no registry entries). Install is a ~1.5 GB download from play0ad.com requiring Ben's action or explicit approval; one first run creates Documents/My Games/0ad. Everything else is in place: the six seed docs (critiqued, 21 findings applied), the yearly rite with R1-R8 conformance checks, the annal format, and annals/campaigns.json as the aggregate.
+
+**Why it matters.** Until the install happens, Project-Rival is a method with no arena - the liturgy, the Rome dossier, and the annal format stay untested against play, which is the project's whole verification model ('play is the verifier'). Also standing behind this: NR-042 (the '0AD = RTS arena' interpretation) - approving the install implicitly ratifies that reading; overturning NR-042 makes this entry moot.
+
+- Ben installs 0 A.D. himself, then opens Year 1 in a Project-Rival session
+- Ben approves the download in-session and Claude runs the install + first-run smoke test
+- Hold until BL-271 (Era -1 sim) exists and skip the external arena entirely (resolves NR-042 to its option 2)
+
+> **Recommendation:** Option 1 or 2, whichever is less friction; the headless rehearsal command in Project-Rival/docs/ENVIRONMENT.md is the smoke test either way.
+
+> **RESOLVED.** Answered 2026-08-03: option 1 — Ben installs 0 A.D. Release 28 himself, then a Project-Rival session opens Year 1 against it. No in-session download. ENVIRONMENT.md records the install as awaited-from-Ben rather than as a step a session performs. The headless rehearsal command in ENVIRONMENT.md is the smoke test whenever the install lands. NOTE: Year 1 now opens as ROME, not Han — see NR-042.
+
+*Files: `Project-Rival/docs/ENVIRONMENT.md`, `Project-Rival/docs/CAMPAIGN.md`*
+
+### NR-044 — Research-session calls taken on Ben’s behalf: two backlog items filed, the Rival computer-use charter narrowed, and priorities/version goals guessed
+*decision taken on your behalf · raised 2026-08-03 · from LLM-grand-strategy research session, 2026-08-03 — Ben: "please make the necessary changes to indicate our new direction. We can use MCP" + "our aim is just fair, text driven, small and local models" + "Cloud usage is just going to be finding tons of input and output sets, for when we fine tune a smaller model of our own"*
+
+The direction was Ben’s and is recorded verbatim in AI_OPPONENT.md § 10d. Four calls inside it were mine, and none were stated: (1) split the work into TWO items rather than one — BL-278 (MCP server) and BL-279 (trace corpus + fine-tuning pipeline) — on the grounds that the server is useful on its own and the corpus work strictly depends on it; (2) priorities SS and S respectively, and version_goal v0.2.0 for both, inherited from the surrounding AI-opponent set rather than asked for; (3) narrowed Project-Rival’s "never through API hooks" charter (CLAUDE.md line 5, MISSION.md) to "computer-use is how we play 0 A.D., because 0 A.D. has no agent interface" — rather than leaving it reading as a house-wide ban that Io’s own MCP direction now contradicts; (4) left § 2C’s A → B → C staging intact, i.e. the MCP/local-model route still sits ON TOP of the deterministic utility core rather than replacing it.
+
+**Why it matters.** Call (1) is the one worth a second look: if Ben pictures the corpus work as inseparable from the server, two items is bureaucracy. Call (2) sets sequencing — v0.2.0 already carries BL-203/204/205/207 plus the trade-policy pair, so adding two more items to that minor may overload it, and BL-278 in particular could argue for v0.1.x since it is an out-of-process tool with no sim risk. Call (3) edits a project charter, which is exactly the kind of change that should not happen silently. Call (4) is the load-bearing one architecturally: the research supports it (every project that worked delegated tactics to algorithmic subsystems), but it does mean the small local model is never the whole opponent — it is a macro layer over BL-202/203.
+
+- Accept as filed — two items, both v0.2.0.
+- Merge BL-278 and BL-279 into one item (MCP server + corpus pipeline as a single deliverable).
+- Move BL-278 to v0.1.x — it is out-of-process tooling with no sim risk, and landing it early lets the first real play session happen sooner.
+- Something else — the split or the sequencing is wrong in a way not listed.
+
+> **Recommendation:** Accept the split (option 1) but consider option 3 on top: BL-278 touches no simulation code and its whole value is enabling a first real attempt at text-driven play, which is exactly the "try it cheaply before designing more" lesson NR-040 already taught. BL-279 genuinely belongs in v0.2.0 — it cannot start until traces exist.
+
+> **RESOLVED.** Answered 2026-08-03. (1) Two-item split KEPT. (2) BL-278 (Io MCP server) MOVED to v0.1.1 — Ben took the recommendation: it touches no simulation code, and landing it early is what lets a first real text-driven play attempt happen. BL-279 (trace corpus) stays v0.2.0, since it cannot start until traces exist. (3) The Project-Rival charter narrowing stands. (4) § 2C's A → B → C staging stands — the local model is a macro layer over the deterministic utility core, never the whole opponent. Answered together with NR-034, which themes v0.1.1 as the word-interface minor and gives BL-278 its home.
+
+*Files: `docs/ai/AI_OPPONENT.md`, `docs/development/backlog.json`, `Project-Rival/CLAUDE.md`, `Project-Rival/docs/MISSION.md`*
 

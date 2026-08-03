@@ -195,13 +195,40 @@ layer land on positioned ground rather than a greenfield. v0.1.1 is a concrete b
 rest of the band (v0.1.2–v0.1.5) is deliberately design-forward — each now has a placeholder
 `design-owed` item that firms into real design as it is reached.
 
-- **v0.1.1 — Shell & legibility follow-through.** *(Re-themed 2026-07-31: roads — BL-146–149 —
-  landed complete ahead of the v0.1.0 cut, retiring the "roads are an invisible tile attribute"
-  concern; § Where we are.)* The live set is shell and read-surface work: the road tier legend
-  (BL-184) and road fog dimming (BL-185), building stack capacity (BL-193), the drill-through
-  disclosure idiom (BL-214), the text-wrap render audit (BL-215), chat pinning (BL-216), and the
-  building-selection tile format (BL-229); the hover glance-then-stick (BL-230) is already
-  landed. Still the concrete build minor.
+> **What this band is FOR (Ben, 2026-08-03).** Until now the band was themed by what it stubs,
+> not by what the stubs serve. Ben's steer supplies the missing answer: the aim is to play as a
+> **governing body**, *"because it allows law, policy and science to use military might — not
+> just economic."* Laws (v0.1.2), techs (v0.1.3), military (v0.1.4) and politics (v0.1.5) are
+> therefore **the governing body's levers**, and each carries a design test it did not have:
+>
+> **Does this system reach military as well as economic outcomes?** If a law can only change a
+> cost, or a technology can only unlock a building, it is being designed for the corporate
+> player we are pivoting away from. See BL-094 (player-identity pivot) § 2026-08-03.
+
+- **v0.1.1 — The word interface, plus shell & legibility follow-through.** *(Re-themed
+  2026-07-31 for roads; **re-themed again 2026-08-03**, NR-034 — Ben named the word interface as
+  this minor's theme.)* Two threads, and it stays the concrete build minor.
+
+  **The word interface (new theme).** The route from docs to a text-driven player: the action
+  dictionary (**BL-270**, complete) supplies meaning, the blackboard export (**BL-206**,
+  complete) supplies state, and the **Io MCP server** (**BL-278**, moved here from v0.2.0 by
+  NR-044) is the socket that makes them drivable by any agent runtime. BL-278 touches no
+  simulation code, and landing it early is what lets a first real text-driven play attempt
+  happen before more gets designed on top of it. Word-driven generation and the difficulty work
+  land later in the arc — deliberately not pre-committed here; the arc gets named once the
+  server exists and the first cloud session has produced evidence. See `docs/ai/AI_OPPONENT.md`
+  § 10.
+
+  **Shell & legibility (the standing set).** The road tier legend (BL-184) and road fog dimming
+  (BL-185), building stack capacity (BL-193), the drill-through disclosure idiom (BL-214), the
+  text-wrap render audit (BL-215), chat pinning (BL-216), and the building-selection tile format
+  (BL-229 — Q1–Q4 answered 2026-08-03, no longer design-owed); the hover glance-then-stick
+  (BL-230) is already landed.
+
+  **Added 2026-08-03 from the review queue.** Retire the History ledger's Tiles view (BL-281),
+  dual-endpoint trade-route log entries (BL-282), corp placement constrained to the home
+  province (BL-283), exclave measurement reopened from BL-054 (BL-284), and harness golden
+  coherence (BL-285).
 - **v0.1.2 — Laws** (**BL-155** law/policy surface design, **BL-186** laws ledger UI). First pass
   at the law / policy surface — what a law *is* as a data object, how it gates or modifies
   economic (and later political) behaviour, and its ledger surface. Design + stub.
@@ -226,21 +253,31 @@ BL-160/161 (auto-exchange policy, counterparty allow/deny).
 *Added 2026-08-03 — the word-interface route.* Ben's direction after the public
 LLM-grand-strategy research sweep (`docs/ai/AI_OPPONENT.md` § 10): the C-route planner gets an
 **MCP** interface and a **small, local** runtime model, with cloud inference used only to
-generate the training corpus. Carried by **BL-278** (Io MCP server) and **BL-279** (AI trace
-corpus). Both sit *above* the deterministic utility core, not in place of it. Sequencing note:
-BL-278 touches no simulation code and could argue for the v0.1.x band instead — NR-044 asks.
+generate the training corpus. **BL-279** (AI trace corpus + the fine-tuning pipeline) carries
+that here; its prerequisite **BL-278** (Io MCP server) sits in **v0.1.1**, where NR-044 placed
+it. Both sit *above* the deterministic utility core, not in place of it — the small local model
+is a macro layer over BL-202/203, never the whole opponent.
 
-*Intended theme, not yet versioned: the refocus — change who the player is.* The player pivots
-from **corporation** to **nation** as the strategic actor — owning research, military, and
-intelligence — while the corporation stays the **economic** actor, prototyped as a single
-chartered corp (= today's player corp) so the v0.0.x economy loop survives intact underneath and
-the nation is a thin strategic layer above it (**BL-094**, settled 2026-07-04). This is the hinge
-from *economy sandbox* toward *grand strategy*: the laws / techs / military / politics stubbed
-across v0.1.x now hang off an actor that can own them.
+*The refocus — change who the player is. **Stated as the aim, 2026-08-03**; still unversioned.*
+The player pivots from **corporation** to **governing body** as the strategic actor — owning
+research, military, and intelligence — while the corporation stays the **economic** actor,
+prototyped as a single chartered corp (= today's player corp) so the v0.0.x economy loop
+survives intact underneath and the governing layer is thin above it (**BL-094**, settled
+2026-07-04, **elevated and unparked 2026-08-03**). This is the hinge from *economy sandbox*
+toward *grand strategy*: the laws / techs / military / politics stubbed across v0.1.x hang off
+an actor that can own them.
 
-**Open sequencing question (2026-07-31).** BL-094 (player-nation pivot) carries no version goal
-in the backlog; the versioned v0.2.0 set is the AI opponent. Whether the pivot shares v0.2.0
-with the AI set or takes its own minor is Ben's call, not yet made.
+**Why it is the aim, in Ben's words:** *"it allows law, policy and science to use military might
+— not just economic."* A corporation's levers are all economic, so a corporate player can be
+given laws and research and both stay flavour on an economy. A governing body wields them, and
+can point them at force. That is also **Conflict's route to being load-bearing** — under a
+corporate player, laws and techs could only ever feed Trade, which is why Conflict has stayed
+the least-designed pillar.
+
+**Open sequencing question (2026-07-31, now louder).** BL-094 still carries no version goal; the
+versioned v0.2.0 set is the AI opponent. Whether the pivot shares v0.2.0 with the AI set or
+takes its own minor is Ben's call, still not made — NR-045 asks it directly now that the item is
+unparked at A priority.
 
 ### v0.3.0 — Politics + the filter system
 

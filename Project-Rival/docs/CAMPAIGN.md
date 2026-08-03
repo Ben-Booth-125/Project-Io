@@ -12,20 +12,29 @@ events are terrain, supply, unit odds, and bot policy; in Io's creeds system war
 drive battle odds and a won war plants the victor's pantheon. Divine dispatch is not a gloss
 laid over the mechanism — it *is* the mechanism, narrated natively.
 
-Both sides get their own theology (dossier: `docs/RIVAL-ROME.md`):
+Both sides get their own theology (dossier: `docs/RIVAL-HAN.md`). *(Voices swapped 2026-08-03,
+NR-042 — the campaign was seeded playing Han.)*
 
-- **Our voice (Han):** Heaven withholds soldiers except to restore harmony. A dispatch is
-  Heaven's favour redeployed; an omen is strategic intelligence; the civilising mission is
-  *laihua* — the distant transformed by virtue, arriving as tribute, not as subjects taken.
-- **The rival's voice (Rome):** their augurs license campaigns, their Mars avenges, their rite
-  of *evocatio* tries to call our gods over to their side. Roman moves are narrated as their
-  priests would claim them — which at year zero is period-accurate propaganda, and flagged as such.
+- **Our voice (Rome):** no campaign without auspices. A dispatch is a god's licence taken and
+  acted on; Mars Ultor avenges an injury before it is answered; the civilising mission is
+  *parcere subiectis et debellare superbos*, and *evocatio* means a siege can be won by
+  inviting the enemy's god to change sides. Ours is a theology that must keep moving to stay
+  proven.
+- **The rival's voice (Han):** Heaven withholds soldiers except to restore harmony; portents,
+  not battles, are how the Mandate shifts. Han moves are narrated as their court would record
+  them — a withdrawal is not a retreat but a refusal to be provoked, which is period-accurate
+  and flagged as such.
+
+Note what the flip does to the rite: we now play the side that must *generate* campaigns, and
+the rival wins by enduring. A year in which nothing happened is a Han success and a Roman
+embarrassment — and the annal should say so rather than smoothing it over.
 
 The bench of record is Pantheon's, cross-tradition by design: the mountain bench counsels
 (Sun Tzu deterrence, Amaterasu withdrawal-pricing, Krishna coalition arithmetic), the banner
 and hearth benches check them (Ares morale, Zhu Bajie desertion, Hestia stakes, Baldr grievance),
-and the annal is voiced in the campaign tradition — classical Chinese, per the voices corpus,
-with its fidelity rules.
+and the annal is voiced in the campaign tradition — **Latin**, per the voices corpus, with its
+fidelity rules. *(MISSION.md flags the owed check: confirm a Latin register exists in Pantheon's
+`data/voices/` before Year 1; if not, propose one rather than faking it.)*
 
 ## The six stations
 

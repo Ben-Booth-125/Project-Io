@@ -26,7 +26,10 @@ computer-use steer). Io has since settled on an **MCP server** as its agent inte
 own AI drives that. What transfers is the *discipline* — legal presses only, state handed to
 the agent rather than remembered, decisions logged as they are taken — not the input device.
 
-## Why Rome as the target
+## Why Han as the target
+
+*(Flipped 2026-08-03 by Ben, NR-042. The campaign was seeded the other way round — playing Han
+against Rome. The reasoning below is the same material read from the other end.)*
 
 At year zero the world holds two great settled powers (Parthia a distant third). Han China is
 the larger by the only hard number the era offers — the AD 2 census registers ~58 million
@@ -34,15 +37,22 @@ people, against model-based Roman estimates of 45–60 million — and by contig
 Rome is the second — and the only one **dedicated to expansion**: *imperium sine fine*, empire
 without end, promised by Jupiter and prosecuted on three frontiers at once.
 
+**We play the expansionist.** Rome's theology is the one that generates campaigns rather than
+absorbing them: no legitimate war without auspices, every frontier a proof of divine favour,
+and *evocatio* — the doctrine that a siege is won by inviting the enemy's god to defect. That
+last is the single best fit for a project about gods sending soldiers, and it is *ours* now
+rather than the rival's.
+
 The Han posture is the opposite — self-preservation as cosmology: walls, garrison-farms,
-tributary ritual, the Mandate held by harmony rather than conquest. A self-preserving rival
-does not press; an expansionist one generates campaigns. We play the preserver; Rome supplies
-the war.
+tributary ritual, the Mandate held by harmony rather than conquest. As a **target** that is
+harder and more interesting than it sounds: a preserving power does not overextend, does not
+take bait, and wins by simply still being there. Rome has to prove its gods right; Han only has
+to not be disproved.
 
 The ideological war is the real engine, and it is documented, not invented: Rome's gods send
 soldiers *outward* and are proven right only by expansion; Heaven *withholds* soldiers except
 to restore harmony and is proven right only by stability. Each side's win condition is the
-other's evidence of impiety. Full dossier: `docs/RIVAL-ROME.md`.
+other's evidence of impiety. Full dossier: `docs/RIVAL-HAN.md`.
 
 One honesty note, stated once and carried always: Rome and Han never fought — at year zero they
 knew each other only as rumours along the silk routes. The campaign is a counterfactual
@@ -55,17 +65,24 @@ omen-reading to annal — that turns god-bench counsel into military strategy an
 record. Spec: `docs/CAMPAIGN.md`. This is the prompt-series design the whole project exists to
 refine.
 
-**2. The refined oral history.** Annals in the campaign tradition's voice (classical Chinese,
-per the voices corpus), phrase-bank candidates with fidelity flags, and doctrine records in
-codebook v3 — grounded successors to doctrine-001 (align-with-the-weaker). The unseen-battle
-idioms gain referents: battles that actually happened, in play.
+**2. The refined oral history.** Annals in the campaign tradition's voice — **Latin** since the
+2026-08-03 flip, where it was classical Chinese — phrase-bank candidates with fidelity flags,
+and doctrine records in codebook v3, grounded successors to doctrine-001
+(align-with-the-weaker). The unseen-battle idioms gain referents: battles that actually
+happened, in play.
+
+> **Owed before Year 1:** confirm Pantheon's voices corpus has a Latin register to work from
+> (`data/voices/`), as it did for classical Chinese. If it does not, that is a Pantheon
+> refinement to propose rather than a licence to fake one — the honesty ethic below applies to
+> our own voice as much as to the rival's.
 
 **3. Calibration for Io.** BL-271 (Era −1 sim) names its own needs: campaign-season structure,
 army supply radii, plausible hegemony-formation speed. A played antiquity campaign observes all
 three — and since BL-272 (mil-sim) landed, observations can also test its constants and feed
 doctrine rows toward BL-274 (era-keyed unit rosters). Io's rule that Rome is *calibration
-reference, not content* stands untouched — Rival plays actual Rome only in the stand-in arena,
-and hands Io numbers, not legions.
+reference, not content* stands untouched — and matters more now that Rome is the played civ
+rather than the rival: Rival plays actual Rome only in the stand-in arena, and hands Io numbers,
+not legions.
 
 ## The bridge to Io
 

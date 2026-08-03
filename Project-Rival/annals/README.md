@@ -21,9 +21,10 @@ conformance:               # rite checks R1–R8 (docs/CAMPAIGN.md § Rite confo
 
 ## Chronicle
 
-(The year in voice — classical Chinese register per Pantheon
-data/voices/classical-chinese.md, translation primary, native lines only
-where fidelity practice allows. Gods send soldiers; no intrigue.)
+(The year in voice — Latin register per Pantheon's voices corpus, translation
+primary, native lines only where fidelity practice allows. Gods send soldiers;
+no intrigue. Register swapped from classical Chinese 2026-08-03 when the played
+civ flipped to Rome, NR-042; the corpus file to cite is confirmed at Year 1.)
 
 ## Accounting
 

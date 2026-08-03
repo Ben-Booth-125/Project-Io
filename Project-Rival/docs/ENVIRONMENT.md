@@ -5,23 +5,30 @@
 **Not installed** (checked 2026-08-03: Program Files, LOCALAPPDATA, `Documents\My Games\0ad`,
 registry uninstall keys, PATH — all empty; the game has never run under this user).
 
-First step of the first session: install **Release 28 "Boiorix"** (Feb 2026, the first
-non-alpha release) from https://play0ad.com/download/ — ~1.5 GB. Installation is a Ben action
-or a Ben-approved download; run once so `%USERPROFILE%\Documents\My Games\0ad\` exists.
+**Settled 2026-08-03 (Ben, NR-043): Ben installs it himself.** Not an in-session download.
+Install **Release 28 "Boiorix"** (Feb 2026, the first non-alpha release) from
+https://play0ad.com/download/ — ~1.5 GB — and run it once so
+`%USERPROFILE%\Documents\My Games\0ad\` exists. A Project-Rival session then opens Year 1
+against it; the headless rehearsal command below is the smoke test.
+
+Until that lands, Year 1 is blocked and everything else is ready: the seed docs, the yearly
+rite with its R1–R8 conformance checks, the annal format, and `annals/campaigns.json`.
 
 The engine is `pyrogenesis.exe` (under `<install>\binaries\system\`); all game logic runs in an
 embedded SpiderMonkey JS VM, which is why the flags below can drive it unattended.
 
 ## Match template
 
-Han China (us) versus Rome (the built-in Petra bot), fixed seed, land map. Difficulty starts
-at 3 (medium) and moves only when the annals justify it.
+**Rome (us) versus Han China (the built-in Petra bot)**, fixed seed, land map. Difficulty
+starts at 3 (medium) and moves only when the annals justify it. *(Flipped 2026-08-03, NR-042 —
+seeded the other way round.)*
 
 Two modes, used for different things:
 
-**Visual (the campaign mode).** Claude plays with mouse and keyboard via computer-use — the
-NR-040 (computer-use steer) model. Prompts pause at year marks; the screen is the blackboard.
-This is where annals come from.
+**Visual (the campaign mode).** Claude plays with mouse and keyboard via computer-use. Prompts
+pause at year marks; the screen is the blackboard. This is where annals come from. *(0 A.D.
+exposes no agent interface, which is why this is computer-use rather than a protocol seam —
+Io's own direction went the other way; see MISSION.md.)*
 
 **Headless (the rehearsal mode).** Bot-vs-bot, no graphics, for testing setups, seeds, and
 match length before spending a campaign on them (PowerShell, the shell campaign sessions
@@ -31,7 +38,7 @@ actually run):
 & "<install>\binaries\system\pyrogenesis.exe" `
   -autostart="random/jebel_barkal" -autostart-nonvisual `
   -autostart-seed=42 -autostart-players=2 `
-  -autostart-civ=1:han -autostart-civ=2:rome `
+  -autostart-civ=1:rome -autostart-civ=2:han `
   -autostart-ai=1:petra -autostart-ai=2:petra `
   -autostart-aidiff=1:3 -autostart-aidiff=2:3 `
   -autostart-player=-1

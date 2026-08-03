@@ -12,9 +12,14 @@ a protocol seam even though the near-term arena is a screen. Rival still never p
 the game it is playing.
 
 The near-term arena is **0 A.D.** (Wildfire Games' RTS, Release 28), a match set at year zero:
-we play **Han China** on a civilising mission; the target is **Rome**, the era's second great
-power and the only *expansionist* one. The destination is Project Io itself — its word interface
-today, its antiquity sandbox (BL-271, the Era −1 sim) when that lands.
+we play **Rome** on a civilising mission — *imperium sine fine*, prosecuted under the auspices;
+the target is **Han China**, the era's larger power and the only *preserving* one. The
+destination is Project Io itself — its word interface today, its antiquity sandbox (BL-271, the
+Era −1 sim) when that lands.
+
+*(Flipped 2026-08-03 by Ben, NR-042 — the campaign was seeded playing Han against Rome. The
+liturgy, annal format and dossier all transfer; what changed is which theology narrates our
+dispatches.)*
 
 The campaign's product is not victory. It is a **refined oral history**: yearly prompts that
 direct military strategy in the voice of gods sending soldiers, recorded as annals that feed
@@ -47,13 +52,13 @@ lines, doctrine records, persona-performance notes — are proposed back to Pant
 Why this project exists: the aim, the bridge to Io, and what "refine the oral history by play" delivers. Start here.
 
 **`docs/ENVIRONMENT.md`**
-The 0 A.D. test environment: install state, match template (Han vs Rome), the year cadence, headless and visual modes, replays as records.
+The 0 A.D. test environment: install state, match template (Rome vs Han), the year cadence, headless and visual modes, replays as records.
 
 **`docs/CAMPAIGN.md`**
 The yearly rite — the prompt series. Six stations per campaign year, the divine-framing rule, the prompt templates, and the oral-history refinement contract.
 
-**`docs/RIVAL-ROME.md`**
-The rival dossier: Rome's theology of expansion, Han's cosmology of preservation, the ideological war between them, and the other live creeds of the year-zero world. Contested history is flagged as such.
+**`docs/RIVAL-HAN.md`**
+The rival dossier: Han's cosmology of preservation (the creed we are set against), Rome's theology of expansion (ours), the ideological war between them, and the other live creeds of the year-zero world. Contested history is flagged as such. *(Renamed from `RIVAL-ROME.md` 2026-08-03 when the played civ flipped.)*
 
 **`annals/README.md`**
 The annal format — one record per campaign year, chronicle plus data. The campaign's durable output lives here.

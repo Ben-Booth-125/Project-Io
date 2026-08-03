@@ -10,6 +10,116 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## Session — two direction points: invented names, and the governing body (2026-08-03, later still)
+
+**Runtime.** ~25m wall. Light-to-Full (doc authority + one standing rule; no `src/` change).
+
+**The ask.** Two points from a prompt that never reached me (the "did my prompt get lost?"
+check was about these). Ben: (1) *"even if we do use real history as an analogy, we should use
+sci-fi / fantasy random names"*; (2) *"the aim that we're going for now, is to really play as a
+governing body. The reason for that is that it allows law, policy and science to use military
+might - not just economic."*
+
+**Point 1 — real history in, invented names out.** Filed as a **standing rule**
+(`io-standing-rules.md` § Terms & docs) plus a full section in `GENERATION_STRATEGY.md` with a
+transfers/does-not table. The distinction: mechanism transfers (how a charter enforces a
+promise, how a front stalls at a strait, how an inland sea concentrates littoral power), proper
+nouns never do. Two traps named because they are easy to fall into — **"culture-flavoured" must
+not mean "Earth-culture-flavoured"** (a name a player can place as "the Roman one" has failed
+however good the mechanism under it), and **analogy language in docs is for the reader, not the
+generator**. Stamped onto BL-271 (Era −1 sim) and BL-277 (Era −1 military strategy), the two
+items filed off "use Rome as a sandbox". Project-Rival is the sole exception and only outside Io
+— it plays a real RTS and returns numbers and doctrine, never names.
+
+*The code was already fine* — nation/corp/city naming is seeded template banks plus phoneme
+tables with no authored lists. The exposure was entirely in the design layer, where the Era −1
+arc could have imported Roman nouns as content.
+
+**Point 2 — the governing body, and its reason.** BL-094 has been settled since 2026-07-04 but
+never carried a *reason*. It does now, and the reason is load-bearing: a corporation's levers
+are all economic, so a corporate player can be handed laws and research and both remain flavour
+on an economy — a law changes a cost, a tech unlocks a building, neither reaches force. A
+governing body **wields** law, policy and science and can point them at military might.
+
+That is also **Conflict's route to being load-bearing**: the house rule says every system must
+feed Trade or Conflict, and under a corporate player laws/techs/politics could only ever feed
+Trade — which is exactly why Conflict has stayed the least-designed pillar and kept sliding. It
+also retroactively converts the 2026-07-04 call that *Military anchors the pivot first* from a
+risky preference into the obvious consequence.
+
+**What it changes.** The v0.1.x stub band (laws BL-155, techs BL-156, military BL-157, politics
+BL-158) was themed "ponder and stub what the expanded prototype will need" — vague because
+nobody had said what the stubs were *for*. They are the governing body's levers, and each now
+carries a design test: **does this system reach military as well as economic outcomes?** If it
+can only change a cost or a price, it is being designed for the player we are pivoting away
+from. Written into ROADMAP's v0.1.x banner and BL-094; deliberately *not* written into the four
+stub items, which stay design-owed until reached.
+
+**Calls taken (NR-045).** BL-094 **unparked and raised F → A** — "the aim we're going for now"
+is not compatible with a parked F item — and retitled to Ben's word, *governing body*, rather
+than "nation". CONCEPT.md's player-identity statement was **left alone** despite being the doc
+his point most directly closes: the authority time-slice rule is unambiguous and the cost of
+waiting is low. NR-045 asks whether that was too conservative, and pushes the ROADMAP sequencing
+question that has been open since 2026-07-31 — a priority says "important", a version goal says
+"when", and "when" is the actual open question.
+
+---
+
+## Session — clearing the review queue: 14 decisions, six of them overturning what shipped (2026-08-03, later)
+
+**Runtime.** ~1h wall. Full (decision intake + doc/backlog authority; no `src/` change — every
+overturned call is filed as work, not applied in place).
+
+**The ask.** Ben, on mobile, asked what was worth doing from a phone and then took the thorough
+option: work all 14 open forks in `NEEDS_REVIEW.json` rather than the three live ones. Queue
+went **19 open → 6**.
+
+**Ratified as recommended.** NR-022 (BL-262 scoring — the six-call package ratified as written,
+diegetic publication confirmed, rival figures stay banded), NR-029 (BL-208 checkpoint timestamps
+keep the documented simplification), NR-042's arena reading, NR-043 (Ben installs 0 A.D.
+himself), NR-025's two-rupture reading, NR-037's sequencing.
+
+**Overturned — six calls I had taken, reversed.** (1) **NR-024**: Tax is not read-only after
+all; the player is a *chartered* corporation that **negotiates** its rate with its home nation,
+which keeps Ben's original intent and makes it coherent → **BL-280**. (2) **NR-020**: the
+History ledger's Tiles view is **retired**, not renamed — History becomes Story + Chain →
+**BL-281**. (3) **NR-030**: trade-route entries push **two** records, one per endpoint, so a
+body filter sees a route from either side → **BL-282**. (4) **NR-035**: Pass 3 placement is
+**constrained to the home province** rather than softening BL-219's wording → **BL-283**.
+(5) **NR-036**: BL-054's territorial half is **reopened** as its own measurable item rather than
+counted complete on an unmeasured argument → **BL-284**. (6) **NR-042**: **the played civ flips
+to Rome** — Han becomes the rival.
+
+**NR-023 — the reserved item, released.** Ben delegated BL-229's four layout questions rather
+than reserving them further, so they are answered against the measured widths and the item flips
+`design-owed` → `designed`; **v0.1.1 now has no design-owed items**. The answers: hex
+neighbourhood stays in the left quarter (it is the one column needing no rival-degradation
+logic); four accordion pages ordered symptom → cause; the two levers go in a strip *under* the
+accordion, keeping "right quarter = actions" stable across both siblings; the 2×3 grid stays,
+Manage dropped, Demolish bottom-right. Recorded explicitly as a *delegated* design, not a
+matched eye — the recourse if it near-misses is Ben's mockup.
+
+**v0.1.1 re-themed (NR-034 + NR-044).** The minor is now **the word interface** plus the
+standing shell set: BL-270 (dictionary, complete) + BL-206 (export, complete) + **BL-278 (MCP
+server, moved down from v0.2.0)**. Ben took the recommendation that the server land early
+because it touches no simulation code and is what lets a first real text-driven play attempt
+happen. BL-279 (trace corpus) stays v0.2.0.
+
+**Project-Rival flipped to Rome.** `RIVAL-ROME.md` → `RIVAL-HAN.md` (scholarship unchanged — it
+was always two-sided); CLAUDE.md, MISSION.md, ENVIRONMENT.md, CAMPAIGN.md and annals/README.md
+updated. The autostart civ flags swap, the annal register goes classical Chinese → Latin, and
+the rite inherits a real consequence: we now play the side that must *generate* campaigns, so a
+quiet year is a Han success and a Roman embarrassment.
+
+**Also.** ERAS.md's Era 0→1 gate corrected now rather than waiting on BL-087 (NR-025) — the
+three conditions gate a quest tree, not an Era; the two ruptures are distinct and CONCEPT.md
+stands unamended. **BL-285** files the GCC re-bless + the H4 chain_stage fix.
+
+**Left open.** Six entries, all older. One owed check before Rival's Year 1: confirm Pantheon's
+voices corpus has a Latin register — if not, propose one rather than faking it.
+
+---
+
 ## Session — LLM grand strategy: the public field, MCP, and the small-local-model direction (2026-08-03)
 
 **Runtime.** ~1h wall. Full (research + doc authority — no `src/` change; two backlog items,

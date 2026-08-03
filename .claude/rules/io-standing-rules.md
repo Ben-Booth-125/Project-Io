@@ -42,6 +42,17 @@ rule has a fuller authority, it is cited — this file does not redefine it.
 
 - Use the canonical terms in `docs/GLOSSARY.md` consistently; if a term is defined there, do
   not substitute an alternative.
+- **Real history is a mechanism reference, never a name source (Ben, 2026-08-03).** The design
+  leans on real history constantly and should keep doing so — the institutional ladder
+  (`docs/lore/HISTORY.md`), the Era −1 sim's "use Rome as a sandbox" (BL-271), the mil-sim's
+  calibration constants. What transfers is the **mechanism**: how a charter enforces a promise,
+  how a frontier stalls, how a hegemony forms or fails to. What must **never** transfer is a
+  proper noun. Every generated name in Io — nation, province, city, corporation, body, person —
+  is **sci-fi / fantasy**, produced by the seeded template banks and phoneme tables, never drawn
+  from an Earth list and never Earth-flavoured. If a doc says "Rome", it is naming an analogy
+  for the reader, not content for the game. **Project-Rival is the one exception and only
+  outside Io**: it plays an actual RTS with actual civilisations, and hands Io *numbers and
+  doctrine*, never names.
 - A settled design for an **open backlog item** lives in the item (BACKLOG.md / backlog.json)
   until the work lands; it propagates into the subject's authority doc *as part of landing the
   work*. Authority time-slices — do not edit the authority doc ahead of the work (see
