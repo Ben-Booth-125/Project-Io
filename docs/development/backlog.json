@@ -6013,6 +6013,32 @@
       "summary": "Ben (2026-08-03): a near-Mediterranean structure - an inland sea enclosed by land - should be almost inevitable (~90% of seeds), while the remaining worlds where forming 'something like Rome' is HARD stay interesting; it must never be impossible to try. Measured baseline (tools/verify/mediterranean_sweep.cpp, 500 seeds): an enclosed sea >=300 tiles exists in only 44% of seeds today.",
       "design": "@docs/development/archive/backlog-design-2026-Q3.json",
       "archived": "docs/development/archive/backlog-design-2026-Q3.json"
+    },
+    {
+      "id": "BL-277",
+      "short_name": "ERA_MINUS1_MILITARY_STRATEGY",
+      "category": "AI",
+      "title": "Era -1 military strategy - deterministic campaign-level decision-making for the Rome-sandbox nations (where armies go and why), above BL-272's battle resolution",
+      "status": "design-owed",
+      "glyph": "~",
+      "priority": "B",
+      "difficulty": 4,
+      "parked": false,
+      "version_goal": "post-v0.1.0",
+      "requires": [
+        "BL-271",
+        "BL-272",
+        "BL-273"
+      ],
+      "blocked_on": [],
+      "written": "2026-08-03",
+      "files": [
+        "src/world/settlement.{hpp,cpp}",
+        "src/world/combat.{hpp,cpp}"
+      ],
+      "authority_doc": "docs/lore/HISTORY.md",
+      "summary": "Filed at Ben's request (2026-08-03), same session as BL-276 (Mediterranean rift sea). BL-272 resolves a battle once armies meet; nothing yet decides WHERE armies go, what a nation is trying to take, or when it sues for peace. The Era -1 sim (BL-271) needs that strategic layer for its 2000-year wars to produce believable territorial history - and the new near-inevitable Mediterranean makes naval/littoral strategy (a Rome: control the inland sea's coasts) a live concern, not a corner case.",
+      "design": "## Intent (design-owed)\n\nThe campaign-level tier above BL-272 (battle resolution): per year-tick, each Era -1 nation picks military objectives and commits manpower. Everything deterministic and mechanical - this is the sandbox for the nation AI, not an LLM seam.\n\nQuestions the design must settle:\n\n1. **Objective selection** - what a nation wants: adjacent rich provinces (farm_q), securing coasts of an enclosed sea (the BL-276 Mediterranean as a strategic prize - a Rome is a nation that closes the ring), punishing a raider, survival. Scored deterministically from province/nation state; no dice-as-strategy (checkpoint-class draws only where BL-217's mechanism applies).\n2. **Force commitment** - how much of the BL-273 manpower stock to raise and where to send it; interaction with attrition and the self-limiting manpower loop so overreach collapses on its own (the hegemony-stall behaviour BL-224 wants emergent).\n3. **Sea crossings** - does Era -1 strategy get naval movement across the inland sea, or coasts-only? The Mediterranean prize argues for at least a crude crossing cost; a full naval layer is almost certainly out of scope.\n4. **Peace and consolidation** - when a war ends, and what territory transfer looks like against BL-218's province model; feeds BL-275's sweep metrics (war frequency, hegemony rates).\n5. **Doctrine choice** - whether a nation's culture/creed leans it toward BL-272 doctrine rows (forge-god cultures fielding aggressive doctrine), reusing the existing creed data rather than new authored tables.\n\nScope guard: strategy for the ERA -1 SANDBOX nations only - the 1960 game's nation behaviour and the corporate AI opponent (BL-054/BL-199 arc) are explicitly untouched; the standing-rules AI-faction prohibition keeps applying to the main era."
     }
   ]
 }
