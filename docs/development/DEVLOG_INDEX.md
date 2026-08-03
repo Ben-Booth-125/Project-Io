@@ -3,13 +3,15 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 111 entries across 2 volume(s).
+One line per session, newest first — 113 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-08-03 | [Mediterranean rift sea: measure, mechanism, gate (BL-276)](DEVLOG.md) | BL-276 | DEVLOG.md |
+| 2026-08-02 | [filing the Era −1 sim: Rome as sandbox, units instead of scalars](DEVLOG.md) | BL-054 BL-155 BL-210 BL-218 BL-223 BL-224 BL-271 BL-272 BL-273 BL-274 BL-275 | DEVLOG.md |
 | 2026-08-02 | [documentation compression: the backlog sheds 42%, and the reading order gets measured](DEVLOG.md) | BL-270 | DEVLOG.md |
 | 2026-08-02 | [the history backend: provinces, gods on the ground, and a record that can be burned](DEVLOG.md) | BL-053 BL-054 BL-170 BL-210 BL-217 BL-218 BL-219 BL-252 | DEVLOG.md |
 | 2026-08-02 | [the action dictionary: 114 controls, five agents, one afternoon](DEVLOG.md) | BL-159 BL-248 BL-270 | DEVLOG.md |

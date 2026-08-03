@@ -5987,6 +5987,32 @@
       "authority_doc": "docs/lore/HISTORY.md",
       "summary": "BL-210's one remaining scope item is the batch-sweep extension, and this gives it its real payload: sweep N seeds of earth-like generation through the full 0-2000 CE sim (BL-271) and report DISTRIBUTIONS - hegemony formation rate, war frequency and lethality, ideology mix at epoch, industrialisation onset spread, record-loss (lacunae) rates, population trajectories. Ben, 2026-08-02: 'Once generation produces a spread of earth-like planets, we can refine the crucial philosophical development of our worlds by getting tons of examples which go from 0 CE to 2000 CE.' The sweep is HOW the campaign premise's philosophical claims stop being assertions: BL-224's non-hegemony becomes a measured rate to tune toward, and BL-223's averted rupture gets designed against a thousand simulated near-ruptures instead of lore. Ben has explicitly welcomed hard failure cases ('if a problem becomes very hard to solve, I will be fascinated') - so the sweep reports the ugly distributions honestly rather than tuning them away before he sees them.",
       "design": "## Settled at filing (2026-08-02 brainstorm)\n\n- **Deterministic per seed, comparable across seeds**: same discipline as every harness - a sweep row is replayable from its seed alone.\n- **Report, do not gate (at first)**: the sweep's first job is to SHOW Ben the distributions (the BL-219-sweep lesson: Ben asked to see failure cases). Assertions (e.g. 'hegemony rate stays under X%') come after he has seen the raw spread and said what he wants, not before.\n- **Named metrics for the first cut**: per-seed final nation count; hegemony events (any nation crossing a territory-share threshold, with the year); wars per century and their average territorial transfer; lacunae per world (how much written history survived); ideology distribution at epoch; first/median/last industrialisation years; population at epoch vs peak.\n- **Closes BL-210**: with this landed, the umbrella's last scope item (batch-sweep extension) is met and BL-210 closes after TILE_GENERATION.md's propagation share.\n\n## Open questions\n\n1. Sweep size vs runtime: hangs entirely on BL-271's per-world budget (its open question 1). 100 seeds at under a second each is the working target.\n2. Output surface: printed table only, or a JSON the (future) generation ledger / wizard could read? (Lean: JSON + printed summary - the marginal cost is trivial, and the wizard's formed-vs-left chart shows there is appetite for generation evidence in the UI.)"
+    },
+    {
+      "id": "BL-276",
+      "short_name": "MEDITERRANEAN_RIFT_SEA",
+      "category": "Environment",
+      "title": "Mediterranean rift sea - a continental rift basin floods into an enclosed sea on ~90% of worlds, with a small-sea floor so a Rome-like start is never impossible",
+      "status": "complete",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 3,
+      "parked": false,
+      "version_goal": "v0.1.1",
+      "requires": [],
+      "blocked_on": [],
+      "written": "2026-08-03",
+      "files": [
+        "src/world/continents.{hpp,cpp}",
+        "src/world/hard_coded_world.cpp",
+        "tools/verify/mediterranean_sweep.cpp",
+        "docs/generation/CONTINENTS.md",
+        "docs/generation/TILE_GENERATION.md"
+      ],
+      "authority_doc": "docs/generation/CONTINENTS.md",
+      "summary": "Ben (2026-08-03): a near-Mediterranean structure - an inland sea enclosed by land - should be almost inevitable (~90% of seeds), while the remaining worlds where forming 'something like Rome' is HARD stay interesting; it must never be impossible to try. Measured baseline (tools/verify/mediterranean_sweep.cpp, 500 seeds): an enclosed sea >=300 tiles exists in only 44% of seeds today.",
+      "design": "@docs/development/archive/backlog-design-2026-Q3.json",
+      "archived": "docs/development/archive/backlog-design-2026-Q3.json"
     }
   ]
 }

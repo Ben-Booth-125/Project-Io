@@ -10,6 +10,42 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## Session — Mediterranean rift sea: measure, mechanism, gate (BL-276) (2026-08-03)
+
+**Runtime.** ~2h wall. Full (delivery — seed exploration turned same-session Full-mode item;
+touches deterministic generation across `continents.cpp` + `hard_coded_world.cpp`).
+
+**The ask.** Ben: explore seeds for a near-Mediterranean structure and make it "almost
+inevitable"; hard-coding on the table. Measured first (new `mediterranean_sweep` harness, 500
+campaign seeds through Kepler's exact pipeline): an enclosed sea ≥ 300 tiles existed on only
+**44%** of seeds — TILE_GENERATION.md's "lacks enclosed seas" note was stale but directionally
+right. Options filed as NR-041; Ben chose **hybrid at ~90%**: "interesting worlds if it is
+HARD to form something like Rome. But it will never be impossible to try."
+
+**Built (BL-276, Mediterranean rift sea).** (1) *Mechanism, consequence-not-dice*: in
+`run_continents`, the divergent continental-continental boundary with the longest
+land-interior segment (per-tile inland-ness ≥ 0.75 over plate ownership) founders — adaptive
+width (short rift → wide Black-Sea oval), depth 0.65, and a +0.50 **rift-shoulder rim** that
+seals the sea off from the world ocean; worlds with no such pair get an **intracratonic sag
+basin** (Caspian shape) at the continental inland-ness argmax. One dated biography line each;
+zero shared-stream RNG. (2) *Backstop gate* in `hard_coded_world.cpp`: Kepler's tile seed is
+attempt-folded — three attempts at the **arena** bar (enclosed sea ≥ 300 tiles), six at the
+**floor** (≥ 30), attempt 0 kept honestly on exhaustion.
+
+**Measured after.** Floor **100%**, arena **89.6%** over 500 seeds — on Ben's ~90%, with the
+1-in-10 hard-Rome tail intact. The sweep asserts wide regression bars (floor ≥ 97%, arena
+82–96%) and mirrors the gate loop line-for-line.
+
+**Verified.** `mediterranean_sweep` PASS; `continents_harness` 11/11, `world_determinism`,
+`determinism_harness`, `world_audit` all PASS on the new surface. Docs: CONTINENTS.md
+§ Rift-basin sea (new), TILE_GENERATION.md § Deferred coastline note updated. NR-041 resolved.
+
+**Left open.** The default-seed world visibly changes (ocean relocates into the basin) — worth
+Ben eyeballing the live Planetary canvas; `mediterranean_sweep` still needs naming in the
+`verifier-headless` skill (permission owed); CMake reconfigure will auto-register it with CTest.
+
+---
+
 ## Session — filing the Era −1 sim: Rome as sandbox, units instead of scalars (2026-08-02, later)
 
 **Runtime.** ~30m wall. Light (filing only — five backlog items, Sprint 5 re-theme, two doc

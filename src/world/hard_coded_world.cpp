@@ -41,6 +41,65 @@ float deposit_scalar_for(abundance_level a, const world_gen_config& cfg)
     return cfg.deposit_scalar[2];
 }
 
+// ---------------------------------------------------------------------------
+// Enclosed-sea measurement for the BL-276 acceptance gate. Returns the tile
+// count of the LARGEST landlocked ocean component (any ocean component other
+// than the biggest, which is the world ocean) — 0 if none. The gate reads it
+// against two bars: the Mediterranean-scale arena (>= 300) and the small-sea
+// floor (>= 30) under "a Rome-like start is never impossible" (Ben, 2026-08-03).
+// ---------------------------------------------------------------------------
+int largest_enclosed_sea(const world& w, const std::vector<entity_id>& tile_ids,
+                         int gw, int gh)
+{
+    std::vector<char> ocean(tile_ids.size(), 0);
+    for (std::size_t i = 0; i < tile_ids.size(); ++i)
+        if (w.tiles.at(tile_ids[i]).composition == terrain_composition::ocean)
+            ocean[i] = 1;
+
+    // Flood-fill ocean components on odd-r hex adjacency (columns wrap).
+    std::vector<int> comp(ocean.size(), -1);
+    std::vector<int> sizes;
+    std::vector<int> stack;
+    static const int even_d[6][2] = { {1,0},{-1,0},{0,-1},{-1,-1},{0,1},{-1,1} };
+    static const int odd_d[6][2]  = { {1,0},{-1,0},{1,-1},{0,-1},{1,1},{0,1} };
+    for (int i = 0; i < static_cast<int>(ocean.size()); ++i)
+    {
+        if (!ocean[static_cast<std::size_t>(i)] || comp[static_cast<std::size_t>(i)] != -1) continue;
+        const int id = static_cast<int>(sizes.size());
+        sizes.push_back(0);
+        comp[static_cast<std::size_t>(i)] = id;
+        stack.push_back(i);
+        while (!stack.empty())
+        {
+            const int t = stack.back();
+            stack.pop_back();
+            ++sizes[static_cast<std::size_t>(id)];
+            const int col = t % gw, row = t / gw;
+            const auto& d = (row & 1) ? odd_d : even_d;
+            for (int k = 0; k < 6; ++k)
+            {
+                const int nr = row + d[k][1];
+                if (nr < 0 || nr >= gh) continue;
+                const int nc = ((col + d[k][0]) % gw + gw) % gw;
+                const int n = nr * gw + nc;
+                if (ocean[static_cast<std::size_t>(n)] && comp[static_cast<std::size_t>(n)] == -1)
+                {
+                    comp[static_cast<std::size_t>(n)] = id;
+                    stack.push_back(n);
+                }
+            }
+        }
+    }
+
+    int main_id = -1, main_sz = 0;
+    for (int i = 0; i < static_cast<int>(sizes.size()); ++i)
+        if (sizes[static_cast<std::size_t>(i)] > main_sz) { main_sz = sizes[static_cast<std::size_t>(i)]; main_id = i; }
+    int best = 0;
+    for (int i = 0; i < static_cast<int>(sizes.size()); ++i)
+        if (i != main_id) best = std::max(best, sizes[static_cast<std::size_t>(i)]);
+    return best;
+}
+
 } // namespace
 
 world make_hard_coded_world(world_params params, generation_report* report,
@@ -200,8 +259,49 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // Pass-1 heightmap it captures; this is a pure capture (TILE_GENERATION.md § Generation
     // history hook) and does not perturb the deterministic tile surface itself.
     generation_record kepler_record;
+
+    // Reject-and-reroll acceptance gate (BL-276), two bars — the hybrid Ben
+    // chose (2026-08-03: "about 90% likely ... never impossible to try"):
+    //
+    //   ARENA (>= 300 tiles): a playable Mediterranean. Three attempts only —
+    //     with the rift-basin mechanism (continents.cpp) putting a single seed
+    //     at ~58%, three tries land ~90% of worlds. Deliberately NOT retried to
+    //     exhaustion: the ~1-in-10 worlds without an arena are the wanted
+    //     hard-Rome tail.
+    //   FLOOR (>= 30 tiles): some enclosed sea, so trying is never impossible.
+    //     All six attempts may serve it; ~98% of seeds pass on attempt 0.
+    //
+    // Attempt 0 is the unfolded seed, so worlds already qualifying are
+    // untouched; on full exhaustion attempt 0 is kept honestly rather than
+    // clamping anything (the resolve_preferences idiom). Each probe is one
+    // scratch tile generation (~tens of ms).
+    uint32_t kepler_tile_seed = params.seed ^ 0xE471001u;
+    {
+        uint32_t floor_seed = 0;
+        bool have_floor = false, have_arena = false;
+        for (int attempt = 0; attempt < 6; ++attempt)
+        {
+            const uint32_t candidate = (params.seed ^ 0xE471001u) ^ (static_cast<uint32_t>(attempt) * 0x9E3779B9u);
+            world scratch;
+            const entity_id probe = scratch.create_entity();
+            const auto probe_tiles = generate_body_tiles(scratch, probe, 180, 84, kepler_pl.profile,
+                candidate, deposit_scalar, &kepler_pl, nullptr, &kepler_bias);
+            const int sea = largest_enclosed_sea(scratch, probe_tiles, 180, 84);
+            if (attempt < 3 && sea >= 300)
+            {
+                kepler_tile_seed = candidate;
+                have_arena = true;
+                break;
+            }
+            if (!have_floor && sea >= 30) { floor_seed = candidate; have_floor = true; }
+            // Past the arena window with the floor already met: done searching.
+            if (attempt >= 2 && have_floor) break;
+        }
+        if (!have_arena && have_floor) kepler_tile_seed = floor_seed;
+    }
+
     auto kepler_tiles = generate_body_tiles(w, kepler, 180, 84, kepler_pl.profile,
-        /*seed=*/params.seed ^ 0xE471001u, deposit_scalar, &kepler_pl, &kepler_record, &kepler_bias);
+        kepler_tile_seed, deposit_scalar, &kepler_pl, &kepler_record, &kepler_bias);
 
     // Rivers (BL-170) — sibling pass (BL-051 convention) over the same heightmap Pass 2
     // already thresholded; needs Kepler's ocean placement done, so it runs after

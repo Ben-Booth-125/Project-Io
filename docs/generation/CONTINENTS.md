@@ -54,6 +54,37 @@ that each generation file owns its stream.
    (`std::stable_sort`, because two boundaries can hash to the same year and a
    plain sort would leave tied order unspecified — a determinism hazard).
 
+## Rift-basin sea (BL-276, landed 2026-08-03)
+
+Ben's call (2026-08-03): a Mediterranean-like enclosed sea should be **almost inevitable
+(~90% of worlds) but never guaranteed** — the rare world where forming a Rome is hard is a
+feature, and it must never be *impossible* to try. Two levers deliver this, both in this
+pass plus one gate in `hard_coded_world.cpp`:
+
+- **Rift basin (the mechanism).** After boundary classification, the divergent boundary
+  between two **continental** plates with the longest *land-interior segment* (per-tile
+  inland-ness ≥ 0.75 against plate ownership) founders: a distance-falloff depression
+  (depth 0.65) with an uplifted **rift-shoulder rim** (+0.50 out to +5 tiles) that seals
+  the flooded basin off from the world ocean. Width is **adaptive** — short rifts flood
+  wide (a Black-Sea oval), long rifts stay narrow — targeting a roughly constant arena
+  area. Pass 2's ocean threshold is a percentile, so the basin **relocates** ocean rather
+  than adding any.
+- **Sag-basin fallback.** A world with no continental divergent pair gets an
+  **intracratonic sag basin** (the Caspian shape) at the inland-ness argmax of its
+  continental plates — still a pure consequence of the plate layout, no draw.
+- **One biography line** per basin (`chain_stage::engine`): rift ("A continental rift
+  foundered below the waterline.") or sag ("The craton's interior sagged into a broad
+  basin."), on a local RNG tag so no existing draw shifts.
+- **Acceptance gate (the backstop, `hard_coded_world.cpp`).** Kepler's tile seed is
+  attempt-folded (attempt 0 = the unfolded seed): three attempts to find an **arena**
+  (enclosed sea ≥ 300 tiles), any of six for the **floor** (≥ 30 tiles); attempt 0 kept
+  honestly on exhaustion — no clamping, the `resolve_preferences` idiom.
+
+Measured (`tools/verify/mediterranean_sweep.cpp`, 500 campaign seeds): floor 100%, arena
+**89.6%** — the ~1-in-10 without an arena are the deliberately-hard tail. The sweep
+asserts wide regression bars (floor ≥ 97%, arena 82–96%) and mirrors the gate loop; keep
+it in sync with `hard_coded_world.cpp` when either changes.
+
 ## Outputs and contracts
 
 `continent_state` carries three things, with three different consumers:

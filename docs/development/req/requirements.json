@@ -8133,6 +8133,62 @@
           "notes": "Same determinism discipline as settlement_harness S1a/S1b."
         }
       ]
+    },
+    {
+      "brief": "mediterranean-rift-sea",
+      "title": "Rift-basin inland sea mechanism + enclosed-sea backstop gate (BL-276)",
+      "difficulty": 3,
+      "importance": "A",
+      "evaluated_difficulty": 3,
+      "status": "complete",
+      "resolved": "2026-08-03",
+      "resolution": "Complete, all rows met. Rift-basin + sag-basin mechanism in run_continents, two-bar acceptance gate in hard_coded_world; measured floor 100%, arena 89.6% over 500 seeds.",
+      "promoted_from": "BL-276, promoted 2026-08-03 (Ben's hybrid call in-session; no dependencies)",
+      "batch": null,
+      "rows": [
+        {
+          "id": "R1",
+          "requirement": "run_continents stamps a rift-basin negative height bias along the largest divergent boundary between two continental plates (distance-falloff corridor), emits one chain_stage::engine biography line for it, and stamps nothing when no such pair exists. The pass draws no shared-stream RNG, so plate seeding and all existing bias values are bit-identical to pre-change output on every world.",
+          "verification": [
+            "headless: continents_harness",
+            "headless: mediterranean_sweep"
+          ],
+          "status": "complete",
+          "result_metric": "Met - interior-segment rift basin (adaptive width, rift-shoulder rim) + intracratonic sag fallback; one dated biography line each; no shared-stream RNG (distance field only, local rng tag for the date). continents_harness 11/11 PASS unchanged.",
+          "notes": ""
+        },
+        {
+          "id": "R2",
+          "requirement": "Kepler's tile-seed acceptance gate in hard_coded_world regenerates into a scratch world (attempt-folded seed, attempt 0 = the unfolded seed) until an enclosed ocean component >= 30 tiles exists, capped at 6 attempts, keeping attempt 0 on exhaustion - no clamping of the surface itself.",
+          "verification": [
+            "headless: mediterranean_sweep",
+            "code: review of the gate loop"
+          ],
+          "status": "complete",
+          "result_metric": "Met - two-bar gate: arena (>=300) on attempts 0-2, floor (>=30) on any of 6, attempt 0 kept on exhaustion. Reviewed; mirrored line-for-line in mediterranean_sweep.",
+          "notes": ""
+        },
+        {
+          "id": "R3",
+          "requirement": "Measured outcome across >= 500 campaign seeds: an enclosed sea >= 300 tiles in 88-92% of worlds (NOT ~100% - the hard-Rome tail is deliberate), and >= 30 tiles in >= 99%.",
+          "verification": [
+            "headless: mediterranean_sweep"
+          ],
+          "status": "complete",
+          "result_metric": "Met - 500 seeds: floor >= 30 on 100.0%, arena >= 300 on 89.6% (target 88-92). Sweep asserts wide bars (floor >= 97%, arena 82-96%) as a CTest-able regression check.",
+          "notes": "Baseline before this item: 44% at >=300, 81% at >=30."
+        },
+        {
+          "id": "R4",
+          "requirement": "Determinism holds: same campaign seed twice -> identical Kepler surface (gate and basin are pure functions of the seed); existing determinism harness still passes.",
+          "verification": [
+            "headless: determinism_harness"
+          ],
+          "status": "complete",
+          "result_metric": "Met - world_determinism, determinism_harness and world_audit all PASS on the new surface (markets/nations/corps regenerate clean).",
+          "notes": ""
+        }
+      ]
     }
   ]
 }

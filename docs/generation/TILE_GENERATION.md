@@ -484,10 +484,14 @@ coal, iron-nickel ore, and platinum-group metals are now authored via the seeded
 rarity-scalar pass — see the full raw-set additions table above and
 [RESOURCES.md](../economy/RESOURCES.md) § Deposit rarity & scarcity.
 
-**Coastline refinement.** The noise-thresholded ocean produces plausible
-coastlines, but lacks features like enclosed seas, archipelagos, or large lakes.
-These could be produced by multi-scale noise layering or post-processing the
-coastline with additional BFS passes.
+**Coastline refinement.** *Enclosed seas: done (BL-276, landed 2026-08-03).* The
+Continents/Drift pass now stamps a rift-basin (or intracratonic sag) depression
+whose rift-shoulder rim seals a Mediterranean-like inland sea into ~90% of
+worlds, backed by an enclosed-sea acceptance gate on Kepler's tile seed in
+`hard_coded_world.cpp` (see `CONTINENTS.md` § Rift-basin sea; measured by
+`tools/verify/mediterranean_sweep.cpp`). Still deferred: archipelagos and large
+lakes, which could be produced by multi-scale noise layering or post-processing
+the coastline with additional BFS passes.
 
 **Additional body types.** The pipeline's parameter set is already adequate to
 model gas giant moons, outer ice worlds, and terrestrial bodies with thin reducing

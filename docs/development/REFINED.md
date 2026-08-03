@@ -1,5 +1,16 @@
 # Project Io — REFINED (active worklist)
 
+# Mediterranean rift sea (BL-276, 2026-08-03) — **COMPLETE**
+
+Requirements: requirements.json § mediterranean-rift-sea (R1–R4 all met).
+Rift-basin mechanism (interior-segment corridor, adaptive width, rift-shoulder rim) +
+intracratonic sag fallback in `run_continents`; two-bar acceptance gate (arena ≥ 300 ×3
+attempts, floor ≥ 30 ×6) in `hard_coded_world.cpp`; new asserted `mediterranean_sweep`
+harness. Measured over 500 seeds: floor 100%, arena 89.6% (~90% per Ben's call, hard tail
+kept). continents_harness, world_determinism, determinism_harness, world_audit all PASS.
+
+---
+
 # Sprint 5 — Era −1 history sim: foundation wave (2026-08-02) — **COMPLETE**
 
 Both items landed as two parallel worktree-isolated agents (disjoint files, no collision), merged

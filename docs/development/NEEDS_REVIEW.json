@@ -829,6 +829,55 @@
     "docs/development/req/requirements.json"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-041",
+   "title": "Mediterranean-like inland seas: 44% of seeds have one at playable scale — pick the mechanism that makes them near-inevitable",
+   "raised": "2026-08-03",
+   "kind": "question",
+   "status": "resolved",
+   "source": "Seed-exploration session (Ben: notice a near-Mediterranean structure, make it almost inevitable). Measured by the new tools/verify/mediterranean_sweep.cpp harness.",
+   "what": "Swept 500 campaign seeds through Kepler's exact pipeline (planetology -> continents -> tile gen). A fully landlocked ocean component of >=30 tiles exists in 81% of seeds, but at Mediterranean scale it thins fast: >=75 tiles (Earth-proportioned, ~0.5% of surface) in 70%, >=300 tiles (a playable inland-sea arena) in 44%, >=600 in 25%. Strait-connected arms (Gibraltar-like, behind a chokepoint) add only ~11%. So the structure is common but far from inevitable, and TILE_GENERATION.md's Deferred note ('lacks enclosed seas') undersold what the noise already does since the BL-210 continent bias landed.",
+   "why_it_matters": "Ben wants the formation 'almost inevitable' — a guarantee, not a tendency. Pure noise-parameter tuning cannot promise a topological feature; the lever has to be either selection (reroll) or construction (a deliberate pass).",
+   "options": [
+    "Reject-and-reroll: add an enclosed-sea acceptance check (>=N tiles) to the existing resolve_preferences-style reroll idiom. At N=300 the expected cost is ~2.3 attempts; honest, no clamping, ~20 lines. But the sea is found, not explained — no tectonic story attaches to it.",
+    "Rift-basin sea pass (consequence, not dice): the continents pass already classifies divergent boundaries; a sibling pass deepens a basin along a divergent boundary segment enclosed by continental plates, so an inland sea is a CONSEQUENCE of plate structure and gets a biography line ('rift basin flooded into an inland sea'). Deeper work, aligns with the deferred 'seed Pass 5 along boundaries' item and the oral-history pivot (BL-210).",
+    "Hard-code Kepler's sea: against the pipeline's no-body-specific-branches principle and dies the day true procedural generation un-defers; cheapest but a dead end.",
+    "Hybrid: land option 2 as the mechanism, keep option 1 as a cheap backstop gate so even an unlucky plate draw still ships a sea."
+   ],
+   "recommendation": "Option 2 (or 4 if a hard guarantee is wanted from day one). It is the only shape where the Mediterranean is driven rather than selected — matching the 'consequence, not dice' rule and giving the History ledger a real line to show. Option 1 alone is defensible and very cheap if the tectonic pass should wait.",
+   "files": [
+    "tools/verify/mediterranean_sweep.cpp",
+    "src/world/continents.cpp",
+    "src/world/tile_generation.cpp",
+    "docs/generation/TILE_GENERATION.md"
+   ],
+   "resolution": "OPTION 4 (Ben, 2026-08-03, same session) - hybrid at ~90%: 'We will also find interesting worlds if it is HARD to form something like Rome. But it will never be impossible to try.' Filed and landed as BL-276 (Mediterranean rift sea): rift-basin + sag-basin mechanism in run_continents, two-bar acceptance gate in hard_coded_world. Measured over 500 seeds: floor (>=30 tiles) 100%, arena (>=300 tiles) 89.6%."
+  },
+  {
+   "id": "NR-042",
+   "title": "Project-Rival seeded: '0AD test environment' read as the RTS 0 A.D. as near-term arena, bridged to BL-271; Han as played civ, Rome as target",
+   "raised": "2026-08-03",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Ben's seeding brief for Project-Rival (2026-08-03): 'get a test environment at 0AD, refine the oral history by play... series of prompts every year that affect military strategy and continue a civilising mission... Rome as a target... spin this as if the gods are sending the soldiers to their locations'",
+   "what": "The brief's '0AD' admits two readings: the Era -1 sim at 0 AD (BL-271, designed, unbuilt, Sprint 5) or the RTS '0 A.D.' (Wildfire Games, installable today, Romans and Han playable). Seeded Project-Rival on the RTS reading as the near-term arena with BL-271 as the destination, because Io has no playable war content at 0 AD yet and the skeleton's own purpose line names computer-use play (the NR-040 steer). Also chosen on Ben's behalf: we play Han China (the self-preservation cosmology carrying the laihua civilising mission) against Rome (Petra bot); campaign year defaults to ~5 minutes of match time; annals voiced in classical Chinese per Pantheon's voices corpus.",
+   "why_it_matters": "If Ben meant the internal sim only, the ENVIRONMENT.md install plan and the Han-vs-Rome match template are scaffolding he didn't ask for (though the liturgy, annal format, and Rome dossier transfer unchanged). The civ choice also fixes the campaign's narrative voice; playing Rome instead would invert the theology (auspices/evocatio as our frame rather than the rival's). BL-271's 'Rome as calibration reference, not content' rule was left intact for Io itself - Rival plays actual Rome only in the stand-in arena.",
+   "options": [
+    "Keep the RTS-arena reading (seed as written)",
+    "Internal-sim only: drop ENVIRONMENT.md's install plan, keep liturgy/annals/dossier waiting on BL-271",
+    "Flip the played civ to Rome (expansionist theology as our voice, Han as target)"
+   ],
+   "recommendation": "Keep as seeded; the RTS is scaffolding that comes down when BL-271 lands (MISSION.md says exactly this).",
+   "files": [
+    "Project-Rival/CLAUDE.md",
+    "Project-Rival/docs/MISSION.md",
+    "Project-Rival/docs/ENVIRONMENT.md",
+    "Project-Rival/docs/CAMPAIGN.md",
+    "Project-Rival/docs/RIVAL-ROME.md",
+    "Project-Rival/annals/README.md"
+   ],
+   "resolution": null
   }
  ]
 }
