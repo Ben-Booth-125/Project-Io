@@ -162,6 +162,9 @@ The Generation Ledger (design only) — a tuning/analysis surface that explains 
 **`docs/lore/HISTORY.md`**
 Design-owed authority for the **institutional history ladder** — why the campaign world of 1960 is market-based and non-hegemonic, as a seven-stage causal ladder (agrarian surplus → the enforceable promise / Charter Age → fragmentation-with-connectivity → capital disciplines the sovereign → the energy transition → the averted rupture → saturation). It picks up where `PLANETOLOGY.md` stops (the civilisation gate) and generates what `NATION_GENERATION.md` / `GENERATION_STRATEGY.md` currently assume. The ladder is **driven, not narrated** (Ben, 2026-07-30): it produces fragmentation, nation count, industrialisation timing and drawdown rather than describing an already-generated world. Promoted into **BL-220** (timestamp foundation), **BL-221** / **BL-222** / **BL-223** (the stages) and **BL-224** (the non-hegemony invariant). Read before any work on settlement, industrialisation, or the campaign premise's historical claims. **Stages 5–6 as written are superseded** — see BL-223.
 
+**`Project-Rival/CLAUDE.md`**
+The AI-player research discipline — live 0 A.D. play under NR-040 (the computer-use steer), refining the Pantheon oral history toward the v0.2.0 AI opponent. Its mission, campaign rite, annals and conformance rules live under `Project-Rival/`; it never writes Io source. Findings return as review-queue entries and proposed notes for BL-207 (persona packs), BL-210 (oral-history pivot), BL-271 (Era −1 sim) and BL-274 (era-keyed rosters). Read before any Rival campaign session.
+
 ---
 
 ## Delivery pipeline

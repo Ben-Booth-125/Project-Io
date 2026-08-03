@@ -1,0 +1,15 @@
+{
+  "_note": "Campaign-level aggregate — one record per war, updated at station 6 as each year closes. The analytics substrate over the annals (the cycles.json analogue from AgenticProcess research practice). Derived, not authoritative: the annals win on any disagreement and this file is regenerated from them. The ten-year test of the rite (docs/CAMPAIGN.md § The refinement contract) is read off this file.",
+  "_schema": {
+    "war": "war-slug, matching annals/<war-slug>/",
+    "status": "active | concluded",
+    "started": "YYYY-MM-DD of year 1's play",
+    "years": "count of annal entries written",
+    "verdicts": "tally object {held, advanced, repulsed, lost}",
+    "doctrine_amendments": "list of {year, rule} the war earned; empty means precedent stood",
+    "phrase_bank": "tally object {attested_adapted, invented} of candidates proposed",
+    "conformance_fails": "list of {year, checks: [R#]} — empty means the rite ran clean (docs/CAMPAIGN.md § Rite conformance)",
+    "calibration_notes": "count of observations proposed toward BL-271 (Era -1 sim), BL-272 (mil-sim) constants, BL-274 (era-keyed rosters)"
+  },
+  "wars": []
+}
