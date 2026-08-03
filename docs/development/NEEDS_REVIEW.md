@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*42 entries — 18 open, 24 resolved.*
+*43 entries — 19 open, 24 resolved.*
 
 ---
 
@@ -270,6 +270,21 @@ The brief's '0AD' admits two readings: the Era -1 sim at 0 AD (BL-271, designed,
 > **Recommendation:** Keep as seeded; the RTS is scaffolding that comes down when BL-271 lands (MISSION.md says exactly this).
 
 *Files: `Project-Rival/CLAUDE.md`, `Project-Rival/docs/MISSION.md`, `Project-Rival/docs/ENVIRONMENT.md`, `Project-Rival/docs/CAMPAIGN.md`, `Project-Rival/docs/RIVAL-ROME.md`, `Project-Rival/annals/README.md`*
+
+### NR-043 — Project-Rival: approve the 0 A.D. install so Year 1 can open (campaign otherwise ready)
+*question · raised 2026-08-03 · from Project-Rival seeding session close-out (2026-08-03); Ben asked for anything reviewable to be parked here*
+
+The seeded campaign's only blocker is the arena itself: 0 A.D. Release 28 'Boiorix' is not installed (verified 2026-08-03 - no install dir, no user data, no registry entries). Install is a ~1.5 GB download from play0ad.com requiring Ben's action or explicit approval; one first run creates Documents/My Games/0ad. Everything else is in place: the six seed docs (critiqued, 21 findings applied), the yearly rite with R1-R8 conformance checks, the annal format, and annals/campaigns.json as the aggregate.
+
+**Why it matters.** Until the install happens, Project-Rival is a method with no arena - the liturgy, the Rome dossier, and the annal format stay untested against play, which is the project's whole verification model ('play is the verifier'). Also standing behind this: NR-042 (the '0AD = RTS arena' interpretation) - approving the install implicitly ratifies that reading; overturning NR-042 makes this entry moot.
+
+- Ben installs 0 A.D. himself, then opens Year 1 in a Project-Rival session
+- Ben approves the download in-session and Claude runs the install + first-run smoke test
+- Hold until BL-271 (Era -1 sim) exists and skip the external arena entirely (resolves NR-042 to its option 2)
+
+> **Recommendation:** Option 1 or 2, whichever is less friction; the headless rehearsal command in Project-Rival/docs/ENVIRONMENT.md is the smoke test either way.
+
+*Files: `Project-Rival/docs/ENVIRONMENT.md`, `Project-Rival/docs/CAMPAIGN.md`*
 
 ---
 
