@@ -1,71 +1,81 @@
 market_id,market_label,body_id,body_name,resource,supply,demand,price,base_price
-30288,"Kumere",15124,"Kepler",Iron Ore,304.683,354.537,2.69678,2.5
-30288,"Kumere",15124,"Kepler",Petroleum,155.402,253.5,4.47019,3.5
-30288,"Kumere",15124,"Kepler",Agricultural Produce,469.938,519.938,3.33014,3
-30288,"Kumere",15124,"Kepler",Water,28.1873,191.159,3.90621,1.5
-30288,"Kumere",15124,"Kepler",Tobacco,0,0,4.81754,4.81754
-30288,"Kumere",15124,"Kepler",Spices,0,0,4.09399,4.09399
-30288,"Kumere",15124,"Kepler",Coffee,0,0,1.9593,1.9593
-30288,"Kumere",15124,"Kepler",Steel,8,152.559,31.9994,8
-30288,"Kumere",15124,"Kepler",Refined Fuel,0,135.608,39.9992,10
-30288,"Kumere",15124,"Kepler",Food Rations,0,237.313,23.9996,6
-30289,"New WaeVaillham",15124,"Kepler",Iron Ore,116.038,70.3891,2.99777,2.5
-30289,"New WaeVaillham",15124,"Kepler",Petroleum,0,17.7831,13.9997,3.5
-30289,"New WaeVaillham",15124,"Kepler",Agricultural Produce,2208.38,240.084,0.989161,3
-30289,"New WaeVaillham",15124,"Kepler",Water,0,23.7108,5.99985,1.5
-30289,"New WaeVaillham",15124,"Kepler",Tobacco,0,0,5.06283,5.06283
-30289,"New WaeVaillham",15124,"Kepler",Spices,0,0,4.27814,4.27814
-30289,"New WaeVaillham",15124,"Kepler",Coffee,0,0,1.58529,1.58529
-30289,"New WaeVaillham",15124,"Kepler",Steel,8,41.7533,18.2764,8
-30289,"New WaeVaillham",15124,"Kepler",Refined Fuel,0,23.7108,39.9991,10
-30289,"New WaeVaillham",15124,"Kepler",Food Rations,0,41.4938,23.9995,6
-30290,"Humcross",15124,"Kepler",Iron Ore,33.4718,33.4718,2.63523,2.5
-30290,"Humcross",15124,"Kepler",Petroleum,0,9.87175,13.9998,3.5
-30290,"Humcross",15124,"Kepler",Agricultural Produce,4.11418,18.0982,11.9999,3
-30290,"Humcross",15124,"Kepler",Water,34.4281,38.2534,1.58114,1.5
-30290,"Humcross",15124,"Kepler",Tobacco,0,0,3.85282,3.85282
-30290,"Humcross",15124,"Kepler",Spices,0,0,4.28468,4.28468
-30290,"Humcross",15124,"Kepler",Coffee,0,0,7.95729,7.95729
-30290,"Humcross",15124,"Kepler",Steel,0,14.8076,31.9996,8
-30290,"Humcross",15124,"Kepler",Refined Fuel,0,13.1623,39.9995,10
-30290,"Humcross",15124,"Kepler",Food Rations,0,23.0341,23.9997,6
-30291,"Kidford",15124,"Kepler",Iron Ore,33.4718,33.4718,2.63523,2.5
-30291,"Kidford",15124,"Kepler",Petroleum,0,9.87175,13.9998,3.5
-30291,"Kidford",15124,"Kepler",Agricultural Produce,18.0833,18.0982,11.9999,3
-30291,"Kidford",15124,"Kepler",Water,34.4281,38.2534,1.58114,1.5
-30291,"Kidford",15124,"Kepler",Tobacco,0,0,4.28468,4.28468
-30291,"Kidford",15124,"Kepler",Spices,0,0,4.69695,4.69695
-30291,"Kidford",15124,"Kepler",Coffee,0,0,8.41058,8.41058
-30291,"Kidford",15124,"Kepler",Steel,0,14.8076,31.9996,8
-30291,"Kidford",15124,"Kepler",Refined Fuel,0,13.1623,39.9995,10
-30291,"Kidford",15124,"Kepler",Food Rations,0,23.0341,23.9997,6
-30292,"Florkport",15124,"Kepler",Iron Ore,92.3798,87.2812,1.52895,2.5
-30292,"Florkport",15124,"Kepler",Petroleum,0,9.87197,13.9996,3.5
-30292,"Florkport",15124,"Kepler",Agricultural Produce,725.549,146.864,1.27046,3
-30292,"Florkport",15124,"Kepler",Water,34.4286,38.254,1.58112,1.5
-30292,"Florkport",15124,"Kepler",Tobacco,0,0,3.56288,3.56288
-30292,"Florkport",15124,"Kepler",Spices,0,0,4.05585,4.05585
-30292,"Florkport",15124,"Kepler",Coffee,0,0,7.33472,7.33472
-30292,"Florkport",15124,"Kepler",Steel,0,32.7726,21.9269,8
-30292,"Florkport",15124,"Kepler",Refined Fuel,0,13.1626,39.999,10
-30292,"Florkport",15124,"Kepler",Food Rations,16,23.7108,15.2252,6
-30293,"Boundmarch",15124,"Kepler",Iron Ore,4379.25,295.672,0.649622,2.5
-30293,"Boundmarch",15124,"Kepler",Petroleum,82.7384,91.9316,3.68929,3.5
-30293,"Boundmarch",15124,"Kepler",Agricultural Produce,161.506,168.541,3.16226,3
-30293,"Boundmarch",15124,"Kepler",Water,110.318,122.575,1.58113,1.5
-30293,"Boundmarch",15124,"Kepler",Tobacco,0,0,6.2041,6.2041
-30293,"Boundmarch",15124,"Kepler",Spices,0,0,6.19404,6.19404
-30293,"Boundmarch",15124,"Kepler",Coffee,0,0,5.39729,5.39729
-30293,"Boundmarch",15124,"Kepler",Steel,8,63.0013,22.4502,8
-30293,"Boundmarch",15124,"Kepler",Refined Fuel,0,42.1763,39.9991,10
-30293,"Boundmarch",15124,"Kepler",Food Rations,0,73.8084,23.9995,6
-30294,"Shommarch",15124,"Kepler",Iron Ore,78.9397,78.9397,2.63523,2.5
-30294,"Shommarch",15124,"Kepler",Petroleum,60.8963,67.6626,3.68932,3.5
-30294,"Shommarch",15124,"Kepler",Agricultural Produce,111.643,124.048,3.16228,3
-30294,"Shommarch",15124,"Kepler",Water,0,31.042,5.99993,1.5
-30294,"Shommarch",15124,"Kepler",Tobacco,0,0,6.11275,6.11275
-30294,"Shommarch",15124,"Kepler",Spices,0,0,5.93835,5.93835
-30294,"Shommarch",15124,"Kepler",Coffee,0,0,4.86544,4.86544
-30294,"Shommarch",15124,"Kepler",Steel,0,34.9222,31.9996,8
-30294,"Shommarch",15124,"Kepler",Refined Fuel,0,31.042,39.9995,10
-30294,"Shommarch",15124,"Kepler",Food Rations,0,54.3235,23.9997,6
+30291,"Kumere",15124,"Kepler",Iron Ore,6049.27,1036.85,1.03501,2.5
+30291,"Kumere",15124,"Kepler",Petroleum,191.343,338.56,4.6556,3.5
+30291,"Kumere",15124,"Kepler",Agricultural Produce,471.392,677.513,3.59656,3
+30291,"Kumere",15124,"Kepler",Water,108.637,353.705,2.70656,1.5
+30291,"Kumere",15124,"Kepler",Tobacco,0,0,2.22872,2.22872
+30291,"Kumere",15124,"Kepler",Spices,0,0,2.77935,2.77935
+30291,"Kumere",15124,"Kepler",Coffee,0,0,6.12535,6.12535
+30291,"Kumere",15124,"Kepler",Steel,16,222.587,29.8387,8
+30291,"Kumere",15124,"Kepler",Refined Fuel,0,187.095,39.9992,10
+30291,"Kumere",15124,"Kepler",Food Rations,0,327.415,23.9996,6
+30292,"New WaeVaillham",15124,"Kepler",Iron Ore,44.283,44.283,2.63523,2.5
+30292,"New WaeVaillham",15124,"Kepler",Petroleum,34.1611,37.9568,3.68932,3.5
+30292,"New WaeVaillham",15124,"Kepler",Agricultural Produce,61.2135,72.015,3.25393,3
+30292,"New WaeVaillham",15124,"Kepler",Water,45.5482,50.6091,1.58114,1.5
+30292,"New WaeVaillham",15124,"Kepler",Tobacco,0,0,3.44491,3.44491
+30292,"New WaeVaillham",15124,"Kepler",Spices,0,0,3.63736,3.63736
+30292,"New WaeVaillham",15124,"Kepler",Coffee,0,0,8.15315,8.15315
+30292,"New WaeVaillham",15124,"Kepler",Steel,0,19.5904,31.9996,8
+30292,"New WaeVaillham",15124,"Kepler",Refined Fuel,0,17.4137,39.9995,10
+30292,"New WaeVaillham",15124,"Kepler",Food Rations,0,30.474,23.9997,6
+30293,"Humcross",15124,"Kepler",Iron Ore,44.283,44.283,2.63523,2.5
+30293,"Humcross",15124,"Kepler",Petroleum,34.1611,37.9568,3.68932,3.5
+30293,"Humcross",15124,"Kepler",Agricultural Produce,61.915,70.7944,3.20791,3
+30293,"Humcross",15124,"Kepler",Water,45.5482,50.6091,1.58114,1.5
+30293,"Humcross",15124,"Kepler",Tobacco,0,0,5.27787,5.27787
+30293,"Humcross",15124,"Kepler",Spices,0,0,5.54565,5.54565
+30293,"Humcross",15124,"Kepler",Coffee,0,0,7.66215,7.66215
+30293,"Humcross",15124,"Kepler",Steel,0,19.5904,31.9996,8
+30293,"Humcross",15124,"Kepler",Refined Fuel,0,17.4137,39.9995,10
+30293,"Humcross",15124,"Kepler",Food Rations,0,30.474,23.9997,6
+30294,"Kroundmarch",15124,"Kepler",Iron Ore,5975.98,176.203,0.625029,2.5
+30294,"Kroundmarch",15124,"Kepler",Petroleum,52.1283,57.9203,3.68928,3.5
+30294,"Kroundmarch",15124,"Kepler",Agricultural Produce,92.7534,111.059,3.28268,3
+30294,"Kroundmarch",15124,"Kepler",Water,3277.49,201.375,0.375017,1.5
+30294,"Kroundmarch",15124,"Kepler",Tobacco,0,0,6.54365,6.54365
+30294,"Kroundmarch",15124,"Kepler",Spices,0,0,6.36227,6.36227
+30294,"Kroundmarch",15124,"Kepler",Coffee,0,0,4.49973,4.49973
+30294,"Kroundmarch",15124,"Kepler",Steel,0,29.8942,31.9992,8
+30294,"Kroundmarch",15124,"Kepler",Refined Fuel,0,26.5726,39.999,10
+30294,"Kroundmarch",15124,"Kepler",Food Rations,0,46.502,23.9994,6
+30295,"Kidford",15124,"Kepler",Iron Ore,41.3964,44.283,2.63523,2.5
+30295,"Kidford",15124,"Kepler",Petroleum,34.1611,37.9568,3.68932,3.5
+30295,"Kidford",15124,"Kepler",Agricultural Produce,60.8673,72.6303,3.27708,3
+30295,"Kidford",15124,"Kepler",Water,45.5482,50.6091,1.58114,1.5
+30295,"Kidford",15124,"Kepler",Tobacco,0,0,5.73453,5.73453
+30295,"Kidford",15124,"Kepler",Spices,0,0,5.99454,5.99454
+30295,"Kidford",15124,"Kepler",Coffee,0,0,7.47089,7.47089
+30295,"Kidford",15124,"Kepler",Steel,0,19.5904,31.9996,8
+30295,"Kidford",15124,"Kepler",Refined Fuel,0,17.4137,39.9995,10
+30295,"Kidford",15124,"Kepler",Food Rations,0,30.474,23.9997,6
+30296,"Florkport",15124,"Kepler",Iron Ore,39.8547,44.283,2.63523,2.5
+30296,"Florkport",15124,"Kepler",Petroleum,34.1611,37.9568,3.68932,3.5
+30296,"Florkport",15124,"Kepler",Agricultural Produce,61.915,70.7944,3.20791,3
+30296,"Florkport",15124,"Kepler",Water,45.5482,50.6091,1.58114,1.5
+30296,"Florkport",15124,"Kepler",Tobacco,0,0,4.72413,4.72413
+30296,"Florkport",15124,"Kepler",Spices,0,0,5.05874,5.05874
+30296,"Florkport",15124,"Kepler",Coffee,0,0,8.35987,8.35987
+30296,"Florkport",15124,"Kepler",Steel,0,19.5904,31.9996,8
+30296,"Florkport",15124,"Kepler",Refined Fuel,0,17.4137,39.9995,10
+30296,"Florkport",15124,"Kepler",Food Rations,0,30.474,23.9997,6
+30297,"Dothby",15124,"Kepler",Iron Ore,33.0256,36.576,2.63521,2.5
+30297,"Dothby",15124,"Kepler",Petroleum,28.2158,31.3508,3.6893,3.5
+30297,"Dothby",15124,"Kepler",Agricultural Produce,1373.17,153.881,1.00427,3
+30297,"Dothby",15124,"Kepler",Water,0,14.3832,5.99986,1.5
+30297,"Dothby",15124,"Kepler",Tobacco,0,0,1.67058,1.67058
+30297,"Dothby",15124,"Kepler",Spices,0,0,1.9593,1.9593
+30297,"Dothby",15124,"Kepler",Coffee,0,0,4.83067,4.83067
+30297,"Dothby",15124,"Kepler",Steel,0,16.1811,31.9992,8
+30297,"Dothby",15124,"Kepler",Refined Fuel,0,14.3832,39.999,10
+30297,"Dothby",15124,"Kepler",Food Rations,0,25.1706,23.9994,6
+30298,"Shommarch",15124,"Kepler",Iron Ore,25.5949,28.4388,2.63521,2.5
+30298,"Shommarch",15124,"Kepler",Petroleum,21.9385,24.3761,3.68929,3.5
+30298,"Shommarch",15124,"Kepler",Agricultural Produce,37.817,49.0189,3.41548,3
+30298,"Shommarch",15124,"Kepler",Water,0,11.1833,5.99985,1.5
+30298,"Shommarch",15124,"Kepler",Tobacco,0,0,1.69071,1.69071
+30298,"Shommarch",15124,"Kepler",Spices,0,0,1.58529,1.58529
+30298,"Shommarch",15124,"Kepler",Coffee,0,0,5.41405,5.41405
+30298,"Shommarch",15124,"Kepler",Steel,0,12.5812,31.9992,8
+30298,"Shommarch",15124,"Kepler",Refined Fuel,0,11.1833,39.999,10
+30298,"Shommarch",15124,"Kepler",Food Rations,0,19.5707,23.9994,6
