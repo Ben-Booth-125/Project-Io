@@ -751,7 +751,30 @@ planetology_state run_planetology(const body_inputs& in,
     // planet cools, so the gate is a band, not a monotone threshold — which is
     // why Venus falls out as stagnant-lid despite ample heat: it lost its water.
     const bool has_water_now = !airless && st.instellation > 0.30f && st.instellation < 1.05f;
-    st.mobile_lid = (st.theta >= 0.55f && st.theta <= 2.2f) && mass >= 0.45f && has_water_now;
+
+    // THETA AS IT STOOD AT A GIVEN AGE, not as it stands now. The radiogenic
+    // term decays by a factor of ~4.7 across a body's life; the tidal term does
+    // not, so it carries across unscaled.
+    //
+    // This exists because S6's two gates ask about events billions of years in
+    // the past, and asking them about PRESENT-DAY heat is a category error: an
+    // 8 Gyr world is radiogenically cold today but was not cold when its
+    // oxygenation actually fired. Measured by tools/verify/planetology_sweep.cpp
+    // (the C1 census): it was the single largest source of homeworld rejection,
+    // and it made "cold and old" cost twice what any other preference did — for
+    // heat the world only lost AFTER the gate it was being judged on.
+    const float tidal_theta = st.theta - radio * size_t_;
+    auto theta_at = [&](float at_age) {
+        const float r = table_lerp(k_radiogenic, 21, 0.5f, clampf(at_age, 0.0f, 10.0f))
+                        * clampf(p.radiogenic, 0.3f, 2.2f);
+        return r * size_t_ + tidal_theta;
+    };
+    auto mobile_lid_at = [&](float at_age) {
+        const float th = theta_at(at_age);
+        return (th >= 0.55f && th <= 2.2f) && mass >= 0.45f && has_water_now;
+    };
+
+    st.mobile_lid = mobile_lid_at(age); // present day — bit-identical to before
 
     if (st.theta < 0.10f)      st.profile.geology = geological_activity::none;
     else if (st.theta < 0.45f) st.profile.geology = geological_activity::low;
@@ -966,6 +989,16 @@ planetology_state run_planetology(const body_inputs& in,
 
         // The reductant flux must actually fall below the burial flux. A young,
         // hot, vigorously outgassing world can never clear it.
+        //
+        // DELIBERATELY present-day theta, unlike the NOE gate below. This is an
+        // UPPER bound on heat, and heat only falls, so today's value is a
+        // conservative proxy for the epoch's. More to the point, the 2.4 constant
+        // was calibrated against present-day theta: re-siting the test to the GOE
+        // epoch (where theta runs ~2x higher) without re-deriving the constant
+        // sends acceptance from 78% to 60% and turns 69% of rejects into Mat
+        // Worlds. Measured, not assumed — planetology_sweep C1, 2026-08-04. The
+        // asymmetry with the NOE gate is real and known; closing it needs a
+        // defensible epoch-relative threshold, which nothing here yet supplies.
         const bool goe_fires = (goe_at > 0.15f) && (st.theta < 2.4f) && st.profile.water_fraction > 0.15f;
 
         if (!goe_fires)
@@ -995,7 +1028,9 @@ planetology_state run_planetology(const body_inputs& in,
             const float noe_delay = budget * (0.30f + (1.0f - dial) * 0.12f) + r6.range(-0.04f, 0.06f);
             const float noe_at    = goe_at - noe_delay;
             noe_epoch = noe_at;
-            const bool  noe_fires = (noe_at > 0.10f) && st.mobile_lid;
+            // The nutrient shock has to be available WHEN the lock breaks, so the
+            // lid is tested at the NOE's own epoch rather than at present day.
+            const bool  noe_fires = (noe_at > 0.10f) && mobile_lid_at(age - noe_at);
 
             // Banded iron stops when the deep ocean finally oxidises. The window
             // duration IS the iron endowment — not the endpoint oxygen level.

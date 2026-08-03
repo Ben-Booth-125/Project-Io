@@ -244,6 +244,32 @@ GOE:
   self-stabilising trap. Escape requires a tectonic nutrient shock.
 - **NOE** (850–540 Ma) reaches modern levels.
 
+#### Each gate is judged at its own epoch, not at present day *(2026-08-04)*
+
+The reductant flux "decays monotonically as radiogenic heat runs down" — which means the heat
+term in these gates is a **function of when the gate fires**, not of the body's age now. Radiogenic
+production falls ~4.7× across a body's life, so testing a 2 Gya event against present-day `theta`
+asks the wrong question: an 8 Gyr world is radiogenically cold *today* and was not cold *then*.
+
+`planetology.cpp` therefore carries `theta_at(age)` and `mobile_lid_at(age)` — the radiogenic term
+re-evaluated at the requested age, the tidal term carried across unscaled. **The NOE's tectonic
+nutrient shock is tested at `age - noe_at`.** `st.theta`, `st.mobile_lid` and `profile.geology`
+remain present-day and bit-identical, so Continents, Engine's biography and tile terrain are
+untouched; only the NOE branch reads history.
+
+**The GOE gate deliberately still reads present-day `theta`,** and the asymmetry is known rather
+than accidental. It is an *upper* bound (`theta < 2.4`) — heat only falls, so today's value is a
+conservative proxy — and, decisively, the 2.4 constant was calibrated against present-day theta.
+Re-siting it to the GOE epoch (where theta runs ~2× higher) without re-deriving that constant was
+measured: acceptance fell 78.5% → 60.2% and 69% of rejects became Mat Worlds. Closing the asymmetry
+properly needs an epoch-relative threshold, which is a calibration pass, not an edit. See NR-046.
+
+Found by the **C1 rejection census** (`tools/verify/planetology_sweep.cpp`), which measures *which
+floor clause* rejects each homeworld. It is the instrument that made this visible: "cold and old"
+cost 2.52 draws against a ~1.24 baseline, for heat the world only lost *after* the gate it was being
+judged on. After the fix the worst preference is `oxygen_story=low` at 1.94 — a real design axis
+rather than a modelling artifact.
+
 ### S7 — Green *(land, and fire)*
 
 Ozone screens UV-C and most UV-B, and the screening is strongly **sublinear** in pO₂. Recent 3D

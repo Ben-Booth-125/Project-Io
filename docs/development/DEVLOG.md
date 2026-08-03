@@ -10,7 +10,62 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Io MCP server: BL-278 built and landed (2026-08-03, latest)
+## Session — Earth-like generation: the C1 rejection census, and S6's epoch bug (2026-08-04, latest)
+
+**Runtime.** ~3h wall across an autonomous stretch. Full (touches `src/world/planetology.cpp` —
+every generated world changes — plus a new measurement section in an existing harness).
+
+**The ask.** Ben, from a Project-Rival session: design tests that show which parameters lead to
+earth-like worlds. Then, after reading the findings: "go straight to the live change. Do follow
+procedure to document well."
+
+**What was built.** A `C1` rejection census inside `tools/verify/planetology_sweep.cpp` — the first
+consumer of `viability::reason`, a field the header has documented "for the sweep's histogram"
+since BL-167 and which nothing read. It draws one unshaped attempt per seed and histograms *which
+floor clause rejected it*, plus what the rejects became and where in the chain they died.
+
+`resolve_preferences` only returns the draw that PASSED, so rejections are invisible from outside
+it. They are recoverable because a draw is a pure function of (preferences, seed, attempt), replayed
+through the public `checkpoint_rng`. That mirrors the sampling band table, and mirrors drift — so
+every censused draw is cross-checked against the live function (viable replay ⇒ `attempts == 1` with
+bit-identical params; rejected replay ⇒ `attempts >= 2`). A band edited in planetology.cpp fails the
+harness rather than silently re-pointing the histogram. 20,000/20,000 agreed.
+
+**What it found.** Ten of the floor's fourteen clauses never fire. The sampling bands were
+calibrated against this very sweep and now sit strictly *inside* the floor — ocean draws 0.42–0.72
+against a 0.40–0.75 window, the carbonate thermostat pins temperature to ~277–288 K inside 275–305,
+`home_mass` lands inside the gravity window. **The bands, not the floor, are the specification of
+Earth.** The floor's live surface is oxygen and arable land, and ~74% of all rejection pressure is
+the oxygen story.
+
+**The bug that fell out.** `interior=low` ("cold and old") cost 2.52 draws against a ~1.24 baseline
+— twice any other preference. Cause: `theta` was computed at present-day age and then used to gate
+the NOE, an event billions of years earlier. Fixed with `theta_at(age)` / `mobile_lid_at(age)`; the
+NOE is now tested at `age - noe_at`. Present-day `st.theta` / `st.mobile_lid` / `profile.geology`
+are bit-identical, so Continents and tile terrain are untouched.
+
+**A call taken and then reversed by measurement.** I also re-sited the GOE gate for symmetry,
+measured it, and reverted: acceptance fell 78.5% → 60.2% with 69% of rejects becoming Mat Worlds.
+That gate is an upper bound whose 2.4 constant was calibrated against present-day theta, and I had
+no independent basis for a new one. Inventing one to make the numbers look right is the forced
+outcome Ben rejects. The asymmetry is commented at the site and filed as **NR-046**.
+
+**Result.** Acceptance unchanged (78.4% vs 78.5%), worst preference 2.52 → 1.94 and now
+`oxygen_story=low` — a genuine design axis rather than a modelling artifact. `interior` spread
+narrowed from 2.25× to 1.64×. `planetology_harness`, `continents_harness`, `world_determinism`,
+`determinism_harness`, `history_ladder_harness` and `mediterranean_sweep` all pass.
+
+**Unplanned bonus.** Running the census under both g++ 15.2 (WSL2) and MSVC 14.44 gave *identical*
+counts on all 20,000 worlds — the first empirical check that PLANETOLOGY.md's determinism discipline
+holds **across compilers**, not just across runs of one build.
+
+**Left open.** The GOE asymmetry (NR-046). Whether a floor with ten inert clauses is the right
+shape. And the variety question the census exposes but does not answer: every generated Earth is
+nearly the same world (surface temp spread ×1.04), because the bands are tight on exactly the axes
+that are cheap to vary. Widening them means deciding whether a homeworld may sit inside the
+*continuously* habitable zone — i.e. be doomed long-term — which is Ben's call, not a tuning knob.
+
+## Session — Io MCP server: BL-278 built and landed (2026-08-03)
 
 **Runtime.** ~1h wall. Full (new `src/` seam — `main.cpp` + `tools/mcp/`; no save-format or
 economy change, but a new external-process attach surface).

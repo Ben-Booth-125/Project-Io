@@ -947,6 +947,28 @@
     "docs/development/ROADMAP.md"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-046",
+   "title": "Planetology S6: the NOE gate now tests tectonics at the NOE's own epoch, not at present day — and the GOE gate deliberately still does not",
+   "raised": "2026-08-04",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Ben, 2026-08-04, from a Project-Rival session: \"go straight to the live change... do follow procedure to document well\". The change was recommended off the new C1 rejection census in tools/verify/planetology_sweep.cpp, which measured WHY homeworlds get rejected for the first time.",
+   "what": "The C1 census found that ~74% of homeworld rejection pressure was the oxygen story, and that \"cold and old\" (interior=low) cost 2.52 draws against a ~1.24 baseline — twice any other preference. Tracing S6 found the cause: `theta` (tectonic vigour) was computed at PRESENT-DAY age and then used to gate the NOE, an event that fired billions of years earlier. An 8 Gyr world is radiogenically cold today but was not cold when its oxygenation actually happened. Fixed by adding `theta_at(age)` / `mobile_lid_at(age)` helpers in planetology.cpp (radiogenic term decays, tidal term carries across unscaled) and testing the NOE at `age - noe_at`. `st.theta`, `st.mobile_lid` and `profile.geology` are bit-identical to before — only the NOE gate reads the historical value, so tectonics, continents and tile terrain are untouched. THE CALL THAT WAS MINE: I also re-sited the GOE gate to its own epoch for symmetry, MEASURED IT, found acceptance fell 78.5% -> 60.2% with 69% of rejects becoming Mat Worlds, and REVERTED that half. The GOE test is an upper bound (`theta < 2.4`) whose constant was calibrated against present-day theta; re-siting it without re-deriving the constant invalidates it, and I had no independent basis for a new one.",
+   "why_it_matters": "Two things. (1) The codebase now contains a deliberate asymmetry — one S6 gate reads historical theta, the other reads present-day — which is defensible (heat only falls, so present-day is conservative for an upper bound) but is the kind of inconsistency that reads as a bug to the next person. It is commented at the site and recorded here so it is a known position rather than an accident. (2) Every generated world changes: same acceptance (78.4% vs 78.5%) but a different rejection profile, \"not enough arable land\" overtaking \"not a Cradle\" as the top clause, and Boring Billion rejects down 25%. planetology_harness, continents_harness, world_determinism, determinism_harness, history_ladder_harness and mediterranean_sweep all still pass, so no assertion caught it — but the default-seed campaign world may look different, which is Ben's eyeball to give (the same debt BL-276 left open).",
+   "options": [
+    "Accept as landed — NOE historical, GOE present-day, asymmetry documented at the site.",
+    "Close the asymmetry properly: derive an epoch-relative GOE threshold (e.g. express the 2.4 bound as a multiple of the reference world's theta AT THAT EPOCH rather than as an absolute), then re-site the GOE gate too. This is the physically coherent end state and wants its own measured calibration pass.",
+    "Revert the whole change — the interior=low cost was a preference-pricing wart, not a correctness bug, and 2.52 draws was survivable."
+   ],
+   "recommendation": "Option 1 now, Option 2 as a filed follow-on. The NOE fix is a correctness fix backed by measurement and costs nothing (acceptance unchanged, worst lean improved 2.52 -> 1.94 and is now a genuine design axis, oxygen_story=low, rather than a modelling artifact). Option 2 is right but is a calibration project, not a one-line change, and doing it badly is worse than the documented asymmetry — the measured 60.2% run is the evidence for that.",
+   "files": [
+    "src/world/planetology.cpp",
+    "tools/verify/planetology_sweep.cpp",
+    "docs/generation/PLANETOLOGY.md"
+   ],
+   "resolution": null
   }
  ]
 }
