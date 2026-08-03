@@ -134,6 +134,20 @@ Two disciplines follow:
 *(The 2026-07-05 sweep numbers that used to sit here — 9 pass / 66 fail / 55 no-golden — are dead:
 the bulk re-blesses above reset the whole baseline, 68 scripts blessed per sweep.)*
 
+#### World-content staleness — a `src/world/` change owes a re-bless too (BL-259, 2026-08-03)
+
+The chrome rule above has a sibling: a `src/world/` change that moves **generated content** —
+terrain colour, nation/corp names, balances, the political map — regresses goldens the same way a
+chrome change does, just wider (most of the suite touches world content somewhere on screen). This
+went unnoticed for two days (BL-233's terrain re-price, landed 2026-07-31, wasn't re-blessed until
+BL-259 caught it 2026-08-03) because nothing owned the coupling — the headless side has the
+equivalent discipline (a band change ships with its commit), the visual side didn't.
+
+**A `src/world/` change that reshapes generated output re-blesses the visual suite in the same
+commit** (`scripts/verify/bless_all.sh`), the way a shared-chrome change already does. Eyeball the
+largest diffs first to confirm they're content, not a layout regression hiding in the noise, then
+bless freely per the policy above.
+
 #### Cross-platform goldens — settled 2026-08-01 (BL-252)
 
 The suite could not be green on Windows and Linux at once, and the two golden families turned out

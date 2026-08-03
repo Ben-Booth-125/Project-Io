@@ -89,14 +89,16 @@ it against a committed golden image:
 ./build/ProjectIo --verify scripts/verify/corporation_lens.lua
 ```
 
-## Latest release — v0.0.9
+## Latest release — v0.1.0
 
-Budget clarity + polish: the remaining legibility rough edges cleared before the v0.1.0 quality
-audit (the budget strands themselves shipped early in v0.0.8). Adds an **in-app system menu** (corner
-gear popup — Pause/Resume + Exit, Esc parity), a **corp emblem system** (a shared identity glyph on
-the card, Selection header, on-canvas markers, and hover, for player and rivals), and a
-**commercial-fog hover line**; **un-cramps the Economy panel** tables; and **fixes** the Construction
-panel occluding the Selection element during placement. Full history in
+**The prototype cut.** The economy loop, validated and playable end-to-end: construction,
+population-grounded workforce, spatial price divergence via supply convoys, gated discovery
+(survey + competitor-intelligence scoping), a legible budget, and a green, performance- and
+data-growth-audited build. Adds the generated **road & logistics lattice**, the **continent lens**
+and Continents/Drift generation pass, **terrain landform render** with graded terrain combat
+costs, the **tile construction ledger**, and three new quality-audit instruments (frame budget,
+econ-tick scaling, data-creep). Everything past this cut — laws, techs, military, politics, the AI
+opponent — is the v0.1.x → v0.3.0 arc, not this release. Full history in
 [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Versioning & releases

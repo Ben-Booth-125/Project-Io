@@ -14,6 +14,60 @@ authoritative version-history record. A local-only snapshot of `src/` is also ke
 
 _Nothing yet._
 
+## [0.1.0] — 2026-08-03
+
+**The prototype cut.** The economy loop, validated and playable end-to-end — construction,
+population-grounded workforce, spatial price divergence via convoys, gated discovery, scoped
+competitor intelligence, a legible budget, and a green, performance/data-growth-audited build.
+This is the milestone `ROADMAP.md` names as the v0.1.0 done-definition; everything past it
+(laws, techs, military, politics, the AI opponent) is the v0.1.x → v0.3.0 arc, not this cut.
+
+### Added
+- **Roads & planetary logistics** — a generated per-nation road lattice (three tiers), cities as
+  free logistics hubs, and the inland logistics-hub building, landed ahead of its originally
+  planned v0.1.1 slot.
+- **Continent lens** (first cut) and the **Continents/Drift** generation pass feeding plate-biased
+  heightmaps into tile generation, with `plate_id` retained for the lens.
+- **Terrain landform render and spanning markers**, plus **terrain combat modifiers** replacing the
+  flat `is_barrier` field with a graded, weighted terrain cost (water weight 750, swept to hold the
+  political map at 30 Kepler nations).
+- **Tile construction ledger** — a world-layer cost estimator with per-recipe rows, surviving a
+  build across selection changes.
+- **Quality-audit instrumentation** (no new systems, three new harnesses): a **frame-budget**
+  reporter (F11, off by default — build/submit/present/other breakdown, avg/max/1%-low against the
+  8 ms / 16.7 ms targets); an **econ-tick scaling** sweep (0.0018 ms/tick mean at prototype scale,
+  555× headroom, growth-shape asserted at size^1.28 against a size^1.5 tolerance across a six-rung
+  bodies × corps sweep); and a **data-creep** harness (~30 counters + RSS over 1500 ticks of the
+  real generated world, asserting a plateau rather than reporting a snapshot).
+- **Convoy data-creep coverage** — convoy dispatch now runs through the audit rollout, so the
+  convoy / trade-route / glimpse plateaus bind instead of passing vacuously.
+
+### Changed
+- **Font glyph range** widened — 43 sites across 7 codepoints were missing, not the 26/2 originally
+  filed.
+- **Headless golden bands pinned per toolchain** (`ai_skill_harness`) rather than widened to cover
+  both — a shared band spanning MSVC and GCC's divergent net-worth outputs would span ~±100% and
+  catch nothing.
+- **Visual goldens declared Windows-authoritative**; the Linux visual-verify job is advisory
+  (inspect by eye, don't golden-diff).
+- **The full 229-golden visual suite re-blessed** after two days of silent staleness from the
+  terrain re-price above — the diffs were world content (terrain colour, generated corp/nation
+  names, balances), not a UI regression. `DEVELOPMENT_PRACTICES.md` now names the missing
+  discipline: a `src/world/` change that reshapes generated output re-blesses the visual suite in
+  the same commit, mirroring the existing shared-chrome rule.
+
+### Fixed
+- Windows headless-harness gate — the absolute 1 ms tick bound at the largest swept rung was a
+  Debug-build artefact (R5 still passes with 19× headroom in Debug; every growth-shape assertion
+  holds either way), not a regression.
+
+### Verified
+- Headless harness suite green on Linux (Release) and Windows (Debug) at the same commit for the
+  first time (42/42 — `mediterranean_sweep`'s 60s CTest timeout is a harness-runtime artefact,
+  confirmed passing standalone; not a v0.1.0 item).
+- Visual golden suite re-established against current world content (229 goldens re-blessed).
+- Windows build green (residual warnings are third-party sol2/ImGui headers, not project code).
+
 ## [0.0.9] — 2026-07-05
 
 Budget clarity + polish — the remaining legibility rough edges cleared before the v0.1.0 quality
@@ -206,7 +260,8 @@ Layer 2 finalisation.
 
 Initial prototype snapshot — application shell, canvases, and the hard-coded world.
 
-[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.9...HEAD
+[Unreleased]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.9...v0.1.0
 [0.0.9]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.8...v0.0.9
 [0.0.8]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.7...v0.0.8
 [0.0.7]: https://github.com/Ben-Booth-125/Project-Io/compare/v0.0.6...v0.0.7
