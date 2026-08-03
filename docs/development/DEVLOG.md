@@ -10,6 +10,57 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## Session — LLM grand strategy: the public field, MCP, and the small-local-model direction (2026-08-03)
+
+**Runtime.** ~1h wall. Full (research + doc authority — no `src/` change; two backlog items,
+one project charter amended).
+
+**The ask.** Ben: "are there other publicly available projects that have tried to use LLMs for
+grand strategy? Do a wide search on the web, and come back with actionable plans." Then, on the
+findings: "We can use MCP, but please explain to me exactly what that is... our aim is just fair,
+text driven, small and local models... Cloud usage is just going to be finding tons of input and
+output sets, for when we fine tune a smaller model of our own."
+
+**The survey.** Eleven public projects, written up as `AI_OPPONENT.md` § 10b: Cicero,
+**Vox Deorum** (Civ V + Vox Populi, the load-bearing one), civ6-mcp/CivBench, civStation,
+CivAgent, CivRealm, SAGA, Richelieu, Agents of Change, DSGBench, WarAgent. Sixteen new sources
+in § 10f. Closed the two citation gaps § 9 had left open since 2026-07-23 — Vox Deorum's
+per-decision latency (~1 min) and per-game token cost (20.35M in / 555k out for `gpt-oss-120b`).
+
+**The findings that mattered** (§ 10c). (1) *Open-weight models already reached parity with a
+tuned algorithmic 4X AI* — 97.5% vs 97.3% survival across 2,327 games, with a simple prompt and
+no fine-tuning; the gap Io must close is size (120B → local), not capability. (2) The field
+universally puts the LLM on **macro only** and delegates tactics to algorithmic subsystems —
+independent confirmation of the A → B → C staging. (3) Personality is emergent and free (+31.5%
+domination victories for one model, unprompted). (4) The failure modes are consistent and none
+is about intelligence: step-wise greed/myopia, CivBench's **sensorium effect** and
+**knowing-doing gap**, the observation-belief and belief-action gaps measured on exactly the
+open-weight class Io targets, and spatial blindness. (5) A ranked list of what actually improves
+play, cheapest first — *push state rather than making the model pull it* sits at the top and is
+an interface decision, not a model decision.
+
+**Direction set (Ben).** MCP as the interface; a **small, local** runtime model; cloud inference
+demoted to corpus generation for a fine-tune. Written into `AI_OPPONENT.md` § 10d, with § 10a
+explaining what MCP is and why Io is unusually close to ready — BL-206 (blackboard export) and
+BL-270 (action dictionary) already built the read and meaning legs, `corp_command` is the write
+leg, and the mapping onto MCP's tools/resources/prompts is near-mechanical.
+
+**Filed.** **BL-278** (Io MCP server, SS, v0.2.0) and **BL-279** (AI trace corpus + fine-tuning
+pipeline, S, v0.2.0). ROADMAP's v0.2.0 section names both.
+
+**Also.** NR-040 (the "what plumbing does C-route need?" question, open since 2026-08-02) is
+**resolved** — the answer is one wrapper, not a subsystem. Project-Rival's charter, which read as
+a house-wide ban on API hooks, is narrowed to what it actually is: computer-use is how Rival
+plays *0 A.D.*, because 0 A.D. exposes no agent interface — not a position that protocol
+interfaces are forbidden (`Project-Rival/CLAUDE.md`, `docs/MISSION.md`).
+
+**Left open.** NR-044 records four calls taken on Ben's behalf — the two-item split, the SS/S
+priorities and v0.2.0 goals for both, the charter narrowing, and leaving § 2C's staging intact.
+The live question in it: BL-278 touches no simulation code, so it may belong in v0.1.x rather
+than v0.2.0, which would let a first real text-driven play attempt happen sooner.
+
+---
+
 ## Session — Mediterranean rift sea: measure, mechanism, gate (BL-276) (2026-08-03)
 
 **Runtime.** ~2h wall. Full (delivery — seed exploration turned same-session Full-mode item;

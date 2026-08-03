@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*43 entries — 19 open, 24 resolved.*
+*44 entries — 19 open, 25 resolved.*
 
 ---
 
@@ -241,21 +241,6 @@ CLAUDE.md opened with "Read the documents below before responding to any request
 
 *Files: `CLAUDE.md`, `tools/doc_weight.js`*
 
-### NR-040 — C-route walk-back: not a shipped LLM API integration — the real ask is human-in-the-loop play via computer-use, plumbing still unscoped
-*question · raised 2026-08-02 · from Same sprint-planning session as NR-039, immediately after — Ben corrected the direction once he saw the concrete design (HTTP client choice, API key storage, threading)*
-
-Asked to design C-route's implementation, I produced a full in-process design: an HTTP client dependency, a live Anthropic API call per corp per econ tick, and a determinism-rule carve-out (recorded as NR-039). Presenting the concrete choices this required (which HTTP library, how to store an API key, whether the call blocks the sim tick) surfaced that this wasn't the intent. Ben: 'I never intended for this to be an item. We still need the plumbing for in-place sessions to make decisions. The best way is just to use Claude on my PC to actually visually play the game with mouse and keyboard input.' All three doc changes from NR-039 (AI_OPPONENT.md §7a, the io-standing-rules.md determinism exception, BL-205's design field) have been reverted; §7's original Stage-C description (unchanged since 2026-07-26) is the standing design again.
-
-**Why it matters.** The actual near-term want is a human-in-the-loop workflow — Claude (this kind of session, with computer-use/screenshot/click tools) playing the game live to make AI-corp decisions or prototype behavior, not a coded feature shipped in ProjectIo.exe. That is much closer to what BL-206 (blackboard export) and BL-270 (the action dictionary) already exist for — an AI-consumable read/write interface — than to a new LLM-API integration. What's still unclear: what 'plumbing' is actually missing. Claude already has computer-use tools (screenshot, click, type) and the `run` skill can launch the app; BL-206's state export and BL-270's action dictionary already give a language-agent read/write surface. It's possible nothing new needs building at all, or the ask is a thin harness that surfaces ACTIONS_INDEX.json + the blackboard export in a form easier for a live session to drive. Filed as a question rather than closed, since guessing further without Ben's steer risks a third build-the-wrong-thing pass.
-
-- Nothing needs building — BL-206 + BL-270 + existing computer-use tools already cover it; next session just tries actually playing the game this way and see what's missing in practice.
-- A small harness is needed: something that packages the blackboard export + action dictionary into a form a live session reads faster than raw JSON (e.g. a single 'what can I do right now' summary).
-- Something else — Ben has a more specific plumbing gap in mind that hasn't been named yet.
-
-> **Recommendation:** Try option 1 first, cheaply: next session, actually attempt to drive the game via computer-use using what already exists (BL-206 export + BL-270 actions), and only design new plumbing against a concrete friction point hit during that attempt. Building infrastructure ahead of the first real attempt is exactly the mistake NR-039 just made at a different layer.
-
-*Files: `docs/ai/AI_OPPONENT.md`, `docs/development/backlog.json`, `docs/ai/ACTIONS.json`, `docs/development/req/requirements.json`*
-
 ### NR-042 — Project-Rival seeded: '0AD test environment' read as the RTS 0 A.D. as near-term arena, bridged to BL-271; Han as played civ, Rome as target
 *decision taken on your behalf · raised 2026-08-03 · from Ben's seeding brief for Project-Rival (2026-08-03): 'get a test environment at 0AD, refine the oral history by play... series of prompts every year that affect military strategy and continue a civilising mission... Rome as a target... spin this as if the gods are sending the soldiers to their locations'*
 
@@ -285,6 +270,22 @@ The seeded campaign's only blocker is the arena itself: 0 A.D. Release 28 'Boior
 > **Recommendation:** Option 1 or 2, whichever is less friction; the headless rehearsal command in Project-Rival/docs/ENVIRONMENT.md is the smoke test either way.
 
 *Files: `Project-Rival/docs/ENVIRONMENT.md`, `Project-Rival/docs/CAMPAIGN.md`*
+
+### NR-044 — Research-session calls taken on Ben’s behalf: two backlog items filed, the Rival computer-use charter narrowed, and priorities/version goals guessed
+*decision taken on your behalf · raised 2026-08-03 · from LLM-grand-strategy research session, 2026-08-03 — Ben: "please make the necessary changes to indicate our new direction. We can use MCP" + "our aim is just fair, text driven, small and local models" + "Cloud usage is just going to be finding tons of input and output sets, for when we fine tune a smaller model of our own"*
+
+The direction was Ben’s and is recorded verbatim in AI_OPPONENT.md § 10d. Four calls inside it were mine, and none were stated: (1) split the work into TWO items rather than one — BL-278 (MCP server) and BL-279 (trace corpus + fine-tuning pipeline) — on the grounds that the server is useful on its own and the corpus work strictly depends on it; (2) priorities SS and S respectively, and version_goal v0.2.0 for both, inherited from the surrounding AI-opponent set rather than asked for; (3) narrowed Project-Rival’s "never through API hooks" charter (CLAUDE.md line 5, MISSION.md) to "computer-use is how we play 0 A.D., because 0 A.D. has no agent interface" — rather than leaving it reading as a house-wide ban that Io’s own MCP direction now contradicts; (4) left § 2C’s A → B → C staging intact, i.e. the MCP/local-model route still sits ON TOP of the deterministic utility core rather than replacing it.
+
+**Why it matters.** Call (1) is the one worth a second look: if Ben pictures the corpus work as inseparable from the server, two items is bureaucracy. Call (2) sets sequencing — v0.2.0 already carries BL-203/204/205/207 plus the trade-policy pair, so adding two more items to that minor may overload it, and BL-278 in particular could argue for v0.1.x since it is an out-of-process tool with no sim risk. Call (3) edits a project charter, which is exactly the kind of change that should not happen silently. Call (4) is the load-bearing one architecturally: the research supports it (every project that worked delegated tactics to algorithmic subsystems), but it does mean the small local model is never the whole opponent — it is a macro layer over BL-202/203.
+
+- Accept as filed — two items, both v0.2.0.
+- Merge BL-278 and BL-279 into one item (MCP server + corpus pipeline as a single deliverable).
+- Move BL-278 to v0.1.x — it is out-of-process tooling with no sim risk, and landing it early lets the first real play session happen sooner.
+- Something else — the split or the sequencing is wrong in a way not listed.
+
+> **Recommendation:** Accept the split (option 1) but consider option 3 on top: BL-278 touches no simulation code and its whole value is enabling a first real attempt at text-driven play, which is exactly the "try it cheaply before designing more" lesson NR-040 already taught. BL-279 genuinely belongs in v0.2.0 — it cannot start until traces exist.
+
+*Files: `docs/ai/AI_OPPONENT.md`, `docs/development/backlog.json`, `Project-Rival/CLAUDE.md`, `Project-Rival/docs/MISSION.md`*
 
 ---
 
@@ -658,6 +659,23 @@ Two standing-rule interactions in one session, both Ben's explicit call rather t
 > **RESOLVED.** Superseded (2026-08-02, same session) — Ben clarified C-route was never meant to be a shipped in-process API call; the sequencing override still stands as a fact of what happened, but the resulting design and the determinism-rule exception it justified were both wrong and have been reverted. See NR-040.
 
 *Files: `.claude/rules/io-standing-rules.md`, `docs/ai/AI_OPPONENT.md`, `docs/development/backlog.json`*
+
+### NR-040 — C-route walk-back: not a shipped LLM API integration — the real ask is human-in-the-loop play via computer-use, plumbing still unscoped
+*question · raised 2026-08-02 · from Same sprint-planning session as NR-039, immediately after — Ben corrected the direction once he saw the concrete design (HTTP client choice, API key storage, threading)*
+
+Asked to design C-route's implementation, I produced a full in-process design: an HTTP client dependency, a live Anthropic API call per corp per econ tick, and a determinism-rule carve-out (recorded as NR-039). Presenting the concrete choices this required (which HTTP library, how to store an API key, whether the call blocks the sim tick) surfaced that this wasn't the intent. Ben: 'I never intended for this to be an item. We still need the plumbing for in-place sessions to make decisions. The best way is just to use Claude on my PC to actually visually play the game with mouse and keyboard input.' All three doc changes from NR-039 (AI_OPPONENT.md §7a, the io-standing-rules.md determinism exception, BL-205's design field) have been reverted; §7's original Stage-C description (unchanged since 2026-07-26) is the standing design again.
+
+**Why it matters.** The actual near-term want is a human-in-the-loop workflow — Claude (this kind of session, with computer-use/screenshot/click tools) playing the game live to make AI-corp decisions or prototype behavior, not a coded feature shipped in ProjectIo.exe. That is much closer to what BL-206 (blackboard export) and BL-270 (the action dictionary) already exist for — an AI-consumable read/write interface — than to a new LLM-API integration. What's still unclear: what 'plumbing' is actually missing. Claude already has computer-use tools (screenshot, click, type) and the `run` skill can launch the app; BL-206's state export and BL-270's action dictionary already give a language-agent read/write surface. It's possible nothing new needs building at all, or the ask is a thin harness that surfaces ACTIONS_INDEX.json + the blackboard export in a form easier for a live session to drive. Filed as a question rather than closed, since guessing further without Ben's steer risks a third build-the-wrong-thing pass.
+
+- Nothing needs building — BL-206 + BL-270 + existing computer-use tools already cover it; next session just tries actually playing the game this way and see what's missing in practice.
+- A small harness is needed: something that packages the blackboard export + action dictionary into a form a live session reads faster than raw JSON (e.g. a single 'what can I do right now' summary).
+- Something else — Ben has a more specific plumbing gap in mind that hasn't been named yet.
+
+> **Recommendation:** Try option 1 first, cheaply: next session, actually attempt to drive the game via computer-use using what already exists (BL-206 export + BL-270 actions), and only design new plumbing against a concrete friction point hit during that attempt. Building infrastructure ahead of the first real attempt is exactly the mistake NR-039 just made at a different layer.
+
+> **RESOLVED.** Answered 2026-08-03 by Ben, on reading the public LLM-grand-strategy research sweep: "We can use MCP." The missing plumbing is one wrapper, not a subsystem — an MCP server over the three legs that already exist (BL-206 blackboard export = read, BL-270 action dictionary = meaning, corp_command = write). Filed as BL-278 (Io MCP server). Closest to the entry's own option 2 (a harness packaging the export + dictionary into a form an agent reads quickly), but with a standard protocol instead of a bespoke format — which the research showed is where the whole field landed independently (Vox Deorum, civ6-mcp, civStation, CivBench). The computer-use reading recorded here was the interim answer and is now superseded for Io; it remains correct for Project-Rival's 0 A.D. arena, which exposes no agent interface. See AI_OPPONENT.md § 10.
+
+*Files: `docs/ai/AI_OPPONENT.md`, `docs/development/backlog.json`, `docs/ai/ACTIONS.json`, `docs/development/req/requirements.json`*
 
 ### NR-041 — Mediterranean-like inland seas: 44% of seeds have one at playable scale — pick the mechanism that makes them near-inevitable
 *question · raised 2026-08-03 · from Seed-exploration session (Ben: notice a near-Mediterranean structure, make it almost inevitable). Measured by the new tools/verify/mediterranean_sweep.cpp harness.*

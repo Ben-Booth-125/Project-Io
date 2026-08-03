@@ -17,9 +17,14 @@ replay records — a test environment we can *get*, at the exact year the name p
 (Its sibling BL-272, the mil-sim, already landed 2026-08-02 — `resolve_battle` exists; what
 remains unbuilt is the antiquity *world* to run it in.)
 
-The play model is the one Ben already chose for Io (NR-040, the computer-use steer): Claude
-plays visually, with mouse and keyboard, no engine hooks. Rival is that steer given a home
-and a discipline.
+The play model is computer-use: Claude plays visually, with mouse and keyboard, no engine hooks.
+
+**Amended 2026-08-03.** This was originally framed as inheriting Io's own play model (NR-040's
+computer-use steer). Io has since settled on an **MCP server** as its agent interface
+(`docs/ai/AI_OPPONENT.md` § 10), so the two now differ by arena rather than by principle:
+0 A.D. offers no agent interface, so Rival drives a screen; Io offers a protocol seam, so its
+own AI drives that. What transfers is the *discipline* — legal presses only, state handed to
+the agent rather than remembered, decisions logged as they are taken — not the input device.
 
 ## Why Rome as the target
 
