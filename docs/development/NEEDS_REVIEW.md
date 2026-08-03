@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*44 entries — 6 open, 38 resolved.*
+*45 entries — 7 open, 38 resolved.*
 
 ---
 
@@ -100,6 +100,22 @@ CLAUDE.md opened with "Read the documents below before responding to any request
 > **Recommendation:** If you disagree, the alternative is to shrink the reading order to fit a real budget (doc_weight.js --budget takes a ceiling and exits non-zero when the named set is over it) rather than to restore the old wording.
 
 *Files: `CLAUDE.md`, `tools/doc_weight.js`*
+
+### NR-045 — Two direction points applied: the sci-fi/fantasy naming rule, and the governing-body aim — BL-094 unparked and raised F → A on my judgement
+*decision taken on your behalf · raised 2026-08-03 · from Ben, 2026-08-03, after the review-queue session — two points from a prompt that did not reach me: (1) "even if we do use real history as an analogy, we should use sci-fi / fantasy random names"; (2) "the aim that we're going for now, is to really play as a governing body. The reason for that is that it allows law, policy and science to use military might - not just economic."*
+
+Point 1 is recorded as a standing rule (io-standing-rules § Terms & docs) plus a full section in GENERATION_STRATEGY.md, and stamped onto BL-271 and BL-277, the two items filed off the Rome analogy. Point 2 is recorded in BL-094's design as the stated reason for the pivot. The calls that were MINE, not Ben's: (a) **BL-094 unparked and raised F → A** — 'the aim we're going for now' is not compatible with a parked F item, but Ben did not ask for a re-prioritisation and did not give it a version goal; (b) BL-094's title changed from 'nation as the strategic actor' to 'the player is a GOVERNING BODY (nation)', following his word; (c) I wrote the v0.1.x design test ('does this system reach military as well as economic outcomes?') into BL-094 rather than editing the four stub items (BL-155/156/157/158) directly; (d) I did NOT touch CONCEPT.md's player-identity statement, on the authority time-slice rule, even though it is the doc his point most directly concerns.
+
+**Why it matters.** (a) is a real sequencing change — an A-priority unparked item reads as near-term work, and v0.1.1 is the live minor with the word interface just themed into it. If the governing-body pivot is the aim but NOT the next thing built, A may overstate it and a version goal would say more than a priority does. ROADMAP has carried an open question since 2026-07-31 about whether the pivot shares v0.2.0 with the AI-opponent set or takes its own minor; that question is now louder, not answered. (d) matters because CONCEPT.md currently states the player identity as an open corporate-or-nation choice, which his message effectively closes — but closing it in the authority doc ahead of the work is exactly what the time-slice rule forbids, so it stays stated in the item.
+
+- Accept as recorded — BL-094 unparked at A, no version goal yet.
+- Give BL-094 a version goal now (v0.2.0, or its own minor) — that settles the ROADMAP question that has been open since 2026-07-31.
+- Too strong — re-park BL-094 or drop it back down; the direction is recorded either way and the priority was not what Ben asked to change.
+- Also close CONCEPT.md now: amend the player-identity statement ahead of the work, treating this as a concept decision rather than an implementation one.
+
+> **Recommendation:** Option 2. A priority says 'important'; a version goal says 'when', and 'when' is the actual open question — it has been open since 2026-07-31 and Ben's message is the strongest signal yet that it should be answered. Option 4 is defensible too and is arguably not a time-slice violation, since CONCEPT.md owns *player identity* and Ben has now made an identity decision rather than an implementation one; I left it alone because the rule is unambiguous and the cost of waiting is low.
+
+*Files: `.claude/rules/io-standing-rules.md`, `docs/generation/GENERATION_STRATEGY.md`, `docs/development/backlog.json`, `docs/development/ROADMAP.md`*
 
 ---
 

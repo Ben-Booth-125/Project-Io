@@ -195,6 +195,16 @@ layer land on positioned ground rather than a greenfield. v0.1.1 is a concrete b
 rest of the band (v0.1.2–v0.1.5) is deliberately design-forward — each now has a placeholder
 `design-owed` item that firms into real design as it is reached.
 
+> **What this band is FOR (Ben, 2026-08-03).** Until now the band was themed by what it stubs,
+> not by what the stubs serve. Ben's steer supplies the missing answer: the aim is to play as a
+> **governing body**, *"because it allows law, policy and science to use military might — not
+> just economic."* Laws (v0.1.2), techs (v0.1.3), military (v0.1.4) and politics (v0.1.5) are
+> therefore **the governing body's levers**, and each carries a design test it did not have:
+>
+> **Does this system reach military as well as economic outcomes?** If a law can only change a
+> cost, or a technology can only unlock a building, it is being designed for the corporate
+> player we are pivoting away from. See BL-094 (player-identity pivot) § 2026-08-03.
+
 - **v0.1.1 — The word interface, plus shell & legibility follow-through.** *(Re-themed
   2026-07-31 for roads; **re-themed again 2026-08-03**, NR-034 — Ben named the word interface as
   this minor's theme.)* Two threads, and it stays the concrete build minor.
@@ -248,17 +258,26 @@ that here; its prerequisite **BL-278** (Io MCP server) sits in **v0.1.1**, where
 it. Both sit *above* the deterministic utility core, not in place of it — the small local model
 is a macro layer over BL-202/203, never the whole opponent.
 
-*Intended theme, not yet versioned: the refocus — change who the player is.* The player pivots
-from **corporation** to **nation** as the strategic actor — owning research, military, and
-intelligence — while the corporation stays the **economic** actor, prototyped as a single
-chartered corp (= today's player corp) so the v0.0.x economy loop survives intact underneath and
-the nation is a thin strategic layer above it (**BL-094**, settled 2026-07-04). This is the hinge
-from *economy sandbox* toward *grand strategy*: the laws / techs / military / politics stubbed
-across v0.1.x now hang off an actor that can own them.
+*The refocus — change who the player is. **Stated as the aim, 2026-08-03**; still unversioned.*
+The player pivots from **corporation** to **governing body** as the strategic actor — owning
+research, military, and intelligence — while the corporation stays the **economic** actor,
+prototyped as a single chartered corp (= today's player corp) so the v0.0.x economy loop
+survives intact underneath and the governing layer is thin above it (**BL-094**, settled
+2026-07-04, **elevated and unparked 2026-08-03**). This is the hinge from *economy sandbox*
+toward *grand strategy*: the laws / techs / military / politics stubbed across v0.1.x hang off
+an actor that can own them.
 
-**Open sequencing question (2026-07-31).** BL-094 (player-nation pivot) carries no version goal
-in the backlog; the versioned v0.2.0 set is the AI opponent. Whether the pivot shares v0.2.0
-with the AI set or takes its own minor is Ben's call, not yet made.
+**Why it is the aim, in Ben's words:** *"it allows law, policy and science to use military might
+— not just economic."* A corporation's levers are all economic, so a corporate player can be
+given laws and research and both stay flavour on an economy. A governing body wields them, and
+can point them at force. That is also **Conflict's route to being load-bearing** — under a
+corporate player, laws and techs could only ever feed Trade, which is why Conflict has stayed
+the least-designed pillar.
+
+**Open sequencing question (2026-07-31, now louder).** BL-094 still carries no version goal; the
+versioned v0.2.0 set is the AI opponent. Whether the pivot shares v0.2.0 with the AI set or
+takes its own minor is Ben's call, still not made — NR-045 asks it directly now that the item is
+unparked at A priority.
 
 ### v0.3.0 — Politics + the filter system
 

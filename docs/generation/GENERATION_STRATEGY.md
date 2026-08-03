@@ -124,6 +124,45 @@ input to the staged-generation Tile Ledger ([[BL-100]]) as a tuning surface.
 
 ---
 
+## Real history in, invented names out (Ben, 2026-08-03)
+
+A standing constraint on every generation pass, stated here because it cuts across all of them.
+
+**The design leans on real history deliberately, and should keep doing so.** The institutional
+ladder (`docs/lore/HISTORY.md`) derives fragmentation, nation count and industrialisation timing
+from a real causal sequence; the Era −1 sim (BL-271) was filed off "use Rome as a sandbox"; the
+mil-sim (BL-272) takes real constants. That is the cheapest source of mechanisms that are known
+to work, and abandoning it would mean inventing social physics from nothing.
+
+**What transfers is the mechanism. What never transfers is a proper noun.**
+
+| Transfers | Does not |
+|---|---|
+| How a charter makes a promise enforceable | "The Hanseatic League" |
+| How a growth front stalls at a strait and leaves an exclave | "Sicily" |
+| How an inland sea concentrates littoral power | "The Mediterranean" |
+| Plausible hegemony-formation speed, campaign-season length, supply radii | "Rome" |
+
+Every generated proper name — nation, province, population centre, corporation, body, person —
+is **sci-fi / fantasy**, produced by the seeded template banks and phoneme tables described in
+the per-subject naming passes (`NATION_GENERATION.md` § Pass 5, `CORPORATION_GENERATION.md`
+§ Pass 5, `generate_city_name`). Two consequences worth stating because they are easy to get
+wrong:
+
+1. **"Culture-flavoured" must not mean "Earth-culture-flavoured."** The template banks are
+   flavoured by *generated* cultural character — the phoneme tables should not read as
+   recognisably Latin, Han, Norse or anything else an Earth reader can place. A name that makes
+   a player think "that's the Roman one" has failed, however good the mechanism underneath it.
+2. **Analogy language in docs is for the reader, not the generator.** When a design doc says
+   "its VOC moment" or "Rome as a sandbox", it is orienting a human. Nothing downstream should
+   read those words as content, and no name pool should be seeded from them.
+
+The one exception lives outside Io: **Project-Rival** plays an actual RTS with actual
+civilisations, because rehearsing the method needed an arena that exists today. It returns
+numbers and doctrine to Io — never names.
+
+---
+
 ## The oral-history pivot (BL-210, design-owed — first slices landed)
 
 **Settled direction, 2026-07-28 (Ben):** generation is being reframed from four separate

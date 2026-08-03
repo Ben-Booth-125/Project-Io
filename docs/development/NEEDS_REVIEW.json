@@ -923,6 +923,30 @@
     "Project-Rival/docs/MISSION.md"
    ],
    "resolution": "Answered 2026-08-03. (1) Two-item split KEPT. (2) BL-278 (Io MCP server) MOVED to v0.1.1 — Ben took the recommendation: it touches no simulation code, and landing it early is what lets a first real text-driven play attempt happen. BL-279 (trace corpus) stays v0.2.0, since it cannot start until traces exist. (3) The Project-Rival charter narrowing stands. (4) § 2C's A → B → C staging stands — the local model is a macro layer over the deterministic utility core, never the whole opponent. Answered together with NR-034, which themes v0.1.1 as the word-interface minor and gives BL-278 its home."
+  },
+  {
+   "id": "NR-045",
+   "title": "Two direction points applied: the sci-fi/fantasy naming rule, and the governing-body aim — BL-094 unparked and raised F → A on my judgement",
+   "raised": "2026-08-03",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Ben, 2026-08-03, after the review-queue session — two points from a prompt that did not reach me: (1) \"even if we do use real history as an analogy, we should use sci-fi / fantasy random names\"; (2) \"the aim that we're going for now, is to really play as a governing body. The reason for that is that it allows law, policy and science to use military might - not just economic.\"",
+   "what": "Point 1 is recorded as a standing rule (io-standing-rules § Terms & docs) plus a full section in GENERATION_STRATEGY.md, and stamped onto BL-271 and BL-277, the two items filed off the Rome analogy. Point 2 is recorded in BL-094's design as the stated reason for the pivot. The calls that were MINE, not Ben's: (a) **BL-094 unparked and raised F → A** — 'the aim we're going for now' is not compatible with a parked F item, but Ben did not ask for a re-prioritisation and did not give it a version goal; (b) BL-094's title changed from 'nation as the strategic actor' to 'the player is a GOVERNING BODY (nation)', following his word; (c) I wrote the v0.1.x design test ('does this system reach military as well as economic outcomes?') into BL-094 rather than editing the four stub items (BL-155/156/157/158) directly; (d) I did NOT touch CONCEPT.md's player-identity statement, on the authority time-slice rule, even though it is the doc his point most directly concerns.",
+   "why_it_matters": "(a) is a real sequencing change — an A-priority unparked item reads as near-term work, and v0.1.1 is the live minor with the word interface just themed into it. If the governing-body pivot is the aim but NOT the next thing built, A may overstate it and a version goal would say more than a priority does. ROADMAP has carried an open question since 2026-07-31 about whether the pivot shares v0.2.0 with the AI-opponent set or takes its own minor; that question is now louder, not answered. (d) matters because CONCEPT.md currently states the player identity as an open corporate-or-nation choice, which his message effectively closes — but closing it in the authority doc ahead of the work is exactly what the time-slice rule forbids, so it stays stated in the item.",
+   "options": [
+    "Accept as recorded — BL-094 unparked at A, no version goal yet.",
+    "Give BL-094 a version goal now (v0.2.0, or its own minor) — that settles the ROADMAP question that has been open since 2026-07-31.",
+    "Too strong — re-park BL-094 or drop it back down; the direction is recorded either way and the priority was not what Ben asked to change.",
+    "Also close CONCEPT.md now: amend the player-identity statement ahead of the work, treating this as a concept decision rather than an implementation one."
+   ],
+   "recommendation": "Option 2. A priority says 'important'; a version goal says 'when', and 'when' is the actual open question — it has been open since 2026-07-31 and Ben's message is the strongest signal yet that it should be answered. Option 4 is defensible too and is arguably not a time-slice violation, since CONCEPT.md owns *player identity* and Ben has now made an identity decision rather than an implementation one; I left it alone because the rule is unambiguous and the cost of waiting is low.",
+   "files": [
+    ".claude/rules/io-standing-rules.md",
+    "docs/generation/GENERATION_STRATEGY.md",
+    "docs/development/backlog.json",
+    "docs/development/ROADMAP.md"
+   ],
+   "resolution": null
   }
  ]
 }
