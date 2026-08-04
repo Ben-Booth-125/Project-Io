@@ -10,7 +10,7 @@ word interface to play through.
 > **Generated file.** Produced by `node tools/session/render_actions.js`.
 > Edit the JSON, then re-run; hand edits here are overwritten.
 
-*114 entries — 11 gameplay · 24 canvas · 15 lens · 36 ledger · 28 chrome.*
+*115 entries — 11 gameplay · 24 canvas · 15 lens · 36 ledger · 29 chrome.*
 
 ---
 
@@ -488,7 +488,7 @@ word interface to play through.
 **Valid when:**
 - The app is in-game and no ImGui text field has keyboard focus.
 
-**Expected output.** Toggles the mock tech-tree viewer — a read-only design aid rendering display data from scripts/tech_tree.lua, with NO simulation coupling (nothing can be researched from it; research is not implemented). Pressing F9 again closes it (toggle rule). Sim, view, and selection untouched.
+**Expected output.** Toggles the mock tech-tree viewer — a read-only design aid rendering display data from scripts/tech_tree.lua, tabbed by era (Era -1 Antiquity placeholder / Era 0 / Era 1 / Standing lines), with NO simulation coupling (nothing can be researched from it; research is not implemented). Pressing F9 again closes it (toggle rule). Sim, view, and selection untouched.
 
 **Reason to select.** Preview the planned research structure. Do not select this expecting to act — it is a mock, not a system.
 
@@ -1311,9 +1311,24 @@ word interface to play through.
 - App is in game.
 - Not while an ImGui widget owns the keyboard.
 
-**Expected output.** Toggles a read-only viewer over scripts/tech_tree.lua. Honest status: this is a mock — a design aid with no simulation coupling; nothing can be researched and nothing in the world reads it.
+**Expected output.** Toggles a read-only viewer over scripts/tech_tree.lua, tabbed by era: Era -1 Antiquity (placeholder pointing at the BL-307 ladder store), Era 0, Era 1, and Standing lines; eras with no authored quests show a placeholder. Honest status: this is a mock — a design aid with no simulation coupling; nothing can be researched and nothing in the world reads it.
 
 **Reason to select.** To browse the drafted tech-tree content; of no strategic use to an AI player yet.
+
+### `chrome.tech_tree_era_tab` — Tech-tree viewer (F9), era tab strip
+
+**Press.** Click the 'Era -1 Antiquity', 'Era 0 — Terrestrial', 'Era 1 — Early Space' or 'Standing lines' tab button
+
+| Arg | Type | Meaning |
+|---|---|---|
+| `view` | `enum` | 'Era -1 Antiquity' (placeholder pointing at the BL-307 ladder store) / 'Era 0 — Terrestrial' (the default) / 'Era 1 — Early Space' / 'Standing lines' (span eras, never gate one) |
+
+**Valid when:**
+- Tech-tree viewer is open (F9)
+
+**Expected output.** Switches which era's tree is shown — each era carries its own tree; eras with no authored quests show a placeholder. Re-clicking the currently-active tab closes the viewer (toggle rule); switching tabs is an ordinary view change.
+
+**Reason to select.** To browse a specific era's drafted content; of no strategic use to an AI player yet — the viewer is a mock with no simulation coupling.
 
 ### `chrome.gear_toggle` — In-game chrome, top-right gear button just left of the time column
 

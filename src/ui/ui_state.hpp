@@ -188,6 +188,10 @@ struct ui_state
     /// charts), 2=Tiles (the tile/building/market tables). BL-211.
     int  history_view = 0;
 
+    /// F9 mock tech-tree viewer: one era per view — 0=Era -1 Antiquity (placeholder),
+    /// 1=Era 0, 2=Era 1, 3=Standing lines. Defaults to Era 0, the campaign's era.
+    int  tech_tree_view = 1;
+
     // --- drill-through disclosure (BL-214 / BL-247) ---
     // The one idiom every dense surface obeys: folded (a verdict line + a chevron)
     // or expanded (a full-screen overlay showing everything at once). Because

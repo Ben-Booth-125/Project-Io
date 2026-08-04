@@ -1081,6 +1081,7 @@ int app::run_verify(const std::string& script_path, bool bless)
         else if (name == "corporation")  m_ui.show_corporation_panel = open;
         else if (name == "build")        m_ui.show_build_ledger = open; // tile construction ledger (BL-162)
         else if (name == "frame_hud")    m_ui.show_frame_hud = open;    // frame-budget HUD (BL-249)
+        else if (name == "tech_tree")    m_show_tech_tree = open;       // F9 mock viewer (BL-087)
     });
 
     // Park a fold-out ledger on one of its button-strip views (BL-117 sweep), so a
@@ -1091,6 +1092,7 @@ int app::run_verify(const std::string& script_path, bool bless)
         else if (name == "history_round") m_ui.history_round = view;
         else if (name == "economy")       m_ui.economy_view = view;
         else if (name == "market")        m_ui.market_ledger_view = view;
+        else if (name == "tech_tree")     m_ui.tech_tree_view = view;
     });
 
     // Park a surface's drill-through disclosure state (BL-214) so a capture can show
@@ -3257,7 +3259,7 @@ void app::render()
 
     // F9 mock tech-tree viewer (BL-087). Read-only design aid over
     // scripts/tech_tree.lua; no simulation coupling.
-    ui::draw_tech_tree_panel(m_tech_tree, m_show_tech_tree);
+    ui::draw_tech_tree_panel(m_tech_tree, m_show_tech_tree, m_ui.tech_tree_view);
 
     // F11 frame-budget HUD (BL-249) — the v0.1.0 audit instrument. Drawn last so it
     // measures a full frame's worth of panels, and anchored (first use only; it is

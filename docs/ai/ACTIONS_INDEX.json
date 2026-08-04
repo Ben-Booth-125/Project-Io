@@ -370,6 +370,10 @@
    "Keyboard; opens the mock tech-tree viewer"
   ],
   [
+   "chrome.tech_tree_era_tab",
+   "Tech-tree viewer (F9), era tab strip"
+  ],
+  [
    "chrome.gear_toggle",
    "In-game chrome, top-right gear button just left of the time column"
   ],

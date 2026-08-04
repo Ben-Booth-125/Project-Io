@@ -1,5 +1,7 @@
 #include "tech_tree_panel.hpp"
 
+#include "foldout_column.hpp"
+
 #include <imgui.h>
 
 #include <string>
@@ -107,7 +109,7 @@ void draw_quest(const tech_tree_registry& tree, const tech_quest& q)
 
 } // namespace
 
-void draw_tech_tree_panel(const tech_tree_registry& tree, bool& open)
+void draw_tech_tree_panel(const tech_tree_registry& tree, bool& open, int& view)
 {
     if (!open)
         return;
@@ -124,21 +126,52 @@ void draw_tech_tree_panel(const tech_tree_registry& tree, bool& open)
             static_cast<int>(tree.quests().size()), static_cast<int>(tree.techs().size()));
         ImGui::Separator();
 
-        // Gate quests grouped by Era, then the standing lines — mirrors the quest
-        // map in docs/research/ERA1_TECH_LANDSCAPE.md.
-        for (int era = 0; era <= 1; ++era)
+        // One tab per era — each era carries its own tree; eras without authored
+        // content hold a placeholder. Standing lines span eras, so they keep a tab
+        // of their own rather than repeating under every era. nav_button strip, not
+        // ImGui::BeginTabBar, whose header does not render in this build (see
+        // foldout_column.hpp); re-clicking the active tab closes the window
+        // (toggle rule).
+        ui::nav_button("Era -1 Antiquity", 0, view, &open);
+        ImGui::SameLine();
+        ui::nav_button("Era 0 — Terrestrial", 1, view, &open);
+        ImGui::SameLine();
+        ui::nav_button("Era 1 — Early Space", 2, view, &open);
+        ImGui::SameLine();
+        ui::nav_button("Standing lines", 3, view, &open);
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        if (view == 0)
         {
-            const char* const era_name =
-                (era == 0) ? "Era 0 — Terrestrial" : "Era 1 — Early Space";
-            ImGui::SeparatorText(era_name);
+            ImGui::TextDisabled("Placeholder — no in-engine tree yet.");
+            ImGui::TextWrapped(
+                "The ancient ladder (0 CE to campaign epoch): derived by the Era -1 "
+                "sim from endowment and contact, never clicked. Its 58 techs, 8 "
+                "vertex quests and 3 keystones are data in "
+                "docs/research/ancient_tech_ladder.json; whether this surface "
+                "renders them is BL-296's open question 4.");
+        }
+        else if (view == 1 || view == 2)
+        {
+            const int era = view - 1;
+            bool any = false;
             for (const tech_quest& q : tree.quests())
                 if (q.type == "gate" && q.era == era)
+                {
+                    draw_quest(tree, q);
+                    any = true;
+                }
+            if (!any)
+                ImGui::TextDisabled("Placeholder — no quests authored for this era yet.");
+        }
+        else
+        {
+            ImGui::TextDisabled("Deepen every Era; never gate an Era.");
+            for (const tech_quest& q : tree.quests())
+                if (q.type == "standing")
                     draw_quest(tree, q);
         }
-        ImGui::SeparatorText("Standing lines (deepen every Era; never gate an Era)");
-        for (const tech_quest& q : tree.quests())
-            if (q.type == "standing")
-                draw_quest(tree, q);
     }
     ImGui::End();
 }

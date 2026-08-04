@@ -8238,6 +8238,34 @@
      "notes": "era_world_harness R5 — the legacy-untouched guard."
     }
    ]
+  },
+  {
+   "brief": "tech-tree-era-tabs",
+   "title": "F9 tech-tree viewer: one era per tab, placeholders for unauthored eras",
+   "difficulty": 1,
+   "importance": "C",
+   "evaluated_difficulty": 1,
+   "status": "complete",
+   "resolved": "2026-08-04",
+   "resolution": "Complete. scripts/verify/tech_tree_panel.lua (visual class), two goldens blessed: the nav_button era strip renders (Era -1 Antiquity / Era 0 / Era 1 / Standing lines, Era 0 default with its gate quests), and the Antiquity view holds the placeholder pointing at the BL-307 ladder store.",
+   "promoted_from": "Ben, 2026-08-04, during the BL-296 constellation review: each era should have its own tree; add a tabbed header with placeholders",
+   "batch": null,
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "The F9 viewer shows a four-tab era strip (Era -1 Antiquity / Era 0 — Terrestrial / Era 1 — Early Space / Standing lines); Era 0 is the default and shows its gate quests; re-clicking the active tab closes the viewer (toggle rule).",
+     "class": "visual",
+     "status": "complete",
+     "notes": "tech_tree_tabs golden."
+    },
+    {
+     "id": "R2",
+     "requirement": "An era with no in-engine tree shows a placeholder naming where its content lives (Era -1 Antiquity points at docs/research/ancient_tech_ladder.json).",
+     "class": "visual",
+     "status": "complete",
+     "notes": "tech_tree_antiquity golden."
+    }
+   ]
   }
  ]
 }
