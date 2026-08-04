@@ -1,6 +1,7 @@
 #include "river_generation.hpp"
 
 #include <algorithm>
+#include <queue>
 #include <random>
 
 namespace {
@@ -91,9 +92,81 @@ void generate_rivers(world& w, const std::vector<entity_id>& tile_ids,
         return a < b;
     });
 
+    // --- Drainage field: where does water go from here? (2026-08-04) ---------
+    //
+    // A strictly-downhill walk on a NOISE heightmap stops almost immediately.
+    // Every pit is a terminus, and a fractal surface is nothing but pits, so
+    // rivers used to end inland a few tiles from their source. The notable-worlds
+    // search measured the consequence: 0-2 river tiles reached the enclosed sea
+    // on every one of its top seeds, so a Mediterranean basin had coasts and no
+    // draining hinterland — and every Mediterranean civilisation sat on a river
+    // mouth.
+    //
+    // The standard fix is a priority flood (Barnes/Planchon-Darboux). Start at
+    // the ocean, repeatedly expand the lowest frontier cell, and record for each
+    // land cell the neighbour it was FIRST reached from. That neighbour is its
+    // outflow: following those pointers from anywhere on the map reaches the
+    // ocean, because the pointers were laid down by a wave that started there.
+    // Pits fill naturally — a basin is entered over its lowest lip, which is
+    // exactly where a lake would spill.
+    //
+    // Deterministic: ties in the queue break on raster index, so the field is a
+    // pure function of the heightmap and grid shape. No RNG.
+    std::vector<int>   outflow(static_cast<std::size_t>(total), -1);
+    std::vector<char>  flooded(static_cast<std::size_t>(total), 0);
+    {
+        // (level, idx): `level` is the fill height — the highest lip crossed to
+        // get here — so the frontier expands over the lowest available saddle.
+        struct node { float level; int idx; };
+        struct worse {
+            bool operator()(const node& a, const node& b) const {
+                if (a.level != b.level) return a.level > b.level; // min-heap
+                return a.idx > b.idx;                             // deterministic tie-break
+            }
+        };
+        std::priority_queue<node, std::vector<node>, worse> q;
+
+        for (int idx = 0; idx < total; ++idx)
+        {
+            const tile_component* tc = tc_at(idx);
+            if (tc && tc->composition == terrain_composition::ocean)
+            {
+                flooded[static_cast<std::size_t>(idx)] = 1;
+                q.push(node{ height[static_cast<std::size_t>(idx)], idx });
+            }
+        }
+
+        while (!q.empty())
+        {
+            const node cur = q.top();
+            q.pop();
+            const int col = cur.idx % gw, row = cur.idx / gw;
+            const auto& tbl = ((row & 1) != 0) ? odd_off : even_off;
+            for (int side = 0; side < 6; ++side)
+            {
+                const int nrow = row + tbl[side][1];
+                if (nrow < 0 || nrow >= gh) continue;
+                const int ncol = ((col + tbl[side][0]) % gw + gw) % gw;
+                const int nidx = raster_idx(ncol, nrow, gw);
+                if (flooded[static_cast<std::size_t>(nidx)] || !tc_at(nidx)) continue;
+                flooded[static_cast<std::size_t>(nidx)] = 1;
+                outflow[static_cast<std::size_t>(nidx)] = cur.idx;
+                // The level a cell drains at is its own height, or the lip it had
+                // to be reached over — whichever is higher.
+                const float nh = height[static_cast<std::size_t>(nidx)];
+                q.push(node{ nh > cur.level ? nh : cur.level, nidx });
+            }
+        }
+    }
+
     // Number of rivers scales with grid area — a fresh, self-contained formula (this
     // is a sibling pass, not a Pass-5 dependency on scale_to_area).
-    const int num_rivers = std::clamp(total / 1800, 3, 24);
+    //
+    // Raised 2026-08-04 from total/1800 (which gave Kepler EIGHT rivers across
+    // ~7,000 land tiles, so most coastlines never saw one) to total/260. Kepler
+    // now carries ~58. Still stylised rather than realistic — a real continent
+    // has thousands — but enough that a basin has a hinterland.
+    const int num_rivers = std::clamp(total / 260, 3, 90);
 
     std::mt19937 rng(seed ^ 0x52495645u); // "RIVE"
 
@@ -114,8 +187,11 @@ void generate_rivers(world& w, const std::vector<entity_id>& tile_ids,
     for (const int src_idx : sources)
     {
         int cur = src_idx;
-        // Strictly-decreasing height per step guarantees termination (no cycles
-        // possible) in at most `total` steps.
+        // Follow the drainage field. Termination is guaranteed because the
+        // outflow pointers form a forest rooted in the ocean — the flood laid
+        // them down expanding outward FROM the ocean, so no cell can point back
+        // into its own subtree. Every trace therefore ends at water rather than
+        // in a pit, which is the whole point of the change.
         for (int steps = 0; steps < total; ++steps)
         {
             tile_component* cur_tc = tc_at(cur);
@@ -127,29 +203,22 @@ void generate_rivers(world& w, const std::vector<entity_id>& tile_ids,
             const bool odd_row = (row & 1) != 0;
             const auto& tbl = odd_row ? odd_off : even_off;
 
+            const int best_idx = outflow[static_cast<std::size_t>(cur)];
             int best_side = -1;
-            int best_idx  = -1;
-            float best_h  = height[static_cast<std::size_t>(cur)];
-            for (int side = 0; side < 6; ++side)
+            if (best_idx >= 0)
             {
-                const int nrow = row + tbl[side][1];
-                if (nrow < 0 || nrow >= gh)
-                    continue;
-                const int ncol = ((col + tbl[side][0]) % gw + gw) % gw;
-                const int nidx = raster_idx(ncol, nrow, gw);
-                if (!tc_at(nidx))
-                    continue;
-                const float nh = height[static_cast<std::size_t>(nidx)];
-                if (nh < best_h)
+                // Recover which hex side the outflow neighbour lies on.
+                for (int side = 0; side < 6; ++side)
                 {
-                    best_h    = nh;
-                    best_side = side;
-                    best_idx  = nidx;
+                    const int nrow = row + tbl[side][1];
+                    if (nrow < 0 || nrow >= gh) continue;
+                    const int ncol = ((col + tbl[side][0]) % gw + gw) % gw;
+                    if (raster_idx(ncol, nrow, gw) == best_idx) { best_side = side; break; }
                 }
             }
 
             if (best_side < 0)
-                break; // local basin — trace ends here; no lake tile is created (out of scope).
+                break; // unreachable from the ocean (an enclosed body with no coast).
 
             tile_component* n_tc = tc_at(best_idx);
             const int opp_side = (best_side + 3) % 6;
