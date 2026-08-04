@@ -10,7 +10,61 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — BL-287: one world layer instead of forty-four, and the three bugs it flushed out (2026-08-04, latest)
+## Session — Documentation retrofit: seven audits, and what the corpus was lying about (2026-08-04, latest)
+
+**Runtime:** ~3 h. Full mode, doc-retrofit delivery. Ran alongside a concurrent star-map coding session.
+
+Seven read-only agents audited the whole doc corpus against the code and against the newer
+direction — core vision, economy, generation, UI, AI/tech, process, plus one extracting the vision
+delta from the backlog and review queue. Their verdict in one line: **the corpus is current where
+the work landed with its doc, and stale at the top of the tree.** PLANETOLOGY, CONTINENTS,
+RESOURCES, AI_OPPONENT, ROADMAP and POPULATION kept up. CONCEPT, SYSTEMS, TECH_FOUNDATIONS and
+GLOSSARY still described a corporate economy player with no combat engine and no agent seam.
+
+**The three findings that mattered most were all of one kind — a doc that would actively misdirect
+the next session**, not merely one that had aged.
+
+1. **LAYOUT.md and MENU.md documented `ui::why_note` as a live control.** Ben removed it under
+   NR-018, and `detail_level.cpp:121` carries "do not reinstate a draw path here without reopening
+   NR-018". The doc was an instruction to rebuild a rejected surface.
+2. **DEVELOPMENT_PRACTICES named CI as "the signal" guarding `main`.** `.github/` was deleted
+   2026-07-31 (`debcefd`). Nothing guards `main` but a local build, and a session trusting that
+   section would trust a gate that cannot fire.
+3. **TECH_FOUNDATIONS excluded combat resolution in two places** while `src/world/combat.cpp` ships
+   `resolve_battle` (BL-272, 15/15 PASS, consumed by the Era −1 sim).
+
+**Ben authorised closing the pivot docs ahead of BL-094 landing**, which the time-slice rule had
+been holding. CONCEPT, SYSTEMS and GLOSSARY now carry the governing-body aim with his stated
+reason — law, policy and science reaching military outcomes — and the design test it implies:
+*does this system reach military as well as economic outcomes?* Written forward-looking and clearly
+unlanded rather than in the governing body's voice (NR-053).
+
+**The naming rule is broken in shipped code, not in the docs.** Every generation and lore doc
+passed the Earth-proper-noun sweep. `nation_generation.cpp:577-608` did not: a *global* phoneme
+bank that ignores the per-culture phonology `creeds.cpp` already rolls, with plainly Latin/European
+tables. Filed as BL-290 — and the interesting half is the global-ness, not the Latin-ness, because
+consuming the phonology the chain already produces makes the Earth-flavour problem structurally
+impossible rather than merely corrected.
+
+**Numbers that had gone stale invisibly.** Every row of PLANETOLOGY's knob table had moved;
+TILE_GENERATION's Pass 5 said mountain seeds `0/2/4/5` against an actual `0/5/11/13`; the "two pure
+post-multiplies" contract is three since ore provinces landed. TILES.md's *measured* landform census
+is marked stale-and-blocked rather than guessed at, because `world_audit` — the harness that
+produced it — currently fails (BL-291).
+
+**One lesson worth keeping.** `_critic_notes.md` *certified* a set of mock-data figures as verified,
+and the fixture was re-blessed afterwards, so the note laundered stale numbers into six sibling
+docs. A verification note that pastes measured values ages the moment the goldens move, and ages
+invisibly. Record the method, not the measurement.
+
+**Filed:** BL-290 … BL-295, six code defects the audit found. **Review queue:** NR-050 … NR-053.
+**Not done:** the BACKLOG_ARCHIVE.json retirement Ben asked for — deferred by his own call until the
+concurrent coding session lands, with the scope question (closed items only, not an id range) still
+open.
+
+---
+
+## Session — BL-287: one world layer instead of forty-four, and the three bugs it flushed out (2026-08-04)
 
 **The build was the symptom, not the problem.** A verify-tier rebuild was taking 45–90 minutes.
 Cause was one line — `CMakeLists.txt:433` handed every harness `${IO_WORLD_SOURCES}` as its own
