@@ -1035,6 +1035,42 @@
     "docs/generation/PLANETOLOGY.md"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-050",
+   "title": "A concurrent session swept this retrofit’s doc edits into three unrelated commits",
+   "raised": "2026-08-04",
+   "kind": "observation",
+   "status": "open",
+   "source": "Documentation retrofit, running alongside the star-map coding session.",
+   "what": "Three times during this pass, doc files edited here were committed by the other session before this one could commit them: 7393a9d (\"Star map: actually draw it\") took CONCEPT.md, SYSTEMS.md, GLOSSARY.md, ui/LAYOUT.md, ui/MENU.md and io-standing-rules.md; 6cbc33f (\"The ladder wraps\") took eleven more; e8f4f57 (\"Bless the goldens\") took the ACTIONS.json corrections. Content survived intact in every case — verified by grep after each sweep. What did not survive is attribution: the governing-body pivot lands in a commit about ImGui draw lists.\n\nCAUSE: that session commits with a broad `git add` every few minutes. The window between editing a batch of docs and committing them is smaller than the batch takes to write, so no amount of committing promptly from this side wins the race.\n\nWHY IT IS WORTH RECORDING RATHER THAN SHRUGGING AT: the commit message is how a future session finds out why a doc changed. `git log -- docs/CONCEPT.md` now returns a star-map commit. The repo already has the fix — CLAUDE.md prescribes the `scoped-commit` skill precisely for a tree carrying someone else’s work — and it was not used.\n\nNO ACTION PROPOSED beyond awareness; rewriting the history would be worse than the problem, and the other session was building on those commits. If concurrent sessions become normal, the worktree isolation model in DELIVERY.md § Sub-agents & worktrees is the real answer."
+  },
+  {
+   "id": "NR-051",
+   "title": "Superseded designs were demoted rather than deleted — four calls taken",
+   "raised": "2026-08-04",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Documentation retrofit, Packages B/C/E.",
+   "what": "Four places described a surface that does not exist. In each I marked the design **designed-not-built** and kept it, rather than deleting it:\n\n1. LENSES.md § Per-lens selection validity & routing — no resolver reads state.overlay; selection is lens-agnostic. Kept because it is a good design and two of its rows already describe the real fall-through. It has NO backlog item; if it should be built, it needs one.\n2. market.md Markets/Trends views — designed, never built; the built tabs are Prices/Sell Orders.\n3. construction.md — Build/Manage/Sell Orders became Construction/Buildings, with Sell Orders relocated to Market.\n4. tile_ledger.md Tiles/Buildings/Market — the built views are Story/Chain/Tiles, and BL-281 retires the last of those.\n\nTHE JUDGEMENT: deleting is cleaner to read, but it destroys the reasoning, and a design that was thought through and not built is worth more than the paragraph it costs. The risk is the opposite failure — a reader skimming past the banner and building from the table. If you would rather these were cut outright, say so and I will cut them; the reasoning survives in git either way."
+  },
+  {
+   "id": "NR-052",
+   "title": "Priorities chosen for the six code-defect items filed from the audit",
+   "raised": "2026-08-04",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Documentation retrofit — findings that were code defects, not doc drift.",
+   "what": "BL-290 (naming banks read Earth-European) and BL-291 (world_audit harness fails) and BL-293 (order book unreachable by command) were filed **A**; BL-292 (economy panel orphaned) **B**; BL-294 (dead UI symbols) and BL-295 (components.hpp cites phantom ids) **C**. All six v0.1.1.\n\nREASONING FOR THE THREE As, since that is the part worth checking: BL-290 is a standing rule being broken in shipped code, and the rule is eleven days old. BL-291 blocks re-measuring the tile census, so TILES.md keeps a stale measured table until it is fixed — a doc defect with a code cause. BL-293 is the hole in the word interface’s write leg, and the word interface is v0.1.1’s named theme; it also surfaced independently in Project-Rival’s findings, which is a second vote.\n\nBL-292 asks a real question rather than proposing a fix — give the orphaned Economy panel a door, or retire it — and I recommended auditing for redundancy first, since the rail is nearly full and BL-094 will want slots for law and force."
+  },
+  {
+   "id": "NR-053",
+   "title": "The pivot docs were closed ahead of BL-094 landing, on your instruction — recording the shape I chose",
+   "raised": "2026-08-04",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Documentation retrofit; you answered \"edit now\" to the NR-045 question.",
+   "what": "You authorised editing CONCEPT.md, SYSTEMS.md and GLOSSARY.md now rather than holding the authority time-slice. What was NOT specified, and what I chose:\n\nI wrote them as **forward-looking, clearly unlanded** rather than as if the pivot had shipped. CONCEPT states the player controls a corporation today and that the stated aim is a governing body, with your reason and the military-reach design test; GLOSSARY gains a Governing body entry marked designed-not-built and leaves the nation-vs-governing-body terminology question explicitly open, which BL-094 says is yours to settle; SYSTEMS splits Policy into automation-policy and law, and adds a Force entry marked designed-not-built.\n\nTHE ALTERNATIVE I DID NOT TAKE: rewriting them in the governing body’s voice throughout. That would read better but would assert a world that does not exist, and would make the docs wrong in the other direction until the work lands.\n\nSTILL OPEN AND NOT DECIDED HERE: BL-094 has no version_goal (the NR-045 question proper), and its design prose says the player is one of \"the 14 generated Voronoi nations\" four times — the generator produces roughly 43. The pivot’s core identity claim rests on a nation count that changed on 2026-07-30."
   }
  ]
 }
