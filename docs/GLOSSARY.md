@@ -1,7 +1,7 @@
 # Project Io — Glossary
 
 **Asset**
-Any owned entity with economic or military value: a building, installation, unit, or vehicle. A corporation persists as long as it holds at least one asset.
+Any owned entity with economic or military value: a building, installation, unit, or vehicle. A corporation persists as long as it holds at least one asset; total elimination also requires destroying the parent nation.
 
 **Body**
 Any discrete celestial object in the simulation — planet, moon, asteroid, or station. Bodies are the primary unit of territorial control and the locations where resources are extracted, colonies are built, and conflict occurs.
@@ -13,7 +13,10 @@ The action that reveals a body's tile surface and deposit richness bands. A body
 The second, independent fog (BL-089, commercial-sphere visibility): a body-level tier — `unknown` / `known_stale` / `known` / `visible` — derived purely from the player's own trade routes, live convoys, and building presence (`body_activity_visibility`, `src/world/world.hpp`; no stored state). Independent of the survey axis: a surveyed-but-unrouted body is still activity-unknown, an unsurveyed-but-routed one is known. See `docs/ui/DISCOVERY.md`.
 
 **Corporation**
-The player's controlling entity. Unlike nation-states, a corporation begins with no territorial claim or military force and must justify every asset through economic or strategic return. The corporation persists as long as it holds any asset.
+The **economic** actor — and today also the player's seat. Unlike nation-states, a corporation begins with no territorial claim or military force and must justify every asset through economic or strategic return. It persists as long as it holds any asset. Under BL-094 (governing-body pivot) the corporation stays the economic actor but stops being the player's identity — see **Governing body**.
+
+**Governing body**
+Ben's term (2026-08-03) for the seat the player is moving to: the sovereign actor that legislates, taxes, researches and commands force. *Designed, not built* — BL-094 (governing-body pivot), priority A, no version goal yet (NR-045 open). The distinction that matters: a corporation's levers are all economic, so law and research stay flavour on an economy; a governing body **wields** them and can point them at military outcomes. In generation terms it is a **Nation**. Whether "nation" or "governing body" becomes the canonical player-facing term is deliberately still open.
 
 **Headquarters (HQ)**
 A corporation's seat building, drawn with the `ui::icons::hq` ringed-star glyph. Today it is the player-only home marker — the `hq` star on the building nearest the home-cluster centroid, paired with the home-cluster ring (BL-085). The **design direction (BL-182, deferred)** is that an HQ projects an **influence range**, and the union of a corporation's HQ ranges forms its **corporate border** — a sphere symmetric with nation territory. A corporation opens with one HQ and builds more as it advances (tech/law-gated); investing in fewer, deeper HQs (**tall**) versus more, spread HQs (**wide**) is the corporation's specialisation lever. See `docs/generation/CORPORATION_GENERATION.md` and BL-182.
@@ -57,6 +60,12 @@ The Continents/Drift generation pass (`src/world/continents.cpp`) simulates a sm
 **Planetology (and the generation chain)**
 The body-level generation pass (BL-167, planetology; `src/world/planetology.cpp`): generated atmosphere, chemistry, and a simulated abiogenesis/evolution history, upstream of tile generation. "The chain" is the ordered, seeded, deterministic generation sequence: planetology → continents → tiles → population centres → history ladder → nations → roads → markets → corporations. Its front door is the **New World wizard** — the setup walk "New Game" opens; the world is not built until the wizard finishes (`start_new_game`, `src/core/app.cpp`). See `docs/generation/PLANETOLOGY.md` and `docs/generation/GENERATION_STRATEGY.md`.
 
+**Ore province**
+A seeded region that holds a disproportionate share of one resource, so an endowment lands *somewhere* rather than dusting evenly (tile generation Pass 6, `provinces_for` / `province_field`). Copper, petroleum, iron and coal each redistribute roughly 45–65% of the world total into 2–3 provinces. Conservation is over the resource's **bearing set**, not over all land. The mechanism is a deterministic post-multiply, not a roll.
+
+**Word interface**
+The text-drivable face of the game — the substrate an AI player uses, and v0.1.1's theme. Three legs plus a socket: **read**, the corp blackboard export (BL-206, `--export-blackboard`); **meaning**, the action dictionary (BL-270, `docs/ai/ACTIONS.json`); **write**, the corp-command seam (`src/world/corp_command.hpp`); and the **socket**, the Io MCP server (BL-278, `ProjectIo --serve` plus `tools/mcp/`). The write channel is narrower than the dictionary — some documented presses have no command verb. See `docs/ai/AI_OPPONENT.md` § 10.
+
 **History ladder**
 The institutional-history generation stage (`src/world/history_ladder.cpp`). The **pre-national ladder** (BL-221) runs after tiles and *before* nations, and drives them: it counts the agrarian cradles the land supported, prices conquest against exit, and sets the nation seed budget (`nation_params_from_ladder`) — the ladder is upstream of the map, not a narration of it. Its events carry historical-epoch timestamps (BL-220, dated epochs) and merge into the body's biography. The industrial stages (BL-222) and the averted rupture (BL-223) are open. See `docs/lore/HISTORY.md`.
 
@@ -85,7 +94,7 @@ The hover-card model (BL-230, glance-then-stick; `src/ui/hover_card.hpp`). A sta
 The entity the player **single-clicked to inspect**. Persists until another entity is selected (or the selection is cleared). Drives the **Selection info element** and its 'go to' target, and does not move the canvas. Backed by `ui_state.selected_entity`. See `docs/ui/SELECTION.md`.
 
 **Item (backlog item)** *(formerly "Brief")*
-A unit of **described intent** in the backlog (`docs/development/backlog.json` — the metadata index, with its design prose in the `design` field; `BACKLOG.md` is a legacy drain holding only older, unmigrated bodies): a problem to solve, a feature to build, or a doc to write, captured with enough context and file pointers to plan later — but deliberately carrying *no* implementation breakdown. An item is the design-level view of a single piece of work; **promoting** it into `docs/development/REFINED.md` decomposes it into a **task group** (one item ↔ one group of tasks). Distinct from a **task**, which is one file-scoped, individually-buildable step within that group. Every item carries a **design state** (see below): `designed` (✓) or `design-owed` (~). See `docs/development/DELIVERY.md`.
+A unit of **described intent** in the backlog (`docs/development/backlog.json` — the metadata index, with its design prose in the `design` field; `BACKLOG.md` was drained on 2026-07-31 and now holds only a tombstone plus seven pointer stubs; a landed item's prose moves on to `docs/development/archive/backlog-design-<quarter>.json`): a problem to solve, a feature to build, or a doc to write, captured with enough context and file pointers to plan later — but deliberately carrying *no* implementation breakdown. An item is the design-level view of a single piece of work; **promoting** it into `docs/development/REFINED.md` decomposes it into a **task group** (one item ↔ one group of tasks). Distinct from a **task**, which is one file-scoped, individually-buildable step within that group. Every item carries a **design state** (see below): `designed` (✓) or `design-owed` (~). See `docs/development/DELIVERY.md`.
 
 **Design state (item)**
 Whether an **item**'s design is settled. The authoritative value is the `status` field in `backlog.json`; the glyph in `BACKLOG.md` mirrors it 1:1. **`designed` (✓) — not implemented:** the design is settled and the item is **promote-ready** (it may still be *blocked* on a dependency existing — a sequencing fact, not a design gap). **`design-owed` (~) — not implemented:** design is still owed and must be settled *before* the item is promoted. Orthogonal to priority and difficulty. Only `designed` items are promotable. See `docs/development/DELIVERY.md` (§ Design state).

@@ -80,8 +80,9 @@ Notes on the mapping:
   **Production**, **Trade**, **Workforce**, **Finance** — folded out into the shell column
   (`src/ui/corporation_dashboard.{hpp,cpp}`). Each card **rests as one verdict line** and
   expands, through the shared drill-through chevron (BL-214, `LAYOUT.md` § Drill-through), to a
-  **full-screen view** carrying its chart, that chart's **question log** (BL-247), and a
-  **per-item drill** with a breadcrumb back to the roll-up.
+  **full-screen view** carrying its chart and a **per-item drill** with a breadcrumb back to the
+  roll-up. *(The chart question log that once rode here — BL-247, `ui::why_note` — was removed
+  2026-08-02 under NR-018 and is not to be reinstated; see `LAYOUT.md` § The chart question log.)*
 
   The four drills are deliberately four *different shapes*, not one generic detail panel: a
   building's operating economics (through the shared `draw_building_profit` builder), a lane's

@@ -27,7 +27,10 @@ void magnitude_to_look(float mag, float& radius, float& alpha)
 
 void draw_star_map(ImVec2 origin, ImVec2 size)
 {
-    ImDrawList* dl = ImGui::GetWindowDrawList();
+    // Background list, matching every other canvas: these are drawn OUTSIDE any
+    // ImGui window, so GetWindowDrawList() targets whatever window happens to be
+    // current — which at this call site is none, and the map silently vanishes.
+    ImDrawList* dl = ImGui::GetBackgroundDrawList();
     const ImVec2 br{ origin.x + size.x, origin.y + size.y };
     const auto at = [&](float x, float y) {
         return ImVec2{ origin.x + x * size.x, origin.y + y * size.y };
@@ -37,20 +40,15 @@ void draw_star_map(ImVec2 origin, ImVec2 size)
     // read as a hole in the UI.
     dl->AddRectFilled(origin, br, IM_COL32(9, 11, 20, 255));
 
-    // The galactic band: a soft brightening across the middle, drawn as stacked
-    // translucent strips rather than a gradient because ImDrawList has no
-    // gradient primitive and the strip count is small.
-    constexpr int k_bands = 14;
-    for (int i = 0; i < k_bands; ++i)
+    // The galactic band: a soft brightening across the middle. Two vertical
+    // gradients meeting at the centre line — stacking translucent strips instead
+    // reads as scanlines at minimap size, where the whole band is only ~90 px
+    // tall and every strip edge lands on its own row of pixels.
     {
-        const float t   = static_cast<float>(i) / static_cast<float>(k_bands - 1); // 0..1
-        const float off = (t - 0.5f) * 0.44f;                                      // band half-width
-        const float fall = 1.0f - std::fabs(t - 0.5f) * 2.0f;                      // 1 at centre
-        const int   a    = static_cast<int>(fall * fall * 26.0f);
-        if (a <= 0) continue;
-        const float y0 = 0.5f + off - 0.022f;
-        const float y1 = 0.5f + off + 0.022f;
-        dl->AddRectFilled(at(0.0f, y0), at(1.0f, y1), IM_COL32(120, 132, 190, a));
+        const ImU32 edge = IM_COL32(120, 132, 190, 0);
+        const ImU32 core = IM_COL32(120, 132, 190, 30);
+        dl->AddRectFilledMultiColor(at(0.0f, 0.24f), at(1.0f, 0.50f), edge, edge, core, core);
+        dl->AddRectFilledMultiColor(at(0.0f, 0.50f), at(1.0f, 0.76f), core, core, edge, edge);
     }
 
     int obj_count = 0;

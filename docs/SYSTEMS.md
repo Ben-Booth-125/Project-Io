@@ -2,7 +2,11 @@
 
 ## Structure
 
-Two pillars define the game's end goals: **Trade** and **Conflict**. Every other system creates the conditions, constraints, or capabilities that flow into one or both. The player is a corporate entity — an owner of assets and operations — and this shapes the economic layer throughout: profit, not policy, is the motive.
+Two pillars define the game's end goals: **Trade** and **Conflict**. Every other system creates the conditions, constraints, or capabilities that flow into one or both.
+
+The player is a corporate entity today — an owner of assets and operations — and that shapes the economic layer throughout: for the chartered corp, profit is the motive. The stated aim is to play a **governing body** (BL-094, governing-body pivot, priority A), whose motive is broader and whose levers reach force. Law, policy and science are that player's instruments, not flavour on someone else's economy.
+
+Each system below therefore answers one test: **does it reach military as well as economic outcomes?** A system that can only ever move a cost or a price is built for the player we are pivoting away from.
 
 Systems are grouped into three supporting tiers below the pillars.
 
@@ -23,6 +27,10 @@ Choosing **counterparties** preferentially shipped with BL-037 (preferential pur
 ### Conflict
 The player claims, defends, and invades territory through military force. Combat runs concurrently with the economy: supply routes are live targets, and active conflict on a body inhibits its trade connections. Territorial control is both a strategic objective and a source of ongoing economic pressure on opponents.
 
+The **governing body** is the actor that commands force — a corporation's levers stop at the economic, which is why this pillar has stayed thin. BL-094 (governing-body pivot) is Conflict's route to being load-bearing.
+
+**Build status.** A battle resolver ships — BL-272, `src/world/combat.cpp`: class-matchup matrix × formation doctrine × terrain × supply × season, integer arithmetic, deterministic tie-break. It is consumed by the Era −1 history sim (BL-271), not by the campaign layer. Nothing in Era 0 commands a unit yet; BL-157 (military datamodel stub) is the first campaign-side rung.
+
 ---
 
 ## Productive tier
@@ -35,7 +43,7 @@ The corporation's operating balance. Revenue comes from trade margins and asset 
 Raw materials are extracted from bodies and processed into higher-tier goods through industrial chains. Output feeds both trade networks and military supply. Starting resource conditions differ between factions, making early industrial priorities a meaningful strategic choice.
 
 ### Supply
-The physical movement of goods, materiel, and forces through space. Supply is cheap on Earth but becomes costly and vulnerable with distance and conflict. A disrupted route halts production, construction, and operations at the destination. The player cannot project power or sustain a colony beyond what their logistics can support.
+The physical movement of goods, materiel, and forces through space. Supply is cheap on the homeworld but becomes costly and vulnerable with distance and conflict. A disrupted route halts production, construction, and operations at the destination. The player cannot project power or sustain a colony beyond what their logistics can support.
 
 Layer 5 of the economy is the **convoy layer** — the mechanism that couples bodies through physical cargo movement. The prototype model (BL-039, the convoy layer; landed v0.0.6, `src/world/supply_system.cpp`) is documented in `docs/economy/SUPPLY.md` and summarised here.
 
@@ -80,11 +88,18 @@ The world is generated, not authored — a deterministic, seeded chain (added 20
 ### History ladder
 The institutional history that makes the campaign premise causal rather than asserted (added 2026-07-31). The pre-national ladder (BL-221, `src/world/history_ladder.cpp`) runs upstream of nation generation and *drives* it — counting agrarian cradles, pricing conquest against exit, and setting the nation seed budget (`nation_params_from_ladder`). Later stages (BL-222 industrial ladder, BL-223 averted rupture) are open. Authority: `docs/lore/HISTORY.md`.
 
+### Force
+Units, doctrine, and the ceiling on what the player can raise and sustain. *Designed, not built at campaign scale.* The resolver ships (BL-272 — see § Conflict) and province manpower ships (BL-273: `manpower_ceiling`, `replenish_manpower`, `raise_manpower`), both consumed by the Era −1 sim. BL-157 (military datamodel stub, v0.1.4) is the campaign-side rung. Under BL-094 the levers that reach this system — conscription, requisition, war powers — are **laws**, which is precisely why they need a governing body to pass them.
+
 ### Research
-Technology is organised into discrete, modular trees, each unlocked by a visible precondition. Research raises capability ceilings across all systems and competes directly with other budget priorities.
+Technology is organised into discrete, modular trees, each unlocked by a visible precondition. Research raises capability ceilings across all systems and competes directly with other budget priorities. It is owned at the **governing-body** tier: research a corporation owns is a tech tree of factories, and must instead reach weapons, logistics and intelligence. *Designed, not built* — BL-156 (tech system early design, v0.1.3), BL-087 (Era 1 tech quests, v0.3.0).
 
 ### Policy
-The player sets standing rules that govern automatic behaviour: trade thresholds, workforce allocation preferences, and military posture. Policy shapes the character of operations across a playthrough and is a lever for managing systemic pressure without direct intervention.
+Two different things share this word, and BL-094 separates them.
+
+**Automation policy** — standing rules governing automatic behaviour: trade thresholds, workforce allocation preferences, exchange policy. This is a convenience altitude; it changes a number in the player's own cost model.
+
+**Law** — the governing body's instrument, and the load-bearing sense. Conscription, requisition, embargo, tariff, war powers: rules that bind actors other than the one who passed them, and that reach force rather than only price. *Designed, not built* — BL-155 (law/policy surface, v0.1.2) and BL-186 (laws ledger, v0.1.2). Laws are enacted by nations; until the pivot lands the player is a law **subject**, not a legislator — the single exception being a chartered corporation's **negotiated** tax rate (BL-280).
 
 ---
 
@@ -95,7 +110,9 @@ The player sets standing rules that govern automatic behaviour: trade thresholds
 Each faction maintains a sentiment value toward every other, shaped by trade history, territorial conflict, and ideological alignment. Diplomacy modulates the likelihood and cost of conflict and affects what trade arrangements are available. Military takeover by another faction is one of the two primary loss vectors.
 
 ### AI opponent
-Rival corporations act (added 2026-07-31): BL-079 (background-corp agency) gives narrow per-building reflexes, and BL-202 (corp AI stage A) layers a deterministic scored-utility evaluation over the corp-command seam (`src/world/corp_ai.cpp`). Stage B (BL-203, predictive spending) is designed, not built. Authority: `docs/ai/AI_OPPONENT.md`; the scoped limits live in `.claude/rules/io-standing-rules.md`.
+Rival corporations act (added 2026-07-31): BL-079 (background-corp agency) gives narrow per-building reflexes, and BL-202 (corp AI stage A) layers a deterministic scored-utility evaluation over the corp-command seam (`src/world/corp_ai.cpp`). BL-203 (predictive spending) has landed on top of it.
+
+Above that core sits the **language layer** (direction settled 2026-08-03): a small local model playing through the word interface below, socketed by the Io MCP server (BL-278, landed). Cloud models generate the fine-tuning corpus (BL-279); they never play, and the engine ships no network client. Authority: `docs/ai/AI_OPPONENT.md` § 10; the scoped limits live in `.claude/rules/io-standing-rules.md`.
 
 ### Comms
 The channel-based chat log (added 2026-07-31) — the surface of the diplomacy-as-communication principle: since every rival is AI, inter-corp coordination happens in a visible medium, and the mechanical actions of background corps surface as messages first. `src/ui/chat_panel.{hpp,cpp}`; authority: `docs/ui/CHAT.md`.
@@ -110,6 +127,15 @@ The channel-based chat log (added 2026-07-31) — the surface of the diplomacy-a
 
 **Budget is the primary pressure point.** All systems compete for it. Allocation decisions — research versus military versus infrastructure — define strategic identity and vulnerability to both loss conditions.
 
+**The word interface is a system in its own right.** The game is drivable by text through three
+legs plus a socket: **read** — the corp blackboard export (BL-206, `--export-blackboard`);
+**meaning** — the action dictionary (BL-270, `docs/ai/ACTIONS.json`, every control as
+`{press, args, preconditions, expected_output, reason_to_select}`); **write** — the corp-command
+seam (`src/world/corp_command.hpp`, eight verbs, rejections returned as data); and the **socket**,
+the MCP server (BL-278, `ProjectIo --serve` plus `tools/mcp/`). It is v0.1.1's named theme. Any
+change to a control, lens, ledger or panel must update its dictionary entry — a stale entry
+misleads an AI player the way a stale golden misleads a visual check.
+
 **The broad economy is the nations'; corporations are specialists.** The campaign opens on a
 saturated, earth-like economy whose bulk industrial base is owned and run by the **Nation AI**
 as background. The player and the major AI rivals are **specialist corporations** occupying a
@@ -117,3 +143,7 @@ focused slice of the chain, differentiated by an interest in expanding to space 
 keeps the loop a contest between a few space-interested specialists rather than a full-economy
 management game. Detail and the generation consequences live in
 `docs/generation/GENERATION_STRATEGY.md`.
+
+This premise survives BL-094 (governing-body pivot): when the player takes the governing-body
+seat, that nation's bulk economy stays AI-run background. The player gains law, force and
+research as levers — not a full-economy management burden.

@@ -25,10 +25,15 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   exception (BL-079, landed 2026-07-07):** background (non-player) corporations may take
   *narrow, local, deterministic* per-building actions from mechanical triggers — idle a
   persistently loss-making building, switch a floored recipe, throttle extraction as a
-  deposit depletes. This is **not** a licence for strategic planning, relocation, or
-  global optimisation; the player's own corp is never auto-acted on **strategically**.
-  Anything broader stays deferred (backlog.json § BL-054). See `src/world/economy_system.cpp`
-  (run_economy_step § agency).
+  deposit depletes. The player's own corp is never auto-acted on **strategically**.
+  See `src/world/economy_system.cpp` (run_economy_step § agency).
+  **Rival-corp strategic exception (BL-202/BL-203, landed 2026-08-01/02):** background
+  corporations run a **deterministic scored-utility** layer over the corp-command seam —
+  build, demolish, survey and road decisions scored each tick, plus predictive spending
+  (`src/world/corp_ai.cpp`). Determinism is the binding constraint, not simplicity: the
+  scorer is pure, seeded and replayable, and it issues only legal `corp_command` verbs.
+  What stays deferred is **nation** behaviour (backlog.json § BL-054) and any planner that
+  is not deterministic. Authority: `docs/ai/AI_OPPONENT.md`.
   **Player-corp exception (BL-181, landed 2026-07-15):** the *workforce target* of a
   player building may be auto-solved each tick to maximise that building's profit — a
   **narrow, local, deterministic, opt-out** convenience for a single micromanagement dial,

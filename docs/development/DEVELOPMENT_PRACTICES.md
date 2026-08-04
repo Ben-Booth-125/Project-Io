@@ -6,7 +6,7 @@ This document defines the coding standards, documentation conventions, and testi
 
 ## Testing
 
-Tests are **headless C++ harnesses**, not a unit-test framework. Each `tools/verify/<name>.cpp` is a standalone program that exercises a slice of the SDL/Lua/ImGui-free `world/*` logic and prints `PASS`/`FAIL` lines through its own small `check()`-style assertions, exiting non-zero on any failure. They are built and run by CMake/CTest (`ctest --test-dir build --output-on-failure`, or `check.bat`) and by the CI headless loop (`.github/workflows/build.yml`), which globs every `tools/verify/*.cpp` so a new harness is picked up automatically. *(Catch2 was evaluated as the unit-test framework but **not adopted** — the printf-assert harness pattern needs no dependency and mirrors how the code is actually structured. The `verifier-headless` skill runs a harness on demand.)*
+Tests are **headless C++ harnesses**, not a unit-test framework. Each `tools/verify/<name>.cpp` is a standalone program that exercises a slice of the SDL/Lua/ImGui-free `world/*` logic and prints `PASS`/`FAIL` lines through its own small `check()`-style assertions, exiting non-zero on any failure. They are built and run by CMake/CTest (`ctest --test-dir build --output-on-failure`, or `check.bat`), which globs every `tools/verify/*.cpp` so a new harness is picked up automatically. CTest is the *only* runner — there is no CI (see § Merge gate). Since BL-287 the world layer builds once as the `io_world_obj` OBJECT library rather than once per harness, so adding a harness is now near-free. *(Catch2 was evaluated as the unit-test framework but **not adopted** — the printf-assert harness pattern needs no dependency and mirrors how the code is actually structured. The `verifier-headless` skill runs a harness on demand.)*
 
 Tests are written alongside the layer they cover, not deferred to the end — alongside, the check catches the quietly-wrong while the layer is still fresh in the head. Each milestone in `ROADMAP.md` should have a harness for its core logic before the next begins.
 
@@ -14,8 +14,11 @@ Tests are written alongside the layer they cover, not deferred to the end — al
 
 Focus on the simulation's pure, deterministic logic — the parts that transform state — in `world/*` (no SDL/Lua/ImGui):
 
-*(List regenerated 2026-07-31 from `ls tools/verify/` — 29 harnesses. The old nine-name list was
-stale and named a `market_clearing` harness that never existed.)*
+*(The categories below are a legend, not a roster — **run `ls tools/verify/` for the real list**,
+46 harnesses as of 2026-08-04. A pasted count has now gone stale twice; do not paste a third.
+Most link `io_world_obj` and nothing else; three are hand-declared with extra deps —
+`pregame_balance` and `persona_counsel` need Lua, `font_glyph` needs ImGui. See
+`tools/verify/README.md`.)*
 
 - Economy — price resolution, budget arithmetic, debt, stability, workforce curves, pre-game
   balance (`econ_harness`, `econ_bankruptcy`, `econ_stability`, `workforce_harness`,
@@ -393,20 +396,26 @@ version is reachable by its tag, not just the most recent one.
 
 ### Merge gate — what actually guards `main`
 
-Recorded 2026-07-05 (BL-105). `main` is **not** protected by GitHub branch-protection rules: the
-repository is private on a free plan, where the branch-protection API returns HTTP 403
-(*"Upgrade to GitHub Pro or make this repository public to enable this feature"*). There is
-therefore **no enforced required-check gate** — a push to `main` lands regardless of CI, and the
-Cut process merges the working branch into `main` locally (step 2) and pushes directly, never
-through a PR.
+**There is no CI, and nothing enforced guards `main`.** Both halves of the old gate are gone.
 
-The gate is thus **procedural, not enforced**: CI (`.github/workflows/build.yml` — Linux
-g++-13/g++-14 + the Windows build + the headless-harness tier) runs on every push as the signal,
-and the **pre-Cut local build-green** (step 1 above) is the human gate before a release commit
-lands. Treat a red CI run on `main` as stop-and-fix. To make the gate *enforced* later, either
-make the repo public (branch protection is free for public repos) or move to Pro, then require the
-`linux (g++-13)`, `linux (g++-14)`, and `windows` checks and route Cuts through a PR so the checks
-apply to the release commits.
+Branch protection was never available (BL-105, 2026-07-05): the repository is private on a free
+plan, where the branch-protection API returns HTTP 403 (*"Upgrade to GitHub Pro or make this
+repository public to enable this feature"*). And GitHub Actions was **deleted on 2026-07-31**
+(commit `debcefd`, "Remove GitHub Actions CI/CD (build + claude-review)") — `.github/` is absent
+from the tree. Do not cite `build.yml` or a "red CI run"; neither can occur.
+
+What actually guards `main` is therefore **entirely local and human**: a green local build plus
+`ctest --test-dir build --output-on-failure` (or `check.bat`) before a release commit lands — step
+1 of the Cut above. That is the whole gate. Run it deliberately; nothing will run it for you.
+
+One consequence worth stating, because it has already bitten: the default `build/` tree is an
+unoptimised **Debug** build, while `build_rel/` is Release. A harness can pass in Debug and fail in
+Release with no signal anywhere — which is exactly how BL-288 (Release-only test failures) went
+unnoticed.
+
+To restore an enforced gate later, CI has to come back first; then either make the repo public
+(branch protection is free for public repos) or move to Pro, require the build checks, and route
+Cuts through a PR so they apply to release commits.
 
 ## Lua files
 

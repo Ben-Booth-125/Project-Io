@@ -439,18 +439,16 @@ BL-196 is therefore the **sibling axis**, not a competitor and not folded in.
   reasoned about an in-place stepper; a full-screen mode with no keyboard exit is a defect,
   not a principle.)*
 
-### The chart question log (BL-247)
+### The chart question log (BL-247) — *removed 2026-08-02*
 
-Any chart may carry a closed-by-default **"Why this chart"** toggle
-(`ui::why_note`) revealing exactly two lines — **Answers:** the question this chart
-answers, **Because:** why this evidence settles it. It is **not a tutorial**: it never
-suggests what to look at next, it documents on request what a chart that already exists is
-for. It is distinct from a *derivation caption*, which answers how a number was computed;
-a chart may want both and they must not be merged into one blob.
+**This surface does not exist, and is not to be rebuilt.** The design was a closed-by-default
+"Why this chart" toggle (`ui::why_note`) revealing an *Answers:* / *Because:* pair on any chart.
+Ben removed it under **NR-018**; the draw path is gone and `src/ui/detail_level.cpp:121` carries
+the standing note — *"REMOVED 2026-08-02 (Ben, NR-018) … Do not reinstate a draw path here
+without reopening NR-018."* There are no `why_note` symbols left in `src/`.
 
-The pair is **optional** — a chart with no authored pair draws no toggle, so an unlabelled
-chart costs nothing and reads as a review signal rather than a render defect. **One note is
-open at a time**, and it resets closed whenever a surface expands or folds.
+The **derivation caption** — which answers how a number was computed — is a different thing and
+was never part of this item. It stands.
 
 ### The surfaces, and the extension recipe
 

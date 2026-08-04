@@ -2658,12 +2658,10 @@ void app::render()
         // --- Minimap chrome, drawn on top of the inset ---
         ImDrawList* bdl = ImGui::GetBackgroundDrawList();
 
-        // At the top rung the inset has no canvas — fill it as a dark branding
-        // placeholder so the full-window solar canvas does not show through.
-        if (m_ui.primary_level == canvas_level::solar)
-            bdl->AddRectFilled(inset_origin,
-                               {inset_origin.x + inset_size.x, inset_origin.y + inset_size.y},
-                               IM_COL32(8, 10, 20, 255));
+        // The top rung used to fill the inset with a flat dark placeholder here,
+        // so the full-window solar canvas did not show through. draw_star_map
+        // above now owns that rectangle and paints its own opaque background —
+        // this fill would land on top of it and erase the sky.
 
         // Title bar.
         bdl->AddRectFilled(mm_origin, {mm_origin.x + mm_w, mm_origin.y + title_h}, IM_COL32(28, 30, 40, 255));
