@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*55 entries — 16 open, 39 resolved.*
+*56 entries — 17 open, 39 resolved.*
 
 ---
 
@@ -225,6 +225,22 @@ BL-274 leaned to four roster era bands (classical / medieval / gunpowder / indus
 **Why it matters.** Both items author data against a band count; whichever lands first sets the de-facto spine. If Ben prefers four bands everywhere, T4/T5 and T5/T6 merge and the 1960 capacity-spread analysis (3-4 bands) must be restated in coarser units.
 
 > **Recommendation:** Six-band spine, four-band roster grouping — divergence resolution for the economy, authoring economy for the rosters.
+
+*Files: `docs/research/ANCIENT_TECH_LADDER.md`*
+
+### NR-056 — Tech-web density grain — coarse, medium, or fine, judged against the worked steam-slice examples
+*question · raised 2026-08-04 · from BL-296 (ancient tech ladder) § Density test — Ben asked to test detail level against examples of technology*
+
+The constellation geometry is settled; the open dial is node density. ANCIENT_TECH_LADDER.md § Density test writes the same slice of history (the steam transition, T4 -> T5) at three grains: coarse (~4 nodes/slice, web ~40-50), medium (~8/slice, web ~100-150, one endowment-explainable keystone fork), fine (~20/slice, web ~400+, PoE-style pathing).
+
+**Why it matters.** Everything downstream sizes from this: authoring effort, fog reveal pacing, how many keystone forks exist for exclusion to act on, and whether pathing is gameplay or bookkeeping. Ben framed it explicitly as a FUN question, which the examples are meant to make answerable.
+
+- Coarse — grand-strategy grain. Maximum legibility; forks have nothing to bite on; wastes the constellation.
+- Medium — every node a one-line meaning; interleaving visible; forks explainable from the map. The doc recommendation.
+- Fine — pathing as gameplay, reference grain. Only pays where someone chooses or reads; invisible on the derived ancient layer.
+- Mixed by consumer — medium web-wide, fine only in keystone neighbourhoods, coarse in sim-only regions.
+
+> **Recommendation:** Medium as the web-wide grain, upgrading to the mixed model if playtests show keystone choices want more texture. Density should follow the consumer: detail only pays where someone chooses or reads.
 
 *Files: `docs/research/ANCIENT_TECH_LADDER.md`*
 

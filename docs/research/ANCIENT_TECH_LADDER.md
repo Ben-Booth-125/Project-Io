@@ -6,6 +6,10 @@
 > Tracked as **BL-296 (ancient tech ladder)**; consumed by **BL-271 (Era −1 sim)** and
 > **BL-274 (era-keyed rosters)**. Authority propagates into `docs/lore/HISTORY.md` (and the
 > sim's own doc) only when the work lands. Read as a basis for the design conversation, not a spec.
+>
+> **Amended 2026-08-04 (same day, follow-up session):** § Geometry settles the constellation
+> shape (Ben's call, overturning BL-087's Q1 binary-tree resolution), and § Density test carries
+> the three-grain examples the detail-level call will be made against.
 
 ## What this is — and the one stance it must not violate
 
@@ -83,6 +87,85 @@ almost all of the realistic 1960 spread:
 
 Rule of thumb the sim should reproduce: **artifacts leapfrog, practices follow contact, capacity
 follows the map.**
+
+---
+
+## Geometry — the constellation (settled 2026-08-04, Ben)
+
+The reference is the Path of Exile passive tree: one shared radial web, identity from where you
+enter and what you can afford to reach. **This overturns BL-087's Q1 resolution** (2026-07-08,
+binary tree / no re-converging mesh) — overturn recorded at `ERA1_TECH_LANDSCAPE.md` § Q1. The
+motive behind Q1 survives: the "inaccessible mess" failure mode is now excluded by node-count
+discipline and the fog, not by forbidding re-convergence.
+
+- **One shared web.** Rings = bands (T1 centre → T6 rim), sectors = domains. Time is the radial
+  axis; specialisation is the angular one. The § Shape "spine" survives as the ring boundaries;
+  its vertices are the ring-crossing gates.
+- **Entry points = endowment.** Nations enter at different sectors of the inner ring — the forge
+  culture via Materials, the river culture via Agriculture — and gates price travel differently
+  per nation. One web of knowledge, unequal traversal: the 1960 spread *is* pathing distance.
+- **Travel is OR, meaning is AND.** Web edges are adjacency; owning any adjacent node opens a
+  travel node (OR). Vertices and keystones keep BL-156's flat AND condition-set (research /
+  structure / stockpile / quest-capstone / endowment gate). PoE's own grammar, kept.
+- **Keystone forks — binary choices with exclusion.** Taking one branch **closes the other's
+  availability window**; nothing ever un-completes, so the monotonic unlocked set survives as
+  windows (BL-087's v0.3.0 concept, pulled earlier by this geometry).
+- **The tech fog.** Nodes render only within reach of an owned node — the third fog, after the
+  geographic and activity fogs (`docs/ui/DISCOVERY.md`). Exclusion and fog compose: a closed
+  branch goes dark permanently. This is the record-burning rule applied to knowledge — by 1960 a
+  nation cannot even see the tree it didn't climb, and the whole web is deliberately never
+  visible at once.
+- **Node budget: much smaller than the reference.** PoE's ~1,325 nodes exist because travel
+  filler is its pricing mechanism; Io prices in time and diffusion, so the filler has no job.
+  Target 100–200 meaning-dense nodes for the full web (see § Density test).
+- **Derived stays derived.** On the ancient layer nations path by seeded, scored choice at forks
+  (the corp-AI precedent — deterministic, replayable). The campaign arc can use the same
+  geometry with real player clicks; the two trees share one shape language.
+
+## Density test — one slice at three grains
+
+Ben's call (2026-08-04): the tree should be much smaller than the reference, and the right
+detail level is a **fun** question to be tested against worked examples. Here is one slice —
+the steam transition (T4 Energy → T5) — written at three grains, so the call can be made
+against real technology rather than in the abstract.
+
+**Coarse — ~1 node per band per domain (whole web ≈ 40–50 nodes).**
+
+> Deep Mining → **Steam Power** → Cheap Steel → Railways
+
+Four nodes; grand-strategy grain. Legible at map scale, but it wastes the geometry: there is no
+interleaving to see, and a fork has nothing to bite on — both sides of any real historical
+choice collapse into one label. Exclusion at this grain would feel arbitrary.
+
+**Medium — 3–5 nodes per band per domain (whole web ≈ 100–150; the § Ladder's current grain).**
+
+> Deep Mining & Drainage → **Atmospheric & Rotative Steam** → Coke Smelting → Machine Tools →
+> Converter Steel → Railway / Steamship
+> plus one keystone: **Fuel Doctrine** — *Coke* (scale; wants coalfields) ⊘ *Charcoal* (quality;
+> wants forest) — a real historical fork: charcoal-iron nations held the quality niche while
+> coke nations took the scale.
+
+About eight nodes for the slice. The interleaving is visible (mining begs for the engine, the
+engine feeds the rail), every node still carries a one-line meaning, and the one fork is
+explainable from the map — endowment picks it for an AI nation, the player picks it knowingly.
+
+**Fine — reference grain, with travel nodes (whole web ≈ 400+).**
+
+> Drainage Pumps → Atmospheric Engine → Separate Condenser → Rotative Motion →
+> keystone: *High-Pressure Steam* (mobile: rail, ships) ⊘ *Stationary Beam* (mill power) →
+> Compound Engines · coke chain: Coking Ovens → Hot Blast · tools chain: Boring Machine →
+> Screw Lathe → Interchangeable Parts
+
+Twenty-plus nodes for the same slice. Pathing itself becomes the gameplay — the reference's own
+pleasure — but on the *derived* ancient layer nobody paths by hand, so the detail is invisible
+outside a codex. Detail only pays where someone **chooses** or **reads**.
+
+**The principle the examples suggest:** density should follow the consumer, per region of the
+web. Sim-only regions (the ancient layer) want coarse-to-medium; player-clicked regions (the
+campaign arc) want medium, with fine grain reserved for the *neighbourhood of each keystone*,
+where the choice deserves texture. The fun question is then not "how detailed is the tree" but
+"how detailed is the neighbourhood of each choice." Recommendation: **medium as the web-wide
+grain** — logged as NR-056 (density grain) for Ben's call.
 
 ---
 
@@ -286,6 +369,10 @@ Per year-tick, per nation, per domain — all integer, seeded, deterministic:
 3. **Where the data lives** — authored C++ table beside the roster table (lean: yes — the sim
    consumes it, nothing player-facing reads it yet), or a second Lua data file like
    `tech_tree.lua`? Determinism favours C++; moddability argues Lua later.
-4. **Does the player ever see it?** A 1960 codex page per nation ("why they are what they are")
-   would make the philosophical-development payload visible — but that is BL-208/BL-271
-   territory, not this item's.
+4. **Does the player ever see it?** Partially advanced by § Geometry — the tech fog implies a
+   rendered web *somewhere*, and a 1960 codex page per nation would make the
+   philosophical-development payload visible — but the surface is BL-208/BL-271 territory,
+   not this item's.
+5. **Density grain** — § Density test's three worked grains; recommendation is medium
+   (~100–150 nodes web-wide, fine grain only around keystones). Logged as NR-056; Ben decides
+   against the examples.

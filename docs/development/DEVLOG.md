@@ -31,8 +31,25 @@ four-band roster lean (proposed: rosters group the same spine).
 conversation happens against the research doc. T6's exit hands off to `scripts/tech_tree.lua`'s
 Era 0 quests, so the two trees meet at the campaign epoch without overlap.
 
-**Runtime:** ~1h remote, Light/design. **Left open:** the doc's four closing questions — band
-count, per-domain state shape, C++-vs-Lua data home, player-facing codex rendering.
+**Follow-up, same session — the constellation.** Ben named the Path of Exile passive tree as the
+shape he's imagining, with two additions: exclusion / binary choices at branches, and the whole
+web never visible at once. Settled as § Geometry in the doc: rings = bands, sectors = domains,
+entry point = endowment (the 1960 spread becomes pathing distance), travel-OR / meaning-AND,
+keystone exclusion via availability windows, and a **tech fog** — the third fog after
+DISCOVERY.md's two. **This overturns BL-087 (tech quest system) Q1** — binary tree, no
+re-converging mesh, 2026-07-08 — on Ben's explicit call; supersession banners sit on
+`ERA1_TECH_LANDSCAPE.md` § Q1 and in BL-087's design field. Q1's motive survives via node-count
+discipline (~100–200 nodes, not the reference's 1,325) and the fog.
+
+**The density test.** Ben wants the detail level judged by *fun*, against real examples — so the
+doc's § Density test writes one slice (the steam transition) at three grains: coarse (4 nodes),
+medium (8, one endowment-explainable Fuel Doctrine fork), fine (20+, reference grain). The
+principle the examples surfaced: detail only pays where someone chooses or reads — so density
+should follow the consumer, per region of the web. Recommendation medium; the call is NR-056
+(density grain).
+
+**Runtime:** ~1.5h remote across two exchanges, Light/design. **Left open:** band count
+(NR-055), density grain (NR-056), per-domain state shape, C++-vs-Lua data home.
 
 ---
 
