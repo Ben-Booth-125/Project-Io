@@ -1,7 +1,8 @@
 # Io Earth-Like World Tests — Findings & Economical Test Plan
 
-**Date:** 2026-08-03. **Status:** Stage 1 built and run under dispensation (uncommitted);
-stages 2–3 designed.
+**Date:** 2026-08-03, updated 2026-08-04. **Status:** **all three stages built, run and committed**
+(f15ad6d, 66844c8, 1a69621, 28663d8), plus one generation fix and one band re-calibration they
+produced. Ben authorised the Io-source work directly.
 **Provenance:** authored in a Project-Rival session from a six-reader recon of the Io repo.
 Rival never writes Io source, so the harnesses named here are built by an Io session (or
 this one under explicit dispensation). Adopt this doc into Io (`docs/generation/` or the
@@ -296,7 +297,43 @@ and may answer the interior question without writing the corridor harness at all
 oxygenation×drawdown). Trigger: a Stage 2 corridor edge that visibly shifts when a second
 knob moves, or a census clause whose rejections no single knob explains. Otherwise skip.
 
-### Stage 3 — Tile census (one run at 500 seeds)
+### Stage 3 — Tile census — **BUILT AND RUN, 2026-08-04**
+
+`tools/verify/earthlike_tile_census.cpp`. Replicates hard_coded_world's Kepler wiring — the BL-276
+two-bar sea gate and the `generate_rivers` sibling pass included — and runs the **land** mask
+through the same hex component labelling `mediterranean_sweep` runs over the ocean mask.
+
+Medians over 120 seeds, against Earth for orientation only:
+
+| metric | generated | Earth |
+|---|---|---|
+| land % of surface | 47.9% | 29% |
+| largest landmass | **78.8%** of land (p95 99.1%) | 57% |
+| landmasses ≥100 tiles | 3 | 4–6 |
+| forest | 6.3% of land | 31% |
+| icy | 24.6% | 10% |
+| barren | 11.1% | 33% |
+| mountain | **1.0%** | ~24% |
+
+**Cold, flat, under-vegetated, land-heavy supercontinents.** The body-level scalars all say Earth;
+the map does not. A p95 of 99.1% on largest-landmass means a substantial share of worlds generate as
+a *single* landmass.
+
+**The biggest finding of the whole battery:** the largest lever on Earth-likeness is not a
+planetology knob at all. Mountain and forest coverage are **tile-pass** parameters — a different
+layer from anything C1 or T2 can reach.
+
+**And a caution about the band change:** `home_ocean`'s always-viable span 0.40–0.68 excludes
+Earth's own 0.71 ocean fraction, which the previous 0.42–0.72 band reached. "Always viable" and
+"Earth-like" turn out to be different objectives, and optimising for the first trimmed exactly the
+part of the range Earth occupies. Filed as NR-047; recommendation is to widen back to the floor edge
+and accept the rerolls, which cost ~8 µs each.
+
+Two defects in this harness were caught and fixed before commit: rivers read 0.0% everywhere because
+`generate_rivers` is a sibling pass that `generate_body_tiles` does not call, and 200 seeds took
+71 s against a 60 s CTest cap (default is now 120 seeds, 41.9 s).
+
+### Stage 3 as originally planned (one run at 500 seeds)
 
 **Question:** do accepted (viability-passing) worlds *look* like Earth at tile level?
 

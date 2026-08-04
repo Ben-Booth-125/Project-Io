@@ -10,7 +10,7 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Earth-like generation: the C1 rejection census, and S6's epoch bug (2026-08-04, latest)
+## Session — Earth-like generation: the three-instrument battery, S6's epoch bug, and bands from measurement (2026-08-04, latest)
 
 **Runtime.** ~3h wall across an autonomous stretch. Full (touches `src/world/planetology.cpp` —
 every generated world changes — plus a new measurement section in an existing harness).
@@ -59,11 +59,67 @@ narrowed from 2.25× to 1.64×. `planetology_harness`, `continents_harness`, `wo
 counts on all 20,000 worlds — the first empirical check that PLANETOLOGY.md's determinism discipline
 holds **across compilers**, not just across runs of one build.
 
-**Left open.** The GOE asymmetry (NR-046). Whether a floor with ten inert clauses is the right
-shape. And the variety question the census exposes but does not answer: every generated Earth is
-nearly the same world (surface temp spread ×1.04), because the bands are tight on exactly the axes
-that are cheap to vary. Widening them means deciding whether a homeworld may sit inside the
-*continuously* habitable zone — i.e. be doomed long-term — which is Ben's call, not a tuning knob.
+### T2 — knob corridors (`tools/verify/earthlike_corridor.cpp`)
+
+Holds every parameter at its Sol default, steps one across its clamp range, 96–128 seeds per step,
+orbit derived per seed as the generator derives it. Draws two spans on each axis: where the floor
+rejects, and where the wizard's `any` band samples.
+
+**Only three of ten knobs can reject a world** — oxygenation (always-viable 0.30–0.91), radiogenic
+(0.57–1.73), home_ocean (0.40–0.68). The other seven never reject anywhere in range. This
+cross-validates C1 independently: the four knobs C1 measured at a flat 1.24-draw cost are exactly
+the four shown here to be incapable of rejecting. Two instruments, same answer.
+
+It also killed a plausible idea. Sweeping `star_mass` 0.60 → 1.50 moves surface temperature only
+282.4 K → 281.1 K, because the derived orbit compensates exactly — a brighter star just sits further
+out. **The only lever on climate variety is the orbit multiplier `{0.985, 1.400}`**, and widening it
+puts the homeworld inside the *continuously* habitable zone (habitable now, doomed as the star
+brightens). That is a design decision about what Earth means, not a tuning knob. Still Ben's.
+
+### Bands become the measured always-viable spans
+
+Ben: "change the band to always viable." Each `any` band is now the span the corridor measures at
+100% viability, with the three leans re-partitioned into thirds. The change cuts both ways — the
+three rejecting axes narrow, the six that never could reject widen to the room they were already
+entitled to.
+
+**Acceptance and variety both rose**, which is not the usual trade: 78.4% → 81.4% acceptance, while
+coal spread went ×6.99 → ×10.79, copper ×2.72 → ×5.84, iron ×1.82 → ×2.59, petroleum ×3.22 → ×4.47.
+The floor also became more load-bearing — 5 of 14 clauses fire now, up from 4. Surface temperature
+stayed pinned at ×1.04, exactly as T2 predicted.
+
+**Cost, recorded rather than tuned away.** `interior=high` is now the worst lean at 2.97 draws. The
+corridor's spans are one-at-a-time slices and do not compose: young age and high radiogenic are each
+individually always-viable but together push theta past the GOE gate's 2.4 ceiling. It is the same
+compounding fold that caused the original `interior=low` problem, arriving from the other end. Under
+R2's <12-draw bar. Filed as NR-047.
+
+### T3 — tile census (`tools/verify/earthlike_tile_census.cpp`)
+
+C1 and T2 both stop at the body level, where "Earth-like" is a set of scalars. None of that says the
+world *looks* like Earth. T3 replicates hard_coded_world's Kepler wiring — including the BL-276
+two-bar sea gate and the `generate_rivers` sibling pass — and runs the LAND mask through the same
+hex component labelling `mediterranean_sweep` runs over the ocean mask.
+
+**The maps are not very Earth-like** (120 seeds, medians): land 47.9% of surface against Earth's
+29%; largest landmass 78.8% of land (p95 99.1%) against 57%, i.e. mostly one supercontinent, median
+3 landmasses over 100 tiles; forest 6.3% against 31%; icy 24.6% against 10%; barren 11.1% against
+33%; mountain 1.0% against roughly 24%. Cold, flat, under-vegetated, land-heavy supercontinents.
+Report-only per BL-275 — the Earth figures are orientation, not targets, and nothing is asserted.
+
+**The largest lever on Earth-likeness is not a planetology knob at all.** Mountains and forest are
+tile-pass parameters — a different layer from anything this session touched.
+
+**Left open.** The GOE asymmetry (NR-046) and the band-composition cost (NR-047). Whether a floor
+with nine inert clauses is the right shape. The orbit-multiplier decision above. And one consequence
+worth a second look: `home_ocean`'s always-viable span 0.40–0.68 **excludes Earth's own 0.71 ocean
+fraction**, which the previous 0.42–0.72 band did reach — optimising the band for "always viable"
+trimmed the wet end and moved the distribution further from Earth. Recorded, not reverted; the T3
+spread is the evidence to set that band against.
+
+**Owed.** The three new harnesses (`planetology_sweep`'s C1 section, `earthlike_corridor`,
+`earthlike_tile_census`) are not registered in the `verifier-headless` skill — that needs Ben's
+authorisation, per the tool-creation rule.
 
 ## Session — Io MCP server: BL-278 built and landed (2026-08-03)
 

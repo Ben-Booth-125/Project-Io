@@ -969,6 +969,30 @@
     "docs/generation/PLANETOLOGY.md"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-047",
+   "title": "Wizard bands set from measured always-viable spans — two consequences that were mine, not measured-away",
+   "raised": "2026-08-04",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Ben, 2026-08-04: \"Let's change the band to always viable, and move onto T3.\" The instruction was clear; the specific numbers, the lean re-partitioning, and how to handle two side effects were mine.",
+   "what": "resolve_preferences' lean::any bands are now the spans tools/verify/earthlike_corridor.cpp measures at 100% viability (65 steps x 128 seeds, other params at Sol defaults), with each lean re-partitioned into thirds of its new span and the age inversion (low = old) preserved. Headline result is good and unusual: acceptance AND variety both rose — 78.4% -> 81.4%, with coal spread x6.99 -> x10.79, copper x2.72 -> x5.84, iron x1.82 -> x2.59. TWO CONSEQUENCES I RECORDED RATHER THAN FIXED. (1) interior=high is now the worst lean at 2.97 draws (was 1.84). The corridor measures one knob at a time, so its spans do not compose: young age and high radiogenic are each individually always-viable but together push theta past the GOE gate's present-day 2.4 ceiling. This is the SAME compounding fold that caused the original interior=low problem, arriving from the other end — the interior lean moves two parameters that both act on theta. (2) home_ocean's always-viable span 0.40-0.68 EXCLUDES Earth's own 0.71 ocean fraction, which the previous 0.42-0.72 band did reach. Optimising a band for \"always viable\" trimmed the wet end and moved the distribution further from Earth, and T3's tile census then measured land at 47.9% of surface against Earth's 29%.",
+   "why_it_matters": "Consequence (2) is the conceptually interesting one: \"always viable\" and \"Earth-like\" are not the same objective, and this is the first place the project has had to notice the difference. The wet end of the ocean range rejects sometimes (arable share falls), so optimising for acceptance trims exactly the part of the range Earth actually occupies. If the aim is recognisably-Earth homeworlds rather than cheap ones, the band arguably wants to reach 0.75 and accept the rerolls — generation is ~8 microseconds per world, so the reroll is free. Consequence (1) matters because the interior fold has now produced a wart twice; the underlying issue is that one player-facing preference drives two parameters that both push theta the same way, and no band arithmetic fixes that.",
+   "options": [
+    "Accept both as recorded — all harness bars pass, acceptance and variety are both up.",
+    "Widen home_ocean back to the floor edge (0.40-0.75) and accept the lower acceptance rate, on the grounds that Earth-like beats always-viable and rerolls are free.",
+    "De-compound the interior fold: have the lean move age and radiogenic in directions that do not both act on theta the same way, or drop radiogenic from the lean and let it vary independently.",
+    "Both 2 and 3, then re-run C1/T2/T3 as the regression check."
+   ],
+   "recommendation": "Option 2 first, on its own, and measure. It is one constant, it directly addresses the finding T3 made most loudly (land 47.9% vs 29%), and the acceptance cost is genuinely irrelevant at 8 microseconds a world. Option 3 is right in principle but changes what a player-facing preference MEANS, which is a design decision rather than a calibration one — and the interior lean is documented as deliberately folded, so unfolding it should be a deliberate reversal, not a side effect of tuning.",
+   "files": [
+    "src/world/planetology.cpp",
+    "tools/verify/planetology_sweep.cpp",
+    "tools/verify/earthlike_corridor.cpp",
+    "tools/verify/earthlike_tile_census.cpp"
+   ],
+   "resolution": null
   }
  ]
 }

@@ -10,7 +10,7 @@ the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
-| 2026-08-04 | [Earth-like generation: the C1 rejection census, and S6's epoch bug](DEVLOG.md) | BL-167 | DEVLOG.md |
+| 2026-08-04 | [Earth-like generation: the three-instrument battery, S6's epoch bug, and bands from measurement](DEVLOG.md) | BL-167 BL-275 BL-276 | DEVLOG.md |
 | 2026-08-03 | [Io MCP server: BL-278 built and landed](DEVLOG.md) | BL-206 BL-278 BL-279 | DEVLOG.md |
 | 2026-08-03 | [two direction points: invented names, and the governing body](DEVLOG.md) | BL-094 BL-155 BL-156 BL-157 BL-158 BL-271 BL-277 | DEVLOG.md |
 | 2026-08-03 | [clearing the review queue: 14 decisions, six of them overturning what shipped](DEVLOG.md) | BL-054 BL-087 BL-206 BL-208 BL-219 BL-229 BL-262 BL-270 BL-278 BL-279 BL-280 BL-281 BL-282 BL-283 BL-284 BL-285 | DEVLOG.md |
