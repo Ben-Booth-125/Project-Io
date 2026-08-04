@@ -366,7 +366,7 @@ word interface to play through.
 - The pointer is over the primary canvas with a body under the cursor.
 - There is a rung below or a body to re-target: on the Planetary surface, tile double-clicks do not descend (bottom rung).
 
-**Expected output.** The view navigates via focus_on_entity, re-anchoring active_body. Solar rung: double-click a planet and its Circumplanetary view becomes primary; double-click a moon and the parent planet's Circumplanetary view becomes primary with the moon selected. Circumplanetary rung: double-click the planet or a moon and that body's Planetary surface becomes primary. The minimap updates to show the new rung's zoom-out neighbour. Any existing selection persists (Selection is independent of Active); the sim speed and lens are untouched.
+**Expected output.** The canvas sets active_body and primary_level inline (not via focus_on_entity), re-anchoring the ladder. Solar rung: double-click a planet and its Circumplanetary view becomes primary; double-click a moon and the parent planet's Circumplanetary view becomes primary with the moon selected. Circumplanetary rung: double-click the planet or a moon and that body's Planetary surface becomes primary. The minimap updates to show the new rung's zoom-out neighbour. Any existing selection persists (Selection is independent of Active); the sim speed and lens are untouched.
 
 **Reason to select.** Drill down the zoom ladder toward a body's surface — the load-bearing navigation gesture for going somewhere rather than merely inspecting it.
 
@@ -579,7 +579,7 @@ word interface to play through.
 - The lens only re-skins the Planetary canvas; selecting it while on Solar or Circumplanetary changes nothing visible until the player descends to a body surface.
 - If Corporation is already the active lens, this same press clears it instead (see lens.clear).
 
-**Expected output.** On the Planetary canvas, every tile holding a corporate building tints to its owning corporation's identity colour (the literal building tile only — no influence radius). The player's tiles additionally get a thin white border. Each rival corporation's HQ-projected reach ring and HQ star draw on that corp's home body in its identity colour. Tiles with no corporate building keep their plain terrain colour — there is no nation underlay. Pointer clicks now resolve through buildings to the owning corporation and route to the Balance Ledger. No on-canvas colour key yet (glyph highlight + tooltip only).
+**Expected output.** On the Planetary canvas, every tile holding a corporate building tints to its owning corporation's identity colour (the literal building tile only — no influence radius). The player's tiles additionally get a thin white border. Each rival corporation's HQ-projected reach ring and HQ star draw on that corp's home body in its identity colour. Tiles with no corporate building keep their plain terrain colour — there is no nation underlay. Pointer clicks are NOT lens-dependent: selection resolves the same way under every lens — marker hit-test (building outranks market centre), else the tile under the pointer, with a built tile resolving to its building. The lens changes what is drawn, never what a click selects. No on-canvas colour key yet (glyph highlight + tooltip only).
 
 **Reason to select.** Who owns what: where do rival corporations operate, how does my footprint sit against theirs, and where do their HQ reach rings suggest they will grow? Use it to find uncontested ground to expand into or to size up a rival's holdings before competing.
 
@@ -591,7 +591,7 @@ word interface to play through.
 - Always pressable from the lens bar; Planetary-only surface — no Solar or Circumplanetary representation.
 - Re-clicking while active clears the lens (see lens.clear).
 
-**Expected output.** Claimed tiles tint to their owning nation's identity colour; a dark border stroke draws on every hex edge between different owners (including claimed/unclaimed boundaries), so territories read as filled regions with hard outlines. Unclaimed tiles keep their plain terrain hue. An on-canvas per-nation key (one colour swatch + name per nation on the active body) folds out flush-left of the minimap. Pointer clicks resolve to the owning nation and route to the Nation ledger.
+**Expected output.** Claimed tiles tint to their owning nation's identity colour; a dark border stroke draws on every hex edge between different owners (including claimed/unclaimed boundaries), so territories read as filled regions with hard outlines. Unclaimed tiles keep their plain terrain hue. An on-canvas per-nation key (one colour swatch + name per nation on the active body) folds out flush-left of the minimap. Pointer clicks are NOT lens-dependent: selection resolves the same way under every lens — marker hit-test (building outranks market centre), else the tile under the pointer, with a built tile resolving to its building. The lens changes what is drawn, never what a click selects.
 
 **Reason to select.** Which nation holds which tile, and where the borders fall. Political context for siting: whose territory would I be building in, which nations border my operations, and how the body's political map is carved up.
 
@@ -637,7 +637,7 @@ word interface to play through.
 - Prices must have resolved (the economy has ticked) for the strip to show meaningful numbers.
 - Re-clicking while active clears the lens (see lens.clear).
 
-**Expected output.** Planetary: a catchment tint — one colour per market, so market boundaries read as colour boundaries — with a city-name swatch key and the shared good selector in the legend. Circumplanetary: a compact per-body price strip (good → price list, the selected good highlighted). Terrain shows through the tint. Pointer clicks resolve to the body's market (or the listing under the pointer) and route to the Market Ledger.
+**Expected output.** Planetary: a catchment tint — one colour per market, so market boundaries read as colour boundaries — with a city-name swatch key and the shared good selector in the legend. Circumplanetary: a compact per-body price strip (good → price list, the selected good highlighted). Terrain shows through the tint. Pointer clicks are NOT lens-dependent: selection resolves the same way under every lens — marker hit-test (building outranks market centre), else the tile under the pointer, with a built tile resolving to its building. The lens changes what is drawn, never what a click selects.
 
 **Reason to select.** Which market does a tile clear against, and where do market boundaries fall? Decide which catchment to build in (your output sells to the nearest centre) and read per-body prices on the Circumplanetary rung to pick where a good is dear enough to sell.
 
@@ -650,7 +650,7 @@ word interface to play through.
 - The economy must have ticked so market prices have diverged from base — before that the surface reads flat/neutral.
 - Re-clicking while active clears the lens (see lens.clear).
 
-**Expected output.** Per-tile red-to-green value marks (same mark idiom as Population), keyed to each tile's catchment market's demand-gap rank — a body-relative, volume-weighted ranking of how far the market's scarcest tradeable good is priced above base. All tiles of one catchment read uniformly (the market is the unit), so the surface shows blocks per catchment. Tiles with no catchment market keep plain terrain. Key is the red-to-green rank bar.
+**Expected output.** Per-tile red-to-green value marks (same mark idiom as Population), keyed to each tile's catchment market's demand-gap rank — a body-relative ranking on gap × volume — unmet demand quantity weighted by traded volume, not a price-above-base measure. All tiles of one catchment read uniformly (the market is the unit), so the surface shows blocks per catchment. Tiles with no catchment market keep plain terrain. Key is the red-to-green rank bar.
 
 **Reason to select.** Where is demand going unmet, so the market will pay a premium to whoever supplies it? The forward-looking siting lens: green catchments are markets bidding above base — build or route supply there. Reads potential; the Production lens reads what is realised.
 
@@ -662,7 +662,7 @@ word interface to play through.
 - Always pressable; Planetary-only. No selector — a whole-body surface with no per-good pick.
 - Re-clicking while active clears the lens (see lens.clear).
 
-**Expected output.** Every buildable tile gets a small per-tile red-to-green value mark keyed by workforce efficiency — the same habitability-to-labour curve the economy applies (full 1.0x efficiency at habitability >= 0.6, ramping down to 0.5x at habitability 0). Tiles keep their terrain hue; the marks carry the signal. A gradient key labelled 'Workforce efficiency' maps the bar's ends to 0.5x -> 1.0x. Note: this is the labour consequence, not raw habitability, and not population density (that lives on the population-centre markers).
+**Expected output.** Every buildable tile gets a small per-tile red-to-green value mark keyed by workforce efficiency — the same habitability-to-labour curve the economy applies (full 1.0x efficiency at habitability >= 0.6, ramping down to 0.5x at habitability 0). Tiles keep their terrain hue; the marks carry the signal. A gradient key labelled 'Workforce efficiency' labels the bar's ends 'low' and 'high' (the underlying curve spans 0.5x to 1.0x, but the key does not print the numbers). Note: this is the labour consequence, not raw habitability, and not population density (that lives on the population-centre markers).
 
 **Reason to select.** Where does labour run at full efficiency? Site buildings where the marks read green (habitability >= 0.6 = full workforce), because the same wages buy less output on the red end. The siting complement to Resource's material read.
 
@@ -675,7 +675,7 @@ word interface to play through.
 - The economy must have ticked so buildings have produced and the economy report is populated — otherwise everything reads cold.
 - Re-clicking while active clears the lens (see lens.clear).
 
-**Expected output.** Each producing tile tints on a warm-to-cool diverging ramp by its output value this tick (sum of output quantity x resolved price) relative to the body's producing-tile geometric mean, composited at 0.6 over terrain. Above-mean producers read warm, below-mean cool; idle, exhausted, or unbuilt tiles produce nothing and stay untinted. Honest caveat: a body of similar producers reads near-neutral — little spread to show. Low-to-high key. Pointer clicks resolve to the producing building and route to the Balance Ledger.
+**Expected output.** Each producing tile tints on the production ramp (production_colour: red → yellow → green) by its output value this tick (sum of output quantity x resolved price) relative to the body's producing-tile geometric mean, composited at 0.6 over terrain. Above-mean producers read green, below-mean red; idle, exhausted, or unbuilt tiles produce nothing and stay untinted. Honest caveat: a body of similar producers reads near-neutral — little spread to show. Low-to-high key. Pointer clicks are NOT lens-dependent: selection resolves the same way under every lens — marker hit-test (building outranks market centre), else the tile under the pointer, with a built tile resolving to its building. The lens changes what is drawn, never what a click selects.
 
 **Reason to select.** Where is value actually being made right now? The realised-output counterpart to Opportunity's potential: spot the hot producers worth expanding and the cold ones worth investigating or idling.
 
@@ -705,7 +705,7 @@ word interface to play through.
 - Always pressable; Planetary-only. No simulation dependency — deposit data exists from tile generation, so it works from turn one.
 - Re-clicking while active clears the lens (see lens.clear).
 
-**Expected output.** Every tile carrying any deposit of the selected good (deposit > 0) fills flat and uniform with that resource's identity colour at fixed 0.8 opacity — the shape of the contiguous deposit, not a magnitude gradient. Tiles without the good keep their terrain hue. The on-canvas key (flush-left of the minimap) shows the selected resource's swatch + name, the note 'filled = deposit present', and hosts the shared good selector. Deposit magnitude lives in tile detail, not this surface. Pointer clicks resolve to the tile's deposit profile and route to the Tile Ledger (deposit detail).
+**Expected output.** Every tile carrying any deposit of the selected good (deposit > 0) fills flat and uniform with that resource's identity colour at fixed 0.8 opacity — the shape of the contiguous deposit, not a magnitude gradient. Tiles without the good keep their terrain hue. The on-canvas key (flush-left of the minimap) shows the selected resource's swatch + name, the note 'filled = deposit present', and hosts the shared good selector. Deposit magnitude lives in tile detail, not this surface. Pointer clicks are NOT lens-dependent: selection resolves the same way under every lens — marker hit-test (building outranks market centre), else the tile under the pointer, with a built tile resolving to its building. The lens changes what is drawn, never what a click selects.
 
 **Reason to select.** Where can a chosen good be extracted? The pre-economy siting lens: find the deposit blobs of iron, copper, etc. before placing extraction. Answers 'where is the iron' by shape; how rich each tile is comes from clicking it.
 
@@ -722,7 +722,7 @@ word interface to play through.
 - Planetary-only. The economy must have ticked so market supply/demand arrays are populated.
 - Cleared by cycling off it or pressing the clear hotkey (controls family), not by a bar re-click.
 
-**Expected output.** A market-level field, not per-tile: every tile in a market's catchment reads as one solid block, composited toward a hot red hue at opacity proportional to that market's supply shortfall of the selected good (max(0, demand - supply), normalised to the body's worst market). A met market keeps plain terrain; a short one reads hot. With one market per body the whole body is a single block — honest to the market structure. Abundant-to-scarce key plus the selected resource's swatch and the shared selector. Pointer clicks resolve to the tile's catchment market and route to the Market Ledger.
+**Expected output.** A market-level field, not per-tile: every tile in a market's catchment reads as one solid block, composited toward a hot red hue at opacity proportional to that market's supply shortfall of the selected good (max(0, demand - supply), normalised to the body's worst market). A met market keeps plain terrain; a short one reads hot. With one market per body the whole body is a single block — honest to the market structure. Abundant-to-scarce key plus the selected resource's swatch and the shared selector. Pointer clicks are NOT lens-dependent: selection resolves the same way under every lens — marker hit-test (building outranks market centre), else the tile under the pointer, with a built tile resolving to its building. The lens changes what is drawn, never what a click selects.
 
 **Reason to select.** Where did demand outrun supply for a chosen good last tick? The inverse of the Resource lens — gaps, not concentrations. Pick a good you can produce and find the hot markets: that is where to sell into or build supply for.
 
@@ -811,7 +811,7 @@ word interface to play through.
 
 **Expected output.** Switches the dock's log and input to that channel; the active channel's button renders pressed. A plain selector - clicking the active channel again does not close the dock (the dock has no open/closed state).
 
-**Reason to select.** Chooses which conversation to read or post into - Public carries the sim's ambient corp chatter (agency reflex events); groups are player-scoped.
+**Reason to select.** Chooses which conversation to read or post into - Public carries nation-voiced public communications (BL-212); groups are player-scoped. It does NOT carry rival corp reflex events — those were removed as a competitor-visibility violation.
 
 ### `ledger.chat_message_input` — Comms dock, message input line at the bottom
 
