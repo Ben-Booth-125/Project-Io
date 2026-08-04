@@ -325,12 +325,33 @@ resolved_world resolve_preferences(const world_preferences& pref, uint32_t seed)
         p.metallicity = draw(ra, pick(pref.metal,
             {0.30f, 2.20f}, {0.30f, 0.93f}, {0.93f, 1.57f}, {1.57f, 2.20f}));
 
-        // Interior folds age and radiogenic endowment together: "cold and old"
-        // against "young and vigorous" is one idea to a player, and splitting it
-        // into two sliders would be two settings rather than one preference.
-        // Age runs INVERTED against the lean — low means OLD.
-        p.system_age_gyr = draw(ra, pick(pref.interior,
-            {2.12f, 9.02f}, {6.72f, 9.02f}, {4.42f, 6.72f}, {2.12f, 4.42f}));
+        // THE STAR'S ONE REAL CONSEQUENCE (2026-08-04). Everything else about a
+        // star cancels: the orbit is derived as sqrt(L) x f, so instellation is
+        // L/(L f^2) and the snow-line ratio is f/2.71 — both independent of
+        // stellar mass by construction. T5 measured `star` as inert on all ten
+        // tile metrics, and it was right.
+        //
+        // What does NOT cancel is how long the star lives. Main-sequence life
+        // goes as M/L, and L ~ M^3.5, so lifetime ~ M^-2.5: the Sun gets ~10 Gyr,
+        // a 1.5 M_sun star only ~3.6. A system cannot be older than the star
+        // lighting it, so the star caps the age band — evaluated as M^2 * sqrt(M)
+        // to keep pow out of the path.
+        //
+        // The consequence is asymmetric, which is what makes it a choice rather
+        // than a slider: dim stars (13-36 Gyr) never bind, sun-like ones bind
+        // gently, and a bright star forces a young system. Young systems have
+        // shorter biosphere windows, so a brighter star buys a leaner fossil
+        // endowment — and, via the age x radiogenic ridge the pair atlas mapped,
+        // pushes toward a colder interior as well.
+        const float t_ms = 10.0f / (p.star_mass * p.star_mass * std::sqrt(p.star_mass));
+        band age_band = pick(pref.interior,
+            {2.12f, 9.02f}, {6.72f, 9.02f}, {4.42f, 6.72f}, {2.12f, 4.42f});
+        if (t_ms < age_band.hi) age_band.hi = t_ms;
+        // "Bright star AND ancient system" is a contradiction, not a preference.
+        // The star wins, because it is the harder physical limit; the biography
+        // says so rather than the generator silently ignoring the ask.
+        if (age_band.lo > age_band.hi) age_band.lo = age_band.hi;
+        p.system_age_gyr = draw(ra, age_band);
         p.radiogenic = draw(ra, pick(pref.interior,
             {0.57f, 1.73f}, {0.57f, 0.96f}, {0.96f, 1.34f}, {1.34f, 1.73f}));
 
@@ -633,6 +654,19 @@ planetology_state run_planetology(const body_inputs& in,
     const float m_star   = clampf(p.star_mass, 0.6f, 1.5f);
     const float l_star   = m_star * m_star * m_star * std::sqrt(m_star);
     const float snow_line = 2.71f * std::sqrt(l_star);
+
+    // The star's clock, and the one thing about it that does not cancel against
+    // the derived orbit. Said on the homeworld only — the whole system shares
+    // one star, and repeating it per body would be four copies of one fact.
+    if (in.is_homeworld)
+    {
+        const float t_ms = 10.0f / (m_star * m_star * std::sqrt(m_star));
+        const float spent = (t_ms > 0.01f) ? clampf(age / t_ms, 0.0f, 1.0f) : 1.0f;
+        say(age, chain_stage::system,
+            fmt("A %.2f-solar-mass star lights the system", m_star),
+            fmt("roughly %.1f Gyr on the main sequence", t_ms)
+                + fmt(" - about %.0f%% of it already spent", spent * 100.0f));
+    }
 
     // =======================================================================
     // S1 — ACCRETION. Formation radius against the ice line sets the volatile

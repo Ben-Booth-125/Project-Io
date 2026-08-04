@@ -164,8 +164,14 @@ drawn replay_draw(const world_preferences& pref, uint32_t seed, uint32_t k)
         {0.66f, 1.48f}, {0.66f, 0.93f}, {0.93f, 1.21f}, {1.21f, 1.48f}));
     p.metallicity = draw(ra, pick(pref.metal,
         {0.30f, 2.20f}, {0.30f, 0.93f}, {0.93f, 1.57f}, {1.57f, 2.20f}));
-    p.system_age_gyr = draw(ra, pick(pref.interior,
-        {2.12f, 9.02f}, {6.72f, 9.02f}, {4.42f, 6.72f}, {2.12f, 4.42f}));
+    // Mirrors the stellar-lifetime cap: a system cannot be older than its star
+    // (lifetime ~ M^-2.5). Same no-extra-draws shape as the real function.
+    const float t_ms = 10.0f / (p.star_mass * p.star_mass * std::sqrt(p.star_mass));
+    band age_band = pick(pref.interior,
+        {2.12f, 9.02f}, {6.72f, 9.02f}, {4.42f, 6.72f}, {2.12f, 4.42f});
+    if (t_ms < age_band.hi) age_band.hi = t_ms;
+    if (age_band.lo > age_band.hi) age_band.lo = age_band.hi;
+    p.system_age_gyr = draw(ra, age_band);
     p.radiogenic = draw(ra, pick(pref.interior,
         {0.57f, 1.73f}, {0.57f, 0.96f}, {0.96f, 1.34f}, {1.34f, 1.73f}));
 
