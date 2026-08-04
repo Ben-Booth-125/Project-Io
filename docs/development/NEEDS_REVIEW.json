@@ -1109,7 +1109,7 @@
    "kind": "question",
    "status": "open",
    "source": "BL-296 (ancient tech ladder) § Density test — Ben asked to test detail level against examples of technology",
-   "what": "The constellation geometry is settled; the open dial is node density. ANCIENT_TECH_LADDER.md § Density test writes the same slice of history (the steam transition, T4 -> T5) at three grains: coarse (~4 nodes/slice, web ~40-50), medium (~8/slice, web ~100-150, one endowment-explainable keystone fork), fine (~20/slice, web ~400+, PoE-style pathing).",
+   "what": "The constellation geometry is settled; the open dial is node density. ANCIENT_TECH_LADDER.md § Density test writes the same slice of history (the steam transition, T4 -> T5) at three grains: coarse (~4 nodes/slice, web ~40-50), medium (~8/slice, web ~100-150, one endowment-explainable keystone fork), fine (~20/slice, web ~400+, PoE-style pathing). AMENDED same day: a second slice — Institutions at medium grain (eight practice-class techs, the Sovereign Doctrine keystone, three vertex quests) — was added for comparison, per Ben. The comparison finding: gates differentiate in Materials/Energy, keystones differentiate in Institutions; judge medium grain against both slices.",
    "why_it_matters": "Everything downstream sizes from this: authoring effort, fog reveal pacing, how many keystone forks exist for exclusion to act on, and whether pathing is gameplay or bookkeeping. Ben framed it explicitly as a FUN question, which the examples are meant to make answerable.",
    "options": [
     "Coarse — grand-strategy grain. Maximum legibility; forks have nothing to bite on; wastes the constellation.",

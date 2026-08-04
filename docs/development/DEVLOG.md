@@ -48,8 +48,21 @@ principle the examples surfaced: detail only pays where someone chooses or reads
 should follow the consumer, per region of the web. Recommendation medium; the call is NR-056
 (density grain).
 
-**Runtime:** ~1.5h remote across two exchanges, Light/design. **Left open:** band count
-(NR-055), density grain (NR-056), per-domain state shape, C++-vs-Lua data home.
+**Third exchange — the Institutions comparison slice, and vertices become quests.** Ben asked
+for Institutions at medium grain as the second density example, with invented quests for key
+future technology placed at clear vertices. New geometry rule: **vertices are quests** — the
+BL-087 gate=quest=tech object at each ring crossing, capstone carrying the economic conditions,
+completion opening the next ring region. The slice: eight practice-class techs, the **Sovereign
+Doctrine** keystone (Chartered Capital ⊘ Command Estate — HISTORY.md Stage 3 turned from
+narration into a choice, creed-picked for AI nations), and three vertex quests (The Enforceable
+Promise / The Disciplined Sovereign / The Lettered Public). Comparison finding worth keeping:
+**gates differentiate in Materials/Energy, keystones differentiate in Institutions** — practice
+diffusion flattens the sector into adoption lag, so the fork is where its differentiation
+lives, not decoration.
+
+**Runtime:** ~2h remote across three exchanges, Light/design. **Left open:** band count
+(NR-055), density grain (NR-056 — now judged against two slices), per-domain state shape,
+C++-vs-Lua data home.
 
 ---
 

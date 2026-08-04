@@ -118,6 +118,12 @@ discipline and the fog, not by forbidding re-convergence.
 - **Node budget: much smaller than the reference.** PoE's ~1,325 nodes exist because travel
   filler is its pricing mechanism; Io prices in time and diffusion, so the filler has no job.
   Target 100–200 meaning-dense nodes for the full web (see § Density test).
+- **Vertices are quests** (added 2026-08-04, Ben: quests for key future technology sit at clear
+  vertices). The gate = quest = tech unification (BL-087) maps onto the geometry directly: a
+  ring-crossing vertex **is** a quest object — named for the capability regime beyond it, its
+  capstone carrying the economic conditions (BL-087's "economic conditions reserved for
+  capstones" rule, surviving the shape overturn), its completion opening the next ring region
+  in that sector. Travel nodes and keystones between vertices stay plain techs.
 - **Derived stays derived.** On the ancient layer nations path by seeded, scored choice at forks
   (the corp-AI precedent — deterministic, replayable). The campaign arc can use the same
   geometry with real player clicks; the two trees share one shape language.
@@ -166,6 +172,54 @@ campaign arc) want medium, with fine grain reserved for the *neighbourhood of ea
 where the choice deserves texture. The fun question is then not "how detailed is the tree" but
 "how detailed is the neighbourhood of each choice." Recommendation: **medium as the web-wide
 grain** — logged as NR-056 (density grain) for Ben's call.
+
+### The comparison slice — Institutions at medium grain (2026-08-04)
+
+The steam slice tests the geometry where **capacity gates** carry the drama. Institutions is the
+deliberate contrast: nearly every node is **practice-class** (diffuses by contact, no endowment
+gate), and the forks are ideological rather than material. Same grain, same shape budget —
+eight techs, one keystone — plus the vertex quests, invented per the new rule above.
+
+The slice runs the Institutions sector from ring T3 to the T6 boundary:
+
+**Techs** (travel nodes and junctions):
+
+> T3-IN-01 Credit Instruments & Double Entry → T3-IN-02 Chartered Companies →
+> T4-IN-01 Empirical Method *(cross-sector link: wants T4-MA-01 Movable-Type Press from
+> Materials — the interleaving, visible)* → T4-IN-02 Joint-Stock & Public Credit →
+> T5-IN-02 Mass Schooling & Press → T6-IN-01 Broadcast *(cross-link back: wants T5-IN-01
+> Telegraph, itself capacity-class — the one hard gate in the slice)*
+
+**Keystone — Sovereign Doctrine** (between T4-IN-02 and the T4/T5 vertex):
+
+> *Chartered Capital* — courts bind the sovereign; cheaper state credit, corporate autonomy,
+> seizure carries a lasting credit cost
+> ⊘ *Command Estate* — crown monopolies and confiscation rights; immediate revenue, chronic
+> credit penalty, corps operate at the sovereign's pleasure
+>
+> This is HISTORY.md's Stage 3 (capital disciplines the sovereign) turned from narration into a
+> choice. For AI nations the creed picks it — the sealed-oath god's provinces take Chartered
+> Capital, the same fact read twice, one layer apart (the BL-218 pattern). The untaken doctrine
+> goes dark; by 1960 a Command Estate nation cannot see the institutional road not taken —
+> which is *why* its 1960 economy tolerates corporations differently.
+
+**Vertex quests** (the invented gates for the key technology beyond each ring crossing —
+schema per `scripts/tech_tree.lua`: thesis, capstone conditions, opens):
+
+| vertex | quest | thesis | capstone conditions | opens |
+|---|---|---|---|---|
+| T3/T4 | **The Enforceable Promise** | contract law reaches capital: an entity that outlives its members can own, sue, be sued | research T3-IN-02 + market: credit-instrument volume ≥ X sustained | T4 Institutions region (press, method, joint-stock) |
+| T4/T5 | **The Disciplined Sovereign** | the state that serves markets outlives the state that raids them | research T4-IN-02 + surplus: debt service sustained N years, no default | T5 Institutions region (mass schooling, mass politics) |
+| T5/T6 | **The Lettered Public** | a literate population is the substrate every machine-age institution runs on | research T5-IN-02 + structure: schooling reach ≥ threshold across provinces | T6 Institutions region (broadcast, early computing's institutional half) |
+
+**What the comparison shows.** Medium grain holds up in both sectors, but they draw their
+texture from different mechanisms: in Materials/Energy the *gates* differentiate nations
+(endowment decides who passes), while in Institutions the *keystones* do (doctrine decides, and
+locks in). Practice-class diffusion means Institutions inequality shows up as adoption **lag**,
+not absence — by 1960 everyone has schooling on paper — so without its keystone the sector
+would flatten into sameness. One fork per slice is therefore not decoration; it is where this
+sector's differentiation lives. The vertex quests also read naturally at this grain: each names
+a capability regime a player (or the sim's codex) can understand without opening a single node.
 
 ---
 
