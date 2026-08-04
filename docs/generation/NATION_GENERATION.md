@@ -7,6 +7,12 @@ positions are, and what legal context corporations operate within.
 Nation system design is **an open item**. This document covers only the generation strategy.
 Mechanical behaviour — taxes, laws, military policy, diplomatic actions — is deferred.
 
+> **The "nations are backdrop" framing is scoped to v0.1.x.** Under BL-094 (governing-body pivot,
+> priority A) the player *becomes* one of these nations, and the deferred mechanics above — taxes,
+> laws, military policy — become the player's own levers rather than background. Forward pointer
+> only; authority propagates when the work lands (DELIVERY.md § Design state). Flagged 2026-08-04
+> because this doc is not in BL-094's file list and so carried no notice at all.
+
 ---
 
 ## Design principles
@@ -229,9 +235,26 @@ regardless of ideology.
 
 ### Pass 5 — Naming
 
-Each nation receives a generated name from a culture-flavoured template bank. Templates are
-seeded and combine a structural form (adjective + noun, compound noun, etc.) with a
-phoneme table. No human-authored list of specific names is required.
+Each nation receives a generated name from a seeded template bank, combining a structural form
+(adjective + noun, compound noun, etc.) with a phoneme table. No human-authored list of specific
+names is required.
+
+> **⚠ "culture-flavoured" overstates it, and the bank breaks the naming rule — filed 2026-08-04 as
+> BL-290 (naming banks read Earth-European).** Two problems, both at
+> `nation_generation.cpp:577-608`:
+>
+> - **The bank is global, not per-culture.** It does not read the per-culture phonology
+>   `creeds.cpp:64-82` already rolls, so a nation's gods and its own name come from unrelated sound
+>   systems. Seeded, yes; culture-derived, no.
+> - **Its tables read Latin/European** — codas `"ia" "us" "is" "or"`, nouns `"Republic"
+>   "Commonwealth" "Principality" "Protectorate"`, adjectives `"Free" "United" "Sacred"`. That is
+>   trap #1 in `GENERATION_STRATEGY.md` § Real history in, invented names out: "culture-flavoured"
+>   must not mean "Earth-culture-flavoured".
+>
+> The fix is not a less Roman-sounding syllable list — that only moves the accent. Naming should
+> *consume* the phonology the chain already produces, so a culture's names, gods and places share
+> one sound system as a consequence rather than a coincidence. `city_names.cpp` has the same
+> problem in milder form (`"ton" "ford" "haven" "burg"`).
 
 ### Pass 6 — Substrate density (BL-050 saturated substrate)
 

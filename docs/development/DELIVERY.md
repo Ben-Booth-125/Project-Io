@@ -9,31 +9,37 @@ The three artefacts:
 | Artefact | Role |
 |---|---|
 | [`backlog.json`](backlog.json) | **Canonical backlog — metadata index.** Every item's status, priority, difficulty, sequencing, file scope. Queryable; the source of truth for metadata. |
-| [`BACKLOG.md`](BACKLOG.md) | **Legacy drain only.** Holds markdown bodies for items not yet migrated to `backlog.json`. Tombstoned on edit; deleted once empty. |
+| [`BACKLOG.md`](BACKLOG.md) | **Drained 2026-07-31 — no bodies remain.** Keeps a tombstone plus seven pointer stubs that surviving `@BACKLOG.md` design pointers resolve to (`backlog_lint.js` Invariant 4 checks them). **Kept, not deleted** — deleting it would break those pointers. |
+| [`archive/backlog-design-<quarter>.json`](archive/) | **Cold store.** A landed item's design/resolution prose moves here via `archive_designs.js`; the hot item keeps an `archived` pointer. `--full` and `backlog_view.js` resolve it transparently. **Amend a landed item's prose here, not in `backlog.json`.** |
 | [`REFINED.md`](REFINED.md) | **Active worklist (transient).** A `designed` item is *promoted* here into file-scoped, dependency-marked tasks when we act on it. Cleared as tasks complete. |
+| [`NEEDS_REVIEW.json`](NEEDS_REVIEW.json) | **Review log (non-blocking).** Open questions, decisions taken on Ben's behalf, observations — written **at the moment they arise** (Rule 0c), never saved for a closing summary. Mirror: `NEEDS_REVIEW.md`. |
 
 *(History: `backlog.json` + `BACKLOG.md` replace the former `OPENS.md`; `REFINED.md` replaces
 `TASKS.md`. The lifecycle verb "Publish" was renamed "Deliver" — "Cut" stays reserved for cutting a
 release, see `DEVELOPMENT_PRACTICES.md` § Cutting a release.)*
 
-### Where design prose lives — the markdown/JSON policy (updated 2026-06-17)
+### Where design prose lives (updated 2026-08-04 — the migration is finished)
 
-Item **metadata** always lives in `backlog.json`. Item **design prose** lives in `backlog.json`
-too — in the `design` field. `BACKLOG.md` is a drain-only legacy file.
+Prose has **three** homes, split by the item's lifecycle:
 
-- **New items:** author prose in the `design` field here. No `BACKLOG.md` body, ever.
-- **Legacy items** (`design: "@BACKLOG.md"`): prose is still in `BACKLOG.md`. **Migrate on first
-  edit** — when you settle the design or promote the item, move the prose to `design` here and
-  replace the `BACKLOG.md` body with a tombstone line (`*(BL-XXX prose promoted to backlog.json
-  YYYY-MM-DD.)*`). Do not wait for promotion; settle → migrate in the same session.
-- **On promotion into `REFINED.md`:** delete any remaining `BACKLOG.md` body if it was not yet
-  migrated. A refined item must have its prose in JSON and no markdown body.
-- `BACKLOG.md` only ever **drains** (migrate-on-edit or on promotion/landing), never grows, and
-  is **deleted once empty**.
-- **Rich tables** in the `design` string are fine — markdown renders in the field. Set `design`
-  to `"@<authority-doc>"` only when the prose genuinely lives in a separate doc.
+1. **Open item** → the `design` field in `backlog.json`. This is the design authority while the
+   item is open. Rich markdown tables in the string are fine.
+2. **Landed item** → `archive/backlog-design-<quarter>.json`, moved there by `archive_designs.js`
+   at close-out; the item keeps an `archived` pointer. **Amend a landed item's prose in the cold
+   file**, not in `backlog.json` — editing the hot copy silently diverges from what readers see.
+3. **The subject's authority doc** → once the work lands and the design propagates. Authority
+   time-slices; see § Design state.
 
-The effect: a single-source model — all prose in JSON, `BACKLOG.md` converging to empty.
+`BACKLOG.md` is **finished as a drain** (completed 2026-07-31). It holds no prose — only a
+tombstone and seven stubs that surviving `@BACKLOG.md` pointers resolve to. Those pointers name an
+authority doc; **do not "migrate" them**, there is nothing to move. New items never get a
+`BACKLOG.md` body.
+
+Set `design` to `"@<authority-doc>"` only when the prose genuinely lives in a separate doc.
+
+*(The 2026-06-17 policy this replaces described an in-flight migration with a migrate-on-first-edit
+rule and `BACKLOG.md` "converging to empty, deleted once empty". It converged; it is not deleted,
+because the pointer stubs are load-bearing.)*
 
 ## The one idea
 
@@ -76,7 +82,7 @@ same two options.
 
 Every backlog item is **not yet implemented** (implemented work leaves the backlog). What varies
 is whether its **design is settled**. The `status` field (in `backlog.json`) is authoritative; the
-glyph in `BACKLOG.md` mirrors it 1:1 for human skimming:
+`glyph` field beside it in `backlog.json` mirrors it 1:1 for human skimming:
 
 - **`designed` (glyph `✓`)** — design settled; **promote-ready**. What remains is execution. (May
   still be *blocked* on a dependency existing — a sequencing fact, not a design gap; see
@@ -89,7 +95,7 @@ Status is orthogonal to **priority** (importance) and **difficulty** (size).
 **Design happens in the item, not mid-flight.** Pausing to settle a `design-owed` item beats
 redesigning during a Delivery (redesign in place is costly). **The backlog is the design authority
 while a design is open** — the settled design lives in the item's `design` field in
-`backlog.json` (or its `BACKLOG.md` body if not yet migrated), which is by definition more
+`backlog.json`, which is by definition more
 current than any authority doc on that subject. Authority **time-slices**: the
 backlog while the item is open; the subject's authority doc once the work lands and the item is
 removed. Propagating the design into its authority doc is **part of landing the work**.
@@ -197,11 +203,25 @@ large); for a `design-owed` item, **Design** is the implied first step.
    `backlog_lint.js` fails on a pointer with no record behind it. The first run took `backlog.json`
    from 1.22 MB to 710 KB.
 
-   Two more close-out checks, both cheap and both catching a class of drift that used to pass:
+   Three more close-out checks, all cheap, each catching a class of drift that used to pass:
    **`node tools/session/mirror_check.js`** re-renders every generated Markdown mirror and reports
-   any that had drifted from its canonical JSON, and **`node tools/session/devlog_index.js`**
+   any that had drifted from its canonical JSON; **`node tools/session/devlog_index.js`**
    regenerates [`DEVLOG_INDEX.md`](DEVLOG_INDEX.md) so the session you just wrote is findable
-   without loading the log.
+   without loading the log; and **`node tools/session/story_check.js`** confirms every user story
+   still traces to something runnable (`USER_STORIES.md` asked for this to sit here and it never
+   did — wired in 2026-08-04).
+
+   **Two obligations that are not scripts.** Commit with the **`scoped-commit`** skill, not a broad
+   `git add` — this tree routinely carries another session's work in progress, and a broad add
+   sweeps it into your commit under your message. And if the change moved **generated world
+   content**, re-bless the visual suite **in the same commit** (BL-259; `DEVELOPMENT_PRACTICES.md`
+   § World-content staleness) — a golden re-blessed a commit later is a golden nobody reviewed
+   against the change that moved it.
+
+   Finally, **drain `NEEDS_REVIEW.json`**: entries are written as decisions are taken (Rule 0c),
+   so close-out is where you resolve the ones this delivery answered and re-render the mirror. An
+   entry that survives its own resolution is noise; a decision that never got written is
+   indistinguishable from one Ben made.
 
    **Commit-format scope (recorded 2026-07-31).** The `Tasks:`/`Requirements:` trailer applies to
    **Full-mode item deliveries**; Light, measurement, and filing commits carry a plain descriptive

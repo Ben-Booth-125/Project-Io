@@ -30,8 +30,8 @@ the file is the project's complete requirement history.
 | `difficulty` | declared difficulty (backlog 1–5 scale), or `null` |
 | `importance` | declared importance, or `null` |
 | `evaluated_difficulty` | retrospective second-guess at the real difficulty once the work landed, or `null` |
-| `status` | `active` \| `complete` \| `cancelled` |
-| `resolved` | resolution date (`YYYY-MM-DD`), or `null` while active |
+| `status` | `pending` \| `complete` \| `cancelled` — corrected 2026-08-04: **`pending` is the in-flight word in practice, not `active`**, which zero groups use. `completed` also appears and is an undocumented duplicate of `complete`; normalise it rather than blessing it. |
+| `resolved` | resolution date (`YYYY-MM-DD`), or `null` while in flight |
 | `resolution` | one-paragraph outcome (the old `Resolved:` line) |
 | `promoted_from` | backlog/TODO origin pointer, or `null` |
 | `batch` | the delivery-set umbrella this item belonged to, or `null` |
@@ -44,17 +44,24 @@ the file is the project's complete requirement history.
 | `id` | sequential within the Brief (`R1`, `R2`, …) — referenced by REFINED.md `Satisfies:` fields and DEVLOG status lines |
 | `requirement` | a single testable outcome, present tense |
 | `verification` | **always an array** of classes (below); a qualifier is kept inline as one element, e.g. `"code: diff_rgba"`, `"doc: docs/ui/LENSES.md"` |
-| `status` | `pending` \| `complete` \| `failed` |
+| `status` | `pending` \| `complete` \| `failed` — the data also carries `completed` (duplicate of `complete`), plus one `cancelled` and one `partial`. Normalise on sight rather than widening the enum. |
 | `result_metric` | the structured outcome (e.g. `"3/3 goldens PASS <=0.0082%"`), or `""` |
 | `notes` | iteration detail: date/reason of failure, or the change made before the next attempt |
 
 **Verification classes:** `build` (clean compile); `code` (symbol/string present in
 source — qualify with the pattern); `doc` (file/section exists — qualify with the path);
 `headless` (headless harness produces expected output); `visual` (screenshot + golden /
-human confirmation); `manual` (human review, no automated check).
+human confirmation); `manual` (human review, no automated check); `review` (the static,
+no-compile `verifier-review` pass over an integrated diff — added by DELIVERY step 4a and
+undocumented here until 2026-08-04, though 21 rows already use it).
 
-**Scope:** apply a full requirement group to Briefs of difficulty 3 and above. For
-difficulty 1–2 Briefs an inline `Verification:` note in the task entry is sufficient.
+**Scope — two thresholds, and they are not the same one.** DELIVERY step 0 is the harder gate:
+**any item that changes `src/` writes one item-spanning requirement first**, difficulty
+irrelevant, so decomposition is shaped by it. Beneath that, a **full requirement group** is for
+items of difficulty 3 and above; for difficulty 1–2 an inline `Verification:` note in the task
+entry is enough. Doc-only items are exempt from both. *(Reconciled 2026-08-04 — this section
+previously stated only the difficulty threshold, which read as licence to skip step 0 on a small
+`src/` change.)*
 
 **DEVLOG convention:** every session entry's **Status** line records the requirement
 count, e.g. `Status: Complete — 5/6 requirements met (R4 failed; see requirements.json
