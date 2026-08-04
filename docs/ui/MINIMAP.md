@@ -73,14 +73,49 @@ always reads the same way.
 | Circumplanetary | Solar | Solar |
 | Solar | *(no rung above — see below)* | — |
 
-### The top rung (Solar primary)
+### The top rung (Solar primary) — **the ladder wraps**
 
 Solar has no zoom-out neighbour, so the "context" slot has no canvas to show.
-Instead, when Solar is primary the minimap displays the **game name**
-(`Project Io` for now) as a branding placeholder: the title bar shows the name
-and the inset is a plain dark fill. It is **non-interactive** — there is no rung
-to ascend to. The player still descends from here by clicking a body in the
-Solar primary.
+It used to display the game name over a plain dark fill, as a branding
+placeholder.
+
+Since 2026-08-04 it shows **the galaxy, seen from the surface of the
+homeworld** — titled **Galaxy**. Rather than invent a further rung, the ladder
+**loops back to where the player is standing**: zoom all the way out and you are
+looking up from the ground again.
+
+That is deliberate, and it is what keeps this panel a *minimap* rather than a
+fourth canvas. There is nothing to navigate here and no rung to ascend to; it
+exists to be looked at. The player still descends from here by clicking a body
+in the Solar primary, exactly as before — the panel itself stays
+**non-interactive**.
+
+What it draws (`src/ui/star_map_view.cpp`, over the authored table in
+`src/world/star_map.hpp`):
+
+- the **galactic band** as an arc across the sky, thickening and brightening
+  toward the core — not a level strip, which reads as a UI element rather than a
+  sky;
+- the **galactic core** as a bright bulge with the supermassive black hole
+  (`Ith-Karan`) dark at its heart. From the ground the centre of the galaxy is a
+  *direction*, not a destination, which is why it appears here as a glow rather
+  than as a top-down map of itself;
+- six named **constellations** with joining lines, plus a faint field biased
+  toward the band;
+- **deep-sky objects** — nebulae, globular clusters, a satellite galaxy, a
+  quasar, and the three supernova remnants the body's biography names.
+
+**The sky is fixed; the world is not.** Nothing in the table reads a seed. Every
+campaign generates a different world around a different star, but the galaxy
+those systems sit in is the same galaxy — it is the one fixture a player carries
+between campaigns. Names are invented per the standing rule (real history is a
+mechanism reference, never a name source), so there is no Orion and no
+Betelgeuse.
+
+**It turns.** One revolution per year against the campaign date, so the
+constellations up tonight are not the ones up in six months. The projection
+wraps in x for that reason; segments crossing the seam are skipped rather than
+smeared across the panel.
 
 ---
 

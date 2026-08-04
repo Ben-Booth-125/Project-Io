@@ -2620,7 +2620,7 @@ void app::render()
                 // § The top rung recorded as a placeholder. Fixed and authored —
                 // every campaign is a different world under the same sky.
                 ui::draw_star_map(inset_origin, inset_size, static_cast<float>(m_ui.sim_now_days));
-                mm_title = "The Sky";
+                mm_title = "Galaxy";
                 break;
 
             case canvas_level::circumplanetary:
