@@ -10,7 +10,115 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Documentation retrofit: seven audits, and what the corpus was lying about (2026-08-04, latest)
+## Session — The earth-like battery, generation retuned, and a sky (2026-08-04, latest)
+
+A long generation session. Built the five-instrument earth-like battery, acted on what it
+measured, and closed with the galaxy minimap. Full detail in the commits; this entry records the
+findings that outlive them and the handoff to the next session.
+
+**Built (all in `tools/verify/`).** `planetology_sweep`'s C1 rejection census; `earthlike_corridor`
+(per-knob viability edges); `earthlike_pairs` (knob × knob interaction atlas); `earthlike_tile_census`
+(what the map actually looks like); `earthlike_lean_trace` (does the wizard's language deliver);
+`notable_worlds` (search for specific playable seeds, not distributions).
+
+**Landed in generation.** Wizard bands set from measured always-viable spans. The S6 epoch fix —
+two gates were asking about present-day tectonic heat to decide events billions of years past. Ore
+provinces (Open call 4). Mountain ranges seeded on convergent plate boundaries. Eclipse geometry,
+narrowed to Earth's near-miss band. A stellar-lifetime cap that finally gives the `star` preference
+a consequence. Rivers routed by a priority flood so they reach the sea. Plus BL-287 (verify tier
+compiles the world layer once, not 44 times) and the galaxy minimap.
+
+**Left open.** BL-288 (two Release-only harness failures, undiagnosed). NR-049 (the arable floor is
+mechanically a hard ocean cap at 0.7143, and Earth is 0.71 — which is why generated worlds sit at
+46% land against Earth's 29%). BL-289 (supernovae as real extinction drivers; deliberately flavour
+for now). `data_creep_harness`'s plateau window, which the river change tripped without any actual
+data creep.
+
+---
+
+### For the next session: diplomacy and military
+
+You inherit more than it looks like. **Read this before designing.**
+
+**What already exists.** `src/world/combat.{hpp,cpp}` and `terrain_combat.{hpp,cpp}` (BL-272's typed
+unit stacks and doctrine-parameter resolve, plus BL-233's measured terrain scalars).
+`nation_generation.cpp` produces ~21 nations; `creeds.cpp` gives them belief weights. BL-273 landed
+province demography — population growth, drawdown, and a **manpower budget**, which is the number an
+army costs and the one that makes war hurt. `docs/lore/HISTORY.md` is the institutional ladder that
+explains why the 1960 world is market-based and non-hegemonic. `Project-Rival/` is the discipline
+that plays 0 A.D. to refine military doctrine from actual play, and it hands back numbers and
+doctrine, never names.
+
+Relevant items already filed: **BL-223** (averted rupture → diplomacy origin), **BL-277** (Era −1
+military strategy), **BL-274** (era-keyed unit rosters), **BL-157** (military datamodel stub),
+**BL-280** (negotiated tax rate), **BL-094** (the governing-body pivot, priority A). Query, don't
+re-derive.
+
+**Three hard constraints, in order of how badly they bite.**
+
+1. **BL-224's non-hegemony invariant.** The world must not produce a runaway winner. This is the
+   single strongest constraint on any military system, and BL-240 already settled how to honour it:
+   measure the hegemony **rate across seeds** and constrain the inputs — never enforce the outcome
+   per world. "Constrain the inputs, never clamp the outputs" is the house rule and it is not
+   negotiable.
+2. **Determinism.** No `std::` distributions, no `exp`/`log`/`pow` in any gate path. Combat
+   resolution is a gate path. `planetology.cpp`'s header states the reasoning; follow it.
+3. **The AI-behaviour rule.** Standing rules still defer *nation* behaviour (BL-054). Rival-corp
+   strategic AI got an explicit exception (BL-202/203) because it is deterministic scored-utility
+   over a legal command seam. Diplomacy AI needs the same kind of exception, argued the same way —
+   not assumed.
+
+**Method, from a day of being wrong in instructive ways.**
+
+- **Build the instrument before the feature.** Every real finding today came from a measuring tool,
+  and none was visible by reading code. Diplomacy is worse than generation here: you cannot look at
+  a screenshot and see whether relations are interesting, so the instrument matters *more*, not less.
+- **Always measure the OFF state.** Ore provinces reported 15.8% concentration and looked like they
+  worked. The baseline was 15.7%. Twice today a feature appeared to work and did nothing, and only a
+  provinces-off comparison caught it. Any relation system will emit plausible numbers from day one.
+- **Never assert a conservation property you have not measured.** I claimed the province field only
+  redistributed ore. It was losing 47% of a world's petroleum. If you write "this only moves
+  influence around", prove it with a sum.
+- **Watch for quantities that cancel.** `star_mass` was measurably inert because the derived orbit
+  cancelled it exactly — two good decisions that annihilated each other. If combat strength is
+  normalised by the opponent's, absolute scale vanishes; if diplomatic weights are normalised
+  per-nation, global weights vanish. Check explicitly.
+- **Diplomacy is interaction by construction, so build the joint measurement early.** The corridor
+  harness said every knob was individually fine; the pair atlas then found a 28.2-point interaction
+  that one-at-a-time sweeps could never have seen. Relations between N parties are *inherently*
+  joint — treat a pair/joint instrument as day-one work, not a contingency.
+- **Ask for the interesting war, not the average war.** The battery measured medians for most of a
+  day before `notable_worlds` turned the search around and found specific playable seeds. A
+  distribution is for calibration; a player experiences one campaign.
+- **Adding an enum surfaces latent bugs.** Extending `resource_type` by eight exposed uninitialised
+  arrays (a NaN in Release only), an out-of-bounds name table (a segfault), and a null-pointer
+  presentation row. You will add enums — relation state, treaty kind, war goal, casus belli. Grep
+  for hand-held table sizes and `[resource_count]`-style declarations first.
+- **Build Release and run the suite.** Four harnesses fail in Release and had gone unnoticed because
+  the default `build/` is Debug. There is undefined behaviour in the tree. Use `build_rel` (Ninja +
+  Release); BL-287 made a full verify build cheap.
+- **A guard that never fires is not a guard.** Ten of fourteen homeworld-floor clauses never fire,
+  because the sampling bands were tuned to sit inside them. A war-weariness cap or a relations floor
+  that never binds is the same bug wearing different clothes — check that your constraints can
+  actually trigger.
+- **Decide flavour vs cause deliberately, and write down which.** BL-289 is the template: the
+  supernova is narration today, with the causal version and its three hard problems recorded rather
+  than reconstructed later. Diplomacy will face this constantly — is a grievance a story or a term
+  in a scoring function?
+- **Any new verb must land in the seam AND the dictionary.** `corp_command` is the write seam;
+  `docs/ai/ACTIONS.json` is what the AI player reads for meaning. A war-declaration verb in one and
+  not the other misleads the AI exactly the way a stale golden misleads a visual check. That is a
+  standing rule, not a nicety.
+
+**One last thing.** The single most valuable half-hour today was building `notable_worlds` — the
+tool that stopped asking "what does the median world look like?" and started asking "show me one
+worth playing." For diplomacy and military, that question is: *show me a war that was worth
+fighting.* Build that instrument early and let it tell you whether the systems are producing drama
+or arithmetic.
+
+---
+
+## Session — Documentation retrofit: seven audits, and what the corpus was lying about (2026-08-04)
 
 **Runtime:** ~3 h. Full mode, doc-retrofit delivery. Ran alongside a concurrent star-map coding session.
 

@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 120 entries across 2 volume(s).
+One line per session, newest first — 121 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-08-04 | [The earth-like battery, generation retuned, and a sky](DEVLOG.md) | BL-054 BL-094 BL-157 BL-202 BL-223 BL-224 BL-233 BL-240 BL-272 BL-273 BL-274 BL-277 BL-280 BL-287 BL-288 BL-289 | DEVLOG.md |
 | 2026-08-04 | [Documentation retrofit: seven audits, and what the corpus was lying about](DEVLOG.md) | BL-094 BL-272 BL-290 BL-291 BL-295 | DEVLOG.md |
 | 2026-08-04 | [BL-287: one world layer instead of forty-four, and the three bugs it flushed out](DEVLOG.md) | BL-217 BL-286 BL-287 BL-288 | DEVLOG.md |
 | 2026-08-04 | [Earth-like generation: the three-instrument battery, S6's epoch bug, and bands from measurement](DEVLOG.md) | BL-167 BL-275 BL-276 | DEVLOG.md |

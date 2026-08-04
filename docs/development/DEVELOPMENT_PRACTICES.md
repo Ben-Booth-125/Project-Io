@@ -10,6 +10,42 @@ Tests are **headless C++ harnesses**, not a unit-test framework. Each `tools/ver
 
 Tests are written alongside the layer they cover, not deferred to the end — alongside, the check catches the quietly-wrong while the layer is still fresh in the head. Each milestone in `ROADMAP.md` should have a harness for its core logic before the next begins.
 
+### Measuring a generated system
+
+Five rules, each earned by getting it wrong first (the earth-like battery, 2026-08-04). They apply
+to anything with tuned parameters and an emergent output — generation, economy, diplomacy, combat.
+
+**Measure the OFF state, always.** A new feature emits plausible numbers immediately, and plausible
+numbers look like success. Ore provinces reported 15.8% concentration and appeared to work; the
+baseline was 15.7%, so the effect was nil. Twice in one day a feature looked like it worked and did
+nothing, and only an explicit with/without comparison caught either. Budget for the baseline run.
+
+**Never assert a conservation property you have not summed.** "This only redistributes X" is a
+claim, not a comment. The province field was documented as conserving a world's ore while quietly
+losing 47% of its petroleum — the normalisation was over the wrong set, which reads as correct until
+someone adds up both sides.
+
+**One-at-a-time sweeps cannot see interaction, so measure pairs before trusting them.** A per-knob
+corridor sweep pronounced every parameter individually safe; a knob × knob atlas then found a
+28.2-point interaction, because two knobs fed the same two-sided band and compounded. Where a system
+is *inherently* joint — relations between parties, unit matchups — the joint instrument is day-one
+work, not a contingency.
+
+**Watch for quantities that cancel.** A parameter can be provably inert without anyone noticing.
+Stellar mass changed nothing because the derived orbit cancelled it exactly: two individually-correct
+decisions that annihilated each other. Any value normalised against something derived from itself is
+a candidate, and a lean-to-outcome trace (signal against seed noise) is how it gets caught.
+
+**A guard that never fires is not a guard.** Ten of the fourteen homeworld-floor clauses never fire,
+because the sampling bands were tuned to sit inside them — the floor reads as the specification and
+the bands actually are it. Check that every constraint you write can still trigger.
+
+**Then ask for the interesting instance, not the median.** Distributions are for calibration; a
+player experiences one campaign. The most valuable instrument in the battery was the last one, which
+stopped asking "what does the median world look like?" and started asking "show me one worth
+playing" — and immediately found both named exemplar seeds and a real defect (rivers never reached
+the inland sea) that every median-based harness had missed.
+
 ### What to test
 
 Focus on the simulation's pure, deterministic logic — the parts that transform state — in `world/*` (no SDL/Lua/ImGui):
