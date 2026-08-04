@@ -24,6 +24,17 @@ struct world_params
 {
     uint32_t        seed       = 0;                         ///< Master seed, XOR-folded into each per-body seed. 0 reproduces the legacy world.
     abundance_level abundance  = abundance_level::standard; ///< Deposit-density tier (standard = earth-like ceiling).
+
+    /// Calendar year the generated world BEGINS at (BL-271, the Era -1 sandbox).
+    /// 1960 (default) is the campaign epoch: the full pre-computed history runs
+    /// (industrialisation, ruptures, globalisation). Any year below 1700 stops
+    /// the settlement pass at that year instead: provinces founded later do not
+    /// exist yet, no furnace ever lights, no rupture is pre-resolved — that
+    /// history is the year-tick sim's to produce — and province demography is
+    /// seeded at founding and grown to the start year. Sandbox-only: the
+    /// 1960-era economy scaffolding (corps, markets, roads) still generates
+    /// underneath and is out of frame; gating it is BL-271's build.
+    int64_t         epoch_year = 1960;
     int             body_count = 0;                         ///< Reserved — the body-count knob is PHASED to a follow-on (bodies are still hard-coded profiles).
     // Note: there is no nation-count knob. The number of nations on the home body is a
     // *consequence* of its habitable land area and the minimum-viable-territory floor

@@ -376,7 +376,8 @@ world make_hard_coded_world(world_params params, generation_report* report,
 
         kepler_settlement = run_settlement(kepler_pl, kepler_hist, kepler_creeds, w,
                                            kepler_tiles, 180, 84, budget,
-                                           /*seed=*/params.seed ^ 0x5E77EDu);
+                                           /*seed=*/params.seed ^ 0x5E77EDu,
+                                           /*stop_year=*/params.epoch_year);
         kepler_np.seed_tiles = settlement_seed_tiles(kepler_settlement);
     }
 
@@ -392,24 +393,34 @@ world make_hard_coded_world(world_params params, generation_report* report,
     derive_national_character(kepler_settlement, kepler_creeds, w,
                               kepler_nations, kepler_tiles, 180, 84);
 
+    // Everything from here to globalisation is the 0-1960 story. An antiquity
+    // start (BL-271: epoch_year < 1700) generates the world BEFORE it happens —
+    // no rupture is pre-resolved, no charter is enacted, no common tongue forms.
+    // The year-tick sim produces that history live instead of this pass
+    // pre-computing it.
+    const bool antiquity_start = params.epoch_year < 1700;
+
     // The historical ruptures: collapse, war and revolution as transforms on
     // territory, character and abundance — and, where a war is won, the
     // victor's gods travel with the border and part of the loser's record is
     // destroyed rather than merely contradicted.
-    resolve_historical_ruptures(kepler_settlement, kepler_creeds, w,
-                                kepler_nations, kepler_tiles, 180, 84,
-                                /*seed=*/params.seed ^ 0x80174E5u);
+    if (!antiquity_start)
+        resolve_historical_ruptures(kepler_settlement, kepler_creeds, w,
+                                    kepler_nations, kepler_tiles, 180, 84,
+                                    /*seed=*/params.seed ^ 0x80174E5u);
 
     // Stages 1-2 can only be written now: the Charter Act names a nation and
     // the border accord counts them, and neither existed a moment ago. The
     // lines then merge into Kepler's biography, which the History ledger reads.
-    record_institutional_history(kepler_hist, w, kepler, kepler_tiles, 180);
+    if (!antiquity_start)
+        record_institutional_history(kepler_hist, w, kepler, kepler_tiles, 180);
 
     // Globalisation closes the generated story: the common tongue line is the
     // hinge from the creeds' native record to the campaign epoch — rendered in
     // the player's language (English for now; Ben, 2026-07-31). The creed
     // lines then merge into the same ladder history the report reads.
-    record_globalisation(kepler_creeds, w, kepler);
+    if (!antiquity_start)
+        record_globalisation(kepler_creeds, w, kepler);
     kepler_hist.history.insert(kepler_hist.history.end(),
                                std::make_move_iterator(kepler_creeds.history.begin()),
                                std::make_move_iterator(kepler_creeds.history.end()));

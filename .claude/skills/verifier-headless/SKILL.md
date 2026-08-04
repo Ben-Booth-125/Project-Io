@@ -159,6 +159,17 @@ in `tools/verify/README.md`.
   PLANETOLOGY.md's presentation rule (R5). Links `planetology.cpp` (reads
   `mobile_lid`/`theta`) + `continents.cpp`. CMake target `continents_harness`.
 
+- **`era_world_harness`** — Era −1 antiquity start (BL-271 first slice): generates the
+  canonical world with `world_params::epoch_year = 0` and asserts the stop holds (every
+  province founded by year 0, no furnace lit, median industrial year 0 — R1), demography is
+  seeded within `(0, carrying_capacity]` with manpower under its ceiling while the default
+  1960 world stays unseeded (R2), the 0 CE world is multipolar (R3), two epoch-0 generations
+  produce byte-identical province tables (R4), and the default 1960 arc is untouched —
+  still industrialises, still ruptures, at least as many provinces (R5). Also **prints the
+  0 CE dossier** (provinces by population, nations by tiles) — the instrument for eyeballing
+  an antiquity world. Links the generation TU superset (as `world_audit`); CMake target
+  `era_world_harness` via the generic glob.
+
 ## Running the whole suite (CTest — BL-104)
 
 As of BL-104 every `tools/verify/*.cpp` is a registered CTest test, so the whole logic tier runs

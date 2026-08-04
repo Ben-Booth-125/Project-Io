@@ -254,7 +254,8 @@ settlement_state run_settlement(const planetology_state& pl,
                                 const std::vector<entity_id>& tile_ids,
                                 int gw, int gh,
                                 int target_provinces,
-                                uint32_t seed)
+                                uint32_t seed,
+                                int64_t stop_year)
 {
     settlement_state out;
     if (gw <= 0 || gh <= 0 || target_provinces <= 0 || hl.cradles.empty())
@@ -362,16 +363,43 @@ settlement_state run_settlement(const planetology_state& pl,
         }
     }
 
+    // --- Antiquity stop (BL-271) ----------------------------------------------
+    // Below the industrial era the pass generates the world AT `stop_year`:
+    // provinces founded later do not exist yet (the year-tick sim founds them),
+    // and the population that HAS arrived is seeded at founding and grown
+    // logistically to the start year. RNG-safe: the founding loop above already
+    // consumed its draws for every candidate, so the streams match the 1960 arc.
+    const bool antiquity = stop_year < 1700;
+    if (antiquity)
+    {
+        out.provinces.erase(
+            std::remove_if(out.provinces.begin(), out.provinces.end(),
+                           [stop_year](const province& p) { return p.founded_year > stop_year; }),
+            out.provinces.end());
+
+        for (province& p : out.provinces)
+        {
+            // Founding band ~2k-26k settlers, richer ground drawing more; the
+            // logistic model then does the two millennia (or fewer) of growth.
+            p.population = 2000 + static_cast<int64_t>(p.farm_q) * 24;
+            p.last_demography_year = p.founded_year;
+            advance_province_demography(
+                p, static_cast<int>(stop_year - p.founded_year), /*war_pressure_q=*/0);
+        }
+    }
+
     // --- Stage 4: who lights the furnaces, and when ----------------------------
     // "Coal-near-cities made Britain — endowment, not virtue" (HISTORY.md Stage
     // 4). The gate is the ground; the creed only moves the date, and only where
     // the creed itself came from the same ground (a forge god is raised over
-    // ore, one stage earlier).
+    // ore, one stage earlier). Never reached by antiquity worlds: no furnace
+    // has lit by year 0, and that history belongs to the sim, not the pass.
     rng rf(seed, tag_furnace);
     const int arable_q = clampi(static_cast<int>(pl.arable_share * 1000.0f), 0, 1000);
 
     for (province& p : out.provinces)
     {
+        if (antiquity) break;
         // The gate is ABOVE-AVERAGE fuel, not any fuel: the scores are relative
         // to the world's own means (500 = average), so an average province sits
         // at 750 here and does not industrialise. Only the endowed do.

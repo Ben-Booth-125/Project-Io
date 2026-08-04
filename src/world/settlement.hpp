@@ -159,6 +159,12 @@ struct settlement_state
 ///                  own seed budget, so the two agree by construction. Clamped
 ///                  to what the land can actually hold at the separation rule.
 /// @param seed      Per-body seed, already folded with the campaign seed.
+/// @param stop_year Calendar year the pass generates AT (BL-271). 1960 runs the
+///                  full arc. Below 1700: provinces founded after it are dropped
+///                  (not yet founded), Stage 4 never runs (no furnace has lit by
+///                  antiquity), and demography is seeded at founding then grown
+///                  to `stop_year` (the graduation path the province struct
+///                  names as BL-271's job).
 settlement_state run_settlement(const planetology_state& pl,
                                 const history_ladder_state& hl,
                                 const creed_state& cs,
@@ -166,7 +172,8 @@ settlement_state run_settlement(const planetology_state& pl,
                                 const std::vector<entity_id>& tile_ids,
                                 int gw, int gh,
                                 int target_provinces,
-                                uint32_t seed);
+                                uint32_t seed,
+                                int64_t stop_year = 1960);
 
 /// The province anchors, as raster indices, in placement order — the seed list
 /// `nation_params::seed_tiles` takes. This is the whole of "seeding changes,

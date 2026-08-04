@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*61 entries — 4 open, 57 resolved.*
+*62 entries — 5 open, 57 resolved.*
 
 ---
 
@@ -75,6 +75,17 @@ The smoke test could not obtain any corporation entity id through the seam: get_
 > **Recommendation:** Option 1. Enumeration serves the multi-agent future (a diplomacy campaign needs to see all seats, not just its own), and the blackboard staying visibility-honest argues against it carrying a world-level corp roster.
 
 *Files: `src/main.cpp`, `tools/mcp/server.js`, `Project-Rival/tools/harness/io_smoke_test.js`*
+
+### NR-062 — Ladder store schema calls taken while delivering BL-307
+*decision taken on your behalf · raised 2026-08-04 · from BL-307 (ladder data store) — filed and delivered on Bens backlog-then-deliver instruction during the constellation review.*
+
+Four calls were interpretation: (1) gate and diffusion are ARRAYS (ore_q+fuel becomes two atoms; T6-ME-01 is practice+artifact) rather than strings with separators. (2) The density-slice objects — the three Institutions quests (Enforceable Promise / Disciplined Sovereign / Lettered Public), Sovereign Doctrine and Fuel Doctrine — are included as STANDING objects with provenance density-slice, not left as doc-only examples; the grain is settled at medium so the worked slices read as the webs first authored regions. (3) Placeholder thresholds (X, N) are kept verbatim as strings until tuning. (4) The neighbourhood count drift the lint caught (19 techs / 27 objects vs the prose 20 / ~28) was fixed in both the doc and BL-296s design prose, dated.
+
+**Why it matters.** If the density-slice trio was meant as illustration only, those five objects should carry a sketch flag or come out; everything downstream (the sim, any codex UI) will otherwise treat them as authored content.
+
+> **Recommendation:** Keep all four as taken — provenance already lets a consumer filter density-slice objects if wanted.
+
+*Files: `docs/research/ancient_tech_ladder.json`, `tools/session/ladder_lint.js`, `docs/research/ANCIENT_TECH_LADDER.md`*
 
 ---
 

@@ -10,6 +10,11 @@
 > **Amended 2026-08-04 (same day, follow-up session):** § Geometry settles the constellation
 > shape (Ben's call, overturning BL-087's Q1 binary-tree resolution), and § Density test carries
 > the three-grain examples the detail-level call will be made against.
+>
+> **Machine-readable store (2026-08-04, BL-307 — ladder data store):** every node, quest,
+> keystone and crossing below is transcribed in `ancient_tech_ladder.json` beside this file.
+> `node tools/session/ladder_lint.js` cross-checks the two both ways — edit a table here,
+> update the store, run the lint.
 
 ## What this is — and the one stance it must not violate
 
@@ -287,7 +292,8 @@ applied to quests, and it keeps quest count proportional to how much a sector ma
 
 ### The count, extrapolated
 
-This neighbourhood: **20 techs + 5 vertex quests + 1 keystone + 2 roster regimes ≈ 28 objects**
+This neighbourhood: **19 techs + 5 vertex quests + 1 keystone + 2 roster regimes = 27 objects**
+*(count corrected 2026-08-04 against the data store — the prose said 20/28)*
 across two rings. Five ring-crossings × seven sectors at this density extrapolates to roughly
 **130–150 objects web-wide** — inside the § Geometry budget, with room for the campaign arc's
 denser keystone neighbourhoods.

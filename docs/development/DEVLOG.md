@@ -10,7 +10,32 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — The arena comes home: text-only Rival, the diplomacy battery, and the RTS that lived for an hour (2026-08-04, latest)
+## Session — A world that begins at 0 CE (2026-08-04, latest)
+
+Full-lite mode, same sitting as the arena re-base below. Ben: "generate a world which begins
+at 0 CE, rather than 1960 CE". Runtime: ~45 min.
+
+**The knob.** `world_params::epoch_year` (default 1960 — legacy byte-identical). Below 1700:
+`run_settlement` gains a `stop_year` — provinces founded later do not exist yet, Stage 4 never
+runs (no furnace has lit by antiquity), and demography is finally **seeded** — the graduation
+path the province struct always named as BL-271's (Era −1 sim) job. Founding band 2k–26k
+settlers off `farm_q`, then `advance_province_demography` does the centuries to year 0.
+`hard_coded_world` gates ruptures, institutional history and globalisation behind the same
+flag — that history is the year-tick sim's to produce, not the pass's to pre-compute.
+
+**The instrument.** `tools/verify/era_world_harness.cpp` (requirement group
+`era-minus1-antiquity-start`, 12/12 PASS): stop holds, demography within capacity, multipolar,
+deterministic, 1960 arc untouched. Its dossier is the deliverable: **82 provinces, 21 nations,
+20.65 M people, 258 k manpower, foundings −1999 to −1502** on the canonical seed.
+
+**Honest limits, on the record.** The 1960 economy scaffolding (corps, markets, roads) still
+generates underneath — out of frame for the sandbox, gated properly in BL-271's build. On this
+seed every province founds before −1500, so the founded-after-0 filter had nothing to drop.
+Two cosmetic name collisions ("Rekmaik lower" ×2) — `region_word` granularity, noted not fixed.
+
+---
+
+## Session — The arena comes home: text-only Rival, the diplomacy battery, and the RTS that lived for an hour (2026-08-04)
 
 Mixed mode: research sweep (Light), backlog filing, one Light `src/` seam extension. Runtime:
 ~3.5 h wall clock, interactive with Ben.
