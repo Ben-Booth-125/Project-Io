@@ -47,8 +47,32 @@ no Earth proper noun is content. The sim renders these through Kepler's own gene
 **Six bands** spanning 0 CE → 1960, each ~2–5 centuries of Earth-equivalent time. BL-274 leaned
 to four bands for the *roster*; the ladder needs six because the economic divergence that answers
 "what differs by 1960" happens inside the two bands BL-274's lean merges (early-modern and
-industrial split, T4/T5). Reconciliation is cheap: roster era-bands are a coarser grouping of the
-same spine (T1–T2 → classical, T2–T3 → medieval, T4 → gunpowder, T5–T6 → industrial).
+industrial split, T4/T5). Roster era-bands are a coarser **grouping of the same spine**.
+
+### The roster grouping (settled 2026-08-04)
+
+The earlier one-line version of this grouping put T2 in two groups at once, so it was never a
+partition and could not be implemented. Settled below, keyed off the **Military column** — the
+roster's own domain, and the only one whose rows must turn over exactly at a roster boundary:
+
+| roster band | ladder bands | regime (the `*-MIL` rows) | what ends it |
+|---|---|---|---|
+| **classical** | T1 | massed iron infantry, siegecraft | the stirrup — shock cavalry, and the fortress answer to it |
+| **medieval** | T2–T3 | stirrup heavy cavalry, fortress, crossbow/plate | gunpowder becomes a field arm, not a siege curiosity |
+| **gunpowder** | T4 | flintlock line, artillery fortress, broadside fleet | the rifle and the railway — range and mobilisation both jump |
+| **industrial** | T5–T6 | rifle, ironclad, general staff → armour, airpower, radar | hands off to the campaign epoch (`scripts/tech_tree.lua`) |
+
+Two things fixed the free boundaries. The **T3/T4** break was already settled in § Band T3
+("the T3/T4 boundary is the roster's medieval → gunpowder turnover"). The **T1/T2** break follows
+from `T2-MIL` being *stirrup heavy cavalry, fortress*: the stirrup is the medieval military
+revolution, so T2 groups forward with T3, not back with T1. That leaves classical as T1 alone.
+
+**Consequence for the 0 CE start (BL-299).** A campaign frozen at the epoch sits in the
+**classical** band alone — `T1-MIL`, gated on `ore_q`. Shock cavalry is therefore *not* a 0 CE
+unit; it is a T2 unlock. A frozen-tier roster gets light/skirmishing horse only, and the heavy
+charge arrives with the band above it.
+
+Mirrored in `ancient_tech_ladder.json` as `roster_band` on each band plus a `roster_bands` table.
 
 **Seven domains** (columns), so a nation's tech state is legible as a profile, not a scalar:
 
