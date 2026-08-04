@@ -87,7 +87,8 @@ it in sync with `hard_coded_world.cpp` when either changes.
 
 ## Outputs and contracts
 
-`continent_state` carries three things, with three different consumers:
+`continent_state` carries **four** consumer-facing outputs *(this read "three things" until
+2026-08-04, when `convergent` was added)*:
 
 - **`height_bias`** — per-tile float, roughly [−1, 1], always sized `gw×gh`
   (all-zero on a stagnant lid). Contract into tile Pass 1: **added to the raw noise
@@ -101,6 +102,19 @@ it in sync with `hard_coded_world.cpp` when either changes.
   the bias was derived *from* instead of inferring landmasses back out of finished
   terrain. Presentation data — never enters `world`, stays off the serialisation
   seam.
+- **`convergent`** — per-tile `uint8_t` mask, 1 where the tile touches a **classified
+  convergent** boundary (the pairs that earned the +0.12 uplift). **Empty on a stagnant
+  lid**, which has no boundaries at all. Written in the same loop that applies the bias.
+
+  It exists because the classification used to survive only as prose: `run_continents` knew
+  which boundaries collided, said so in a history line, folded the uplift into the heightmap
+  and then forgot. Pass 5 could not seed mountains where mountains actually form, so it fell
+  back to "high and rocky" — blobs on existing high ground rather than chains along the
+  boundary that raised them. Consumed as the first tier of `pick_seeds`
+  (TILE_GENERATION.md § Pass 5).
+
+  **Only Kepler receives it today** — `hard_coded_world.cpp:146` passes `&kepler_convergent`
+  and the other bodies fall through to the older height-preference path.
 - **`history`** — dated `history_event` lines tagged `chain_stage::engine`. The
   caller (`plan()` in `hard_coded_world.cpp`) moves them into the body's biography
   (`planetology_state::history`) and re-sorts; they are not stored twice. This is
@@ -120,6 +134,12 @@ Full catalogue in `docs/ui/LENSES.md` § Continent lens; visual check
 - **BL-210 (oral-history pivot, design-owed)** — this pass is its first slice only;
   the fuller S1–S4 continents simulation (collision/rift history replacing the
   remaining noise machinery) stays with the parent item.
-- Seeding tile Pass 5's mountain/rift clusters along the classified boundaries
-  directly, rather than by preference over the biased heightmap
-  (`TILE_GENERATION.md` § Deferred, tectonic landforms).
+- ~~Seeding tile Pass 5's mountain/rift clusters along the classified boundaries~~
+  **Mountains landed 2026-08-04** (`71e8a9b`) via the `convergent` mask above.
+  **Rifts are still deferred**, as is concentrating volcanic activity on boundaries.
+
+  Worth recording because it was counter-intuitive: boundary-seeding *lowered* relief
+  on its own, 17.5% → 9.9% of land. Convergent boundaries often run along coastlines,
+  and cluster growth is blocked by ocean, so a range seeded there loses most of its
+  rings to water. Raising the seed counts recovered it to ~14.0%. The mechanism was
+  right; the seeding budget had been tuned against a different placement rule.

@@ -285,21 +285,40 @@ regardless of geological activity.
 
 | Feature | `none` | `low` | `moderate` | `high` |
 |---|---|---|---|---|
-| Mountain range seeds | 0 | 2 | 4 | 5 |
+| Mountain range seeds | 0 | 5 | 11 | 13 |
 | Rift zone seeds | 0 | 0 | 1 | 3 |
 | Crater field seeds (atmospheric) | 0 | 1 | 2 | 1 |
 | Crater field seeds (airless bonus) | +4 | +3 | +3 | +2 |
 
-**Mountain range seed placement** — seeds prefer tiles where `H > 0.65` and
-composition is rocky or barren. BFS expansion uses a decay probability of 0.65
-per step, out to a fourth ring (retuned 2026-06-14 from `{2 rings, 0.55}` — see
-§ Deviations). The expanding frontier transitions:
+*(Mountain seeds read `0 / 2 / 4 / 5` before 2026-08-04. Verified against `seed_count`,
+`tile_generation.cpp`.)*
+
+**Mountain range seed placement — a three-tier pool, boundary-first.** `pick_seeds` tries,
+in order:
+
+1. **Tiles on a classified convergent plate boundary** — where mountains actually form.
+   This tier exists only for mountains, only when the body was given a `convergent` mask
+   (CONTINENTS.md § Outputs), and it is tried *before* the height rule.
+2. **High and rocky** — `H > 0.65` and composition rocky or barren, the original rule.
+3. **Anywhere on land** — so a body with no classified boundaries still gets ranges.
+
+BFS expansion uses `shape_of(mountain) = {5 rings, 0.72 decay}`, grown 2026-08-04 from
+`{3, 0.65}`. The frontier transitions:
 
 ```
-core tile → mountain
-first ring → highland (probability 0.7) or mountain (probability 0.3)
-second ring → highland (probability 0.5) or plains (probability 0.5)
+core tile  → mountain
+ring 1     → mountain 55% / highland 45%
+ring 2     → mountain 25% / highland 75%
+ring 3+    → highland 65% / plains 35%
 ```
+
+**The honest result, worth recording.** Boundary-seeding *lowered* relief on its own —
+17.5% → 9.9% of land — because convergent boundaries often run along coastlines and
+`grow_cluster` is blocked by ocean, so a range seeded there loses most of its rings to
+water. Raising the seed counts recovered it to ~14.0%, against Earth's ~24%. Clusters were
+grown rather than seeded more thickly because Earth's relief is a few long chains, not many
+small blobs — but the remaining shortfall is range **count**, not range size, and pushing
+`max_ring` further would produce blobs rather than chains.
 
 **Rift zone seed placement** — seeds prefer volcanic or barren tiles at subtropical
 or tropical latitude. Growth uses decay 0.60 to a fourth ring (retuned 2026-06-14
@@ -393,8 +412,8 @@ goods are sparse *and* small. Base ranges below are pre-scalar.
 
 ### Post-multiplies and endemic additions
 
-After the deposit array is filled, two **pure post-multiplies** run in sequence.
-Neither draws RNG, so each reproduces the unscaled surface bit-for-bit at its
+After the deposit array is filled, **three** pure post-multiplies run in sequence.
+None draws RNG, so each reproduces the unscaled surface bit-for-bit at its
 identity value:
 
 1. **Abundance scalar (BL-114, world descriptor).** `deposit_scalar` — sparse
@@ -404,6 +423,18 @@ identity value:
    `endowment[r]`. A channel at 0.0 removes the resource outright rather than
    thinning it — "no life, no coal" lands here. A null planetology state skips
    the multiply entirely.
+3. **Ore-province field (landed 2026-08-04, `613b78a`).** `provinces_for` seeds
+   2–3 provinces per province-bearing resource and `province_field` redistributes
+   a large share of the world total into them — copper 65%, petroleum 60%, iron
+   55%, coal 45%. Skipped entirely when `pl == nullptr`, which preserves the
+   identity contract for bodies with no planetology.
+
+   **Conservation is over the resource's bearing set, not over all land.** That
+   distinction is load-bearing rather than pedantic: conserving across land drained
+   petroleum by 47%, because the province took its share from tiles that never bore
+   any in the first place.
+
+*(This section read "two post-multiplies" until 2026-08-04.)*
 
 Then **endemic trade goods (BL-191, complete)** *add* deposits rather than scale
 them — an endemic good has no base distribution to scale; it exists only where it
@@ -475,9 +506,10 @@ artefact.
 `run_continents` (`src/world/continents.cpp` — `CONTINENTS.md`) derives drifting
 plates from Planetology's Engine output and feeds a plate-boundary height bias
 into Pass 1, so mountain candidacy already correlates with convergent boundaries
-through the heightmap. Still deferred: seeding Pass 5's mountain/rift *clusters*
-along the boundaries directly (they still sample by weighted preference over the
-biased heightmap) and concentrating volcanic activity there.
+through the heightmap. **The mountain half landed 2026-08-04** (`71e8a9b`): Pass 5
+now seeds mountain clusters on classified convergent boundaries directly, as the
+first tier of `pick_seeds` — see § Pass 5 above. Still deferred: the same treatment
+for **rift** clusters, and concentrating volcanic activity along boundaries.
 
 **Full deposit authoring.** *Done (BL-040).* Copper ore, rare earth ore, silica,
 coal, iron-nickel ore, and platinum-group metals are now authored via the seeded
@@ -564,6 +596,10 @@ identity.
   mountain `{2 rings, 0.55}` → `{3, 0.65}`, rift `{2, 0.55}` → `{3, 0.60}`,
   crater `{1, 0.45}` → `{2, 0.55}`. Pairs with the reference-tiles change above
   to make landform features more prominent and more numerous.
+- **Mountain cluster retune (2026-08-04, T3 calibration).** `shape_of(mountain)`
+  `{3, 0.65}` → `{5, 0.72}`, and the ring→landform mapping was rewritten so ranges
+  keep a mountainous core instead of dissolving into plains (see § Pass 5). Driven
+  by the tile census measuring relief at 6.8% of land against Earth's ~24%.
 
 ### Generation history hook
 

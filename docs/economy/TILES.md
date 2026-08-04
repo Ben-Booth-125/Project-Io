@@ -52,6 +52,23 @@ The deposits that can appear on a tile are determined primarily by composition, 
 
 ### Composition deposit tables
 
+> **⚠ These tables are no longer the final word (2026-08-04).** They remain faithful to
+> `generate_deposits` — spot-checked and accurate — but `generate_deposits` is now one factor of
+> four. Three **pure post-multiplies** run after it in `generate_body_tiles`, and they can move a
+> row by an order of magnitude or delete it outright:
+>
+> 1. **`deposit_scalar`** (BL-114) — sparse 0.40 / lean 0.65 / standard 1.00, world-wide.
+> 2. **Planetology `endowment[r]`** (BL-167) — per-resource, and **0.0 removes the resource
+>    outright rather than thinning it**. A generated world can therefore have *no coal at all*,
+>    whatever the "Coal 30–140, rarity-gated" row below says: coal is zeroed unless the biosphere
+>    reached land, petroleum unless the atmosphere oxygenated.
+> 3. **Ore provinces** (2026-08-04) — copper, petroleum, iron and coal each redistribute 45–65%
+>    of the world total into 2–3 seeded provinces, so the "Relative weight" column now describes a
+>    **pre-province** quantity.
+>
+> Read the tables as the *shape* of a deposit's distribution, not its delivered magnitude.
+> `TILE_GENERATION.md` § Post-multiplies is authoritative on the chain.
+
 Regenerated 2026-07-31 from `generate_deposits` (`src/world/tile_generation.cpp`) — the earlier
 tables carried ~10 row-level drifts against the code (petroleum landform rule, phantom icy
 silica and regolith water, missing volcanic copper, invented rarity-row modifiers, and others).
@@ -199,7 +216,17 @@ The prototype bodies are generated against the full model by the six-pass pipeli
 
 **Both axes now render (BL-231, 2026-07-31).** Until then the canvas drew *composition only* — `terrain_colour` switched on the composition enum and landform never reached the screen, so mountain, highland, canyon, valley, crater and rift all appeared as flat hexes despite driving build cost, hazard, habitability and deposit richness. Landform is now a second, independent render channel: a subtle **relief tint** for the common ground and a **glyph** for the four dramatic landforms. The split is authored in `docs/ui/CANVASES.md` § Terrain channels; the glyph shapes are catalogued in `docs/ui/ICONS.md` § Landform glyphs.
 
-**Measured landform distribution** (`world_audit` § S3, the canonical seed — reported per body because the profile varies sharply between wet and airless bodies):
+**Measured landform distribution — ⚠ STALE, and blocked on a broken harness (2026-08-04).**
+
+The figures below were superseded twice on 2026-08-04. `802421c` (larger mountain clusters) took
+relief — mountain plus highland — from 6.8% to 17.5% of land; `71e8a9b` (convergent-boundary
+seeding) then settled it at **~14.0%**, with mountain seeds moving `2/4/5` → `5/11/13`. Kepler's
+"0.0% valley" is from the same superseded census and the ring→landform mapping has changed since.
+
+**They cannot be re-measured yet:** `world_audit`, the harness that produced this table, currently
+fails — filed as BL-291 (world_audit harness fails), which owns both the fix and the re-issue.
+Treat every number here as indicative only; a *measured* table that has gone stale reads as
+verified, which is why it is flagged rather than quietly left.
 
 | Landform | System | Kepler (home) | Build cost |
 |---|---|---|---|
@@ -210,6 +237,9 @@ The prototype bodies are generated against the full model by the six-pass pipeli
 | Mountain | 0.6% | 1.5% | ×2.0 |
 | Canyon | 0.1% | 0.4% | ×1.5 |
 | Rift | 0.1% | 0.3% | ×1.6 |
+
+*(Build-cost multipliers are unaffected — they are authored constants in
+`landform_logistics_cost`, not measurements.)*
 
 **Terrain has a graded combat value (BL-233, 2026-07-31).** SYSTEMS.md § Environment has always
 assigned terrain "the difficulty of military operations", but the only code expressing it was a
@@ -248,4 +278,6 @@ barren/icy pair) and is now **325**; per-body land means now separate (defence 8
 > something untrue. **Whether landform should also modify build cost is a design call, not a bug
 > fix** — it belongs with the tile-generation/economy refinements, not with a rendering item.
 
-**Open tuning question raised by that measurement: Kepler generates no valley tiles at all.** Valley is assigned to unclaimed non-ocean ground below the height threshold (Pass 5), but on a wet body the ocean has already taken everything that low — so the ×1.1 fertile landform is unreachable on exactly the bodies where river valleys should be most characteristic. Dry bodies carry 20–27% valley. This is self-consistent rather than a defect, but it is a generation-tuning question, not a rendering one; it belongs with the tile-generation refinements (BL-051).
+**Open tuning question raised by that measurement: Kepler generated no valley tiles at all.** Valley is assigned to unclaimed non-ocean ground below the height threshold (Pass 5), but on a wet body the ocean has already taken everything that low — so the ×1.1 fertile landform was unreachable on exactly the bodies where river valleys should be most characteristic. Dry bodies carried 20–27% valley. Self-consistent rather than a defect, but a generation-tuning question; it belongs with the tile-generation refinements (BL-051).
+
+*Whether it still holds is unknown (2026-08-04): Pass 5's ring→landform mapping was rewritten and the ocean band moved, so this needs re-measuring alongside the census — BL-291.*
