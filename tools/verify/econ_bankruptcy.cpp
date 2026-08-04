@@ -62,7 +62,14 @@ static const char* resource_name(std::size_t idx)
         "stone", "timber", "sand", "clay", "peat",
         "steel", "refined_fuel", "food_rations"
     };
-    if (idx < resource_count)
+    // The guard must be the ARRAY's own extent, not resource_count. This table
+    // is a convenience for report lines and has never covered the whole enum
+    // (19 names against 23 resources even before BL-286), so testing against
+    // resource_count read past the end for every resource it lacked. That was
+    // invisible while the overrun was small enough to land on adjacent static
+    // data; BL-286 widened the enum to 31 and the read ran far enough off the
+    // end to fault outright.
+    if (idx < sizeof(names) / sizeof(names[0]))
         return names[idx];
     return "unknown";
 }

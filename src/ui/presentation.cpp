@@ -68,7 +68,20 @@ constexpr ImU32 corp_table[palette::corp_slot_count] = {
 
 const resource_presentation& presentation_of(resource_type r)
 {
-    return resource_table[static_cast<std::size_t>(r)];
+    // resource_table is declared [resource_count], so widening resource_type
+    // silently appends ZERO-FILLED rows — a NULL name, not a missing row the
+    // compiler would complain about. Every caller hands the result straight to
+    // a "%s", so an unauthored resource is a null dereference rather than a
+    // visible gap. BL-286 added eight logistics goods whose presentation is not
+    // authored yet (BL-287-290 give them behaviour, and names/colours with it);
+    // today they stay unreached only because nothing produces them and the
+    // callers happen to guard on a positive quantity.
+    static constexpr resource_presentation unauthored{
+        "(unnamed resource)", "?", IM_COL32(140, 140, 140, 255) };
+    const auto i = static_cast<std::size_t>(r);
+    if (i >= resource_count || resource_table[i].name == nullptr)
+        return unauthored;
+    return resource_table[i];
 }
 
 const char* resource_name(resource_type r)

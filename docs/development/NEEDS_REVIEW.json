@@ -993,6 +993,26 @@
     "tools/verify/earthlike_tile_census.cpp"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-048",
+   "title": "A fresh CMake configure cannot download SDL3 on this machine",
+   "raised": "2026-08-04",
+   "kind": "observation",
+   "status": "open",
+   "source": "Hit while trying to time a from-cold build for BL-287.",
+   "what": "Configuring a brand-new build directory fails in FetchContent_MakeAvailable(SDL3) at CMakeLists.txt:44. The download from codeload.github.com reports \"unable to check revocation for the certificate\", ninja stops, and configure aborts. Existing build directories (build/, build_rel/) are unaffected because their _deps are already populated.",
+   "why_it_matters": "Every current build dir works, so this is invisible day to day — but it means a fresh clone, a new git worktree, or a CI runner cannot configure the project at all. It also blocked the from-cold timing measurement BL-287 wanted, so that number is still unmeasured. Unclear whether this is a transient network condition, a corporate/AV TLS interception, or a change in the certificate chain; it was seen once and not retried later.",
+   "options": [
+    "Retry later — it may simply be transient.",
+    "If persistent: vendor the deps, or point FetchContent at a local cache/mirror, or set CMAKE_TLS_VERIFY/CURLOPT_SSL_OPTIONS appropriately for this machine.",
+    "Check whether CI is currently affected — if CI provisions fresh dirs, it may already be failing."
+   ],
+   "recommendation": "Retry a fresh configure once before investigating; if it reproduces, check CI first, since a green local build directory hides this completely.",
+   "files": [
+    "CMakeLists.txt"
+   ],
+   "resolution": null
   }
  ]
 }

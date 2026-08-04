@@ -10,7 +10,53 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Earth-like generation: the three-instrument battery, S6's epoch bug, and bands from measurement (2026-08-04, latest)
+## Session — BL-287: one world layer instead of forty-four, and the three bugs it flushed out (2026-08-04, latest)
+
+**The build was the symptom, not the problem.** A verify-tier rebuild was taking 45–90 minutes.
+Cause was one line — `CMakeLists.txt:433` handed every harness `${IO_WORLD_SOURCES}` as its own
+sources, so 44 harnesses × 30 world TUs = **1,320 compilations** of the same files, producing
+byte-identical objects 44 times. Compounded by the default `build/` being single-threaded NMake +
+Debug while a Ninja + Release `build_rel/` already existed and nobody reached for it.
+
+**Fixed by an OBJECT library.** `io_world_obj` compiles the world layer once; the foreach and both
+Lua harnesses link it. Include dir and `cxx_std_20` are PUBLIC so consumers inherit them;
+`IO_WARNING_FLAGS` stays PRIVATE so it does not leak onto a consumer's TU. **1,320 → 30.**
+Full-tier incremental rebuilds now run in 1.5–6.5 s.
+
+**Three latent bugs, one family.** All were code that had baked in the old width of `resource_type`,
+and BL-286's widening 23 → 31 exposed them in sequence:
+
+1. **`market_component`'s `supply`/`demand`/`price`/`base_price` and `tile_component`'s
+   `resource_deposit` carried no initialiser** — every sibling array has `= {}`. They relied on
+   every slot being authored, which held only while the authored set covered the whole enum. The
+   eight new goods kept stack garbage, one decoded as NaN, and it reached
+   `prospective_profit`'s revenue estimate. **Release only** — Debug's fill pattern hid it.
+2. **`econ_bankruptcy`'s `resource_name` guarded on `idx < resource_count` against a 19-entry
+   table** — out of bounds since `resource_count` was 23. The overrun grew to 12 slots, and
+   BL-287's link-order change put it on unmapped memory. Segfault.
+3. **`ui/presentation.cpp`'s `resource_table[resource_count]`** zero-fills new rows, so
+   `resource_name()` returns a **null pointer** every caller hands to `"%s"`. Unreached today only
+   because callers guard on a positive quantity — a protection that expires when BL-287–290 give
+   the goods behaviour.
+
+**Attribution was measured, not assumed.** BL-286's three source files were reverted to the
+pre-merge commit and the failing targets rebuilt: `prospective_profit` passed pre-merge (a real
+regression), the other four failed pre-merge too (pre-existing → BL-288).
+
+**Left open.** BL-288 (four Release-only failures, unexplained — at least `settlement_harness`
+passes in Debug and fails in Release at the same commit). NR-048: a **fresh** configure cannot
+download SDL3 (`unable to check revocation for the certificate`), so a new clone, worktree, or CI
+runner cannot configure at all; existing dirs work from cache, which hides it completely. That also
+means BL-287's from-cold timing is still unmeasured.
+
+**Worktree triage.** Only three branches unmerged, all stale and small; every `worktree-agent-*` is
+already in main. But `next_id` reports **9 in-flight ID collisions** — those three assign
+BL-217/218/219 different meanings than main does, so they need cherry-picking with renumbering,
+never a plain merge.
+
+---
+
+## Session — Earth-like generation: the three-instrument battery, S6's epoch bug, and bands from measurement (2026-08-04)
 
 **Runtime.** ~3h wall across an autonomous stretch. Full (touches `src/world/planetology.cpp` —
 every generated world changes — plus a new measurement section in an existing harness).

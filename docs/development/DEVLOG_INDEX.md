@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 118 entries across 2 volume(s).
+One line per session, newest first — 119 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-08-04 | [BL-287: one world layer instead of forty-four, and the three bugs it flushed out](DEVLOG.md) | BL-217 BL-286 BL-287 BL-288 | DEVLOG.md |
 | 2026-08-04 | [Earth-like generation: the three-instrument battery, S6's epoch bug, and bands from measurement](DEVLOG.md) | BL-167 BL-275 BL-276 | DEVLOG.md |
 | 2026-08-03 | [Io MCP server: BL-278 built and landed](DEVLOG.md) | BL-206 BL-278 BL-279 | DEVLOG.md |
 | 2026-08-03 | [two direction points: invented names, and the governing body](DEVLOG.md) | BL-094 BL-155 BL-156 BL-157 BL-158 BL-271 BL-277 | DEVLOG.md |

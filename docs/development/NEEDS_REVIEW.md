@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*47 entries — 9 open, 38 resolved.*
+*48 entries — 10 open, 38 resolved.*
 
 ---
 
@@ -147,6 +147,21 @@ resolve_preferences' lean::any bands are now the spans tools/verify/earthlike_co
 > **Recommendation:** Option 2 first, on its own, and measure. It is one constant, it directly addresses the finding T3 made most loudly (land 47.9% vs 29%), and the acceptance cost is genuinely irrelevant at 8 microseconds a world. Option 3 is right in principle but changes what a player-facing preference MEANS, which is a design decision rather than a calibration one — and the interior lean is documented as deliberately folded, so unfolding it should be a deliberate reversal, not a side effect of tuning.
 
 *Files: `src/world/planetology.cpp`, `tools/verify/planetology_sweep.cpp`, `tools/verify/earthlike_corridor.cpp`, `tools/verify/earthlike_tile_census.cpp`*
+
+### NR-048 — A fresh CMake configure cannot download SDL3 on this machine
+*observation · raised 2026-08-04 · from Hit while trying to time a from-cold build for BL-287.*
+
+Configuring a brand-new build directory fails in FetchContent_MakeAvailable(SDL3) at CMakeLists.txt:44. The download from codeload.github.com reports "unable to check revocation for the certificate", ninja stops, and configure aborts. Existing build directories (build/, build_rel/) are unaffected because their _deps are already populated.
+
+**Why it matters.** Every current build dir works, so this is invisible day to day — but it means a fresh clone, a new git worktree, or a CI runner cannot configure the project at all. It also blocked the from-cold timing measurement BL-287 wanted, so that number is still unmeasured. Unclear whether this is a transient network condition, a corporate/AV TLS interception, or a change in the certificate chain; it was seen once and not retried later.
+
+- Retry later — it may simply be transient.
+- If persistent: vendor the deps, or point FetchContent at a local cache/mirror, or set CMAKE_TLS_VERIFY/CURLOPT_SSL_OPTIONS appropriately for this machine.
+- Check whether CI is currently affected — if CI provisions fresh dirs, it may already be failing.
+
+> **Recommendation:** Retry a fresh configure once before investigating; if it reproduces, check CI first, since a green local build directory hides this completely.
+
+*Files: `CMakeLists.txt`*
 
 ---
 

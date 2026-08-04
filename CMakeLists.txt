@@ -324,6 +324,28 @@ enable_testing()
 file(GLOB IO_WORLD_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/world/*.cpp")
 list(FILTER IO_WORLD_SOURCES EXCLUDE REGEX "(recipe_registry|tech_tree|world_gen_config)\\.cpp$")
 
+# ---------------------------------------------------------------------------
+# The world layer, compiled ONCE (BL-287)
+# ---------------------------------------------------------------------------
+# Every harness below used to take ${IO_WORLD_SOURCES} directly as sources, so
+# each one compiled the whole world layer from scratch. With 44 harnesses and 30
+# world TUs that is 1,320 compilations of the same 30 files per clean build,
+# producing byte-identical objects 44 times over — measured at 45-90 minutes on
+# the single-threaded default configuration, and paid in full by any edit to a
+# widely-included header (components.hpp, world.hpp).
+#
+# An OBJECT library compiles them once and hands the same objects to every
+# consumer: 1,320 -> 30. Nothing about the harnesses changes; this is only how
+# the objects are produced.
+#
+# PUBLIC include dir + cxx_std_20 so consumers inherit them by linking. The
+# warning flags stay PRIVATE — they apply to compiling the world layer itself,
+# and must not leak onto a consumer's own TU.
+add_library(io_world_obj OBJECT ${IO_WORLD_SOURCES})
+target_include_directories(io_world_obj PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_compile_features(io_world_obj PUBLIC cxx_std_20)
+target_compile_options(io_world_obj PRIVATE ${IO_WARNING_FLAGS})
+
 # pregame_balance_harness is the one harness that genuinely needs a live Lua
 # state: it constructs a `lua_state`, loads scripts/economy.lua + recipes.lua,
 # and calls recipe_registry::load_from_lua (defined in recipe_registry.cpp, the
@@ -336,7 +358,6 @@ list(FILTER IO_WORLD_SOURCES EXCLUDE REGEX "(recipe_registry|tech_tree|world_gen
 # registers it as a CTest test.
 add_executable(pregame_balance_harness
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/pregame_balance_harness.cpp"
-    ${IO_WORLD_SOURCES}
     "${CMAKE_CURRENT_SOURCE_DIR}/src/world/recipe_registry.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/lua_state.cpp"
 )
@@ -344,7 +365,7 @@ target_include_directories(pregame_balance_harness PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
     "${sol2_src_SOURCE_DIR}/include"
 )
-target_link_libraries(pregame_balance_harness PRIVATE lua54)
+target_link_libraries(pregame_balance_harness PRIVATE io_world_obj lua54)
 target_compile_features(pregame_balance_harness PRIVATE cxx_std_20)
 target_compile_options(pregame_balance_harness PRIVATE ${IO_WARNING_FLAGS})
 
@@ -355,14 +376,13 @@ target_compile_options(pregame_balance_harness PRIVATE ${IO_WARNING_FLAGS})
 # then skips it while the unconditional add_test still registers it.
 add_executable(persona_counsel_harness
     "${CMAKE_CURRENT_SOURCE_DIR}/tools/verify/persona_counsel_harness.cpp"
-    ${IO_WORLD_SOURCES}
     "${CMAKE_CURRENT_SOURCE_DIR}/src/scripting/persona_pack.cpp"
 )
 target_include_directories(persona_counsel_harness PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src"
     "${sol2_src_SOURCE_DIR}/include"
 )
-target_link_libraries(persona_counsel_harness PRIVATE lua54)
+target_link_libraries(persona_counsel_harness PRIVATE io_world_obj lua54)
 target_compile_features(persona_counsel_harness PRIVATE cxx_std_20)
 target_compile_options(persona_counsel_harness PRIVATE ${IO_WARNING_FLAGS})
 
@@ -430,7 +450,9 @@ set(IO_TEST_LONG_HARNESSES
 foreach(harness_src ${IO_VERIFY_HARNESSES})
     get_filename_component(harness_name "${harness_src}" NAME_WE)
     if(NOT TARGET ${harness_name})
-        add_executable(${harness_name} "${harness_src}" ${IO_WORLD_SOURCES})
+        # Links io_world_obj rather than recompiling ${IO_WORLD_SOURCES} (BL-287).
+        add_executable(${harness_name} "${harness_src}")
+        target_link_libraries(${harness_name} PRIVATE io_world_obj)
         target_include_directories(${harness_name} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src")
         target_compile_features(${harness_name} PRIVATE cxx_std_20)
         target_compile_options(${harness_name} PRIVATE ${IO_WARNING_FLAGS})
