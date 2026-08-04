@@ -23,7 +23,7 @@ settled.
 | Presentation (biography, dated lines) | settled |
 | Determinism & cost | settled |
 | Implementation (incl. Continents, preferences, checkpoints, verification) | settled |
-| Open calls | open (3, 4, 7, 8, 10 remain) |
+| Open calls | open (3, 7, 8, 10 remain — 4 closed 2026-08-04, ore provinces) |
 | Known weaknesses | recorded — one half-closed 2026-07-30 |
 
 ---
@@ -694,18 +694,38 @@ the New World flow walks them in chain order. **Air** and **Legacy** carry *no* 
 is a consequence of earlier choices, the second is the payoff — and the UI says so rather than
 inventing a knob.
 
-| Stage | Knob | Range |
+The bands below are the **measured always-viable spans**, not authored preferences —
+`earthlike_corridor` swept each axis and these are the spans where every seed clears the homeworld
+gates, widened at the wet end so Earth's own 0.71 ocean fraction stays reachable. Verified against
+`planetology.cpp:321-386` on 2026-08-04. *(This table previously read 0.80–1.20 / 3–9 / 0.40–2.00 /
+0.70–1.50 / 0.40–1.80 / 0.30–0.80 and 0–1 for oxygenation; every row had moved.)*
+
+| Stage | Knob | `any` band (measured) |
 |---|---|---|
-| System | `star_mass`, `system_age_gyr`, `metallicity` | 0.80–1.20, 3–9 Gyr, 0.40–2.00 |
-| Accretion | `home_mass` | 0.70–1.50 M⊕ |
+| System | `star_mass` | 0.60–1.50 M☉ |
+| System | `system_age_gyr` | 2.12–9.02 Gyr, **then capped by the star** |
+| System | `metallicity` | 0.30–2.20 |
+| Accretion | `home_mass` | 0.66–1.48 M⊕ |
 | Air | — *(consequence)* | |
-| Engine | `radiogenic` | 0.40–1.80 |
-| Water | `home_ocean` | 0.30–0.80 |
+| Engine | `radiogenic` | 0.57–1.73 |
+| Water | `home_ocean` | 0.40–0.75 |
 | Spark | `abiogenesis_ease` | 0–1 |
-| Breath | `oxygenation` | 0–1 |
+| Breath | `oxygenation` | 0.30–0.91 |
 | Green | `coal_climate` | 0–1 |
 | Legacy | — *(payoff)* | |
 | Spend | `drawdown` | 0–0.95 |
+
+**The age band is not free — the star caps it.** Main-sequence lifetime goes as `10 / (M² · √M)`, so
+a 1.5 M☉ star lives ~3.6 Gyr, and a system cannot be older than the star lighting it. The cap is
+applied after the lean's band is picked (`age_band.hi = min(hi, t_ms)`). If the ask is contradictory
+— a bright star *and* an ancient system — the star wins, being the harder physical limit, and the
+biography says so rather than the generator silently ignoring the request.
+
+That cap is also what finally gave `star` a job. T5 measured it **inert on all ten tile metrics**,
+which this doc elsewhere called "exactly right"; it was not — a knob the player can move that
+changes nothing is a dead control. Now a brighter star forces a younger system, a younger system has
+a shorter biosphere window, and through the age × radiogenic ridge the pair atlas mapped, that buys
+a leaner fossil endowment. Eclipse geometry is its second job.
 
 **`radiogenic` is deliberately independent of `metallicity`** — U and Th come from rare r-process
 events, so a metal-rich system is not automatically a geologically active one. Keeping them separate
@@ -800,11 +820,20 @@ interior 2.57 / 1.12 / 1.19    coal_basins   1.24 / 1.24 / 1.24
 metal 1.24 / 1.24 / 1.24       drawdown      1.24 / 1.24 / 1.24
 ```
 
-`star`, `metal`, `coal_basins` and `drawdown` cost nothing at any lean — they are pure character
-axes with no viability consequence, which is exactly right. The worst is `interior = old and cold` at
-2.57 draws, and that cost is **physically honest**: an old, radiogenically poor world loses its
-mobile lid, so the second oxygenation never fires and it stalls at a Boring Billion. The reroll
-absorbs it rather than the model hiding it.
+> **⚠ These figures are stale — superseded 2026-08-04, not re-measured here.** Three commits moved
+> them: `1a69621` (wizard bands become the measured spans), `fed808`/`fed8db` (arable floor) and
+> `5360ce5` (the star's age cap). Re-run `earthlike_lean_trace` before quoting any number in this
+> block. Two conclusions did change direction and are worth stating:
+>
+> - **`interior = high` is now the worst lean, at ~2.97 draws** — not `interior = low` at 2.57.
+> - **"`star` costs nothing … which is exactly right" was the wrong reading.** A knob that costs
+>   nothing *and* changes nothing is inert, not free; T5 measured `star` at 0.00 on all ten tile
+>   metrics and it was treated as a defect. It now caps system age (see § the knob table).
+
+`metal`, `coal_basins` and `drawdown` cost nothing at any lean — they are pure character axes with
+no viability consequence. Where a lean *does* cost draws, the cost is **physically honest**: an old,
+radiogenically poor world loses its mobile lid, so the second oxygenation never fires and it stalls
+at a Boring Billion. The reroll absorbs it rather than the model hiding it.
 
 ### Checkpoints — branch decisions as a first-class record (BL-217)
 
@@ -925,15 +954,22 @@ case in the harness. This is expected — one living world is the intended shape
    — it is the flux for iron smelting and the binder for all masonry, and without it the carbonate
    half of the thermostat has nowhere to go. Each addition shifts `resource_count` and every
    `std::array` width in the model.
-4. **Provinces or global scalars.** A body-level "1.4× copper" smears evenly and reads as noise. Real
-   ore is province-scale — the Hamersley is *one* basin, a handful of tiles at any resolution. 2–5
-   seeded province records would be the single biggest legibility gain available, but it is a genuine
-   new Pass 6 concept.
+4. ~~**Provinces or global scalars.**~~ **Closed — ore provinces landed 2026-08-04 (`613b78a`).**
+   The concern was right: a body-level "1.4× copper" smears evenly and reads as noise, where real ore
+   is province-scale. Tile Pass 6 now seeds `ore_province` records (`provinces_for`, `province_field`
+   in `tile_generation.cpp`) and redistributes a large share of each world's total into 2–3 of them:
+   copper 65%, petroleum 60%, iron 55%, coal 45%.
+
+   One implementation note worth keeping, because the measurement caught it: **conservation is over
+   the resource's *bearing set*, not over all land.** Conserving across land drained petroleum by 47%,
+   since most land bears none of it — the province took its share from tiles that never had any.
 5. ~~**`deposit_scalar` ownership.**~~ **Settled in implementation (marked resolved 2026-07-31):**
-   the two levers are **two sequential pure post-multiplies** in tile Pass 6 — BL-114's
-   `deposit_scalar` first, then this pass's per-resource `endowment` — and neither draws RNG, so
-   each is bit-exact at its identity value and sparse/lean/standard stays interpretable as a
-   flat tier over whatever the endowment shaped. See `generate_body_tiles`
+   the levers are **pure post-multiplies** in tile Pass 6, and none draws RNG, so each is bit-exact
+   at its identity value and sparse/lean/standard stays interpretable as a flat tier over whatever
+   the endowment shaped. **There are now three, not two** (updated 2026-08-04): BL-114's
+   `deposit_scalar`, then this pass's per-resource `endowment`, then the **ore-province field**
+   (open call 4). The province multiply is skipped entirely when `pl == nullptr`, which is what
+   keeps the identity contract intact for bodies with no planetology. See `generate_body_tiles`
    (`tile_generation.cpp`) and `TILE_GENERATION.md` § Post-multiplies. Original concern kept:
    BL-114's per-body abundance multiplier already exists with the same semantics this pass
    claims; two independent levers multiplying risked making the tiers uninterpretable.
@@ -984,9 +1020,15 @@ Recorded so nobody later mistakes design choices for derived physics.
   hangs on; whether liquid water is strictly required for mobile-lid tectonics (a modelling
   convenience that reproduces Venus, not an established result); the fire minimum; and the abiogenesis
   probability. **The report screen must not imply more certainty than exists.**
-- **The homeworld corridor's width is unmeasured.** Whether the endowment genuinely varies several-fold
-  inside a corridor that guarantees success is an empirical question about a distribution nobody has
-  sampled. For a seeded generator, that measurement *is* part of the deliverable.
+- ~~**The homeworld corridor's width is unmeasured.**~~ **Measured 2026-08-04.** The point stood —
+  for a seeded generator the measurement *is* part of the deliverable — so it was built:
+  `earthlike_corridor` sweeps each axis (65 steps × 128 seeds), with `earthlike_pairs`,
+  `earthlike_tile_census` and `earthlike_lean_trace` alongside. The corridor is now the *source* of
+  the wizard's `any` bands rather than an open question about them.
+
+  The finding that changed the model: **the sampling bands, not the viability floor, are the
+  specification of Earth.** Ten of the fourteen floor clauses never fire. The floor was doing much
+  less work than it appeared to, and the bands were doing all of it.
 - **The depletion inversion is a design assertion dressed as a finding.** Historically suggestive, but
   the constants are free parameters chosen for tension.
 - **The pass hands nothing to nation or corporation generation — now half-closed (2026-07-30,
