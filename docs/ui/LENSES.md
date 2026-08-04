@@ -371,15 +371,23 @@ genuinely multiple centres (from capitals / population centres — owed, follows
 layer, OPENS § Trade), this lens should tint **each market's catchment** rather than the whole
 body, regaining a spatial per-market surface.
 
-## Per-lens selection validity & routing (settled 2026-06-15, [F4])
+## Per-lens selection validity & routing — **designed, not built**
 
-The active lens does not only re-skin the canvas — it also **defines what the pointer resolves
-to**. Each lens answers "what is the meaningful target under this pointer?" differently, so the
-same position resolves to a different entity (and routes to a different ledger) per lens. The
-Selection element walks the kind stack (SELECTION.md) and returns the first entity this lens calls
-valid:
+> **Status (2026-08-04).** This section describes a resolver that **does not exist**. No selection
+> code reads `state.overlay`: `body_surface_canvas.cpp` hit-tests markers (building outranks market
+> centre) and otherwise takes the tile under the pointer, with a built tile resolving to its
+> building — identically under every lens. The overlay is read further up the same file only to
+> draw the lens *key*. The claim had also propagated into eight `lens.*` entries in
+> `docs/ai/ACTIONS.json`; those were corrected in the same pass.
+>
+> **What is true today:** the lens changes what is *drawn*, never what a click *selects*.
 
-| Lens | Valid target under the pointer | Routes selection to |
+The design below stands as a design (settled 2026-06-15, [F4]) — it is a good idea and worth
+building; it is simply not the behaviour. Its premise: the active lens should not only re-skin the
+canvas but **define what the pointer resolves to**, each lens answering "what is the meaningful
+target under this pointer?" in its own terms.
+
+| Lens | Valid target under the pointer | Would route selection to |
 |---|---|---|
 | **none** | the lowest drawn entity (marker, else tile) | Tile Ledger |
 | **Corporation** | the **owning corporation** of the tile/building | Balance Ledger |
@@ -392,11 +400,12 @@ valid:
 | **Industry** | the tile (no dedicated ledger route; falls through to the tile) | Tile Ledger |
 | **Supply** *(Layer 5)* | the **route segment / stockpile** under the pointer | (Supply surface) |
 
-A lens skips kinds it does not validate: under the Corporation lens a hovered *building* resolves
-*through* to its owning corporation, not to the building, because the corporation is the lens's
-unit of meaning. Under no lens that same building resolves to itself. This is the per-lens
-*validity* function the resolution rule consumes; the gating on data/geometry per lens (Market,
-Supply) applies here too — a lens whose data does not yet exist contributes no valid target.
+Under the design a lens skips kinds it does not validate: beneath the Corporation lens a hovered
+*building* would resolve *through* to its owning corporation, because the corporation is that
+lens's unit of meaning. Note the two rows that already match reality — **none** and **Industry**
+both describe the lens-agnostic fall-through, which is why they read as correct today.
+
+If this is ever built, it needs a backlog item; it does not have one.
 
 ## Resource lens *(built 2026-06-17 — no data dependency)*
 
