@@ -2,7 +2,7 @@
 
 > **Working design doc** for the ledger-mockup pass (Power BI). Strawman answers — Ben revises.
 > Menu slot: `selection-driven / not in rail` · Source: `src/ui/selection_panel.cpp` · Mock table(s): `none (all live)` · Related: `BL-093, BL-071, BL-074, BL-067, BL-089, BL-068, BL-122, BL-123`
-> Host: shell fold-out column (BL-122), ~480px @1720.
+> Host: shell fold-out column (BL-122), ~380px @1720 (derived — `shell_column_width(disp.x)`, 380–460 by resolution).
 
 ## 1. Top question — the one thing this answers at first glance
 **"What's my move on the thing I just clicked?"** This is the opposite of a ledger: not exhaustive reference reached from the rail, but a decision prompt that appears *because* the player selected something. It is polymorphic by selection **kind** (tile / body / building / market / unit / nation / corporation), and each kind leads with ONE hero **action** (`draw_selection_action`), backed by a slim line of decision-relevant **facts** (`draw_selection_facts`), plus a `[>]` 'go to' into the deep ledger where the encyclopedic detail lives. Secondary question per kind: *"what do I need to know to make that move?"* — the tile's suitability, the building's profitability, the body's commercial pulse.

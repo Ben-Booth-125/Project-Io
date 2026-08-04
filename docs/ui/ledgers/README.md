@@ -10,7 +10,7 @@ in `backlog.json`) → implemented to Ben's Power BI mockups. These docs are the
 authority; `backlog.json` becomes authority once items are minted.
 
 ## Settled decisions these docs honour (this session)
-- **Column host** — every ledger draws into the shell fold-out column (BL-122), widened to ~480px @1720;
+- **Column host** — every ledger draws into the shell fold-out column (BL-122), widened to ~380px @1720 (derived — `shell_column_width(disp.x)`, 380–460 by resolution);
   splits into one-question-per-view tabs (`ui::nav_button`).
 - **Economy = aggregate-only** — Corporation and Market are the drill-downs; no two surfaces answer the
   same question.

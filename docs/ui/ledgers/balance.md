@@ -2,14 +2,21 @@
 
 > **Working design doc** for the ledger-mockup pass (Power BI). Strawman answers — Ben revises.
 > Menu slot: `rail slot 2 "Budget"` · Source: `src/ui/balance_ledger.cpp` · Mock table(s): `cashflow.csv`, `player_timeseries.csv` · Related: `BL-072` (cashflow/runway), `BL-118` (Treasury/Cashflow/Assets split), `BL-122` (fold-out host)
-> Host: shell fold-out column (BL-122), ~480px @1720.
+> Host: shell fold-out column (BL-122), ~380px @1720 (derived — `shell_column_width(disp.x)`, 380–460 by resolution).
 
 ## 1. Top question — the one thing this answers at first glance
 **"Am I solvent, and how long do I have?"** The first-glance read is the balance figure (colour-coded pos/neg) and the projected **runway** in quarters at current burn. Everything else on the surface is the supporting decomposition: *what moved the balance last tick* (the signed cashflow lines — income, inputs, maintenance, wages, interest, net) and *what I own* (building count). Secondary questions that justify sub-views: **why** is my net what it is (line-item cashflow), and **how did I get here** (the balance/income/expenditure trend over ticks, which the code does not yet render but `player_timeseries.csv` exists to feed).
 
 ## 2. Sub-levels — views & default
 
-Code today is **one flat panel** with three `SeparatorText` sections (Treasury / Cashflow / Assets) stacked in a single scroll — BL-118's "split" is currently a visual grouping, **not** nav_button tabs. Proposed one-question-per-view tabs for the fold-out:
+> **Three corrections against code, 2026-08-04.** (1) There are **two** `SeparatorText` sections,
+> not three — *Assets* and *Top buildings by profit*. (2) **Runway is not on this surface** —
+> `grep runway balance_ledger.cpp` returns nothing, so § 1's "the first-glance read is the
+> projected runway" is aspirational; the runway readout lives in the header (BL-177). (3) **There
+> is no Corporation combo and no `selected_corp`** — BL-142 pinned the surface to the player, which
+> also settles the open question in § 6: Budget is player-only.
+
+Code today is **one flat panel** with `SeparatorText` sections stacked in a single scroll — BL-118's "split" is a visual grouping, **not** nav_button tabs. Proposed one-question-per-view tabs for the fold-out:
 
 | View | Answers (one question) | Content |
 |---|---|---|
@@ -19,7 +26,7 @@ Code today is **one flat panel** with three `SeparatorText` sections (Treasury /
 | **Assets** | What do I own that generates this? | Buildings-owned count today; proposed to grow into a by-type / by-body asset roll-up |
 
 **Default view on open:** Treasury (the solvency read is the reason to open Budget).
-**Cross-cutting selectors (NOT views, exempt from toggle rule):** the **Corporation combo** (`selected_corp`, defaults to `w.player_entity`). Note this makes Budget technically viewable for any corp — see Open Questions; if Budget is strictly player-money, the combo is redundant.
+**Cross-cutting selectors (NOT views, exempt from toggle rule):** **none.** *(This described a Corporation combo on `selected_corp`; neither exists — BL-142 pinned the surface to the player. Corrected 2026-08-04.)*
 
 ## 3. Lens on open
 **None.** This is the one ledger that is genuinely about *your money*, not a map field — balance, burn, and runway have no per-body or per-tile spatial expression to arm. Opening Budget should leave `overlay_mode` as-is rather than force a lens. The nearest candidate is the **corporation** lens (identity-colour the map by owning corp), but that answers "who is where," not "how is my money" — it belongs to the Corporation dashboard, not here. If Ben wants the "opening a menu arms a lens" default honoured, **corporation** is the only defensible pick, and only when the Corporation combo is off the player (i.e. you're inspecting a rival's money and want to see their footprint). Recommend: **none**, fixed.

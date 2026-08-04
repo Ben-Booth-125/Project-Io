@@ -2,7 +2,7 @@
 
 > **Working design doc** for the ledger-mockup pass (Power BI). Strawman answers — Ben revises.
 > Menu slot: `nav rail slot 5` · Source: `src/ui/market_ledger.cpp` · Mock table(s): `markets.csv`, `stockpiles.csv` · Related: `BL-063` (trends), `BL-122` (fold-out host), `BL-078/BL-079` (pool→market drain)
-> Host: shell fold-out column (BL-122), ~480px @1720.
+> Host: shell fold-out column (BL-122), ~380px @1720 (derived — `shell_column_width(disp.x)`, 380–460 by resolution).
 
 ## 1. Top question — the one thing this answers at first glance
 **"For the market I'm looking at, what's each resource's supply/demand/price right now, and where's it tight?"** The default lands on a single market's per-resource board (the `##market_detail` table today: Resource / Supply / Demand / Price / Net, colour-keyed by scarcity). The secondary questions that earn the other views: **where does trade concentrate** across a body's multiple markets (Kepler has 5 — the `##market_dash` turnover table), and **which way is a resource's price/supply/demand moving** over the last ticks (the `draw_plot` trends block, BL-063). Each is a distinct question, so each is its own view rather than the current single stacked scroll.

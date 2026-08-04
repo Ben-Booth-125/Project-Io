@@ -35,9 +35,13 @@ per tick) are the trend tables for line charts — `market_prices` is what feeds
 **`market_label` is the generated city name.** Each market resolves to the procedural name of the
 population centre anchoring its `centre_tile` (`world::population_centre_name`, assigned by
 `generate_population_centres` from an independent seeded stream — see the city-naming feature). The
-market ledger's second selector and this column share `ui::market_city_name`. There are **5 markets on
-Kepler** (one per major population centre — e.g. Kynrdton, NuneKrenton, Thear City), so the body →
-market cascade has real, named options.
+market ledger's second selector and this column share `ui::market_city_name`. Kepler carries several
+markets, one per major population centre, so the body → market cascade has real, named options.
+
+*Deliberately not stating the count or the names here (corrected 2026-08-04): the fixture is
+re-blessed whenever generation moves, and the previously-pasted "5 markets … Kynrdton, NuneKrenton,
+Thear City" had gone stale on both. Read `markets.csv` — it now carries a `market_id` column, so the
+distinct markets are countable directly.*
 
 ## Caveats (design inputs, not data bugs)
 

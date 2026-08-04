@@ -2,20 +2,25 @@
 
 > **Working design doc** for the ledger-mockup pass (Power BI). Strawman answers — Ben revises.
 > Menu slot: `rail slot 6` · Source: `src/ui/construction_panel.cpp` · Mock table(s): `buildings.csv` · Related: `BL-122`, `BL-029` (queue backend), `BL-044` (material build cost), `BL-123` (selection resize)
-> Host: shell fold-out column (BL-122), ~480px @1720.
+> Host: shell fold-out column (BL-122), ~380px @1720 (derived — `shell_column_width(disp.x)`, 380–460 by resolution).
 
 ## 1. Top question — the one thing this answers at first glance
 **"What can I build right now, and what will it cost me?"** — the placement affordance. Opening Construction should put the player one click from arming a building type and reading its cost (cash + materials, per `reg.economics()`). The secondary questions that justify the tabs: **"How do I configure the buildings I already have?"** (workforce %, recipe, decommission — the Manage tab) and **"How do I sell what those buildings make?"** (per-body sell orders — the Sell Orders tab). These are three genuinely different verbs (place / configure / sell), which is exactly why the 2026-07-06 redesign split the old single scrolling column into tabs.
 
 ## 2. Sub-levels — views & default
 
-| View | Answers (one question) | Content (live in code today) |
-|---|---|---|
-| **Build** | "What can I place, and what's it cost?" | Three arm-buttons (Extraction Site / Processing Facility / Port); for extraction, a `placement_rules::k_extractable` target picker; live cost readout (`build_cost` cr + `resource_build_cost[]` materials); "click a tile to build". Plus a **Queue** subsection — **placeholder only** (`any_items = false`, BL-029 owed). |
-| **Manage** | "How do I configure the thing I have?" | Resolves the selected building (by building-id, falling back to tile-match); shows type/target/recipe/build-cost/maintenance; **live** workforce slider (0–200%), recipe combo (when >1 recipe), Decommission button. |
-| **Sell Orders** | "How do I sell what I make?" | Per-body sell-order list for the player corp (resource ×qty ≥ floor); add/remove; reads the body's `market_component`. Flagged in-code as a **candidate to move to the Market ledger** later. |
+> **The tabs are now Construction / Buildings** (`construction_panel.cpp:553-555`), defaulting to
+> **Buildings**. The three views below were the pre-BL-162 shape: Build became **Construction**,
+> Manage folded into **Buildings**, and Sell Orders **moved to the Market ledger** — exactly the
+> relocation this doc flagged as a candidate. Corrected 2026-08-04.
 
-**Default view on open:** `Build` (`panel_view == 0`, the placement affordance — the reason you opened Construction).
+| View | Answers (one question) | Content |
+|---|---|---|
+| **Construction** *(was Build)* | "What can I place, and what's it cost?" | Arm-buttons per building class; for extraction, a `placement_rules::k_extractable` target picker; live cost readout (`build_cost` cr + `resource_build_cost[]` materials); "click a tile to build". **The queue is real** since BL-162 — durative, material-gated, and it survives a build; the "placeholder only, `any_items = false`" note is superseded. |
+| **Buildings** *(default; was Manage)* | "How do I configure what I have?" | Per-building rows with type/target/recipe/build-cost/maintenance; workforce slider (0–200%), recipe combo (when >1 recipe), Decommission. |
+| ~~Sell Orders~~ | — | **Moved to the Market ledger**, which now carries a Sell Orders tab of its own. |
+
+**Default view on open:** **Buildings** — what you own, not what you might place. *(Was `Build`.)*
 **Cross-cutting selectors that are NOT views (toggle-exempt):** the extraction **target** resource picker (Build), the **recipe** combo and **workforce** slider (Manage), and the **body / resource** combos (Sell Orders). None of these are sub-views; they're in-view selectors.
 
 ## 3. Lens on open

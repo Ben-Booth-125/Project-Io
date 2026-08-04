@@ -2,7 +2,7 @@
 
 > **Working design doc** for the ledger-mockup pass (Power BI). Strawman answers — Ben revises.
 > Menu slot: `NOT IN RAIL (currently orphaned — see §5 / open questions)` · Source: `src/ui/economy_panel.cpp` · Mock table(s): `player_timeseries.csv, cashflow.csv, workforce.csv, buildings.csv, corporations.csv` · Related: `BL-117, BL-122, BL-123, BL-078/079`
-> Host: shell fold-out column (BL-122), ~480px @1720.
+> Host: shell fold-out column (BL-122), ~380px @1720 (derived — `shell_column_width(disp.x)`, 380–460 by resolution).
 
 > **Lead decision — does Economy survive as a distinct surface?** Before the four-tab shape below is taken as the target, note the overlap this pass surfaced: as currently drafted, Economy **substantially re-implements Balance + Corporation**. Its **Cashflow** view duplicates the Balance ledger's Cashflow tab *exactly* (same `cashflow.csv`, same six lines, same player corp `30310`); its **Standing** corp-rank duplicates Corporation's **Standings**; and §2 already drops Holdings→Corporation and Markets→Market. Strip those and what is genuinely *aggregate-only* — neither a single corp's ledger nor a single market's board — is thin: the **Sector composition bar** and **Workforce**. That thinness is exactly why open-Q (B) *"fold Economy into Corporation"* is live. **Read this doc as the "does Economy earn its own rail slot" decision first, and the four-tab layout as the strawman that mostly loses to Balance + Corporation second.**
 
