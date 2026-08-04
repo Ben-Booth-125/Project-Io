@@ -106,7 +106,10 @@ const knob k_knobs[] = {
       "tectonic heat -> theta -> mobile lid" },
     { "system_age_gyr", &planetology_params::system_age_gyr, 1.00f,10.00f, 2.12f, 9.02f,
       "enters twice, with opposing signs" },
-    { "home_ocean",     &planetology_params::home_ocean,     0.20f, 0.85f, 0.40f, 0.68f,
+    // home_ocean is INTENTIONALLY wider than its always-viable span (NR-047):
+    // Earth's own 0.71 sits above that span, so this axis is expected to report
+    // "band REACHES past the always-viable span". That verdict is correct here.
+    { "home_ocean",     &planetology_params::home_ocean,     0.20f, 0.85f, 0.40f, 0.75f,
       "land fraction -> arable share" },
     { "home_mass",      &planetology_params::home_mass,      0.50f, 2.00f, 0.66f, 1.48f,
       "gravity, and the mass term in theta" },

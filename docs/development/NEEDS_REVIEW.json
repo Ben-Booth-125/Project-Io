@@ -975,7 +975,7 @@
    "title": "Wizard bands set from measured always-viable spans — two consequences that were mine, not measured-away",
    "raised": "2026-08-04",
    "kind": "decision-taken",
-   "status": "open",
+   "status": "resolved",
    "source": "Ben, 2026-08-04: \"Let's change the band to always viable, and move onto T3.\" The instruction was clear; the specific numbers, the lean re-partitioning, and how to handle two side effects were mine.",
    "what": "resolve_preferences' lean::any bands are now the spans tools/verify/earthlike_corridor.cpp measures at 100% viability (65 steps x 128 seeds, other params at Sol defaults), with each lean re-partitioned into thirds of its new span and the age inversion (low = old) preserved. Headline result is good and unusual: acceptance AND variety both rose — 78.4% -> 81.4%, with coal spread x6.99 -> x10.79, copper x2.72 -> x5.84, iron x1.82 -> x2.59. TWO CONSEQUENCES I RECORDED RATHER THAN FIXED. (1) interior=high is now the worst lean at 2.97 draws (was 1.84). The corridor measures one knob at a time, so its spans do not compose: young age and high radiogenic are each individually always-viable but together push theta past the GOE gate's present-day 2.4 ceiling. This is the SAME compounding fold that caused the original interior=low problem, arriving from the other end — the interior lean moves two parameters that both act on theta. (2) home_ocean's always-viable span 0.40-0.68 EXCLUDES Earth's own 0.71 ocean fraction, which the previous 0.42-0.72 band did reach. Optimising a band for \"always viable\" trimmed the wet end and moved the distribution further from Earth, and T3's tile census then measured land at 47.9% of surface against Earth's 29%.",
    "why_it_matters": "Consequence (2) is the conceptually interesting one: \"always viable\" and \"Earth-like\" are not the same objective, and this is the first place the project has had to notice the difference. The wet end of the ocean range rejects sometimes (arable share falls), so optimising for acceptance trims exactly the part of the range Earth actually occupies. If the aim is recognisably-Earth homeworlds rather than cheap ones, the band arguably wants to reach 0.75 and accept the rerolls — generation is ~8 microseconds per world, so the reroll is free. Consequence (1) matters because the interior fold has now produced a wart twice; the underlying issue is that one player-facing preference drives two parameters that both push theta the same way, and no band arithmetic fixes that.",
@@ -992,7 +992,7 @@
     "tools/verify/earthlike_corridor.cpp",
     "tools/verify/earthlike_tile_census.cpp"
    ],
-   "resolution": null
+   "resolution": "RESOLVED 2026-08-04 by Ben (\"do NR-047 then pass 5\"). home_ocean widened from the\nalways-viable span 0.40-0.68 to the floor edge 0.40-0.75, leans re-partitioned into thirds.\nEarth's own 0.71 ocean fraction is reachable again.\n\nAND THE MEASUREMENT SAYS IT BARELY MATTERS, which is the useful part. Acceptance fell\n81.4% -> 70.5% and arable rejections rose 11.9% -> 44.4% of rejects, but land fraction moved\nonly 47.9% -> 46.5% median. The wet worlds are drawn and then thrown away: ocean p95 reached\njust 68.96, barely past the old 0.68 cap.\n\nThe binding constraint was never the band. It is the arable floor - see NR-049. Change kept\nanyway: a homeworld generator whose sampling range excludes Earth is mistuned regardless of\nwhat else gates it, and the 11% acceptance costs ~8 microseconds a reroll.\n\nThe interior=high composition cost recorded in this entry is unaddressed and stands."
   },
   {
    "id": "NR-048",
@@ -1011,6 +1011,28 @@
    "recommendation": "Retry a fresh configure once before investigating; if it reproduces, check CI first, since a green local build directory hides this completely.",
    "files": [
     "CMakeLists.txt"
+   ],
+   "resolution": null
+  },
+  {
+   "id": "NR-049",
+   "title": "The arable floor is a hard ocean cap at 0.714, and Earth clears it by 0.4%",
+   "raised": "2026-08-04",
+   "kind": "question",
+   "status": "open",
+   "source": "Found measuring NR-047: widening the ocean band did not move land fraction, so something downstream was rejecting the wet worlds.",
+   "what": "homeworld_viability requires arable_share >= 0.08, and arable_share = land_frac * (0.28 - (o2 - 0.21) * 0.45) * (mobile_lid ? 1.0 : 0.72). Solve it: even in the BEST case (oxygen exactly 21%, mobile lid) the floor caps ocean fraction at 1 - 0.08/0.28 = 0.7143. Earth is 0.71. Worked cases: Earth with a mobile lid and 21% O2 gives arable 0.0812 and PASSES by 1.5%; the same world with a stagnant lid gives 0.0585 and is REJECTED; the same world at 23% oxygen gives 0.0786 and is REJECTED; at 25% oxygen, 0.0760, REJECTED.",
+   "why_it_matters": "Two things. First, the clause does not do what it says. It reads as \"a climate people can farm in\", but mechanically it is a hard ceiling on ocean fraction — and the ceiling sits 0.4% above Earth. Second, it explains the whole shape of T3: generated worlds sit at 46-48% land against Earth's 29% not because the ocean band is wrong (that is now fixed) but because anything wetter than Earth is unreachable by construction. The generator cannot produce an ocean world, and can only produce Earth itself in the corner where oxygen is at the low end and the lid happens to be mobile.",
+   "options": [
+    "Lower the floor from 0.08 to ~0.06. Ocean ceiling moves to 0.786, Earth sits comfortably inside instead of on the edge, and ocean-heavy homeworlds become possible.",
+    "Keep the floor and rescale the 0.28 coefficient, if the intent is that arable share should be a larger fraction of land.",
+    "Accept it, and state plainly in PLANETOLOGY.md that Io homeworlds are drier than Earth by design — the floor is a playability constraint (enough land to build on), not a realism one.",
+    "Split the concern: keep a low absolute arable floor for playability, and let ocean fraction be governed by its own clause so the two stop being entangled."
+   ],
+   "recommendation": "Option 1 as the cheap move — it is one constant, it puts Earth inside the envelope rather than on its edge, and T3 can measure the result immediately. But option 3 is a legitimate answer too: if the real requirement is \"the player must have somewhere to build\", then a drier-than-Earth homeworld is a deliberate game-design choice and should be written down as one rather than left looking like a miscalibration. What should not stand is the current position, where a realism-shaped formula is silently enforcing a gameplay constraint nobody wrote down.",
+   "files": [
+    "src/world/planetology.cpp",
+    "docs/generation/PLANETOLOGY.md"
    ],
    "resolution": null
   }

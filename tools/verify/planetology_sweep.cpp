@@ -174,7 +174,7 @@ drawn replay_draw(const world_preferences& pref, uint32_t seed, uint32_t k)
 
     // --- Round B: Life ---
     p.home_ocean = draw(rb, pick(pref.ocean,
-        {0.40f, 0.68f}, {0.40f, 0.49f}, {0.49f, 0.59f}, {0.59f, 0.68f}));
+        {0.40f, 0.75f}, {0.40f, 0.52f}, {0.52f, 0.63f}, {0.63f, 0.75f}));
     p.oxygenation = draw(rb, pick(pref.oxygen_story,
         {0.30f, 0.91f}, {0.30f, 0.50f}, {0.50f, 0.71f}, {0.71f, 0.91f}));
     p.coal_climate = draw(rb, pick(pref.coal_basins,

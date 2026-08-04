@@ -342,8 +342,22 @@ resolved_world resolve_preferences(const world_preferences& pref, uint32_t seed)
         w.home_orbit_au = std::sqrt(l) * ra.range(0.985f, 1.400f);
 
         // --- Round B: Life ---
+        // OCEAN IS THE ONE BAND DELIBERATELY WIDER THAN ITS ALWAYS-VIABLE SPAN
+        // (NR-047, 2026-08-04). Every other band above is the span the corridor
+        // measures at 100% viability. Ocean is not, because "always viable" and
+        // "Earth-like" turn out to be different objectives here: the wet end
+        // rejects sometimes (more ocean -> less land -> arable share falls), so
+        // optimising for acceptance trimmed the range at 0.68 — and Earth's own
+        // ocean fraction is 0.71. A homeworld generator that cannot draw Earth
+        // is mistuned, whatever its acceptance rate.
+        //
+        // So the band now runs to the floor's own edge (homeworld_viability
+        // rejects above 0.75) and the rerolls are simply paid. A world costs
+        // ~8 microseconds to generate; buying a recognisably Earth-like ocean
+        // with a few extra draws is the trade this project has always made
+        // — constrain the inputs, never clamp the outputs.
         p.home_ocean = draw(rb, pick(pref.ocean,
-            {0.40f, 0.68f}, {0.40f, 0.49f}, {0.49f, 0.59f}, {0.59f, 0.68f}));
+            {0.40f, 0.75f}, {0.40f, 0.52f}, {0.52f, 0.63f}, {0.63f, 0.75f}));
         p.oxygenation = draw(rb, pick(pref.oxygen_story,
             {0.30f, 0.91f}, {0.30f, 0.50f}, {0.50f, 0.71f}, {0.71f, 0.91f}));
         // coal_climate is viable across its whole range, so its band is already
