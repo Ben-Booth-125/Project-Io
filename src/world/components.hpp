@@ -148,7 +148,10 @@ struct tile_component
     int        grid_y;    ///< Row index within the body's tile grid.
     terrain_composition composition; ///< Material character (geology/ecology).
     terrain_landform    landform;    ///< Physical shape (elevation/slope).
-    std::array<float, resource_count> resource_deposit; ///< Fixed deposit **richness** per resource type (the extraction rate multiplier).
+    /// Fixed deposit **richness** per resource type (the extraction rate multiplier).
+    /// Value-initialised for the same reason as market_component's arrays below: a
+    /// resource no generation rule authors must read as zero, not as stack garbage.
+    std::array<float, resource_count> resource_deposit = {};
 
     /// Finite depletion reserve per resource type. **Live** — extraction draws this
     /// down each tick (run_extraction, economy_system.cpp): richness sets the rate,
@@ -341,10 +344,18 @@ struct market_component
     /// `null_entity` = unanchored: a body with a single market routes to it
     /// regardless of centre (the degenerate, behaviour-preserving case).
     entity_id centre_tile = null_entity;
-    std::array<float, resource_count> supply;
-    std::array<float, resource_count> demand;
-    std::array<float, resource_count> price;      ///< Current resolved price; set to base_price until first tick.
-    std::array<float, resource_count> base_price; ///< Rarity-derived floor; authored at world creation.
+    // VALUE-INITIALISED DELIBERATELY (2026-08-04). These four carried no
+    // initialiser and relied on every slot being written at world creation.
+    // That held only while the authored resource set covered the whole enum:
+    // BL-286 added eight goods nothing authors yet, so their slots kept
+    // whatever was on the stack — which surfaced as a NaN price propagating
+    // into prospective_profit's revenue estimate, in Release only (Debug
+    // fills fresh allocations with a pattern and hid it). An unauthored
+    // resource must read as zero, not as garbage.
+    std::array<float, resource_count> supply = {};
+    std::array<float, resource_count> demand = {};
+    std::array<float, resource_count> price = {};      ///< Current resolved price; set to base_price until first tick.
+    std::array<float, resource_count> base_price = {}; ///< Rarity-derived floor; authored at world creation.
 };
 
 /// A player-authored standing sell order — the manual side of the market. Each
