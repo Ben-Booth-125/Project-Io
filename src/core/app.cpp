@@ -33,6 +33,7 @@
 #include "ui/selection_card.hpp"
 #include "ui/selection_panel.hpp"
 #include "ui/solar_system_canvas.hpp"
+#include "ui/star_map_view.hpp"
 #include "ui/tech_tree_panel.hpp"
 #include "ui/tile_inspector.hpp"
 #include "ui/view_nav.hpp"
@@ -2614,7 +2615,12 @@ void app::render()
         {
             case canvas_level::solar:
                 ui::draw_solar_system_canvas(m_world, m_ui, {0.0f, 0.0f}, disp, primary_input, false);
-                // No rung above solar — the minimap is game branding (game name).
+                // No CANVAS rung above solar, but there is a rung: the galaxy the
+                // system sits in. Replaces the flat branding fill MINIMAP.md
+                // § The top rung recorded as a placeholder. Fixed and authored —
+                // every campaign is a different world under the same sky.
+                ui::draw_star_map(inset_origin, inset_size);
+                mm_title = "The Sky";
                 break;
 
             case canvas_level::circumplanetary:

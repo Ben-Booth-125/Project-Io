@@ -1,5 +1,8 @@
 #include "planetology.hpp"
 
+#include "star_map.hpp"
+
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -654,6 +657,41 @@ planetology_state run_planetology(const body_inputs& in,
     const float m_star   = clampf(p.star_mass, 0.6f, 1.5f);
     const float l_star   = m_star * m_star * m_star * std::sqrt(m_star);
     const float snow_line = 2.71f * std::sqrt(l_star);
+
+    // Things seen in the sky. FLAVOUR ONLY, deliberately (Ben, 2026-08-04): these
+    // lines change nothing — no gate reads them, no endowment moves. They exist
+    // because a biography that is nothing but thresholds reads like a lab report,
+    // and because the objects are real fixtures of the star map the Solar minimap
+    // draws, so the sky and the history agree about what is up there.
+    //
+    // Dated from star_map's own seen_gya, not invented here, and only reported
+    // when the light actually arrived while the world existed. Making them
+    // CAUSES — a nearby supernova stripping ozone at a mass-extinction
+    // checkpoint — is filed as BL-289 rather than smuggled in.
+    if (in.is_homeworld)
+    {
+        int obj_count = 0;
+        const star_map_object* objs = star_map_objects(obj_count);
+        for (int i = 0; i < obj_count; ++i)
+        {
+            const star_map_object& o = objs[i];
+            if (o.kind != deep_sky_kind::supernova_remnant) continue;
+            if (o.seen_gya <= 0.0f || o.seen_gya >= age) continue; // light not yet arrived
+            say(o.seen_gya, chain_stage::system,
+                std::string("A star died where none had been, and was named ") + o.name,
+                "visible in daylight for a season, then a slow ring of gas");
+        }
+        // The quasar has been burning the whole time, so it is stated once, at
+        // formation, rather than dated to an event.
+        for (int i = 0; i < obj_count; ++i)
+        {
+            if (objs[i].kind != deep_sky_kind::quasar) continue;
+            say(age, chain_stage::system,
+                std::string(objs[i].name) + " burns at the edge of sight",
+                "the brightest thing in the sky, and the furthest");
+            break;
+        }
+    }
 
     // The star's clock, and the one thing about it that does not cancel against
     // the derived orbit. Said on the homeworld only — the whole system shares
@@ -1487,6 +1525,19 @@ planetology_state run_planetology(const body_inputs& in,
         st.archetype = st.peak >= life_stage::land ? body_archetype::cradle
                                                    : body_archetype::mat_world;
     }
+
+    // Oldest first, which planetology_harness R14 asserts. The chain used to
+    // deliver this for free, because every stage narrates in causal order and
+    // causal order IS chronological — until a line dates itself from something
+    // other than the stage that emits it. The sky lines do exactly that: a
+    // supernova seen 0.43 Gya is announced at S0, because S0 is where the star
+    // map is read, not where the event belongs in the story. Sorting here makes
+    // the ordering a property of the function rather than a happy accident of
+    // emission order. Stable, so equal timestamps keep their causal sequence,
+    // and a no-op for every line the chain already emits in order.
+    std::stable_sort(st.history.begin(), st.history.end(),
+        [](const history_event& a, const history_event& b)
+        { return a.years_before_epoch > b.years_before_epoch; });
 
     return st;
 }
