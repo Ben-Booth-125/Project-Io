@@ -159,24 +159,24 @@ drawn replay_draw(const world_preferences& pref, uint32_t seed, uint32_t k)
 
     // --- Round A: the System ---
     p.star_mass = draw(ra, pick(pref.star,
-        {0.75f, 1.25f}, {0.75f, 0.92f}, {0.92f, 1.08f}, {1.08f, 1.25f}));
+        {0.60f, 1.50f}, {0.60f, 0.90f}, {0.90f, 1.20f}, {1.20f, 1.50f}));
     p.home_mass = draw(ra, pick(pref.world_size,
-        {0.72f, 1.32f}, {0.72f, 0.92f}, {0.92f, 1.12f}, {1.12f, 1.32f}));
+        {0.66f, 1.48f}, {0.66f, 0.93f}, {0.93f, 1.21f}, {1.21f, 1.48f}));
     p.metallicity = draw(ra, pick(pref.metal,
-        {0.50f, 1.80f}, {0.50f, 0.85f}, {0.85f, 1.25f}, {1.25f, 1.80f}));
+        {0.30f, 2.20f}, {0.30f, 0.93f}, {0.93f, 1.57f}, {1.57f, 2.20f}));
     p.system_age_gyr = draw(ra, pick(pref.interior,
-        {3.60f, 8.00f}, {6.00f, 8.00f}, {4.20f, 6.00f}, {3.60f, 4.80f}));
+        {2.12f, 9.02f}, {6.72f, 9.02f}, {4.42f, 6.72f}, {2.12f, 4.42f}));
     p.radiogenic = draw(ra, pick(pref.interior,
-        {0.60f, 1.80f}, {0.60f, 0.95f}, {0.90f, 1.35f}, {1.30f, 1.80f}));
+        {0.57f, 1.73f}, {0.57f, 0.96f}, {0.96f, 1.34f}, {1.34f, 1.73f}));
 
     const float l = p.star_mass * p.star_mass * p.star_mass * std::sqrt(p.star_mass);
     d.orbit_au = std::sqrt(l) * (0.985f + (1.400f - 0.985f) * ra.unit());
 
     // --- Round B: Life ---
     p.home_ocean = draw(rb, pick(pref.ocean,
-        {0.42f, 0.72f}, {0.42f, 0.52f}, {0.50f, 0.62f}, {0.60f, 0.72f}));
+        {0.40f, 0.68f}, {0.40f, 0.49f}, {0.49f, 0.59f}, {0.59f, 0.68f}));
     p.oxygenation = draw(rb, pick(pref.oxygen_story,
-        {0.00f, 1.00f}, {0.00f, 0.34f}, {0.33f, 0.67f}, {0.66f, 1.00f}));
+        {0.30f, 0.91f}, {0.30f, 0.50f}, {0.50f, 0.71f}, {0.71f, 0.91f}));
     p.coal_climate = draw(rb, pick(pref.coal_basins,
         {0.00f, 1.00f}, {0.00f, 0.34f}, {0.33f, 0.67f}, {0.66f, 1.00f}));
 
@@ -184,7 +184,7 @@ drawn replay_draw(const world_preferences& pref, uint32_t seed, uint32_t k)
 
     // --- Round C: Inheritance ---
     p.drawdown = draw(rc, pick(pref.drawdown,
-        {0.15f, 0.90f}, {0.15f, 0.40f}, {0.38f, 0.66f}, {0.64f, 0.90f}));
+        {0.00f, 0.95f}, {0.00f, 0.32f}, {0.32f, 0.63f}, {0.63f, 0.95f}));
 
     return d;
 }

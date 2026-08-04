@@ -95,24 +95,28 @@ struct knob
 // lean::any bands. Where the two differ is exactly what this harness exists to
 // show. abiogenesis_ease has NO band — resolve_preferences pins it at 1.0 — so
 // its band is recorded as a point.
+// Band ranges track resolve_preferences' lean::any bands, which since
+// 2026-08-04 ARE the always-viable spans this harness measured. So a healthy
+// re-run now reports the band and the span coinciding; a band that has drifted
+// away from its span is the signal to re-tune.
 const knob k_knobs[] = {
-    { "oxygenation",    &planetology_params::oxygenation,    0.00f, 1.00f, 0.00f, 1.00f,
+    { "oxygenation",    &planetology_params::oxygenation,    0.00f, 1.00f, 0.30f, 0.91f,
       "the dial: GOE/NOE timing and the final O2 level" },
-    { "radiogenic",     &planetology_params::radiogenic,     0.30f, 2.20f, 0.60f, 1.80f,
+    { "radiogenic",     &planetology_params::radiogenic,     0.30f, 2.20f, 0.57f, 1.73f,
       "tectonic heat -> theta -> mobile lid" },
-    { "system_age_gyr", &planetology_params::system_age_gyr, 1.00f,10.00f, 3.60f, 8.00f,
+    { "system_age_gyr", &planetology_params::system_age_gyr, 1.00f,10.00f, 2.12f, 9.02f,
       "enters twice, with opposing signs" },
-    { "home_ocean",     &planetology_params::home_ocean,     0.20f, 0.85f, 0.42f, 0.72f,
+    { "home_ocean",     &planetology_params::home_ocean,     0.20f, 0.85f, 0.40f, 0.68f,
       "land fraction -> arable share" },
-    { "home_mass",      &planetology_params::home_mass,      0.50f, 2.00f, 0.72f, 1.32f,
+    { "home_mass",      &planetology_params::home_mass,      0.50f, 2.00f, 0.66f, 1.48f,
       "gravity, and the mass term in theta" },
-    { "star_mass",      &planetology_params::star_mass,      0.60f, 1.50f, 0.75f, 1.25f,
+    { "star_mass",      &planetology_params::star_mass,      0.60f, 1.50f, 0.60f, 1.50f,
       "luminosity; the orbit is derived from it" },
-    { "metallicity",    &planetology_params::metallicity,    0.30f, 2.20f, 0.50f, 1.80f,
+    { "metallicity",    &planetology_params::metallicity,    0.30f, 2.20f, 0.30f, 2.20f,
       "ore endowment" },
     { "coal_climate",   &planetology_params::coal_climate,   0.00f, 1.00f, 0.00f, 1.00f,
       "everwet vs seasonal basins" },
-    { "drawdown",       &planetology_params::drawdown,       0.00f, 0.95f, 0.15f, 0.90f,
+    { "drawdown",       &planetology_params::drawdown,       0.00f, 0.95f, 0.00f, 0.95f,
       "how much was already dug up" },
     { "abiogenesis_ease",&planetology_params::abiogenesis_ease,0.00f,1.00f, 1.00f, 1.00f,
       "NOT a preference — pinned at 1.0 by resolve_preferences" },

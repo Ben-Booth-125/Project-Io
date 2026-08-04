@@ -300,21 +300,39 @@ resolved_world resolve_preferences(const world_preferences& pref, uint32_t seed)
         resolved_world w;
         planetology_params& p = w.params;
 
+        // BANDS ARE THE MEASURED ALWAYS-VIABLE SPANS (2026-08-04). Each `any`
+        // band below is the range over which tools/verify/earthlike_corridor.cpp
+        // measured a 100% viability rate at 65 steps x 128 seeds, with every
+        // other parameter at its Sol default. The three leans partition that
+        // span into thirds.
+        //
+        // This replaces bands that were hand-calibrated against acceptance
+        // alone, and it cuts both ways: the three axes that could reject
+        // (oxygenation, radiogenic, home_ocean) NARROW, and the six that never
+        // could (star, mass, metallicity, age, coal, drawdown) WIDEN to the
+        // room they were already entitled to. More variety and fewer rerolls
+        // from the same change.
+        //
+        // The spans are one-at-a-time slices, so they do NOT promise 100%
+        // acceptance in combination — the C1 census measures what the joint
+        // distribution actually does.
+
         // --- Round A: the System ---
         p.star_mass = draw(ra, pick(pref.star,
-            {0.75f, 1.25f}, {0.75f, 0.92f}, {0.92f, 1.08f}, {1.08f, 1.25f}));
+            {0.60f, 1.50f}, {0.60f, 0.90f}, {0.90f, 1.20f}, {1.20f, 1.50f}));
         p.home_mass = draw(ra, pick(pref.world_size,
-            {0.72f, 1.32f}, {0.72f, 0.92f}, {0.92f, 1.12f}, {1.12f, 1.32f}));
+            {0.66f, 1.48f}, {0.66f, 0.93f}, {0.93f, 1.21f}, {1.21f, 1.48f}));
         p.metallicity = draw(ra, pick(pref.metal,
-            {0.50f, 1.80f}, {0.50f, 0.85f}, {0.85f, 1.25f}, {1.25f, 1.80f}));
+            {0.30f, 2.20f}, {0.30f, 0.93f}, {0.93f, 1.57f}, {1.57f, 2.20f}));
 
         // Interior folds age and radiogenic endowment together: "cold and old"
         // against "young and vigorous" is one idea to a player, and splitting it
         // into two sliders would be two settings rather than one preference.
+        // Age runs INVERTED against the lean — low means OLD.
         p.system_age_gyr = draw(ra, pick(pref.interior,
-            {3.60f, 8.00f}, {6.00f, 8.00f}, {4.20f, 6.00f}, {3.60f, 4.80f}));
+            {2.12f, 9.02f}, {6.72f, 9.02f}, {4.42f, 6.72f}, {2.12f, 4.42f}));
         p.radiogenic = draw(ra, pick(pref.interior,
-            {0.60f, 1.80f}, {0.60f, 0.95f}, {0.90f, 1.35f}, {1.30f, 1.80f}));
+            {0.57f, 1.73f}, {0.57f, 0.96f}, {0.96f, 1.34f}, {1.34f, 1.73f}));
 
         // The orbit is DERIVED, not preferred. It is placed inside the star's own
         // CONTINUOUSLY habitable band — narrower than the instantaneous one, since
@@ -325,9 +343,11 @@ resolved_world resolve_preferences(const world_preferences& pref, uint32_t seed)
 
         // --- Round B: Life ---
         p.home_ocean = draw(rb, pick(pref.ocean,
-            {0.42f, 0.72f}, {0.42f, 0.52f}, {0.50f, 0.62f}, {0.60f, 0.72f}));
+            {0.40f, 0.68f}, {0.40f, 0.49f}, {0.49f, 0.59f}, {0.59f, 0.68f}));
         p.oxygenation = draw(rb, pick(pref.oxygen_story,
-            {0.00f, 1.00f}, {0.00f, 0.34f}, {0.33f, 0.67f}, {0.66f, 1.00f}));
+            {0.30f, 0.91f}, {0.30f, 0.50f}, {0.50f, 0.71f}, {0.71f, 0.91f}));
+        // coal_climate is viable across its whole range, so its band is already
+        // the always-viable span and does not move.
         p.coal_climate = draw(rb, pick(pref.coal_basins,
             {0.00f, 1.00f}, {0.00f, 0.34f}, {0.33f, 0.67f}, {0.66f, 1.00f}));
 
@@ -337,7 +357,7 @@ resolved_world resolve_preferences(const world_preferences& pref, uint32_t seed)
 
         // --- Round C: Inheritance ---
         p.drawdown = draw(rc, pick(pref.drawdown,
-            {0.15f, 0.90f}, {0.15f, 0.40f}, {0.38f, 0.66f}, {0.64f, 0.90f}));
+            {0.00f, 0.95f}, {0.00f, 0.32f}, {0.32f, 0.63f}, {0.63f, 0.95f}));
 
         w.attempts = k + 1;
 
