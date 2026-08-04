@@ -6324,6 +6324,113 @@
     "docs/generation/PLANETOLOGY.md"
    ],
    "design": "DEFERRED DELIBERATELY. Ben, 2026-08-04: \"just flavor, keep a deferred item with your thoughts\nfor if I decide to add more challenging aspects.\" The star map and its supernova/quasar lines\nlanded as pure narration — no gate reads them, no endowment moves. This item is the version\nwith teeth, recorded now while the reasoning is in hand.\n\nWHY IT IS TEMPTING. A nearby supernova is a real extinction mechanism, and it happens to be\nthe one kind of catastrophe this model has no way to express. Every existing failure in the\nchain is a property of the world itself — too little heat, too much ocean, the wrong oxygen\ntiming. All of them are things the player chose in the wizard, however indirectly. A supernova\nis the first cause that is NOT about the world: it arrives from outside, it is nobody's fault,\nand it is the only mechanism in the design that could make two otherwise-identical worlds\ndiverge. That is worth something narratively that no amount of knob-tuning provides.\n\nTHE MECHANISM, IF BUILT. Ozone is already modelled — ozone_du() in planetology.cpp, a lookup\nagainst O2 as a fraction of present level, used by the S7 land-colonisation gate at a 60 DU\nthreshold. A supernova within ~10 parsecs strips a large fraction of the ozone column for\nyears to decades. So the hook is exact and already present: temporarily depress the ozone\ncolumn at the moment the light arrives, and let the EXISTING S7 gate do the work. If the world\nhad only just cleared 60 DU, it loses its land biosphere and becomes a Graveyard; if it was\ncomfortably above, it survives with a scar in the biography. No new gate, no new archetype —\nthe graveyard mechanic (peak vs current life_stage) already models exactly this outcome, where\nthe coal survives and the forests do not.\n\nBL-217's checkpoint machinery is the natural home: a checkpoint_record at chain_stage::green\nwith branch_taken \"supernova at N pc - ozone stripped\" and viability_result set by whether the\nbiosphere held. That gets it into the replayable branch history for free.\n\nWHAT MAKES IT HARD, AND WHY IT IS NOT DEFAULT-ON.\n1. The star map is FIXED and the campaign is not. A supernova at a fixed sky position is at a\n   fixed DISTANCE only if every campaign system sits in the same place in the galaxy, which is\n   currently unstated. Either the campaign system gets a galactic position (new state), or the\n   distance is drawn per campaign and the fixed map becomes a fixed DIRECTION with a variable\n   range. The second is cheaper and probably right, but it means the sky lies slightly: the\n   same remnant is 8 pc away in one campaign and 300 in another.\n2. It reintroduces exactly the failure mode this session spent a day measuring away. A world\n   can now fail for a reason no wizard preference predicts, which is thrilling once and\n   infuriating on the fourth reroll. It wants a rate, and the rate wants measuring — the\n   earthlike battery (planetology_sweep C1, earthlike_tile_census) is the instrument, and the\n   question is what fraction of campaigns should lose their biosphere this way. My guess is\n   low single digits, and that it should never fire on the homeworld before civilisation\n   unless Ben wants Era -1 to be genuinely dangerous.\n3. The homeworld floor would have to decide whether it cares. homeworld_viability rejects\n   non-Cradles, so a supernova-killed homeworld is simply rerolled and the player never sees\n   it — the drama lands only on NON-homeworld bodies, or if the floor gains an exception. The\n   more interesting version is the latter: a Graveyard homeworld the player is told about and\n   must live with. That is a much bigger design decision than the mechanism.\n\nCHEAPER MIDDLE GROUND, if the full version is too much: let the supernova fire on non-homeworld\nbodies only. Cinder, Selene and Pallas have no biosphere to lose, so today it would be inert —\nbut it becomes live the moment the body count grows (PLANETOLOGY.md Open call 2), and it gives\nthe sky something to do without ever costing the player their own world.\n\nSEE ALSO: the quasar is deliberately excluded from all of this. It has been shining the whole\ntime, which is exactly why it makes a good fixed landmark and a bad event."
+  },
+  {
+   "id": "BL-290",
+   "short_name": "Naming banks read Earth-European",
+   "title": "The nation and city name banks are Latin/European, and ignore the culture phonology creeds already rolls",
+   "category": "World Generation",
+   "status": "design-owed",
+   "priority": "A",
+   "difficulty": "M",
+   "version_goal": "v0.1.1",
+   "created": "2026-08-04",
+   "authority_doc": "docs/generation/NATION_GENERATION.md",
+   "touches": [
+    "src/world/nation_generation.cpp",
+    "src/world/city_names.cpp",
+    "src/world/creeds.cpp"
+   ],
+   "design": "FOUND BY THE DOCUMENTATION AUDIT (2026-08-04), reading code against the standing rule added\n2026-08-03: \"Real history is a mechanism reference, never a name source.\" The docs passed that\nsweep clean. The code did not.\n\nTWO SITES.\n\n1. nation_generation.cpp:577-608 — Pass 5 naming. Two problems, and the second is the worse one.\n   (a) The bank is recognisably Latin/European: codas \"ia\", \"us\", \"is\", \"or\"; onset \"Lun\"; nouns\n   \"Republic\", \"Commonwealth\", \"Principality\", \"Protectorate\"; adjectives \"Free\", \"United\",\n   \"Sacred\". That is trap #1 named in GENERATION_STRATEGY.md's own transfers/does-not table —\n   \"culture-flavoured\" must not mean \"Earth-culture-flavoured\".\n   (b) The bank is GLOBAL. It does not read the per-culture phonology that creeds.cpp:64-82\n   already rolls, so a nation's gods and the nation's own name come from unrelated sound systems.\n   NATION_GENERATION.md § Pass 5 claims the bank is \"culture-flavoured\"; it is not culture-derived\n   at all.\n\n2. city_names.cpp:8-22 — synthetic, but the morphemes are English: \"ton\", \"ford\", \"haven\",\n   \"burg\". Same trap, milder, same fix class.\n\nWHY (b) IS THE INTERESTING HALF. The fix is not \"pick less Roman-sounding syllables\" — that just\nmoves the accent. The generator already produces a per-culture phonology upstream; naming should\nCONSUME it, so a culture's names, gods and places share one sound system as a consequence of the\nchain rather than by coincidence. That is the house pattern (generation as consequence, not dice)\nand it makes the Earth-flavour problem structurally impossible rather than merely corrected.\n\nNOT IN SCOPE: body names (Helios, Kepler, Selene, Pallas, Cinder) are Greek/Latin astronomy words,\npre-existing and deliberate — Ben's call if that ever changes.\n\nRELATED: BL-257 (generated body names) is the sibling item on the body axis."
+  },
+  {
+   "id": "BL-291",
+   "short_name": "world_audit harness fails",
+   "title": "world_audit fails, so the tile census cannot be re-measured and TILES.md stays stale",
+   "category": "Tooling",
+   "status": "design-owed",
+   "priority": "A",
+   "difficulty": "S",
+   "version_goal": "v0.1.1",
+   "created": "2026-08-04",
+   "authority_doc": "docs/economy/TILES.md",
+   "touches": [
+    "tools/verify/world_audit.cpp",
+    "docs/economy/TILES.md"
+   ],
+   "design": "FOUND BY THE DOCUMENTATION AUDIT (2026-08-04). world_audit is one of the four harnesses BL-288\n(Release-only test failures) records as failing, but it carries a consequence the others do not:\nit is the harness that PRODUCED the measured landform distribution table in TILES.md § Measured\nlandform distribution.\n\nTHE KNOCK-ON. Two commits on 2026-08-04 moved relief on every generated world — 802421c took\nmountain+highland 6.8% -> 17.5%, then 71e8a9b (convergent-boundary seeding) settled it at 14.0%,\nwith seeds 7/6/3 -> 13/11/5. The documented table is therefore stale, and cannot be regenerated\nuntil this harness runs. Stale MEASURED numbers are worse than absent ones, because they read as\nverified.\n\nSO THE ITEM IS TWO STEPS, in order: fix the harness, then re-run it and re-issue the table. The\ndoc has been marked stale-and-blocked in the meantime, pointing here.\n\nRELATION TO BL-288: same failure set, but BL-288 is about the Debug/Release gap that hid four\nfailures. This one is about the specific instrument and the doc it feeds. Fixing BL-288's build\nquestion does not by itself re-issue the census."
+  },
+  {
+   "id": "BL-292",
+   "short_name": "Economy panel is orphaned",
+   "title": "The Economy panel is drawn every frame but has no door — no nav slot, no action entry",
+   "category": "UI",
+   "status": "design-owed",
+   "priority": "B",
+   "difficulty": "S",
+   "version_goal": "v0.1.1",
+   "created": "2026-08-04",
+   "authority_doc": "docs/ui/LAYOUT.md",
+   "touches": [
+    "src/ui/economy_panel.cpp",
+    "src/ui/nav_pane.cpp",
+    "docs/ui/LAYOUT.md",
+    "docs/ai/ACTIONS.json"
+   ],
+   "design": "FOUND BY THE DOCUMENTATION AUDIT (2026-08-04). The Economy panel (Corps / Holdings / Markets) is\ndrawn every frame, but `show_economy_panel` is only ever CLEARED — nothing in nav_pane.cpp sets\nit. The only thing that opens it is the verify harness. A player cannot reach it at all.\n\nIT IS INVISIBLE FROM BOTH DIRECTIONS, which is why it went unnoticed: it has no nav-rail slot and\nno entry in the action dictionary, so neither a human reading the rail nor an agent reading\nACTIONS.json can discover it. Meanwhile MENU.md:104 still cites \"the Economy panel's Corps view\"\nas the surviving home for the corporations table — pointing at a surface with no door.\n\nTHE DECISION IS WHICH WAY TO RESOLVE IT, and it is genuinely open:\n  (a) Give it a door — a nav slot plus an ACTIONS entry. But the rail is nearly full and BL-094\n      (governing-body pivot) will want slots for law and force.\n  (b) Retire it — its three views may already be covered by the Corporation dashboard (slot 1),\n      the corporations table (slot 8) and the Market ledger. If so this is dead weight that costs\n      a draw call per frame and misleads two docs.\n\nAudit (b) first: if the three views are genuinely redundant, deleting is the cheaper answer and\nthe one that leaves the rail free for the pivot."
+  },
+  {
+   "id": "BL-293",
+   "short_name": "Order book unreachable by command",
+   "title": "Three order-book presses exist in the dictionary but have no corp_command verb, so no text player can trade",
+   "category": "AI",
+   "status": "design-owed",
+   "priority": "A",
+   "difficulty": "M",
+   "version_goal": "v0.1.1",
+   "created": "2026-08-04",
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "touches": [
+    "src/world/corp_command.hpp",
+    "src/world/corp_command.cpp",
+    "docs/ai/ACTIONS.json"
+   ],
+   "design": "FOUND BY THE DOCUMENTATION AUDIT (2026-08-04), and independently logged in Project-Rival's own\nfindings doc as its ranked gap #4 — so this is the second time it has surfaced.\n\nTHE GAP. `ACTIONS.json` carries gameplay entries for `place_sell_order`, `remove_sell_order` and\n`set_workforce_auto`. None has a `corp_verb`; the enum in corp_command.hpp is eight wide and holds\nnone of them. So they are player-only presses: a text-driven player can READ the order book and\ncan be told what the press MEANS, but has no way to issue it.\n\nWHY IT MATTERS MORE THAN THREE MISSING VERBS. Standing sell orders with a floor price are how a\ncorporation governs the release of its own stock rather than dumping at the resolved price\n(SYSTEMS.md § Trade). An agent that cannot place one is not playing the economy; it is watching\nit. The word interface is v0.1.1's theme and this is the hole in its write leg.\n\nALSO FIX THE OVERCLAIM: ACTIONS.md's preamble says pairing the three legs gives an LLM \"the full\nword interface\". Until this lands that is false, and it is the one line in the dictionary most\nlikely to mislead. Either close the gap or state the narrowing — closing it is better.\n\nSEQUENCING: the gameplay family is TRANSCRIBED from corp_command.hpp, never authored. So the seam\nchanges first, then the dictionary is re-transcribed and the mirror re-rendered."
+  },
+  {
+   "id": "BL-294",
+   "short_name": "Dead UI symbols",
+   "title": "diverging_colour and icons::unit have zero call sites",
+   "category": "UI",
+   "status": "designed",
+   "priority": "C",
+   "difficulty": "XS",
+   "version_goal": "v0.1.1",
+   "created": "2026-08-04",
+   "authority_doc": "docs/ui/ICONS.md",
+   "touches": [
+    "src/ui/presentation.hpp",
+    "src/ui/icons.cpp",
+    "docs/ui/ICONS.md",
+    "docs/ui/LENSES.md"
+   ],
+   "design": "FOUND BY THE DOCUMENTATION AUDIT (2026-08-04). Two symbols survive with no callers:\n\n1. `diverging_colour` — zero call sites. It went dead when the Production lens moved to\n   `production_colour` (red -> yellow -> green). LENSES.md still describes Production as using\n   \"the same band the Market wash uses\", which is how the deletion stayed invisible.\n\n2. `icons::unit` — zero call sites. ICONS.md's catalogue entry claims canvas use under\n   \"Drawn for / where\"; nothing draws it.\n\nDELETE BOTH, and correct the two doc claims that made them look live. The icon is the one worth a\nsecond's thought: units are coming back under BL-157 (military datamodel stub), so either keep the\nglyph and mark it explicitly unused-pending-BL-157, or delete it and redraw then. Prefer deleting\n— a glyph with no caller cannot be verified, and ICONS.md's own rule is that the code is the\nsource of truth."
+  },
+  {
+   "id": "BL-295",
+   "short_name": "components.hpp cites phantom ids",
+   "title": "A components.hpp comment cites BL-287 to BL-290 for logistics-goods follow-ons that were never filed",
+   "category": "Documentation",
+   "status": "designed",
+   "priority": "C",
+   "difficulty": "XS",
+   "version_goal": "v0.1.1",
+   "created": "2026-08-04",
+   "authority_doc": "docs/economy/RESOURCES.md",
+   "touches": [
+    "src/world/components.hpp"
+   ],
+   "design": "FOUND BY THE DOCUMENTATION AUDIT (2026-08-04). The comment block on the logistics-goods block of\n`resource_type` (components.hpp:60-71) names BL-287, BL-288, BL-289 and BL-290 as the follow-on\nitems that will add consumption, range-cap, shelf-life and purchase behaviour.\n\nNONE OF THOSE IDS MEANS THAT. BL-287 is the verify-tier build change; BL-288 is the Release-only\ntest failures; BL-289, BL-290 and BL-291 did not exist when the comment was written. BL-286's own\ndesign correctly said \"(not yet filed)\" for each behaviour — the caveat was dropped when the\nprose was transcribed into the comment and into RESOURCES.md.\n\nRESOURCES.md has been corrected (2026-08-04). This item is the code half.\n\nTHE FIX IS ONE COMMENT: say the follow-ons are unfiled, and that ids get allocated with\n`node tools/session/next_id.js` when they are. Do not invent placeholder ids — a wrong id is\nworse than no id, because it routes the reader to real but unrelated work. That is the whole\nlesson here and it is worth stating in the comment itself."
   }
  ]
 }
