@@ -1,7 +1,7 @@
 # Project Io — Roadmap
 
 The milestone map from the current state through the **v0.1.0** prototype cut and on into the
-**expanded prototype** (v0.1.x → v0.3.0). This document is **forward-facing and lean**: it names
+**expanded prototype** (v0.1.x → v0.4.0). This document is **forward-facing and lean**: it names
 the version sequence, the *theme* of each minor, and the done-definition for the prototype cut. It
 deliberately does **not** enumerate individual items — that lives in the backlog
 ([`backlog.json`](backlog.json), metadata + design prose; [`BACKLOG.md`](BACKLOG.md) is a legacy
@@ -109,9 +109,9 @@ work that landed early). What remains toward the cut is named under § v0.1.0 be
 
 The map no longer ends at the prototype cut. Ben's **2026-07-09 refocus** extends it: **v0.1.0**
 still cuts the economy-loop prototype; then the **v0.1.x** band lays groundwork for an *expanded
-prototype*, **v0.2.0** carries the AI opponent (the player refocus is intended for the same era
-but not yet versioned — see § v0.2.0), and **v0.3.0** brings the political layer and the filter
-system online. The v0.0.x themes have all shipped; the roll-up is § Where we are, the per-item
+prototype*, **v0.2.0** carries the AI opponent, **v0.3.0** the governing-body refocus (versioned
+as its own minor — Ben, 2026-08-04, resolving NR-045), and **v0.4.0** brings the political layer
+and the filter system online. The v0.0.x themes have all shipped; the roll-up is § Where we are, the per-item
 record `DEVLOG.md`.
 
 ### v0.1.0 — Quality audit + legibility polish + cut
@@ -194,10 +194,12 @@ assertion holds.
 
 *Theme: ponder and stub what the expanded prototype will need — design-forward, data-model-first,
 no committed systems yet.* Past the cut, the v0.1.x band is where the game's next dimensions get
-their first shape: enough design and stubbing that the v0.2.0 refocus and the v0.3.0 political
+their first shape: enough design and stubbing that the v0.3.0 refocus and the v0.4.0 political
 layer land on positioned ground rather than a greenfield. v0.1.1 is a concrete build minor; the
-rest of the band (v0.1.2–v0.1.5) is deliberately design-forward — each now has a placeholder
-`design-owed` item that firms into real design as it is reached.
+stub minors (v0.1.2–v0.1.5) are deliberately design-forward — each now has a placeholder
+`design-owed` item that firms into real design as it is reached — and the band closes with
+**v0.1.6**, a second concrete build minor (generation visibility + the UI-alignment review,
+added by Ben 2026-08-04).
 
 > **What this band is FOR (Ben, 2026-08-03).** Until now the band was themed by what it stubs,
 > not by what the stubs serve. Ben's steer supplies the missing answer: the aim is to play as a
@@ -238,16 +240,33 @@ rest of the band (v0.1.2–v0.1.5) is deliberately design-forward — each now h
   at the law / policy surface — what a law *is* as a data object, how it gates or modifies
   economic (and later political) behaviour, and its ledger surface. Design + stub.
 - **v0.1.3 — Techs** (**BL-156**). Early design toward the tech / quest system — the condition-set
-  gate model (gate = quest = tech) that BL-087 reframed and the v0.3.0 filter system formalises.
+  gate model (gate = quest = tech) that BL-087 reframed and the v0.4.0 filter system formalises.
   Design only; precursor to BL-087.
 - **v0.1.4 — Military systems** (**BL-157**). The Conflict dimension's first data-model footing —
   units, forces, and the seams they need in the world model. Stub, not mechanics (Conflict proper
   stays post-cut scope).
 - **v0.1.5 — Politics (stub)** (**BL-158**). A data-model stub only — enough political layer for
-  the v0.2.0 nation actor to have something to own, deferring the working system to v0.3.0. The
-  band's last minor before the refocus.
+  the v0.3.0 governing actor to have something to own, deferring the working system to v0.4.0.
+- **v0.1.6 — Generation visibility + UI alignment.** *(Added by Ben, 2026-08-04: "a pass on
+  generation visibility... visualising the world at each step — we haven't yet done that.")* The
+  band's last minor before the refocus, and its second concrete build minor. Two themes:
 
-### v0.2.0 — The AI opponent (versioned), and the refocus (intended, unversioned)
+  **Generation visibility.** Every generation step earns a surface the player (and Ben) can
+  watch it through: the Generation Ledger build (**BL-303** — the window `GENERATION_LEDGER.md`
+  designed but no item ever carried), the field-overlay lenses for the generation intermediates
+  (**BL-304** — heightmap / moisture / band / plate on the Planetary canvas), and the political
+  steps' visibility (**BL-305**, design-owed — the nation carve and corp seeding are today the
+  only generation steps with no visibility designed anywhere). Siblings landing earlier keep
+  their own goals: **BL-256** (generation globe, v0.1.1) and **BL-211** (player-facing history
+  ledger).
+
+  **UI alignment.** *"It's important to keep our UI in line with new development"* — the
+  end-of-band review that walks the UI against everything v0.1.x added. **BL-098** (UX
+  user-story review) is the vehicle, retargeted here from v0.1.1; it consumes
+  `user_stories.json` and closes the loop between the band's new systems and the surfaces that
+  serve them.
+
+### v0.2.0 — The AI opponent
 
 *Versioned theme: the AI opponent.* The backlog's live v0.2.0 set is the corp-AI arc: stage A —
 the deterministic scored-utility layer over the corp-command seam — already landed (BL-202,
@@ -263,14 +282,20 @@ that here; its prerequisite **BL-278** (Io MCP server) sits in **v0.1.1**, where
 it. Both sit *above* the deterministic utility core, not in place of it — the small local model
 is a macro layer over BL-202/203, never the whole opponent.
 
-*The refocus — change who the player is. **Stated as the aim, 2026-08-03**; still unversioned.*
+### v0.3.0 — The governing body (the refocus)
+
+*Theme: change who the player is.* **Versioned 2026-08-04** — Ben's answer to the sequencing
+question open since 2026-07-31 (NR-045): the pivot takes **its own minor**, not a share of
+v0.2.0. Sequence rationale: v0.2.0's AI opponent proves the game plays before the pivot changes
+who plays it, and the political layer (v0.4.0) needs the governing actor to exist first.
+
 The player pivots from **corporation** to **governing body** as the strategic actor — owning
 research, military, and intelligence — while the corporation stays the **economic** actor,
 prototyped as a single chartered corp (= today's player corp) so the v0.0.x economy loop
 survives intact underneath and the governing layer is thin above it (**BL-094**, settled
-2026-07-04, **elevated and unparked 2026-08-03**). This is the hinge from *economy sandbox*
-toward *grand strategy*: the laws / techs / military / politics stubbed across v0.1.x hang off
-an actor that can own them.
+2026-07-04, **elevated and unparked 2026-08-03**, versioned v0.3.0 2026-08-04). This is the
+hinge from *economy sandbox* toward *grand strategy*: the laws / techs / military / politics
+stubbed across v0.1.x hang off an actor that can own them.
 
 **Why it is the aim, in Ben's words:** *"it allows law, policy and science to use military might
 — not just economic."* A corporation's levers are all economic, so a corporate player can be
@@ -279,12 +304,7 @@ can point them at force. That is also **Conflict's route to being load-bearing**
 corporate player, laws and techs could only ever feed Trade, which is why Conflict has stayed
 the least-designed pillar.
 
-**Open sequencing question (2026-07-31, now louder).** BL-094 still carries no version goal; the
-versioned v0.2.0 set is the AI opponent. Whether the pivot shares v0.2.0 with the AI set or
-takes its own minor is Ben's call, still not made — NR-045 asks it directly now that the item is
-unparked at A priority.
-
-### v0.3.0 — Politics + the filter system
+### v0.4.0 — Politics + the filter system
 
 *Theme: the political layer for real, and Era → Filter.* Two coupled deliverables:
 
@@ -302,7 +322,7 @@ unparked at A priority.
 ## Done-definition — v0.1.0 (the prototype cut)
 
 v0.1.0 is the **economy loop, validated and playable end-to-end** — not the full game. It remains
-the **prototype cut**; the expanded-prototype milestones above (v0.1.x → v0.3.0) are theme-level
+the **prototype cut**; the expanded-prototype milestones above (v0.1.x → v0.4.0) are theme-level
 and earn their own done-definitions as they firm up. v0.1.0 is cut when all of the following hold:
 
 - The player can **construct and manage** buildings — placement with cost and validation,

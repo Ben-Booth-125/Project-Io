@@ -769,8 +769,19 @@ instantaneous one) eliminated that failure mode outright:
 
 **The strict floor** (`homeworld_viability`): a Cradle that reached civilisation, O₂ in 16–30%
 (breathable, above the combustion floor, below fire-suppression), liquid surface water at 40–75%,
-275–305 K, arable ≥ 8% of land, escape velocity 9.5–13 km/s, at least one primary fuel, and workable
-iron. Each clause names its reason, so it can be argued with rather than merely tuned.
+275–305 K, arable ≥ 8% of *surface* (`arable_share` already folds in the land fraction), escape
+velocity 9.5–13 km/s, at least one primary fuel, and workable iron. Each clause names its reason,
+so it can be argued with rather than merely tuned.
+
+> **Drier than Earth by design (Ben, 2026-08-04, NR-049).** The arable clause is mechanically a
+> hard ocean cap. `arable_share = land × (0.28 − (O₂ − 0.21) × 0.45) × lid-factor`, so even in
+> the best case (O₂ at exactly 21%, mobile lid) the ≥ 8% floor caps ocean fraction at **0.714** —
+> 0.4% above Earth's own 0.71. Earth passes only in that corner: the same world with a stagnant
+> lid, or at 23% O₂, is rejected. The measured consequence is that homeworlds run ~46–48% land
+> against Earth's 29%, and an ocean-heavy homeworld is unreachable by construction. **This stands
+> as a playability constraint, not a miscalibration**: the player must have land to build on, and
+> this clause is where that requirement lives. Ocean worlds remain generatable (see the
+> Waterworld class above) — they are simply never the homeworld.
 
 **Variety survives the floor** — the thing a strict floor risks destroying:
 
