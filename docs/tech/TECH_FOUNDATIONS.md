@@ -11,12 +11,20 @@ This document captures the decisions that must be in place before development be
 ### Prototype scope
 The prototype validates the **economy loop only**. It covers resource extraction, market behaviour, supply routing, and the tick-gated price resolution system. Combat is explicitly out of scope for this phase.
 
-> **Status note (2026-07-31).** Combat *resolution* stays out of scope — nothing resolves a battle. But the terrain side of combat now exists as measurement: `terrain_combat.{hpp,cpp}` provides `terrain_defence` / `terrain_attrition` / `terrain_resistance` (0–1000, pure functions of composition × landform — no stored field, nothing on the serialisation seam). No consumer is wired yet: the history ladder still prices conquest through its own `is_barrier` bool, and swapping it onto the graded scalars — plus any gameplay use — is BL-233 (terrain combat modifiers), open. When combat lands it reads these same functions rather than inventing a second answer to "how does ground resist an army".
+> **Status note (superseded 2026-08-02 — BL-272 landed).** A battle resolver now exists:
+> `src/world/combat.{hpp,cpp}` — `resolve_battle` over a class-matchup matrix × formation
+> doctrine × terrain × supply × season, integer arithmetic with a deterministic tie-break, and
+> `unit_component` carries a `uint16_t` type field. Its consumer is the **Era −1 history sim**
+> (BL-271), not the campaign layer: nothing in Era 0 commands a unit, and the campaign-side stub
+> is BL-157 (military datamodel stub, v0.1.4). So combat resolution is no longer excluded from the
+> *codebase*, only from *campaign play*.
+>
+> The earlier note, still accurate on terrain: `terrain_combat.{hpp,cpp}` provides `terrain_defence` / `terrain_attrition` / `terrain_resistance` (0–1000, pure functions of composition × landform — no stored field, nothing on the serialisation seam). No consumer is wired yet: the history ladder still prices conquest through its own `is_barrier` bool, and swapping it onto the graded scalars — plus any gameplay use — is BL-233 (terrain combat modifiers), open. When combat lands it reads these same functions rather than inventing a second answer to "how does ground resist an army".
 
 ### Units
 Units exist in the **data model** as minimal entities. They are defined enough that they will not need to be retrofitted when combat is added, but no combat rules are implemented. The following are explicitly excluded from the prototype:
 
-- Combat resolution of any kind — *still holds*
+- ~~Combat resolution of any kind~~ — *superseded 2026-08-02; `resolve_battle` ships (BL-272), consumed by the Era −1 sim only. Campaign-side combat is still excluded.*
 - ~~Opponent or AI factions~~ — *superseded; see § Factions below (2026-07-31)*
 - Unit transport infrastructure (troop carriers, shuttles, transit buildings) — *still holds*
 - Weaponry or equipment systems — *still holds*
@@ -42,6 +50,21 @@ Economy-supporting infrastructure (extraction sites, processing facilities, port
 
 ### Language and scripting
 The engine is written in **C++** with **Lua** used for scripting. The split is: simulation logic lives in C++; Lua handles data definitions, balance values, and future scripting of behaviour. The boundary is kept narrow — the less data shared between C++ and Lua, the better. Performance-critical paths (extraction yields, price resolution, supply calculations) stay in C++.
+
+### Agent interface — out-of-process only *(added 2026-08-04; BL-278 landed)*
+The app ships **three headless CLI modes** beside its windowed one, all in `src/main.cpp`:
+`--verify <script>` (visual-verification capture), `--export-blackboard <corp|all>` (BL-206, the
+read leg), and `--serve [--ticks N]` (BL-278) — a persistent mode that reads one request per line
+from stdin and answers on stdout.
+
+`tools/mcp/` wraps `--serve` as an **MCP server**: Node, JSON-RPC 2.0 over stdio, spawning
+`ProjectIo --serve` as a child. That adds a third runtime, but **only at the tooling boundary** —
+it is not an engine dependency, and the engine cannot call out.
+
+The hard invariant, and the reason the seam is shaped this way: **`ProjectIo.exe` ships no HTTP
+client, no API key and no cloud dependency.** A model reaches the game by speaking to a wrapper
+that speaks to the process; the process never reaches a model. Anything that would put a network
+client in the engine is out of scope. Authority: `docs/ai/AI_OPPONENT.md` § 10.
 
 ### Framework — SDL3
 The platform layer is **SDL3**, providing windowing, input, audio, and 2D rendering on Windows and Linux.
@@ -117,9 +140,11 @@ build + run) — the cross-platform path is no longer source-audit-only.
 
 **Headless verification tier** (the `tools/verify/*.cpp` harnesses over `world/*`,
 deliberately SDL/Lua/ImGui-free) builds with nothing but a C++20 compiler — no
-external deps, no display — which is why it runs in any sandbox and is the standing
-CI guard. Link each harness against every `src/world/*.cpp` except
-`recipe_registry.cpp` (the one TU that pulls sol2/Lua):
+external deps, no display — which is why it runs in any sandbox. It is the standing
+guard, and since CI was removed (2026-07-31) the *only* one. Link each harness against
+every `src/world/*.cpp` except `recipe_registry.cpp` (the one TU that pulls sol2/Lua) —
+in practice via the `io_world_obj` OBJECT library, which since BL-287 compiles the world
+layer once for the whole tier rather than once per harness:
 
 ```
 WORLD=$(ls src/world/*.cpp | grep -v recipe_registry.cpp)
@@ -175,9 +200,10 @@ This means ImGui panel code should be written clearly, not cleverly. It is refer
 | Lua binding | sol2 (v3) |
 | Tick architecture | Three-layer calendar clock (`sim_loop`: 12 sim ticks/day → day tick → 90-day quarter econ tick); tick-boundary snapshots for saves (planned) |
 | Generation | In scope, deterministic (seeded) — planetology → continents → tiles → history ladder → nations/population/roads/corporations (superseded the out-of-scope call, 2026-07-31) |
-| Factions | Generated nations + rival corps with scoped AI (BL-079 reflexes, BL-202 corp AI stage A); combat resolution still excluded |
+| Factions | Generated nations + rival corps with scoped AI (BL-079 reflexes, BL-202 corp AI, BL-203 predictive spending); campaign-side combat still excluded, though `resolve_battle` ships for the Era −1 sim (BL-272) |
 | Tile memory | All tiles resident; flat binary structs; no per-tile Lua |
 | UI (prototype) | Dear ImGui |
 | UI (production) | Lua-driven retained layer — deferred to UI document |
 | Serialisation | Flat binary; format hardened in place ahead of the serialiser; SQLite deferred until world scale requires it |
+| Agent interface | **Out-of-process only.** `ProjectIo --serve` speaks a line protocol on stdio; `tools/mcp/` wraps it as an MCP server (Node, tooling tier). The engine ships no HTTP client, no API key, no cloud dependency. Authority: `docs/ai/AI_OPPONENT.md` § 10 |
 | Build | CMake + FetchContent (self-contained), Linux + Windows; headless tier needs only a C++20 compiler |

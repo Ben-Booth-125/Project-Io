@@ -95,7 +95,10 @@ markers embedded in it.
 ## Interaction
 
 - **Hover** a body circle: show tooltip.
-- **Left-click a body — descend (zoom in).** When the Solar screen is primary, clicking a body sets `active_body` and drills the primary down one rung to that body's **Circumplanetary** view. Clicking a **planet** opens the planet's view; clicking a **moon** opens its **parent planet's** view with the moon selected. Clicking the **star** does nothing (it has no Circumplanetary view).
+- **Single-click a body — select.** Sets `selected_entity` and fills the Selection band. The view rung does not change (`solar_system_canvas.cpp`).
+- **Double-click a body — descend (zoom in).** Sets `active_body` and drills the primary down one rung to that body's **Circumplanetary** view. A **planet** opens its own view; a **moon** opens its **parent planet's** view with the moon selected. The **star** does not descend — it has no Circumplanetary view — but it does select, Helios being a selectable entity.
+
+  *(Single-click-selects / double-click-navigates is the shared model across all three canvases; `docs/ui/SELECTION.md` owns it.)*
 - **Click the Solar minimap — ascend.** When the Solar screen is the minimap (i.e. the Circumplanetary screen is primary), any click promotes the Solar screen back to primary.
 - Input is only processed for the canvas the mouse is over; an ImGui panel under the cursor takes precedence over the canvases.
 - **Pan and zoom (primary view only).** Scroll wheel zooms, anchored at the cursor so the point under the mouse stays fixed; the middle mouse button pans. A bottom-centre **zoom slider** sets the same factor — dragging **right zooms in**, left zooms out — sharing its bounds with the wheel. Positions and orbital rings scale with zoom, but element sizes (body/star radii, labels, selection outlines) stay the same pixel size. The default framing (zoom 1, no pan) is the auto-fit that shows all bodies. The **minimap always renders the default framing** — pan/zoom apply only when the canvas holds the primary slot. View state (`solar_zoom`, `solar_pan_x/y`) lives in `ui_state`.

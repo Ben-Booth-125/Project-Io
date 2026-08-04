@@ -13,8 +13,19 @@
 //
 // It fills the Solar minimap slot, which MINIMAP.md § The top rung records as a
 // branding placeholder: Solar has no zoom-out neighbour, so the inset had
-// nothing to show and drew a flat dark fill. The rung above a solar system is
-// the galaxy it belongs to.
+// nothing to show and drew a flat dark fill.
+//
+// THE LADDER WRAPS (Ben, 2026-08-04). Solar is as far out as the zoom goes, so
+// instead of inventing a further rung the minimap loops back to where the
+// player is standing: the sky over the homeworld, seen from the top of a hill.
+// Zoom all the way out and you are looking up again. That keeps the panel a
+// MINIMAP rather than a fourth canvas — there is nothing to navigate here, only
+// something to look at.
+//
+// The galaxy is in the picture rather than being a separate view of it: the
+// core rides across the sky as a bright bulge in the band, so the supermassive
+// black hole at the centre of everything is a DIRECTION you can point at from
+// the ground, which is how it actually reads to anyone who has stood outside.
 //
 // NAMES ARE INVENTED, not transferred. The standing rule
 // (.claude/rules/io-standing-rules.md § Terms & docs) is that real history is a
@@ -51,7 +62,8 @@ struct star_map_constellation
 /// Things that are not stars: the quasar, the remnants, the nebulae. These are
 /// the objects the biography's flavour lines point at (BL-289) — a supernova
 /// remnant in the sky is the same object the history says was seen to flare.
-enum class deep_sky_kind : uint8_t { quasar = 0, supernova_remnant, nebula, cluster, galaxy };
+enum class deep_sky_kind : uint8_t { quasar = 0, supernova_remnant, nebula, cluster, galaxy,
+                                     galactic_core };
 
 struct star_map_object
 {
@@ -70,6 +82,11 @@ const star_map_constellation* star_map_constellations(int& count);
 const star_map_object* star_map_objects(int& count);
 
 /// Display name for a spectral class, and its identity colour as 0xRRGGBB.
+/// Where the galactic band crosses the sky: the band is drawn as a great circle
+/// tilted by `band_tilt` and centred on the core's x position, so the core bulge
+/// and the band agree by construction rather than by hand-placement.
+float star_map_band_tilt();
+
 const char* star_class_name(star_class k);
 uint32_t    star_class_rgb(star_class k);
 const char* deep_sky_kind_name(deep_sky_kind k);

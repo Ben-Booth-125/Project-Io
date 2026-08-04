@@ -32,9 +32,10 @@ where one is likely.
 
 ---
 
-## Where we are — v0.0.9 shipped, v0.1.0 in progress
+## Where we are — v0.1.0 shipped; v0.1.1 in progress
 
-*Latest tag `v0.0.9`, cut 2026-07-05; the v0.1.0 work is landing on `main` (status 2026-07-31).*
+*Latest tag `v0.1.0`, cut 2026-08-03 (`49c7fbf`; CHANGELOG `[0.1.0] — 2026-08-03`). **The prototype
+cut has happened** — the done-definition below was met and the tag exists. Status 2026-08-04.*
 The interactive economy loop is mechanically complete, legible, and discovery-gated:
 
 - **Layer 0–2** — SDL3 + fixed-timestep simulation + economy tick + sol2; the core data
@@ -179,12 +180,15 @@ swept rung — filed as **BL-258**, and a build-configuration artefact rather th
 Windows tree is deliberately Debug, R5 still passes with 19× headroom, and every growth-shape
 assertion holds.
 
-**Still owed before the cut:** **BL-258** (gate the absolute timing bound on an optimised build),
-and the **frame-budget targets measured against the real app** — headless capture has no vsync and
-no real present, so its numbers cannot speak to them. That last one needs a human at the keyboard.
+**The Cut happened on 2026-08-03** (`49c7fbf`, tag `v0.1.0`), preceded by a full visual re-bless
+(BL-259). What had been listed as owed before it resolved as follows:
 
-Plus hygiene: warning-clean build, one-off static-analysis (cppcheck), headless harnesses green.
-Final verification pass against the done-definition below, then the Cut.
+- **BL-258** (gate the absolute timing bound on an optimised build) — the live successor is
+  **BL-288** (Release-only test failures, `design-owed`, A, v0.1.2). Four harnesses fail in Release
+  and nothing caught it, because the default `build/` tree is Debug. Same root, wider scope.
+- **Frame-budget targets measured against the real app** — still owed, and still needs a human at
+  the keyboard: headless capture has no vsync and no real present, so its numbers cannot speak to
+  them. Tracked as **NR-026**, open. The HUD itself shipped (BL-249).
 
 ### v0.1.x — Expanded-prototype groundwork
 
@@ -212,9 +216,10 @@ rest of the band (v0.1.2–v0.1.5) is deliberately design-forward — each now h
   **The word interface (new theme).** The route from docs to a text-driven player: the action
   dictionary (**BL-270**, complete) supplies meaning, the blackboard export (**BL-206**,
   complete) supplies state, and the **Io MCP server** (**BL-278**, moved here from v0.2.0 by
-  NR-044) is the socket that makes them drivable by any agent runtime. BL-278 touches no
-  simulation code, and landing it early is what lets a first real text-driven play attempt
-  happen before more gets designed on top of it. Word-driven generation and the difficulty work
+  NR-044, **complete**) is the socket that makes them drivable by any agent runtime — shipped as
+  `ProjectIo --serve` plus `tools/mcp/` (`d62a4f0`). All three legs of the theme have now landed.
+  BL-278 touched no simulation code, and landing it early is what lets a first real text-driven
+  play attempt happen before more gets designed on top of it. Word-driven generation and the difficulty work
   land later in the arc — deliberately not pre-committed here; the arc gets named once the
   server exists and the first cloud session has produced evidence. See `docs/ai/AI_OPPONENT.md`
   § 10.

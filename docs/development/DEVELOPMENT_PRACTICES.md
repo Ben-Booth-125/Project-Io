@@ -42,7 +42,7 @@ Do not test rendering, ImGui panels, or SDL3 platform behaviour in a harness —
 ### Authoring a harness
 
 - One `tools/verify/<name>.cpp` per behaviour; `#include` the `world/*` headers it needs and build a small fixture (usually `make_hard_coded_world()` or a hand-built registry).
-- Print one `PASS`/`FAIL`/`WARN` line per assertion, naming what failed, and `return` non-zero on any hard failure so CTest and the CI loop detect it.
+- Print one `PASS`/`FAIL`/`WARN` line per assertion, naming what failed, and `return` non-zero on any hard failure so CTest detects it.
 - Keep it free of SDL/Lua/ImGui so it links against the `world/*` superset (`recipe_registry.cpp` excepted — it pulls sol2/Lua). CMake's `foreach` over `tools/verify/*.cpp` wires each one into `ctest` automatically; name a genuinely new *check class* in the `verifier-headless` skill so it stays discoverable.
 
 ### Visual verification (rendering / lenses)
@@ -96,7 +96,8 @@ ProjectIo --verify scripts/verify/<name>.lua
   exceed 0.5% of the frame. A diff image lands in `screenshots/diff/<name>.png`. **Still owed**
   from the 2026-06-15 tolerance design (its superseded "build deferred" subsection removed
   2026-07-31): per-golden ignore masks, per-check tolerance overrides via the Lua API (noted as a
-  follow-on in `compare_to_golden`), and CI promotion — the Linux visual-verify job stays advisory.
+  follow-on in `compare_to_golden`). *(A third owed item, "CI promotion", is retired — CI was
+  deleted 2026-07-31; see § Merge gate.)*
 
 #### Acceptance flows — driving a real player action through the commit path (BL-113)
 
@@ -160,7 +161,7 @@ to need **different answers**. Both are now settled; the underlying measurement 
 Linux the same commit diffs 9–57%, because pixel output depends on font rasterisation and the
 GPU/driver as well as the toolchain — pinning a set per platform would mean re-blessing on every
 driver update, for no gain in regression detection. On Linux, **inspect captures by eye and do not
-golden-diff them**; the Linux visual-verify job stays advisory (§ above).
+golden-diff them**. There is no CI job to defer to — inspection is the whole check (§ Merge gate).
 
 **Headless golden bands are pinned per toolchain.** `ai_skill_harness` carries one blessed set per
 compiler, selected by `#if defined(_MSC_VER)` / `#elif defined(__GNUC__)`, with an `#error` for any

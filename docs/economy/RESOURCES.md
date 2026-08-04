@@ -90,25 +90,33 @@ Available in Era 1 and beyond. Found predominantly on moons, asteroids, and oute
 
 ### Logistics goods (BL-286, 2026-08-04)
 
-Eight resources added for the army/unit logistics family (BL-286–291). This entry is **BL-286
-only** — enum + serialization + authored base price. None of the consumption, range-cap,
-shelf-life, or purchase mechanics below are implemented yet; each names the follow-on task that
-adds its behaviour.
+Eight resources added for the army/unit logistics family. This entry is **BL-286 only** — enum +
+serialisation + authored base price. None of the consumption, range-cap, shelf-life or purchase
+mechanics are implemented, and **their follow-on items are not yet filed**. Allocate ids with
+`node tools/session/next_id.js` when they are; do not cite one before it exists.
+
+*(Corrected 2026-08-04. This section previously cited "BL-286–291" and named BL-287/288/289/290 as
+the follow-ons. Those ids belong to unrelated items — BL-287 is the verify-tier build change,
+BL-288 is the Release-only test failures — and BL-289–291 do not exist. BL-286's own design said
+"not yet filed"; the caveat was dropped in transcription. The same bad ids are copied into a
+`components.hpp` comment.)*
 
 | Resource | Tier | Notes |
 |----------|------|-------|
-| Grain | 1 (raw) | Human ration staple. Per-tick army/unit draw lands with BL-287. |
-| Fodder | 1 (raw) | Draft-animal/cavalry feed, drawn down alongside grain by BL-287. |
-| Salt | 1 (raw) | Preservative. Gates ration shelf-life — BL-289 (not yet implemented). |
-| Transport capacity | 1 (abstract) | Logistics-train throughput good; caps supply range — BL-288 (not yet implemented). |
-| Charcoal | 2 (refined) | Refined fuel-wood; pre-coal smelting/heating input. |
-| Iron blooms | 2 (refined) | Bloomery-refined iron intermediate — distinct from raw iron ore / iron-nickel ore. |
-| Bullion | 2 (refined) | Minted precious-metal specie; local purchase medium via `resolve_price` — BL-290 (not yet implemented). |
+| Grain | 1 (raw) | Human ration staple. Per-tick army/unit draw is a follow-on, unfiled. |
+| Fodder | 1 (raw) | Draft-animal/cavalry feed, drawn down alongside grain. Follow-on, unfiled. |
+| Salt | 1 (raw) | Preservative. Intended to gate ration shelf-life. Follow-on, unfiled. |
+| Transport capacity | 1 (abstract) | Logistics-train throughput good; intended to cap supply range. Follow-on, unfiled. |
+| Charcoal | 2 (refined) | Refined fuel-wood; pre-coal smelting/heating input. No recipe yet. |
+| Iron blooms | 2 (refined) | Bloomery-refined iron intermediate — distinct from raw iron ore / iron-nickel ore. No recipe yet. |
+| Bullion | 2 (refined) | Minted precious-metal specie; intended as a local purchase medium via `resolve_price`. Follow-on, unfiled. |
 | Trade goods (misc) | 1 (endemic, placeholder) | Generic endemic-luxury-class placeholder. Not a specific named luxury — that naming is a separate design step. |
 
 All eight carry an authored mid-tier `base_price` in the Kepler market template
-(`src/world/world_gen_config.hpp`) from BL-286, so they trade like any other priced resource even
-though nothing yet reads their intended behaviour.
+(`src/world/world_gen_config.hpp`). **They are priced but inert** — none has a tile deposit
+(`generate_deposits` never emits them), a recipe (`recipes.lua` holds four, none producing them),
+or a `demand_basket` entry. A good with no supply and no demand never clears, so no market will
+ever price one in play; the base price is scaffolding for when the behaviour lands.
 | Iron-nickel ore | Rocky (metallic asteroid) | Found in metallic asteroids; feeds the same smelting chain as iron ore and eliminates dependence on Earth-side steel once accessible. |
 | Platinum group metals | Rocky, volcanic (asteroid) | Ultra-rare catalytic and industrial metals. Very low deposit concentration; extremely high base price. The primary high-value trade good of the asteroid belt. |
 | Regolith | All terrain (airless bodies) | Loose surface dust and broken rock. Used for bulk construction in-situ; not typically traded (high mass, low unit value). Included in the resource model but excluded from market tables; see note below. |

@@ -128,7 +128,11 @@ constexpr int k_constellation_count =
 // system — the number the biography's flavour lines date themselves from, so a
 // remnant in the sky and the line about it agree.
 const star_map_object k_objects[] = {
-    { "Ith-Karan",          0.386f, 0.148f, 0.012f, deep_sky_kind::quasar,            0.0f  },
+    // The galactic core: a bright bulge where the band runs thickest, and the
+    // supermassive black hole sitting inside it. From the ground this is a
+    // direction, not a destination — which is exactly what it is.
+    { "Ith-Karan",          0.293f, 0.500f, 0.115f, deep_sky_kind::galactic_core,     0.0f  },
+    { "The Far Lantern",    0.792f, 0.116f, 0.010f, deep_sky_kind::quasar,            0.0f  },
     { "The Ember Wake",     0.166f, 0.556f, 0.030f, deep_sky_kind::supernova_remnant, 2.85f },
     { "Sarrow's Lamp",      0.679f, 0.434f, 0.024f, deep_sky_kind::supernova_remnant, 1.12f },
     { "The Cold Sister",    0.598f, 0.744f, 0.021f, deep_sky_kind::supernova_remnant, 0.43f },
@@ -197,6 +201,14 @@ const char* deep_sky_kind_name(deep_sky_kind k)
         case deep_sky_kind::nebula:            return "nebula";
         case deep_sky_kind::cluster:           return "cluster";
         case deep_sky_kind::galaxy:            return "galaxy";
+        case deep_sky_kind::galactic_core:     return "galactic core";
     }
     return "?";
+}
+
+float star_map_band_tilt()
+{
+    // Shallow, so the band sweeps across the panel rather than cutting it in
+    // half. Radians of rise across the full sky width.
+    return 0.34f;
 }

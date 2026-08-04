@@ -78,12 +78,12 @@ author opens PR  ──►  CI gate (hard)  ──►  independent review posts 
 ## The artifacts (portable)
 
 1. **`.claude/agents/code-reviewer.md`** — the cold, adversarial reviewer persona. Read-only
-   tools; reports findings; never approves/merges/pushes. Used by the CI action and by any
-   manual `Agent`/Task review pass. Repo-agnostic.
-2. **`.github/workflows/claude-review.yml`** — runs the reviewer automatically on PR-open.
-   Requires one repo secret (the Anthropic API key or a Claude Code OAuth token — see the
-   workflow header). This is the only piece that costs API tokens per PR; keep it on Full
-   PRs (e.g. gate by a label or path filter) if cost matters.
+   tools; reports findings; never approves/merges/pushes. Invoked manually via `Agent`. This is
+   the only artifact of the three that exists here. Repo-agnostic.
+2. **`.github/workflows/claude-review.yml`** — *removed from this repo 2026-07-31 (`debcefd`);
+   recreate when porting.* Runs the reviewer automatically on PR-open. Requires one repo secret
+   (the Anthropic API key or a Claude Code OAuth token). This is the only piece that costs API
+   tokens per PR; keep it on Full PRs (e.g. gate by a label or path filter) if cost matters.
 3. **One-time GitHub config** (set via the UI or `gh api`, below).
 
 ## One-time GitHub config
@@ -143,21 +143,25 @@ gh alias set shipit '!gh pr review --approve "$1" && gh pr merge --squash --auto
 
 ## Project-Io anchors
 
-> **Current reality (2026-07-31).** The pipeline above is the method; most of it is not live here.
-> Branch protection is impossible on this plan — BL-105 (main merge gate) recorded the HTTP 403 on
-> 2026-07-05 (private repo, free plan) — so merges are **local and direct to `main`**, never
-> through a PR. The last PR was #25 (2026-07-19); the PR-triggered `claude-review.yml` has not
-> fired since (its last run was on PR #24's branch, 2026-07-18). The **live** review gate is the
-> `verifier-review` skill (DELIVERY step 4a) plus the requirements ledger
-> (`req/requirements.json`); the generic method below stays as the target state, not the practice.
+> **Current reality (updated 2026-08-04).** Read this document as a **porting template**, not as a
+> description of this repo. Its keystone is absent: **there is no CI here at all.** GitHub Actions
+> was deleted on 2026-07-31 (commit `debcefd`) — both `build.yml` and `claude-review.yml` are gone,
+> and `.github/` is not in the tree. Branch protection was never possible either; BL-105 (main merge
+> gate) recorded the HTTP 403 on 2026-07-05 (private repo, free plan). Merges are **local and direct
+> to `main`**, never through a PR.
+>
+> With the keystone gone, the pipeline below is aspirational rather than partly-live. What *is* live
+> is the `verifier-review` skill (DELIVERY step 4a), the `code-reviewer` agent
+> (`.claude/agents/code-reviewer.md`), and the requirements ledger (`req/requirements.json`).
 
 - **Standing rules** the reviewer must enforce: `.claude/rules/io-standing-rules.md`
   (determinism, no tile data to Lua, no unprotected sol2, flat-binary serialisation, AI a
   data-model stub) and the lifecycle in `docs/development/DELIVERY.md`.
 - **Spec source** for "is every requirement met": `docs/development/req/requirements.json`
   (the row's `verification` must have actually been *run*).
-- **CI checks** live in `.github/workflows/build.yml` — job names: *Linux GCC 13/14 (build
-  + headless harnesses)*, *Windows (build)*, *Linux visual-verify (advisory)*.
+- **CI checks** — none exist. If CI is ever restored, the job names to recreate were *Linux GCC
+  13/14 (build + headless harnesses)*, *Windows (build)*, *Linux visual-verify (advisory)*. Until
+  then the only gate is a green local build plus `ctest` (DEVELOPMENT_PRACTICES.md § Merge gate).
 - **Accept policy (current):** auto-merge Light / doc-only; **human-gate Full-mode** work
   touching the economy / save-format / determinism seams. This mirrors Rule 0.
 - The author session must **not** post an approving self-review; it runs `verifier-review`

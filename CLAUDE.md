@@ -1,9 +1,9 @@
 # Project Io — Claude Reference
 
-Project Io is a near-future space-based 4X grand strategy game. The player controls a corporate entity competing through resource extraction, trade, and military conflict across an Earth-like solar system. The project is in prototype phase, solo-developed in C++ with Lua scripting.
+Project Io is a near-future space-based 4X grand strategy game. The player controls a corporate entity competing through resource extraction, trade, and military conflict across an earth-like solar system — pivoting to a **governing body**, so that law, policy and science reach military as well as economic outcomes (BL-094, governing-body pivot, priority A; not yet landed). The project is in prototype phase, solo-developed in C++ with Lua scripting.
 
 The documents below are the authoritative source for all design and technical decisions. Read the
-ones your request touches — **not all of them**: the set is now ~600K tokens (measure it with
+ones your request touches — **not all of them**: the set is now ~650K tokens (measure it with
 `node tools/doc_weight.js`), so "read everything first" stopped being an instruction anyone could
 follow. Read for **traversal**: find the doc that owns the question and read that. Where a doc has
 an index or a query tool — `DEVLOG_INDEX.md`, `backlog_query.js`, `actions_query.js`,
@@ -41,7 +41,7 @@ All settled technical decisions: language, framework, architecture, tick model, 
 The milestone map from the current state through v0.1.0 (the finished prototype) and into the post-prototype arc (laws, tech, the v0.2.0 AI opponent): the version sequence, the theme of each minor, and the v0.1.0 done-definition. Forward-facing and lean — it sits above the backlog and worklist, naming which theme each minor carries, not the individual items. Read this for questions about sequence, what comes when, or whether a feature belongs in the prototype's remaining arc.
 
 **`docs/development/DEVELOPMENT_PRACTICES.md`**
-Testing framework (Catch2), naming conventions, documentation standards, the per-milestone ImGui panel rule, the standing development constraints, the tone/approach guidance, and how to cut a release. Read this alongside TECH_FOUNDATIONS when working on implementation.
+Testing via headless C++ harnesses (no unit-test framework — Catch2 was evaluated and *not* adopted), naming conventions, documentation standards, the per-milestone ImGui panel rule, the standing development constraints, the tone/approach guidance, and how to cut a release. Read this alongside TECH_FOUNDATIONS when working on implementation.
 
 **`docs/development/DEVLOG_INDEX.md`** and **`docs/development/DEVLOG.md`**
 Running session log — chronological record of what was built each session and
@@ -114,11 +114,20 @@ The map-lens system — the overlay modes (`overlay_mode` in `src/ui/ui_state.hp
 **`docs/ui/DISCOVERY.md`**
 The discovery & intelligence model — how the player *learns about the world*. Owns the two independent "fogs": the **geographic fog** (the Survey system, BL-067 — bodies start unsurveyed; a paid survey reveals tiles + deposit bands region-by-region) and the **activity fog** (the commercial sphere, BL-089 — a body-level Unknown/Known/Stale/Visible tier lit by the player's own trade routes + presence, `body_activity_visibility`), plus the **competitor-visibility rule** (BL-068 — rival buildings visible, internals private, markets public) and **persistent trade routes** (BL-088, the substrate the activity fog reads). The two fogs are independent axes (a body can be Known-but-unsurveyed). Read before any work on survey, competitor intelligence, trade-route recording, or the activity fog; the canvas rendering lives in SOLAR/PLANETARY/SELECTION, the glyphs in ICONS.
 
+**`docs/ai/AI_OPPONENT.md`**
+The AI-opponent authority — the design of the rival that carries the competition, and the doc that
+owns the **whole AI direction**. The shipped core is a deterministic scored-utility layer over the
+corp-command seam (BL-202/BL-203, `src/world/corp_ai.cpp`). Above it, § 10 sets the direction
+settled 2026-08-03: a **small local model** playing through the word interface, socketed by the
+**Io MCP server** (BL-278, landed — `ProjectIo --serve` plus `tools/mcp/`), with cloud models
+generating the fine-tuning corpus (BL-279) rather than playing. The hard invariant: the engine
+ships no HTTP client, no API key, no cloud dependency. Read before any AI, MCP, or agent-seam work.
+
 **`docs/ai/ACTIONS.json`** and **`docs/ai/ACTIONS.md`**
 The action dictionary (BL-270) — every control in the game as `{press, typed args, preconditions, expected_output, reason_to_select}`, in five families (gameplay / canvas / lens / ledger / chrome). **`ACTIONS.json`** is canonical and machine-consumable — the third leg of the word interface an AI player uses (blackboard export BL-206 = read, corp-command seam = write, dictionary = meaning); **`ACTIONS.md`** is the generated mirror (`node tools/session/render_actions.js` — also the store's parse/shape check; never hand-edit the mirror, which also emits **`ACTIONS_INDEX.json`**, the compact `[id, surface]` table of contents a language agent holds in context, fetching full entries via **`tools/session/actions_query.js`** — entries deliberately carry no urgency/importance; the live AI scores those on a 2D urgency × importance map at decision time, AI_OPPONENT.md § 6a). The gameplay family is *transcribed* from `src/world/corp_command.hpp`, not authored — where dictionary and seam disagree, the dictionary is wrong. **Any change to a control, binding, lens, ledger or panel must update its entry** — a stale entry misleads the AI player the way a stale golden misleads a visual check. Sibling axes: `user_stories.json` (intent), UX_QUESTIONS/BL-260 (information).
 
 **`docs/economy/RESOURCES.md`**
-The canonical resource list: all 23 resources organised into three tiers (raw → refined → product), their terrain affinity and body availability, the Era 0 / Era 1 split, and the seven-resource prototype subset. Read before any work involving resource types, tile deposits, or market goods.
+The canonical resource list: 31 resources organised into three tiers (raw → refined → product) — 23 core plus the eight logistics/endemic goods BL-286 added — their terrain affinity and body availability, the Era 0 / Era 1 split, and the seven-resource prototype subset. Read before any work involving resource types, tile deposits, or market goods.
 
 **`docs/economy/PRODUCTION.md`**
 All extraction and processing buildings: placement rules, valid terrain, output resources, and full recipe tables. Also covers the workforce scalar model, stockpile flow, and the Layer 3 prototype scope. Read before any work involving buildings, recipes, or production logic.
@@ -309,6 +318,11 @@ These skills exist and should be used proactively rather than reinventing their 
 - **`scoped-commit`** — stages exactly the files belonging to the current task and commits
   with the correct format, without bundling unrelated working-tree changes. Use whenever
   committing, especially on the default branch or when the tree has pre-existing edits.
+- **`status`** — the project status dashboard (`tools/status.ps1`): open items by priority with
+  blocked ones flagged, plus recent deliveries and commits, read live from `backlog.json` and
+  `git log`. The natural session-start move for "what's left" or "what shipped recently".
+- **`commit`** — the plain commit path, for a clean tree with no unrelated edits. Prefer
+  `scoped-commit` when the tree carries someone else's work in progress, which here it usually does.
 
 #### Tool creation is skill creation
 

@@ -4,17 +4,24 @@
 
 namespace ui {
 
-/// Draw the fixed star map into a rectangle — the Solar minimap's inset.
+/// Draw the sky over the homeworld into a rectangle — the Solar minimap's inset.
 ///
-/// Solar is the top rung of the zoom ladder, so its minimap has no zoom-out
-/// neighbour to show; MINIMAP.md § The top rung recorded the slot as a branding
-/// placeholder drawing a flat dark fill. The rung above a solar system is the
-/// galaxy it sits in, and unlike everything else on screen that galaxy is the
-/// SAME every campaign (src/world/star_map.hpp) — the one fixture a player
-/// carries between worlds.
+/// THE LADDER WRAPS. Solar is the top rung, so its minimap has no zoom-out
+/// neighbour; MINIMAP.md § The top rung recorded the slot as a branding
+/// placeholder drawing a flat dark fill. Rather than invent a further rung, the
+/// panel loops back to where the player is standing — the night sky from the top
+/// of a hill. Zoom all the way out and you are looking up again.
+///
+/// It stays a MINIMAP, not a fourth canvas: nothing here is navigable, and the
+/// galaxy appears in the picture (the core as a bright bulge in the band) rather
+/// than as a separate map of itself.
+///
+/// @param day_of_year Turns the sky. One revolution per year, so the panel shows
+///                    the constellations up on THIS day rather than a fixed
+///                    poster. Pass the campaign date; any value works, it wraps.
 ///
 /// Purely presentational: reads the authored table, draws, touches no world
 /// state and no seed.
-void draw_star_map(ImVec2 origin, ImVec2 size);
+void draw_star_map(ImVec2 origin, ImVec2 size, float day_of_year);
 
 } // namespace ui

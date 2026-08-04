@@ -96,7 +96,8 @@ framing.
 ## Interaction
 
 - **Hover** a body circle: show tooltip.
-- **Left-click a body — descend (zoom in).** When the Circumplanetary screen is primary, clicking the anchor planet or one of its moons sets `active_body` and drills the primary down to that body's **Planetary** surface.
+- **Single-click a body — select.** Sets `selected_entity` and fills the Selection band; the rung does not change. The selection ring is keyed on `selected_entity`, not `active_body`.
+- **Double-click a body — descend (zoom in).** Sets `active_body` and drills the primary down to that body's **Planetary** surface. (Shared click model — see `docs/ui/SELECTION.md`.)
 - **Click the Circumplanetary minimap — ascend.** When the Circumplanetary screen is the minimap (i.e. the Planetary screen is primary), any click promotes it to primary.
 - **Pan and zoom (primary view only).** Middle mouse button pans; scroll wheel zooms, anchored at the cursor. A bottom-centre **scale bar + zoom slider** (shared with the Solar canvas) sets the same factor — dragging **right zooms in**. Element sizes stay fixed; only the framing scales. View state (`circum_zoom`, `circum_pan_x/y`) lives in `ui_state`. The minimap always renders the default framing.
 - Input is only processed for the canvas the mouse is over; an ImGui panel under the cursor takes precedence.

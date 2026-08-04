@@ -8,10 +8,12 @@ This file stays only because other docs link it; do not add entries here.
 The two entries it carried, disposed of honestly:
 
 - **Frame stutter / performance.** The settled fix — a frame-time HUD in `src/core/app.cpp`
-  (last / avg / max ms + 1% lows + sparkline, debug-key toggled) — **remains unbuilt** as of
-  2026-07-31 (no HUD in `app.cpp`). It is now owned by `ROADMAP.md` § Audit instruments (the
-  frame-budget targets: avg < 8 ms, max < 16.7 ms panning the full Kepler grid). Build it there;
-  the classification-then-fix sequence from the original entry still applies.
+  (last / avg / max ms + 1% lows + sparkline, debug-key toggled) — **was built** as BL-249
+  (`ui::draw_frame_budget_hud`, called from `app.cpp`; covered by
+  `scripts/verify/frame_budget_hud.lua`). *(Corrected 2026-08-04; the "remains unbuilt" note here
+  was already stale when written.)* What is still owed is the **measurement** — the frame-budget
+  targets (avg < 8 ms, max < 16.7 ms panning the full Kepler grid) need a human at the keyboard,
+  NR-026, open. Performance work at large is now BL-267 (GPU and multicore).
 - **Body labels move in steps, not smoothly.** The settled mitigation — round **both** the dot
   centre and the label origin to the same integer pixel so they step together — **never landed**
   (verified 2026-07-31: the label derives from the live float `pos` in

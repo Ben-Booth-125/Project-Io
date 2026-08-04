@@ -151,7 +151,8 @@ for i in 0..5:
 ## Interaction
 
 - **Hover** a tile: show tooltip. Hit-tested by distance to hex centre (< circumradius).
-- **Left-click** a tile: set `active_tile` in selection state. (Tile clicks do not change the view rung — the Planetary screen is the bottom of the ladder.)
+- **Single-click** the surface: set `selected_entity`. Markers are hit-tested first, in the order **building → market → tile** (`body_surface_canvas.cpp`), so buildings, markets and tiles are all independently selectable. Clicks do not change the view rung — the Planetary screen is the bottom of the ladder.
+- **Rivers.** Directed river lines are drawn along tile edges with downstream chevrons (BL-170, `body_surface_canvas.cpp`), so a basin reads as flowing rather than as a static blue band. They are terrain drawing, not a lens, and are always on.
 - **Ascend:** clicking the minimap (which shows the Circumplanetary view) promotes it to primary.
 - **Middle mouse button drag:** pan. Horizontal panning is unbounded — the grid is a cylinder, so panning past the east or west edge wraps seamlessly to the opposite side. Each tile is drawn (and hit-tested) at every horizontal offset that falls within the canvas, so there is no visible seam and the column under the cursor is always correct.
 - **Scroll wheel:** zoom, anchored at the cursor position.
