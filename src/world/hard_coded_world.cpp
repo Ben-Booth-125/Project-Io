@@ -150,6 +150,13 @@ world make_hard_coded_world(world_params params, generation_report* report,
         body_inputs in = prototype_body(proto_index);
         if (in.is_homeworld)
             in.orbit_au = rw.home_orbit_au;
+        // A moon travels with its planet. The homeworld's orbit is DERIVED from
+        // the star, so a moon left at its authored 1.00 AU would sit somewhere
+        // else in the system entirely — computing its instellation, and now its
+        // eclipse geometry, against a star it is not actually that far from.
+        // The prototype set's only moon (Selene) orbits the homeworld.
+        else if (in.parent_mass_earths > 0.0f)
+            in.orbit_au = rw.home_orbit_au;
         const uint32_t body_seed = params.seed ^ prototype_body_seed(proto_index);
         planetology_state st = run_planetology(in, rw.params, body_seed);
 

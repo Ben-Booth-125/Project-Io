@@ -503,6 +503,16 @@ struct planetology_state
     float surface_pressure_bar= 0.0f;
     float surface_temp_k      = 0.0f;
     float o2_fraction         = 0.0f; ///< Mole fraction, 0-0.35.
+    /// Solar-eclipse geometry, for a body that orbits another (0 for everything
+    /// else). The moon's angular radius divided by the star's, seen from the
+    /// planet: >= 1 means the disc covers the star and totality is possible.
+    /// `mean` is at the moon's mean distance, `perigee` at closest approach —
+    /// the pair is what decides whether eclipses are always total, sometimes
+    /// total, or always annular. Earth sits at 0.971 / 1.028, which is why it
+    /// gets both kinds and why totality is a near-miss rather than a given.
+    float eclipse_ratio_mean    = 0.0f;
+    float eclipse_ratio_perigee = 0.0f;
+
     float ferruginous_gyr     = 0.0f; ///< Banded-iron window duration — the iron term.
     float marine_anoxia_gyr   = 0.0f; ///< The petroleum term.
     float land_burial_gyr     = 0.0f; ///< The coal term.

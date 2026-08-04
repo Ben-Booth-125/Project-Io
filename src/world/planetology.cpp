@@ -400,8 +400,8 @@ void preview_system(const planetology_params& p, float home_orbit_au, uint32_t s
         // The homeworld's orbit is derived from the star, so the preview has to
         // use it too — otherwise the charts describe a world at 1 AU that the
         // generator never builds.
-        if (in.is_homeworld && home_orbit_au > 0.0f)
-            in.orbit_au = home_orbit_au;
+        if (home_orbit_au > 0.0f && (in.is_homeworld || in.parent_mass_earths > 0.0f))
+            in.orbit_au = home_orbit_au; // a moon travels with its planet
         out.push_back(run_planetology(in, p, seed ^ k_prototypes[i].seed));
     }
 }
@@ -666,6 +666,47 @@ planetology_state run_planetology(const body_inputs& in,
         : 0.2725f * det_cbrt(mass / 0.0123f);
 
     st.v_esc_kms = 11.186f * std::sqrt(mass / radius);
+
+    // --- Eclipses. Whether this body's disc can cover its star, seen from the
+    // planet it orbits. Earth's case is a coincidence worth reproducing rather
+    // than assuming: the Moon is 400x smaller than the Sun and 400x closer, so
+    // the two discs very nearly match and totality is a near-miss — mean ratio
+    // 0.971, perigee 1.028. That is why Earth gets annular AND total eclipses
+    // instead of one kind forever.
+    //
+    // Derived, not authored: it falls out of the moon's radius and orbit, the
+    // star's radius, and the planet's own orbit. A dim star is small but close,
+    // and the orbit shrinks faster than the star does, so its disc looks BIGGER
+    // from the habitable zone — dim-star worlds lose totality entirely.
+    if (in.parent_mass_earths > 0.0f && in.parent_orbit_au > 0.0f && in.orbit_au > 0.0f)
+    {
+        constexpr float k_earth_radius_au = 4.2587e-5f; // 6371 km
+        constexpr float k_sun_radius_au   = 4.6520e-3f; // 696,000 km
+        // Main-sequence radius as M^0.75, evaluated as two exact sqrts of M^3.
+        // No pow in this path (PLANETOLOGY.md § Determinism), and within a few
+        // percent of the published ~0.8 exponent across the 0.6-1.5 M_sun range
+        // this generator actually samples.
+        const float m3        = m_star * m_star * m_star;
+        const float r_star_au = k_sun_radius_au * std::sqrt(std::sqrt(m3));
+        const float star_ang  = r_star_au / in.orbit_au;
+        const float moon_r_au = radius * k_earth_radius_au;
+        const float perigee   = in.parent_orbit_au * (1.0f - clampf(in.eccentricity, 0.0f, 0.9f));
+        if (star_ang > 0.0f)
+        {
+            st.eclipse_ratio_mean    = (moon_r_au / in.parent_orbit_au) / star_ang;
+            st.eclipse_ratio_perigee = (moon_r_au / perigee) / star_ang;
+        }
+
+        const char* verdict =
+            st.eclipse_ratio_mean    >= 1.0f ? "every alignment is a total eclipse"
+          : st.eclipse_ratio_perigee >= 1.0f ? "totality near perigee, annular at apogee"
+                                             : "the disc never quite covers the star - annular only";
+        say(age * 0.5f, chain_stage::accretion,
+            std::string(in.name) + " settles into an orbit that nearly matches the star's disc",
+            std::string(verdict)
+                + fmt(" - the disc spans %.0f%% of the star at mean distance",
+                      st.eclipse_ratio_mean * 100.0f));
+    }
 
     const float late_veneer = r1.range(0.4f, 1.6f);
     const bool  wet_accretion = in.orbit_au > snow_line * 0.62f;
