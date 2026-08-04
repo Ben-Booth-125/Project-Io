@@ -106,7 +106,30 @@ struct seed_metrics
     float relief_pct = 0.0f;   ///< mountain + highland, the fair comparison to Earth's figure.
     float river_pct = 0.0f;
     float temperate_forest_pct = 0.0f; ///< forest as % of land in the middle latitudes
+
+    // Ore provinces (Open calls 4). `top10` is the share of a resource's whole
+    // world total sitting in its richest 10% of bearing tiles — a flat endowment
+    // lands near 10-20%, a province model much higher. `total` is the world sum,
+    // carried so a provinces-on/off comparison can confirm the field only
+    // REDISTRIBUTES ore rather than creating it.
+    float coal_top10 = 0.0f, oil_top10 = 0.0f, copper_top10 = 0.0f, iron_top10 = 0.0f;
+    float coal_total = 0.0f, oil_total = 0.0f, copper_total = 0.0f, iron_total = 0.0f;
 };
+
+/// Share of the total held by the richest 10% of non-zero entries.
+void concentration(std::vector<float> v, float& top10_out, float& total_out)
+{
+    total_out = 0.0f;
+    top10_out = 0.0f;
+    if (v.empty()) return;
+    for (float x : v) total_out += x;
+    if (total_out <= 0.0f) return;
+    std::sort(v.begin(), v.end(), std::greater<float>());
+    const std::size_t k = std::max<std::size_t>(1, v.size() / 10);
+    float top = 0.0f;
+    for (std::size_t i = 0; i < k; ++i) top += v[i];
+    top10_out = 100.0f * top / total_out;
+}
 
 /// Percentile over a copy — the spread is the deliverable, not the mean.
 float pct(std::vector<float> v, float q)
@@ -245,6 +268,24 @@ seed_metrics census_one(uint32_t campaign_seed)
         }
     }
     m.coast_pct = 100.0f * static_cast<float>(n_coast) / land_f;
+
+    // Province concentration, per resource that has a placement mechanism.
+    {
+        std::vector<float> coal, oil, cu, fe;
+        for (int i = 0; i < static_cast<int>(ids.size()); ++i)
+        {
+            const auto& t = w.tiles.at(ids[static_cast<std::size_t>(i)]);
+            const auto d = [&](resource_type r) { return t.resource_deposit[static_cast<std::size_t>(r)]; };
+            if (d(resource_type::coal)       > 0.0f) coal.push_back(d(resource_type::coal));
+            if (d(resource_type::petroleum)  > 0.0f) oil.push_back(d(resource_type::petroleum));
+            if (d(resource_type::copper_ore) > 0.0f) cu.push_back(d(resource_type::copper_ore));
+            if (d(resource_type::iron_ore)   > 0.0f) fe.push_back(d(resource_type::iron_ore));
+        }
+        concentration(coal, m.coal_top10,   m.coal_total);
+        concentration(oil,  m.oil_top10,    m.oil_total);
+        concentration(cu,   m.copper_top10, m.copper_total);
+        concentration(fe,   m.iron_top10,   m.iron_total);
+    }
     return m;
 }
 
@@ -303,6 +344,18 @@ int main(int argc, char** argv)
     report("relief % (mtn+high)", col(&seed_metrics::relief_pct), "24 % mountainous land");
     report("river-tile %", col(&seed_metrics::river_pct),  "(no clean figure)");
     report("forest % in mid-lat", col(&seed_metrics::temperate_forest_pct), "(orientation only)");
+
+    std::printf("\nORE PROVINCES — share of the world total in the richest 10%% of bearing tiles\n");
+    std::printf("(a flat endowment lands near 10-20%%; a province model well above it)\n");
+    report("coal top-10%",      col(&seed_metrics::coal_top10),   "(concentration)");
+    report("petroleum top-10%", col(&seed_metrics::oil_top10),    "(concentration)");
+    report("copper top-10%",    col(&seed_metrics::copper_top10), "(concentration)");
+    report("iron top-10%",      col(&seed_metrics::iron_top10),   "(concentration)");
+    std::printf("  world totals (for a provinces-on/off conservation check):\n");
+    report("coal total",      col(&seed_metrics::coal_total),   "(sum, not a rate)");
+    report("petroleum total", col(&seed_metrics::oil_total),    "(sum, not a rate)");
+    report("copper total",    col(&seed_metrics::copper_total), "(sum, not a rate)");
+    report("iron total",      col(&seed_metrics::iron_total),   "(sum, not a rate)");
 
     std::printf("\nEarth figures are ORIENTATION, not targets. A generator that hit them all\n");
     std::printf("exactly would be reproducing one planet, not generating earth-LIKE ones.\n");

@@ -559,6 +559,179 @@ int scale_to_area(int base, int total_tiles)
     return std::max(base, static_cast<int>(scaled));
 }
 
+// ---------------------------------------------------------------------------
+// Ore provinces (PLANETOLOGY.md § Open calls 4)
+// ---------------------------------------------------------------------------
+// "A body-level 1.4x copper smears evenly and reads as noise. Real ore is
+// province-scale — the Hamersley is ONE basin, a handful of tiles at any
+// resolution."
+//
+// The planetology endowment says how much of a resource a world's HISTORY
+// produced; it says nothing about where. Applied as a flat multiplier it makes
+// every eligible tile equally rich, so a biosphere history that the model
+// computes in real detail arrives on the map as uniform grey. A province field
+// puts it somewhere: the oil in the basin that was an anoxic sea, the porphyry
+// copper along the boundary that was subducting.
+//
+// CONCENTRATE, DO NOT INFLATE. Each field is normalised to mean 1.0 over the
+// tiles that bear the resource, so a province moves ore around the body without
+// changing how much of it the world has. The endowment stays the sole authority
+// on quantity; provinces are purely a redistribution. That keeps this pass
+// orthogonal to S8 and to BL-114's deposit_scalar, both of which own magnitude.
+struct ore_province { int centre; float radius; };
+
+// Where each province-forming resource actually forms. Anything not listed here
+// keeps the flat endowment — a province model is only honest for resources with
+// a real concentrating mechanism.
+std::vector<ore_province> provinces_for(resource_type res, int n, int gw, int gh,
+                                        const std::vector<float>& height,
+                                        const std::vector<bool>& is_ocean,
+                                        const std::vector<terrain_composition>& comp,
+                                        const std::vector<uint8_t>* convergent,
+                                        std::mt19937& rng)
+{
+    using tc = terrain_composition;
+    const int total = gw * gh;
+    const bool have_conv = convergent != nullptr
+                           && convergent->size() == static_cast<std::size_t>(total);
+
+    // "Low-lying" has to be a percentile of the LAND range, not an absolute
+    // height. Pass 2 puts the ocean threshold at the water_fraction percentile of
+    // the height field, so EVERY land tile sits above it — on a 55%-ocean world
+    // an absolute cutoff like 0.45 selects nothing at all. That was exactly the
+    // bug the provinces-off comparison caught: petroleum and iron concentration
+    // came back bit-identical because no province ever formed.
+    std::vector<float> land_h;
+    land_h.reserve(static_cast<std::size_t>(total));
+    for (int idx = 0; idx < total; ++idx)
+        if (!is_ocean[idx]) land_h.push_back(height[idx]);
+    if (land_h.empty()) return {};
+    std::sort(land_h.begin(), land_h.end());
+    const auto land_pct = [&](float q) {
+        const std::size_t k = static_cast<std::size_t>(q * static_cast<float>(land_h.size() - 1));
+        return land_h[k];
+    };
+    const float marine_cut = land_pct(0.40f); // lowest 40% of land: old shelf and basin
+    const float swamp_cut  = land_pct(0.55f); // a little higher: the coal measures
+
+    std::vector<int> cand;
+    for (int idx = 0; idx < total; ++idx)
+    {
+        if (is_ocean[idx]) continue;
+        bool ok = false;
+        switch (res)
+        {
+            // Porphyry sits over a subduction arc. S8 already says so in prose
+            // ("porphyry needs sustained subduction"); this is the same claim
+            // made spatial, using the boundary mask the continents pass records.
+            case resource_type::copper_ore:
+                ok = have_conv && (*convergent)[static_cast<std::size_t>(idx)] != 0u;
+                break;
+            // Oil and banded iron are MARINE legacies: they want ground that sat
+            // low — a shelf or an epicontinental basin — not today's uplands.
+            case resource_type::petroleum:
+            case resource_type::iron_ore:
+                ok = height[idx] <= marine_cut;
+                break;
+            // Coal wants the swamp: low, wet, vegetated ground.
+            case resource_type::coal:
+                ok = height[idx] <= swamp_cut
+                     && (comp[idx] == tc::wetland || comp[idx] == tc::forest || comp[idx] == tc::grassland);
+                break;
+            default: break;
+        }
+        if (ok) cand.push_back(idx);
+    }
+    if (static_cast<int>(cand.size()) < n * 4) return {}; // too few sites to be a province
+
+    std::shuffle(cand.begin(), cand.end(), rng);
+    std::uniform_real_distribution<float> rad(5.0f, 11.0f);
+    std::vector<ore_province> out;
+    out.reserve(static_cast<std::size_t>(n));
+    for (int i = 0; i < n; ++i)
+        out.push_back(ore_province{ cand[static_cast<std::size_t>(i)], rad(rng) });
+    return out;
+}
+
+// Per-tile multiplier for one resource's provinces, normalised to mean 1.0 over
+// the tiles that can bear it. Falls off smoothly from each centre so a province
+// reads as a basin with margins rather than a stamped disc.
+/// @param share Fraction of the world's total that should end up inside the
+///              provinces. This, not a peak multiplier, is the honest control:
+///              normalising a peak to mean 1.0 sounds like concentration but is
+///              not. With provinces covering ~5% of land, a mean-1.0 field
+///              leaves every tile outside them at ~0.97 — measurably identical
+///              to no provinces at all, which is what the first version did.
+///              Fixing the share instead makes the statement directly: "most of
+///              this world's copper is in two places."
+/// @param bears 1 on tiles that actually carry this resource. The budget MUST be
+///              conserved over these, not over all land: a province that lands on
+///              ground which cannot bear the resource wastes its boost while the
+///              reduction outside still applies, and the world quietly loses ore.
+///              Measured at -47% petroleum, -19% copper, -17% coal, -10% iron
+///              before this was keyed to the bearing set.
+std::vector<float> province_field(const std::vector<ore_province>& prov,
+                                  int gw, int gh, const std::vector<uint8_t>& bears,
+                                  float share)
+{
+    const int total = gw * gh;
+    std::vector<float> f(static_cast<std::size_t>(total), 1.0f);
+    if (prov.empty()) return f;
+
+    // Raw shape: t^2 inside a province (a core with margins, not a stamped disc),
+    // zero outside.
+    std::vector<float> shape(static_cast<std::size_t>(total), 0.0f);
+    for (int idx = 0; idx < total; ++idx)
+    {
+        if (!bears[static_cast<std::size_t>(idx)]) continue;
+        const int c = idx % gw, r = idx / gw;
+        float best = 0.0f;
+        for (const ore_province& p : prov)
+        {
+            const int pc = p.centre % gw, pr = p.centre / gw;
+            int dc = std::abs(c - pc);
+            if (dc > gw / 2) dc = gw - dc;          // columns wrap
+            const int dr = std::abs(r - pr);
+            const float d = std::sqrt(static_cast<float>(dc * dc + dr * dr));
+            if (d < p.radius)
+            {
+                const float t = 1.0f - d / p.radius; // 1 at centre, 0 at rim
+                best = std::max(best, t * t);
+            }
+        }
+        shape[static_cast<std::size_t>(idx)] = best;
+    }
+
+    // Split the land budget: `share` of it distributed by shape, the rest spread
+    // evenly over the tiles the provinces do not reach. Land-only, because ocean
+    // tiles carry no land deposits and would otherwise make province strength
+    // depend on how wet the world happens to be.
+    double shape_sum = 0.0;
+    int n_land = 0, n_outside = 0;
+    for (int idx = 0; idx < total; ++idx)
+    {
+        if (!bears[static_cast<std::size_t>(idx)]) continue;
+        ++n_land;
+        const float s = shape[static_cast<std::size_t>(idx)];
+        shape_sum += s;
+        if (s <= 0.0f) ++n_outside;
+    }
+    if (shape_sum <= 0.0 || n_outside == 0) return f; // degenerate: leave it flat
+
+    // Total land budget is n_land (mean 1.0), so the sum is conserved exactly.
+    const double in_budget  = share * static_cast<double>(n_land);
+    const double out_budget = (1.0 - share) * static_cast<double>(n_land);
+    const float  out_value  = static_cast<float>(out_budget / static_cast<double>(n_outside));
+    const float  in_scale   = static_cast<float>(in_budget / shape_sum);
+
+    for (int idx = 0; idx < total; ++idx)
+    {
+        const float s = shape[static_cast<std::size_t>(idx)];
+        f[static_cast<std::size_t>(idx)] = (s > 0.0f) ? s * in_scale : out_value;
+    }
+    return f;
+}
+
 int seed_count(feature_kind kind, geological_activity g, bool airless, int total_tiles)
 {
     int base = 0;
@@ -999,6 +1172,58 @@ std::vector<entity_id> generate_body_tiles(
     // tiles, so each campaign varies while the rare-stays-rare ordering holds.
     const std::array<float, resource_count> rarity = build_rarity_profile(seed ^ 0x68E31DA4u);
 
+    // Ore provinces (Open calls 4). Own RNG stream, so adding this pass leaves
+    // every earlier draw untouched; skipped entirely without a planetology state,
+    // which keeps the null-pl identity contract exact.
+    std::vector<std::pair<resource_type, std::vector<float>>> province_fields;
+    if (pl)
+    {
+        std::mt19937 prov_rng(seed ^ 0x0BE0F1E1u);
+        struct spec { resource_type res; int count; float share; };
+        // Counts sit inside Open calls 4's "2-5 seeded province records" per
+        // resource. `share` is the fraction of the world's total that ends up in
+        // those provinces, ordered by how province-bound the real material is:
+        // porphyry copper is the extreme (a handful of districts supply most of
+        // world production), coal the mildest (workable seams are widespread even
+        // though the great basins dominate tonnage).
+        static constexpr spec k_specs[] = {
+            { resource_type::copper_ore, 2, 0.65f },
+            { resource_type::petroleum,  2, 0.60f },
+            { resource_type::iron_ore,   2, 0.55f },
+            { resource_type::coal,       3, 0.45f },
+        };
+        // Which tiles will actually bear each of these. generate_deposits is a
+        // pure function of (composition, landform, per-tile seeds), so replaying
+        // it here is exact and costs one extra table-driven pass. Necessary
+        // because the province budget has to be conserved over the BEARING set:
+        // normalising over all land instead silently cost a world 10-47% of its
+        // ore wherever a province landed on ground that carries none.
+        std::array<std::vector<uint8_t>, 4> bears;
+        for (auto& b : bears) b.assign(static_cast<std::size_t>(total), 0u);
+        for (int idx = 0; idx < total; ++idx)
+        {
+            if (is_ocean[idx]) continue;
+            std::mt19937 tr(seed_deposit ^ (static_cast<uint32_t>(idx) * 2654435761u));
+            std::mt19937 rr(seed_deposit ^ (static_cast<uint32_t>(idx) * 40503u) ^ 0x5BD1E995u);
+            std::array<float, resource_count> d{};
+            generate_deposits(comp[idx], land[idx], d, tr, rr, rarity);
+            for (std::size_t k = 0; k < 4; ++k)
+                if (d[static_cast<std::size_t>(k_specs[k].res)] > 0.0f)
+                    bears[k][static_cast<std::size_t>(idx)] = 1u;
+        }
+
+        for (std::size_t k = 0; k < 4; ++k)
+        {
+            const spec& s = k_specs[k];
+            if (pl->endowment[static_cast<std::size_t>(s.res)] <= 0.0f)
+                continue; // the world's history never made this — nothing to place
+            const auto prov = provinces_for(s.res, s.count, gw, gh, height, is_ocean,
+                                            comp, convergent, prov_rng);
+            if (prov.empty()) continue;
+            province_fields.emplace_back(s.res, province_field(prov, gw, gh, bears[k], s.share));
+        }
+    }
+
     std::vector<entity_id> tile_ids(total, null_entity);
     for (int row = 0; row < gh; ++row)
     {
@@ -1035,6 +1260,18 @@ std::vector<entity_id> generate_body_tiles(
                 for (std::size_t r = 0; r < resource_count; ++r)
                     if (deposits[r] > 0.0f)
                         deposits[r] *= pl->endowment[r];
+
+            // Ore provinces: a third pure post-multiply in the same shape as the
+            // two above, and equally RNG-free at this point (the placement drew
+            // its randomness once, before the tile loop). The field is mean-1.0
+            // over land, so this redistributes the endowment without changing
+            // the world's total.
+            for (const auto& [res, field] : province_fields)
+            {
+                const std::size_t ri = static_cast<std::size_t>(res);
+                if (deposits[ri] > 0.0f)
+                    deposits[ri] *= field[static_cast<std::size_t>(idx)];
+            }
 
             // C -> D: endemic trade goods (BL-191). Unlike the endowment above
             // this ADDS a deposit rather than scaling one, because an endemic good
