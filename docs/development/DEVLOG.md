@@ -60,9 +60,17 @@ Promise / The Disciplined Sovereign / The Lettered Public). Comparison finding w
 diffusion flattens the sector into adoption lag, so the fork is where its differentiation
 lives, not decoration.
 
-**Runtime:** ~2h remote across three exchanges, Light/design. **Left open:** band count
-(NR-055), density grain (NR-056 — now judged against two slices), per-domain state shape,
-C++-vs-Lua data home.
+**Fourth exchange — grain settled, first full region worked.** Ben chose **medium** against the
+two slices (NR-056 resolved), and asked for the full ring-1-to-2 neighbourhood at that grain.
+Delivered in the doc plus a generated SVG sketch: 20 techs + 5 vertex quests + the **Granary
+Doctrine** keystone (Temple Stores ⊘ Open Granaries — the campaign's markets-not-command
+premise made a ring-1 *choice*, BL-275-assertable) + 2 roster regimes ≈ 28 objects,
+extrapolating to ~130–150 web-wide — inside the § Geometry budget. New rule adopted: the
+**sparse-sector rule** — a vertex quest only where the crossing is a genuine capability regime
+(Military crosses on the BL-274 roster turnover, Medicine on a plain edge).
+
+**Runtime:** ~2.5h remote across four exchanges, Light/design. **Left open:** band count
+(NR-055), per-domain state shape, C++-vs-Lua data home.
 
 ---
 

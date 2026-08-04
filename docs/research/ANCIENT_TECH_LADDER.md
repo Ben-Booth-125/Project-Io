@@ -221,6 +221,77 @@ would flatten into sameness. One fork per slice is therefore not decoration; it 
 sector's differentiation lives. The vertex quests also read naturally at this grain: each names
 a capability regime a player (or the sim's codex) can understand without opening a single node.
 
+> **Grain settled: MEDIUM (Ben, 2026-08-04, against both slices — NR-056 resolved).** The
+> mixed-by-consumer upgrade (fine grain in keystone neighbourhoods) stays available if
+> playtests want more texture at forks.
+
+---
+
+## The ring-1-to-2 neighbourhood (medium grain, worked in full)
+
+The first complete region of the web at the settled grain: every sector, ring T1 through the
+T1/T2 crossings into ring T2. The centre is the **Stage 0 hand-off** — the cradle's agrarian
+surplus, which every sector's first node hangs off. Nations enter on ring T1 at their
+endowment-flavoured sector.
+
+### Nodes by sector
+
+All techs below are the § Ladder's T1/T2 rows (plus T2-ME-01, added with this pass); the
+neighbourhood adds the connective tissue — vertex quests, one keystone, and the cross-links.
+
+| sector | ring T1 | ring T2 | cross-links in |
+|---|---|---|---|
+| **Materials** | Bloomery Iron · Structural Masonry & Cement | Pattern-Forged Steel · Paper | — |
+| **Energy** | Water Wheel | Windmill | — |
+| **Transport** | Engineered Road Network · Deep-Hull Sail | Lateen & Long-Range Rig | Masonry → Roads |
+| **Institutions** | Codified Law & Census · Coinage at Scale | Positional Arithmetic · Endowed Scholarship | Paper → Arithmetic |
+| **Military** | *regime: massed iron infantry* | *regime: stirrup cavalry, fortress* | roster rows, BL-274 |
+| **Medicine** | Physicians' Canon | Founded Infirmaries | — |
+| **Agriculture** | Iron-Shod Plough · Irrigation Works | Mouldboard Plough & Harness · Three-Field Rotation | Masonry → Irrigation |
+
+### Vertex quests at the T1/T2 crossings
+
+Five earned vertices; two sectors deliberately have none (the sparse-sector rule, below).
+
+| sector | quest | thesis | capstone conditions | opens |
+|---|---|---|---|---|
+| Materials | **The Common Forge** | iron stops being a treasure and becomes a tool | research Bloomery Iron + market: tool volume ≥ X | T2 Materials |
+| Energy | **The Tireless Wheel** | work detaches from muscle for the first time | structure: N water wheels operating | T2 Energy |
+| Transport | **All Roads Home** | goods move because the way is maintained | research Roads + Sail + market: trade-route volume ≥ X *(cross-link: wants Coinage)* | T2 Transport |
+| Institutions | **The Written Ledger** | the sovereign counts, therefore the sovereign can promise | research Census + Coinage + Granary Doctrine taken | T2 Institutions |
+| Agriculture | **The Fed Village** | surplus is the platform every other sector stands on | surplus: sustained food surplus ≥ X | T2 Agriculture |
+
+The **Military** crossing is not a quest: it is the BL-274 roster turnover (massed infantry →
+stirrup cavalry), fired by grassland endowment plus the band boundary — availability derived,
+per that item. **Medicine** earns no vertex at this ring: its edge crosses the boundary as a
+plain prereq (Physicians' Canon → Founded Infirmaries).
+
+**The sparse-sector rule** (adopted with this pass): a sector earns a vertex quest only where
+the ring crossing is a genuine capability regime — "clear vertices", per Ben. Thin sectors
+cross on plain edges rather than inventing ceremony. This is the medium-grain discipline
+applied to quests, and it keeps quest count proportional to how much a sector matters per era.
+
+### Keystone — Granary Doctrine (Institutions, ring T1)
+
+> *Temple Stores* — the surplus is gathered and redistributed by command; famine-resistant,
+> stable, and markets stay thin
+> ⊘ *Open Granaries* — the surplus is priced and traded; markets deepen early, famine risk
+> stays live
+>
+> The campaign's own premise — **markets, not command** (HISTORY.md claim 1) — becomes
+> something nations *chose* at ring 1, not a fact of the setting. Creed-picked for AI nations;
+> a world where most cradles took Open Granaries is the saturated market world the 1960
+> campaign asserts, and BL-275's (history sweep) distributions can assert how often that world
+> actually emerges. Note the interlock: The Written Ledger requires the doctrine to be
+> *taken* — either branch satisfies it, so the fork is unavoidable, but never dictated.
+
+### The count, extrapolated
+
+This neighbourhood: **20 techs + 5 vertex quests + 1 keystone + 2 roster regimes ≈ 28 objects**
+across two rings. Five ring-crossings × seven sectors at this density extrapolates to roughly
+**130–150 objects web-wide** — inside the § Geometry budget, with room for the campaign arc's
+denser keystone neighbourhoods.
+
 ---
 
 ## The ladder
@@ -264,6 +335,7 @@ moved — the calibration lesson is that **band leadership is not sticky** (see 
 | T2-IN-01 | Positional Arithmetic | T2-MA-02 | — | practice | the zero; calculation cheapens |
 | T2-IN-02 | Endowed Scholarship | T1-IN-01 | — | practice | institutional memory survives dynasties |
 | T2-MIL | *Regime: stirrup heavy cavalry, fortress* | — | grassland | — | BL-274 rows |
+| T2-ME-01 | Founded Infirmaries | T1-ME-01 | — | practice | endowed hospitals; care institutionalises |
 
 ### Band T3 — High Medieval (Earth ≈ 1000–1450)
 
