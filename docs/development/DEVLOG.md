@@ -10,7 +10,42 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — The ancient tech ladder, mocked up (2026-08-04, latest)
+## Session — The arena comes home: text-only Rival, the diplomacy battery, and the RTS that lived for an hour (2026-08-04, latest)
+
+Mixed mode: research sweep (Light), backlog filing, one Light `src/` seam extension. Runtime:
+~3.5 h wall clock, interactive with Ben.
+
+**The sweep.** Ben asked for a fresh state-of-the-art pass on running the Rival agent via text
+alone. It overturned a premise: 0 A.D. ships an official agent seam (`--rl-interface`, Alpha 24,
+the in-tree `zero_ad` client) — recorded as NR-057; the literature (BALROG, lmgame-Bench) finds
+text observations *beat* pixels for decision quality.
+
+**Filed.** BL-306 (text Rival harness — summarizer / dispatch-grammar / MCP socket), BL-307
+(Era −1 diplomacy seam — nation blackboard + typed verbs over a year-tick command queue),
+BL-308 (diplomacy test battery — seven checks, two of them pre-LLM), BL-309 (great-power seed —
+self-preservation vs civilising mission, frozen era, periphery-richness clause), BL-310 (myth &
+theology generation, design-owed — structurally accurate myths, old gods persisting under
+conquest). Ben's steers captured verbatim in BL-309/BL-310: low-friction economics ("don't
+invent the steam engine"), and "we should not miss the richness of each other civilisation".
+
+**The RTS that lived for an hour.** On "install that release", Release 28 went on and its RL
+seam answered on port 6000 — then Ben saw the game launch and named the crossed wires: "0 AD"
+means the *year* (the Era −1 sandbox), not Wildfire Games' game. Uninstalled same session,
+verified clean (NR-060); the Rival docs re-based — the arena is Project Io's own word interface.
+
+**Mid-session, Ben integrated the tech-ladder branch** — both sides had minted BL-296/NR-054,
+and he renumbered the local WIP (NR-059). This session's ids moved accordingly; the transcript
+cites the old ones.
+
+**The smoke that passed.** `Project-Rival/tools/harness/io_smoke_test.js` drives the Io MCP
+server end-to-end: 7/7 checks — corps enumerate, the player blackboard returns 364 facts, ticks
+advance, the dictionary resolves, an illegal command rejects typed. It surfaced a real seam gap:
+nothing answered "who am I?", fixed as a `CORPS` opcode + `list_corps` tool (NR-061, Light —
+the BL-278 tool roster is now six, pending Ben's read).
+
+---
+
+## Session — The ancient tech ladder, mocked up (2026-08-04)
 
 Remote session, doc-only, Light mode. Ben asked for an ancient tech tree mockup — the major
 advancements from 0 CE, and what inequality between nations is realistic by 1960.

@@ -124,6 +124,13 @@ const TOOLS = [
     },
   },
   {
+    name: 'list_corps',
+    description: 'List every corporation on the seam — entity id, generated name, is_player, '
+      + 'home nation. The answer to an agent\'s first question ("who am I?"); ids feed '
+      + 'get_blackboard and issue_command.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
     name: 'advance_tick',
     description: 'Advance the running world by one tick (dispatch/advance convoys -> '
       + 'run_economy_step -> clear_markets -> apply_budget -> credit convoys), the same '
@@ -162,6 +169,11 @@ async function callTool(name, args) {
     const resultLine = lines.find((l) => l.startsWith('RESULT '));
     const m = /result=(\S+) building=(-?\d+)/.exec(resultLine || '');
     return { result: m ? m[1] : 'unknown', building: m ? Number(m[2]) : -1 };
+  }
+  if (name === 'list_corps') {
+    const lines = await sendRequest('CORPS');
+    const corps = lines.filter((l) => l !== 'END').map((l) => JSON.parse(l));
+    return { corps };
   }
   if (name === 'advance_tick') {
     const lines = await sendRequest('TICK');

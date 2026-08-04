@@ -23,188 +23,11 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*56 entries — 16 open, 40 resolved.*
+*61 entries — 4 open, 57 resolved.*
 
 ---
 
 ## Open
-
-### NR-025 — CONCEPT.md:51 is right after all — the Era rupture disagreement was four-way, and the fourth doc dissolves it
-*observation · raised 2026-08-02 · from Settling BL-223 (averted rupture) during the design-owed sweep, 2026-08-02*
-
-BL-223 tabulates a three-doc disagreement about the Era 0 rupture — CONCEPT.md:51 (a future WW3-scale event during play), ERAS.md (three purely mechanical gate conditions, no event), HISTORY.md Stage 5 (a past event) — and its owed action 2 was to amend CONCEPT.md. There is a fourth doc it omits: BL-087 Era reframe of 2026-07-08, which says Eras ARE catastrophic seeded events on the world clock and explicitly re-reads the ERAS.md Rocketry/Launchpad/propellant condition set as gating a QUEST TREE rather than an Era. That is dated later than the ERAS.md model, so under newest-dated-wins it governs. With it in the table the contradiction dissolves: there are TWO ruptures doing different jobs — a PAST averted near-miss (backstory, sets starting diplomatic posture) and a FUTURE seeded event that ends Era 0 during play. CONCEPT.md needs no amendment; only ERAS.md does, and BL-087 already owns that edit when its work lands.
-
-**Why it matters.** The item was about to amend a CONCEPT.md line that is correct, on the strength of a table that was missing a doc. CONCEPT.md is the top of the corpus and the hardest place to undo a wrong edit — a claim removed there stops being available as a premise everywhere downstream. It is also a small warning about the reconciliation method: BL-223 built its table by reading the three docs that talk about Eras by name, and missed the design that changed what an Era IS because it lives in a backlog item rather than a doc. The 2026-07-31 doc-truth sweep would not have caught this either, for the same reason.
-
-- Accept the reading: two ruptures, CONCEPT.md unamended, ERAS.md corrected by BL-087 when it lands (what I recorded).
-- Accept the reading but correct ERAS.md now rather than waiting on BL-087, since it is currently the one doc stating something the design has superseded.
-- Disagree — you intended only one rupture, in which case say which one, and HISTORY.md Stage 5 or CONCEPT.md:51 goes rather than both standing.
-
-> **Recommendation:** Option 1, and the two-rupture reading is worth keeping for its own sake rather than just as a reconciliation: the rupture that was averted then is not averted this time. The backstory establishes that these powers can pull back from the brink, and the Era 0 exit is the occasion they do not — which is a stronger premise than either event alone and costs nothing, since both were already written. Option 2 is defensible if the ERAS.md line is bothering you, but it edits an authority doc ahead of the work, which the time-slice rule exists to prevent.
-
-*Files: `docs/CONCEPT.md`, `docs/economy/ERAS.md`, `docs/lore/HISTORY.md`, `docs/development/backlog.json`*
-
-### NR-026 — Frame-budget targets (BL-249) still need a human at the keyboard
-*observation · raised 2026-08-02 · from Closing out v0.1.0's remaining items (BL-258 landed 2026-08-02)*
-
-ROADMAP.md names the frame-budget targets (avg < 8ms, max < 16.7ms panning the full Kepler grid) as "still owed before the cut" alongside BL-258. BL-258 (the optimised-build timing gate) is now landed and the harness suite is 36/36 green. The frame-budget check cannot be automated the same way: headless capture has no vsync and no real present, so its numbers say nothing about the real frame budget. It needs Ben to launch the live app (F11 overlay), pan the full Kepler grid, and read the numbers off the real render loop.
-
-**Why it matters.** This is the last named item standing between the current state and declaring the v0.1.0 done-definition met — everything else in ROADMAP.md § v0.1.0 is already checked off.
-
-> **Recommendation:** Open the app (F11 for the frame-stats overlay), pan the full Kepler tile grid, and confirm avg < 8ms / max < 16.7ms. If it passes, v0.1.0 is done bar hygiene (warning-clean build, cppcheck pass) and the cut can be tagged.
-
-> **RESOLVED.** Superseded 2026-08-02: the premise was wrong — nothing in src/ forces a dummy driver under --verify, so a scripted run uses the real renderer and the build's real vsync. The measurement no longer needs a human: scripts/verify/pan_perf.lua (via the new verify.frame_csv tap on the BL-249 instrument) ran the exact ROADMAP check. Result: the target FAILS today — Debug 41-53 ms work/frame (every frame over 16.7), Release 11.3 ms at play zoom (passes 16.7, misses 8) and 16.8-17.6 ms at whole-grid zoom. Cause and fix are BL-268 (planetary canvas cull + cache); BL-267 (GPU/multicore) records the full verdict. Re-run pan_perf after BL-268 to close the cut-gate check.
-
-*Files: `docs/development/ROADMAP.md`, `src/ui/frame_stats.hpp`, `src/ui/frame_stats.cpp`*
-
-### NR-027 — BL-217 checkpoint retrofit: S8/Legacy has no branch point, so no checkpoint was added there
-*decision taken on your behalf · raised 2026-08-02 · from Session 2026-08-02 (BL-217 checkpoint/branch/lean foundation)*
-
-The task brief pointed at S8/Legacy (~line 1116+ in the pre-change planetology.cpp) as one of four biological die-off points to wrap in a checkpoint_record, alongside S5 Spark, S6 Breath and S7 Green. Reading the code, S8 Legacy has no die()/branch decision at all — it is a deterministic resource-endowment calculation over whatever life_stage the chain already reached. No checkpoint was added there.
-
-**Why it matters.** BL-217's own admission rule (settled in backlog.json) says a checkpoint is a point where the outcome distribution genuinely branches, not every point where something interesting happens. S8 fails that test — two runs reaching the same peak life_stage always produce the same Legacy endowment shape, so a checkpoint there would violate the rule this session's design explicitly wrote in. Five checkpoints were recorded instead (Spark: 1, Breath: GOE + NOE, Green: land colonisation + fire threshold), matching every genuine branch S5-S8 actually contains.
-
-> **Recommendation:** No action needed unless a future S8 mechanic (e.g. a stochastic Legacy-stage roll) introduces a real fork — at that point it would earn its own checkpoint under the same admission rule.
-
-*Files: `src/world/planetology.cpp`, `src/world/planetology.hpp`, `docs/generation/PLANETOLOGY.md`*
-
-### NR-032 — Pan-stutter measurement: added a verify frame-timing tap (frame_reset/frame_csv/window + pan_perf.lua) and configured a Ninja Release tree (build_rel/)
-*decision taken on your behalf · raised 2026-08-02 · from Session 2026-08-02 (stutter-while-panning report)*
-
-To measure the reported panning stutter with real numbers, three verify functions were added to app.cpp (frame_reset / frame_csv — a CSV dump of the BL-249 frame-stats ring — and window(w,h) to measure at the live 1720x1080 rather than the 1280x720 golden size), frame_stats gained sample(i)/reset() accessors, the BL-249 instrument's function-local static was lifted to a file-local accessor so the verify tap can reach it, and scripts/verify/pan_perf.lua scripts a 300-frame sustained pan at three zooms against a no-pan baseline. Separately, build_rel/ was configured as a Ninja Release tree (same pinned 14.44 toolchain; ninja.exe found bundled under BuildTools' CMake) to quantify the Debug-vs-Release gap without touching the daily build/ Debug cache. All uncommitted as of writing.
-
-**Why it matters.** The tap is a permanent measurement asset (any future perf question is a Lua script away), but it adds three verify functions and a new build tree Ben did not ask for by name. The measurement route itself was a delegated call: desktop-automation of the live app was abandoned (its app resolver cannot see a non-Start-menu exe) in favour of instrumenting --verify, which was verified to run on the real renderer with real vsync.
-
-> **Recommendation:** Keep the tap and commit it (it is pure instrumentation — no world/* contact, no determinism surface); keep build_rel/ as the standing play/perf build alongside the Debug dev build. A build_rel.bat mirroring build_app.bat's toolchain pinning would make it one keystroke.
-
-*Files: `src/core/app.cpp`, `src/ui/frame_stats.hpp`, `src/ui/frame_stats.cpp`, `scripts/verify/pan_perf.lua`*
-
-### NR-033 — The daily-driver build is unoptimised Debug (/Od /RTC1) — and the stale claim that --verify uses a dummy video driver is wrong
-*observation · raised 2026-08-02 · from Session 2026-08-02 (stutter-while-panning measurement)*
-
-build/ (the exe _run.bat launches and Ben plays) is CMAKE_BUILD_TYPE=Debug with /Ob0 /Od /RTC1 — zero optimisation plus runtime checks. Measured pan cost: 41-53 ms of work per frame (every frame over the 16.7 ms refresh budget; ~19-24 fps). The same code built Release measures 11-18 ms — 3.6x faster; at play zoom it is 11.3 ms with zero budget misses. Separately, scripts/verify/frame_budget_hud.lua's header claims verify numbers are meaningless because --verify runs an offscreen/dummy driver; grep shows nothing in src/ sets any such driver — verify runs the real renderer with the build's real vsync, which is exactly why the pan_perf measurement is valid. That stale comment should be corrected so future sessions do not route around a measurement path that works.
-
-**Why it matters.** The 'engine starting to thrash' impression is substantially an artefact of playing an unoptimised Debug binary. No engine-architecture conclusion (GPU port, multithreading) should be drawn from Debug frame times.
-
-> **Recommendation:** Play from a Release build; keep Debug for debugging. Fix the frame_budget_hud.lua header comment when next touched.
-
-*Files: `build_app.bat`, `scripts/verify/frame_budget_hud.lua`*
-
-### NR-038 — CLAUDE.md no longer says "read every document before responding" — the doc set outgrew the instruction
-*decision taken on your behalf · raised 2026-08-02 · from Documentation-compression pass (hot/cold backlog split, DEVLOG index, doc_weight.js)*
-
-CLAUDE.md opened with "Read the documents below before responding to any request." tools/doc_weight.js measures that reading order at ~606,000 tokens across 40 files — several times any usable context, so in practice the instruction was already being ignored, silently and unevenly. The opening was rewritten to instruct traversal instead: read the doc that owns the question, and prefer an index or query tool (DEVLOG_INDEX.md, backlog_query.js, actions_query.js) over loading a file whole.
-
-**Why it matters.** An instruction that cannot be followed is worse than a narrower one that can: it makes every session's actual reading undocumented and unpredictable. Recorded here rather than assumed because it changes the contract at the top of CLAUDE.md, which is the one document every session reads.
-
-> **Recommendation:** If you disagree, the alternative is to shrink the reading order to fit a real budget (doc_weight.js --budget takes a ceiling and exits non-zero when the named set is over it) rather than to restore the old wording.
-
-*Files: `CLAUDE.md`, `tools/doc_weight.js`*
-
-### NR-045 — Two direction points applied: the sci-fi/fantasy naming rule, and the governing-body aim — BL-094 unparked and raised F → A on my judgement
-*decision taken on your behalf · raised 2026-08-03 · from Ben, 2026-08-03, after the review-queue session — two points from a prompt that did not reach me: (1) "even if we do use real history as an analogy, we should use sci-fi / fantasy random names"; (2) "the aim that we're going for now, is to really play as a governing body. The reason for that is that it allows law, policy and science to use military might - not just economic."*
-
-Point 1 is recorded as a standing rule (io-standing-rules § Terms & docs) plus a full section in GENERATION_STRATEGY.md, and stamped onto BL-271 and BL-277, the two items filed off the Rome analogy. Point 2 is recorded in BL-094's design as the stated reason for the pivot. The calls that were MINE, not Ben's: (a) **BL-094 unparked and raised F → A** — 'the aim we're going for now' is not compatible with a parked F item, but Ben did not ask for a re-prioritisation and did not give it a version goal; (b) BL-094's title changed from 'nation as the strategic actor' to 'the player is a GOVERNING BODY (nation)', following his word; (c) I wrote the v0.1.x design test ('does this system reach military as well as economic outcomes?') into BL-094 rather than editing the four stub items (BL-155/156/157/158) directly; (d) I did NOT touch CONCEPT.md's player-identity statement, on the authority time-slice rule, even though it is the doc his point most directly concerns.
-
-**Why it matters.** (a) is a real sequencing change — an A-priority unparked item reads as near-term work, and v0.1.1 is the live minor with the word interface just themed into it. If the governing-body pivot is the aim but NOT the next thing built, A may overstate it and a version goal would say more than a priority does. ROADMAP has carried an open question since 2026-07-31 about whether the pivot shares v0.2.0 with the AI-opponent set or takes its own minor; that question is now louder, not answered. (d) matters because CONCEPT.md currently states the player identity as an open corporate-or-nation choice, which his message effectively closes — but closing it in the authority doc ahead of the work is exactly what the time-slice rule forbids, so it stays stated in the item.
-
-- Accept as recorded — BL-094 unparked at A, no version goal yet.
-- Give BL-094 a version goal now (v0.2.0, or its own minor) — that settles the ROADMAP question that has been open since 2026-07-31.
-- Too strong — re-park BL-094 or drop it back down; the direction is recorded either way and the priority was not what Ben asked to change.
-- Also close CONCEPT.md now: amend the player-identity statement ahead of the work, treating this as a concept decision rather than an implementation one.
-
-> **Recommendation:** Option 2. A priority says 'important'; a version goal says 'when', and 'when' is the actual open question — it has been open since 2026-07-31 and Ben's message is the strongest signal yet that it should be answered. Option 4 is defensible too and is arguably not a time-slice violation, since CONCEPT.md owns *player identity* and Ben has now made an identity decision rather than an implementation one; I left it alone because the rule is unambiguous and the cost of waiting is low.
-
-*Files: `.claude/rules/io-standing-rules.md`, `docs/generation/GENERATION_STRATEGY.md`, `docs/development/backlog.json`, `docs/development/ROADMAP.md`*
-
-### NR-046 — Planetology S6: the NOE gate now tests tectonics at the NOE's own epoch, not at present day — and the GOE gate deliberately still does not
-*decision taken on your behalf · raised 2026-08-04 · from Ben, 2026-08-04, from a Project-Rival session: "go straight to the live change... do follow procedure to document well". The change was recommended off the new C1 rejection census in tools/verify/planetology_sweep.cpp, which measured WHY homeworlds get rejected for the first time.*
-
-The C1 census found that ~74% of homeworld rejection pressure was the oxygen story, and that "cold and old" (interior=low) cost 2.52 draws against a ~1.24 baseline — twice any other preference. Tracing S6 found the cause: `theta` (tectonic vigour) was computed at PRESENT-DAY age and then used to gate the NOE, an event that fired billions of years earlier. An 8 Gyr world is radiogenically cold today but was not cold when its oxygenation actually happened. Fixed by adding `theta_at(age)` / `mobile_lid_at(age)` helpers in planetology.cpp (radiogenic term decays, tidal term carries across unscaled) and testing the NOE at `age - noe_at`. `st.theta`, `st.mobile_lid` and `profile.geology` are bit-identical to before — only the NOE gate reads the historical value, so tectonics, continents and tile terrain are untouched. THE CALL THAT WAS MINE: I also re-sited the GOE gate to its own epoch for symmetry, MEASURED IT, found acceptance fell 78.5% -> 60.2% with 69% of rejects becoming Mat Worlds, and REVERTED that half. The GOE test is an upper bound (`theta < 2.4`) whose constant was calibrated against present-day theta; re-siting it without re-deriving the constant invalidates it, and I had no independent basis for a new one.
-
-**Why it matters.** Two things. (1) The codebase now contains a deliberate asymmetry — one S6 gate reads historical theta, the other reads present-day — which is defensible (heat only falls, so present-day is conservative for an upper bound) but is the kind of inconsistency that reads as a bug to the next person. It is commented at the site and recorded here so it is a known position rather than an accident. (2) Every generated world changes: same acceptance (78.4% vs 78.5%) but a different rejection profile, "not enough arable land" overtaking "not a Cradle" as the top clause, and Boring Billion rejects down 25%. planetology_harness, continents_harness, world_determinism, determinism_harness, history_ladder_harness and mediterranean_sweep all still pass, so no assertion caught it — but the default-seed campaign world may look different, which is Ben's eyeball to give (the same debt BL-276 left open).
-
-- Accept as landed — NOE historical, GOE present-day, asymmetry documented at the site.
-- Close the asymmetry properly: derive an epoch-relative GOE threshold (e.g. express the 2.4 bound as a multiple of the reference world's theta AT THAT EPOCH rather than as an absolute), then re-site the GOE gate too. This is the physically coherent end state and wants its own measured calibration pass.
-- Revert the whole change — the interior=low cost was a preference-pricing wart, not a correctness bug, and 2.52 draws was survivable.
-
-> **Recommendation:** Option 1 now, Option 2 as a filed follow-on. The NOE fix is a correctness fix backed by measurement and costs nothing (acceptance unchanged, worst lean improved 2.52 -> 1.94 and is now a genuine design axis, oxygen_story=low, rather than a modelling artifact). Option 2 is right but is a calibration project, not a one-line change, and doing it badly is worse than the documented asymmetry — the measured 60.2% run is the evidence for that.
-
-*Files: `src/world/planetology.cpp`, `tools/verify/planetology_sweep.cpp`, `docs/generation/PLANETOLOGY.md`*
-
-### NR-048 — A fresh CMake configure cannot download SDL3 on this machine
-*observation · raised 2026-08-04 · from Hit while trying to time a from-cold build for BL-287.*
-
-Configuring a brand-new build directory fails in FetchContent_MakeAvailable(SDL3) at CMakeLists.txt:44. The download from codeload.github.com reports "unable to check revocation for the certificate", ninja stops, and configure aborts. Existing build directories (build/, build_rel/) are unaffected because their _deps are already populated.
-
-**Why it matters.** Every current build dir works, so this is invisible day to day — but it means a fresh clone, a new git worktree, or a CI runner cannot configure the project at all. It also blocked the from-cold timing measurement BL-287 wanted, so that number is still unmeasured. Unclear whether this is a transient network condition, a corporate/AV TLS interception, or a change in the certificate chain; it was seen once and not retried later.
-
-- Retry later — it may simply be transient.
-- If persistent: vendor the deps, or point FetchContent at a local cache/mirror, or set CMAKE_TLS_VERIFY/CURLOPT_SSL_OPTIONS appropriately for this machine.
-- Check whether CI is currently affected — if CI provisions fresh dirs, it may already be failing.
-
-> **Recommendation:** Retry a fresh configure once before investigating; if it reproduces, check CI first, since a green local build directory hides this completely.
-
-*Files: `CMakeLists.txt`*
-
-### NR-049 — The arable floor is a hard ocean cap at 0.714, and Earth clears it by 0.4%
-*question · raised 2026-08-04 · from Found measuring NR-047: widening the ocean band did not move land fraction, so something downstream was rejecting the wet worlds.*
-
-homeworld_viability requires arable_share >= 0.08, and arable_share = land_frac * (0.28 - (o2 - 0.21) * 0.45) * (mobile_lid ? 1.0 : 0.72). Solve it: even in the BEST case (oxygen exactly 21%, mobile lid) the floor caps ocean fraction at 1 - 0.08/0.28 = 0.7143. Earth is 0.71. Worked cases: Earth with a mobile lid and 21% O2 gives arable 0.0812 and PASSES by 1.5%; the same world with a stagnant lid gives 0.0585 and is REJECTED; the same world at 23% oxygen gives 0.0786 and is REJECTED; at 25% oxygen, 0.0760, REJECTED.
-
-**Why it matters.** Two things. First, the clause does not do what it says. It reads as "a climate people can farm in", but mechanically it is a hard ceiling on ocean fraction — and the ceiling sits 0.4% above Earth. Second, it explains the whole shape of T3: generated worlds sit at 46-48% land against Earth's 29% not because the ocean band is wrong (that is now fixed) but because anything wetter than Earth is unreachable by construction. The generator cannot produce an ocean world, and can only produce Earth itself in the corner where oxygen is at the low end and the lid happens to be mobile.
-
-- Lower the floor from 0.08 to ~0.06. Ocean ceiling moves to 0.786, Earth sits comfortably inside instead of on the edge, and ocean-heavy homeworlds become possible.
-- Keep the floor and rescale the 0.28 coefficient, if the intent is that arable share should be a larger fraction of land.
-- Accept it, and state plainly in PLANETOLOGY.md that Io homeworlds are drier than Earth by design — the floor is a playability constraint (enough land to build on), not a realism one.
-- Split the concern: keep a low absolute arable floor for playability, and let ocean fraction be governed by its own clause so the two stop being entangled.
-
-> **Recommendation:** Option 1 as the cheap move — it is one constant, it puts Earth inside the envelope rather than on its edge, and T3 can measure the result immediately. But option 3 is a legitimate answer too: if the real requirement is "the player must have somewhere to build", then a drier-than-Earth homeworld is a deliberate game-design choice and should be written down as one rather than left looking like a miscalibration. What should not stand is the current position, where a realism-shaped formula is silently enforcing a gameplay constraint nobody wrote down.
-
-*Files: `src/world/planetology.cpp`, `docs/generation/PLANETOLOGY.md`*
-
-### NR-050 — A concurrent session swept this retrofit’s doc edits into three unrelated commits
-*observation · raised 2026-08-04 · from Documentation retrofit, running alongside the star-map coding session.*
-
-Three times during this pass, doc files edited here were committed by the other session before this one could commit them: 7393a9d ("Star map: actually draw it") took CONCEPT.md, SYSTEMS.md, GLOSSARY.md, ui/LAYOUT.md, ui/MENU.md and io-standing-rules.md; 6cbc33f ("The ladder wraps") took eleven more; e8f4f57 ("Bless the goldens") took the ACTIONS.json corrections. Content survived intact in every case — verified by grep after each sweep. What did not survive is attribution: the governing-body pivot lands in a commit about ImGui draw lists.
-
-CAUSE: that session commits with a broad `git add` every few minutes. The window between editing a batch of docs and committing them is smaller than the batch takes to write, so no amount of committing promptly from this side wins the race.
-
-WHY IT IS WORTH RECORDING RATHER THAN SHRUGGING AT: the commit message is how a future session finds out why a doc changed. `git log -- docs/CONCEPT.md` now returns a star-map commit. The repo already has the fix — CLAUDE.md prescribes the `scoped-commit` skill precisely for a tree carrying someone else’s work — and it was not used.
-
-NO ACTION PROPOSED beyond awareness; rewriting the history would be worse than the problem, and the other session was building on those commits. If concurrent sessions become normal, the worktree isolation model in DELIVERY.md § Sub-agents & worktrees is the real answer.
-
-### NR-051 — Superseded designs were demoted rather than deleted — four calls taken
-*decision taken on your behalf · raised 2026-08-04 · from Documentation retrofit, Packages B/C/E.*
-
-Four places described a surface that does not exist. In each I marked the design **designed-not-built** and kept it, rather than deleting it:
-
-1. LENSES.md § Per-lens selection validity & routing — no resolver reads state.overlay; selection is lens-agnostic. Kept because it is a good design and two of its rows already describe the real fall-through. It has NO backlog item; if it should be built, it needs one.
-2. market.md Markets/Trends views — designed, never built; the built tabs are Prices/Sell Orders.
-3. construction.md — Build/Manage/Sell Orders became Construction/Buildings, with Sell Orders relocated to Market.
-4. tile_ledger.md Tiles/Buildings/Market — the built views are Story/Chain/Tiles, and BL-281 retires the last of those.
-
-THE JUDGEMENT: deleting is cleaner to read, but it destroys the reasoning, and a design that was thought through and not built is worth more than the paragraph it costs. The risk is the opposite failure — a reader skimming past the banner and building from the table. If you would rather these were cut outright, say so and I will cut them; the reasoning survives in git either way.
-
-### NR-052 — Priorities chosen for the six code-defect items filed from the audit
-*decision taken on your behalf · raised 2026-08-04 · from Documentation retrofit — findings that were code defects, not doc drift.*
-
-BL-290 (naming banks read Earth-European) and BL-291 (world_audit harness fails) and BL-293 (order book unreachable by command) were filed **A**; BL-292 (economy panel orphaned) **B**; BL-294 (dead UI symbols) and BL-295 (components.hpp cites phantom ids) **C**. All six v0.1.1.
-
-REASONING FOR THE THREE As, since that is the part worth checking: BL-290 is a standing rule being broken in shipped code, and the rule is eleven days old. BL-291 blocks re-measuring the tile census, so TILES.md keeps a stale measured table until it is fixed — a doc defect with a code cause. BL-293 is the hole in the word interface’s write leg, and the word interface is v0.1.1’s named theme; it also surfaced independently in Project-Rival’s findings, which is a second vote.
-
-BL-292 asks a real question rather than proposing a fix — give the orphaned Economy panel a door, or retire it — and I recommended auditing for redundancy first, since the rail is nearly full and BL-094 will want slots for law and force.
-
-### NR-053 — The pivot docs were closed ahead of BL-094 landing, on your instruction — recording the shape I chose
-*decision taken on your behalf · raised 2026-08-04 · from Documentation retrofit; you answered "edit now" to the NR-045 question.*
-
-You authorised editing CONCEPT.md, SYSTEMS.md and GLOSSARY.md now rather than holding the authority time-slice. What was NOT specified, and what I chose:
-
-I wrote them as **forward-looking, clearly unlanded** rather than as if the pivot had shipped. CONCEPT states the player controls a corporation today and that the stated aim is a governing body, with your reason and the military-reach design test; GLOSSARY gains a Governing body entry marked designed-not-built and leaves the nation-vs-governing-body terminology question explicitly open, which BL-094 says is yours to settle; SYSTEMS splits Policy into automation-policy and law, and adds a Force entry marked designed-not-built.
-
-THE ALTERNATIVE I DID NOT TAKE: rewriting them in the governing body’s voice throughout. That would read better but would assert a world that does not exist, and would make the docs wrong in the other direction until the work lands.
-
-STILL OPEN AND NOT DECIDED HERE: BL-094 has no version_goal (the NR-045 question proper), and its design prose says the player is one of "the 14 generated Voronoi nations" four times — the generator produces roughly 43. The pivot’s core identity claim rests on a nation count that changed on 2026-07-30.
 
 ### NR-054 — The 'ancient tech tree' ask was delivered as a derived ladder, not a player-facing research tree
 *decision taken on your behalf · raised 2026-08-04 · from BL-296 (ancient tech ladder) — remote mockup session*
@@ -227,6 +50,31 @@ BL-274 leaned to four roster era bands (classical / medieval / gunpowder / indus
 > **Recommendation:** Six-band spine, four-band roster grouping — divergence resolution for the economy, authoring economy for the rosters.
 
 *Files: `docs/research/ANCIENT_TECH_LADDER.md`*
+
+### NR-058 — The v0.1.6 generation-visibility minor: the shape chosen for your one-line instruction
+*decision taken on your behalf · raised 2026-08-04 · from Ben, 2026-08-04, mid-session: "Add a release before v0.2.0 for a pass on generation visibility... items in the backlog about visualising the world at each step - we haven't yet done that... reviewing [UI alignment] towards the end of v0.1.x."*
+
+The release is numbered v0.1.6 — the end of the v0.1.x band, before v0.2.0, which also satisfies "towards the end of v0.1.x" for the UI review. Items filed: BL-303 (Generation Ledger build — the window GENERATION_LEDGER.md designed but nothing carried), BL-304 (field-overlay lenses for the generation intermediates), BL-305 (nation/corp generation visibility, design-owed — the political steps are the one part of generation with no visibility designed anywhere). BL-098 (UX user-story review) retargeted v0.1.1 -> v0.1.6 as the UI-alignment review vehicle. NOT retargeted: BL-256 (generation globe) and BL-211 (history ledger) keep their existing goals — they are siblings of this theme, not children, and pulling landed-or-versioned work into a new minor re-litigates settled sequencing.
+
+**Why it matters.** Three calls were interpretation rather than instruction: the v0.1.6 number (you said "before v0.2.0", not which slot), BL-098 as the review vehicle (you said "reviewing that", not which item), and the three-item decomposition of "each step" (physical steps had designed visibility; only the ledger build, the lenses, and the political steps were genuinely missing). Each is cheap to reverse.
+
+> **Recommendation:** No action needed unless a call reads wrong — the likeliest candidate is BL-098 as the review vehicle, if you meant a fresh dedicated review rather than the standing user-story one.
+
+*Files: `docs/development/ROADMAP.md`, `docs/development/backlog.json`*
+
+### NR-061 — The word interface could not answer "who am I?" — a CORPS opcode and list_corps tool were added (Light mode)
+*decision taken on your behalf · raised 2026-08-04 · from BL-306 (text Rival harness) — io_smoke_test.js, the first agent-shaped consumer of the MCP seam.*
+
+The smoke test could not obtain any corporation entity id through the seam: get_blackboard and issue_command both require a corp id, but nothing on the protocol enumerates corps or identifies the player. Corp entity ids in the generated world are non-obvious (the player corp landed at 30318). Fixed by extending run_serve with a CORPS opcode (one JSON line per corp: id, name, is_player, home_nation, then END) and mirroring it as a list_corps MCP tool. Read-only export, two files (src/main.cpp, tools/mcp/server.js), no determinism surface — taken as Light mode without a requirement group.
+
+**Why it matters.** This touches the BL-278 (Io MCP server) seam, whose design is otherwise settled prose — the tool roster there now differs from what AI_OPPONENT.md § 10 describes (six tools, not five). If you would rather the discovery leg live elsewhere (e.g. in the blackboard itself as a self-identity fact), the opcode is easy to move; the smoke test is its only consumer so far.
+
+- Keep list_corps as the sixth tool; amend AI_OPPONENT.md § 10's roster when BL-306 lands.
+- Fold self-identity into the blackboard export (a who-am-i fact per BL-206) and retire the opcode.
+
+> **Recommendation:** Option 1. Enumeration serves the multi-agent future (a diplomacy campaign needs to see all seats, not just its own), and the blackboard staying visibility-honest argues against it carrying a world-level corp roster.
+
+*Files: `src/main.cpp`, `tools/mcp/server.js`, `Project-Rival/tools/harness/io_smoke_test.js`*
 
 ---
 
@@ -632,6 +480,51 @@ BL-171 added Tax and Wages tier selectors to the player Budget ledger as stubbed
 
 *Files: `docs/development/backlog.json`, `src/ui/balance_ledger.cpp`, `src/ui/ui_state.hpp`*
 
+### NR-025 — CONCEPT.md:51 is right after all — the Era rupture disagreement was four-way, and the fourth doc dissolves it
+*observation · raised 2026-08-02 · from Settling BL-223 (averted rupture) during the design-owed sweep, 2026-08-02*
+
+BL-223 tabulates a three-doc disagreement about the Era 0 rupture — CONCEPT.md:51 (a future WW3-scale event during play), ERAS.md (three purely mechanical gate conditions, no event), HISTORY.md Stage 5 (a past event) — and its owed action 2 was to amend CONCEPT.md. There is a fourth doc it omits: BL-087 Era reframe of 2026-07-08, which says Eras ARE catastrophic seeded events on the world clock and explicitly re-reads the ERAS.md Rocketry/Launchpad/propellant condition set as gating a QUEST TREE rather than an Era. That is dated later than the ERAS.md model, so under newest-dated-wins it governs. With it in the table the contradiction dissolves: there are TWO ruptures doing different jobs — a PAST averted near-miss (backstory, sets starting diplomatic posture) and a FUTURE seeded event that ends Era 0 during play. CONCEPT.md needs no amendment; only ERAS.md does, and BL-087 already owns that edit when its work lands.
+
+**Why it matters.** The item was about to amend a CONCEPT.md line that is correct, on the strength of a table that was missing a doc. CONCEPT.md is the top of the corpus and the hardest place to undo a wrong edit — a claim removed there stops being available as a premise everywhere downstream. It is also a small warning about the reconciliation method: BL-223 built its table by reading the three docs that talk about Eras by name, and missed the design that changed what an Era IS because it lives in a backlog item rather than a doc. The 2026-07-31 doc-truth sweep would not have caught this either, for the same reason.
+
+- Accept the reading: two ruptures, CONCEPT.md unamended, ERAS.md corrected by BL-087 when it lands (what I recorded).
+- Accept the reading but correct ERAS.md now rather than waiting on BL-087, since it is currently the one doc stating something the design has superseded.
+- Disagree — you intended only one rupture, in which case say which one, and HISTORY.md Stage 5 or CONCEPT.md:51 goes rather than both standing.
+
+> **Recommendation:** Option 1, and the two-rupture reading is worth keeping for its own sake rather than just as a reconciliation: the rupture that was averted then is not averted this time. The backstory establishes that these powers can pull back from the brink, and the Era 0 exit is the occasion they do not — which is a stronger premise than either event alone and costs nothing, since both were already written. Option 2 is defensible if the ERAS.md line is bothering you, but it edits an authority doc ahead of the work, which the time-slice rule exists to prevent.
+
+> **RESOLVED.** ACCEPTED (Ben, 2026-08-04, bulk): "I'm happy to accept what's just flagged as 'Ben should see this', I was watching the previous session." Option 1 stands: two ruptures, CONCEPT.md:51 unamended, ERAS.md corrected by BL-087 (Era reframe) when its work lands.
+
+*Files: `docs/CONCEPT.md`, `docs/economy/ERAS.md`, `docs/lore/HISTORY.md`, `docs/development/backlog.json`*
+
+### NR-026 — Frame-budget targets (BL-249) still need a human at the keyboard
+*observation · raised 2026-08-02 · from Closing out v0.1.0's remaining items (BL-258 landed 2026-08-02)*
+
+ROADMAP.md names the frame-budget targets (avg < 8ms, max < 16.7ms panning the full Kepler grid) as "still owed before the cut" alongside BL-258. BL-258 (the optimised-build timing gate) is now landed and the harness suite is 36/36 green. The frame-budget check cannot be automated the same way: headless capture has no vsync and no real present, so its numbers say nothing about the real frame budget. It needs Ben to launch the live app (F11 overlay), pan the full Kepler grid, and read the numbers off the real render loop.
+
+**Why it matters.** This is the last named item standing between the current state and declaring the v0.1.0 done-definition met — everything else in ROADMAP.md § v0.1.0 is already checked off.
+
+> **Recommendation:** Open the app (F11 for the frame-stats overlay), pan the full Kepler tile grid, and confirm avg < 8ms / max < 16.7ms. If it passes, v0.1.0 is done bar hygiene (warning-clean build, cppcheck pass) and the cut can be tagged.
+
+> **RESOLVED.** Superseded 2026-08-02: the premise was wrong — nothing in src/ forces a dummy driver under --verify, so a scripted run uses the real renderer and the build's real vsync. The measurement no longer needs a human: scripts/verify/pan_perf.lua (via the new verify.frame_csv tap on the BL-249 instrument) ran the exact ROADMAP check. Result: the target FAILS today — Debug 41-53 ms work/frame (every frame over 16.7), Release 11.3 ms at play zoom (passes 16.7, misses 8) and 16.8-17.6 ms at whole-grid zoom. Cause and fix are BL-268 (planetary canvas cull + cache); BL-267 (GPU/multicore) records the full verdict. Re-run pan_perf after BL-268 to close the cut-gate check.
+
+STATUS CLOSED 2026-08-04: BL-268 (canvas cull + cache) has since landed (96712ec), so the re-run of pan_perf that closes the ROADMAP cut-gate check is now unblocked and owed.
+
+*Files: `docs/development/ROADMAP.md`, `src/ui/frame_stats.hpp`, `src/ui/frame_stats.cpp`*
+
+### NR-027 — BL-217 checkpoint retrofit: S8/Legacy has no branch point, so no checkpoint was added there
+*decision taken on your behalf · raised 2026-08-02 · from Session 2026-08-02 (BL-217 checkpoint/branch/lean foundation)*
+
+The task brief pointed at S8/Legacy (~line 1116+ in the pre-change planetology.cpp) as one of four biological die-off points to wrap in a checkpoint_record, alongside S5 Spark, S6 Breath and S7 Green. Reading the code, S8 Legacy has no die()/branch decision at all — it is a deterministic resource-endowment calculation over whatever life_stage the chain already reached. No checkpoint was added there.
+
+**Why it matters.** BL-217's own admission rule (settled in backlog.json) says a checkpoint is a point where the outcome distribution genuinely branches, not every point where something interesting happens. S8 fails that test — two runs reaching the same peak life_stage always produce the same Legacy endowment shape, so a checkpoint there would violate the rule this session's design explicitly wrote in. Five checkpoints were recorded instead (Spark: 1, Breath: GOE + NOE, Green: land colonisation + fire threshold), matching every genuine branch S5-S8 actually contains.
+
+> **Recommendation:** No action needed unless a future S8 mechanic (e.g. a stochastic Legacy-stage roll) introduces a real fork — at that point it would earn its own checkpoint under the same admission rule.
+
+> **RESOLVED.** ACCEPTED (Ben, 2026-08-04, bulk): "I'm happy to accept what's just flagged as 'Ben should see this', I was watching the previous session." The S8/Legacy omission stands under BL-217's own admission rule; a checkpoint there waits for a genuine fork.
+
+*Files: `src/world/planetology.cpp`, `src/world/planetology.hpp`, `docs/generation/PLANETOLOGY.md`*
+
 ### NR-028 — BL-217 verification: fresh worktree could not configure CMake (FetchContent blocked), fell back to hand-compiled cl
 *observation · raised 2026-08-02 · from Session 2026-08-02 (BL-217 checkpoint/branch/lean foundation)*
 
@@ -692,6 +585,32 @@ This worktree's HEAD was the merge-base with main, 24 commits behind (missing BL
 
 *Files: `src/core/app.cpp`, `tools/verify/README.md`*
 
+### NR-032 — Pan-stutter measurement: added a verify frame-timing tap (frame_reset/frame_csv/window + pan_perf.lua) and configured a Ninja Release tree (build_rel/)
+*decision taken on your behalf · raised 2026-08-02 · from Session 2026-08-02 (stutter-while-panning report)*
+
+To measure the reported panning stutter with real numbers, three verify functions were added to app.cpp (frame_reset / frame_csv — a CSV dump of the BL-249 frame-stats ring — and window(w,h) to measure at the live 1720x1080 rather than the 1280x720 golden size), frame_stats gained sample(i)/reset() accessors, the BL-249 instrument's function-local static was lifted to a file-local accessor so the verify tap can reach it, and scripts/verify/pan_perf.lua scripts a 300-frame sustained pan at three zooms against a no-pan baseline. Separately, build_rel/ was configured as a Ninja Release tree (same pinned 14.44 toolchain; ninja.exe found bundled under BuildTools' CMake) to quantify the Debug-vs-Release gap without touching the daily build/ Debug cache. All uncommitted as of writing.
+
+**Why it matters.** The tap is a permanent measurement asset (any future perf question is a Lua script away), but it adds three verify functions and a new build tree Ben did not ask for by name. The measurement route itself was a delegated call: desktop-automation of the live app was abandoned (its app resolver cannot see a non-Start-menu exe) in favour of instrumenting --verify, which was verified to run on the real renderer with real vsync.
+
+> **Recommendation:** Keep the tap and commit it (it is pure instrumentation — no world/* contact, no determinism surface); keep build_rel/ as the standing play/perf build alongside the Debug dev build. A build_rel.bat mirroring build_app.bat's toolchain pinning would make it one keystroke.
+
+> **RESOLVED.** ACCEPTED (Ben, 2026-08-04, bulk): "I'm happy to accept what's just flagged as 'Ben should see this', I was watching the previous session." Tap and build_rel/ kept; pan_perf.lua and the frame tap have since been committed (they carried the BL-268 cull + cache measurement, 96712ec). The suggested build_rel.bat remains unmade.
+
+*Files: `src/core/app.cpp`, `src/ui/frame_stats.hpp`, `src/ui/frame_stats.cpp`, `scripts/verify/pan_perf.lua`*
+
+### NR-033 — The daily-driver build is unoptimised Debug (/Od /RTC1) — and the stale claim that --verify uses a dummy video driver is wrong
+*observation · raised 2026-08-02 · from Session 2026-08-02 (stutter-while-panning measurement)*
+
+build/ (the exe _run.bat launches and Ben plays) is CMAKE_BUILD_TYPE=Debug with /Ob0 /Od /RTC1 — zero optimisation plus runtime checks. Measured pan cost: 41-53 ms of work per frame (every frame over the 16.7 ms refresh budget; ~19-24 fps). The same code built Release measures 11-18 ms — 3.6x faster; at play zoom it is 11.3 ms with zero budget misses. Separately, scripts/verify/frame_budget_hud.lua's header claims verify numbers are meaningless because --verify runs an offscreen/dummy driver; grep shows nothing in src/ sets any such driver — verify runs the real renderer with the build's real vsync, which is exactly why the pan_perf measurement is valid. That stale comment should be corrected so future sessions do not route around a measurement path that works.
+
+**Why it matters.** The 'engine starting to thrash' impression is substantially an artefact of playing an unoptimised Debug binary. No engine-architecture conclusion (GPU port, multithreading) should be drawn from Debug frame times.
+
+> **Recommendation:** Play from a Release build; keep Debug for debugging. Fix the frame_budget_hud.lua header comment when next touched.
+
+> **RESOLVED.** ACCEPTED (Ben, 2026-08-04, bulk): "I'm happy to accept what's just flagged as 'Ben should see this', I was watching the previous session." Play from Release, Debug for debugging. The stale dummy-driver claim in scripts/verify/frame_budget_hud.lua's header was already corrected on 2026-08-02 during the BL-268 work (verified 2026-08-04) — the recommendation is fully discharged.
+
+*Files: `build_app.bat`, `scripts/verify/frame_budget_hud.lua`*
+
 ### NR-034 — The word-based milestone (generation via words, then gameplay) has no ROADMAP slot yet — Ben calls it 'the whole process', not one item
 *question · raised 2026-08-02 · from BL-270 (action dictionary) filing — Ben's elicitation answers, 2026-08-02*
 
@@ -747,6 +666,19 @@ BL-218 changes the political map on every seed (nation seeds are now province an
 > **RESOLVED.** Answered 2026-08-03: options (b) then (c) — **re-bless GCC first, then tag the ladder lines and restore H4's stricter form**. Filed as BL-285, v0.1.1, with the two tasks in that order. Reasoning recorded on the item: until GCC is re-run, the two platforms' goldens describe different worlds and the next cross-platform failure is ambiguous between a real regression and accumulated drift; and H4's narrowing made it pass without making it right, since matching ladder line *text* means any rewording silently changes what the assertion covers — the failure mode a golden should catch rather than exhibit. The item flags the sequencing interaction with BL-283, which will also move the corporation-mix goldens.
 
 *Files: `tools/verify/ai_skill_harness.cpp`, `tools/verify/history_ladder_harness.cpp`*
+
+### NR-038 — CLAUDE.md no longer says "read every document before responding" — the doc set outgrew the instruction
+*decision taken on your behalf · raised 2026-08-02 · from Documentation-compression pass (hot/cold backlog split, DEVLOG index, doc_weight.js)*
+
+CLAUDE.md opened with "Read the documents below before responding to any request." tools/doc_weight.js measures that reading order at ~606,000 tokens across 40 files — several times any usable context, so in practice the instruction was already being ignored, silently and unevenly. The opening was rewritten to instruct traversal instead: read the doc that owns the question, and prefer an index or query tool (DEVLOG_INDEX.md, backlog_query.js, actions_query.js) over loading a file whole.
+
+**Why it matters.** An instruction that cannot be followed is worse than a narrower one that can: it makes every session's actual reading undocumented and unpredictable. Recorded here rather than assumed because it changes the contract at the top of CLAUDE.md, which is the one document every session reads.
+
+> **Recommendation:** If you disagree, the alternative is to shrink the reading order to fit a real budget (doc_weight.js --budget takes a ceiling and exits non-zero when the named set is over it) rather than to restore the old wording.
+
+> **RESOLVED.** ACCEPTED (Ben, 2026-08-04, bulk): "I'm happy to accept what's just flagged as 'Ben should see this', I was watching the previous session." The traversal wording at the top of CLAUDE.md stands.
+
+*Files: `CLAUDE.md`, `tools/doc_weight.js`*
 
 ### NR-039 — C-route design session: Ben overrode the milestone-sequencing rule, and the design carves a new exception into the determinism standing rule
 *observation · raised 2026-08-02 · from Sprint-planning session, 2026-08-02 — asked whether the backlog was sprint-ready*
@@ -848,6 +780,41 @@ The direction was Ben’s and is recorded verbatim in AI_OPPONENT.md § 10d. Fou
 
 *Files: `docs/ai/AI_OPPONENT.md`, `docs/development/backlog.json`, `Project-Rival/CLAUDE.md`, `Project-Rival/docs/MISSION.md`*
 
+### NR-045 — Two direction points applied: the sci-fi/fantasy naming rule, and the governing-body aim — BL-094 unparked and raised F → A on my judgement
+*decision taken on your behalf · raised 2026-08-03 · from Ben, 2026-08-03, after the review-queue session — two points from a prompt that did not reach me: (1) "even if we do use real history as an analogy, we should use sci-fi / fantasy random names"; (2) "the aim that we're going for now, is to really play as a governing body. The reason for that is that it allows law, policy and science to use military might - not just economic."*
+
+Point 1 is recorded as a standing rule (io-standing-rules § Terms & docs) plus a full section in GENERATION_STRATEGY.md, and stamped onto BL-271 and BL-277, the two items filed off the Rome analogy. Point 2 is recorded in BL-094's design as the stated reason for the pivot. The calls that were MINE, not Ben's: (a) **BL-094 unparked and raised F → A** — 'the aim we're going for now' is not compatible with a parked F item, but Ben did not ask for a re-prioritisation and did not give it a version goal; (b) BL-094's title changed from 'nation as the strategic actor' to 'the player is a GOVERNING BODY (nation)', following his word; (c) I wrote the v0.1.x design test ('does this system reach military as well as economic outcomes?') into BL-094 rather than editing the four stub items (BL-155/156/157/158) directly; (d) I did NOT touch CONCEPT.md's player-identity statement, on the authority time-slice rule, even though it is the doc his point most directly concerns.
+
+**Why it matters.** (a) is a real sequencing change — an A-priority unparked item reads as near-term work, and v0.1.1 is the live minor with the word interface just themed into it. If the governing-body pivot is the aim but NOT the next thing built, A may overstate it and a version goal would say more than a priority does. ROADMAP has carried an open question since 2026-07-31 about whether the pivot shares v0.2.0 with the AI-opponent set or takes its own minor; that question is now louder, not answered. (d) matters because CONCEPT.md currently states the player identity as an open corporate-or-nation choice, which his message effectively closes — but closing it in the authority doc ahead of the work is exactly what the time-slice rule forbids, so it stays stated in the item.
+
+- Accept as recorded — BL-094 unparked at A, no version goal yet.
+- Give BL-094 a version goal now (v0.2.0, or its own minor) — that settles the ROADMAP question that has been open since 2026-07-31.
+- Too strong — re-park BL-094 or drop it back down; the direction is recorded either way and the priority was not what Ben asked to change.
+- Also close CONCEPT.md now: amend the player-identity statement ahead of the work, treating this as a concept decision rather than an implementation one.
+
+> **Recommendation:** Option 2. A priority says 'important'; a version goal says 'when', and 'when' is the actual open question — it has been open since 2026-07-31 and Ben's message is the strongest signal yet that it should be answered. Option 4 is defensible too and is arguably not a time-slice violation, since CONCEPT.md owns *player identity* and Ben has now made an identity decision rather than an implementation one; I left it alone because the rule is unambiguous and the cost of waiting is low.
+
+> **RESOLVED.** ITS OWN MINOR (Ben, 2026-08-04, via the review form). BL-094 (governing body) is versioned v0.3.0; the ROADMAP sequencing question open since 2026-07-31 is closed, and priority A stands. THE SHAPE WAS MINE: own-minor could slot before or after Politics, and I inserted it BEFORE — v0.3.0 governing body, Politics + filter shifted v0.3.0 -> v0.4.0, expanded-prototype ceiling now v0.4.0 — because BL-094 own text says the political layer hangs off an actor that can own it (v0.1.5 stub wording agreed: "enough political layer for the governing actor to have something to own"). Flip it if the intent was pivot-after-politics. CONCEPT.md option 4 was overtaken separately: NR-053 records the docs closed forward-looking on Ben instruction.
+
+*Files: `.claude/rules/io-standing-rules.md`, `docs/generation/GENERATION_STRATEGY.md`, `docs/development/backlog.json`, `docs/development/ROADMAP.md`*
+
+### NR-046 — Planetology S6: the NOE gate now tests tectonics at the NOE's own epoch, not at present day — and the GOE gate deliberately still does not
+*decision taken on your behalf · raised 2026-08-04 · from Ben, 2026-08-04, from a Project-Rival session: "go straight to the live change... do follow procedure to document well". The change was recommended off the new C1 rejection census in tools/verify/planetology_sweep.cpp, which measured WHY homeworlds get rejected for the first time.*
+
+The C1 census found that ~74% of homeworld rejection pressure was the oxygen story, and that "cold and old" (interior=low) cost 2.52 draws against a ~1.24 baseline — twice any other preference. Tracing S6 found the cause: `theta` (tectonic vigour) was computed at PRESENT-DAY age and then used to gate the NOE, an event that fired billions of years earlier. An 8 Gyr world is radiogenically cold today but was not cold when its oxygenation actually happened. Fixed by adding `theta_at(age)` / `mobile_lid_at(age)` helpers in planetology.cpp (radiogenic term decays, tidal term carries across unscaled) and testing the NOE at `age - noe_at`. `st.theta`, `st.mobile_lid` and `profile.geology` are bit-identical to before — only the NOE gate reads the historical value, so tectonics, continents and tile terrain are untouched. THE CALL THAT WAS MINE: I also re-sited the GOE gate to its own epoch for symmetry, MEASURED IT, found acceptance fell 78.5% -> 60.2% with 69% of rejects becoming Mat Worlds, and REVERTED that half. The GOE test is an upper bound (`theta < 2.4`) whose constant was calibrated against present-day theta; re-siting it without re-deriving the constant invalidates it, and I had no independent basis for a new one.
+
+**Why it matters.** Two things. (1) The codebase now contains a deliberate asymmetry — one S6 gate reads historical theta, the other reads present-day — which is defensible (heat only falls, so present-day is conservative for an upper bound) but is the kind of inconsistency that reads as a bug to the next person. It is commented at the site and recorded here so it is a known position rather than an accident. (2) Every generated world changes: same acceptance (78.4% vs 78.5%) but a different rejection profile, "not enough arable land" overtaking "not a Cradle" as the top clause, and Boring Billion rejects down 25%. planetology_harness, continents_harness, world_determinism, determinism_harness, history_ladder_harness and mediterranean_sweep all still pass, so no assertion caught it — but the default-seed campaign world may look different, which is Ben's eyeball to give (the same debt BL-276 left open).
+
+- Accept as landed — NOE historical, GOE present-day, asymmetry documented at the site.
+- Close the asymmetry properly: derive an epoch-relative GOE threshold (e.g. express the 2.4 bound as a multiple of the reference world's theta AT THAT EPOCH rather than as an absolute), then re-site the GOE gate too. This is the physically coherent end state and wants its own measured calibration pass.
+- Revert the whole change — the interior=low cost was a preference-pricing wart, not a correctness bug, and 2.52 draws was survivable.
+
+> **Recommendation:** Option 1 now, Option 2 as a filed follow-on. The NOE fix is a correctness fix backed by measurement and costs nothing (acceptance unchanged, worst lean improved 2.52 -> 1.94 and is now a genuine design axis, oxygen_story=low, rather than a modelling artifact). Option 2 is right but is a calibration project, not a one-line change, and doing it badly is worse than the documented asymmetry — the measured 60.2% run is the evidence for that.
+
+> **RESOLVED.** ACCEPTED (Ben, 2026-08-04, bulk): "I'm happy to accept what's just flagged as 'Ben should see this', I was watching the previous session." Option 1 as recommended: NOE historical, GOE present-day, asymmetry documented at the site. Option 2 (epoch-relative GOE threshold + measured re-calibration) filed as BL-301 (GOE epoch calibration). The default-seed eyeball stays under BL-276's standing debt.
+
+*Files: `src/world/planetology.cpp`, `tools/verify/planetology_sweep.cpp`, `docs/generation/PLANETOLOGY.md`*
+
 ### NR-047 — Wizard bands set from measured always-viable spans — two consequences that were mine, not measured-away
 *decision taken on your behalf · raised 2026-08-04 · from Ben, 2026-08-04: "Let's change the band to always viable, and move onto T3." The instruction was clear; the specific numbers, the lean re-partitioning, and how to handle two side effects were mine.*
 
@@ -879,6 +846,92 @@ The interior=high composition cost recorded in this entry is unaddressed and sta
 
 *Files: `src/world/planetology.cpp`, `tools/verify/planetology_sweep.cpp`, `tools/verify/earthlike_corridor.cpp`, `tools/verify/earthlike_tile_census.cpp`*
 
+### NR-048 — A fresh CMake configure cannot download SDL3 on this machine
+*observation · raised 2026-08-04 · from Hit while trying to time a from-cold build for BL-287.*
+
+Configuring a brand-new build directory fails in FetchContent_MakeAvailable(SDL3) at CMakeLists.txt:44. The download from codeload.github.com reports "unable to check revocation for the certificate", ninja stops, and configure aborts. Existing build directories (build/, build_rel/) are unaffected because their _deps are already populated.
+
+**Why it matters.** Every current build dir works, so this is invisible day to day — but it means a fresh clone, a new git worktree, or a CI runner cannot configure the project at all. It also blocked the from-cold timing measurement BL-287 wanted, so that number is still unmeasured. Unclear whether this is a transient network condition, a corporate/AV TLS interception, or a change in the certificate chain; it was seen once and not retried later.
+
+- Retry later — it may simply be transient.
+- If persistent: vendor the deps, or point FetchContent at a local cache/mirror, or set CMAKE_TLS_VERIFY/CURLOPT_SSL_OPTIONS appropriately for this machine.
+- Check whether CI is currently affected — if CI provisions fresh dirs, it may already be failing.
+
+> **Recommendation:** Retry a fresh configure once before investigating; if it reproduces, check CI first, since a green local build directory hides this completely.
+
+> **RESOLVED.** ACCEPTED (Ben, 2026-08-04, bulk): "I'm happy to accept what's just flagged as 'Ben should see this', I was watching the previous session." Retried 2026-08-04 per the recommendation: it REPRODUCES (curl to codeload.github.com fails TLS, exit 35), so this is persistent, not transient. Filed as BL-302 (fresh-configure SDL3 fetch) — fresh clones, new worktrees and CI cannot configure until it is fixed.
+
+*Files: `CMakeLists.txt`*
+
+### NR-049 — The arable floor is a hard ocean cap at 0.714, and Earth clears it by 0.4%
+*question · raised 2026-08-04 · from Found measuring NR-047: widening the ocean band did not move land fraction, so something downstream was rejecting the wet worlds.*
+
+homeworld_viability requires arable_share >= 0.08, and arable_share = land_frac * (0.28 - (o2 - 0.21) * 0.45) * (mobile_lid ? 1.0 : 0.72). Solve it: even in the BEST case (oxygen exactly 21%, mobile lid) the floor caps ocean fraction at 1 - 0.08/0.28 = 0.7143. Earth is 0.71. Worked cases: Earth with a mobile lid and 21% O2 gives arable 0.0812 and PASSES by 1.5%; the same world with a stagnant lid gives 0.0585 and is REJECTED; the same world at 23% oxygen gives 0.0786 and is REJECTED; at 25% oxygen, 0.0760, REJECTED.
+
+**Why it matters.** Two things. First, the clause does not do what it says. It reads as "a climate people can farm in", but mechanically it is a hard ceiling on ocean fraction — and the ceiling sits 0.4% above Earth. Second, it explains the whole shape of T3: generated worlds sit at 46-48% land against Earth's 29% not because the ocean band is wrong (that is now fixed) but because anything wetter than Earth is unreachable by construction. The generator cannot produce an ocean world, and can only produce Earth itself in the corner where oxygen is at the low end and the lid happens to be mobile.
+
+- Lower the floor from 0.08 to ~0.06. Ocean ceiling moves to 0.786, Earth sits comfortably inside instead of on the edge, and ocean-heavy homeworlds become possible.
+- Keep the floor and rescale the 0.28 coefficient, if the intent is that arable share should be a larger fraction of land.
+- Accept it, and state plainly in PLANETOLOGY.md that Io homeworlds are drier than Earth by design — the floor is a playability constraint (enough land to build on), not a realism one.
+- Split the concern: keep a low absolute arable floor for playability, and let ocean fraction be governed by its own clause so the two stop being entangled.
+
+> **Recommendation:** Option 1 as the cheap move — it is one constant, it puts Earth inside the envelope rather than on its edge, and T3 can measure the result immediately. But option 3 is a legitimate answer too: if the real requirement is "the player must have somewhere to build", then a drier-than-Earth homeworld is a deliberate game-design choice and should be written down as one rather than left looking like a miscalibration. What should not stand is the current position, where a realism-shaped formula is silently enforcing a gameplay constraint nobody wrote down.
+
+> **RESOLVED.** OPTION 3 (Ben, 2026-08-04, via the review form): keep the floor, write it down. No constant changed. PLANETOLOGY.md § strict floor now carries a dated note stating drier-than-Earth as a playability constraint — the algebra (ocean capped at 0.714, Earth clears by 0.4%), the measured consequence (~46-48% land vs Earth 29%), and that ocean worlds stay generatable but are never the homeworld. The formula stops silently enforcing a gameplay constraint nobody wrote down, which was the entry actual complaint. Also corrected in passing: the doc said "arable >= 8% of land"; the code floors arable_share at 8% of SURFACE (land fraction already folded in).
+
+*Files: `src/world/planetology.cpp`, `docs/generation/PLANETOLOGY.md`*
+
+### NR-050 — A concurrent session swept this retrofit’s doc edits into three unrelated commits
+*observation · raised 2026-08-04 · from Documentation retrofit, running alongside the star-map coding session.*
+
+Three times during this pass, doc files edited here were committed by the other session before this one could commit them: 7393a9d ("Star map: actually draw it") took CONCEPT.md, SYSTEMS.md, GLOSSARY.md, ui/LAYOUT.md, ui/MENU.md and io-standing-rules.md; 6cbc33f ("The ladder wraps") took eleven more; e8f4f57 ("Bless the goldens") took the ACTIONS.json corrections. Content survived intact in every case — verified by grep after each sweep. What did not survive is attribution: the governing-body pivot lands in a commit about ImGui draw lists.
+
+CAUSE: that session commits with a broad `git add` every few minutes. The window between editing a batch of docs and committing them is smaller than the batch takes to write, so no amount of committing promptly from this side wins the race.
+
+WHY IT IS WORTH RECORDING RATHER THAN SHRUGGING AT: the commit message is how a future session finds out why a doc changed. `git log -- docs/CONCEPT.md` now returns a star-map commit. The repo already has the fix — CLAUDE.md prescribes the `scoped-commit` skill precisely for a tree carrying someone else’s work — and it was not used.
+
+NO ACTION PROPOSED beyond awareness; rewriting the history would be worse than the problem, and the other session was building on those commits. If concurrent sessions become normal, the worktree isolation model in DELIVERY.md § Sub-agents & worktrees is the real answer.
+
+> **RESOLVED.** ACCEPTED (Ben, 2026-08-04, bulk): "I'm happy to accept what's just flagged as 'Ben should see this', I was watching the previous session." Awareness recorded; no history rewrite. scoped-commit on the sweeping side and DELIVERY.md's worktree isolation remain the standing answers if concurrent sessions become normal.
+
+### NR-051 — Superseded designs were demoted rather than deleted — four calls taken
+*decision taken on your behalf · raised 2026-08-04 · from Documentation retrofit, Packages B/C/E.*
+
+Four places described a surface that does not exist. In each I marked the design **designed-not-built** and kept it, rather than deleting it:
+
+1. LENSES.md § Per-lens selection validity & routing — no resolver reads state.overlay; selection is lens-agnostic. Kept because it is a good design and two of its rows already describe the real fall-through. It has NO backlog item; if it should be built, it needs one.
+2. market.md Markets/Trends views — designed, never built; the built tabs are Prices/Sell Orders.
+3. construction.md — Build/Manage/Sell Orders became Construction/Buildings, with Sell Orders relocated to Market.
+4. tile_ledger.md Tiles/Buildings/Market — the built views are Story/Chain/Tiles, and BL-281 retires the last of those.
+
+THE JUDGEMENT: deleting is cleaner to read, but it destroys the reasoning, and a design that was thought through and not built is worth more than the paragraph it costs. The risk is the opposite failure — a reader skimming past the banner and building from the table. If you would rather these were cut outright, say so and I will cut them; the reasoning survives in git either way.
+
+> **RESOLVED.** ACCEPTED (Ben, 2026-08-04, bulk): "I'm happy to accept what's just flagged as 'Ben should see this', I was watching the previous session." The four designed-not-built banners stand; nothing is cut. LENSES.md § per-lens selection routing stays itemless until someone wants it built.
+
+### NR-052 — Priorities chosen for the six code-defect items filed from the audit
+*decision taken on your behalf · raised 2026-08-04 · from Documentation retrofit — findings that were code defects, not doc drift.*
+
+BL-290 (naming banks read Earth-European) and BL-291 (world_audit harness fails) and BL-293 (order book unreachable by command) were filed **A**; BL-292 (economy panel orphaned) **B**; BL-294 (dead UI symbols) and BL-295 (components.hpp cites phantom ids) **C**. All six v0.1.1.
+
+REASONING FOR THE THREE As, since that is the part worth checking: BL-290 is a standing rule being broken in shipped code, and the rule is eleven days old. BL-291 blocks re-measuring the tile census, so TILES.md keeps a stale measured table until it is fixed — a doc defect with a code cause. BL-293 is the hole in the word interface’s write leg, and the word interface is v0.1.1’s named theme; it also surfaced independently in Project-Rival’s findings, which is a second vote.
+
+BL-292 asks a real question rather than proposing a fix — give the orphaned Economy panel a door, or retire it — and I recommended auditing for redundancy first, since the rail is nearly full and BL-094 will want slots for law and force.
+
+> **RESOLVED.** ACCEPTED (Ben, 2026-08-04, bulk): "I'm happy to accept what's just flagged as 'Ben should see this', I was watching the previous session." The six priorities stand as filed (BL-290/291/293 at A, BL-292 at B, BL-294/295 at C, all v0.1.1).
+
+### NR-053 — The pivot docs were closed ahead of BL-094 landing, on your instruction — recording the shape I chose
+*decision taken on your behalf · raised 2026-08-04 · from Documentation retrofit; you answered "edit now" to the NR-045 question.*
+
+You authorised editing CONCEPT.md, SYSTEMS.md and GLOSSARY.md now rather than holding the authority time-slice. What was NOT specified, and what I chose:
+
+I wrote them as **forward-looking, clearly unlanded** rather than as if the pivot had shipped. CONCEPT states the player controls a corporation today and that the stated aim is a governing body, with your reason and the military-reach design test; GLOSSARY gains a Governing body entry marked designed-not-built and leaves the nation-vs-governing-body terminology question explicitly open, which BL-094 says is yours to settle; SYSTEMS splits Policy into automation-policy and law, and adds a Force entry marked designed-not-built.
+
+THE ALTERNATIVE I DID NOT TAKE: rewriting them in the governing body’s voice throughout. That would read better but would assert a world that does not exist, and would make the docs wrong in the other direction until the work lands.
+
+STILL OPEN AND NOT DECIDED HERE: BL-094 has no version_goal (the NR-045 question proper), and its design prose says the player is one of "the 14 generated Voronoi nations" four times — the generator produces roughly 43. The pivot’s core identity claim rests on a nation count that changed on 2026-07-30.
+
+> **RESOLVED.** ACCEPTED (Ben, 2026-08-04, bulk): "I'm happy to accept what's just flagged as 'Ben should see this', I was watching the previous session." The forward-looking shape of the pivot docs stands. The stale "14 nations" count in BL-094's design got a dated correction note this session (the claim is "one of the generated nations"; the count is ~43 and immaterial). The version-goal question stays open in NR-045.
+
 ### NR-056 — Tech-web density grain — coarse, medium, or fine, judged against the worked steam-slice examples
 *question · raised 2026-08-04 · from BL-296 (ancient tech ladder) § Density test — Ben asked to test detail level against examples of technology*
 
@@ -896,4 +949,39 @@ The constellation geometry is settled; the open dial is node density. ANCIENT_TE
 > **RESOLVED.** MEDIUM (Ben, 2026-08-04) — chosen against the two slices. The ring-1-to-2 neighbourhood was worked in full at this grain the same day (ANCIENT_TECH_LADDER.md § The ring-1-to-2 neighbourhood): 28 objects across two rings, extrapolating to ~130-150 web-wide, inside the § Geometry budget. The mixed-by-consumer upgrade (fine grain in keystone neighbourhoods) stays available if playtests want more texture at forks.
 
 *Files: `docs/research/ANCIENT_TECH_LADDER.md`*
+
+### NR-057 — 0 A.D. does ship an official agent interface — the computer-use premise in Rival's docs is stale
+*observation · raised 2026-08-04 · from SOTA research sweep (2026-08-04) for the text-only Rival proposals, requested by Ben.*
+
+Project-Rival/CLAUDE.md and docs/ENVIRONMENT.md both state 0 A.D. exposes no agent interface and no official external RPC, which is why the campaign rite plays via computer-use (NR-040). Research found this is wrong: since Alpha 24 (Feb 2021) the engine ships --rl-interface=127.0.0.1:6000, an official HTTP seam driven by the in-tree zero_ad Python client (source/tools/rlclient/python) — reset() with a JSON scenario config, step(actions), full JSON game-state dump per step, headless. It is a lightly-maintained research seam, not a supported API, so it needs a conformance smoke test against Release 28 before relying on it.
+
+**Why it matters.** Text-only play of 0 A.D. is possible today without patching or hooking the game, honouring Rival's constraint as written. Benchmarks (BALROG, lmgame-Bench) find language observations beat pixels for decision quality, so the computer-use rite is both the slower and the weaker modality. Full proposals delivered in the 2026-08-04 chat; if adopted, ENVIRONMENT.md § Later-if-earned and the CLAUDE.md scope note need amending, and the harness/test items get filed on the backlog.
+
+> **Recommendation:** Amend the two Rival docs' premise (the constraint stands, its justification changes), and pilot a zero_ad smoke test once the Release 28 install (NR-043, owed by Ben) lands.
+
+> **RESOLVED.** AMEND (Ben, 2026-08-04). Both docs amended same day: Project-Rival/CLAUDE.md scope note re-based (text-only play is now the preferred mode, computer-use the fallback) and docs/ENVIRONMENT.md gained the RL-interface seam as the campaign mode. Work filed: BL-306 (text Rival harness), BL-297 (Era -1 diplomacy seam), BL-298 (diplomacy test battery), BL-299 (great-power seed), BL-300 (myth & theology generation). Release 28 install + zero_ad smoke test authorised and run the same session.
+
+*Files: `Project-Rival/CLAUDE.md`, `Project-Rival/docs/ENVIRONMENT.md`*
+
+### NR-059 — ID collision on pull: the remote tech-ladder session and the local Rival/diplomacy WIP both minted BL-296 and NR-054/055 — local side renumbered
+*decision taken on your behalf · raised 2026-08-04 · from Integrating origin/claude/ancient-tech-tree-mockup-m3fgk3 into main (Ben: pull the tech tree mockup back from origin).*
+
+The branch (committed, pushed) and the uncommitted local working tree allocated the same ids independently. Per the session-start policy (committed history wins; renumber off next_id.js), the LOCAL side moved: BL-296 (text Rival harness) -> BL-306; NR-054 (0 A.D. official agent interface) -> NR-057; NR-055 (v0.1.6 generation-visibility shape) -> NR-058. All cross-references updated: Project-Rival/CLAUDE.md, Project-Rival/docs/ENVIRONMENT.md, Project-Rival/tools/harness/smoke_test.js, and the BL-306 summary in backlog.json. BL-296 now means the ancient tech ladder everywhere; next safe id is BL-307.
+
+**Why it matters.** Anything Ben remembers as BL-296-the-Rival-harness or NR-054-the-0AD-finding from the local session now lives under the new ids; the chat transcript of that session cites the old ones.
+
+> **RESOLVED.** Mechanical application of the documented collision policy; no design content changed on either side.
+
+*Files: `docs/development/backlog.json`, `docs/development/NEEDS_REVIEW.json`, `Project-Rival/CLAUDE.md`, `Project-Rival/docs/ENVIRONMENT.md`, `Project-Rival/tools/harness/smoke_test.js`*
+
+### NR-060 — The 0 A.D. RTS bench is retired: "0 AD" means the year, not the game — Wildfire Games' RTS uninstalled same-day
+*observation · raised 2026-08-04 · from Ben, in-session (2026-08-04), on seeing the RTS launch: "0 AD is a testing mode in Project-Io, I wasn't looking for a game installation. Please remove that game from my drive."*
+
+The Rival docs (2026-08-03) framed Wildfire Games' 0 A.D. (Release 28) as the near-term arena, and NR-043 recorded "Ben installs it himself". Acting on "install that release and let's run a smoke test", the RTS was downloaded and installed this session; its RL-interface seam answered on port 6000 before the reset call was debugged. Ben then clarified the premise was crossed wires: "0 AD" in his framing is the YEAR — Io's own Era -1 sandbox (BL-271) — not the RTS. The game was removed on his instruction: NSIS uninstaller run, install dir (C:/Users/benbo/Games/0ad), installer exe, OneDrive Documents/My Games/0ad and AppData/Local/0ad all deleted, registry and Start Menu verified clean.
+
+**Why it matters.** Rival's arena re-bases onto Project Io itself: the word interface (MCP seam, BL-278) today, the Era -1 sandbox when BL-271 lands, the diplomacy seam (BL-307) as the growing edge. BL-306 (text Rival harness) re-aims accordingly — its three-layer shape (summarizer / macro-action grammar / MCP socket) transfers intact; only the zero_ad-specific layer falls away. The NR-057 finding (0 A.D.'s official RL interface) stays true and on record, and the smoke test written against it proved the protocol end-to-end minus reset; it is simply no longer our arena.
+
+> **RESOLVED.** Executed same session: game fully removed; ENVIRONMENT.md carries a retirement banner; CLAUDE.md arena paragraph re-based; BL-306 design amended with the re-aim. The RTS harness files stay in the repo as the record of the protocol work.
+
+*Files: `Project-Rival/CLAUDE.md`, `Project-Rival/docs/ENVIRONMENT.md`, `Project-Rival/tools/harness/smoke_test.js`*
 

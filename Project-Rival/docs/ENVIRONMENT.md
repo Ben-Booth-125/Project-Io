@@ -1,5 +1,10 @@
 # Environment — the 0 A.D. test bench (2026-08-03)
 
+> **Retired 2026-08-04 (Ben, NR-060).** "0 AD" means the *year* — Io's own Era −1 sandbox
+> (BL-271), not Wildfire Games' RTS. The RTS was installed and uninstalled the same day; the
+> arena is Project Io's word interface, with the Era −1 sandbox as its destination map. This
+> doc is kept as the record of the RTS bench that briefly existed; nothing below is live.
+
 ## Install state
 
 **Not installed** (checked 2026-08-03: Program Files, LOCALAPPDATA, `Documents\My Games\0ad`,
@@ -25,10 +30,17 @@ seeded the other way round.)*
 
 Two modes, used for different things:
 
-**Visual (the campaign mode).** Claude plays with mouse and keyboard via computer-use. Prompts
-pause at year marks; the screen is the blackboard. This is where annals come from. *(0 A.D.
-exposes no agent interface, which is why this is computer-use rather than a protocol seam —
-Io's own direction went the other way; see MISSION.md.)*
+**Text (the campaign mode — re-based 2026-08-04, NR-057).** The engine ships an official agent
+seam: `--rl-interface=127.0.0.1:6000`, an HTTP loop the in-tree `zero_ad` Python client
+(`source/tools/rlclient/python`) drives — JSON scenario config in, full JSON game state per
+step, programmatic commands, exact step control. Year marks become exact ticks and pausing is
+free; the JSON state is the blackboard. The seam is lightly maintained research tooling, so it
+is pinned to Release 28 and guarded by a conformance smoke test.
+
+**Visual (the fallback mode).** Claude plays with mouse and keyboard via computer-use; the
+screen is the blackboard. Kept for visual play and for anything the RL seam does not expose —
+no longer the default. *(The 2026-08-03 premise that 0 A.D. exposes no agent interface was
+wrong; see NR-057.)*
 
 **Headless (the rehearsal mode).** Bot-vs-bot, no graphics, for testing setups, seeds, and
 match length before spending a campaign on them (PowerShell, the shell campaign sessions

@@ -73,6 +73,7 @@ const char* corp_command_result_name(corp_command_result r)
 //
 // Requests (space-separated `key=value` tokens after the opcode):
 //   TICK                                            -> advance one tick
+//   CORPS                                           -> one JSON line per corp, then END
 //   BLACKBOARD corp=<id> ticks=<n>                  -> facts as BL-206 JSONL, then END
 //   COMMAND corp=<id> verb=<0-7> subject=<id> tile=<id> type=<0-4> target=<0-22>
 //           recipe=<id> workforce=<n> road_tier=<n>  -> apply_corp_command
@@ -165,6 +166,19 @@ int run_serve(int ticks)
                                                ? static_cast<long>(out_building)
                                                : -1)
                       << std::endl;
+        }
+        else if (op == "CORPS")
+        {
+            // Who can act on this seam: one JSON line per corporation, then END.
+            // An agent's first question is "who am I?" — nothing else on the
+            // protocol answers it (NR-061).
+            for (const auto& [id, corp] : w.corporations)
+                std::cout << "{\"id\":" << static_cast<long>(id)
+                          << ",\"name\":\"" << corp.name << "\""
+                          << ",\"is_player\":" << (corp.is_player ? "true" : "false")
+                          << ",\"home_nation\":" << static_cast<long>(corp.home_nation)
+                          << "}" << std::endl;
+            std::cout << "END" << std::endl;
         }
         else
         {

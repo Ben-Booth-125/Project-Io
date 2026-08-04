@@ -1,21 +1,26 @@
 # Project Rival — Claude Reference
 
 Project Rival is the AI-player discipline for Project Io, run as **live play, not shipped code**.
-A session (this kind of session) plays a strategy game through interactive prompts and
-computer-use tooling — screen, mouse, keyboard.
+A session (this kind of session) plays a strategy game through interactive prompts — via the
+game's text seam where one exists, via computer-use where none does.
 
-**Scope of that constraint (amended 2026-08-03).** Computer-use is how Rival plays **0 A.D.**,
-because 0 A.D. exposes no agent interface and patching its engine is out of scope. It is *not* a
-house position that protocol interfaces are forbidden: Io's own direction is now an **MCP server**
-over its existing read/meaning/write legs (`docs/ai/AI_OPPONENT.md` § 10). So the destination is
-a protocol seam even though the near-term arena is a screen. Rival still never patches or hooks
-the game it is playing.
+**Scope of that constraint (re-amended 2026-08-04, NR-057).** The 2026-08-03 premise — that
+0 A.D. exposes no agent interface — was wrong: since Alpha 24 the engine ships
+`--rl-interface`, an official HTTP seam driven by the in-tree `zero_ad` Python client. Playing
+through it patches nothing and hooks nothing, so **text-only play is the preferred mode**: it is
+the same read/meaning/write triple Io's own MCP server (`docs/ai/AI_OPPONENT.md` § 10) exposes,
+rehearsed against a real opponent. Computer-use stays available for visual play, as fallback
+rather than rule. Rival still never patches or hooks the game it is playing.
 
-The near-term arena is **0 A.D.** (Wildfire Games' RTS, Release 28), a match set at year zero:
-we play **Rome** on a civilising mission — *imperium sine fine*, prosecuted under the auspices;
-the target is **Han China**, the era's larger power and the only *preserving* one. The
-destination is Project Io itself — its word interface today, its antiquity sandbox (BL-271, the
-Era −1 sim) when that lands.
+**The arena is Project Io itself (re-based 2026-08-04, NR-060).** "0 AD" names the *year* —
+Io's Era −1 sandbox (BL-271), not Wildfire Games' RTS; the RTS bench was installed and retired
+the same day (`docs/ENVIRONMENT.md` banner). Rival plays through Io's word interface — the MCP
+seam today, the antiquity sandbox when BL-271 (Era −1 sim) lands, with the diplomacy seam
+(BL-297) as the campaign's growing edge.
+
+The match stays set at year zero: a **civilising-mission** power (our voice, *imperium sine
+fine* under the auspices) against a **self-preservation** power (the rival's, the era's larger
+creed). The theologies, dossier and rite transfer unchanged; only the board is now Io's own.
 
 *(Flipped 2026-08-03 by Ben, NR-042 — the campaign was seeded playing Han against Rome. The
 liturgy, annal format and dossier all transfer; what changed is which theology narrates our
