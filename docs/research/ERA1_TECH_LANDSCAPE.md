@@ -451,6 +451,14 @@ Three facts from the web pass that update the threads above:
 
 ## Q1 — quest shape: mostly a binary tree, some dead-end leaves
 
+> **OVERTURNED (2026-08-04, Ben).** The binary-tree / no-re-converging-mesh shape is superseded
+> by the **constellation geometry** settled in `ANCIENT_TECH_LADDER.md` § Geometry: a shared
+> radial web (rings = bands, sectors = domains), travel by adjacency (OR), meaning nodes
+> carrying AND condition-sets, keystone forks with exclusion via availability windows, and a
+> tech fog so the whole web is not visible at once. The *motive* below survives — the TI
+> "inaccessible mess" failure mode stays excluded, now by node-count discipline and the fog
+> rather than by forbidding re-convergence. Kept for the record.
+
 Branching factor ≤ 2 out of any node; no re-converging mesh. Dead-end leaves — tier chains and
 optional techs that lead nowhere further — carry the depth without onward requirement. Sits
 between the strictly-linear and mesh options: route choice exists, but the TI "inaccessible mess"

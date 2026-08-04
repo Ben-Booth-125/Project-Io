@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*53 entries — 14 open, 39 resolved.*
+*56 entries — 16 open, 40 resolved.*
 
 ---
 
@@ -205,6 +205,28 @@ I wrote them as **forward-looking, clearly unlanded** rather than as if the pivo
 THE ALTERNATIVE I DID NOT TAKE: rewriting them in the governing body’s voice throughout. That would read better but would assert a world that does not exist, and would make the docs wrong in the other direction until the work lands.
 
 STILL OPEN AND NOT DECIDED HERE: BL-094 has no version_goal (the NR-045 question proper), and its design prose says the player is one of "the 14 generated Voronoi nations" four times — the generator produces roughly 43. The pivot’s core identity claim rests on a nation count that changed on 2026-07-30.
+
+### NR-054 — The 'ancient tech tree' ask was delivered as a derived ladder, not a player-facing research tree
+*decision taken on your behalf · raised 2026-08-04 · from BL-296 (ancient tech ladder) — remote mockup session*
+
+Ben asked to 'mock up an ancient tech tree'. BL-274 (era-keyed rosters) records his standing position that a player-facing tech tree only works in a 1900s+ start, and that the ancient side is derived from endowment, not researched. The mockup keeps the tree STRUCTURE (nodes, prereqs, gates) as sim-consumed data, but no nation ever chooses a node: acquisition is invention-at-the-frontier + diffusion + endowment gates, per the settlement pass's endowment-not-virtue mechanism.
+
+**Why it matters.** If Ben actually wanted a clickable ancient research tree (a Paradox-style pre-1960 layer), this reading forecloses it. Recorded so the framing can be overturned before BL-271 (Era -1 sim) builds against it.
+
+> **Recommendation:** Keep the derived reading — it is consistent with BL-274's recorded stance and with how BL-218 already derives industrialisation timing. A player-facing rendering can be added later as a codex view without changing the data.
+
+*Files: `docs/research/ANCIENT_TECH_LADDER.md`*
+
+### NR-055 — Six ladder bands vs BL-274's four-band lean — grouped, not contradicted, but Ben has not confirmed
+*decision taken on your behalf · raised 2026-08-04 · from BL-296 (ancient tech ladder) mockup vs BL-274 (era-keyed rosters) open question 1*
+
+BL-274 leaned to four roster era bands (classical / medieval / gunpowder / industrial). The ladder mockup uses six (T1 Classical, T2 Post-Classical, T3 High Medieval, T4 Gunpowder, T5 Industrial, T6 Machine Age), because the economic divergence that answers 'what differs by 1960' happens across the T4/T5/T6 split the four-band lean merges. Proposed reconciliation: roster bands are a coarser grouping of the same six-band spine, so the two items share one timeline.
+
+**Why it matters.** Both items author data against a band count; whichever lands first sets the de-facto spine. If Ben prefers four bands everywhere, T4/T5 and T5/T6 merge and the 1960 capacity-spread analysis (3-4 bands) must be restated in coarser units.
+
+> **Recommendation:** Six-band spine, four-band roster grouping — divergence resolution for the economy, authoring economy for the rosters.
+
+*Files: `docs/research/ANCIENT_TECH_LADDER.md`*
 
 ---
 
@@ -856,4 +878,22 @@ what else gates it, and the 11% acceptance costs ~8 microseconds a reroll.
 The interior=high composition cost recorded in this entry is unaddressed and stands.
 
 *Files: `src/world/planetology.cpp`, `tools/verify/planetology_sweep.cpp`, `tools/verify/earthlike_corridor.cpp`, `tools/verify/earthlike_tile_census.cpp`*
+
+### NR-056 — Tech-web density grain — coarse, medium, or fine, judged against the worked steam-slice examples
+*question · raised 2026-08-04 · from BL-296 (ancient tech ladder) § Density test — Ben asked to test detail level against examples of technology*
+
+The constellation geometry is settled; the open dial is node density. ANCIENT_TECH_LADDER.md § Density test writes the same slice of history (the steam transition, T4 -> T5) at three grains: coarse (~4 nodes/slice, web ~40-50), medium (~8/slice, web ~100-150, one endowment-explainable keystone fork), fine (~20/slice, web ~400+, PoE-style pathing). AMENDED same day: a second slice — Institutions at medium grain (eight practice-class techs, the Sovereign Doctrine keystone, three vertex quests) — was added for comparison, per Ben. The comparison finding: gates differentiate in Materials/Energy, keystones differentiate in Institutions; judge medium grain against both slices.
+
+**Why it matters.** Everything downstream sizes from this: authoring effort, fog reveal pacing, how many keystone forks exist for exclusion to act on, and whether pathing is gameplay or bookkeeping. Ben framed it explicitly as a FUN question, which the examples are meant to make answerable.
+
+- Coarse — grand-strategy grain. Maximum legibility; forks have nothing to bite on; wastes the constellation.
+- Medium — every node a one-line meaning; interleaving visible; forks explainable from the map. The doc recommendation.
+- Fine — pathing as gameplay, reference grain. Only pays where someone chooses or reads; invisible on the derived ancient layer.
+- Mixed by consumer — medium web-wide, fine only in keystone neighbourhoods, coarse in sim-only regions.
+
+> **Recommendation:** Medium as the web-wide grain, upgrading to the mixed model if playtests show keystone choices want more texture. Density should follow the consumer: detail only pays where someone chooses or reads.
+
+> **RESOLVED.** MEDIUM (Ben, 2026-08-04) — chosen against the two slices. The ring-1-to-2 neighbourhood was worked in full at this grain the same day (ANCIENT_TECH_LADDER.md § The ring-1-to-2 neighbourhood): 28 objects across two rings, extrapolating to ~130-150 web-wide, inside the § Geometry budget. The mixed-by-consumer upgrade (fine grain in keystone neighbourhoods) stays available if playtests want more texture at forks.
+
+*Files: `docs/research/ANCIENT_TECH_LADDER.md`*
 

@@ -10,7 +10,71 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — The earth-like battery, generation retuned, and a sky (2026-08-04, latest)
+## Session — The ancient tech ladder, mocked up (2026-08-04, latest)
+
+Remote session, doc-only, Light mode. Ben asked for an ancient tech tree mockup — the major
+advancements from 0 CE, and what inequality between nations is realistic by 1960.
+
+**Delivered.** `docs/research/ANCIENT_TECH_LADDER.md` — six bands (T1 Classical → T6 Machine
+Age) × seven domains, ~60 load-bearing nodes with prereqs, endowment gates over the settlement
+pass's classes, and a three-class **diffusion axis** (artifact / practice / capacity) that
+generates the realistic 1960 spread: knowledge ~0 bands apart, capacity 3–4, military artifacts
+1–2. Artifacts leapfrog, practices follow contact, capacity follows the map.
+
+**The framing call.** BL-274 (era-keyed rosters) records Ben's stance that a player-facing tech
+tree only works in a 1900s+ start — so the mockup is a tree in *structure* (data the BL-271
+Era −1 sim evaluates) and a ladder in *play*: no nation clicks a node. Recorded as NR-054 so it
+can be overturned rather than becoming precedent; NR-055 records the six-band spine vs BL-274's
+four-band roster lean (proposed: rosters group the same spine).
+
+**Filed.** BL-296 (ancient tech ladder), priority B, post-v0.1.0, the tracked home; design
+conversation happens against the research doc. T6's exit hands off to `scripts/tech_tree.lua`'s
+Era 0 quests, so the two trees meet at the campaign epoch without overlap.
+
+**Follow-up, same session — the constellation.** Ben named the Path of Exile passive tree as the
+shape he's imagining, with two additions: exclusion / binary choices at branches, and the whole
+web never visible at once. Settled as § Geometry in the doc: rings = bands, sectors = domains,
+entry point = endowment (the 1960 spread becomes pathing distance), travel-OR / meaning-AND,
+keystone exclusion via availability windows, and a **tech fog** — the third fog after
+DISCOVERY.md's two. **This overturns BL-087 (tech quest system) Q1** — binary tree, no
+re-converging mesh, 2026-07-08 — on Ben's explicit call; supersession banners sit on
+`ERA1_TECH_LANDSCAPE.md` § Q1 and in BL-087's design field. Q1's motive survives via node-count
+discipline (~100–200 nodes, not the reference's 1,325) and the fog.
+
+**The density test.** Ben wants the detail level judged by *fun*, against real examples — so the
+doc's § Density test writes one slice (the steam transition) at three grains: coarse (4 nodes),
+medium (8, one endowment-explainable Fuel Doctrine fork), fine (20+, reference grain). The
+principle the examples surfaced: detail only pays where someone chooses or reads — so density
+should follow the consumer, per region of the web. Recommendation medium; the call is NR-056
+(density grain).
+
+**Third exchange — the Institutions comparison slice, and vertices become quests.** Ben asked
+for Institutions at medium grain as the second density example, with invented quests for key
+future technology placed at clear vertices. New geometry rule: **vertices are quests** — the
+BL-087 gate=quest=tech object at each ring crossing, capstone carrying the economic conditions,
+completion opening the next ring region. The slice: eight practice-class techs, the **Sovereign
+Doctrine** keystone (Chartered Capital ⊘ Command Estate — HISTORY.md Stage 3 turned from
+narration into a choice, creed-picked for AI nations), and three vertex quests (The Enforceable
+Promise / The Disciplined Sovereign / The Lettered Public). Comparison finding worth keeping:
+**gates differentiate in Materials/Energy, keystones differentiate in Institutions** — practice
+diffusion flattens the sector into adoption lag, so the fork is where its differentiation
+lives, not decoration.
+
+**Fourth exchange — grain settled, first full region worked.** Ben chose **medium** against the
+two slices (NR-056 resolved), and asked for the full ring-1-to-2 neighbourhood at that grain.
+Delivered in the doc plus a generated SVG sketch: 20 techs + 5 vertex quests + the **Granary
+Doctrine** keystone (Temple Stores ⊘ Open Granaries — the campaign's markets-not-command
+premise made a ring-1 *choice*, BL-275-assertable) + 2 roster regimes ≈ 28 objects,
+extrapolating to ~130–150 web-wide — inside the § Geometry budget. New rule adopted: the
+**sparse-sector rule** — a vertex quest only where the crossing is a genuine capability regime
+(Military crosses on the BL-274 roster turnover, Medicine on a plain edge).
+
+**Runtime:** ~2.5h remote across four exchanges, Light/design. **Left open:** band count
+(NR-055), per-domain state shape, C++-vs-Lua data home.
+
+---
+
+## Session — The earth-like battery, generation retuned, and a sky (2026-08-04)
 
 A long generation session. Built the five-instrument earth-like battery, acted on what it
 measured, and closed with the galaxy minimap. Full detail in the commits; this entry records the
