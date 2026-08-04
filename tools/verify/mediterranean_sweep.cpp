@@ -121,7 +121,7 @@ seed_result sweep_one(uint32_t campaign_seed, bool keep_map)
         world scratch;
         const entity_id body = scratch.create_entity();
         auto probe = generate_body_tiles(scratch, body, gw, gh, st.profile,
-            tile_seed, 1.0f, &st, nullptr, &cs.height_bias);
+            tile_seed, 1.0f, &st, nullptr, &cs.height_bias, &cs.convergent);
         std::vector<char> pocean(probe.size(), 0);
         for (std::size_t i = 0; i < probe.size(); ++i)
             if (scratch.tiles.at(probe[i]).composition == terrain_composition::ocean) pocean[i] = 1;
@@ -154,7 +154,7 @@ seed_result sweep_one(uint32_t campaign_seed, bool keep_map)
     world w;
     const entity_id fb = w.create_entity();
     std::vector<entity_id> ids = generate_body_tiles(w, fb, gw, gh, st.profile,
-        chosen_seed, 1.0f, &st, nullptr, &cs.height_bias);
+        chosen_seed, 1.0f, &st, nullptr, &cs.height_bias, &cs.convergent);
 
     std::vector<char> ocean(static_cast<std::size_t>(gw) * gh, 0);
     int ocean_n = 0;

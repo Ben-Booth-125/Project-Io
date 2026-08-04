@@ -143,7 +143,10 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // history merges into the body's biography (chain_stage::engine lines);
     // its height bias feeds Pass 1 in place of pure noise. `plan` therefore
     // needs the body's grid dims and an out-param for the bias.
-    auto plan = [&](int proto_index, int gw, int gh, std::vector<float>& bias_out) {
+    // `convergent_out` is optional: only Kepler's Pass 5 currently reads it, and
+    // the other bodies have no mountain-bearing terrain worth steering.
+    auto plan = [&](int proto_index, int gw, int gh, std::vector<float>& bias_out,
+                    std::vector<uint8_t>* convergent_out = nullptr) {
         body_inputs in = prototype_body(proto_index);
         if (in.is_homeworld)
             in.orbit_au = rw.home_orbit_au;
@@ -159,6 +162,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
             [](const history_event& a, const history_event& b)
             { return a.years_before_epoch > b.years_before_epoch; });
         bias_out = cs.height_bias;
+        if (convergent_out) *convergent_out = cs.convergent;
 
         if (report)
         {
@@ -254,7 +258,8 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // gates (PLANETOLOGY.md § The homeworld rule). Every gate still runs, still
     // records its margin, and still writes its line.
     std::vector<float> kepler_bias;
-    const planetology_state kepler_pl = plan(1, 180, 84, kepler_bias);
+    std::vector<uint8_t> kepler_convergent; // Pass 5 seeds mountain ranges along these
+    const planetology_state kepler_pl = plan(1, 180, 84, kepler_bias, &kepler_convergent);
     // A non-null generation_record is requested here so the river pass below can read the
     // Pass-1 heightmap it captures; this is a pure capture (TILE_GENERATION.md § Generation
     // history hook) and does not perturb the deterministic tile surface itself.
@@ -285,7 +290,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
             world scratch;
             const entity_id probe = scratch.create_entity();
             const auto probe_tiles = generate_body_tiles(scratch, probe, 180, 84, kepler_pl.profile,
-                candidate, deposit_scalar, &kepler_pl, nullptr, &kepler_bias);
+                candidate, deposit_scalar, &kepler_pl, nullptr, &kepler_bias, &kepler_convergent);
             const int sea = largest_enclosed_sea(scratch, probe_tiles, 180, 84);
             if (attempt < 3 && sea >= 300)
             {
@@ -301,7 +306,7 @@ world make_hard_coded_world(world_params params, generation_report* report,
     }
 
     auto kepler_tiles = generate_body_tiles(w, kepler, 180, 84, kepler_pl.profile,
-        kepler_tile_seed, deposit_scalar, &kepler_pl, &kepler_record, &kepler_bias);
+        kepler_tile_seed, deposit_scalar, &kepler_pl, &kepler_record, &kepler_bias, &kepler_convergent);
 
     // Rivers (BL-170) — sibling pass (BL-051 convention) over the same heightmap Pass 2
     // already thresholded; needs Kepler's ocean placement done, so it runs after

@@ -56,6 +56,19 @@ struct continent_state
     /// 1's heightmap before normalisation — see generate_body_tiles.
     std::vector<float> height_bias;
 
+    /// [row*gw+col], 1 where the tile touches a CLASSIFIED CONVERGENT boundary
+    /// — the pairs that earned the +0.12 uplift above. Empty on a stagnant-lid
+    /// body (no boundaries at all).
+    ///
+    /// Exposed as data because the classification used to exist only as prose:
+    /// run_continents knew which boundaries collided, said so in a history line,
+    /// folded 0.12 into the heightmap and then forgot. Pass 5 could not seed
+    /// mountains where mountains actually form, so it fell back to "high and
+    /// rocky", which puts ranges in blobs on existing high ground rather than in
+    /// chains along the boundary that raised them. See TILE_GENERATION.md
+    /// § Pass 5 and CONTINENTS.md § Outputs and contracts.
+    std::vector<uint8_t> convergent;
+
     /// Dated lines for the body's biography (history_event::stage ==
     /// chain_stage::engine). Appended to planetology_state::history by the
     /// caller, not stored twice.

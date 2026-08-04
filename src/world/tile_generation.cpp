@@ -478,17 +478,30 @@ std::vector<int> pick_seeds(feature_kind kind, int n_seeds, int gw, int gh,
                             const std::vector<terrain_composition>& comp,
                             const std::vector<lat_band>& band,
                             const std::vector<bool>& is_ocean,
-                            std::mt19937& rng)
+                            std::mt19937& rng,
+                            const std::vector<uint8_t>* convergent)
 {
     using tc = terrain_composition;
     std::vector<int> preferred;
     std::vector<int> any_land;
+    // Tiles on a classified convergent plate boundary — where mountains actually
+    // form. Tried BEFORE the height/composition rule for mountains, so a range
+    // follows the collision that raised it. Seeding on "already high and rocky"
+    // instead is what made ranges pool into blobs: every extra seed landed in
+    // the same uplands and overlapped a range already there, which is why raising
+    // the seed count returned sublinearly (1.5x seeds bought 1.13x relief).
+    std::vector<int> on_boundary;
+    const bool have_boundary = (kind == feature_kind::mountain)
+                               && convergent != nullptr
+                               && convergent->size() == static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh);
     const int total = gw * gh;
     for (int idx = 0; idx < total; ++idx)
     {
         if (is_ocean[idx])
             continue;
         any_land.push_back(idx);
+        if (have_boundary && (*convergent)[static_cast<std::size_t>(idx)] != 0u)
+            on_boundary.push_back(idx);
 
         bool ok = false;
         switch (kind)
@@ -508,7 +521,14 @@ std::vector<int> pick_seeds(feature_kind kind, int n_seeds, int gw, int gh,
             preferred.push_back(idx);
     }
 
-    std::vector<int>& pool = (static_cast<int>(preferred.size()) >= n_seeds) ? preferred : any_land;
+    // Three tiers, most-meaningful first: the collision zone, then merely-high
+    // rocky ground, then anywhere on land. A body with no classified convergent
+    // boundary (stagnant lid, or a draw where no pair closed) simply falls
+    // through to the old behaviour.
+    std::vector<int>& pool =
+        (static_cast<int>(on_boundary.size()) >= n_seeds)  ? on_boundary
+      : (static_cast<int>(preferred.size()) >= n_seeds)    ? preferred
+                                                           : any_land;
     std::shuffle(pool.begin(), pool.end(), rng);
 
     std::vector<int> seeds;
@@ -550,9 +570,9 @@ int seed_count(feature_kind kind, geological_activity g, bool airless, int total
             // Earth's ~24%; the remaining shortfall is range COUNT, not range
             // size — going further on max_ring would produce blobs rather than
             // the chains the shapes are meant to read as.
-            base = g == geological_activity::high ? 7
-                 : g == geological_activity::moderate ? 6
-                 : g == geological_activity::low ? 3 : 0;
+            base = g == geological_activity::high ? 13
+                 : g == geological_activity::moderate ? 11
+                 : g == geological_activity::low ? 5 : 0;
             break;
         case feature_kind::rift:
             base = g == geological_activity::high ? 3
@@ -792,7 +812,8 @@ std::vector<entity_id> generate_body_tiles(
     float deposit_scalar,
     const planetology_state* pl,
     generation_record* record,
-    const std::vector<float>* continent_bias)
+    const std::vector<float>* continent_bias,
+    const std::vector<uint8_t>* convergent)
 {
     const int total = gw * gh;
 
@@ -959,7 +980,8 @@ std::vector<entity_id> generate_body_tiles(
     for (feature_kind kind : { feature_kind::mountain, feature_kind::rift, feature_kind::crater })
     {
         const int n = seed_count(kind, profile.geology, airless, total);
-        const std::vector<int> seeds = pick_seeds(kind, n, gw, gh, height, comp, band, is_ocean, cluster_rng);
+        const std::vector<int> seeds = pick_seeds(kind, n, gw, gh, height, comp, band, is_ocean,
+                                                  cluster_rng, convergent);
         for (int idx : seeds)
             grow_cluster(kind, idx % gw, idx / gw, gw, gh, land, claimed, cluster_rng);
     }

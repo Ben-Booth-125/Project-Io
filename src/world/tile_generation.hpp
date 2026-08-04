@@ -105,6 +105,12 @@ struct generation_record
 ///                Pass 1's heightmap before normalisation, so plate-boundary uplift/rift
 ///                shapes the same terrain a pure-noise heightmap would otherwise produce.
 ///                A null pointer reproduces the pre-BL-210 surface bit-for-bit.
+/// @param convergent Optional per-tile mask (continent_state::convergent), sized gw*gh,
+///                1 where the tile sits on a classified CONVERGENT plate boundary. Pass 5
+///                seeds mountain clusters here first, so ranges follow the collision that
+///                raised them instead of pooling on whatever ground is already high. A
+///                null pointer falls back to the height/composition rule and reproduces
+///                the earlier surface bit-for-bit.
 /// @return        Tile entity IDs in raster order (index = row * gw + col).
 std::vector<entity_id> generate_body_tiles(
     world& w,
@@ -115,7 +121,8 @@ std::vector<entity_id> generate_body_tiles(
     float deposit_scalar = 1.0f,
     const planetology_state* pl = nullptr,
     generation_record* record = nullptr,
-    const std::vector<float>* continent_bias = nullptr);
+    const std::vector<float>* continent_bias = nullptr,
+    const std::vector<uint8_t>* convergent = nullptr);
 
 /// Scan raster order and return the first @p n land (non-ocean) tile IDs. Used to
 /// pick building attachment points after a body's tiles are generated.

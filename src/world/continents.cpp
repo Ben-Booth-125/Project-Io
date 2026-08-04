@@ -194,7 +194,12 @@ continent_state run_continents(const planetology_state& pl, int gw, int gh, uint
         }
     }
 
-    // Apply the per-boundary bias to the tiles that touch a classified pair.
+    // Apply the per-boundary bias to the tiles that touch a classified pair, and
+    // RECORD which tiles the convergent ones were. The uplift alone is not enough
+    // for Pass 5: 0.12 folded into a heightmap is indistinguishable afterwards
+    // from terrain that was simply high to begin with, so a mountain pass reading
+    // only the finished height cannot tell a collision zone from a plateau.
+    out.convergent.assign(static_cast<std::size_t>(gw) * static_cast<std::size_t>(gh), 0u);
     for (int row = 0; row < gh; ++row)
     {
         for (int col = 0; col < gw; ++col)
@@ -211,7 +216,11 @@ continent_state run_continents(const planetology_state& pl, int gw, int gh, uint
                 const int key = a * plate_count + b;
                 if (boundary_tiles[static_cast<std::size_t>(key)] < notable_threshold) continue;
                 const int sign = boundary_sign[static_cast<std::size_t>(key)];
-                if (sign < 0)      out.height_bias[static_cast<std::size_t>(idx)] += 0.12f; // convergent
+                if (sign < 0)
+                {
+                    out.height_bias[static_cast<std::size_t>(idx)] += 0.12f; // convergent
+                    out.convergent[static_cast<std::size_t>(idx)] = 1u;
+                }
                 else if (sign > 0) out.height_bias[static_cast<std::size_t>(idx)] -= 0.08f; // divergent
             }
         }

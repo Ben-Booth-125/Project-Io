@@ -132,7 +132,7 @@ seed_metrics census_one(uint32_t campaign_seed)
         world scratch;
         const entity_id body = scratch.create_entity();
         auto probe = generate_body_tiles(scratch, body, gw, gh, st.profile,
-            tile_seed, 1.0f, &st, nullptr, &cs.height_bias);
+            tile_seed, 1.0f, &st, nullptr, &cs.height_bias, &cs.convergent);
         std::vector<char> pocean(probe.size(), 0);
         for (std::size_t i = 0; i < probe.size(); ++i)
             if (scratch.tiles.at(probe[i]).composition == terrain_composition::ocean) pocean[i] = 1;
@@ -166,7 +166,7 @@ seed_metrics census_one(uint32_t campaign_seed)
     const entity_id fb = w.create_entity();
     generation_record rec;
     const std::vector<entity_id> ids = generate_body_tiles(w, fb, gw, gh, st.profile,
-        chosen_seed, 1.0f, &st, &rec, &cs.height_bias);
+        chosen_seed, 1.0f, &st, &rec, &cs.height_bias, &cs.convergent);
 
     // Rivers are a SIBLING pass (BL-051 convention), not part of the six — so a
     // harness that calls generate_body_tiles alone measures a world with no
