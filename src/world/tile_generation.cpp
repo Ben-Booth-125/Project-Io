@@ -383,7 +383,13 @@ cluster_shape shape_of(feature_kind kind)
     // adjust further if coverage is still too sparse or overshoots plains.
     switch (kind)
     {
-        case feature_kind::mountain: return { 3, 0.65f };
+        // Mountains reach further than the other two (2026-08-04, T3 calibration).
+        // The tile census measured relief — mountain plus highland — at 6.8% of
+        // land against Earth's ~24% mountainous land, i.e. roughly 3.5x short.
+        // Grown rather than seeded more thickly: Earth's relief is a few long
+        // chains (Andes, Himalaya, Rockies), not many small blobs, so a larger
+        // cluster is the more Earth-like lever than a higher seed count.
+        case feature_kind::mountain: return { 5, 0.72f };
         case feature_kind::rift:     return { 3, 0.60f };
         case feature_kind::crater:   return { 2, 0.55f };
     }
@@ -397,10 +403,17 @@ terrain_landform landform_at_ring(feature_kind kind, int ring, std::mt19937& rng
     std::uniform_real_distribution<float> u(0.0f, 1.0f);
     switch (kind)
     {
+        // A range should read as peaks with shoulders, not one peak with a wide
+        // plain around it. Ring 1 used to be 70% highland and rings 2+ half
+        // plains, so a cluster contributed barely more than a single mountain
+        // tile — the reason the census measured mountain at 1.0% of land. Ring 1
+        // is now mountain-dominant, ring 2 mixes, and the outer rings stay
+        // highland rather than dissolving straight back into plains.
         case feature_kind::mountain:
             if (ring == 0) return terrain_landform::mountain;
-            if (ring == 1) return (u(rng) < 0.7f) ? terrain_landform::highland : terrain_landform::mountain;
-            return (u(rng) < 0.5f) ? terrain_landform::highland : terrain_landform::plains;
+            if (ring == 1) return (u(rng) < 0.55f) ? terrain_landform::mountain : terrain_landform::highland;
+            if (ring == 2) return (u(rng) < 0.25f) ? terrain_landform::mountain : terrain_landform::highland;
+            return (u(rng) < 0.65f) ? terrain_landform::highland : terrain_landform::plains;
         case feature_kind::rift:
             if (ring == 0) return terrain_landform::rift;
             if (ring == 1) return (u(rng) < 0.6f) ? terrain_landform::canyon : terrain_landform::rift;
@@ -532,9 +545,14 @@ int seed_count(feature_kind kind, geological_activity g, bool airless, int total
     switch (kind)
     {
         case feature_kind::mountain:
-            base = g == geological_activity::high ? 5
-                 : g == geological_activity::moderate ? 4
-                 : g == geological_activity::low ? 2 : 0;
+            // Raised 2026-08-04 alongside the larger clusters in shape_of. Growing
+            // the clusters alone took relief from 6.8% to 15.5% of land against
+            // Earth's ~24%; the remaining shortfall is range COUNT, not range
+            // size — going further on max_ring would produce blobs rather than
+            // the chains the shapes are meant to read as.
+            base = g == geological_activity::high ? 7
+                 : g == geological_activity::moderate ? 6
+                 : g == geological_activity::low ? 3 : 0;
             break;
         case feature_kind::rift:
             base = g == geological_activity::high ? 3
