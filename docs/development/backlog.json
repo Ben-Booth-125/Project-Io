@@ -6431,6 +6431,24 @@
     "src/world/components.hpp"
    ],
    "design": "FOUND BY THE DOCUMENTATION AUDIT (2026-08-04). The comment block on the logistics-goods block of\n`resource_type` (components.hpp:60-71) names BL-287, BL-288, BL-289 and BL-290 as the follow-on\nitems that will add consumption, range-cap, shelf-life and purchase behaviour.\n\nNONE OF THOSE IDS MEANS THAT. BL-287 is the verify-tier build change; BL-288 is the Release-only\ntest failures; BL-289, BL-290 and BL-291 did not exist when the comment was written. BL-286's own\ndesign correctly said \"(not yet filed)\" for each behaviour — the caveat was dropped when the\nprose was transcribed into the comment and into RESOURCES.md.\n\nRESOURCES.md has been corrected (2026-08-04). This item is the code half.\n\nTHE FIX IS ONE COMMENT: say the follow-ons are unfiled, and that ids get allocated with\n`node tools/session/next_id.js` when they are. Do not invent placeholder ids — a wrong id is\nworse than no id, because it routes the reader to real but unrelated work. That is the whole\nlesson here and it is worth stating in the comment itself."
+  },
+  {
+   "id": "BL-296",
+   "short_name": "ancient tech ladder",
+   "title": "Ancient tech ladder — the 0 CE -> 1960 tech spine (bands x domains x diffusion classes) that the Era -1 sim and the era-keyed rosters key off",
+   "category": "Research",
+   "status": "designed",
+   "priority": "B",
+   "difficulty": "M",
+   "version_goal": "post-v0.1.0",
+   "created": "2026-08-04",
+   "authority_doc": "docs/lore/HISTORY.md",
+   "touches": [
+    "docs/research/ANCIENT_TECH_LADDER.md",
+    "docs/lore/HISTORY.md",
+    "src/world/history_sim.{hpp,cpp} (future, with BL-271)"
+   ],
+   "design": "MOCKED UP 2026-08-04 (Ben: 'mock up an ancient tech tree as a basis; consider the major advancements from 0 AD, and what differences are realistic by 1960 AD'). The full mockup lives in docs/research/ANCIENT_TECH_LADDER.md — this item is its tracked home; the design conversation happens against that doc.\n\nSHAPE, in one paragraph: six bands (T1 Classical -> T6 Machine Age) x seven domains (Agriculture / Materials / Energy / Transport / Institutions / Military / Medicine), ~60 load-bearing nodes with prereqs, endowment gates over settlement_state (ore_q / fuel / arable / coastal / grassland), and a three-class DIFFUSION axis (artifact / practice / capacity) that generates the realistic 1960 inequality: knowledge spread ~0 bands, capacity spread 3-4 bands, military-artifact spread 1-2 bands. Honours the BL-274 stance in full — derived availability, never a player-facing research tree; the tree structure is data the BL-271 year-tick sim evaluates.\n\nRELATION TO SIBLINGS: BL-271 (Era -1 sim) is the consumer of the acquisition model (invention at the frontier / practice diffusion by contact / artifact flow by trade / capacity regression on rupture). BL-274 (era-keyed rosters) reads the Military band boundaries plus the capacity-vs-artifact split (what a nation FIELDS vs what it can REPLACE under blockade). BL-273 (province demography) reads the Medicine and Agriculture bands. The T6 exit hands off to scripts/tech_tree.lua (BL-087) at the campaign epoch.\n\nOPEN QUESTIONS (in the doc, section-final): band-count reconciliation with BL-274 four-band lean; per-domain capacity + artifact-access state representation; C++ table vs Lua data home; whether the player ever sees a 1960 codex rendering. NR-054 / NR-055 record the two calls taken on Ben behalf."
   }
  ]
 }

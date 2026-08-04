@@ -10,7 +10,33 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — The earth-like battery, generation retuned, and a sky (2026-08-04, latest)
+## Session — The ancient tech ladder, mocked up (2026-08-04, latest)
+
+Remote session, doc-only, Light mode. Ben asked for an ancient tech tree mockup — the major
+advancements from 0 CE, and what inequality between nations is realistic by 1960.
+
+**Delivered.** `docs/research/ANCIENT_TECH_LADDER.md` — six bands (T1 Classical → T6 Machine
+Age) × seven domains, ~60 load-bearing nodes with prereqs, endowment gates over the settlement
+pass's classes, and a three-class **diffusion axis** (artifact / practice / capacity) that
+generates the realistic 1960 spread: knowledge ~0 bands apart, capacity 3–4, military artifacts
+1–2. Artifacts leapfrog, practices follow contact, capacity follows the map.
+
+**The framing call.** BL-274 (era-keyed rosters) records Ben's stance that a player-facing tech
+tree only works in a 1900s+ start — so the mockup is a tree in *structure* (data the BL-271
+Era −1 sim evaluates) and a ladder in *play*: no nation clicks a node. Recorded as NR-054 so it
+can be overturned rather than becoming precedent; NR-055 records the six-band spine vs BL-274's
+four-band roster lean (proposed: rosters group the same spine).
+
+**Filed.** BL-296 (ancient tech ladder), priority B, post-v0.1.0, the tracked home; design
+conversation happens against the research doc. T6's exit hands off to `scripts/tech_tree.lua`'s
+Era 0 quests, so the two trees meet at the campaign epoch without overlap.
+
+**Runtime:** ~1h remote, Light/design. **Left open:** the doc's four closing questions — band
+count, per-domain state shape, C++-vs-Lua data home, player-facing codex rendering.
+
+---
+
+## Session — The earth-like battery, generation retuned, and a sky (2026-08-04)
 
 A long generation session. Built the five-instrument earth-like battery, acted on what it
 measured, and closed with the galaxy minimap. Full detail in the commits; this entry records the
