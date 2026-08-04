@@ -55,7 +55,21 @@ enum class resource_type : uint8_t
     steel                 = 20, ///< Smelted from iron ore (+ coal).
     refined_fuel          = 21, ///< Refined from petroleum.
     food_rations          = 22, ///< Processed from agricultural produce.
-    count                 = 23
+    // --- Logistics goods (BL-286, 2026-08-04) ---
+    //
+    // Enum + serialization + base-price wiring only (BL-286). The consumption,
+    // transport-capacity range cap, salt shelf-life gate, and bullion purchase
+    // mechanics that give these goods behaviour land in BL-287–290. See
+    // docs/economy/RESOURCES.md § Logistics goods.
+    grain                 = 23, ///< Human ration staple; per-tick army/unit draw (BL-287, not yet implemented).
+    fodder                = 24, ///< Draft-animal/cavalry feed; per-tick draw alongside grain (BL-287, not yet implemented).
+    salt                  = 25, ///< Preservative; gates ration shelf-life (BL-289, not yet implemented).
+    transport_capacity    = 26, ///< Abstract logistics-train throughput good; caps supply range (BL-288, not yet implemented).
+    charcoal              = 27, ///< Refined fuel-wood; pre-coal smelting/heating input.
+    iron_blooms           = 28, ///< Bloomery-refined iron intermediate — distinct from raw iron/iron-nickel ore.
+    bullion               = 29, ///< Minted precious-metal specie; local purchase medium (BL-290, not yet implemented).
+    trade_goods_misc      = 30, ///< Placeholder endemic-luxury-class good; a specific luxury name is a later design step.
+    count                 = 31
 };
 
 static constexpr std::size_t resource_count = static_cast<std::size_t>(resource_type::count);

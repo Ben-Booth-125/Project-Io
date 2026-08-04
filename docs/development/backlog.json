@@ -6248,6 +6248,30 @@
       ],
       "summary": "Ben, 2026-08-03 (NR-037): two follow-ons from BL-218/219's harness moves, in order. (1) Re-run and re-bless the GCC golden set on the next Linux session — only the MSVC set was re-blessed, so the two platforms are currently drifting apart. (2) Tag history-ladder lines with their own `chain_stage` so H4 can filter on a field rather than text-match a line; text-matching is exactly the fragility that assertion had to be narrowed around.",
       "design": "DESIGNED 2026-08-03 (Ben, NR-037 option b then c).\n\n**Task 1 — GCC re-bless (do first, it is cheap).** BL-218/219 moved `ai_skill_harness`'s nine\nMSVC assertions; those were re-blessed and verified against a stashed baseline as genuinely\ncaused by the change (every divergence upward — net worth up on seeds 0/2/4, dial counts past\nthe old ceiling on 0/1/4, solvency and survival in band on all five). The GCC set was not\nre-run. Until it is, the two platforms' goldens describe different worlds, and the next\ncross-platform failure will be ambiguous between a real regression and accumulated drift.\nRe-run on Linux, confirm the divergences match the MSVC ones in direction, commit alongside.\n\n**Task 2 — tag the ladder lines (the real fix).** `history_ladder_harness`'s H4 was **narrowed**\nbecause it identifies its window by matching ladder line *text*. Narrowing made it pass; it did\nnot make it right — any rewording of a biography line still silently changes what H4 asserts\nover, which is the failure mode a golden is supposed to catch rather than exhibit.\n\nThe fix: carry each ladder line's own `chain_stage` as a field, so H4 filters on the stage\nrather than pattern-matching prose. Then restore H4 to its **stricter pre-narrowing form** —\nthe narrowing was a workaround for the fragility, so removing the fragility should remove the\nneed for it.\n\n**Note the interaction with BL-283.** That item narrows Pass 3's placement window and expects\nthe corporation-mix goldens to move. Sequence the two so a golden is not re-blessed twice, and\nso a move caused by BL-283 is not mistaken for platform drift."
-    }
+    },
+  {
+    "parked": false,
+    "blocked_on": [],
+    "written": "2026-08-04",
+    "id": "BL-286",
+    "short_name": "LOGISTICS_GOODS_ENUM",
+    "category": "Economy",
+    "title": "Logistics goods — extend resource_type with grain, fodder, salt, transport capacity, charcoal, iron blooms, bullion, and a placeholder endemic-luxury slot (enum + base-price wiring only)",
+    "status": "designed",
+    "glyph": "✓",
+    "priority": "C",
+    "difficulty": 2,
+    "version_goal": "post-v0.1.0",
+    "requires": [],
+    "authority_doc": "docs/economy/RESOURCES.md",
+    "files": [
+      "src/world/components.hpp",
+      "src/world/world_gen_config.{hpp,cpp}",
+      "docs/economy/RESOURCES.md"
+    ],
+    "summary": "Filed 2026-08-04 from a Ben brainstorm about the 0 A.D. sandbox (Project-Rival, BL-271 era −1 proving ground): what other resources does a diverse, realistic logistics system need beyond food/wood/stone/metal? The answer organised around three axes rather than a longer stock list — per-tick flows (grain, fodder, water, salt), carrying capacity as a held resource (transport_capacity), and value density (charcoal, iron blooms, bullion, an endemic-luxury slot). Ben decided (2026-08-04) to ship these as a permanent extension of the shared resource_type enum — not a sandbox-local roster as first drafted — so resource_count moves from 23 to 31 and this IS a save-format retrofit (RESOURCES.md § Prototype scope). This item lands the enum values, name-lookup wiring, and authored placeholder base prices only; no consumption, transport-range cap, salt shelf-life gate, or bullion purchase mechanic reads them yet.",
+    "design": "DESIGNED 2026-08-04 (Ben brainstorm, filed retroactively after the code was already written on worktree-agent-a737ae8388a41f55b without a backlog entry — see NEEDS_REVIEW.json for the process note).\n\n## The three axes\n\n- **Flows, not stocks.** 0 A.D.'s four goods are banked and spent; a logistics system needs goods\n  consumed every tick wherever a force is standing. Grain sets march radius; fodder is why\n  animal-heavy forces stalled; salt converts a perishable good into a shippable one — its whole\n  value is changing another good's logistics class, not being useful on its own.\n- **Carrying capacity as a held resource.** transport_capacity is the single addition that most\n  changes what a nation actor reasons about: pack animals/carts/hulls are built, lost, and\n  captured, so effective supply range is capped by the train's own fodder draw rather than by a\n  tuned constant.\n- **Value density spread.** charcoal (very low — must be made beside the smelter), iron_blooms\n  (medium — the material gate BL-274's era rosters assume), bullion (high — buy supply locally\n  instead of hauling it, the real alternative to a train), trade_goods_misc (a placeholder slot\n  for a specific endemic luxury — naming is a later step, per the mercantile track's BL-191\n  precedent).\n\n## What this item does NOT do\n\nEnum + name-table + authored base price only. No mechanic reads these values yet:\n\n- BL-287 (not yet filed): grain/fodder per-tick consumption draw.\n- BL-288 (not yet filed): transport_capacity as a supply-range cap.\n- BL-289 (not yet filed): salt as a ration shelf-life gate.\n- BL-290 (not yet filed): bullion as a local-purchase mechanic.\n\n## Naming\n\nPlain English here for the reader (grain, salt, bullion). Per the standing rule\n(io-standing-rules § Terms & docs), any in-sim/in-lore surfacing of these goods in the Era −1\nsandbox (BL-271) uses the seeded name banks, not the English mechanism name — “grain” is the\nmechanism, not the string.\n\n## Process note\n\nThis item should have been filed BEFORE the enum change, per DELIVERY.md's lifecycle (Rule 0\nitem-spanning requirement gate). It was not — the code landed on a worktree branch with no\nbacklog entry. Filed retroactively at Ben's explicit confirmation (2026-08-04) to ship the enum\nextension as-is. See NEEDS_REVIEW.json for the corresponding process entry.",
+    "resolution": null
+  }
   ]
 }

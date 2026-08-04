@@ -87,6 +87,28 @@ Available in Era 1 and beyond. Found predominantly on moons, asteroids, and oute
 | Resource | Terrain affinity | Notes |
 |----------|-----------------|-------|
 | Water | Icy | Deposits on icy terrain, extracted as liquid water; also the baseline life-support input for off-world populations. Trades terrestrially from tick 0 — see note above. |
+
+### Logistics goods (BL-286, 2026-08-04)
+
+Eight resources added for the army/unit logistics family (BL-286–291). This entry is **BL-286
+only** — enum + serialization + authored base price. None of the consumption, range-cap,
+shelf-life, or purchase mechanics below are implemented yet; each names the follow-on task that
+adds its behaviour.
+
+| Resource | Tier | Notes |
+|----------|------|-------|
+| Grain | 1 (raw) | Human ration staple. Per-tick army/unit draw lands with BL-287. |
+| Fodder | 1 (raw) | Draft-animal/cavalry feed, drawn down alongside grain by BL-287. |
+| Salt | 1 (raw) | Preservative. Gates ration shelf-life — BL-289 (not yet implemented). |
+| Transport capacity | 1 (abstract) | Logistics-train throughput good; caps supply range — BL-288 (not yet implemented). |
+| Charcoal | 2 (refined) | Refined fuel-wood; pre-coal smelting/heating input. |
+| Iron blooms | 2 (refined) | Bloomery-refined iron intermediate — distinct from raw iron ore / iron-nickel ore. |
+| Bullion | 2 (refined) | Minted precious-metal specie; local purchase medium via `resolve_price` — BL-290 (not yet implemented). |
+| Trade goods (misc) | 1 (endemic, placeholder) | Generic endemic-luxury-class placeholder. Not a specific named luxury — that naming is a separate design step. |
+
+All eight carry an authored mid-tier `base_price` in the Kepler market template
+(`src/world/world_gen_config.hpp`) from BL-286, so they trade like any other priced resource even
+though nothing yet reads their intended behaviour.
 | Iron-nickel ore | Rocky (metallic asteroid) | Found in metallic asteroids; feeds the same smelting chain as iron ore and eliminates dependence on Earth-side steel once accessible. |
 | Platinum group metals | Rocky, volcanic (asteroid) | Ultra-rare catalytic and industrial metals. Very low deposit concentration; extremely high base price. The primary high-value trade good of the asteroid belt. |
 | Regolith | All terrain (airless bodies) | Loose surface dust and broken rock. Used for bulk construction in-situ; not typically traded (high mass, low unit value). Included in the resource model but excluded from market tables; see note below. |
@@ -237,29 +259,36 @@ The full resource list above is the design target. For the prototype (Layers 3�
 | Refined fuel | 2 | — | from Petroleum |
 | Food rations | 2 | — | from Agricultural produce |
 
-The `resource_type` enum (`src/world/components.hpp`) holds **23 values** — the frozen prototype
-set — not the full design list above (corrected 2026-07-31; the previous "no data-model retrofit
-required" claim was false). Adding a resource changes `resource_count` and with it the width of
-every serialised `std::array<float, resource_count>` — tile deposits and reserves, market
-supply/demand/price/base-price, stockpiles, nation abundance and substrate capacity. **Extending
-the enum IS a save-format retrofit.** The Tier 2/3 refined goods, habitability goods, and most
-Tier 3 products above have no enum value at all; they cannot be held, priced, or traded until
-that retrofit is made.
+The `resource_type` enum (`src/world/components.hpp`) holds **31 values** as of BL-286
+(2026-08-04; was 23 pre-BL-286) — not the full design list above. Adding a resource changes
+`resource_count` and with it the width of every serialised `std::array<float, resource_count>` —
+tile deposits and reserves, market supply/demand/price/base-price, stockpiles, nation abundance
+and substrate capacity. **Extending the enum IS a save-format retrofit**, but every one of those
+arrays is already sized off `resource_count` rather than a hardcoded width, so BL-286's eight-good
+extension (§ Logistics goods above) needed no manual per-array edit — only the enum + the Kepler
+base-price authoring. The Tier 2/3 refined goods, habitability goods, and most Tier 3 products
+above still have no enum value; they cannot be held, priced, or traded until a future retrofit
+adds them.
 
 The full design list including ambient and habitability goods is approximately **35–40 entries**
-— a design target. The shipped count is 23, frozen for the prototype.
+— a design target. The shipped count is 31 (23 pre-BL-286 + 8 logistics goods), frozen for the
+prototype pending further items.
 
 ---
 
-## What actually trades (recorded 2026-07-31)
+## What actually trades (recorded 2026-07-31; updated 2026-08-04 for BL-286)
 
-The load-bearing fact for any market work: of the 23 enum values, only a fraction carry a
+The load-bearing fact for any market work: of the 31 enum values, only a fraction carry a
 non-zero `base_price`, and `resolve_price` / the clearing pass ignore everything else
 (`docs/economy/MARKETS.md`). The tradeable set is:
 
-- **Seven authored base prices** (`make_hard_coded_world`, the Kepler market template):
-  iron ore 2.5, petroleum 3.5, water 1.5, agricultural produce 3.0, steel 8.0,
+- **Seven authored base prices** (`world_gen_config.hpp`'s `kepler_base_price`, the Kepler
+  market template): iron ore 2.5, petroleum 3.5, water 1.5, agricultural produce 3.0, steel 8.0,
   refined fuel 10.0, food rations 6.0.
+- **Eight logistics-goods base prices** (BL-286, same `kepler_base_price` table): grain 2.0,
+  fodder 1.2, salt 2.0, transport capacity 5.0, charcoal 4.0, iron blooms 6.0, bullion 50.0,
+  trade goods (misc) 15.0 — mid-tier authored placeholders; no consumption/gate mechanic reads
+  them yet (§ Logistics goods above).
 - **Endemic goods** (tobacco, spices, coffee, furs — BL-191, endemic trade goods) with
   **distance-derived** per-market base prices: `1.5 × (1 + 7.0 × normalised distance to the
   nearest source)` (§ Mercantile below). Only the 2–3 goods the world's biosphere actually

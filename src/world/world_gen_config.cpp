@@ -23,6 +23,14 @@ resource_type resource_from_name(const std::string& name, bool& ok)
         { "steel",                resource_type::steel },
         { "refined_fuel",         resource_type::refined_fuel },
         { "food_rations",         resource_type::food_rations },
+        { "grain",                resource_type::grain },
+        { "fodder",               resource_type::fodder },
+        { "salt",                 resource_type::salt },
+        { "transport_capacity",   resource_type::transport_capacity },
+        { "charcoal",             resource_type::charcoal },
+        { "iron_blooms",          resource_type::iron_blooms },
+        { "bullion",              resource_type::bullion },
+        { "trade_goods_misc",     resource_type::trade_goods_misc },
     };
 
     const auto it = table.find(name);
