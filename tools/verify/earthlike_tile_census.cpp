@@ -102,6 +102,8 @@ struct seed_metrics
     float forest_pct = 0.0f, grass_pct = 0.0f, desert_pct = 0.0f;
     float ice_pct = 0.0f, wetland_pct = 0.0f;
     float mountain_pct = 0.0f;
+    float highland_pct = 0.0f; ///< Counted separately: see the report note on relief.
+    float relief_pct = 0.0f;   ///< mountain + highland, the fair comparison to Earth's figure.
     float river_pct = 0.0f;
     float temperate_forest_pct = 0.0f; ///< forest as % of land in the middle latitudes
 };
@@ -174,7 +176,7 @@ seed_metrics census_one(uint32_t campaign_seed)
     // --- measure -------------------------------------------------------------
     std::vector<char> land(static_cast<std::size_t>(k_cells), 0);
     int n_land = 0, n_forest = 0, n_grass = 0, n_desert = 0, n_ice = 0, n_wet = 0;
-    int n_mountain = 0, n_river = 0;
+    int n_mountain = 0, n_highland = 0, n_river = 0;
     int n_temp_land = 0, n_temp_forest = 0;
 
     // "Middle latitudes" is the central half of the grid by row — a fixed
@@ -203,6 +205,7 @@ seed_metrics census_one(uint32_t campaign_seed)
             default: break;
         }
         if (t.landform == terrain_landform::mountain) ++n_mountain;
+        if (t.landform == terrain_landform::highland) ++n_highland;
         if (t.river_edges != 0) ++n_river;
     }
 
@@ -215,6 +218,8 @@ seed_metrics census_one(uint32_t campaign_seed)
     m.ice_pct    = 100.0f * static_cast<float>(n_ice) / land_f;
     m.wetland_pct= 100.0f * static_cast<float>(n_wet) / land_f;
     m.mountain_pct = 100.0f * static_cast<float>(n_mountain) / land_f;
+    m.highland_pct = 100.0f * static_cast<float>(n_highland) / land_f;
+    m.relief_pct   = 100.0f * static_cast<float>(n_mountain + n_highland) / land_f;
     m.river_pct    = 100.0f * static_cast<float>(n_river) / land_f;
     m.temperate_forest_pct = (n_temp_land > 0)
         ? 100.0f * static_cast<float>(n_temp_forest) / static_cast<float>(n_temp_land) : 0.0f;
@@ -289,7 +294,13 @@ int main(int argc, char** argv)
     report("wetland %",  col(&seed_metrics::wetland_pct),  "6 %");
 
     std::printf("\nRELIEF AND WATER\n");
-    report("mountain %", col(&seed_metrics::mountain_pct), "24 % (incl. highland)");
+    // Reported as three rows, not one. The first version of this harness compared
+    // mountain-ONLY against Earth's ~24% mountainous-land figure, which counts
+    // rugged highland too — so it overstated how flat the generated worlds are.
+    // The honest comparison is the combined relief row.
+    report("mountain %", col(&seed_metrics::mountain_pct), "(steep peaks only)");
+    report("highland %", col(&seed_metrics::highland_pct), "(plateau/upland)");
+    report("relief % (mtn+high)", col(&seed_metrics::relief_pct), "24 % mountainous land");
     report("river-tile %", col(&seed_metrics::river_pct),  "(no clean figure)");
     report("forest % in mid-lat", col(&seed_metrics::temperate_forest_pct), "(orientation only)");
 
