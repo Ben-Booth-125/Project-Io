@@ -1,8 +1,24 @@
 # Corporation — design Q&A
 
+> **⚠ THE SLOT AND SOURCE IN THIS HEADER WERE WRONG — corrected 2026-08-04.** Two different
+> surfaces got conflated, so implementing from this doc built the wrong one.
+>
+> - **Slot 1** is the **Corporation overview dashboard** — `src/ui/corporation_dashboard.cpp`,
+>   built 2026-08-01 as BL-248. Four roll-up cards (Production / Trade / Workforce / Finance),
+>   each resting as one verdict line and expanding to a full-screen drill. It is about the
+>   **player's own corporation**, not the rival field.
+> - **`corporation_panel.cpp`** — the all-corporations table this doc actually describes — moved to
+>   **slot 8** (Diplomacy), restored under NR-012 behind its own flag. It is now **two** columns,
+>   not three: BL-145 hid the Focus readout blanket.
+>
+> Everything below describes the slot-8 rival-field table. Read it as that doc, not as slot 1's.
+> Slot 8's table is provisional in its own right — it shows exact rival balances, which BL-068
+> (competitor visibility) does not permit, and **BL-262 (scoring system)** retires or absorbs it
+> in favour of banded rival figures.
+
 > **Working design doc** for the ledger-mockup pass (Power BI). Strawman answers — Ben revises.
-> Menu slot: `nav rail slot 1 "Corporations"` · Source: `src/ui/corporation_panel.cpp` · Mock table(s): `corporations.csv`, `cashflow.csv` · Related: `BL-121` (audit), `BL-122` (fold-out host), `BL-123` (Selection resize)
-> Host: shell fold-out column (BL-122), ~480px @1720.
+> Menu slot: `nav rail slot 8` (was slot 1) · Source: `src/ui/corporation_panel.cpp` · Mock table(s): `corporations.csv`, `cashflow.csv` · Related: `BL-121` (audit), `BL-122` (fold-out host), `BL-145` (focus hidden), `BL-262` (scoring), NR-012 (restoration)
+> Host: shell fold-out column (BL-122), ~380px @1720.
 
 ## 1. Top question — the one thing this answers at first glance
 **"Who are the corporations, and where do I stand among them?"** The current panel already answers this literally: a sorted, one-row-per-corp table of `Corporation | Focus | Balance`, with the player's row tinted (`IM_COL32(255,255,255,40)`) and balance coloured red/green. The first-glance read is the **balance ranking** — am I ahead of or behind my rivals, and by how much. Secondary questions that justify sub-views: *by what strategy is each competing* (focus mix — extraction/processing/trade), *how big is each* (building/asset count), and *who is winning right now vs. who is bleeding* (net cash direction, which lives in `cashflow.csv` but is not yet shown). This is the **drill-down onto the field of players**; whole-economy aggregate (my totals, sector balance, income/expenditure trend) belongs to Economy, not here.

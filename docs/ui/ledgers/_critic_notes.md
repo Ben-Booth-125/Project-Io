@@ -1,6 +1,24 @@
 # Cross-doc consistency critic notes
 
-MOCK-DATA VERIFICATION (all checked against docs/ui/mockdata/*.csv): markets.csv has 35 data rows / 7 resources = 5 markets all on body_id 15124 with no market_id column — the "5x fan-out, 35/7" claim is ACCURATE (Market, Tile Ledger docs correct). stockpiles.csv = 1 row (FararAthar Iron Ore 16, NOT Genom) — "sparse ~1-2 rows" ACCURATE. workforce.csv uniform 85.4724 — ACCURATE. player = 30310 Genom Systems — ACCURATE. cashflow.csv row 30310: income 16.0007, exp 159.992, maint 20, wages 4.69095, interest 5.14972, net -173.832 — Balance doc's "interest 5.15, net -173.83" ACCURATE. player_timeseries tick0 balance 1963.13 -> tick15 -262.636 — Economy's "+1963 to -262 over 16 ticks" ACCURATE. corporations.csv starting_capital=0 / since_start=balance dup for all 8 corps — ACCURATE everywhere cited. All mock-data claims across all seven docs verified correct. One minor: Corporation doc says "8 corps in mock" — confirmed 8 (30304-30311), correct.
+**⚠ THIS CERTIFICATION IS VOID — the mock data was re-blessed after it was written (2026-08-04).**
+Every figure below is stale, and because this note *certified* them, it launders the same stale
+numbers into `balance.md`, `market.md`, `economy.md` and `tile_ledger.md`. Do not cite it.
+
+What actually changed, spot-checked 2026-08-04: `markets.csv` now carries a **`market_id` column**
+(the gap the Market doc filed as a fix has shipped) and holds **4 markets over 68 rows**, not the
+"5× fan-out, 35/7" this note certified. `cashflow.csv` no longer has 30310 as its first row and the
+`net -173.83` figure is gone. `player_timeseries` opens at balance **8512.72**, not 1963.13.
+
+**The lesson, not the numbers.** A verification note that pastes measured values ages the moment the
+fixture is re-blessed, and it ages *invisibly* — worse than no note, because six sibling docs cited
+it as authority. If this is rewritten, it should record the *method* (which file, which column,
+which invariant) and leave the reader to run it. Goldens are disposable; a note that hard-codes
+their contents is not.
+
+*(The original text is kept below for the reasoning it carries about overlap and lens pairing,
+which does not depend on the figures.)*
+
+~~MOCK-DATA VERIFICATION (all checked against docs/ui/mockdata/*.csv): markets.csv has 35 data rows / 7 resources = 5 markets all on body_id 15124 with no market_id column — the "5x fan-out, 35/7" claim is ACCURATE (Market, Tile Ledger docs correct). stockpiles.csv = 1 row (FararAthar Iron Ore 16, NOT Genom) — "sparse ~1-2 rows" ACCURATE. workforce.csv uniform 85.4724 — ACCURATE. player = 30310 Genom Systems — ACCURATE. cashflow.csv row 30310: income 16.0007, exp 159.992, maint 20, wages 4.69095, interest 5.14972, net -173.832 — Balance doc's "interest 5.15, net -173.83" ACCURATE. player_timeseries tick0 balance 1963.13 -> tick15 -262.636 — Economy's "+1963 to -262 over 16 ticks" ACCURATE. corporations.csv starting_capital=0 / since_start=balance dup for all 8 corps — ACCURATE everywhere cited. All mock-data claims across all seven docs verified correct. One minor: Corporation doc says "8 corps in mock" — confirmed 8 (30304-30311), correct.~~
 
 LENS SANITY: all lens names cited exist in overlay_mode (src/ui/ui_state.hpp: none/supply/market/country/corporation/resource/population/opportunity/production/scarcity/industry). BUT one lens is MISCHARACTERIZED: Economy §3 claims Industry is "the on-canvas twin of the whole-economy sector-balance (extraction/processing distribution across bodies)". Per LENSES.md and ui_state.hpp, overlay_mode::industry is the per-tile NATION-SUBSTRATE throughput field (the AI-owned broad economy, occupation x terrain richness) — it does NOT paint the player's corp building mix. Arming Industry for a "my sector footprint" view would show the nation substrate, not the player's extraction/processing split. This is the one genuinely wrong lens pairing in the set. (Also note Industry is keyboard-cycle-only off the visible bar per BL-093 — arming it programmatically is fine but it's not strip-selectable.)
 

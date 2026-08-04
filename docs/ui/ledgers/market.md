@@ -9,11 +9,16 @@
 
 ## 2. Sub-levels — views & default
 
-| View | Answers (one question) | Content |
-|---|---|---|
-| **Prices** *(default)* | What are supply/demand/price/net per resource here, and what's tight? | The `##market_detail` board for the selected market: one row per traded resource (`base_price[r] > 0`), Supply/Demand/Price/**Net** with the positive/negative/neutral colour wash; "Turnover this tick" footer. |
-| **Markets** | Where does trade concentrate on this body? | The `##market_dash` list — one row per market on the selected body (Market / Supply / Demand / **Turnover** = Σ min(supply,demand)), selectable to re-point Prices/Trends. This is the 5-on-Kepler view. |
-| **Trends** | Which way is a chosen resource moving here? | The BL-063 `draw_plot` trio (price / supply / demand sparklines) for the resource picked in the trend combo, read from `market_plot_history` for the selected market. |
+> **As built the surface has TWO tabs, not three** (`market_ledger.cpp:260-262`): **Prices** and
+> **Sell Orders**. The Markets and Trends views below were designed and not built; Sell Orders was
+> built and never designed here. Corrected 2026-08-04.
+
+| View | Status | Answers (one question) | Content |
+|---|---|---|---|
+| **Prices** *(default)* | **built** | What are supply/demand/price/net per resource here, and what's tight? | The `##market_detail` board for the selected market: one row per traded resource (`base_price[r] > 0`), Supply/Demand/Price/**Net** with the positive/negative/neutral colour wash; "Turnover this tick" footer. |
+| **Sell Orders** | **built** | What am I offering here, and at what floor? | The player's standing sell orders for the selected market — per-(body, resource) quantity with a floor price, honoured at clearing ahead of the anonymous auto-sell path (BL-037 routing). Undocumented here until now; it arrived from the Construction ledger's own open question about where sell orders belong. |
+| **Markets** | *designed, not built* | Where does trade concentrate on this body? | The `##market_dash` list — one row per market on the selected body (Market / Supply / Demand / **Turnover** = Σ min(supply,demand)), selectable to re-point Prices. |
+| **Trends** | *designed, not built* | Which way is a chosen resource moving here? | The BL-063 `draw_plot` trio (price / supply / demand sparklines) for the resource picked in the trend combo, read from `market_plot_history`. |
 
 **Default on open:** **Prices** (single-market per-resource board — the first-glance question).
 **Cross-cutting selectors (NOT views, toggle-exempt):** the **Body** combo, the **Market** row-selection (from Markets, or falls back to `home_body`'s first market), and the **Resource** combo inside Trends. Selecting a market on the Markets view re-points both Prices and Trends.
@@ -24,7 +29,12 @@ Arms **`market`** — the per-body price wash keyed to the currently selected re
 ## 4. Data — live vs plumbing gaps
 Everything the ledger draws is **already live in `w.markets`** (`market_component`: `supply[]`, `demand[]`, `price[]`, `base_price[]`, `body`, `centre_tile`) and `market_plot_history` for trends — no new world plumbing needed for the surface itself.
 
-The gap is **export-only, for the Power BI mock**: `markets.csv` emits **one row per market_component with no market_id/region column**, so all 5 Kepler markets share `body_id` — a Power BI join on `body_id` **5x-inflates** (35 rows / 7 resources). **Fix: add a `market_id` (and human `region` label, e.g. the `market_label` "Region (col,row)") column to the exporter** so each market row is distinct and the Markets/Prices split is representable in the mock. `stockpiles.csv` is near-empty by design (the economy drains pools to market each tick, BL-078/079) — not a market-ledger input, just noted so it isn't mistaken for one.
+**This gap is closed (2026-08-04).** `markets.csv` now leads with `market_id,market_label,body_id,…`,
+so each market row is distinct and the join no longer inflates. The fixture currently holds four
+markets over 68 rows; do not paste that count anywhere — read the file (see `_critic_notes.md` for
+why a pasted fixture figure is a liability). *The original text: the exporter emitted one row per
+`market_component` with no `market_id`/region column, so all Kepler markets shared `body_id` and a
+Power BI join on it fanned out.* `stockpiles.csv` is near-empty by design (the economy drains pools to market each tick, BL-078/079) — not a market-ledger input, just noted so it isn't mistaken for one.
 
 ## 5. Close / toggle semantics
 Nav-rail slot-5 icon toggles the ledger open/closed. Re-clicking the **currently-active sub-view tab** (Prices / Markets / Trends) **closes the ledger** — it does not collapse to an overview. Switching *between* tabs just changes view. The Body / Market / Resource selectors are cross-cutting and **never** trigger the close (toggle-exempt). Opening the ledger takes the fold-out column from the Selection element (mutually exclusive, per the settled decision); closing it returns the column to the persisted Selection if one exists.
