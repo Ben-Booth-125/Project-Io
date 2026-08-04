@@ -667,6 +667,38 @@ planetology_state run_planetology(const body_inputs& in,
 
     st.v_esc_kms = 11.186f * std::sqrt(mass / radius);
 
+    // --- A moon's semi-major axis is DERIVED, not authored (2026-08-04).
+    //
+    // Ben's call: aim for the near-miss band, the coincidence that makes Earth's
+    // eclipses worth watching. Left authored, the moon sits at a fixed distance
+    // while the star's apparent size swings with stellar mass, and the ratio
+    // ranged 0.73-1.77 across campaigns — a median world whose moon is 20% too
+    // wide, covering the corona and losing the diamond ring.
+    //
+    // A moon's distance is a free parameter of formation in a way its radius is
+    // not, so selecting it is choosing which system to tell a story about rather
+    // than overriding a computed outcome. The target ratio is drawn per body, so
+    // the coincidence is not identical everywhere: below 1.0 the world sees
+    // annular eclipses at apogee and total ones at perigee, exactly as Earth
+    // does; a little above, totality every time but only just, with the corona
+    // still out.
+    float moon_a = in.parent_orbit_au;
+    if (in.parent_mass_earths > 0.0f && in.parent_orbit_au > 0.0f && in.orbit_au > 0.0f)
+    {
+        constexpr float k_earth_radius_au = 4.2587e-5f; // 6371 km
+        constexpr float k_sun_radius_au   = 4.6520e-3f; // 696,000 km
+        const float m3        = m_star * m_star * m_star;
+        const float r_star_au = k_sun_radius_au * std::sqrt(std::sqrt(m3));
+        const float star_ang  = r_star_au / in.orbit_au;
+        // Earth's own mean ratio is 0.971. The band is centred just under 1 so
+        // that perigee (x 1/(1-e)) always clears totality while apogee often
+        // does not.
+        rng re(seed, tag_accretion ^ 0xEC117u);
+        const float target = re.range(0.955f, 1.015f);
+        if (star_ang > 0.0f && target > 0.0f)
+            moon_a = (radius * k_earth_radius_au) / (star_ang * target);
+    }
+
     // --- Eclipses. Whether this body's disc can cover its star, seen from the
     // planet it orbits. Earth's case is a coincidence worth reproducing rather
     // than assuming: the Moon is 400x smaller than the Sun and 400x closer, so
@@ -690,10 +722,10 @@ planetology_state run_planetology(const body_inputs& in,
         const float r_star_au = k_sun_radius_au * std::sqrt(std::sqrt(m3));
         const float star_ang  = r_star_au / in.orbit_au;
         const float moon_r_au = radius * k_earth_radius_au;
-        const float perigee   = in.parent_orbit_au * (1.0f - clampf(in.eccentricity, 0.0f, 0.9f));
+        const float perigee   = moon_a * (1.0f - clampf(in.eccentricity, 0.0f, 0.9f));
         if (star_ang > 0.0f)
         {
-            st.eclipse_ratio_mean    = (moon_r_au / in.parent_orbit_au) / star_ang;
+            st.eclipse_ratio_mean    = (moon_r_au / moon_a) / star_ang;
             st.eclipse_ratio_perigee = (moon_r_au / perigee) / star_ang;
         }
 
@@ -812,7 +844,7 @@ planetology_state run_planetology(const body_inputs& in,
         // The primary-mass term is what actually separates the cases: Jupiter is
         // 318 Earth masses, so M_p^2 alone is a ~1e5 multiplier, which is why Io
         // runs at ~2 W/m2 and the Moon is cold at a nearly identical distance.
-        const float a_rel = in.parent_orbit_au / 0.00257f;
+        const float a_rel = moon_a / 0.00257f; // derived above, not authored
         const float a2 = a_rel * a_rel;
         const float a4 = a2 * a2;
         const float a8 = a4 * a4;
