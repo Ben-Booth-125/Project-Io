@@ -10,7 +10,125 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — A world that begins at 0 CE (2026-08-04, latest)
+## Session — The Era 1 tree, first draft: keystones opened by deeds (2026-08-05, latest)
+
+Light mode, doc-only, same sitting as the effects pass below. Ben: *consider the shape of the
+Era 1 tree — it will be the first tech tree to gate keystones via quests, i.e. tangible actions
+done in game*, with the node list explicitly reserved for his own hand. Runtime: ~25 min.
+
+**The missing primitive.** The condition vocabulary is entirely **state** — `research`,
+`structure`, `stockpile`, `market`, `surplus`, `era` are predicates sampled at a tick, each of
+which can be true today and false tomorrow. None can say *"you did this."*
+
+So the draft adds a seventh: **`deed`** `{subject, scope, count, recorded}` — a one-time event that
+fires at a tick and stays true. Monotonic, deterministic, serialises as a flag plus a tick. NR-067
+carries it as a decision taken; it is an addition to a closed vocabulary, so it is Ben's call.
+
+**Shape.** Five sectors (Launch / Volatiles / Mobility / Yards / Extraction) × three rings
+(**Reach** — can you get there; **Foothold** — can you stay; **Industry** — does it pay). Power
+and Automation stays a **standing line**, not a sector, per this doc's own rule that standing
+lines never gate an era.
+
+**Four keystones, each opened by a deed, none visible until it fires:** Lift Doctrine after **Ten
+Flights**, Propellant Doctrine after **The First Tank**, Yard Doctrine after **The First Truss**,
+Autonomy Doctrine after **The Empty Shift**. You don't pick your propellant chemistry from a menu
+— you make propellant off-world once, and *then* the fork appears.
+
+**The node list is a draft and says so.** ~45 objects with effects typed against the new taxonomy,
+nothing transcribed to any store — deliberately, so the review isn't reviewing something that
+already looks settled. Four review questions carried: whether four keystones is right (Autonomy is
+weakest), whether a deed is a world first or a personal one, whether rivals see your deeds, and
+whether an unfired deed hides its keystone or shows it locked.
+
+---
+
+## Session — Effects: what a tech actually does, mapped to real buildings (2026-08-05)
+
+Light-plus mode, doc + data, no `src/`. Ben: *let's map this to real buildings and units* —
+with seven categories named (unlock / upgrade / retire / recon / law-tax-automation / space /
+war-and-comms doctrines). Runtime: ~35 min.
+
+**The structural call.** The seven categories mix three things: effect **kinds** (unlock,
+upgrade, retire), subject **domains** (reconnaissance, space) and **systems** that are themselves
+unlocked (laws, doctrines). Collapsed they cannot compose. Split into a pair — `(kind, target)` —
+they do, and one node can carry several effects, which nearly every interesting node does.
+
+**Eleven kinds, closed**, in `docs/research/TECH_EFFECTS.md`: `unlock upgrade retire modifier
+access reach intel institution doctrine resource open`. Closed for the BL-155 reason — the
+consumer must switch exhaustively. `open` is BL-156's settled capstone rule unchanged.
+
+**Seven categories the list omitted**, each already implied by a doc we have: placement access,
+continuous modifiers, logistics reach, resource realisation, demography, finance/credit terms,
+instrument access.
+
+**The region is typed.** 62 effects across rings T4–T5 — modifier 19, institution 11, unlock 10,
+upgrade 5, reach 4, retire 4, access 3, intel 3, resource 2, doctrine 1; shipped 15 / designed 29
+/ unbuilt 18. **Modifiers outnumber unlocks two to one**, which is exactly the class an
+unlock/upgrade reading misses.
+
+**Two nodes land on shipped machinery.** Railway → **Inland Logistics Hub** (BL-149's placeable
+haul-cost discount *is* a railway) and Germ Theory → **tile hazard penalty** (already a
+`(1 − hazard)` multiplier on extraction). No new mechanism needed for either.
+
+**Honesty markers throughout.** `building_type` has six values and `recipes.lua` has three
+recipes, so most named buildings are design vocabulary, not enum values; units do not exist
+(BL-157 stub); laws do not exist (BL-155). Every effect carries `shipped | designed | unbuilt` so
+the mapping cannot read as more real than it is. `ladder_lint.js` validates the vocabulary and
+fails if any object in the typed region is left untyped.
+
+**Open:** NR-066 — retirement breaks BL-156's monotonic unlocked set (grandfathering,
+availability-vs-economics, reversibility under blockade), plus whether pre-game effects ever
+*fire* or are only read at the 1960 handoff. NR-065 resolved by this pass.
+
+**Settled same day (Ben), the visibility half of NR-066:** obsolete content is **not rendered at
+all** — *"there's no use for a player to see 'water mill' if they will never build it."* No greyed
+row, no struck-through entry; the absent-not-disabled rule extended to the far end of the
+lifecycle. His Martian-water-mill aside carries the real constraint: **obsolescence is contextual,
+not global** — a mill obsolete on a 1960 homeworld isn't obsolete on a body where nothing better
+runs, so retirement is a per-context predicate, which is what a BL-087 availability window already
+is. Rule recorded: *hide what this player cannot build here, not what the tech tree has moved past.*
+
+---
+
+## Session — The industrial neighbourhood: the second worked region of the tech web (2026-08-05)
+
+Light mode, design pass only — no `src/` touched. Ben: *another pre-game tech tree centred around
+the industrial revolution, to go alongside the pre-game early Civilisation tech tree.*
+Runtime: ~40 min.
+
+**The reading.** "Another tree" is a second worked **region of the one shared web** — rings T4–T5
+and the T4/T5 crossings — not a second web. The constellation geometry is one object; what makes
+the region feel like its own tree is that a nation traverses it two millennia later, under gates
+that bind where ring 1's barely did. Recorded as NR-063, with the four other calls the pass took.
+
+**What was authored.** `ANCIENT_TECH_LADDER.md` § The industrial neighbourhood, at the settled
+medium grain: **7 new techs** (Coal Haulage & Urban Fuel, Patent Grants, Preventive Inoculation,
+High-Pressure & Compound Engines, Framed Construction & Cement, Soil Chemistry & Fertiliser Trade,
+General Incorporation), **4 vertex quests** (The Unwearied Fire / The Cheap Ton / The Scheduled
+World / The Freed Hands — the fifth crossing already had The Disciplined Sovereign), and **2
+keystones**. Fuel Doctrine moved inward one ring so The Cheap Ton can require it *taken* — the
+ring-1 Written-Ledger interlock, repeated, which makes it the house rule.
+
+**The two new forks are the point.** **Labour Doctrine** (Cleared Holdings ⊘ Smallholder Tenure)
+makes the human price of industrialisation a choice and feeds BL-273 (province demography).
+**Works Doctrine** (State Arsenal ⊘ Private Works) decides who owns the heavy plant — and
+therefore the terms a player corporation operates on in 1960. It is not Sovereign Doctrine
+restated: one fork asks whether courts bind the sovereign, the other asks who owns the furnaces.
+
+**New rule, adopted not proposed:** fork count scales with the band's divergence. Ring 1 carries
+one keystone; this region carries four. A band where everyone lands in the same place needs one
+choice to differentiate it; a band that opens 3-band gaps needs the gaps explainable.
+
+**Kept honest.** Everything is transcribed into `ancient_tech_ladder.json` (provenance
+`industrial-pass`, with `amended` on the two objects an earlier pass authored), and
+`ladder_lint.js` was generalised to print **one line per worked region** so the doc's counts are
+checked rather than asserted — region 38 objects, web-wide 88, extrapolating to ~120–135. Open,
+in NR-064: whether Works Doctrine gates corporation generation (lean yes — file it when BL-296
+lands), and whether the region earns its own viewer tab (lean no — the era strip means eras).
+
+---
+
+## Session — A world that begins at 0 CE (2026-08-04)
 
 Full-lite mode, same sitting as the arena re-base below. Ben: "generate a world which begins
 at 0 CE, rather than 1960 CE". Runtime: ~45 min.

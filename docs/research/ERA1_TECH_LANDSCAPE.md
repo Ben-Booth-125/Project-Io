@@ -519,3 +519,200 @@ door that opens.
 **C — terminology:** rename **gate quest → keystone quest**, matching the "keystone" language
 already used for the Propellant Loop. Apply on the next pass through the itemisation schema
 (quest-record `type` field); not renamed retroactively in this doc's earlier sections.
+
+---
+
+# The Era 1 tree — first draft (2026-08-05)
+
+> **DRAFT FOR REVIEW — the shape is the argument; the node list is a starting point, not a
+> proposal.** Ben, 2026-08-05: *let's consider the shape of the Era 1 tree. It will be the first
+> tech tree to gate keystones via quests, i.e. tangible actions done in game. I want to have a heavy
+> hand in what actual nodes there are, however you are certainly capable of drafting the initial
+> tree, which we can leave for a later review.* Read § Shape and § The deed primitive as design;
+> read § The node draft as a first cut to be overwritten. Nothing here is transcribed into a data
+> store yet — deliberately, so the node review isn't reviewing something that already looks settled.
+> Tracked under **BL-087 (filter system / Era 1 content)**; the effect vocabulary is
+> `docs/research/TECH_EFFECTS.md`.
+
+## What makes this tree different from the pre-game one
+
+Three differences, and all three follow from one fact: **someone is actually playing this one.**
+
+| | Pre-game ladder (BL-296) | Era 1 tree |
+|---|---|---|
+| Who paths it | the year-tick sim, by endowment and contact | the player, by clicking |
+| What a keystone costs | a creed or an endowment the nation already has | **a deed — something done, once, in game** |
+| What effects do | describe a capacity band, read at the 1960 handoff | fire live, at the moment of unlock |
+| Rings mean | historical bands (centuries) | depth within one era |
+| Exclusion | the road not taken goes dark, invisibly | the player *chooses* and watches the other branch close |
+
+The pre-game tree earns its inequality from the map. This one has to earn its progression from the
+player's own economy — which is what the threading insight already said (*you don't research your
+way into Era 2, you build an economy that earns it*), now made structural.
+
+## The deed primitive — the missing condition type
+
+The existing condition vocabulary (§ The condition vocabulary) is entirely **state**: `research`,
+`structure`, `stockpile`, `market`, `surplus`, `era` are all predicates sampled at a tick. Every one
+of them can be true today and false tomorrow, and none of them can express *"you did this"*.
+
+A tangible action is not a state. Landing on a body you had never touched is an **event**: it
+happens once, at a tick, at a place, and it stays true forever afterwards. That is a seventh
+primitive, and it is the one Ben's framing needs:
+
+```
+deed:  subject   the act — first_landing | first_return | first_assembly | first_export | …
+       scope     where it counts: any body / a named body class / off-world / this corporation
+       count     1 for a first, N for a cumulative deed ("ten launches")
+       recorded  the tick it fired, stored — a deed never un-fires
+```
+
+Three properties make it worth adding rather than faking with `structure` + `stockpile`:
+
+1. **It is monotonic and cheap to serialise** — a flag plus a tick, which is exactly what BL-156's
+   unlocked set already round-trips. No new save hazard.
+2. **It is deterministic** — the deed fires inside the sim, from the same tick data everything else
+   reads. Seed + command log still replays.
+3. **It says something the state vocabulary can't.** "Own a launchpad and 500 propellant" is a
+   shopping list. "Land on a body you have never operated on" is a story beat, and the player
+   remembers doing it.
+
+Deeds are also the honest home for **firsts** — the moments an Era is remembered by. A campaign log
+line ("First footing on Ganymede analogue, day 4,412") comes free with the record.
+
+## Shape
+
+**Five sectors, three rings, one substrate line.** Sectors are the threads (§ The threads); rings
+are depth within the era, not centuries.
+
+| ring | name | the question it answers |
+|---|---|---|
+| **R1** | **Reach** | can you get there at all, and see what's there? |
+| **R2** | **Foothold** | can you stay, and make something locally? |
+| **R3** | **Industry** | does it pay for itself, and can it supply someone else? |
+
+| sector | thread | what it owns |
+|---|---|---|
+| **Launch** | 1 | cadence, reuse, lift cost per kg |
+| **Volatiles** | 2 | ISRU: water, electrolysis, the propellant loop |
+| **Mobility** | 3 | transfer cost, the propellant tax, engine classes |
+| **Yards** | 4 | orbital construction, assembly, the port as trade participant |
+| **Extraction** | 5 | off-world deposits: regolith, iron-nickel, PGM |
+
+**Power / Automation (thread 6) is not a sector** — it is a standing line (`L-AUTO`) that crosses
+every sector, exactly as this doc's § Two kinds of quest requires: standing lines deepen, they never
+gate an Era. `L-LOG` (Logistics) and `L-MIL` (Military, reserved) sit the same way.
+
+**Vertices stay quests.** The rule from the pre-game geometry carries over unchanged — a ring
+crossing in a sector *is* a quest object, named for the capability regime beyond it. What changes is
+what the capstone asks for: on the pre-game side it was research plus an economic threshold; here
+**every ring-crossing capstone carries a deed**.
+
+## The four keystones — each opened by a deed
+
+This is the part to review first, because it is the structural claim. Each keystone is a binary fork
+with permanent exclusion, and **none of them are visible until their deed fires**. You do not choose
+your propellant chemistry from a menu; you make propellant off-world once, and *then* the fork appears.
+
+| keystone | opened by the deed | branch A | ⊘ | branch B |
+|---|---|---|---|---|
+| **Lift Doctrine** *(Launch, R1/R2)* | **Ten Flights** — cumulative launches ≥ N from one body | *Reusable Chemical* — low capital, cost falls with cadence, scales anywhere | ⊘ | *Fixed Infrastructure* — mass driver / tether: enormous capital and a site requirement, then near-zero marginal lift |
+| **Propellant Doctrine** *(Volatiles, R2)* | **The First Tank** — produce any propellant off-world, once | *Methalox* — Sabatier route; wants a carbon source; the methane tell | ⊘ | *Hydrolox* — electrolysis route; wants water ice; higher performance, harder storage |
+| **Yard Doctrine** *(Yards, R2/R3)* | **The First Truss** — complete one structure assembled off Earth | *Orbital Assembly* — build at the depot; no gravity well, total dependence on lift | ⊘ | *Surface Assembly* — build on the body; local materials, pays the well every launch |
+| **Autonomy Doctrine** *(crossing Extraction × L-AUTO, R3)* | **The Empty Shift** — run an off-world building at zero workforce for N days | *Crewed Operations* — higher output ceiling, habitability and life-support burden | ⊘ | *Autonomous Fleets* — workforce scalar collapses, electronics dependency becomes strategic |
+
+Four forks for one era matches the rule the industrial pass adopted — **fork count scales with the
+band's divergence** — and Era 1 is the divergence era of the campaign proper. Each fork also keys
+off a *different* axis: cadence, chemistry, geometry, labour. If two of them turn out to answer the
+same question, one should go.
+
+## The node draft — ~45 objects
+
+> **This table is the part Ben wants to own.** It is drafted so the shape can be judged against
+> something concrete: names, prereq direction, and the effect each node carries (using the eleven
+> kinds from `TECH_EFFECTS.md`). Expect most names to change.
+
+### Launch
+
+| ring | node | effects |
+|---|---|---|
+| R1 | Expendable Lift Cadence | `modifier` → launch cost per kg · `unlock` → repeat dispatch without refit |
+| R1 | Recovery & Refurbishment | `modifier` → launch cost with cadence |
+| R2 | Reusable Booster | `upgrade` → Launchpad throughput · `modifier` → lift cost |
+| R2 | Heavy Lift Stack | `unlock` → oversize payload class (assembly modules) |
+| R3 | Launch Site Network | `reach` → dispatch from a second body · `retire` → single-site dispatch limit |
+| R3 | *Fixed Infrastructure branch:* Mass Driver | `unlock` → non-rocket lift [Lift Doctrine B only] |
+
+### Volatiles
+
+| ring | node | effects |
+|---|---|---|
+| R1 | Volatile Prospecting | `intel` → ice/water richness bands appear in survey |
+| R1 | Ice Extraction | `unlock` → Ice Extractor [designed building] |
+| R2 | Water Purification | `unlock` → water recipe chain |
+| R2 | Electrolysis | `unlock` → water → LH₂ + LOX recipe |
+| R2 | Sabatier Reactor | `unlock` → CO₂ + H₂ → methane recipe [Propellant Doctrine A] |
+| R2 | Cryogenic Storage | `unlock` → depot tank · `modifier` → boil-off |
+| R3 | In-Situ Tank Fabrication | `access` → depot buildable without lifted parts |
+| R3 | Propellant Export | `resource` → propellant enters the space market as a traded good |
+
+### Mobility
+
+| ring | node | effects |
+|---|---|---|
+| R1 | Transfer Planning | `modifier` → propellant per leg |
+| R2 | High-Impulse Engines | `modifier` → propellant tax · `reach` → longer legs |
+| R2 | Electric Propulsion | `modifier` → propellant tax for slow cargo · `unlock` → bulk-freight lane class |
+| R3 | Nuclear Thermal | `reach` → the outer-body lanes · `modifier` → transit time |
+| R3 | Depot Routing | `reach` → refuel mid-route · `intel` → lane freshness |
+
+### Yards
+
+| ring | node | effects |
+|---|---|---|
+| R1 | Orbital Rendezvous | `unlock` → two-vehicle operations |
+| R2 | Modular Assembly | `unlock` → Assembly Plant [designed] |
+| R2 | Orbital Port | `unlock` → Orbital Port [designed] · `reach` → the station joins the trade graph |
+| R3 | Station Fabrication | `unlock` → habitat/station class · `access` → orbital build sites |
+| R3 | On-Orbit Servicing | `modifier` → asset maintenance · `retire` → single-use orbital assets |
+
+### Extraction
+
+| ring | node | effects |
+|---|---|---|
+| R1 | Regolith Excavation | `unlock` → Surface Extractor [designed] |
+| R2 | Metallic Body Working | `unlock` → iron-nickel ore chain · `access` → metallic bodies |
+| R2 | Platinum-Group Separation | `unlock` → PGM recipe · `resource` → PGM as a traded good |
+| R3 | Deep Regolith Processing | `upgrade` → extractor throughput |
+| R3 | Autonomous Mining Rig | `modifier` → workforce scalar [Autonomy Doctrine B] |
+
+### Standing lines (cross every sector, never gate the era)
+
+**L-LOG** deepens the convoy/propellant tax. **L-AUTO** carries the workforce scalar and the power
+substrate — and owns the Autonomy Doctrine's second branch. **L-MIL** stays **reserved**: this doc's
+own rule is not to enumerate it until the combat system is mapped, and BL-157 (units) is still a stub.
+
+## What this draft deliberately does not do
+
+- **No node count inflation.** ~45 objects, against the worked propellant loop's 25 techs *for one
+  quest*. The medium-grain call from the pre-game side applies here too: detail pays where someone
+  chooses, and the choosing happens at the four keystones, not along the chains.
+- **No new resources.** Every target above is an existing or already-designed resource; propellant is
+  the one that still has no `resource_type` value, which is a real blocker for the Volatiles sector.
+- **No Era 2 hook.** The Era event mechanics (§ Resolutions, 2026-07-08) own that, and an Era is a
+  *rupture* the player manages, not a door this tree opens.
+
+## Open questions for the review
+
+1. **Are four keystones right, or is one of them a chain?** Autonomy is the weakest — it may be
+   an L-AUTO tier rather than a fork.
+2. **Does a deed belong to the corporation or the world?** "First footing" reads as a world first
+   (only one corporation can have it) or a personal first (each corporation gets its own). World
+   firsts create a race; personal firsts create a checklist. Lean: **world** for the four keystone
+   deeds, personal for anything smaller.
+3. **Do rival corporations see your deeds?** The activity fog says buildings are visible and
+   internals are private (BL-068). A landing is arguably visible; a propellant surplus is arguably
+   not. This is the first place the tech system touches the discovery model.
+4. **Does an unfired deed hide its keystone entirely, or show it locked?** The tech fog says
+   unreachable nodes are not rendered at all. A hidden fork is a better surprise; a visible locked
+   fork is a better goal.

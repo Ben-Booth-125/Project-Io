@@ -54,6 +54,33 @@ for (const n of store.nodes) {
   }
 }
 
+// Effect typing (2026-08-05 effects pass) — kind/status vocabulary, and the rings T4–T5
+// completeness rule: every object in the worked industrial region carries effects.
+const effectKinds = new Set(store.effect_kinds || []);
+const effectStatuses = new Set(store.effect_statuses || []);
+const checkEffects = (label, fx) => {
+  if (!Array.isArray(fx)) return fail(`${label}: effects must be an array`);
+  if (!fx.length) return fail(`${label}: effects array is empty`);
+  for (const e of fx) {
+    if (!effectKinds.has(e.kind)) fail(`${label}: effect kind '${e.kind}' not in vocabulary`);
+    if (!effectStatuses.has(e.status)) fail(`${label}: effect status '${e.status}' not in vocabulary`);
+    if (!e.target) fail(`${label}: effect ${e.kind} has no target`);
+  }
+};
+const TYPED_BANDS = ['T4', 'T5'];
+for (const n of store.nodes) {
+  if (n.effects) checkEffects(n.id, n.effects);
+  else if (TYPED_BANDS.includes(n.band)) fail(`${n.id}: sits in the typed region but carries no effects`);
+}
+for (const k of store.keystones) for (const b of k.branches || []) {
+  if (b.effects) checkEffects(`${k.id}/${b.key}`, b.effects);
+  else if (TYPED_BANDS.includes(k.band)) fail(`${k.id}/${b.key}: typed region branch carries no effects`);
+}
+for (const q of store.quests) {
+  if (q.effects) fail(`${q.id}: a quest's effect is always open -> opens; drop the effects array`);
+  if (!q.opens) fail(`${q.id}: quest has no opens target (its implicit open effect)`);
+}
+
 const keystoneIds = new Set(store.keystones.map(k => k.id));
 for (const q of store.quests) {
   if (!domains.includes(q.domain)) fail(`${q.id}: unknown domain ${q.domain}`);
@@ -79,12 +106,34 @@ const techs = store.nodes.filter(n => n.kind === 'tech').length;
 const regimes = store.nodes.filter(n => n.kind === 'regime').length;
 const perBand = {};
 for (const n of store.nodes) perBand[n.band] = (perBand[n.band] || 0) + 1;
-const t12techs = store.nodes.filter(n => n.kind === 'tech' && (n.band === 'T1' || n.band === 'T2')).length;
 console.log(`ladder_lint: ${techs} techs + ${regimes} regimes` +
   ` (${Object.entries(perBand).sort().map(([b, c]) => `${b}:${c}`).join(' ')})` +
   `, ${store.quests.length} quests, ${store.keystones.length} keystones, ${store.crossings.length} crossings`);
-console.log(`  ring-1-to-2 neighbourhood: ${t12techs} techs + ${store.quests.filter(q => q.boundary === 'T1/T2').length} quests + ` +
-  `${store.keystones.filter(k => k.band === 'T1').length} keystone + 2 regimes = ` +
-  `${t12techs + store.quests.filter(q => q.boundary === 'T1/T2').length + store.keystones.filter(k => k.band === 'T1').length + 2} objects`);
+
+// Worked regions — one line each, counted from the store so the doc's prose can be checked
+// against it. Add a row here when a pass works a new region of the web.
+const regions = [
+  { label: 'ring-1-to-2 neighbourhood', bands: ['T1', 'T2'], boundary: 'T1/T2' },
+  { label: 'industrial neighbourhood ', bands: ['T4', 'T5'], boundary: 'T4/T5' },
+];
+for (const r of regions) {
+  const t = store.nodes.filter(n => n.kind === 'tech' && r.bands.includes(n.band)).length;
+  const g = store.nodes.filter(n => n.kind === 'regime' && r.bands.includes(n.band)).length;
+  const q = store.quests.filter(x => x.boundary === r.boundary).length;
+  const k = store.keystones.filter(x => r.bands.includes(x.band)).length;
+  console.log(`  ${r.label}: ${t} techs + ${q} quests + ${k} keystones + ${g} regimes = ${t + q + k + g} objects`);
+}
+const fxAll = [
+  ...store.nodes.flatMap(n => n.effects || []),
+  ...store.keystones.flatMap(k => (k.branches || []).flatMap(b => b.effects || [])),
+];
+if (fxAll.length) {
+  const byKind = {}, byStatus = {};
+  for (const e of fxAll) { byKind[e.kind] = (byKind[e.kind] || 0) + 1; byStatus[e.status] = (byStatus[e.status] || 0) + 1; }
+  console.log(`  effects: ${fxAll.length} typed — ` +
+    Object.entries(byKind).sort((a, b) => b[1] - a[1]).map(([k, c]) => `${k}:${c}`).join(' ') +
+    ` | ${Object.entries(byStatus).sort().map(([s, c]) => `${s}:${c}`).join(' ')}`);
+}
+
 if (failures) { console.error(`ladder_lint: ${failures} failure(s)`); process.exit(1); }
 console.log('ladder_lint: clean');

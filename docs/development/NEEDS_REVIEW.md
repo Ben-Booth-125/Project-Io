@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*62 entries — 5 open, 57 resolved.*
+*67 entries — 9 open, 58 resolved.*
 
 ---
 
@@ -86,6 +86,67 @@ Four calls were interpretation: (1) gate and diffusion are ARRAYS (ore_q+fuel be
 > **Recommendation:** Keep all four as taken — provenance already lets a consumer filter density-slice objects if wanted.
 
 *Files: `docs/research/ancient_tech_ladder.json`, `tools/session/ladder_lint.js`, `docs/research/ANCIENT_TECH_LADDER.md`*
+
+### NR-063 — Industrial-neighbourhood calls taken while working the rings T4-T5 region
+*decision taken on your behalf · raised 2026-08-05 · from BL-296 (ancient tech ladder) - Ben: 'another pre-game tech tree centred around the industrial revolution, to go alongside the pre-game early Civilisation tech tree'.*
+
+Five calls were interpretation. (1) SCOPE: 'another tech tree' was read as a second worked REGION of the one shared web (rings T4-T5 and the T4/T5 crossings), not a second web - the settled constellation geometry is one object, and a per-era viewer tab can still present the region separately. (2) FUEL DOCTRINE MOVED from ring T5 to ring T4 so the new Materials vertex (The Cheap Ton) can require it taken, repeating the ring-1 Written-Ledger interlock; the fuel choice genuinely predates the industrial band. (3) SEVEN NEW TECHS were added to the band tables to bring rings T4-T5 to medium grain (T4 Medicine had no node at all): Coal Haulage & Urban Fuel, Patent Grants, Preventive Inoculation, High-Pressure & Compound Engines, Framed Construction & Cement, Soil Chemistry & Fertiliser Trade, General Incorporation. (4) TELEGRAPH gained a Railway prereq - rail signalling drove the network - which is a change to an already-authored node, flagged with an `amended` field in the store. (5) A NEW RULE was adopted rather than proposed: fork count scales with the band's divergence (ring 1 carries one keystone, this region carries four), which is why two new keystones - Labour Doctrine and Works Doctrine - were authored in one region.
+
+**Why it matters.** Call 1 decides whether there is one tech object or two, which every later surface inherits. Calls 2 and 4 edit objects an earlier pass authored - if the density slices were meant to be frozen examples, both should be reverted. Call 5 sets an authoring rule the remaining three crossings will be worked under.
+
+> **Recommendation:** Keep all five. The store records provenance ('industrial-pass') and `amended` on both edited objects, so any of them can be reverted by inspection rather than archaeology.
+
+*Files: `docs/research/ANCIENT_TECH_LADDER.md`, `docs/research/ancient_tech_ladder.json`, `tools/session/ladder_lint.js`*
+
+### NR-064 — Works Doctrine may gate corporation generation - and does the industrial region get its own viewer tab?
+*question · raised 2026-08-05 · from BL-296 (ancient tech ladder) SS The industrial neighbourhood - surfaced while authoring the region's keystones.*
+
+Two open questions from the same pass. (a) WORKS DOCTRINE (State Arsenal vs Private Works, ring T5 Materials) says whether a 1960 nation's heavy plant is the sovereign's or is chartered and owned. If that is load-bearing, it is a real dependency from the ladder into CORPORATION_GENERATION.md's nation assignment and into BL-094 (governing-body pivot): a State-Arsenal nation may be one where a specialist space-interested corporation cannot be chartered at all, which changes who the player can be. (b) SURFACE: the F9 tech-tree mock has one tab per era; this region is one ring band inside Era -1, not an era. Either it earns an 'Era -1 - Industrial' tab beside Antiquity, or Antiquity is one web the reader zooms within.
+
+**Why it matters.** (a) is the difference between a flavour fork and a generation input - if it is the latter it should be a filed backlog item, not a note in a research doc. (b) decides whether the era strip is an ERA selector or a REGION selector, which is easier to settle before a second tab exists than after.
+
+- (a) Flavour only - Works Doctrine tints the 1960 economy, corporation generation ignores it.
+- (a) Generation input - file an item wiring the doctrine into nation assignment and the charter terms.
+- (b) Its own tab - the strip becomes a region selector, one per worked neighbourhood.
+- (b) One Antiquity web - the strip stays an era selector and the reader zooms.
+
+> **Recommendation:** (a) Generation input, filed as its own item once BL-296 lands - it is the most campaign-relevant object the ladder has produced and it costs nothing to honour at generation time. (b) One Antiquity web; the strip means eras, and a region is a zoom, not a tab.
+
+*Files: `docs/research/ANCIENT_TECH_LADDER.md`, `docs/generation/CORPORATION_GENERATION.md`, `src/ui/tech_tree_panel.cpp`*
+
+### NR-066 — Retirement breaks the monotonic unlocked set - three calls, plus whether pre-game effects ever fire
+*question · raised 2026-08-05 · from BL-156 (tech system early design) / BL-296 - raised by Ben's category C, 'retire buildings or units so they cannot be built when a qualitatively better option becomes available'.*
+
+BL-156 settled that the unlocked set is MONOTONIC: techs complete, never un-complete, so the set only grows and there is no revocation path to get wrong. Category C breaks that deliberately. The sanctioned mechanism exists - BL-087's availability windows, a predicate over the same set rather than a different structure - but three questions come with it and none are answered anywhere. (1) GRANDFATHERING: what happens to already-built content? Grandfather (it runs, cannot be re-placed) or force obsolescence (it degrades or must be replaced)? (2) AVAILABILITY VS ECONOMICS: a charcoal smelter nobody builds because coke is cheaper has retired itself; explicit retirement is only needed where the game wants to STOP the player, not out-price them. (3) REVERSIBILITY: under blockade a T5-capacity nation may need the T3 route back, and the ladder's own diffusion axis says capacity can be destroyed but awareness cannot. FOURTH, separate: do pre-game effects ever FIRE? On the ancient layer nobody clicks, so the ladder's effects may only be read at the 1960 handoff - making them a DESCRIPTION of the capacity band rather than events, with only the campaign tree's effects firing live.
+
+**Why it matters.** (1)-(3) decide whether retirement is a UI rule, an economic outcome, or a simulation event - and the answer changes what BL-087 has to build. (4) decides whether the two trees share one effect runtime or only one vocabulary, which is the difference between a shared system and a shared spreadsheet.
+
+- Grandfather + retire by window, explicit retirement mostly on units and doctrine branches (the doc's lean).
+- Force obsolescence - retired content degrades, making the turnover felt rather than merely offered.
+- Price-only retirement - no explicit mechanism; better options simply dominate.
+- (4) Ladder effects are descriptive; only campaign-tree effects fire.
+- (4) One effect runtime, with the ladder's effects evaluated by the BL-271 year-tick sim.
+
+> **Recommendation:** Option 1 for (1)-(3): grandfather, retire by window not erasure, and use explicit retirement sparingly - for buildings and recipes, price is usually the better retirement. For (4), lean descriptive: it keeps the derived/clicked distinction the whole ladder rests on, and BL-271 can promote it later without rework.
+
+> **RESOLVED.** PARTIAL (Ben, 2026-08-05): question (1) settled on the VISIBILITY axis - obsolete content is NOT RENDERED AT ALL ('there's no use for a player to see water mill if they will never build it'). No greyed row, no struck-through entry: the absent-not-disabled rule (BL-156, BL-229) extended to the far end of the lifecycle. His Martian-water-mill aside adds the constraint that OBSOLESCENCE IS CONTEXTUAL, not global - a mill obsolete on a 1960 homeworld is not obviously obsolete on a body where nothing better runs - so retirement is a per-context predicate, which is what a BL-087 availability window already is. Rule recorded: hide what this player cannot build HERE, not what the tech tree has moved past. STILL OPEN: whether an already-built obsolete building keeps running (grandfathering, as distinct from whether it is re-placeable), question (2) availability-vs-economics, question (3) reversibility under blockade, and question (4) whether pre-game effects ever fire.
+
+*Files: `docs/research/TECH_EFFECTS.md`, `docs/research/ancient_tech_ladder.json`, `docs/development/backlog.json`*
+
+### NR-067 — Era 1 draft introduces a seventh condition primitive: the deed (a tangible act, not a state)
+*decision taken on your behalf · raised 2026-08-05 · from BL-087 (filter system / Era 1 content) - Ben, 2026-08-05: the Era 1 tree 'will be the first tech tree to gate keystones via quests, i.e. tangible actions done in game'.*
+
+The existing condition vocabulary (ERA1_TECH_LANDSCAPE.md, carried into BL-156's condition_set) is entirely STATE: research, structure, stockpile, market, surplus, era are predicates sampled at a tick, each of which can be true today and false tomorrow. None can express 'you did this'. The draft adds a seventh primitive - `deed` {subject, scope, count, recorded} - a one-time event that fires at a tick and stays true. All four Era 1 keystones are gated on deeds rather than thresholds: Ten Flights, The First Tank, The First Truss, The Empty Shift. Also drafted on Ben's behalf, pending his node review: five sectors (Launch / Volatiles / Mobility / Yards / Extraction) x three rings (Reach / Foothold / Industry), Power-Automation kept as a standing line rather than a sector, ~45 objects, and four binary keystone forks each keyed to a different axis (cadence, chemistry, geometry, labour).
+
+**Why it matters.** A deed is a new serialised primitive - a flag plus a tick - so it touches the save format and BL-156's condition_set shape, which is settled. It is cheap and monotonic, but it is an addition to a closed vocabulary and should be Ben's call, not mine. If it is rejected, keystone gating falls back to structure + stockpile combinations, which express the shopping list but not the act.
+
+- Adopt `deed` as a seventh condition primitive.
+- Fake it with structure + stockpile predicates - no new primitive, weaker expression.
+- Adopt it only for keystones, keeping ordinary techs on state conditions.
+
+> **Recommendation:** Adopt it (option 1 or 3). It is monotonic, deterministic and trivially serialised, and it is the only way the tree can ask for an ACT rather than a balance sheet - which is what the whole framing asks for. Four review questions carried in the doc: whether four keystones is right, whether a deed is a world first or a personal one, whether rivals see your deeds, and whether an unfired deed hides its keystone or shows it locked.
+
+*Files: `docs/research/ERA1_TECH_LANDSCAPE.md`, `docs/development/backlog.json`*
 
 ---
 
@@ -995,4 +1056,21 @@ The Rival docs (2026-08-03) framed Wildfire Games' 0 A.D. (Release 28) as the ne
 > **RESOLVED.** Executed same session: game fully removed; ENVIRONMENT.md carries a retirement banner; CLAUDE.md arena paragraph re-based; BL-306 design amended with the re-aim. The RTS harness files stay in the repo as the record of the protocol work.
 
 *Files: `Project-Rival/CLAUDE.md`, `Project-Rival/docs/ENVIRONMENT.md`, `Project-Rival/tools/harness/smoke_test.js`*
+
+### NR-065 — Ladder nodes carry no effect field - the campaign tree types its techs, the pre-game web does not
+*question · raised 2026-08-05 · from BL-296 (ancient tech ladder) - surfaced by Ben asking whether ladder techs give new options or upgrades.*
+
+scripts/tech_tree.lua types every tech by kind: 30 invention (new option), 17 tier (upgrade), 6 capstone (opens a tree) across 53 techs. The ladder store has no equivalent axis - a node is {id, name, band, domain, prereqs, gate, diffusion, earth_ref} and nothing says what completing it GRANTS. In content terms the ladder is plainly a mix: Railway and Telegraph and General Incorporation are new options, Converter Steel and High-Pressure Engines and Three-Field Rotation are upgrades, and Deep Mining and Coal Haulage grant nothing at all - they exist to satisfy a vertex. Today that distinction lives only in the reader's head, and the ladder's sole mechanical output is the 1960 handoff (capacity band -> unlocked set, per BL-156 set-membership).
+
+**Why it matters.** BL-271's sim can run without it - the ladder is derived, so nothing needs a payoff to be evaluated. But BL-274 rosters, the epoch building/recipe set, and any codex rendering all want to know which nodes are option-openers and which are multipliers. Adopting the campaign tree's existing kind vocabulary would make both trees speak one language for the cost of one field.
+
+- Adopt kind: invention | tier | enabler | capstone on ladder nodes, mirroring scripts/tech_tree.lua.
+- Leave it - the ladder is derived, and the 1960 handoff is the only effect that matters.
+- Defer to BL-271, which will need the distinction as soon as it computes the handoff.
+
+> **Recommendation:** Option 1, as a small pass over the store - it is one field, it is checkable by the lint, and it stops the two trees drifting into different vocabularies for the same idea.
+
+> **RESOLVED.** SUPERSEDED BY THE EFFECTS PASS (2026-08-05, same day): Ben asked for the mapping directly ('let's map this to real buildings and units'), which answers the question in the affirmative and goes further. Rather than borrowing scripts/tech_tree.lua's three-value kind field, an eleven-kind closed vocabulary was authored in docs/research/TECH_EFFECTS.md and applied to every rings T4-T5 object as {kind, target, status}. The campaign tree's invention/tier/capstone maps onto it as unlock/upgrade/open. Remaining open calls moved to NR-066.
+
+*Files: `docs/research/ancient_tech_ladder.json`, `scripts/tech_tree.lua`, `docs/research/ANCIENT_TECH_LADDER.md`*
 
