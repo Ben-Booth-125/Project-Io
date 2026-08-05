@@ -8578,6 +8578,55 @@
      "notes": "'Time-lapse: 654 changes, 5232 bytes' on the epoch capture."
     }
    ]
+  },
+  {
+   "brief": "history-sweep",
+   "title": "The history sweep: distributions over a seed spread (BL-275)",
+   "difficulty": 3,
+   "importance": "B",
+   "evaluated_difficulty": 3,
+   "status": "complete",
+   "resolved": "2026-08-04",
+   "resolution": "Complete. tools/verify/history_sweep.cpp reports and does not gate, per the item's own instruction. First spread (12 seeds) found hegemony 0/12 and elimination 0/12 — filed as BL-308, since a model where no polity can die makes BL-224's invariant unmeasurable.",
+   "promoted_from": "Ben, 2026-08-04, choosing the sweep as the next work.",
+   "batch": null,
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "The sweep runs N seeds of world generation through the full 0->1960 sim and reports per-seed rows plus aggregate distributions, taking the seed count as an argument.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "S1: every seed produced a world and completed."
+    },
+    {
+     "id": "R2",
+     "requirement": "A sweep row is replayable from its seed alone — re-running one swept seed reproduces its battle and conquest counts exactly.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "S2."
+    },
+    {
+     "id": "R3",
+     "requirement": "Seeds genuinely diverge: the sweep measures a spread of worlds, not one world sampled N times.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "S3. Battles range 316..3688 across 12 seeds."
+    },
+    {
+     "id": "R4",
+     "requirement": "The sweep REPORTS and does not GATE: hegemony and elimination rates are printed as measured rates, with no assertion binding them to a target nobody has chosen.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "Only structural checks are PASS/FAIL; the header states why."
+    },
+    {
+     "id": "R5",
+     "requirement": "Output is machine-readable as well as printed — history_sweep.json carries one object per world.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "Open question 2 settled as the lean: JSON + printed summary."
+    }
+   ]
   }
  ]
 }

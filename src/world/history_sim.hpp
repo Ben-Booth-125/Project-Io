@@ -245,6 +245,19 @@ struct history_sim_state
     int64_t foundings   = 0;
     int64_t winter_campaigns = 0;
     int64_t stalled_campaigns = 0; ///< Scored but never launched: supply decay bit.
+
+    /// Battles in each century of the run, index 0 = the first hundred years.
+    /// The sweep reports war frequency PER CENTURY rather than as a total,
+    /// because a world that fought all its wars in one age and a world that
+    /// fought steadily for two millennia have the same total and nothing else
+    /// in common — the total alone cannot tell them apart.
+    std::vector<int32_t> battles_per_century;
+
+    /// Highest total population the body ever carried, and the year it peaked.
+    /// Peak has to be tracked as the run goes: the epoch figure alone cannot
+    /// show a world that grew, collapsed and never recovered.
+    int64_t peak_population = 0;
+    int64_t peak_year       = 0;
 };
 
 /// Sentinel for "no polity owns this province in this year slice".

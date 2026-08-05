@@ -254,14 +254,25 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 static_cast<uint16_t>(owner[i])});
 
     const int64_t years = params.stop_year - params.start_year;
+    out.battles_per_century.assign(static_cast<std::size_t>(years / 100 + 1), 0);
 
     for (int64_t y = params.start_year; y < params.stop_year; ++y)
     {
+        const std::size_t century =
+            static_cast<std::size_t>((y - params.start_year) / 100);
+
         // ---- Demography -------------------------------------------------
+        int64_t total_pop = 0;
         for (std::size_t i = 0; i < ss.provinces.size(); ++i)
         {
             advance_province_demography(ss.provinces[i], 1, war_pressure[i]);
             war_pressure[i] = 0;
+            total_pop += ss.provinces[i].population;
+        }
+        if (total_pop > out.peak_population)
+        {
+            out.peak_population = total_pop;
+            out.peak_year       = y;
         }
 
         // ---- Each polity acts, in id order (deterministic) ---------------
@@ -454,6 +465,8 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     atk_supply, def_supply);
 
                 ++out.battles;
+                if (century < out.battles_per_century.size())
+                    ++out.battles_per_century[century];
                 if (best_winter) ++out.winter_campaigns;
                 if (atk_supply == 0) ++out.stalled_campaigns;
 
