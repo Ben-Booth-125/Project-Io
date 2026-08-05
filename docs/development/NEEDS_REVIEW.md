@@ -129,6 +129,8 @@ BL-156 settled that the unlocked set is MONOTONIC: techs complete, never un-comp
 
 > **Recommendation:** Option 1 for (1)-(3): grandfather, retire by window not erasure, and use explicit retirement sparingly - for buildings and recipes, price is usually the better retirement. For (4), lean descriptive: it keeps the derived/clicked distinction the whole ladder rests on, and BL-271 can promote it later without rework.
 
+> **RESOLVED.** PARTIAL (Ben, 2026-08-05): question (1) settled on the VISIBILITY axis - obsolete content is NOT RENDERED AT ALL ('there's no use for a player to see water mill if they will never build it'). No greyed row, no struck-through entry: the absent-not-disabled rule (BL-156, BL-229) extended to the far end of the lifecycle. His Martian-water-mill aside adds the constraint that OBSOLESCENCE IS CONTEXTUAL, not global - a mill obsolete on a 1960 homeworld is not obviously obsolete on a body where nothing better runs - so retirement is a per-context predicate, which is what a BL-087 availability window already is. Rule recorded: hide what this player cannot build HERE, not what the tech tree has moved past. STILL OPEN: whether an already-built obsolete building keeps running (grandfathering, as distinct from whether it is re-placeable), question (2) availability-vs-economics, question (3) reversibility under blockade, and question (4) whether pre-game effects ever fire.
+
 *Files: `docs/research/TECH_EFFECTS.md`, `docs/research/ancient_tech_ladder.json`, `docs/development/backlog.json`*
 
 ### NR-067 — Era 1 draft introduces a seventh condition primitive: the deed (a tangible act, not a state)

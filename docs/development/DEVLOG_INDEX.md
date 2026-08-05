@@ -11,7 +11,7 @@ the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 | Date | Session | Items | Volume |
 |---|---|---|---|
 | 2026-08-05 | [The Era 1 tree, first draft: keystones opened by deeds](DEVLOG.md) | — | DEVLOG.md |
-| 2026-08-05 | [Effects: what a tech actually does, mapped to real buildings](DEVLOG.md) | BL-149 BL-155 BL-156 BL-157 | DEVLOG.md |
+| 2026-08-05 | [Effects: what a tech actually does, mapped to real buildings](DEVLOG.md) | BL-087 BL-149 BL-155 BL-156 BL-157 | DEVLOG.md |
 | 2026-08-05 | [The industrial neighbourhood: the second worked region of the tech web](DEVLOG.md) | BL-273 BL-296 | DEVLOG.md |
 | 2026-08-04 | [A world that begins at 0 CE](DEVLOG.md) | BL-271 | DEVLOG.md |
 | 2026-08-04 | [The arena comes home: text-only Rival, the diplomacy battery, and the RTS that lived for an hour](DEVLOG.md) | BL-278 BL-296 BL-306 BL-307 BL-308 BL-309 BL-310 | DEVLOG.md |

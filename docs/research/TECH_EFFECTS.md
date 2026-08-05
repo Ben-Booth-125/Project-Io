@@ -120,6 +120,20 @@ answered anywhere yet:
    re-placed) or force obsolescence (it degrades or must be replaced)? Grandfathering is the
    legible choice and matches "unlocked content is absent rather than disabled-and-visible" — the
    old building is simply no longer *offered*.
+
+> **SETTLED 2026-08-05 (Ben): obsolete content is not rendered at all.** *"There's no use for a
+> player to see 'water mill' if they will never build it."* Retired content leaves the UI
+> completely — no greyed row, no struck-through entry, no tooltip explaining why it's unavailable.
+> This is the **absent-not-disabled** rule (BL-156, BL-229) extended to the far end of the
+> lifecycle: content is absent before it unlocks and absent again after it retires, and the build
+> menu only ever shows what you can actually build *now*.
+>
+> **The Martian water mill — obsolescence is contextual, not global.** Ben's aside carries a real
+> constraint: a water mill is obsolete on a 1960 industrial homeworld and not obviously obsolete on
+> a body where nothing better can run. So retirement cannot be a global flag on a content id. It is
+> a predicate evaluated **per context** — which is exactly what a BL-087 availability window is,
+> and one more reason the window is the right mechanism rather than an erasure. The rule to hold:
+> *hide what this player cannot build here, not what the tech tree has moved past.*
 2. **Does retirement fire on availability or on economics?** A charcoal smelter that nobody builds
    because coke is cheaper has retired itself. Explicit retirement is only needed where the game
    wants to *stop* the player, not merely out-price them.

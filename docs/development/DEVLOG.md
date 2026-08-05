@@ -80,6 +80,14 @@ fails if any object in the typed region is left untyped.
 availability-vs-economics, reversibility under blockade), plus whether pre-game effects ever
 *fire* or are only read at the 1960 handoff. NR-065 resolved by this pass.
 
+**Settled same day (Ben), the visibility half of NR-066:** obsolete content is **not rendered at
+all** — *"there's no use for a player to see 'water mill' if they will never build it."* No greyed
+row, no struck-through entry; the absent-not-disabled rule extended to the far end of the
+lifecycle. His Martian-water-mill aside carries the real constraint: **obsolescence is contextual,
+not global** — a mill obsolete on a 1960 homeworld isn't obsolete on a body where nothing better
+runs, so retirement is a per-context predicate, which is what a BL-087 availability window already
+is. Rule recorded: *hide what this player cannot build here, not what the tech tree has moved past.*
+
 ---
 
 ## Session — The industrial neighbourhood: the second worked region of the tech web (2026-08-05)
