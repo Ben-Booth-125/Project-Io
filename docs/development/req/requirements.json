@@ -8690,6 +8690,55 @@
      "notes": "Elimination 0/12 after the fix. Weakest power median 6 provinces, range 1..22. BL-308 stays open with a sharper diagnosis."
     }
    ]
+  },
+  {
+   "brief": "era-minus-1-review-fixes",
+   "title": "Review fixes: province stacking, Ages cache key, and the vacuous stall assertion (BL-310/311/312)",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": 3,
+   "status": "complete",
+   "resolved": "2026-08-04",
+   "resolution": "BL-310, BL-311 and BL-312 complete. BL-309 attempted and REVERTED — range-based normalisation structurally favours the narrowest-range verb, so it needs a scorer redesign. BL-310 carried most of the benefit anyway: LAST CHANGE YEAR 458 -> 967, first-tenth share 36% -> 5%.",
+   "promoted_from": "Ben, 2026-08-04: batch deliver the review items.",
+   "batch": "era-minus-1",
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "Settle never founds a province on an occupied grid cell; the map's distinct-cell count equals its province count.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "Occupancy search with widening ring. Conquests 201 -> 3568 as a side effect."
+    },
+    {
+     "id": "R2",
+     "requirement": "History recurs across the run rather than firing early and stopping: the last ownership change lands well beyond the first quarter, and the first tenth holds a small minority of changes.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "LAST CHANGE YEAR median 458 -> 967; first-tenth share 36% -> 5%. Instrumented in history_sweep."
+    },
+    {
+     "id": "R3",
+     "requirement": "The Ages view re-runs its sim when the world is regenerated, rather than showing the previous world's political history.",
+     "class": "visual",
+     "status": "complete",
+     "notes": "Cache keyed on a generation fingerprint, not the hard-coded body name."
+    },
+    {
+     "id": "R4",
+     "requirement": "The supply-decay stall assertion is non-vacuous: the far objective is genuinely scored and attacked, and the test states which mechanism actually stops distant expansion.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "R3a2/R3a3/R3b/R3b2. Found that supply decay ALONE does not stop conquest — the w_dist score penalty does. BL-277 Q2 corrected."
+    },
+    {
+     "id": "R5",
+     "requirement": "No comment in the sim describes behaviour the code does not implement, and the uint16 province index cannot silently wrap.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "Four comments corrected; owner_index_limit guards the change list."
+    }
+   ]
   }
  ]
 }

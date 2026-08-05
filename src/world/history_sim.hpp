@@ -118,9 +118,43 @@ struct history_sim_params
     int winter_score_premium_q = 90;
 
     // --- Thresholds -------------------------------------------------------
+    //
+    // THE VERBS ARE SCORED ON THEIR OWN SCALES AND COMPARED ON A SHARED ONE
+    // (BL-309). Each verb produces a raw score, a threshold it must clear, and
+    // a ceiling that raw score is measured against; the argmax then runs over
+    // the NORMALISED margin `(raw - threshold) / (ceiling - threshold)`.
+    //
+    // The first cut compared raw scores directly and it did not work. Invest's
+    // raw score was population/4000 clamped to 1000, and province population is
+    // hard-capped near 505,000 and only grows — so a few mature provinces pinned
+    // Invest at 1000 forever, while Campaign could not arithmetically exceed
+    // ~750 and Settle ~600. The result was a simulation whose last ownership
+    // change happened at median year 458 of a 0-1960 run: three quarters of
+    // every run was inert, and every distribution the sweep reported described
+    // a ~460-year world.
+    //
+    // Capping Invest would have hidden that rather than fixed it. The error was
+    // comparing incommensurable quantities, so the fix is to make them
+    // commensurable.
     int campaign_threshold_q  = 220; ///< Minimum score for a campaign to be launched.
     int settle_threshold_q    = 380; ///< Minimum score for founding a new province.
     int invest_threshold_q    = 160; ///< Minimum score for a capacity investment.
+
+    // BL-309 ATTEMPTED AND REVERTED, 2026-08-04. Normalising each verb onto
+    // `(raw - threshold) / (ceiling - threshold)` and running the argmax over
+    // that margin does NOT fix this, and the reason is structural: dividing by
+    // each verb's own range systematically favours the verb with the NARROWEST
+    // range. Settle's usable span is 220 wide and Campaign's is ~540, so the
+    // same relative desirability gave Settle a far larger margin — the run went
+    // from Invest-dominated to Settle-dominated (82 -> 1532 provinces, 1450
+    // foundings, and conquests fell to ZERO), which is the same failure wearing
+    // a different verb.
+    //
+    // The real fix is to score the verbs on ONE scale by construction — a
+    // common "value to this polity" quantity every verb expresses itself in —
+    // not to rescale four incommensurable numbers after the fact. That is a
+    // redesign of the scorer, so it stays with BL-309 rather than being
+    // half-done here.
 
     /// Decisiveness (0-1000) a victory must reach before territory changes
     /// hands. Below it the battle is a raid: losses and contest, no transfer.
@@ -129,6 +163,11 @@ struct history_sim_params
     /// Adjacency radius in tiles — two provinces closer than this are
     /// neighbours, and only neighbours are campaign candidates.
     int neighbour_radius = 9;
+
+    /// Supply below which an arriving force counts as STALLED. This is what
+    /// `history_sim_state::stalled_campaigns` measures — a campaign that was
+    /// launched but arrived too thin to win, which is the frontier stalling.
+    int stalled_supply_q = 300;
 
     /// Population pressure (population * 1000 / carrying capacity) above which
     /// a polity will consider founding a new province.
@@ -221,8 +260,18 @@ struct polity
     /// multiplies the power of every stack the polity fields, so a losing
     /// polity gets easier to beat — which is what a death spiral is.
     ///
-    /// It recovers on Consolidate, so the spiral is escapable by a polity that
-    /// stops fighting and holds what it has. That is the whole trade.
+    /// HOW IT APPLIES: cohesion scales the readiness handed to the roster,
+    /// which lands as an ADDITIVE per-mille offset on each unit's
+    /// `type_power_mod` (unit_roster.cpp). It is not a multiplier on final
+    /// stack power, and the first cut's comment claiming it was is corrected
+    /// here (BL-312) — at the floor it is worth roughly -82 against row values
+    /// of 90..380, so it tilts a fight rather than deciding one.
+    ///
+    /// It recovers on Consolidate, which is a SCORED candidate worth more the
+    /// further cohesion has fallen (BL-309) — so the spiral is escapable by a
+    /// polity that stops fighting and holds what it has. Under the first cut's
+    /// raw-score comparison Consolidate was never chosen after ~year 176 and
+    /// this escape did not exist.
     int cohesion_q = 1000;
 
     /// True for a seeded great power (BL-299). Majors start with more ground
@@ -249,7 +298,15 @@ enum class sim_verb : uint8_t
 // ---------------------------------------------------------------------------
 
 /// One ownership change: province `province` came under polity `owner` in
-/// year `year`. `owner_none` records a province leaving all ownership.
+/// year `year`.
+///
+/// `owner_none` is reserved for a province leaving all ownership, but NOTHING
+/// EMITS IT TODAY: once settled or conquered a province always has an owner,
+/// and no code path resets one to unowned. The value is kept because
+/// `owner_slice_at` needs it for provinces that do not exist yet in an early
+/// year, and because depopulation-to-abandonment is a plausible later mechanic
+/// — but a reader should not infer from the sentinel that abandonment exists
+/// (BL-312).
 ///
 /// This is the whole time-lapse format. It is a change LIST rather than a
 /// per-year grid because ownership is overwhelmingly static — most years, on
@@ -296,7 +353,10 @@ struct history_sim_state
     int64_t conquests   = 0;
     int64_t foundings   = 0;
     int64_t winter_campaigns = 0;
-    int64_t stalled_campaigns = 0; ///< Scored but never launched: supply decay bit.
+    /// Campaigns that reached their objective under `stalled_supply_q` supply
+    /// — launched, but arriving too thin for the distance. The supply-decay
+    /// stall, counted where it happens rather than after the battle resolved.
+    int64_t stalled_campaigns = 0;
 
     /// Battles in each century of the run, index 0 = the first hundred years.
     /// The sweep reports war frequency PER CENTURY rather than as a total,
@@ -314,6 +374,13 @@ struct history_sim_state
 
 /// Sentinel for "no polity owns this province in this year slice".
 inline constexpr uint16_t owner_none = 0xFFFFu;
+
+/// Hard cap on the province count, because `owner_change::province` is a
+/// uint16_t and `owner_none` claims the top value. The Settle verb grows the
+/// province vector without any natural bound, so this is the guard that stops
+/// a long run silently wrapping the index and replaying a plausible-but-wrong
+/// political map (BL-312).
+inline constexpr std::size_t owner_index_limit = 0xFFFEu;
 
 // ---------------------------------------------------------------------------
 // Entry point

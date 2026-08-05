@@ -204,7 +204,13 @@ void draw_tile_inspector(const world& w, ui_state& s,
     // 2000-year run costs ~600 ms and re-running it per frame would stall the UI.
     if (view == view_ages)
     {
+        // Keyed on the body name AND the generation's own identity (BL-311).
+        // Name alone is not enough: body names are hard-coded literals, so
+        // regenerating the world left the key matching and the view rendered the
+        // PREVIOUS world's political history over the previous world's
+        // provinces — confidently, with no cue that anything was wrong.
         static std::string        cached_body;
+        static uint64_t           cached_gen = 0;
         static settlement_state   cached_ss;
         static history_sim_state  cached_sim;
 
@@ -215,7 +221,15 @@ void draw_tile_inspector(const world& w, ui_state& s,
             return;
         }
 
-        if (cached_body != sel_body.name)
+        // A cheap generation fingerprint: what this world actually generated.
+        // Two different seeds essentially never agree on all four.
+        const uint64_t gen_id =
+              (static_cast<uint64_t>(report.bodies.size()) << 48)
+            ^ (static_cast<uint64_t>(entry->settlement.provinces.size()) << 32)
+            ^ (static_cast<uint64_t>(entry->settlement.median_industrial_year & 0xFFFF) << 16)
+            ^  static_cast<uint64_t>(report.attempts);
+
+        if (cached_body != sel_body.name || cached_gen != gen_id)
         {
             cached_ss = entry->settlement; // The copy the sim is allowed to move.
             history_sim_params p;
@@ -226,6 +240,7 @@ void draw_tile_inspector(const world& w, ui_state& s,
                                          sel_body.grid_width, sel_body.grid_height,
                                          p, 7u);
             cached_body   = sel_body.name;
+            cached_gen    = gen_id;
             s.ages_year   = 0;
             s.ages_playing = false;
         }

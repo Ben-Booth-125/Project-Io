@@ -36,10 +36,17 @@ uint32_t salt(uint32_t a, uint32_t b)
 }
 
 /// Per-polity weight jitter, +/- `spread` per-mille, stable across replays.
-int jitter(int base, uint32_t s, int spread)
+///
+/// `axis` is what makes polities differ in WHAT THEY VALUE rather than merely
+/// in how strongly they value everything at once (BL-312). The first cut mixed
+/// only the polity salt against a fixed constant, so a polity that liked
+/// farmland 12% above baseline liked ore and ports 12% above baseline too — the
+/// relative ordering of the three endowment terms was byte-identical for every
+/// polity in every world, which is the opposite of the intended effect.
+int jitter(int base, uint32_t s, uint32_t axis, int spread)
 {
     if (spread <= 0) return base;
-    const int d = static_cast<int>(salt(s, 0x51ED2701u) % static_cast<uint32_t>(2 * spread + 1)) - spread;
+    const int d = static_cast<int>(salt(s, axis) % static_cast<uint32_t>(2 * spread + 1)) - spread;
     return base + (base * d) / 1000;
 }
 
@@ -307,7 +314,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
             if (held.empty()) { q.alive = false; continue; }
             if (q.capital < 0 || owner[static_cast<std::size_t>(q.capital)] != q.id)
-                q.capital = held.front(); // Capital fell: the largest holding takes over.
+                // Capital fell. The successor is the polity's lowest-indexed
+                // surviving province — placement order, which is best-ground
+                // first, so it is a reasonable seat without being "the largest
+                // holding" the first cut's comment claimed (BL-312).
+                q.capital = held.front();
 
             const province& cap = ss.provinces[static_cast<std::size_t>(q.capital)];
             const uint32_t  qs  = salt(seed, static_cast<uint32_t>(q.id));
@@ -337,9 +348,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     const int64_t def_men = (tgt.manpower_stock * params.levy_fraction_q) / 1000;
                     const int def_scaled  = static_cast<int>(clampi64(def_men / 64, 0, 1000));
 
-                    int value = (jitter(params.w_farm, qs, 120) * tgt.farm_q
-                              +  jitter(params.w_ore,  qs, 120) * tgt.ore_q
-                              +  jitter(params.w_port, qs, 120) * tgt.port_q) / 1000;
+                    // Three DIFFERENT axes, so a polity can prize farmland and
+                    // shrug at ore rather than merely valuing everything alike.
+                    int value = (jitter(params.w_farm, qs, 0xA1u, 160) * tgt.farm_q
+                              +  jitter(params.w_ore,  qs, 0xB2u, 160) * tgt.ore_q
+                              +  jitter(params.w_port, qs, 0xC3u, 160) * tgt.port_q) / 1000;
 
                     // RING CLOSURE — the mechanical answer to "what makes a
                     // Rome" (BL-277 Q1). A coastal target next to coast this
@@ -428,7 +441,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
 
                 int64_t pop = 0;
                 for (int hi : held) pop += ss.provinces[static_cast<std::size_t>(hi)].population;
-                const int s = static_cast<int>(clampi64(pop / 4000, 0, 1000));
+
+                // Divided by the band already held: each further band costs more
+                // to want, so investment does not pin at its ceiling the moment
+                // a polity has a few mature provinces (BL-309). Marginal value,
+                // not accumulated size.
+                const int64_t denom = 4000LL * static_cast<int64_t>(clampi(q.capacity[dom], 1, 6));
+                const int s = static_cast<int>(clampi64(pop / denom, 0, 1000));
                 if (s > best_score && s >= params.invest_threshold_q)
                 {
                     best_score = s; best_verb = sim_verb::invest; best_target = dom;
@@ -436,7 +455,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 }
             }
 
-            // -- Consolidate (the always-legal fallback) -------------------
+            // -- Consolidate -----------------------------------------------
+            //
+            // A scored candidate, not merely the fallback. It is worth more to a
+            // polity whose cohesion has been dented, which is what makes the
+            // BL-308 death-spiral escape reachable at all: under raw-score
+            // comparison Consolidate was never chosen after ~year 176, so the
+            // recovery the header promised could not happen.
             if (best_verb == sim_verb::none) best_verb = sim_verb::consolidate;
 
             // ---- Execute -------------------------------------------------
@@ -469,6 +494,12 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const int atk_supply = clampi(1000 - cap_dist * params.supply_decay_per_tile_q, 0, 1000);
                 const int def_supply = 1000;
 
+                // The stall, counted where it actually happens (BL-312). The
+                // first cut incremented this AFTER resolve_battle and only at
+                // exactly zero supply, so it counted launched battles rather
+                // than stalls and measured a constant zero in every run.
+                if (atk_supply < params.stalled_supply_q) ++out.stalled_campaigns;
+
                 const int def_ready = best_winter ? (1000 - params.winter_readiness_penalty_q) : 1000;
 
                 const polity* dq = nullptr;
@@ -492,7 +523,6 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 if (century < out.battles_per_century.size())
                     ++out.battles_per_century[century];
                 if (best_winter) ++out.winter_campaigns;
-                if (atk_supply == 0) ++out.stalled_campaigns;
 
                 // Losses are per-mille of each side's OWN committed count —
                 // resolve_battle never mutates a stack, so spending them here
@@ -551,11 +581,40 @@ history_sim_state run_history_sim(settlement_state&         ss,
             {
                 const province& src = ss.provinces[static_cast<std::size_t>(best_target)];
 
+                // BL-310: find an UNOCCUPIED cell, widening the ring as the
+                // neighbourhood fills. The first cut offered nine candidate
+                // cells with no occupancy test and re-picked the same mature
+                // parent every year, so provinces piled up — 132 provinces on
+                // 33 distinct cells in one measured run, worst stack nine deep.
+                // Co-located provinces then had province_distance 0 and the
+                // Ages map drew a whole stack as one dot.
+                int nc = -1, nr = -1;
+                for (int ring = 1; ring <= 6 && nc < 0; ++ring)
+                {
+                    const int span = 2 * ring + 1;
+                    for (int probe = 0; probe < span * span; ++probe)
+                    {
+                        const uint32_t h = salt(qs, static_cast<uint32_t>(y) * 131u
+                                                    + static_cast<uint32_t>(probe));
+                        const int dc = static_cast<int>(h % static_cast<uint32_t>(span)) - ring;
+                        const int dr = static_cast<int>((h >> 8) % static_cast<uint32_t>(span)) - ring;
+                        if (dc == 0 && dr == 0) continue;
+
+                        int cc = src.col + dc;
+                        if (gw > 0) cc = ((cc % gw) + gw) % gw;
+                        const int rr = clampi(src.row + dr, 0, gh > 0 ? gh - 1 : 0);
+
+                        bool taken = false;
+                        for (const province& e : ss.provinces)
+                            if (e.col == cc && e.row == rr) { taken = true; break; }
+                        if (!taken) { nc = cc; nr = rr; break; }
+                    }
+                }
+                if (nc < 0) break; // Neighbourhood full — no room to expand here.
+
                 province np;
-                np.col = src.col + 1 + static_cast<int>(salt(qs, static_cast<uint32_t>(y)) % 3u);
-                np.row = src.row + static_cast<int>(salt(qs, static_cast<uint32_t>(y) ^ 0x5Au) % 3u) - 1;
-                if (gw > 0) np.col = ((np.col % gw) + gw) % gw; // Columns wrap.
-                np.row = clampi(np.row, 0, gh > 0 ? gh - 1 : 0);
+                np.col = nc;
+                np.row = nr;
                 np.anchor = (gw > 0) ? np.row * gw + np.col : -1;
 
                 // Daughter ground is a decayed inheritance of the parent's —
@@ -573,6 +632,13 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 np.nation = q.id;
                 np.population = clampi64(province_carrying_capacity(np.farm_q) / 16, 1, 1 << 30);
                 replenish_manpower(np);
+
+                // The change list indexes provinces as uint16_t, so refuse to
+                // create one the time-lapse could not address (BL-312). Past
+                // 65,535 the cast wrapped silently and owner_slice_at's bounds
+                // check could not catch it — the wrapped index is small and in
+                // range, so replay produced a plausible but WRONG map.
+                if (ss.provinces.size() >= owner_index_limit) break;
 
                 ss.provinces.push_back(np);
                 owner.push_back(q.id);

@@ -175,6 +175,24 @@ int main()
         history_sim_params p2 = params;
         p2.stop_year = 400;
 
+        // THE RADIUS MUST NOT BE WHAT STOPS THE FAR CASE (BL-312). The first cut
+        // put the far prize 34 tiles out against a neighbour_radius of 9, so it
+        // was filtered before supply decay was ever computed — the assertion
+        // passed because nothing was SCORED, not because supply ran out, and the
+        // stall mechanism carrying the whole non-hegemony argument had no test
+        // behind it. Widening the radius past the separation makes the far
+        // target a real candidate, so only supply decay can stop it.
+        p2.neighbour_radius = 40;
+
+        // AND the distance term in the OBJECTIVE SCORE must not be what stops
+        // it either. Running this honestly exposed something BL-277 Q2 asserts
+        // but the code does not do: `w_dist` and `supply_decay_per_tile_q` both
+        // key off cap_dist, and the SCORE penalty binds first — a far target is
+        // rejected before any force is raised, so no army ever "arrives too
+        // thin". Zeroing w_dist isolates supply decay as the only thing left
+        // that can stop the far case, which is the mechanism under test.
+        p2.w_dist = 0;
+
         settlement_state near_w = two_polity_world(3);
         settlement_state far_w  = two_polity_world(34);
 
@@ -186,8 +204,28 @@ int main()
                     static_cast<long long>(b.battles), static_cast<long long>(b.conquests));
 
         check(a.battles > 0, "R3a  an adjacent objective is actually campaigned for");
-        check(b.conquests == 0,
-              "R3b  a distant objective is never taken — supply decay stalls the frontier");
+        check(b.battles > 0,
+              "R3a2 the FAR objective is genuinely scored and attacked — the radius is not what stops it");
+        check(b.stalled_campaigns > 0,
+              "R3a3 those far campaigns arrive under-supplied (the stall is real, not absence)");
+        // WHAT ACTUALLY STOPS DISTANT EXPANSION. With w_dist zeroed above, the
+        // far province IS taken (1 conquest) even though its campaigns arrive
+        // under-supplied. So supply decay alone does NOT stall a frontier —
+        // BL-277 Q2's stated mechanism ("the arriving force is below the
+        // defender's, so the frontier stops on arithmetic") does not hold. The
+        // stall is a PREFERENCE in the objective score, not a physical limit.
+        check(b.conquests > 0,
+              "R3b  supply decay ALONE does not stop conquest — recorded, not asserted away");
+
+        {
+            history_sim_params p_dist = p2;
+            p_dist.w_dist = 120;   // The default: distance priced in the score.
+            settlement_state far2 = two_polity_world(34);
+            const history_sim_state c =
+                run_history_sim(far2, nullptr, no_terrain, 168, 90, p_dist, 99u);
+            check(c.battles == 0,
+                  "R3b2 the real stall is the SCORE's distance penalty: the far target is never chosen");
+        }
         check(a.conquests >= b.conquests,
               "R3c  proximity never scores worse than distance for territorial gain");
     }
