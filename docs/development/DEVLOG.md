@@ -10,7 +10,39 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Effects: what a tech actually does, mapped to real buildings (2026-08-05, latest)
+## Session — The Era 1 tree, first draft: keystones opened by deeds (2026-08-05, latest)
+
+Light mode, doc-only, same sitting as the effects pass below. Ben: *consider the shape of the
+Era 1 tree — it will be the first tech tree to gate keystones via quests, i.e. tangible actions
+done in game*, with the node list explicitly reserved for his own hand. Runtime: ~25 min.
+
+**The missing primitive.** The condition vocabulary is entirely **state** — `research`,
+`structure`, `stockpile`, `market`, `surplus`, `era` are predicates sampled at a tick, each of
+which can be true today and false tomorrow. None can say *"you did this."*
+
+So the draft adds a seventh: **`deed`** `{subject, scope, count, recorded}` — a one-time event that
+fires at a tick and stays true. Monotonic, deterministic, serialises as a flag plus a tick. NR-067
+carries it as a decision taken; it is an addition to a closed vocabulary, so it is Ben's call.
+
+**Shape.** Five sectors (Launch / Volatiles / Mobility / Yards / Extraction) × three rings
+(**Reach** — can you get there; **Foothold** — can you stay; **Industry** — does it pay). Power
+and Automation stays a **standing line**, not a sector, per this doc's own rule that standing
+lines never gate an era.
+
+**Four keystones, each opened by a deed, none visible until it fires:** Lift Doctrine after **Ten
+Flights**, Propellant Doctrine after **The First Tank**, Yard Doctrine after **The First Truss**,
+Autonomy Doctrine after **The Empty Shift**. You don't pick your propellant chemistry from a menu
+— you make propellant off-world once, and *then* the fork appears.
+
+**The node list is a draft and says so.** ~45 objects with effects typed against the new taxonomy,
+nothing transcribed to any store — deliberately, so the review isn't reviewing something that
+already looks settled. Four review questions carried: whether four keystones is right (Autonomy is
+weakest), whether a deed is a world first or a personal one, whether rivals see your deeds, and
+whether an unfired deed hides its keystone or shows it locked.
+
+---
+
+## Session — Effects: what a tech actually does, mapped to real buildings (2026-08-05)
 
 Light-plus mode, doc + data, no `src/`. Ben: *let's map this to real buildings and units* —
 with seven categories named (unlock / upgrade / retire / recon / law-tax-automation / space /

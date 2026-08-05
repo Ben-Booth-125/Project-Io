@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*66 entries — 8 open, 58 resolved.*
+*67 entries — 9 open, 58 resolved.*
 
 ---
 
@@ -130,6 +130,21 @@ BL-156 settled that the unlocked set is MONOTONIC: techs complete, never un-comp
 > **Recommendation:** Option 1 for (1)-(3): grandfather, retire by window not erasure, and use explicit retirement sparingly - for buildings and recipes, price is usually the better retirement. For (4), lean descriptive: it keeps the derived/clicked distinction the whole ladder rests on, and BL-271 can promote it later without rework.
 
 *Files: `docs/research/TECH_EFFECTS.md`, `docs/research/ancient_tech_ladder.json`, `docs/development/backlog.json`*
+
+### NR-067 — Era 1 draft introduces a seventh condition primitive: the deed (a tangible act, not a state)
+*decision taken on your behalf · raised 2026-08-05 · from BL-087 (filter system / Era 1 content) - Ben, 2026-08-05: the Era 1 tree 'will be the first tech tree to gate keystones via quests, i.e. tangible actions done in game'.*
+
+The existing condition vocabulary (ERA1_TECH_LANDSCAPE.md, carried into BL-156's condition_set) is entirely STATE: research, structure, stockpile, market, surplus, era are predicates sampled at a tick, each of which can be true today and false tomorrow. None can express 'you did this'. The draft adds a seventh primitive - `deed` {subject, scope, count, recorded} - a one-time event that fires at a tick and stays true. All four Era 1 keystones are gated on deeds rather than thresholds: Ten Flights, The First Tank, The First Truss, The Empty Shift. Also drafted on Ben's behalf, pending his node review: five sectors (Launch / Volatiles / Mobility / Yards / Extraction) x three rings (Reach / Foothold / Industry), Power-Automation kept as a standing line rather than a sector, ~45 objects, and four binary keystone forks each keyed to a different axis (cadence, chemistry, geometry, labour).
+
+**Why it matters.** A deed is a new serialised primitive - a flag plus a tick - so it touches the save format and BL-156's condition_set shape, which is settled. It is cheap and monotonic, but it is an addition to a closed vocabulary and should be Ben's call, not mine. If it is rejected, keystone gating falls back to structure + stockpile combinations, which express the shopping list but not the act.
+
+- Adopt `deed` as a seventh condition primitive.
+- Fake it with structure + stockpile predicates - no new primitive, weaker expression.
+- Adopt it only for keystones, keeping ordinary techs on state conditions.
+
+> **Recommendation:** Adopt it (option 1 or 3). It is monotonic, deterministic and trivially serialised, and it is the only way the tree can ask for an ACT rather than a balance sheet - which is what the whole framing asks for. Four review questions carried in the doc: whether four keystones is right, whether a deed is a world first or a personal one, whether rivals see your deeds, and whether an unfired deed hides its keystone or shows it locked.
+
+*Files: `docs/research/ERA1_TECH_LANDSCAPE.md`, `docs/development/backlog.json`*
 
 ---
 
