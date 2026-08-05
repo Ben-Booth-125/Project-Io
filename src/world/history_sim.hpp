@@ -133,6 +133,40 @@ struct history_sim_params
     /// Population pressure (population * 1000 / carrying capacity) above which
     /// a polity will consider founding a new province.
     int settle_pressure_q = 780;
+
+    // --- Defeat compounds (BL-308) ----------------------------------------
+    /// Cohesion lost when a province is taken from this polity.
+    int cohesion_loss_on_defeat_q = 110;
+    /// Cohesion regained per year of Consolidate — deliberately slower than the
+    /// loss, so recovery costs several quiet years and a two-front collapse is
+    /// not simply walked back.
+    int cohesion_recovery_q = 14;
+    /// Floor cohesion can fall to. Above zero so a dying polity still fights,
+    /// badly, rather than becoming a free province with a flag on it.
+    int cohesion_floor_q = 180;
+    /// Cohesion below which a polity stops founding new provinces. A state
+    /// fighting for its life does not colonise, and letting it do so was the
+    /// main reason losers regrew faster than they were conquered.
+    int settle_cohesion_gate_q = 620;
+
+    /// Fraction of a conquered province's population lost in the taking.
+    /// The collapse path the first sweep had none of: population rose to
+    /// carrying capacity by ~1300 CE and never fell again in any world.
+    int sack_population_loss_q = 220;
+
+    /// How much a province's accumulated `contest_q` lowers the decisiveness a
+    /// victory needs before territory changes hands. A frontier ground down
+    /// over centuries should eventually give, which a flat threshold never let
+    /// it do — battles outnumbered conquests by up to 1000:1.
+    int contest_transfer_relief_q = 400;
+
+    // --- Great-power seed (BL-299) ----------------------------------------
+    /// Seed two opposed majors: one preserving, one expansionist. Off by
+    /// default so the ordinary sweep measures an unseeded world.
+    bool seed_great_powers = false;
+    /// Aggression assigned to the expansionist and preserving majors.
+    int major_expansionist_aggression_q = 880;
+    int major_preserving_aggression_q   = 260;
 };
 
 // ---------------------------------------------------------------------------
@@ -176,6 +210,24 @@ struct polity
 
     /// Accumulated investment per domain; crossing a threshold raises the band.
     int progress_q[sim_domain_count] = {0, 0, 0, 0, 0, 0, 0};
+
+    /// COHESION, 0-1000 (BL-308). The polity-level term that makes defeat
+    /// compound instead of merely accumulating.
+    ///
+    /// Without it the first sweep produced elimination in 0 of 12 worlds:
+    /// losing a province cost a polity that province's manpower and nothing
+    /// else, so its remaining provinces defended exactly as well as before and
+    /// no defeat ever led to another. Cohesion falls when ground is lost and
+    /// multiplies the power of every stack the polity fields, so a losing
+    /// polity gets easier to beat — which is what a death spiral is.
+    ///
+    /// It recovers on Consolidate, so the spiral is escapable by a polity that
+    /// stops fighting and holds what it has. That is the whole trade.
+    int cohesion_q = 1000;
+
+    /// True for a seeded great power (BL-299). Majors start with more ground
+    /// and an opposed strategic creed; the periphery stays alive as actors.
+    bool major = false;
 
     bool alive = true; ///< False once the polity holds no provinces.
 };

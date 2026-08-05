@@ -1,5 +1,7 @@
 #include "history_sim.hpp"
 
+#include "unit_roster.hpp"
+
 #include <algorithm>
 
 // ---------------------------------------------------------------------------
@@ -70,44 +72,30 @@ doctrine_row doctrine_for(const polity& p)
     return d;
 }
 
-/// Turn raised manpower into a typed stack. Composition follows the polity's
-/// endowment and military band rather than a roster table — BL-274 owns the
-/// roster proper; this is the coarse class split `resolve_battle` scores on.
+/// Turn raised manpower into a typed stack via the era-keyed roster (BL-274),
+/// then scale the whole stack by the owner's COHESION (BL-308).
 ///
-/// `readiness_q` scales every entry's power modifier: the caller-side lever the
-/// winter-campaign candidate uses against a defender (history_sim.hpp § season).
+/// The roster answers "what can this ground field at this band"; cohesion
+/// answers "how well does this polity fight right now". They are separate on
+/// purpose: the first is a property of the map, the second of the polity's
+/// recent history, and only the second can spiral.
+///
+/// `readiness_q` is the caller-side lever the winter-campaign candidate uses
+/// against a defender (history_sim.hpp § season).
 std::vector<army_stack_entry> build_stack(int64_t manpower,
                                           const province& home,
                                           const polity&   owner,
                                           int             readiness_q)
 {
-    std::vector<army_stack_entry> stack;
-    if (manpower <= 0) return stack;
+    const int band_index = clampi(owner.capacity[static_cast<int>(sim_domain::military)], 1, 6);
+    const roster_band band = roster_band_for_capacity(band_index);
 
-    const int band = clampi(owner.capacity[static_cast<int>(sim_domain::military)], 1, 6);
+    // Cohesion folds into readiness rather than into the counts: a shaken
+    // polity fields the same men fighting worse, not fewer men fighting well.
+    const int cohesion = clampi(owner.cohesion_q, 0, 1000);
+    const int effective_readiness = (readiness_q * cohesion) / 1000;
 
-    // Class split, per-mille. Ore country fields more heavy foot; open ground
-    // and a later band field more horse. Ranged and siege stay minorities.
-    int inf = 560, cav = 160, rng = 200, sge = 80;
-    if (home.ore_q > 600) { inf += 80; rng -= 40; cav -= 40; }
-    if (band >= 2)        { cav += 60; inf -= 60; }   // The stirrup — a T2 unlock.
-    if (home.port_q > 600) { sge += 30; inf -= 30; }
-
-    const int   power_mod = ((band - 1) * 60) + ((readiness_q - 1000) / 10);
-    const auto  entry = [&](unit_class c, int share, uint16_t tag) {
-        army_stack_entry e;
-        e.type_id  = tag;
-        e.cls      = c;
-        e.count    = static_cast<int>((manpower * share) / 1000);
-        e.type_power_mod = power_mod;
-        if (e.count > 0) stack.push_back(e);
-    };
-
-    entry(unit_class::infantry, inf, 1);
-    entry(unit_class::cavalry,  cav, 2);
-    entry(unit_class::ranged,   rng, 3);
-    entry(unit_class::siege,    sge, 4);
-    return stack;
+    return roster_stack(manpower, home, band, effective_readiness);
 }
 
 /// Total committed headcount in a stack — the denominator losses apply to.
@@ -194,6 +182,38 @@ history_sim_state run_history_sim(settlement_state&         ss,
         }
     }
     if (out.polities.empty()) return out;
+
+    // --- Great-power seed (BL-299) ----------------------------------------
+    //
+    // Two majors with OPPOSED strategic creeds — one preserving, one on a
+    // civilising mission — in a world whose periphery stays multipolar. The
+    // periphery is not terrain: minors keep their own cultures, doctrines and
+    // recorded history, exactly as the item's richness clause requires. All
+    // this seed does is set two aggressions apart and mark the pair.
+    if (params.seed_great_powers && out.polities.size() >= 2)
+    {
+        // Largest two by starting holdings, ties to the lower id so the choice
+        // does not depend on iteration order.
+        std::vector<std::pair<int, int>> by_size; // (count, id)
+        for (const polity& q : out.polities)
+        {
+            int n = 0;
+            for (const province& p : ss.provinces) if (p.culture == q.culture) ++n;
+            by_size.push_back({n, q.id});
+        }
+        std::sort(by_size.begin(), by_size.end(),
+                  [](const std::pair<int, int>& a, const std::pair<int, int>& b) {
+                      if (a.first != b.first) return a.first > b.first;
+                      return a.second < b.second;
+                  });
+
+        polity& expansionist = out.polities[static_cast<std::size_t>(by_size[0].second)];
+        polity& preserving   = out.polities[static_cast<std::size_t>(by_size[1].second)];
+        expansionist.major = true;
+        preserving.major   = true;
+        expansionist.aggression_q = clampi(params.major_expansionist_aggression_q, 0, 1000);
+        preserving.aggression_q   = clampi(params.major_preserving_aggression_q, 0, 1000);
+    }
 
     // Province -> owning polity. Seeded from culture, then owned by conquest.
     std::vector<int> owner(ss.provinces.size(), -1);
@@ -384,7 +404,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     const int pressure = static_cast<int>(clampi64((p.population * 1000) / K, 0, 1000));
                     if (pressure > pressure_best) { pressure_best = pressure; pressure_src = hi; }
                 }
-                if (pressure_src >= 0 && pressure_best >= params.settle_pressure_q)
+                // A polity fighting for its life does not colonise (BL-308).
+                // Letting it was the main reason losers regrew faster than they
+                // were conquered, and why elimination never happened.
+                const bool may_settle = q.cohesion_q >= params.settle_cohesion_gate_q;
+                if (may_settle && pressure_src >= 0 && pressure_best >= params.settle_pressure_q)
                 {
                     const int s = pressure_best - params.settle_pressure_q + params.settle_threshold_q;
                     if (s > best_score && s >= params.settle_threshold_q)
@@ -483,9 +507,32 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 tgt.contest_q = clampi(tgt.contest_q + bo.decisiveness / 4, 0, 1000);
 
                 // TERRITORY MOVES AT PROVINCE GRANULARITY, NEVER TILE.
+                //
+                // A ground-down frontier eventually gives (BL-308): the bar a
+                // victory must clear falls as the province's accumulated
+                // contest rises. A flat threshold meant centuries of fighting
+                // over the same ground moved nothing — battles outnumbered
+                // conquests by up to 1000:1 in the first sweep.
+                const int relief = (tgt.contest_q * params.contest_transfer_relief_q) / 1000;
+                const int needed = clampi(params.transfer_decisiveness_q - relief, 40, 1000);
+
                 if (bo.result == battle_result::attacker_victory
-                 && bo.decisiveness >= params.transfer_decisiveness_q)
+                 && bo.decisiveness >= needed)
                 {
+                    // The loser's cohesion falls: this is where defeat starts
+                    // to compound rather than merely accumulate.
+                    if (dq)
+                    {
+                        polity& loser = out.polities[static_cast<std::size_t>(dq->id)];
+                        loser.cohesion_q = clampi(loser.cohesion_q - params.cohesion_loss_on_defeat_q,
+                                                  params.cohesion_floor_q, 1000);
+                    }
+
+                    // The sack — the collapse path the first sweep had none of.
+                    tgt.population = clampi64(
+                        tgt.population - (tgt.population * params.sack_population_loss_q) / 1000,
+                        0, 1LL << 40);
+
                     owner[ti]  = q.id;
                     tgt.nation = q.id;
                     tgt.culture = q.culture;      // The conqueror's gods arrive...
@@ -563,6 +610,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                     province& p = ss.provinces[static_cast<std::size_t>(hi)];
                     p.contest_q = clampi(p.contest_q - 8, 0, 1000);
                 }
+                // Cohesion recovers only here, and slower than it is lost — so
+                // the spiral is escapable, but only by a polity that stops
+                // fighting for several years running (BL-308).
+                q.cohesion_q = clampi(q.cohesion_q + params.cohesion_recovery_q,
+                                      params.cohesion_floor_q, 1000);
                 break;
             }
         }

@@ -8627,6 +8627,69 @@
      "notes": "Open question 2 settled as the lean: JSON + printed summary."
     }
    ]
+  },
+  {
+   "brief": "era-rosters-and-great-powers",
+   "title": "Era-keyed rosters (BL-274), the great-power seed (BL-299), and the first BL-308 fix attempt",
+   "difficulty": 3,
+   "importance": "B",
+   "evaluated_difficulty": 3,
+   "status": "complete",
+   "resolved": "2026-08-04",
+   "resolution": "Complete for BL-274 and BL-299; BL-308 PARTIAL and stays open. Hegemony became reachable (0/12 -> 1/12) but elimination did not (still 0/12), with the weakest power now measured at median 6 provinces, range 1..22 — a sharper diagnosis rather than a fix.",
+   "promoted_from": "Ben, 2026-08-04: complete the remaining items, then review.",
+   "batch": "era-minus-1",
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "Unit availability is DERIVED from a province's endowment, not chosen: ore country fields types bare ground cannot, and a port fields ships a landlocked province cannot.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "B274a, B274b."
+    },
+    {
+     "id": "R2",
+     "requirement": "The roster honours the settled band grouping: shock cavalry is absent from the classical band (the stirrup is a T2 unlock), and capacity bands 1/3/4/6 map to classical/medieval/gunpowder/industrial.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "B274c, B274e."
+    },
+    {
+     "id": "R3",
+     "requirement": "Bands are cumulative — a later-band polity keeps the earlier rows, because nothing un-invents a spear.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "B274d."
+    },
+    {
+     "id": "R4",
+     "requirement": "combat.{hpp,cpp} is not modified: the roster resolves INTO combat's types rather than combat gaining a roster table it was designed not to have.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "Structural — unit_roster.cpp includes combat.hpp, not the reverse."
+    },
+    {
+     "id": "R5",
+     "requirement": "The great-power seed produces exactly two majors carrying OPPOSED creeds, and the periphery survives as actors rather than terrain.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "B299a, B299b, B299c."
+    },
+    {
+     "id": "R6",
+     "requirement": "Defeat compounds: a polity that loses ground fights measurably worse, and the effect is escapable only by consolidating for several years.",
+     "class": "headless",
+     "status": "complete",
+     "notes": "Cohesion multiplies stack readiness; recovery is slower than loss."
+    },
+    {
+     "id": "R7",
+     "requirement": "BL-308's target outcome — a polity is eliminated in at least one world of a seed spread — is NOT met. Recorded as failed rather than re-scoped.",
+     "class": "headless",
+     "status": "failed",
+     "notes": "Elimination 0/12 after the fix. Weakest power median 6 provinces, range 1..22. BL-308 stays open with a sharper diagnosis."
+    }
+   ]
   }
  ]
 }

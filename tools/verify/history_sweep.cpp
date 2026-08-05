@@ -60,6 +60,9 @@ struct sweep_row
     /// First year any polity crossed the hegemony threshold, or -1 for never.
     int64_t hegemony_year = -1;
     int  peak_share_q     = 0; ///< The highest share reached at any point.
+    /// Provinces held by the WEAKEST surviving power at the epoch — how close
+    /// the model gets to eliminating anyone (BL-308).
+    int  smallest_holding = 0;
 
     int64_t battles   = 0;
     int64_t conquests = 0;
@@ -83,8 +86,16 @@ struct sweep_row
 /// threshold only — it gates nothing.
 constexpr int hegemony_threshold_q = 500;
 
-/// Distinct owners, and the largest owner's share, in one materialised slice.
-void slice_shape(const std::vector<uint16_t>& slice, int& powers, int& top_share_q)
+/// Distinct owners, the largest owner's share, and the SMALLEST holding, in one
+/// materialised slice.
+///
+/// The smallest holding is the diagnostic for BL-308: "elimination rate 0/12"
+/// alone cannot distinguish a model that is one province away from killing
+/// somebody from one where the weakest power still holds fifty. Those need
+/// completely different fixes, so the sweep reports the distance rather than
+/// just the binary.
+void slice_shape(const std::vector<uint16_t>& slice, int& powers, int& top_share_q,
+                 int* smallest_out = nullptr)
 {
     std::vector<uint16_t> ids;
     std::vector<int>      counts;
@@ -101,6 +112,13 @@ void slice_shape(const std::vector<uint16_t>& slice, int& powers, int& top_share
     int top = 0;
     for (int c : counts) top = c > top ? c : top;
     top_share_q = live > 0 ? (top * 1000) / live : 0;
+
+    if (smallest_out)
+    {
+        int small = 0;
+        for (int c : counts) if (small == 0 || c < small) small = c;
+        *smallest_out = small;
+    }
 }
 
 /// Median of a copy — the sweep reports medians rather than means because a
@@ -177,7 +195,8 @@ int main(int argc, char** argv)
         // again, and only the peak shows that it happened at all.
         int dummy = 0;
         slice_shape(owner_slice_at(sim, 0), row.powers_start, dummy);
-        slice_shape(owner_slice_at(sim, 1960), row.powers_end, row.top_share_q);
+        slice_shape(owner_slice_at(sim, 1960), row.powers_end, row.top_share_q,
+                    &row.smallest_holding);
 
         for (int64_t y = 0; y <= 1960; y += 100)
         {
@@ -215,10 +234,10 @@ int main(int argc, char** argv)
         if (r.hegemony_year < 0) std::snprintf(heg, sizeof heg, "  -  ");
         else                     std::snprintf(heg, sizeof heg, "%5lld",
                                                static_cast<long long>(r.hegemony_year));
-        std::printf("%4u  %5d > %5d  %6d > %6d  %3d%%  %s  %7lld  %4lld  %11lld (%4lld)  %12lld  %4lld\n",
+        std::printf("%4u  %5d > %5d  %6d > %6d  %3d%%  %3d  %s  %7lld  %4lld  %11lld (%4lld)  %12lld  %4lld\n",
                     r.seed, r.provinces_start, r.provinces_end,
                     r.powers_start, r.powers_end,
-                    r.top_share_q / 10, heg,
+                    r.top_share_q / 10, r.smallest_holding, heg,
                     static_cast<long long>(r.battles), static_cast<long long>(r.conquests),
                     static_cast<long long>(r.peak_population), static_cast<long long>(r.peak_year),
                     static_cast<long long>(r.epoch_population),
@@ -262,8 +281,14 @@ int main(int argc, char** argv)
                     static_cast<long long>(median_of(ends)));
         std::printf("\n  HEGEMONY RATE        %d / %d worlds reached %d%% single-power share\n",
                     hegemonies, static_cast<int>(rows.size()), hegemony_threshold_q / 10);
+        std::vector<int64_t> smalls;
+        for (const sweep_row& r : rows) smalls.push_back(r.smallest_holding);
+        const auto ss_ = span(smalls);
         std::printf("  ELIMINATION RATE     %d / %d worlds lost even one power\n",
                     eliminations, static_cast<int>(rows.size()));
+        std::printf("  WEAKEST POWER holds  median %lld provinces   range %lld..%lld\n",
+                    static_cast<long long>(median_of(smalls)),
+                    static_cast<long long>(ss_.first), static_cast<long long>(ss_.second));
         std::printf("\n  (Both rates are REPORTED, not asserted — BL-224's non-hegemony becomes a\n"
                     "   tuning target read off this spread, not a construction guarantee.)\n");
     }
@@ -281,13 +306,14 @@ int main(int argc, char** argv)
             std::fprintf(f,
                 "  {\"seed\": %u, \"provinces_start\": %d, \"provinces_end\": %d, "
                 "\"powers_start\": %d, \"powers_end\": %d, \"top_share_q\": %d, "
-                "\"peak_share_q\": %d, \"hegemony_year\": %lld, \"battles\": %lld, "
+                "\"peak_share_q\": %d, \"smallest_holding\": %d, \"hegemony_year\": %lld, \"battles\": %lld, "
                 "\"conquests\": %lld, \"foundings\": %lld, \"peak_population\": %lld, "
                 "\"peak_year\": %lld, \"epoch_population\": %lld, \"lacunae\": %d, "
                 "\"industrial_first\": %lld, \"industrial_median\": %lld, "
                 "\"industrial_last\": %lld, \"ms\": %lld}%s\n",
                 r.seed, r.provinces_start, r.provinces_end, r.powers_start, r.powers_end,
-                r.top_share_q, r.peak_share_q, static_cast<long long>(r.hegemony_year),
+                r.top_share_q, r.peak_share_q, r.smallest_holding,
+                static_cast<long long>(r.hegemony_year),
                 static_cast<long long>(r.battles), static_cast<long long>(r.conquests),
                 static_cast<long long>(r.foundings), static_cast<long long>(r.peak_population),
                 static_cast<long long>(r.peak_year), static_cast<long long>(r.epoch_population),

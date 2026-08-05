@@ -10,6 +10,7 @@
 
 #include "world/hard_coded_world.hpp"
 #include "world/history_sim.hpp"
+#include "world/unit_roster.hpp"
 #include "world/settlement.hpp"
 #include "world/world.hpp"
 
@@ -220,6 +221,76 @@ int main()
               "R4   a run never rewrites a province's anchor tile — transfer is province-granular");
         check(a.province_stride == static_cast<int>(s.provinces.size()),
               "R4b  the ring's stride matches the final province count");
+    }
+
+    // --- BL-274  era-keyed rosters ----------------------------------------
+    //
+    // Asymmetry is the point: two provinces at the same band field different
+    // rosters because their ground differs. A test that only checked "a stack
+    // comes back" would pass on a table that ignored endowment entirely.
+    {
+        province bare;  bare.farm_q = 100; bare.ore_q = 0;   bare.port_q = 0;   bare.energy_q = 0;
+        province forge; forge.farm_q = 100; forge.ore_q = 900; forge.port_q = 0; forge.energy_q = 0;
+        province coast; coast.farm_q = 100; coast.ore_q = 0;  coast.port_q = 900; coast.energy_q = 0;
+
+        const auto bare_rows  = available_rows(bare,  roster_band::classical);
+        const auto forge_rows = available_rows(forge, roster_band::classical);
+        const auto coast_rows = available_rows(coast, roster_band::classical);
+
+        check(forge_rows.size() > bare_rows.size(),
+              "B274a ore country fields types bare ground cannot (endowment gates bite)");
+
+        bool coast_has_naval = false;
+        for (const roster_row* r : coast_rows) if (r->cls == unit_class::naval) coast_has_naval = true;
+        bool bare_has_naval = false;
+        for (const roster_row* r : bare_rows) if (r->cls == unit_class::naval) bare_has_naval = true;
+        check(coast_has_naval && !bare_has_naval,
+              "B274b a port fields ships and a landlocked province does not");
+
+        // The stirrup is a MEDIEVAL unlock — the T1/T2 boundary settled with the
+        // roster grouping. A classical roster must not contain heavy horse.
+        bool classical_stirrup = false;
+        for (const roster_row* r : available_rows(forge, roster_band::classical))
+            if (std::string(r->name) == "Stirrup Horse") classical_stirrup = true;
+        bool medieval_stirrup = false;
+        for (const roster_row* r : available_rows(forge, roster_band::medieval))
+            if (std::string(r->name) == "Stirrup Horse") medieval_stirrup = true;
+        check(!classical_stirrup, "B274c shock cavalry is NOT a 0 CE unit (the stirrup is T2)");
+
+        // Bands are cumulative — nothing un-invents a spear.
+        check(available_rows(forge, roster_band::industrial).size()
+                  > available_rows(forge, roster_band::classical).size(),
+              "B274d bands are cumulative: a later band keeps the earlier rows");
+        (void)medieval_stirrup;
+
+        check(roster_band_for_capacity(1) == roster_band::classical
+           && roster_band_for_capacity(3) == roster_band::medieval
+           && roster_band_for_capacity(4) == roster_band::gunpowder
+           && roster_band_for_capacity(6) == roster_band::industrial,
+              "B274e capacity bands map onto the settled roster grouping");
+    }
+
+    // --- BL-299  two-great-powers seed ------------------------------------
+    {
+        settlement_state s = k1->settlement;
+        history_sim_params p5 = params;
+        p5.stop_year = 300;
+        p5.seed_great_powers = true;
+        const history_sim_state a = run_history_sim(s, nullptr, no_terrain, 168, 90, p5, 11u);
+
+        int majors = 0, expansionist = 0, preserving = 0;
+        for (const polity& q : a.polities)
+        {
+            if (!q.major) continue;
+            ++majors;
+            if (q.aggression_q >= 800) ++expansionist;
+            if (q.aggression_q <= 300) ++preserving;
+        }
+        check(majors == 2, "B299a exactly two majors are seeded");
+        check(expansionist == 1 && preserving == 1,
+              "B299b the majors carry OPPOSED creeds, not the same one twice");
+        check(static_cast<int>(a.polities.size()) > 2,
+              "B299c the periphery survives as actors, not terrain");
     }
 
     std::printf("\n%s (%d failure%s)\n",
