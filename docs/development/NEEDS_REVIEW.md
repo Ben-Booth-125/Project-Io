@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*64 entries — 7 open, 57 resolved.*
+*65 entries — 8 open, 57 resolved.*
 
 ---
 
@@ -113,6 +113,21 @@ Two open questions from the same pass. (a) WORKS DOCTRINE (State Arsenal vs Priv
 > **Recommendation:** (a) Generation input, filed as its own item once BL-296 lands - it is the most campaign-relevant object the ladder has produced and it costs nothing to honour at generation time. (b) One Antiquity web; the strip means eras, and a region is a zoom, not a tab.
 
 *Files: `docs/research/ANCIENT_TECH_LADDER.md`, `docs/generation/CORPORATION_GENERATION.md`, `src/ui/tech_tree_panel.cpp`*
+
+### NR-065 — Ladder nodes carry no effect field - the campaign tree types its techs, the pre-game web does not
+*question · raised 2026-08-05 · from BL-296 (ancient tech ladder) - surfaced by Ben asking whether ladder techs give new options or upgrades.*
+
+scripts/tech_tree.lua types every tech by kind: 30 invention (new option), 17 tier (upgrade), 6 capstone (opens a tree) across 53 techs. The ladder store has no equivalent axis - a node is {id, name, band, domain, prereqs, gate, diffusion, earth_ref} and nothing says what completing it GRANTS. In content terms the ladder is plainly a mix: Railway and Telegraph and General Incorporation are new options, Converter Steel and High-Pressure Engines and Three-Field Rotation are upgrades, and Deep Mining and Coal Haulage grant nothing at all - they exist to satisfy a vertex. Today that distinction lives only in the reader's head, and the ladder's sole mechanical output is the 1960 handoff (capacity band -> unlocked set, per BL-156 set-membership).
+
+**Why it matters.** BL-271's sim can run without it - the ladder is derived, so nothing needs a payoff to be evaluated. But BL-274 rosters, the epoch building/recipe set, and any codex rendering all want to know which nodes are option-openers and which are multipliers. Adopting the campaign tree's existing kind vocabulary would make both trees speak one language for the cost of one field.
+
+- Adopt kind: invention | tier | enabler | capstone on ladder nodes, mirroring scripts/tech_tree.lua.
+- Leave it - the ladder is derived, and the 1960 handoff is the only effect that matters.
+- Defer to BL-271, which will need the distinction as soon as it computes the handoff.
+
+> **Recommendation:** Option 1, as a small pass over the store - it is one field, it is checkable by the lint, and it stops the two trees drifting into different vocabularies for the same idea.
+
+*Files: `docs/research/ancient_tech_ladder.json`, `scripts/tech_tree.lua`, `docs/research/ANCIENT_TECH_LADDER.md`*
 
 ---
 
