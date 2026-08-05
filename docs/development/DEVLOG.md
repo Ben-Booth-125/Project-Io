@@ -10,7 +10,47 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — The industrial neighbourhood: the second worked region of the tech web (2026-08-05, latest)
+## Session — Effects: what a tech actually does, mapped to real buildings (2026-08-05, latest)
+
+Light-plus mode, doc + data, no `src/`. Ben: *let's map this to real buildings and units* —
+with seven categories named (unlock / upgrade / retire / recon / law-tax-automation / space /
+war-and-comms doctrines). Runtime: ~35 min.
+
+**The structural call.** The seven categories mix three things: effect **kinds** (unlock,
+upgrade, retire), subject **domains** (reconnaissance, space) and **systems** that are themselves
+unlocked (laws, doctrines). Collapsed they cannot compose. Split into a pair — `(kind, target)` —
+they do, and one node can carry several effects, which nearly every interesting node does.
+
+**Eleven kinds, closed**, in `docs/research/TECH_EFFECTS.md`: `unlock upgrade retire modifier
+access reach intel institution doctrine resource open`. Closed for the BL-155 reason — the
+consumer must switch exhaustively. `open` is BL-156's settled capstone rule unchanged.
+
+**Seven categories the list omitted**, each already implied by a doc we have: placement access,
+continuous modifiers, logistics reach, resource realisation, demography, finance/credit terms,
+instrument access.
+
+**The region is typed.** 62 effects across rings T4–T5 — modifier 19, institution 11, unlock 10,
+upgrade 5, reach 4, retire 4, access 3, intel 3, resource 2, doctrine 1; shipped 15 / designed 29
+/ unbuilt 18. **Modifiers outnumber unlocks two to one**, which is exactly the class an
+unlock/upgrade reading misses.
+
+**Two nodes land on shipped machinery.** Railway → **Inland Logistics Hub** (BL-149's placeable
+haul-cost discount *is* a railway) and Germ Theory → **tile hazard penalty** (already a
+`(1 − hazard)` multiplier on extraction). No new mechanism needed for either.
+
+**Honesty markers throughout.** `building_type` has six values and `recipes.lua` has three
+recipes, so most named buildings are design vocabulary, not enum values; units do not exist
+(BL-157 stub); laws do not exist (BL-155). Every effect carries `shipped | designed | unbuilt` so
+the mapping cannot read as more real than it is. `ladder_lint.js` validates the vocabulary and
+fails if any object in the typed region is left untyped.
+
+**Open:** NR-066 — retirement breaks BL-156's monotonic unlocked set (grandfathering,
+availability-vs-economics, reversibility under blockade), plus whether pre-game effects ever
+*fire* or are only read at the 1960 handoff. NR-065 resolved by this pass.
+
+---
+
+## Session — The industrial neighbourhood: the second worked region of the tech web (2026-08-05)
 
 Light mode, design pass only — no `src/` touched. Ben: *another pre-game tech tree centred around
 the industrial revolution, to go alongside the pre-game early Civilisation tech tree.*

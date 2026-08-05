@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*65 entries — 8 open, 57 resolved.*
+*66 entries — 8 open, 58 resolved.*
 
 ---
 
@@ -114,20 +114,22 @@ Two open questions from the same pass. (a) WORKS DOCTRINE (State Arsenal vs Priv
 
 *Files: `docs/research/ANCIENT_TECH_LADDER.md`, `docs/generation/CORPORATION_GENERATION.md`, `src/ui/tech_tree_panel.cpp`*
 
-### NR-065 — Ladder nodes carry no effect field - the campaign tree types its techs, the pre-game web does not
-*question · raised 2026-08-05 · from BL-296 (ancient tech ladder) - surfaced by Ben asking whether ladder techs give new options or upgrades.*
+### NR-066 — Retirement breaks the monotonic unlocked set - three calls, plus whether pre-game effects ever fire
+*question · raised 2026-08-05 · from BL-156 (tech system early design) / BL-296 - raised by Ben's category C, 'retire buildings or units so they cannot be built when a qualitatively better option becomes available'.*
 
-scripts/tech_tree.lua types every tech by kind: 30 invention (new option), 17 tier (upgrade), 6 capstone (opens a tree) across 53 techs. The ladder store has no equivalent axis - a node is {id, name, band, domain, prereqs, gate, diffusion, earth_ref} and nothing says what completing it GRANTS. In content terms the ladder is plainly a mix: Railway and Telegraph and General Incorporation are new options, Converter Steel and High-Pressure Engines and Three-Field Rotation are upgrades, and Deep Mining and Coal Haulage grant nothing at all - they exist to satisfy a vertex. Today that distinction lives only in the reader's head, and the ladder's sole mechanical output is the 1960 handoff (capacity band -> unlocked set, per BL-156 set-membership).
+BL-156 settled that the unlocked set is MONOTONIC: techs complete, never un-complete, so the set only grows and there is no revocation path to get wrong. Category C breaks that deliberately. The sanctioned mechanism exists - BL-087's availability windows, a predicate over the same set rather than a different structure - but three questions come with it and none are answered anywhere. (1) GRANDFATHERING: what happens to already-built content? Grandfather (it runs, cannot be re-placed) or force obsolescence (it degrades or must be replaced)? (2) AVAILABILITY VS ECONOMICS: a charcoal smelter nobody builds because coke is cheaper has retired itself; explicit retirement is only needed where the game wants to STOP the player, not out-price them. (3) REVERSIBILITY: under blockade a T5-capacity nation may need the T3 route back, and the ladder's own diffusion axis says capacity can be destroyed but awareness cannot. FOURTH, separate: do pre-game effects ever FIRE? On the ancient layer nobody clicks, so the ladder's effects may only be read at the 1960 handoff - making them a DESCRIPTION of the capacity band rather than events, with only the campaign tree's effects firing live.
 
-**Why it matters.** BL-271's sim can run without it - the ladder is derived, so nothing needs a payoff to be evaluated. But BL-274 rosters, the epoch building/recipe set, and any codex rendering all want to know which nodes are option-openers and which are multipliers. Adopting the campaign tree's existing kind vocabulary would make both trees speak one language for the cost of one field.
+**Why it matters.** (1)-(3) decide whether retirement is a UI rule, an economic outcome, or a simulation event - and the answer changes what BL-087 has to build. (4) decides whether the two trees share one effect runtime or only one vocabulary, which is the difference between a shared system and a shared spreadsheet.
 
-- Adopt kind: invention | tier | enabler | capstone on ladder nodes, mirroring scripts/tech_tree.lua.
-- Leave it - the ladder is derived, and the 1960 handoff is the only effect that matters.
-- Defer to BL-271, which will need the distinction as soon as it computes the handoff.
+- Grandfather + retire by window, explicit retirement mostly on units and doctrine branches (the doc's lean).
+- Force obsolescence - retired content degrades, making the turnover felt rather than merely offered.
+- Price-only retirement - no explicit mechanism; better options simply dominate.
+- (4) Ladder effects are descriptive; only campaign-tree effects fire.
+- (4) One effect runtime, with the ladder's effects evaluated by the BL-271 year-tick sim.
 
-> **Recommendation:** Option 1, as a small pass over the store - it is one field, it is checkable by the lint, and it stops the two trees drifting into different vocabularies for the same idea.
+> **Recommendation:** Option 1 for (1)-(3): grandfather, retire by window not erasure, and use explicit retirement sparingly - for buildings and recipes, price is usually the better retirement. For (4), lean descriptive: it keeps the derived/clicked distinction the whole ladder rests on, and BL-271 can promote it later without rework.
 
-*Files: `docs/research/ancient_tech_ladder.json`, `scripts/tech_tree.lua`, `docs/research/ANCIENT_TECH_LADDER.md`*
+*Files: `docs/research/TECH_EFFECTS.md`, `docs/research/ancient_tech_ladder.json`, `docs/development/backlog.json`*
 
 ---
 
@@ -1037,4 +1039,21 @@ The Rival docs (2026-08-03) framed Wildfire Games' 0 A.D. (Release 28) as the ne
 > **RESOLVED.** Executed same session: game fully removed; ENVIRONMENT.md carries a retirement banner; CLAUDE.md arena paragraph re-based; BL-306 design amended with the re-aim. The RTS harness files stay in the repo as the record of the protocol work.
 
 *Files: `Project-Rival/CLAUDE.md`, `Project-Rival/docs/ENVIRONMENT.md`, `Project-Rival/tools/harness/smoke_test.js`*
+
+### NR-065 — Ladder nodes carry no effect field - the campaign tree types its techs, the pre-game web does not
+*question · raised 2026-08-05 · from BL-296 (ancient tech ladder) - surfaced by Ben asking whether ladder techs give new options or upgrades.*
+
+scripts/tech_tree.lua types every tech by kind: 30 invention (new option), 17 tier (upgrade), 6 capstone (opens a tree) across 53 techs. The ladder store has no equivalent axis - a node is {id, name, band, domain, prereqs, gate, diffusion, earth_ref} and nothing says what completing it GRANTS. In content terms the ladder is plainly a mix: Railway and Telegraph and General Incorporation are new options, Converter Steel and High-Pressure Engines and Three-Field Rotation are upgrades, and Deep Mining and Coal Haulage grant nothing at all - they exist to satisfy a vertex. Today that distinction lives only in the reader's head, and the ladder's sole mechanical output is the 1960 handoff (capacity band -> unlocked set, per BL-156 set-membership).
+
+**Why it matters.** BL-271's sim can run without it - the ladder is derived, so nothing needs a payoff to be evaluated. But BL-274 rosters, the epoch building/recipe set, and any codex rendering all want to know which nodes are option-openers and which are multipliers. Adopting the campaign tree's existing kind vocabulary would make both trees speak one language for the cost of one field.
+
+- Adopt kind: invention | tier | enabler | capstone on ladder nodes, mirroring scripts/tech_tree.lua.
+- Leave it - the ladder is derived, and the 1960 handoff is the only effect that matters.
+- Defer to BL-271, which will need the distinction as soon as it computes the handoff.
+
+> **Recommendation:** Option 1, as a small pass over the store - it is one field, it is checkable by the lint, and it stops the two trees drifting into different vocabularies for the same idea.
+
+> **RESOLVED.** SUPERSEDED BY THE EFFECTS PASS (2026-08-05, same day): Ben asked for the mapping directly ('let's map this to real buildings and units'), which answers the question in the affirmative and goes further. Rather than borrowing scripts/tech_tree.lua's three-value kind field, an eleven-kind closed vocabulary was authored in docs/research/TECH_EFFECTS.md and applied to every rings T4-T5 object as {kind, target, status}. The campaign tree's invention/tier/capstone maps onto it as unlock/upgrade/open. Remaining open calls moved to NR-066.
+
+*Files: `docs/research/ancient_tech_ladder.json`, `scripts/tech_tree.lua`, `docs/research/ANCIENT_TECH_LADDER.md`*
 

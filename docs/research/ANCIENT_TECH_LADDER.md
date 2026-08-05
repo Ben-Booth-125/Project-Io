@@ -435,6 +435,29 @@ crossing in the ladder that arguably wants **two** vertices); Institutions cross
 last roster turnover before the epoch. The handoff to `scripts/tech_tree.lua` then happens one
 ring later, unchanged (§ The 1960 handoff).
 
+### Effects — what each node actually does (2026-08-05)
+
+The region is now **typed**: every tech, regime and keystone branch in rings T4–T5 carries an
+`effects` array in the store, and the vocabulary is authored in
+**[`TECH_EFFECTS.md`](TECH_EFFECTS.md)** — Ben's ask to map the tree to real buildings and units.
+An effect is a pair, `(kind, target)`, plus a status marking how much of the target exists in code:
+
+> `unlock · upgrade · retire · modifier · access · reach · intel · institution · doctrine ·
+> resource · open` — eleven kinds, closed, declared in the store beside the gate and diffusion
+> vocabularies.
+
+62 effects across the region, and the distribution is the finding: **modifier 19, institution 11,
+unlock 10, upgrade 5, reach 4, retire 4, access 3, intel 3, resource 2, doctrine 1** —
+`shipped 15 / designed 29 / unbuilt 18`. Continuous modifiers outnumber unlocks two to one, which
+is the class a straight unlock/upgrade reading of a tech tree misses entirely.
+
+Two nodes land on **shipped** machinery with no new mechanism required: **Railway → Inland
+Logistics Hub** (BL-149's placeable haul-cost discount *is* a railway) and **Germ Theory → tile
+hazard penalty** (already a `(1 − hazard)` multiplier on every extraction building). Vertex quests
+carry no effects array — a quest's effect is always `open` → its `opens` field, per BL-156's
+capstone rule. `ladder_lint.js` enforces all of this, including that no object in the typed region
+is left untyped.
+
 ### What this region hands the campaign
 
 Four outputs, all consumed by things that already exist or are already filed:
