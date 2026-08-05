@@ -5,11 +5,13 @@
 #include "generation_charts.hpp" // the chain-stage charts, shared with the wizard (BL-211)
 #include "presentation.hpp"
 #include "world/components.hpp"
+#include "world/history_sim.hpp"  // the Era -1 time-lapse the Ages view replays (BL-277)
 
 #include <imgui.h>
 
 #include <algorithm>
 #include <cstdio>
+#include <string>
 #include <vector>
 
 namespace ui {
@@ -74,7 +76,7 @@ void draw_tile_inspector(const world& w, ui_state& s,
     // five tabs on one row because the shell column cannot fit five labels — and
     // because the Chain's own sub-strip is the wizard's round grouping, which the
     // player has already been taught once at generation.
-    enum view_id { view_story = 0, view_chain, view_tiles };
+    enum view_id { view_story = 0, view_chain, view_tiles, view_ages };
     int& view = s.history_view; // in ui_state so a verify script can park a view
 
     nav_button("Story", view_story, view, p_open);
@@ -82,13 +84,17 @@ void draw_tile_inspector(const world& w, ui_state& s,
     nav_button("Chain", view_chain, view, p_open);
     ImGui::SameLine();
     nav_button("Tiles", view_tiles, view, p_open);
+    ImGui::SameLine();
+    nav_button("Ages", view_ages, view, p_open);
 
     // The view-level fold control (BL-214). Story and Tiles are single blocks, so
     // the chevron gives the whole view the screen — which is the honest fix for the
     // Tiles table, whose 29 columns have always overflowed a 380 px column. Chain
     // does NOT take one: its stages carry their own, and a second control governing
     // all four at once would re-merge what the per-stage fold separates.
-    if (view != view_chain)
+    // Ages is excluded alongside Chain: its map sizes itself to the column, so a
+    // fold control would govern a surface that already fills what it is given.
+    if (view != view_chain && view != view_ages)
     {
         ImGui::SameLine(ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX()
                         - ImGui::GetFrameHeight());
@@ -181,6 +187,137 @@ void draw_tile_inspector(const world& w, ui_state& s,
         {
             story_body();
         }
+        ui::foldout_end();
+        return;
+    }
+
+    // --- Ages: the Era -1 political time-lapse (BL-277) -------------------
+    //
+    // Two thousand years of province ownership, scrubbable. The sim is run HERE,
+    // lazily, over a COPY of the body's settlement state — it does not run in
+    // the generation path and nothing it does reaches the world. That is the
+    // whole point of building this view first: the time-lapse is visible without
+    // the determinism/golden churn that wiring the sim into generation carries
+    // (BL-271 open question 2, still unanswered).
+    //
+    // The cache is keyed on body name and survives across frames, because a
+    // 2000-year run costs ~600 ms and re-running it per frame would stall the UI.
+    if (view == view_ages)
+    {
+        static std::string        cached_body;
+        static settlement_state   cached_ss;
+        static history_sim_state  cached_sim;
+
+        if (!entry)
+        {
+            ImGui::TextDisabled("No generation record for this body.");
+            ui::foldout_end();
+            return;
+        }
+
+        if (cached_body != sel_body.name)
+        {
+            cached_ss = entry->settlement; // The copy the sim is allowed to move.
+            history_sim_params p;
+            p.start_year = 0;
+            p.stop_year  = static_cast<int64_t>(fmt::campaign_epoch_year);
+            const sim_terrain_view no_terrain{};
+            cached_sim = run_history_sim(cached_ss, nullptr, no_terrain,
+                                         sel_body.grid_width, sel_body.grid_height,
+                                         p, 7u);
+            cached_body   = sel_body.name;
+            s.ages_year   = 0;
+            s.ages_playing = false;
+        }
+
+        if (cached_sim.owner_changes.empty())
+        {
+            ImGui::TextDisabled("%s was never settled - no political history to replay.",
+                                sel_body.name.c_str());
+            ui::foldout_end();
+            return;
+        }
+
+        const int last_year = static_cast<int>(cached_sim.start_year + cached_sim.years);
+
+        // --- Transport -----------------------------------------------------
+        if (ImGui::Button(s.ages_playing ? "Pause" : "Play"))
+            s.ages_playing = !s.ages_playing;
+        ImGui::SameLine();
+        if (ImGui::Button("Restart")) { s.ages_year = 0; s.ages_playing = true; }
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
+        ImGui::SliderInt("##ages_year", &s.ages_year, 0, last_year, "%d CE");
+
+        if (s.ages_playing)
+        {
+            // ~120 years a second: a 2000-year run reads in about a quarter of a
+            // minute, which is long enough to watch a frontier move and short
+            // enough to sit through.
+            static float carry = 0.0f;
+            carry += ImGui::GetIO().DeltaTime * 120.0f;
+            const int whole = static_cast<int>(carry);
+            if (whole > 0) { carry -= static_cast<float>(whole); s.ages_year += whole; }
+            if (s.ages_year >= last_year) { s.ages_year = last_year; s.ages_playing = false; }
+        }
+
+        // --- The map -------------------------------------------------------
+        const std::vector<uint16_t> slice = owner_slice_at(cached_sim, s.ages_year);
+
+        int live = 0;
+        for (uint16_t o : slice) if (o != owner_none) ++live;
+
+        // Distinct owners on the map right now — the multipolarity read, and the
+        // number BL-224's non-hegemony invariant is ultimately about.
+        std::vector<uint16_t> seen;
+        for (uint16_t o : slice)
+            if (o != owner_none && std::find(seen.begin(), seen.end(), o) == seen.end())
+                seen.push_back(o);
+
+        ImGui::TextDisabled("%d CE  |  %d provinces  |  %d powers",
+                            s.ages_year, live, static_cast<int>(seen.size()));
+
+        const float avail = ImGui::GetContentRegionAvail().x;
+        const int   gw    = sel_body.grid_width  > 0 ? sel_body.grid_width  : 1;
+        const int   gh    = sel_body.grid_height > 0 ? sel_body.grid_height : 1;
+        const float scale = avail / static_cast<float>(gw);
+        const float mh    = scale * static_cast<float>(gh);
+
+        const ImVec2 origin = ImGui::GetCursorScreenPos();
+        ImDrawList*  dl     = ImGui::GetWindowDrawList();
+        dl->AddRectFilled(origin, ImVec2(origin.x + avail, origin.y + mh),
+                          IM_COL32(18, 20, 26, 255));
+
+        // One dot per province, at its anchor's grid position, in its owner's
+        // colour. Province granularity is what makes this cheap to draw as well
+        // as cheap to store — there is no tile loop here at all.
+        const float r = scale * 1.6f < 2.5f ? 2.5f : scale * 1.6f;
+        for (std::size_t i = 0; i < slice.size() && i < cached_ss.provinces.size(); ++i)
+        {
+            if (slice[i] == owner_none) continue;
+            const province& p = cached_ss.provinces[i];
+            const ImVec2 at(origin.x + (static_cast<float>(p.col) + 0.5f) * scale,
+                            origin.y + (static_cast<float>(p.row) + 0.5f) * scale);
+            dl->AddCircleFilled(at, r,
+                                palette::nation_colour(static_cast<entity_id>(slice[i] + 1)));
+        }
+        ImGui::Dummy(ImVec2(avail, mh));
+
+        // --- What the run produced -----------------------------------------
+        ImGui::Separator();
+        // Wrapped, not TextDisabled: the counters line overran the 380 px column
+        // and clipped mid-word ("371 foun"), the same failure the Story view's
+        // consequence text already fixed this way.
+        ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyle().Colors[ImGuiCol_TextDisabled]);
+        ImGui::TextWrapped("Full run: %lld battles, %lld conquests, %lld foundings",
+                           static_cast<long long>(cached_sim.battles),
+                           static_cast<long long>(cached_sim.conquests),
+                           static_cast<long long>(cached_sim.foundings));
+        ImGui::TextWrapped("Time-lapse: %lld changes, %lld bytes",
+                           static_cast<long long>(cached_sim.owner_changes.size()),
+                           static_cast<long long>(owner_ring_bytes(cached_sim)));
+        ImGui::PopStyleColor();
+
         ui::foldout_end();
         return;
     }

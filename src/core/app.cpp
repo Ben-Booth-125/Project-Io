@@ -1093,6 +1093,10 @@ int app::run_verify(const std::string& script_path, bool bless)
     v.set_function("panel_view", [this](const std::string& name, int view) {
         if (name == "history")            m_ui.history_view = view;
         else if (name == "history_round") m_ui.history_round = view;
+        // The Ages time-lapse is a scrubber, so its YEAR is the thing a capture
+        // needs to park — parking only the view would pin every shot to year 0,
+        // the one frame where no history has happened yet (BL-277).
+        else if (name == "ages_year")     m_ui.ages_year = view;
         else if (name == "economy")       m_ui.economy_view = view;
         else if (name == "market")        m_ui.market_ledger_view = view;
         else if (name == "tech_tree")     m_ui.tech_tree_view = view;

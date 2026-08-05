@@ -8536,6 +8536,48 @@
      "notes": ""
     }
    ]
+  },
+  {
+   "brief": "history-ages-view",
+   "title": "History ledger: the Ages view — the Era -1 political time-lapse (BL-277)",
+   "difficulty": 2,
+   "importance": "B",
+   "evaluated_difficulty": 2,
+   "status": "complete",
+   "resolved": "2026-08-04",
+   "resolution": "Complete. Fourth History tab; the sim runs lazily over a COPY of the body's settlement state when the view opens, so world generation is untouched. scripts/verify/history_ages.lua captures three years. Captures inspected; NOT blessed as goldens — the software renderer fails on this machine (see NR-065), so any golden blessed here would be GPU-specific and would widen the drift NR-064 already records.",
+   "promoted_from": "Ben, 2026-08-04: 'How can you transform this into something viewable in the history ledger?' -> build it now.",
+   "batch": null,
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "The History ledger carries a fourth tab, Ages, showing the Era -1 political time-lapse: a year scrubber, Play/Restart transport, and a province-ownership map coloured by polity.",
+     "class": "visual",
+     "status": "complete",
+     "notes": "history_ages_start/mid/epoch captures."
+    },
+    {
+     "id": "R2",
+     "requirement": "Opening the view never touches world generation: the sim runs on a copy of the settlement state, cached per body, and no generated world state changes.",
+     "class": "visual",
+     "status": "complete",
+     "notes": "Structural — entry->settlement is copied; the report is const."
+    },
+    {
+     "id": "R3",
+     "requirement": "Scrubbing the year changes the map: the antiquity frame shows more, smaller, mixed-colour holdings than the epoch frame, which shows regionally consolidated blocs.",
+     "class": "visual",
+     "status": "complete",
+     "notes": "0 CE = 82 provinces mixed; 1960 CE = 453 provinces, clusters colour-uniform."
+    },
+    {
+     "id": "R4",
+     "requirement": "The view reports the run's own cost honestly — change count and byte size — so the time-lapse substrate's cheapness is visible rather than asserted.",
+     "class": "visual",
+     "status": "complete",
+     "notes": "'Time-lapse: 654 changes, 5232 bytes' on the epoch capture."
+    }
+   ]
   }
  ]
 }

@@ -191,8 +191,15 @@ struct ui_state
     int  market_ledger_view = 0;
 
     /// History ledger: 0=Story (the body's biography), 1=Chain (the generation
-    /// charts), 2=Tiles (the tile/building/market tables). BL-211.
+    /// charts), 2=Tiles (the tile/building/market tables), 3=Ages (the Era -1
+    /// political time-lapse, BL-277). BL-211.
     int  history_view = 0;
+
+    /// Ages view: the year currently scrubbed to, and whether playback is
+    /// running. VIEW state — not serialised; where the scrubber was parked is a
+    /// display detail, not part of the campaign.
+    int  ages_year    = 0;
+    bool ages_playing = false;
 
     /// F9 mock tech-tree viewer: one era per view — 0=Era -1 Antiquity (placeholder),
     /// 1=Era 0, 2=Era 1, 3=Standing lines. Defaults to Era 0, the campaign's era.
