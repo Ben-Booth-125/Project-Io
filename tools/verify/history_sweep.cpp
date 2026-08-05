@@ -79,6 +79,13 @@ struct sweep_row
     int64_t industrial_last   = 0;
 
     int64_t ms = 0;
+
+    /// DOES THE HISTORY ACTUALLY RECUR? The sim's stated premise is that wars
+    /// and expansion recur across the whole run rather than firing once. These
+    /// two measure it directly: the last year anything changed hands, and the
+    /// share of changes that happened in the first tenth of the run.
+    int64_t last_change_year  = 0;
+    int      early_change_pct = 0;
 };
 
 /// A polity holding this share of all provinces counts as a hegemon. 0.5 is
@@ -181,6 +188,18 @@ int main(int argc, char** argv)
         const history_sim_state sim =
             run_history_sim(ss, nullptr, no_terrain, 168, 90, params, wp.seed);
 
+        {
+            int64_t early = 0;
+            for (const owner_change& c : sim.owner_changes)
+            {
+                if (c.year > row.last_change_year) row.last_change_year = c.year;
+                if (c.year <= 196) ++early;   // First tenth of a 0..1960 run.
+            }
+            if (!sim.owner_changes.empty())
+                row.early_change_pct =
+                    static_cast<int>((early * 100) / static_cast<int64_t>(sim.owner_changes.size()));
+        }
+
         row.provinces_end = static_cast<int>(ss.provinces.size());
         row.battles       = sim.battles;
         row.conquests     = sim.conquests;
@@ -279,6 +298,14 @@ int main(int argc, char** argv)
                     static_cast<long long>(median_of(conq)));
         std::printf("  provinces at epoch   median %lld\n",
                     static_cast<long long>(median_of(ends)));
+        std::vector<int64_t> lasts;
+        for (const sweep_row& r : rows) lasts.push_back(r.last_change_year);
+        int64_t early_sum = 0;
+        for (const sweep_row& r : rows) early_sum += r.early_change_pct;
+        std::printf("\n  LAST CHANGE YEAR     median %lld   (does history recur, or stop?)\n",
+                    static_cast<long long>(median_of(lasts)));
+        std::printf("  CHANGES IN 1st 10%%   %lld%% on average\n",
+                    static_cast<long long>(early_sum / static_cast<int64_t>(rows.size())));
         std::printf("\n  HEGEMONY RATE        %d / %d worlds reached %d%% single-power share\n",
                     hegemonies, static_cast<int>(rows.size()), hegemony_threshold_q / 10);
         std::vector<int64_t> smalls;
