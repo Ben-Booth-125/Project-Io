@@ -79,12 +79,22 @@ const techs = store.nodes.filter(n => n.kind === 'tech').length;
 const regimes = store.nodes.filter(n => n.kind === 'regime').length;
 const perBand = {};
 for (const n of store.nodes) perBand[n.band] = (perBand[n.band] || 0) + 1;
-const t12techs = store.nodes.filter(n => n.kind === 'tech' && (n.band === 'T1' || n.band === 'T2')).length;
 console.log(`ladder_lint: ${techs} techs + ${regimes} regimes` +
   ` (${Object.entries(perBand).sort().map(([b, c]) => `${b}:${c}`).join(' ')})` +
   `, ${store.quests.length} quests, ${store.keystones.length} keystones, ${store.crossings.length} crossings`);
-console.log(`  ring-1-to-2 neighbourhood: ${t12techs} techs + ${store.quests.filter(q => q.boundary === 'T1/T2').length} quests + ` +
-  `${store.keystones.filter(k => k.band === 'T1').length} keystone + 2 regimes = ` +
-  `${t12techs + store.quests.filter(q => q.boundary === 'T1/T2').length + store.keystones.filter(k => k.band === 'T1').length + 2} objects`);
+
+// Worked regions — one line each, counted from the store so the doc's prose can be checked
+// against it. Add a row here when a pass works a new region of the web.
+const regions = [
+  { label: 'ring-1-to-2 neighbourhood', bands: ['T1', 'T2'], boundary: 'T1/T2' },
+  { label: 'industrial neighbourhood ', bands: ['T4', 'T5'], boundary: 'T4/T5' },
+];
+for (const r of regions) {
+  const t = store.nodes.filter(n => n.kind === 'tech' && r.bands.includes(n.band)).length;
+  const g = store.nodes.filter(n => n.kind === 'regime' && r.bands.includes(n.band)).length;
+  const q = store.quests.filter(x => x.boundary === r.boundary).length;
+  const k = store.keystones.filter(x => r.bands.includes(x.band)).length;
+  console.log(`  ${r.label}: ${t} techs + ${q} quests + ${k} keystones + ${g} regimes = ${t + q + k + g} objects`);
+}
 if (failures) { console.error(`ladder_lint: ${failures} failure(s)`); process.exit(1); }
 console.log('ladder_lint: clean');

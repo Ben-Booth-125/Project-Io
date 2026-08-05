@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*62 entries — 5 open, 57 resolved.*
+*64 entries — 7 open, 57 resolved.*
 
 ---
 
@@ -86,6 +86,33 @@ Four calls were interpretation: (1) gate and diffusion are ARRAYS (ore_q+fuel be
 > **Recommendation:** Keep all four as taken — provenance already lets a consumer filter density-slice objects if wanted.
 
 *Files: `docs/research/ancient_tech_ladder.json`, `tools/session/ladder_lint.js`, `docs/research/ANCIENT_TECH_LADDER.md`*
+
+### NR-063 — Industrial-neighbourhood calls taken while working the rings T4-T5 region
+*decision taken on your behalf · raised 2026-08-05 · from BL-296 (ancient tech ladder) - Ben: 'another pre-game tech tree centred around the industrial revolution, to go alongside the pre-game early Civilisation tech tree'.*
+
+Five calls were interpretation. (1) SCOPE: 'another tech tree' was read as a second worked REGION of the one shared web (rings T4-T5 and the T4/T5 crossings), not a second web - the settled constellation geometry is one object, and a per-era viewer tab can still present the region separately. (2) FUEL DOCTRINE MOVED from ring T5 to ring T4 so the new Materials vertex (The Cheap Ton) can require it taken, repeating the ring-1 Written-Ledger interlock; the fuel choice genuinely predates the industrial band. (3) SEVEN NEW TECHS were added to the band tables to bring rings T4-T5 to medium grain (T4 Medicine had no node at all): Coal Haulage & Urban Fuel, Patent Grants, Preventive Inoculation, High-Pressure & Compound Engines, Framed Construction & Cement, Soil Chemistry & Fertiliser Trade, General Incorporation. (4) TELEGRAPH gained a Railway prereq - rail signalling drove the network - which is a change to an already-authored node, flagged with an `amended` field in the store. (5) A NEW RULE was adopted rather than proposed: fork count scales with the band's divergence (ring 1 carries one keystone, this region carries four), which is why two new keystones - Labour Doctrine and Works Doctrine - were authored in one region.
+
+**Why it matters.** Call 1 decides whether there is one tech object or two, which every later surface inherits. Calls 2 and 4 edit objects an earlier pass authored - if the density slices were meant to be frozen examples, both should be reverted. Call 5 sets an authoring rule the remaining three crossings will be worked under.
+
+> **Recommendation:** Keep all five. The store records provenance ('industrial-pass') and `amended` on both edited objects, so any of them can be reverted by inspection rather than archaeology.
+
+*Files: `docs/research/ANCIENT_TECH_LADDER.md`, `docs/research/ancient_tech_ladder.json`, `tools/session/ladder_lint.js`*
+
+### NR-064 — Works Doctrine may gate corporation generation - and does the industrial region get its own viewer tab?
+*question · raised 2026-08-05 · from BL-296 (ancient tech ladder) SS The industrial neighbourhood - surfaced while authoring the region's keystones.*
+
+Two open questions from the same pass. (a) WORKS DOCTRINE (State Arsenal vs Private Works, ring T5 Materials) says whether a 1960 nation's heavy plant is the sovereign's or is chartered and owned. If that is load-bearing, it is a real dependency from the ladder into CORPORATION_GENERATION.md's nation assignment and into BL-094 (governing-body pivot): a State-Arsenal nation may be one where a specialist space-interested corporation cannot be chartered at all, which changes who the player can be. (b) SURFACE: the F9 tech-tree mock has one tab per era; this region is one ring band inside Era -1, not an era. Either it earns an 'Era -1 - Industrial' tab beside Antiquity, or Antiquity is one web the reader zooms within.
+
+**Why it matters.** (a) is the difference between a flavour fork and a generation input - if it is the latter it should be a filed backlog item, not a note in a research doc. (b) decides whether the era strip is an ERA selector or a REGION selector, which is easier to settle before a second tab exists than after.
+
+- (a) Flavour only - Works Doctrine tints the 1960 economy, corporation generation ignores it.
+- (a) Generation input - file an item wiring the doctrine into nation assignment and the charter terms.
+- (b) Its own tab - the strip becomes a region selector, one per worked neighbourhood.
+- (b) One Antiquity web - the strip stays an era selector and the reader zooms.
+
+> **Recommendation:** (a) Generation input, filed as its own item once BL-296 lands - it is the most campaign-relevant object the ladder has produced and it costs nothing to honour at generation time. (b) One Antiquity web; the strip means eras, and a region is a zoom, not a tab.
+
+*Files: `docs/research/ANCIENT_TECH_LADDER.md`, `docs/generation/CORPORATION_GENERATION.md`, `src/ui/tech_tree_panel.cpp`*
 
 ---
 

@@ -10,7 +10,45 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — A world that begins at 0 CE (2026-08-04, latest)
+## Session — The industrial neighbourhood: the second worked region of the tech web (2026-08-05, latest)
+
+Light mode, design pass only — no `src/` touched. Ben: *another pre-game tech tree centred around
+the industrial revolution, to go alongside the pre-game early Civilisation tech tree.*
+Runtime: ~40 min.
+
+**The reading.** "Another tree" is a second worked **region of the one shared web** — rings T4–T5
+and the T4/T5 crossings — not a second web. The constellation geometry is one object; what makes
+the region feel like its own tree is that a nation traverses it two millennia later, under gates
+that bind where ring 1's barely did. Recorded as NR-063, with the four other calls the pass took.
+
+**What was authored.** `ANCIENT_TECH_LADDER.md` § The industrial neighbourhood, at the settled
+medium grain: **7 new techs** (Coal Haulage & Urban Fuel, Patent Grants, Preventive Inoculation,
+High-Pressure & Compound Engines, Framed Construction & Cement, Soil Chemistry & Fertiliser Trade,
+General Incorporation), **4 vertex quests** (The Unwearied Fire / The Cheap Ton / The Scheduled
+World / The Freed Hands — the fifth crossing already had The Disciplined Sovereign), and **2
+keystones**. Fuel Doctrine moved inward one ring so The Cheap Ton can require it *taken* — the
+ring-1 Written-Ledger interlock, repeated, which makes it the house rule.
+
+**The two new forks are the point.** **Labour Doctrine** (Cleared Holdings ⊘ Smallholder Tenure)
+makes the human price of industrialisation a choice and feeds BL-273 (province demography).
+**Works Doctrine** (State Arsenal ⊘ Private Works) decides who owns the heavy plant — and
+therefore the terms a player corporation operates on in 1960. It is not Sovereign Doctrine
+restated: one fork asks whether courts bind the sovereign, the other asks who owns the furnaces.
+
+**New rule, adopted not proposed:** fork count scales with the band's divergence. Ring 1 carries
+one keystone; this region carries four. A band where everyone lands in the same place needs one
+choice to differentiate it; a band that opens 3-band gaps needs the gaps explainable.
+
+**Kept honest.** Everything is transcribed into `ancient_tech_ladder.json` (provenance
+`industrial-pass`, with `amended` on the two objects an earlier pass authored), and
+`ladder_lint.js` was generalised to print **one line per worked region** so the doc's counts are
+checked rather than asserted — region 38 objects, web-wide 88, extrapolating to ~120–135. Open,
+in NR-064: whether Works Doctrine gates corporation generation (lean yes — file it when BL-296
+lands), and whether the region earns its own viewer tab (lean no — the era strip means eras).
+
+---
+
+## Session — A world that begins at 0 CE (2026-08-04)
 
 Full-lite mode, same sitting as the arena re-base below. Ben: "generate a world which begins
 at 0 CE, rather than 1960 CE". Runtime: ~45 min.

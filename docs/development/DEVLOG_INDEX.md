@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 124 entries across 2 volume(s).
+One line per session, newest first — 125 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-08-05 | [The industrial neighbourhood: the second worked region of the tech web](DEVLOG.md) | BL-273 BL-296 | DEVLOG.md |
 | 2026-08-04 | [A world that begins at 0 CE](DEVLOG.md) | BL-271 | DEVLOG.md |
 | 2026-08-04 | [The arena comes home: text-only Rival, the diplomacy battery, and the RTS that lived for an hour](DEVLOG.md) | BL-278 BL-296 BL-306 BL-307 BL-308 BL-309 BL-310 | DEVLOG.md |
 | 2026-08-04 | [The ancient tech ladder, mocked up](DEVLOG.md) | BL-087 BL-271 BL-274 BL-275 BL-296 | DEVLOG.md |

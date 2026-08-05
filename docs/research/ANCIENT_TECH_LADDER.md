@@ -11,6 +11,11 @@
 > shape (Ben's call, overturning BL-087's Q1 binary-tree resolution), and § Density test carries
 > the three-grain examples the detail-level call will be made against.
 >
+> **Amended 2026-08-05:** § The industrial neighbourhood works the region's opposite end — rings
+> T4–T5 and the T4/T5 crossings — at the settled medium grain, from Ben's ask for a second
+> pre-game tree centred on the industrial revolution. Seven techs, four vertex quests and two
+> keystones are new with that pass; Fuel Doctrine moves inward one ring.
+>
 > **Machine-readable store (2026-08-04, BL-307 — ladder data store):** every node, quest,
 > keystone and crossing below is transcribed in `ancient_tech_ladder.json` beside this file.
 > `node tools/session/ladder_lint.js` cross-checks the two both ways — edit a table here,
@@ -300,6 +305,164 @@ denser keystone neighbourhoods.
 
 ---
 
+## The industrial neighbourhood (rings T4–T5, medium grain, worked in full)
+
+The second complete region, worked 2026-08-05 from Ben's ask: *another pre-game tech tree centred
+on the industrial revolution, to go alongside the pre-game early-civilisation tree.* Same grain,
+same rules, opposite end of the run-up: ring T4 through the T4/T5 crossings into ring T5.
+
+**The reading taken** (recorded as a call — NR-063): "another tree" is a second **worked region of
+the one shared web**, not a second web. The § Geometry constellation is one object; what makes
+this region feel like its own tree is that a nation traverses it two millennia after the first and
+under completely different physics — endowment gates bind here and barely bind at ring 1. A
+viewer surface can still present it as its own tab (the F9 mock's era strip already implies one
+per era) without the underlying web splitting.
+
+**Why this region and not another.** The ring-1-to-2 neighbourhood answers *how a civilisation
+starts*. This one answers the question the whole ladder exists for — **why nations are unequal in
+1960** (§ What "not every nation is equal" means, fact 3). Divergence is manufactured here: before
+ring T5 connected nations sit within ~1 band; the fuel gate opens 3-band gaps in a century. Every
+object below is either a gate that binds or a fork that locks in.
+
+### Nodes by sector
+
+Ring-T4 and ring-T5 rows from § The ladder, plus **seven new techs** added with this pass
+(marked *new*) to bring the region to medium grain — the earlier pass added T2-ME-01 the same way.
+
+| sector | ring T4 | ring T5 | cross-links in |
+|---|---|---|---|
+| **Materials** | Movable-Type Press · Cast Ordnance · Precision Instruments | Coke Smelting · Machine Tools · Converter Steel · *Framed Construction & Cement* **new** | Clockwork → Precision Instruments |
+| **Energy** | Deep Mining & Drainage · *Coal Haulage & Urban Fuel* **new** | Atmospheric & Rotative Steam · *High-Pressure & Compound Engines* **new** | Precision Instruments → Steam; Machine Tools → High-Pressure |
+| **Transport** | Full-Rigged Ship · Celestial Navigation | Railway · Steamship | Steam → both T5 rows |
+| **Institutions** | Empirical Method · Joint-Stock & Public Credit · *Patent Grants* **new** | Telegraph · Mass Schooling & Press · *General Incorporation* **new** | Press → Method; **Railway → Telegraph** *(added with this pass)* |
+| **Military** | *regime: flintlock line, artillery fortress, broadside fleet* | *regime: rifle, ironclad, general staff* | roster rows, BL-274 |
+| **Medicine** | *Preventive Inoculation* **new** | Germ Theory & Sanitation | Empirical Method → Germ Theory |
+| **Agriculture** | Crop-Package Exchange · Convertible Husbandry | Farm Mechanisation · *Soil Chemistry & Fertiliser Trade* **new** | Machine Tools → Mechanisation; Steamship → Fertiliser Trade |
+
+Four of the seven additions are load-bearing rather than cosmetic, and it is worth saying which
+job each does:
+
+- **T4-EN-02 Coal Haulage & Urban Fuel** supplies the *demand* side the engine answers. Deep pits
+  are dug because cities burn the fuel; the pump problem is downstream of the coal trade, not of
+  curiosity. Without this node the region's master crossing has only one prerequisite and the
+  whole industrial revolution reads as a single invention.
+- **T5-EN-02 High-Pressure & Compound Engines** is the fine-grain upgrade the § Density test
+  reserved for keystone neighbourhoods, cashed in here: it separates *power in a building* from
+  *power that moves*, which is the difference between a mill economy and a rail economy.
+- **T4-IN-03 Patent Grants** is the one node that touches the acquisition model directly — it is
+  an institutional modifier on § Acquisition model step 1 (the invention roll), and its absence is
+  a defensible reason for a well-endowed nation to keep inventing slowly.
+- **T5-IN-03 General Incorporation** is the campaign's own premise arriving on the ladder: a
+  company chartered by registration rather than by sovereign grant. A 1960 nation that never took
+  this node is one where the player's corporation is a guest, not a citizen.
+
+The other three — Framed Construction, Soil Chemistry, Preventive Inoculation — fill sector cells
+that were empty or thin at this ring (Medicine had *no* T4 node at all), and each feeds a
+downstream consumer already named: construction material availability at the epoch, BL-273
+demography, and the pre-germ-theory mortality fall respectively.
+
+### Vertex quests at the T4/T5 crossings
+
+Five earned vertices again, of which **one already exists** — The Disciplined Sovereign was
+authored by the Institutions density slice, and is cited here rather than duplicated. Two sectors
+cross without ceremony (below).
+
+| sector | quest | thesis | capstone conditions | opens |
+|---|---|---|---|---|
+| Energy | **The Unwearied Fire** | heat becomes motion that never tires and does not care where the river runs | research Deep Mining + Coal Haulage + market: fuel throughput ≥ X sustained | T5 Energy |
+| Materials | **The Cheap Ton** | metal stops being counted by the piece and starts being weighed by the ton | research Blast Furnace + **Fuel Doctrine taken** + market: metal volume ≥ X | T5 Materials |
+| Transport | **The Scheduled World** | arrival stops being a matter of season and wind and becomes a printed promise | research Full-Rigged Ship + Celestial Navigation + market: route volume ≥ X sustained | T5 Transport |
+| Agriculture | **The Freed Hands** | the field stops needing most of the people, and the people go where the work is | research Convertible Husbandry + surplus: food surplus per farm worker ≥ X sustained | T5 Agriculture |
+| Institutions | **The Disciplined Sovereign** *(existing)* | the state that serves markets outlives the state that raids them | research Joint-Stock & Public Credit + surplus: debt service sustained N years, no default | T5 Institutions |
+
+The Cheap Ton repeats the ring-1 interlock deliberately: it requires the Fuel Doctrine to have
+been **taken**, either branch — the fork is unavoidable, never dictated. That is the second use of
+the pattern, which is enough to call it the house rule for keystones that sit under a vertex.
+
+**Sparse sectors.** **Military** crosses as the BL-274 roster turnover (flintlock line → rifle,
+ironclad, general staff), fired by the band boundary plus `ore_q + fuel` — derived availability,
+per that item, never a quest. **Medicine** crosses on a plain edge (Preventive Inoculation → Germ
+Theory & Sanitation). Both are the sparse-sector rule doing exactly what it was adopted for.
+
+### Keystones — four in the region, three of them new industrial forks
+
+Ring 1 carried one fork; this region carries four. **Sovereign Doctrine** already sits at ring T4
+Institutions (authored by the density slice, cited not repeated); the three below are this pass's.
+That is not drift: **fork count should scale with the band's divergence**, because a band where
+everyone ends up in the same place needs one choice to differentiate it, and a band that opens
+3-band gaps needs the gaps to be *explainable*. The three new ones sit on the three axes the 1960
+spread actually runs along — what a nation smelts with, what it does to its own people, and who is
+allowed to own the plant.
+
+> **Fuel Doctrine** (Materials, ring T4 — *relocated from ring T5 with this pass*)
+> *Coke* — scale; wants coalfields ⊘ *Charcoal* — quality; wants forest.
+> Moved inward one ring so The Cheap Ton can require it: the fuel choice genuinely predates the
+> industrial band, and charcoal-iron nations held the quality niche for a century after coke took
+> the scale. Endowment-priced — this is the fork the map decides.
+
+> **Labour Doctrine** (Agriculture, ring T5)
+> *Cleared Holdings* — consolidate the land and release the labour fast: an urban workforce
+> arrives in a generation, at the cost of unrest and a hollowed countryside
+> ⊘ *Smallholder Tenure* — the land stays divided: industrialisation starts late, the domestic
+> market is deeper, rural demography survives the transition.
+> This is the human price of the divergence made into a choice rather than an assumption, and it
+> is the region's direct input to BL-273 (province demography) — growth rate, urban share, and the
+> unrest the Nation AI inherits.
+
+> **Works Doctrine** (Materials, ring T5)
+> *State Arsenal* — the heavy plant is the sovereign's; capacity arrives fast and stays under
+> command, and companies rent what they cannot own
+> ⊘ *Private Works* — the heavy plant is chartered and owned; a slower start, compounding
+> reinvestment, and corporations that own capacity outright.
+> The most campaign-relevant object in the region. It is **not** a restatement of Sovereign
+> Doctrine: that fork decides whether courts bind the sovereign (credit, seizure); this one
+> decides who owns the furnaces. A nation can perfectly well honour its debts and still own every
+> works in it — and by 1960 that nation is one the player's corporation operates in on completely
+> different terms. Pairs with T5-IN-03 General Incorporation, which is its institutional half.
+
+Exclusion and the tech fog compose here exactly as designed: a State-Arsenal nation in 1960
+cannot see the private-works road, which is *why* its 1960 economy tolerates corporations
+differently — the same "cannot see the tree it didn't climb" the geometry section claims, arriving
+at the one place the campaign will actually feel it.
+
+### The exit — T5/T6, sketched not authored
+
+The region stops at the T5/T6 boundary, where the Machine Age band begins and the campaign's own
+epoch is one ring further out. That crossing is a third pass's work; what this one fixes is its
+shape. Energy crosses on electrification and oil (two prime-mover shifts in one band, the only
+crossing in the ladder that arguably wants **two** vertices); Institutions crosses on the existing
+**The Lettered Public**; Materials crosses on synthetic chemistry; and Military crosses on the
+last roster turnover before the epoch. The handoff to `scripts/tech_tree.lua` then happens one
+ring later, unchanged (§ The 1960 handoff).
+
+### What this region hands the campaign
+
+Four outputs, all consumed by things that already exist or are already filed:
+
+1. **Capacity band per domain at the epoch** — the unlocked building/recipe set (BL-156 shape).
+2. **Corporate terms** — Works Doctrine × General Incorporation decides whether a chartering
+   nation is one a specialist corporation can be *founded* in, which is a direct input to
+   `CORPORATION_GENERATION.md`'s nation assignment and to BL-094's governing-body pivot.
+3. **Demography** — Labour Doctrine × Farm Mechanisation × Soil Chemistry set BL-273's growth,
+   urban share and unrest at 1960.
+4. **War endurance** — the fielded-vs-replaceable split (§ fact 2) is legible from this region
+   alone: T5-MIL artifacts diffuse, but Converter Steel plus Machine Tools is what lets a nation
+   replace them.
+
+### The count
+
+This region: **27 techs + 5 vertex quests + 4 keystones + 2 roster regimes = 38 objects**, of
+which **13 are new here** (7 techs, 4 quests, 2 keystones — Fuel Doctrine moved rather than
+appeared). `node tools/session/ladder_lint.js` now prints one line per worked region, so this
+count is checked rather than asserted. Web-wide the store stands at 71 techs and regimes, 12
+vertex quests and 5 keystones — **88 objects with two of five ring-crossings worked**.
+Extrapolating the three unworked crossings
+at the sparse-sector average lands near **120–135 web-wide**, comfortably inside the § Geometry
+budget and slightly under the earlier estimate, because the sparse-sector rule keeps retiring
+vertices that a naive 5 × 7 grid would have invented.
+
+---
+
 ## The ladder
 
 Nodes are the 3–5 load-bearing advancements per band per domain — the ones that flipped a regime
@@ -376,11 +539,14 @@ better than any resource did.
 | T4-MA-02 | Cast Ordnance | T3-MA-01 | ore_q + fuel | capacity | foundry cannon |
 | T4-MA-03 | Precision Instruments | T3-MA-02 | — | capacity | lenses, gauges, screw threads — T5's toolroom |
 | T4-EN-01 | Deep Mining & Drainage | T3-EN-01 | fuel | capacity | the pump problem that *asks for* steam |
+| T4-EN-02 | Coal Haulage & Urban Fuel | T3-TR-02 | fuel | capacity | coastal coal trade; urban fuel demand precedes the engine |
 | T4-TR-01 | Full-Rigged Ship | T3-TR-02 | coastal | capacity | global range |
 | T4-TR-02 | Celestial Navigation | T3-TR-01, T4-MA-03 | coastal | practice | longitude closes the ocean |
 | T4-IN-01 | Empirical Method | T4-MA-01 | — | practice | knowledge compounds openly |
 | T4-IN-02 | Joint-Stock & Public Credit | T3-IN-02 | — | practice | Stage 3 lands: capital disciplines the sovereign |
+| T4-IN-03 | Patent Grants | T4-IN-01 | — | practice | invention becomes property; modifies the invention roll |
 | T4-MIL | *Regime: flintlock line, artillery fortress, broadside fleet* | T4-MA-02 | fuel | — | BL-274 rows |
+| T4-ME-01 | Preventive Inoculation | T3-ME-01 | — | practice | 18th c.; mortality falls before germ theory explains it |
 
 ### Band T5 — Industrial (Earth ≈ 1750–1900)
 
@@ -392,14 +558,18 @@ The furnace date `run_settlement` already computes **is** this band's entry date
 | id | node | prereqs | gate | diffusion | earth_ref |
 |---|---|---|---|---|---|
 | T5-EN-01 | Atmospheric & Rotative Steam | T4-EN-01, T4-MA-03 | fuel | capacity | 1712 → 1780s; the master node |
+| T5-EN-02 | High-Pressure & Compound Engines | T5-EN-01, T5-MA-02 | fuel | capacity | power leaves the engine house; rail and ships become possible |
 | T5-MA-01 | Coke Smelting | T3-MA-01 | ore_q + fuel | capacity | breaks the charcoal ceiling |
 | T5-MA-02 | Machine Tools | T4-MA-03, T5-EN-01 | ore_q | capacity | interchangeable parts; capacity that builds capacity |
 | T5-MA-03 | Converter Steel | T5-MA-01 | ore_q + fuel | capacity | 1856; cheap steel |
+| T5-MA-04 | Framed Construction & Cement | T5-MA-03 | — | capacity | iron-framed mills → steel frame; the industrial city |
 | T5-AG-01 | Farm Mechanisation | T5-MA-02 | arable | capacity | reaper line; releases workforce to industry |
+| T5-AG-02 | Soil Chemistry & Fertiliser Trade | T5-TR-02, T4-IN-01 | — | practice + artifact | 1840s; yield stops being bounded by the local nitrogen cycle |
 | T5-TR-01 | Railway | T5-EN-01, T5-MA-01 | fuel | capacity | interior distance collapses |
 | T5-TR-02 | Steamship | T5-EN-01 | coastal | capacity | schedule replaces season |
-| T5-IN-01 | Telegraph | T5-MA-02 | — | capacity | information detaches from transport |
+| T5-IN-01 | Telegraph | T5-MA-02, T5-TR-01 | — | capacity | information detaches from transport; rail signalling drives the net |
 | T5-IN-02 | Mass Schooling & Press | T4-MA-01 | — | practice | literate workforce — T6's floor |
+| T5-IN-03 | General Incorporation | T4-IN-02 | — | practice | chartering by registration, not by grant — the campaign's premise |
 | T5-MIL | *Regime: rifle, ironclad, general staff* | T5-MA-03 | ore_q + fuel | — | BL-274 rows |
 | T5-ME-01 | Germ Theory & Sanitation | T4-IN-01 | — | practice | mortality falls ahead of wealth |
 
@@ -507,4 +677,16 @@ Per year-tick, per nation, per domain — all integer, seeded, deterministic:
    not this item's.
 5. **Density grain** — § Density test's three worked grains; recommendation is medium
    (~100–150 nodes web-wide, fine grain only around keystones). Logged as NR-056; Ben decides
-   against the examples.
+   against the examples. **Resolved: medium.**
+6. **Does the industrial region get its own surface?** (2026-08-05) The F9 mock viewer's era strip
+   has one tab per era; this region is one *ring band* inside Era −1, not an era of its own. Two
+   readings — an "Era −1 · Industrial" tab beside Antiquity, or one Antiquity web the reader zooms
+   within. Filed as NR-064; no code either way until BL-296 lands.
+7. **Does Works Doctrine gate corporation generation?** (2026-08-05) The State Arsenal branch says
+   a 1960 nation owns its heavy plant, which is a strong statement about whether a specialist
+   corporation can be chartered there at all. If the answer is yes, this is a real dependency from
+   BL-296 into `CORPORATION_GENERATION.md` and BL-094 (governing-body pivot), and should be filed
+   as work rather than left as a note. NR-064 carries it.
+8. **Does the T5/T6 Energy crossing want two vertices?** (2026-08-05) Electrification and internal
+   combustion are two prime-mover shifts inside one band — the only crossing in the ladder where
+   the one-vertex-per-sector convention looks wrong. Deferred to the Machine-Age pass.
