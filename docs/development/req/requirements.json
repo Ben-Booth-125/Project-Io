@@ -8330,6 +8330,71 @@
      "notes": "Follow-on: a visible-information production proxy (e.g. building-type nominal capacity, independent of assigned recipe/workforce) would need its own design pass."
     }
    ]
+  },
+  {
+   "brief": "tech-tree-radial-canvas",
+   "title": "F9 viewer: radial constellation for Era 0/1 (BL-310)",
+   "difficulty": 4,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-08-06",
+   "resolution": "Radial constellation landed for Era 0/1 gate quests; nav slot 4 enabled. scripts/verify/tech_tree_panel.lua 3/3 golden PASS (tech_tree_tabs, tech_tree_era1 new, tech_tree_antiquity).",
+   "promoted_from": "backlog.json BL-310 (TECH_TREE_RADIAL_CANVAS)",
+   "batch": null,
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "Brief-spanning: Era 0 and Era 1 tabs render their gate quests as a radial web (rings=graph depth, sectors=quests) with pan (middle-drag) and zoom (scroll), replacing the collapsing-header table; capstone/keystone nodes are visually distinct; hover still shows a tech's unlock text.",
+     "verification": [
+      "visual: scripts/verify/tech_tree_panel.lua"
+     ],
+     "status": "complete",
+     "result_metric": "golden PASS, tech_tree_tabs + tech_tree_era1",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "Edges are drawn for every prereq whose source node has a position in the current era's layout; a prereq outside the view (e.g. an Era-1 node's Era-0 gate) is silently omitted, not drawn as a dangling stub.",
+     "verification": [
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "requirement": "The four Era-1 keystone branch pairs (id suffix A/B) render colour-differentiated with a visible exclusion mark between siblings sharing a *-KEYSTONE prereq.",
+     "verification": [
+      "visual: scripts/verify/tech_tree_panel.lua"
+     ],
+     "status": "complete",
+     "result_metric": "golden PASS, tech_tree_era1 shows 4 excludes marks",
+     "notes": ""
+    },
+    {
+     "id": "R4",
+     "requirement": "Standing lines (view 3) and the Antiquity placeholder (view 0) are unchanged by this item.",
+     "verification": [
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R5",
+     "requirement": "Nav rail slot 4 (Research) is enabled and toggles the same viewer/flag F9 already drives, following the toggle rule (re-click while active closes it).",
+     "verification": [
+      "code",
+      "visual: scripts/verify/tech_tree_panel.lua"
+     ],
+     "status": "complete",
+     "result_metric": "golden PASS at 0.0157% (icon lit-state within tolerance, visually confirmed)",
+     "notes": ""
+    }
+   ]
   }
  ]
 }

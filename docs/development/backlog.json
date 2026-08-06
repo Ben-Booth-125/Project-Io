@@ -6757,6 +6757,33 @@
    "summary": "The Era 1 tree draft's deed primitive (docs/research/ERA1_TECH_LANDSCAPE.md § The deed primitive) is design-owed and gates real keystones — too early to build. But recording campaign firsts (first off-world launch, first building on a second body) as plain world_history_entry lines, gating nothing, is buildable now on the landed BL-208 log and makes deeds observable for match reports and, later, the strategy library's ⚠-marked deed facts (STRATEGIES.md § The design-gap yield).",
    "design": "DESIGN OWED — filed 2026-08-06 from the strategy-library design session. The open call: does this reuse an existing history_topic (decision or agency, per src/world/world.hpp's enum) tagged as a first, or does it need a new topic value now rather than waiting for the full deed primitive? Leaning toward reusing the existing enum with a tag/flag rather than adding a topic value, since the Era 1 tree's deed — subject/scope/count/recorded — is a richer object than a bare log line and this item should not pre-empt that design by shipping a half-shaped enum value. Candidate first launch-dispatch-to-space and first-building-on-a-second-body events, read from existing supply_system.cpp dispatch code, logged once (world-scoped: only the first corporation to do it fires the line, per the STRATEGIES.md ST-10/NR-069 lean toward world-scoped deeds). Needs a short design pass against docs/ai/AI_OPPONENT.md § 8a (the world history log) and the Era 1 tree draft's § The deed primitive before promotion — do not build ahead of that pass.",
    "resolution": null
+  },
+  {
+   "id": "BL-310",
+   "short_name": "TECH_TREE_RADIAL_CANVAS",
+   "title": "F9 viewer: render the Era 0/1 quest trees as a radial constellation, per the settled Path-of-Exile geometry",
+   "category": "UI",
+   "status": "complete",
+   "glyph": "✓",
+   "parked": false,
+   "priority": "B",
+   "difficulty": 4,
+   "version_goal": "v0.1.1",
+   "requires": [],
+   "blocked_on": [],
+   "written": "2026-08-06",
+   "created": "2026-08-06",
+   "authority_doc": "docs/research/ANCIENT_TECH_LADDER.md",
+   "files": [
+    "src/ui/tech_tree_panel.cpp",
+    "src/ui/tech_tree_panel.hpp",
+    "src/ui/ui_state.hpp",
+    "src/ui/nav_pane.cpp",
+    "scripts/verify/tech_tree_panel.lua"
+   ],
+   "summary": "The F9 viewer's Era 0/1 tabs are a plain collapsible-list table today. ANCIENT_TECH_LADDER.md § Geometry (settled 2026-08-04, Ben) already specifies the intended shape in full: a Path-of-Exile-style radial web — rings are bands/eras (time, centre-out), sectors are domains (angle), keystone forks carry visible exclusion, travel is OR/meaning is AND. This item is the implementation of that already-settled design for the two authored eras, not new design. Also flips nav rail slot 4 (Research, previously hard-disabled) to open the same viewer, per Ben's request 2026-08-06.",
+   "design": "Filed 2026-08-06 (Ben, live playtest of the freshly-built standing-profile + Era-1-transcription session: 'do you have access to the visual demonstration of how the tech trees should look? ... we can also use the tech tree button now. This should open up a canvas view of the tree.'). The geometry is not new design work — ANCIENT_TECH_LADDER.md § Geometry (2026-08-04) already settles rings=bands/sectors=domains/OR-travel/AND-conditions/keystone-exclusion-with-fog against the Path of Exile passive-tree reference. This item transcribes that geometry into src/ui/tech_tree_panel.cpp for the two eras that currently carry authored content (view 1 = Era 0, view 2 = Era 1), replacing the collapsing-header table with an ImDrawList radial canvas: ring = graph depth within the quest (same-quest prereq chain length, computed generically rather than trusting the tier field, which the Era 0 data never populated consistently), sector = one angular wedge per gate quest, edges drawn for every prereq (including cross-quest/cross-era edges the design calls 'the interleaving, visible' — an edge to a prereq outside the current view is simply not drawn, since its node has no position in this era's layout). Keystone/capstone techs render as a distinct marker; the four Era-1 branch pairs (id suffix A/B under a *-KEYSTONE prereq) render colour-differentiated with an exclusion mark between siblings. Pan (middle-mouse drag) and zoom (scroll wheel, cursor-anchored) reuse the existing idiom from body_surface_canvas.cpp verbatim rather than inventing a second one. The tech fog (§ Geometry: nodes render only within reach of an owned node) is explicitly NOT implemented here — there is no player progression state in the mock (BL-087 resolution 6, tech system post-prototype, nothing simulated), so nothing is ever 'owned'; the whole authored web renders, same honesty stance the current list view already takes. Standing lines (view 3) and the Antiquity placeholder (view 0) are UNCHANGED — the radial treatment applies to the gate-quest tabs only; standing lines have no ring structure ('deepen every Era, never gate one') and Antiquity has no engine data yet (BL-296 open question 4). Nav wiring: nav_pane.cpp's slot 4 (Research) was a permanently ImGui::BeginDisabled() placeholder; this item enables it and wires its click to toggle the same m_show_tech_tree flag F9 already drives (the toggle rule: re-clicking the active slot closes it, same as every other nav icon).",
+   "resolution": "LANDED 2026-08-06 (docs/development/req/requirements.json § tech-tree-radial-canvas): src/ui/tech_tree_panel.cpp's Era 0/1 tabs now render ANCIENT_TECH_LADDER.md's settled geometry — rings by same-quest-prereq graph depth, sectors by gate quest, middle-drag pan + scroll zoom (idiom reused from body_surface_canvas.cpp). Keystone/capstone nodes draw larger and gold; the four Era-1 branch pairs (id suffix A/B) draw colour-differentiated with an 'excludes' mark between siblings sharing a keystone prereq. Nav rail slot 4 (Research), previously hard-disabled, now toggles ui_state::show_tech_tree (moved there from app.hpp's m_show_tech_tree so nav_pane.cpp could reach it) and lights like every other slot. Standing lines (view 3) and the Antiquity placeholder (view 0) untouched. scripts/verify/tech_tree_panel.lua extended with a third capture (tech_tree_era1); 3/3 golden PASS after re-blessing the two intentional diffs. Crowding at default zoom in the Era 1 view (5 sectors, ~35 nodes) is a known, easily-tunable follow-on (default zoom-out, or label-density thinning) — not filed separately since pan/zoom already lets a player declutter interactively."
   }
  ]
 }

@@ -1,5 +1,16 @@
 # Project Io — REFINED (active worklist)
 
+## Tech tree radial canvas (promoted from BL-310) — **COMPLETE**
+
+Requirements: requirements.json § tech-tree-radial-canvas (R1–R5, all met). Era 0 and Era 1
+gate quests render as a radial constellation (rings = graph depth, sectors = quests) with
+middle-drag pan and scroll zoom; keystone/capstone nodes render larger and gold; the four
+Era-1 branch pairs render colour-differentiated (green/purple) with an orange "excludes" mark
+between siblings. Nav rail slot 4 (Research) is enabled and toggles the same viewer F9 drives,
+icon now lights when open. Standing lines / Antiquity views untouched. Verified via
+`scripts/verify/tech_tree_panel.lua` — 3/3 golden PASS (tabs, era1, antiquity), goldens
+re-blessed against the intentional changes.
+
 ## Corp standing profile (promoted from BL-262, first slice) — **COMPLETE**
 
 Requirements: requirements.json § corp-standing-profile (R1–R5, all met bar R1's visual leg,

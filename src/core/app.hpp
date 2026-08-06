@@ -237,7 +237,6 @@ private:
 
     bool        m_show_help        = false;   ///< Toggle for the F1 key-binding cheat-sheet overlay.
     bool        m_show_options     = false;   ///< Toggle for the F10 display/options window.
-    bool        m_show_tech_tree   = false;   ///< Toggle for the F9 mock tech-tree viewer (BL-087).
     display_settings m_settings;              ///< Persisted display settings (options.cfg).
     bool        m_capture_requested = false;  ///< Set by F12 / capture_frame, consumed in render().
     std::string m_capture_name;              ///< Base name for the next capture; empty = timestamped (F12).

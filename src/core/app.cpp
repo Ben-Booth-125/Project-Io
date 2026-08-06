@@ -1084,7 +1084,7 @@ int app::run_verify(const std::string& script_path, bool bless)
         else if (name == "corporation")  m_ui.show_corporation_panel = open;
         else if (name == "build")        m_ui.show_build_ledger = open; // tile construction ledger (BL-162)
         else if (name == "frame_hud")    m_ui.show_frame_hud = open;    // frame-budget HUD (BL-249)
-        else if (name == "tech_tree")    m_show_tech_tree = open;       // F9 mock viewer (BL-087)
+        else if (name == "tech_tree")    m_ui.show_tech_tree = open;    // F9 mock viewer (BL-087)
     });
 
     // Park a fold-out ledger on one of its button-strip views (BL-117 sweep), so a
@@ -2066,7 +2066,7 @@ void app::dispatch_action(ui::canvas_command cmd)
             m_show_options = !m_show_options;
             return;
         case ui::canvas_command::tech_tree_toggle:
-            m_show_tech_tree = !m_show_tech_tree;
+            m_ui.show_tech_tree = !m_ui.show_tech_tree;
             return;
 
         // Everything else is a canvas navigation command.
@@ -3260,9 +3260,11 @@ void app::render()
         ImGui::End();
     }
 
-    // F9 mock tech-tree viewer (BL-087). Read-only design aid over
-    // scripts/tech_tree.lua; no simulation coupling.
-    ui::draw_tech_tree_panel(m_tech_tree, m_show_tech_tree, m_ui.tech_tree_view);
+    // F9 mock tech-tree viewer (BL-087), also reachable from nav rail slot 4
+    // (BL-310). Read-only design aid over scripts/tech_tree.lua; no simulation
+    // coupling.
+    ui::draw_tech_tree_panel(m_tech_tree, m_ui.show_tech_tree, m_ui.tech_tree_view,
+                              m_ui.tech_tree_pan_x, m_ui.tech_tree_pan_y, m_ui.tech_tree_zoom);
 
     // F11 frame-budget HUD (BL-249) — the v0.1.0 audit instrument. Drawn last so it
     // measures a full frame's worth of panels, and anchored (first use only; it is

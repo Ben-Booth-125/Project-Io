@@ -15,6 +15,10 @@ namespace ui {
 /// @param tree The startup-loaded mock tree.
 /// @param open Visibility flag; the window's close button writes false.
 /// @param view Selected era view (ui_state::tech_tree_view).
-void draw_tech_tree_panel(const tech_tree_registry& tree, bool& open, int& view);
+/// @param pan_x Radial-canvas pan offset, screen px (ui_state::tech_tree_pan_x). Era tabs only.
+/// @param pan_y Radial-canvas pan offset, screen px (ui_state::tech_tree_pan_y). Era tabs only.
+/// @param zoom  Radial-canvas zoom factor (ui_state::tech_tree_zoom). Era tabs only.
+void draw_tech_tree_panel(const tech_tree_registry& tree, bool& open, int& view,
+                           float& pan_x, float& pan_y, float& zoom);
 
 } // namespace ui
