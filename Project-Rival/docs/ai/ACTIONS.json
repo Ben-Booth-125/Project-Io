@@ -1,0 +1,1871 @@
+{
+ "_schema": "The action dictionary (BL-270). Every control in the game: id (family-prefixed slug), family (gameplay|canvas|lens|ledger|chrome), surface, press, args [{name,type,meaning}], preconditions [strings], expected_output, reason_to_select. Canonical; ACTIONS.md is the generated mirror (node tools/session/render_actions.js, which is also the shape check). Machine-consumable: the word-play harness and word-driven generation read this file directly.",
+ "_note": [
+  "The third catalogue axis: user_stories.json = intent, UX_QUESTIONS (BL-260) = information, ACTIONS = action.",
+  "The gameplay family is TRANSCRIBED from src/world/corp_command.hpp (verbs, typed args, corp_command_result rejections) — where dictionary and seam disagree, the dictionary is wrong and the fix is mechanical.",
+  "Deliberately absent fields (Ben, 2026-08-02): cost/spend (world state the blackboard reports, not dictionary material) and backlog provenance (UX_QUESTIONS’ axis, not this one).",
+  "Any change to a control, binding, lens, ledger or panel must update its entry here — a stale entry misleads the AI player the way a stale golden misleads a visual check.",
+  "Consumption model (Ben, 2026-08-02): a language agent holds the generated ACTIONS_INDEX.json ([id, surface] per action) in context and fetches full entries via tools/session/actions_query.js — it never absorbs this file whole.",
+  "Deliberately NO urgency/importance fields (Ben, 2026-08-02): the live AI scores candidate actions on a 2D urgency x importance map at decision time, against blackboard state. Priority is situational; the dictionary supplies meaning. See AI_OPPONENT.md § 6a.",
+  "",
+  "MCP (BL-278): this file backs the MCP server’s lookup_action / list_actions tools",
+  "(tools/mcp/server.js, wrapping ProjectIo --serve). That server is the socket; this file is",
+  "the meaning leg behind it.",
+  "",
+  "THE WRITE CHANNEL IS NARROWER THAN THIS DICTIONARY. Some gameplay entries describe presses a",
+  "human can make but an agent cannot issue: place_sell_order, remove_sell_order and",
+  "set_workforce_auto have no corp_verb, and corp_command’s enum is eight wide. Do not read",
+  "\"the full word interface\" as meaning every entry here is reachable by command — filed as",
+  "BL-293 (order book unreachable by command).",
+  "",
+  "PULLED INTO PROJECT-RIVAL (Ben, 2026-08-06): this is a working mirror of Io's",
+  "docs/ai/ACTIONS.json, source of truth still docs/ai/ACTIONS.json in the Io repo. Pulled so",
+  "Rival — the project responsible for AI-thinking design — can design a per-action natural-",
+  "language phrasing sub-dictionary directly against it (small local model, no cloud opponent;",
+  "see AI_OPPONENT.md § 10). Rival still does not write Io source: land changes back into Io's",
+  "copy explicitly, don't let the two silently diverge. Re-pull if Io's ACTIONS.json changes",
+  "upstream (new/changed entries) before resuming this design."
+ ],
+ "entries": [
+  {
+   "id": "gameplay.build",
+   "family": "gameplay",
+   "surface": "Tile construction ledger (fold-out column), opened from the Selection band of a selected tile; a shortcut lives on a selected owned building ('Build another here').",
+   "press": "Single-click a tile on the Planetary canvas (the Selection band appears), click 'Construct Buildings' in the band's action grid, then click 'Build' on a candidate row in the ledger. Rows are one per extractable resource deposited on the tile (plus a coastal Fishing Wharf row even with zero deposit), one per processing recipe, then Port, Launchpad, Inland Logistics Hub. Alternate press: with an owned building selected, 'Build another here' repeats its type/target on the same tile, gated by the tile's stack capacity.",
+   "args": [
+    {
+     "name": "tile",
+     "type": "entity_id",
+     "meaning": "The selected tile the building goes on."
+    },
+    {
+     "name": "type",
+     "type": "building_type",
+     "meaning": "Which building — extraction_site, processing_facility, port, launchpad, inland_logistics_hub. Set by which row is pressed."
+    },
+    {
+     "name": "target",
+     "type": "resource_type",
+     "meaning": "Extraction rows only: the deposited resource the site extracts. Ignored for other types."
+    },
+    {
+     "name": "recipe",
+     "type": "uint16 recipe id",
+     "meaning": "Processing rows only: the recipe the facility is seeded with (the row it was priced on). no_recipe elsewhere; a recipe-less processor seeds the default steel recipe."
+    }
+   ],
+   "preconditions": [
+    "The acting corporation exists (rejected_no_corp otherwise).",
+    "The tile entity exists (rejected_invalid otherwise).",
+    "placement_rules::can_place_in_world accepts (type, target) on this tile — ocean, missing deposit, a port off the coast, or a full per-body slot cap (Launchpad: max 1 per body) all refuse (rejected_placement).",
+    "The corporation's balance covers the full capex: registry build_cost plus the material costs priced at the tile's local market (rejected_funds). The UI shows this one credit total and disables Build with 'Can't afford' when short."
+   ],
+   "expected_output": "The press enqueues a construction request; the app's mutable pass executes construct_building the same frame. On success a building entity exists immediately — staffed at 50% workforce (0 for a port), a processing facility seeded with the pressed row's recipe — and the capex is debited up front. Construction is then DURATIVE and material-gated: each economy tick (one quarter) it advances at a rate in [0,1] set by how much of its per-tick material need the local market can supply; scarce materials stretch the ETA and total shortage shows 'Paused - market can't supply materials'. Management controls unlock only when construction completes. A rejected attempt mutates nothing; the reason string appears at the top of the ledger (construction.last_message), and invalid rows already show reason-coded text in place of the Build button ('Cannot build on water', 'A port must sit on the coast', ...).",
+   "reason_to_select": "The only way to add productive capacity. Extraction turns a tile deposit into pool stock to sell; processing turns inputs into higher-margin outputs; ports/hubs move goods cheaper and a launchpad gates space access. The ledger ranks candidates by expected net per quarter and prints payback, so build is the press when a candidate's expected profit beats holding the cash."
+  },
+  {
+   "id": "gameplay.demolish",
+   "family": "gameplay",
+   "surface": "Selection band, player-owned building layout, bottom action row.",
+   "press": "Select the owned building, click 'Demolish', then confirm 'Demolish' in the popup (the popup exists because the act is irreversible; 'Cancel' backs out).",
+   "args": [
+    {
+     "name": "building",
+     "type": "entity_id",
+     "meaning": "The selected building to remove. Must be owned by the acting corporation."
+    }
+   ],
+   "preconditions": [
+    "The acting corporation exists (rejected_no_corp otherwise).",
+    "The building entity exists (rejected_invalid otherwise).",
+    "The corporation owns the building (rejected_not_owner otherwise)."
+   ],
+   "expected_output": "Enqueued at confirm; executed against the mutable world after the draw. The building's components are erased, its id is removed from the corporation's assets, and the tile slot is freed for something else. NO refund — the build cost is not returned; demolition destroys the asset outright. A rejected attempt changes nothing and shows nothing beyond the world staying identical.",
+   "reason_to_select": "Frees a capacity-capped tile for a better use — the press when the tile is worth more re-purposed than the building is worth running. For a merely loss-making building, idle is the better press: demolition is irreversible and refundless."
+  },
+  {
+   "id": "gameplay.idle",
+   "family": "gameplay",
+   "surface": "The 'Idle' button on the Selection band's building layout, bottom row (paired with Demolish). The Building panel's inline detail carries a one-way 'Decommission' button with the same effect; Resume lives only on the band.",
+   "press": "Select the owned, running building, click 'Idle'. No confirmation — the act is reversible.",
+   "args": [
+    {
+     "name": "building",
+     "type": "entity_id",
+     "meaning": "The building to idle."
+    }
+   ],
+   "preconditions": [
+    "The acting corporation exists (rejected_no_corp otherwise).",
+    "The corporation owns the building (rejected_not_owner otherwise).",
+    "The building is not already idled (rejected_state — a no-op in current state)."
+   ],
+   "expected_output": "decommissioned := true immediately. From the next economy tick production stops and wages stop; material upkeep CONTINUES, and the building keeps occupying its tile. Status surfaces read 'Decommissioned' / 'Idled - producing nothing'. Fully reversible via resume. Rejected attempts change nothing.",
+   "reason_to_select": "A persistently loss-making building burns wages and maintenance every quarter; idling stops the wage bleed while keeping the asset and its tile for when prices recover. The reversible alternative to demolition — pay a small upkeep to keep the option open."
+  },
+  {
+   "id": "gameplay.place_road",
+   "family": "gameplay",
+   "surface": "Three road-tier rows (Track / Road / Highway) at the bottom of the tile construction ledger, below the building candidates.",
+   "press": "Select a tile, click 'Construct Buildings' on the Selection band, scroll to the road rows, click 'Build' on a tier. Each row shows its own credit total and validity.",
+   "args": [
+    {
+     "name": "tile",
+     "type": "entity_id",
+     "meaning": "The tile whose road level rises."
+    },
+    {
+     "name": "road_tier",
+     "type": "uint8 [1, 3]",
+     "meaning": "1 = Track, 2 = Road, 3 = Highway. Higher tiers cost more and cut traversal cost further."
+    }
+   ],
+   "preconditions": [
+    "The acting corporation exists (rejected_no_corp otherwise).",
+    "The tile entity exists (rejected_invalid otherwise).",
+    "can_place_road accepts: a land tile whose current road_level is BELOW the pressed tier — upgrade-in-place is allowed, re-laying the same or a lower tier is refused, ocean is refused (rejected_placement).",
+    "The balance covers the tier's build cost plus materials priced at the tile's local market (rejected_funds; the row disables Build with 'Can't afford')."
+   ],
+   "expected_output": "INSTANT, unlike building construction: on execution the tile's road_level rises to the tier, the full cost is debited up front, and the world's A* cost cache is invalidated so freight dispatch immediately sees the lower traversal cost through this tile. A road is a tile mutation, not a building — it occupies no build slot. Rejected attempts change nothing; invalid tiers show their reason string in place of the button.",
+   "reason_to_select": "Lowers intra-body haul cost along the tile, cheapening every supply run that routes through it — the press that tightens the chain between extraction sites, processors, and the market. Worth it on tiles carrying real freight; a road on an unused tile is pure spend."
+  },
+  {
+   "id": "gameplay.place_sell_order",
+   "family": "gameplay",
+   "surface": "The 'Sell Orders' tab of the Market Ledger (opened from the nav rail; the tab is scoped to the ledger's selected market body).",
+   "press": "Open the Market Ledger, switch to the Sell Orders tab, pick a resource in the combo (only resources the market prices are listed), type a Quantity/qtr and a Floor price, click 'Add sell order'. The button is disabled with no resource chosen or quantity <= 0.",
+   "args": [
+    {
+     "name": "body",
+     "type": "entity_id",
+     "meaning": "The body whose market the order lists on — the ledger's currently selected body."
+    },
+    {
+     "name": "resource",
+     "type": "resource_type",
+     "meaning": "What to sell. Must have a positive base price on this market."
+    },
+    {
+     "name": "quantity",
+     "type": "float > 0",
+     "meaning": "Maximum units offered per quarter, capped each tick by what the (corp, body) pool actually holds."
+    },
+    {
+     "name": "floor_price",
+     "type": "float >= 0",
+     "meaning": "Minimum acceptable unit price. 0 means sell at the market price."
+    }
+   ],
+   "preconditions": [
+    "The selected body has a market ('This body has no market.' otherwise, and no form renders).",
+    "The resource is priced on that market (base_price > 0).",
+    "Quantity is positive."
+   ],
+   "expected_output": "A STANDING order — it persists until removed and is evaluated every economy tick, not once. Each tick it lists up to `quantity` from the corp's pool on that body (an empty pool lists nothing, silently); it clears at max(resolved market price, floor) — with no matching buyer it still auto-clears at that price, so offered supply always clears in the prototype, but a floor above what the resolution supports means less or nothing sells that tick. CRITICAL side effect: the (corp, body, resource) triple leaves the automatic surplus-selling path — the auto path yields to the manual order — so a too-high floor does not just fail to sell, it stops that resource selling AT ALL on that body and the stock piles up. There is no rejection enum; a bad order simply sits there selling nothing.",
+   "reason_to_select": "Price and quantity control the auto-sell path lacks: floor-protect against dumping stock into a crashed price, or meter quantity to ration a stockpile toward a construction project or a better market. The manual side of the trade loop — the press when 'sell everything at whatever it fetches' is the wrong answer."
+  },
+  {
+   "id": "gameplay.remove_sell_order",
+   "family": "gameplay",
+   "surface": "The 'Remove' button beside each listed order on the Market Ledger's Sell Orders tab.",
+   "press": "Open the Market Ledger, switch to the Sell Orders tab; each of the player's standing orders on the selected body renders as a row ('<resource> x<qty> >= <floor>') with a small 'Remove' button. Click Remove on the target row. Immediate — no confirmation.",
+   "args": [
+    {
+     "name": "order",
+     "type": "row reference",
+     "meaning": "Which standing order to remove, identified by the row pressed — i.e. the (body, resource, quantity, floor_price) tuple displayed. Internally the order's index in the sell-order list. Only the player's own orders on the ledger's selected body are listed."
+    }
+   ],
+   "preconditions": [
+    "The order exists — the button only renders on rows that do, so there is no rejection mode; a body with no orders shows 'No sell orders on this body.' and nothing to press."
+   ],
+   "expected_output": "The order is erased from the standing sell-order list immediately, at no cost. From the next economy tick that quantity is no longer listed for sale. Routing consequence: if this was the LAST remaining order for that (corp, body, resource) triple, the triple returns to the automatic surplus-selling path — each tick the pool's surplus above processor reservation auto-sells at the market's reference price, with no floor protection. If another order for the same triple still stands, manual control persists. Nothing else changes; already-cleared past sales are untouched.",
+   "reason_to_select": "Ends manual control over a resource's sales: hand it back to the auto-surplus path when floor-pricing or rationing is no longer wanted (e.g. the price crash passed, or a too-high floor was silently stockpiling the resource instead of selling it). Also the only way to correct a mistyped order — there is no edit; remove and re-add."
+  },
+  {
+   "id": "gameplay.resume",
+   "family": "gameplay",
+   "surface": "The 'Resume' button on the Selection band's building layout — it renders in place of 'Idle' when the building is idled.",
+   "press": "Select the owned, idled building, click 'Resume'.",
+   "args": [
+    {
+     "name": "building",
+     "type": "entity_id",
+     "meaning": "The idled building to restart."
+    }
+   ],
+   "preconditions": [
+    "The acting corporation exists (rejected_no_corp otherwise).",
+    "The corporation owns the building (rejected_not_owner otherwise).",
+    "The building is currently idled (rejected_state otherwise — resuming a running building is a no-op)."
+   ],
+   "expected_output": "decommissioned := false immediately; production and wages restart on the next economy tick at the building's existing workforce target and recipe. Rejected attempts change nothing.",
+   "reason_to_select": "The idled asset now reads profitable again — prices recovered or inputs cheapened — so resuming captures margin with zero capex. The AI's own dial_resume fires on exactly this signal."
+  },
+  {
+   "id": "gameplay.set_recipe",
+   "family": "gameplay",
+   "surface": "The 'Production method' combo on the Selection band's building layout; the same combo also appears as 'Production Methods' in the Building panel's Buildings-tab inline detail.",
+   "press": "Select the owned building, open the production-method combo, click a recipe row (each row carries a resource pip for its primary output).",
+   "args": [
+    {
+     "name": "building",
+     "type": "entity_id",
+     "meaning": "The building whose recipe changes."
+    },
+    {
+     "name": "recipe",
+     "type": "uint16 recipe id",
+     "meaning": "The recipe to run, from the building type's recipe list. In practice only processing facilities have multiple; extraction is fixed to its target resource."
+    }
+   ],
+   "preconditions": [
+    "The acting corporation exists (rejected_no_corp otherwise).",
+    "The corporation owns the building (rejected_not_owner otherwise).",
+    "The recipe is valid for the building's type (rejected_invalid otherwise).",
+    "Construction is complete — the UI hides all controls while ticks_remaining > 0.",
+    "The building produces output (infrastructure has no recipe section at all)."
+   ],
+   "expected_output": "An immediate component write — no queue, no cost. From the next economy tick the building consumes the new recipe's inputs and produces its outputs; its profit readout, its input demand on the local market, and what it contributes to the pool all change with it. Re-selecting the recipe already active is a no-op (rejected_state at the command seam).",
+   "reason_to_select": "The first lever on a processor's profitability, free of capex: per-recipe margins genuinely diverge with local prices (steel can lose money on a tile where food rations clear well), so switching chases the better-clearing output with the plant already paid for. Every new processor defaults to the steel recipe, so this is typically the first press after building one."
+  },
+  {
+   "id": "gameplay.set_workforce",
+   "family": "gameplay",
+   "surface": "The workforce slider on the Selection band's building layout (0–200% of nominal); the Building panel's inline detail offers a coarser 0/20/40/60/80/100 tier button grid instead.",
+   "press": "Band: select the owned building, untick 'Auto' (the slider is disabled while Auto holds the dial), drag the slider. Panel: click a tier button directly — this pins even while Auto is active.",
+   "args": [
+    {
+     "name": "building",
+     "type": "entity_id",
+     "meaning": "The building whose staffing target changes."
+    },
+    {
+     "name": "workforce",
+     "type": "int [0, 200]",
+     "meaning": "Target staffing as % of nominal. Above 100 pushes past nominal output; the panel grid only reaches 100, the slider and the command seam reach 200."
+    }
+   ],
+   "preconditions": [
+    "The acting corporation exists (rejected_no_corp otherwise).",
+    "The corporation owns the building (rejected_not_owner otherwise).",
+    "The value is inside [0, 200] (rejected_invalid otherwise)."
+   ],
+   "expected_output": "workforce_target is set AND workforce_auto is cleared — a manual move pins the dial, so the per-tick profit-max auto-solver stops adjusting this building until Auto is re-enabled. This IS the workforce-auto opt-out. Actual staffing is the target mediated by body-level labour contention: when the corp's demand on the body exceeds the habitability-sized pool, every building is throttled by the same fraction and the band prints 'Body allows N%'. Wages scale with assigned workforce; output scales with effective workforce. Setting the value already held is a no-op (rejected_state).",
+   "reason_to_select": "Trades wage bill against output when the solver's profit-max answer is not what is wanted — throttle to cut losses without idling, staff to 0 to park a building cheaply, or overdrive past 100% to feed a downstream chain even at a per-building loss. Also the deliberate press for taking manual control away from the auto-solver."
+  },
+  {
+   "id": "gameplay.set_workforce_auto",
+   "family": "gameplay",
+   "surface": "The 'Auto' checkbox beside the band's workforce slider; the 'Auto (N%)' button above the panel's tier grid.",
+   "press": "Select the owned building, click the Auto checkbox (band) or the Auto button (panel). Clicking while already on is a plain re-assert on the checkbox; the button simply sets it on.",
+   "args": [
+    {
+     "name": "building",
+     "type": "entity_id",
+     "meaning": "The building handed back to the auto-solver."
+    }
+   ],
+   "preconditions": [
+    "The acting corporation exists.",
+    "The corporation owns the building.",
+    "Construction is complete (controls hidden until then)."
+   ],
+   "expected_output": "workforce_auto := true. Each economy tick the solver sets this building's workforce_target to the profit-maximising value; the panel's Auto button displays the currently solved percentage. This is the only sanctioned auto-action on the player's corporation — it moves one dial and never places, relocates, retargets, or decommissions anything. Any later manual target (slider drag or tier button) clears it again.",
+   "reason_to_select": "Removes one micromanagement dial per building. The right press whenever 'maximise this building's own profit' is exactly the intent — freshly built buildings start with it on, so this mostly exists to undo an earlier manual pin."
+  },
+  {
+   "id": "gameplay.survey",
+   "family": "gameplay",
+   "surface": "The Survey section of the Selection band when an unsurveyed body is selected (the hero action for that selection kind; the star carries no survey).",
+   "press": "Single-click the body on the Solar or Circumplanetary canvas, then click 'Dispatch Survey' — the button carries a 'cost cr - ETA d' preview derived from the body's size and distance.",
+   "args": [
+    {
+     "name": "body",
+     "type": "entity_id",
+     "meaning": "The body to survey."
+    }
+   ],
+   "preconditions": [
+    "The acting corporation exists (rejected_no_corp otherwise).",
+    "The body exists and is not the star (rejected_invalid otherwise).",
+    "The body's survey phase is 'hidden' — a survey already in transit, scanning, or completed is refused (rejected_state).",
+    "The balance covers the survey cost (rejected_funds; the UI disables the button and prints 'Insufficient funds.')."
+   ],
+   "expected_output": "Enqueued on press; the app debits the FULL cost up front and arms the schedule. DURATIVE over days, not quarters: phase runs in_transit ('En route - ETA N d') then scanning region-by-region ('Surveying k/N - ETA N d') then surveyed. Each completed region reveals that region's tiles and deposit bands — the geographic fog lifts progressively, so partial results arrive before completion. Nothing is produced; the entire payoff is information. Rejected attempts change nothing.",
+   "reason_to_select": "An unsurveyed body cannot be evaluated or built on — survey is the discovery spend that opens new deposits and expansion sites. The press when local tiles are saturating or the corp needs its next profitable resource base; the AI's own survey_expand fires on discovery spend within its solvency floor."
+  },
+  {
+   "id": "canvas.ascend_key",
+   "family": "canvas",
+   "surface": "Keyboard.",
+   "press": "Press Backspace.",
+   "args": [],
+   "preconditions": [
+    "The app is in-game and no ImGui text field has keyboard focus.",
+    "The primary rung is not already Solar (top of the ladder)."
+   ],
+   "expected_output": "The primary ascends one rung: Planetary -> Circumplanetary -> Solar. Same effect as clicking the minimap. The minimap updates accordingly. Selection, lens, and sim speed are untouched; at the Solar rung the press does nothing.",
+   "reason_to_select": "Step out for context from the keyboard — pair with Enter to ride the ladder without the mouse."
+  },
+  {
+   "id": "canvas.body_next",
+   "family": "canvas",
+   "surface": "Keyboard.",
+   "press": "Press ] (right bracket).",
+   "args": [],
+   "preconditions": [
+    "The app is in-game and no ImGui text field has keyboard focus."
+   ],
+   "expected_output": "The next body (by entity id) becomes the navigation anchor (active_body) and the current rung re-frames around it — the Circumplanetary view centres on its planet, the Planetary view draws its surface. The rung itself does not change, and neither does the selection (Active and Selection are independent states).",
+   "reason_to_select": "Cycle through the system's bodies at your current altitude — tour surfaces or local views one body at a time."
+  },
+  {
+   "id": "canvas.body_prev",
+   "family": "canvas",
+   "surface": "Keyboard.",
+   "press": "Press [ (left bracket).",
+   "args": [],
+   "preconditions": [
+    "The app is in-game and no ImGui text field has keyboard focus."
+   ],
+   "expected_output": "The previous body (by entity id) becomes active_body and the current rung re-frames around it. Rung, selection, lens, and sim speed unchanged — the mirror of canvas.body_next.",
+   "reason_to_select": "Step the body cycle backwards — retrace to the body you just left."
+  },
+  {
+   "id": "canvas.descend_key",
+   "family": "canvas",
+   "surface": "Keyboard.",
+   "press": "Press Enter.",
+   "args": [],
+   "preconditions": [
+    "The app is in-game and no ImGui text field has keyboard focus (bindings are suppressed while ImGui captures the keyboard).",
+    "The primary rung is not already Planetary (bottom of the ladder)."
+   ],
+   "expected_output": "The primary descends one rung, framing the current active_body: Solar -> Circumplanetary -> Planetary. The minimap updates to the new rung's zoom-out neighbour. Selection, lens, and sim speed are untouched. At the Planetary rung the press does nothing.",
+   "reason_to_select": "Keyboard equivalent of drilling in — reach the surface of the currently anchored body without picking it out with the mouse."
+  },
+  {
+   "id": "canvas.deselect",
+   "family": "canvas",
+   "surface": "The primary canvas (any rung).",
+   "press": "Single left-click on empty space (no entity under the cursor).",
+   "args": [],
+   "preconditions": [
+    "The app is in-game.",
+    "The pointer is over the primary canvas, not the minimap inset or an ImGui panel.",
+    "No entity resolves under the cursor."
+   ],
+   "expected_output": "The selection clears and the Selection band hides (it is hidden whenever nothing is selected). No view change of any kind — rung, pan, zoom, lens, and active_body all stay as they were.",
+   "reason_to_select": "Dismiss the Selection band and reclaim the bottom strip when you are done acting on the current selection."
+  },
+  {
+   "id": "canvas.help_overlay_key",
+   "family": "canvas",
+   "surface": "Keyboard.",
+   "press": "Press F1.",
+   "args": [],
+   "preconditions": [
+    "The app is in-game and no ImGui text field has keyboard focus."
+   ],
+   "expected_output": "Toggles the key-bindings cheat-sheet overlay — a table generated from the same binding table the keys route through, so it can never drift from the real bindings (it also lists the off-table F11/F12 entries). Pressing F1 while the overlay is up closes it (toggle rule: its active state is visible). The sim, view, and selection are untouched.",
+   "reason_to_select": "Look up what the keys do without leaving the game — the authoritative in-app copy of this binding table."
+  },
+  {
+   "id": "canvas.hover",
+   "family": "canvas",
+   "surface": "The Planetary surface canvas (tiles, buildings, market centres). The Solar and Circumplanetary rungs still use a lightweight ad-hoc tooltip (name, type, orbital radius) — the full card has not migrated there yet.",
+   "press": "Hold the pointer over a tile or marker without clicking.",
+   "args": [
+    {
+     "name": "target",
+     "type": "entity",
+     "meaning": "The hovered tile, building, or market centre (resolved by the same stack-and-lens rule as clicks)."
+    },
+    {
+     "name": "dwell",
+     "type": "duration",
+     "meaning": "How long the hover is held: ~0.5 s of stable hover opens the glance card; ~2.5 s total sticks it."
+    }
+   ],
+   "preconditions": [
+    "The app is in-game with the Planetary surface primary.",
+    "The pointer rests over an entity; moving off it before ~0.5 s means no card appears.",
+    "No hover card is already up, and construction placement mode is not active (the placement ghost owns that moment)."
+   ],
+   "expected_output": "Glance phase: after ~0.5 s a small chrome-free card appears above the cursor and tracks it like a tooltip; leaving the entity dismisses it. Stick phase: after ~2.5 s total the card freezes in place and is dismissed only when the cursor leaves the card's rect plus a 26 px pad, so long lines can be read to the end. Content is keyed on the active lens (e.g. terrain header + habitability by default; deposit richness under Resource; price signal on a market centre under Market; rival buildings show type + owner only). The card never captures the pointer, never opens the Selection band (clicking is the only opener), and changes no selection or view state.",
+   "reason_to_select": "Read a thing before committing a click — check a tile's landform and movement cost, a deposit's richness, or a price signal, and learn the glyph vocabulary at the point of looking."
+  },
+  {
+   "id": "canvas.lens_clear",
+   "family": "canvas",
+   "surface": "Keyboard.",
+   "press": "Press 0.",
+   "args": [],
+   "preconditions": [
+    "The app is in-game and no ImGui text field has keyboard focus."
+   ],
+   "expected_output": "The overlay lens clears to none: the canvas returns to its unskinned terrain render (the state the app opens in — no lens is active on load). Always-on chrome (landform relief/glyphs, civic markers, player-presence ring) is not lens-gated and stays. The minimap bar shows no active glyph. Selection, framing, and speed unchanged.",
+   "reason_to_select": "Get back to plain terrain in one press from any lens, on-bar or keyboard-only, instead of cycling to the null state."
+  },
+  {
+   "id": "canvas.lens_next",
+   "family": "canvas",
+   "surface": "Keyboard (the minimap's 8-glyph lens bar mirrors the result for on-bar lenses).",
+   "press": "Press L.",
+   "args": [],
+   "preconditions": [
+    "The app is in-game and no ImGui text field has keyboard focus."
+   ],
+   "expected_output": "The overlay lens advances to the next mode in cycle order. The keyboard cycle covers the FULL lens roster, including the off-bar lenses (Scarcity, Industry, Reach, Supply-routes) the minimap bar has no room for — cycling is the only way to reach those. The active lens re-skins the canvas per that lens's semantics (owned elsewhere) and highlights its glyph on the minimap bar when it is an on-bar lens. Selection, view framing, and sim speed are untouched.",
+   "reason_to_select": "Walk the lens family in order — including the keyboard-only lenses — to change which question the map is answering."
+  },
+  {
+   "id": "canvas.lens_prev",
+   "family": "canvas",
+   "surface": "Keyboard.",
+   "press": "Press Shift+L.",
+   "args": [],
+   "preconditions": [
+    "The app is in-game and no ImGui text field has keyboard focus."
+   ],
+   "expected_output": "The overlay lens steps backward through the same full cycle canvas.lens_next walks forward. Everything else as for lens_next: canvas re-skins per the new lens, bar glyph highlight updates for on-bar lenses, no selection/view/speed change.",
+   "reason_to_select": "Step back to the lens you just passed instead of cycling all the way around."
+  },
+  {
+   "id": "canvas.minimap_ascend",
+   "family": "canvas",
+   "surface": "The minimap inset canvas, bottom-right corner of the shell (the middle tier of the minimap box, between its title bar and the lens mode bar).",
+   "press": "Single left-click anywhere on the inset canvas.",
+   "args": [],
+   "preconditions": [
+    "The app is in-game.",
+    "The primary rung is Planetary or Circumplanetary. When Solar is primary the minimap is a non-interactive branding placeholder (game name, plain fill) — there is no rung above to ascend to.",
+    "The pointer is over the minimap inset (input goes to the minimap, not the primary, when the mouse is over it)."
+   ],
+   "expected_output": "The zoom-out neighbour the minimap is showing is promoted to primary: Planetary -> Circumplanetary, Circumplanetary -> Solar. The minimap then shows the next rung out (or the branding placeholder once Solar is primary), and its title updates (planet name -> star name -> game name). This is a single click, not a double — the minimap has no selection semantics. Selection, lens, and sim speed are untouched.",
+   "reason_to_select": "Step out one level for context — see where the body you are looking at sits in the bigger picture, or start navigating somewhere else entirely."
+  },
+  {
+   "id": "canvas.navigate",
+   "family": "canvas",
+   "surface": "The primary canvas (Solar or Circumplanetary rung; the Planetary rung is the bottom of the ladder).",
+   "press": "Double left-click on a body.",
+   "args": [
+    {
+     "name": "target",
+     "type": "entity",
+     "meaning": "The body to navigate to (planet or moon). Resolved the same way as a single-click select."
+    }
+   ],
+   "preconditions": [
+    "The app is in-game.",
+    "The pointer is over the primary canvas with a body under the cursor.",
+    "There is a rung below or a body to re-target: on the Planetary surface, tile double-clicks do not descend (bottom rung)."
+   ],
+   "expected_output": "The canvas sets active_body and primary_level inline (not via focus_on_entity), re-anchoring the ladder. Solar rung: double-click a planet and its Circumplanetary view becomes primary; double-click a moon and the parent planet's Circumplanetary view becomes primary with the moon selected. Circumplanetary rung: double-click the planet or a moon and that body's Planetary surface becomes primary. The minimap updates to show the new rung's zoom-out neighbour. Any existing selection persists (Selection is independent of Active); the sim speed and lens are untouched.",
+   "reason_to_select": "Drill down the zoom ladder toward a body's surface — the load-bearing navigation gesture for going somewhere rather than merely inspecting it."
+  },
+  {
+   "id": "canvas.options_key",
+   "family": "canvas",
+   "surface": "Keyboard.",
+   "press": "Press F10.",
+   "args": [],
+   "preconditions": [
+    "The app is in-game and no ImGui text field has keyboard focus."
+   ],
+   "expected_output": "Toggles the Options window (display/UI settings; changes apply live). Pressing F10 while it is open closes it (toggle rule). Sim, view, and selection untouched — though settings changed inside it (e.g. UI scale) can re-layout the shell.",
+   "reason_to_select": "Adjust display or UI settings mid-session without going through a menu."
+  },
+  {
+   "id": "canvas.pan_drag",
+   "family": "canvas",
+   "surface": "The primary canvas (all three rungs).",
+   "press": "Hold the middle mouse button and drag.",
+   "args": [
+    {
+     "name": "delta",
+     "type": "vector2",
+     "meaning": "The drag displacement in screen pixels; the view translates with the cursor."
+    }
+   ],
+   "preconditions": [
+    "The app is in-game.",
+    "The pointer is over the primary canvas, not the minimap inset or an ImGui panel."
+   ],
+   "expected_output": "The current rung's pan offset shifts so the world moves with the cursor. Pan state is per-rung — panning the Planetary surface does not move the Solar view. No selection, zoom, rung, lens, or sim-speed change; releasing the button simply stops the pan.",
+   "reason_to_select": "Reposition the viewport to look at a different part of the current rung without changing what is selected or how far in you are."
+  },
+  {
+   "id": "canvas.pan_keys",
+   "family": "canvas",
+   "surface": "Keyboard.",
+   "press": "Press an arrow key (Left / Right / Up / Down).",
+   "args": [
+    {
+     "name": "direction",
+     "type": "enum: left | right | up | down",
+     "meaning": "Which arrow was pressed; the view pans one step that way."
+    }
+   ],
+   "preconditions": [
+    "The app is in-game and no ImGui text field has keyboard focus."
+   ],
+   "expected_output": "The current rung's view pans by one step in the given direction (same per-rung pan state the middle-mouse drag writes). Nothing else changes — no selection, zoom, rung, lens, or speed effect.",
+   "reason_to_select": "Nudge the viewport precisely, or pan at all when driving keyboard-only (this is the limited-access surface the verification harness also drives)."
+  },
+  {
+   "id": "canvas.pause_button",
+   "family": "canvas",
+   "surface": "The leftmost button of the time-control row in the time panel (right chrome column, above the minimap).",
+   "press": "Left-click the pause button.",
+   "args": [],
+   "preconditions": [
+    "The app is in-game."
+   ],
+   "expected_output": "Identical to Space (they route through the same seam): toggles pause, remembering the running tier and restoring it on resume. The button's own face is the state readout — a filled square while running, a > play glyph while paused — so this is a toggle under the toggle rule: clicking it while paused resumes. Its tooltip names the Space binding. No view or selection change.",
+   "reason_to_select": "The mouse-side pause: stop or restart time while the cursor is already in the chrome column."
+  },
+  {
+   "id": "canvas.pause_key",
+   "family": "canvas",
+   "surface": "Keyboard (mirrors the on-screen pause button).",
+   "press": "Press Space.",
+   "args": [],
+   "preconditions": [
+    "The app is in-game and no ImGui text field has keyboard focus."
+   ],
+   "expected_output": "Toggles pause. Running -> paused: the sim clock stops (orbits freeze, no economy ticks; the rate label reads Paused) and the tier you were at is remembered. Paused -> running: resumes at the remembered tier, not a fixed default. The on-screen pause button's glyph flips (filled square while running, > play glyph while paused) — the visible active state that makes this a toggle.",
+   "reason_to_select": "Stop time to read the world or line up decisions, then resume at exactly the pace you had."
+  },
+  {
+   "id": "canvas.select",
+   "family": "canvas",
+   "surface": "The primary canvas (Solar, Circumplanetary, or Planetary rung — whichever fills the window).",
+   "press": "Single left-click on an entity: a body on the Solar/Circumplanetary rungs, a tile or marker on the Planetary surface.",
+   "args": [
+    {
+     "name": "target",
+     "type": "entity",
+     "meaning": "The entity under the cursor. Overlapping candidates resolve to one entity: the stack building > market > unit > tile > body is walked most-specific first, the active lens filters validity, and nearest-to-cursor (entity id breaking ties) picks a single stable winner."
+    }
+   ],
+   "preconditions": [
+    "The app is in-game (not the main menu or New World wizard).",
+    "The pointer is over the primary canvas, not over the minimap inset or any ImGui panel (panels capture the mouse).",
+    "An entity is under the cursor (empty space is a different press — see canvas.deselect)."
+   ],
+   "expected_output": "selected_entity becomes the target and the Selection band (fixed strip at the bottom of the screen) appears or re-points, showing that kind's action and facts; a new selection resets any drill-down stack in the band. Nothing else changes: same rung, same pan, same zoom, active_body untouched, no lens change, the canvas is not re-skinned, and any open fold-out ledger stays open. A single click never navigates.",
+   "reason_to_select": "Inspect a thing and surface its one primary move — Dispatch Survey on an unsurveyed body, Manage on your building, the construct/manage grid on a tile — without losing your current framing."
+  },
+  {
+   "id": "canvas.speed_buttons",
+   "family": "canvas",
+   "surface": "The five buttons labelled I, II, III, IV, V beside the pause button in the time panel's control row.",
+   "press": "Left-click a speed-tier button.",
+   "args": [
+    {
+     "name": "tier",
+     "type": "int 1-5",
+     "meaning": "The clicked button: I = 0.25x, II = 0.5x, III = 1x, IV = 4x, V = 16x. The panel's rate label shows the multiplier and the real-time cost of one economic quarter at that tier."
+    }
+   ],
+   "preconditions": [
+    "The app is in-game."
+   ],
+   "expected_output": "The sim runs at the clicked tier and that tier becomes the remembered resume tier; clicking a tier while paused resumes directly at it. The active tier is visibly highlighted, but the row is a single-select selector, NOT a toggle — re-clicking the active tier leaves the speed unchanged (it does not pause; the pause button/Space is the toggle). No view or selection change.",
+   "reason_to_select": "Set the sim pace by eye against the rate label — the mouse equivalent of the 1-5 keys."
+  },
+  {
+   "id": "canvas.speed_keys",
+   "family": "canvas",
+   "surface": "Keyboard (mirrors the on-screen speed buttons I-V).",
+   "press": "Press a digit 1-5.",
+   "args": [
+    {
+     "name": "tier",
+     "type": "int 1-5",
+     "meaning": "Speed tier: 1 = I (0.25x), 2 = II (0.5x), 3 = III (1x), 4 = IV (4x), 5 = V (16x)."
+    }
+   ],
+   "preconditions": [
+    "The app is in-game and no ImGui text field has keyboard focus."
+   ],
+   "expected_output": "The sim runs at the chosen tier's multiplier, and that tier becomes the remembered resume tier. Pressing a digit while paused unpauses directly to that tier. Pressing the digit of the already-active tier changes nothing — speed is a selector, not a toggle; pause (Space) is the toggle. No view or selection change.",
+   "reason_to_select": "Set the pace to the decision density: crawl at 0.25x through a delicate moment, run at 16x through quiet quarters."
+  },
+  {
+   "id": "canvas.tech_tree_key",
+   "family": "canvas",
+   "surface": "Keyboard.",
+   "press": "Press F9.",
+   "args": [],
+   "preconditions": [
+    "The app is in-game and no ImGui text field has keyboard focus."
+   ],
+   "expected_output": "Toggles the mock tech-tree viewer — a read-only design aid rendering display data from scripts/tech_tree.lua, tabbed by era (Era -1 Antiquity placeholder / Era 0 / Era 1 / Standing lines), with NO simulation coupling (nothing can be researched from it; research is not implemented). Pressing F9 again closes it (toggle rule). Sim, view, and selection untouched.",
+   "reason_to_select": "Preview the planned research structure. Do not select this expecting to act — it is a mock, not a system."
+  },
+  {
+   "id": "canvas.zoom_keys",
+   "family": "canvas",
+   "surface": "Keyboard.",
+   "press": "Press = (or +) to zoom in, - to zoom out.",
+   "args": [
+    {
+     "name": "direction",
+     "type": "enum: in | out",
+     "meaning": "= / + zooms in one step; - zooms out one step."
+    }
+   ],
+   "preconditions": [
+    "The app is in-game and no ImGui text field has keyboard focus.",
+    "The current rung is not at its zoom bound in that direction."
+   ],
+   "expected_output": "The current rung's zoom factor steps in or out, clamped to the same per-rung bounds the wheel and slider share. Unlike the wheel there is no cursor anchor to aim — the view scales in place. No selection, rung, lens, or speed change.",
+   "reason_to_select": "Zoom without the mouse — the keyboard leg of the pan/zoom pair for keyboard-only driving."
+  },
+  {
+   "id": "canvas.zoom_slider",
+   "family": "canvas",
+   "surface": "The scale-bar + zoom-slider overlay pinned to the bottom-centre of the primary canvas — present on the Solar and Circumplanetary rungs only (primary view only, never on the minimap copy; the Planetary surface has no slider).",
+   "press": "Click and drag the slider handle.",
+   "args": [
+    {
+     "name": "zoom",
+     "type": "float",
+     "meaning": "The target zoom factor. The track is logarithmic: left end = most zoomed out (zoom_min), right end = most zoomed in (zoom_max). The slider carries no value text; the scale bar beside it gives the distance reading."
+    }
+   ],
+   "preconditions": [
+    "The app is in-game.",
+    "The primary rung is Solar or Circumplanetary."
+   ],
+   "expected_output": "The current rung's zoom factor is set directly to the dragged position, clamped to the same bounds the scroll wheel uses. This is an absolute selector, not a toggle — its position always reflects the current zoom, and wheel zooming moves it. No selection, pan, rung, lens, or speed change.",
+   "reason_to_select": "Jump to a known framing in one gesture — e.g. all the way out to see the whole system — instead of scrolling notch by notch."
+  },
+  {
+   "id": "canvas.zoom_wheel",
+   "family": "canvas",
+   "surface": "The primary canvas (all three rungs).",
+   "press": "Scroll the mouse wheel (up = zoom in, down = zoom out).",
+   "args": [
+    {
+     "name": "direction",
+     "type": "enum: in | out",
+     "meaning": "Wheel-up zooms in, wheel-down zooms out, one increment per notch."
+    }
+   ],
+   "preconditions": [
+    "The app is in-game.",
+    "The pointer is over the primary canvas, not the minimap inset or an ImGui panel.",
+    "The current rung is not already at its zoom bound in that direction (zoom is clamped per rung)."
+   ],
+   "expected_output": "The current rung's zoom factor changes, anchored at the cursor: the point under the pointer stays put while the view scales around it. Per-rung state; the zoom slider (where present) moves to reflect the new factor. No selection, rung, pan-recentre, lens, or speed change.",
+   "reason_to_select": "Move closer to or further from a specific spot — cursor anchoring means you aim the zoom at the thing you are interested in."
+  },
+  {
+   "id": "lens.clear",
+   "family": "lens",
+   "surface": "Minimap lens bar — the glyph of whichever lens is currently active (shown highlighted)",
+   "press": "Single left-click on the currently-active (highlighted) lens glyph. This is the family's one toggle behaviour, stated here once: the bar is single-select with a null state, so re-selecting the active lens clears to no-lens (overlay_mode::none). Each bar-lens entry references this. Off-bar lenses have no glyph to re-click; they are cleared via the keyboard cycle or the clear hotkey (controls family).",
+   "args": [],
+   "preconditions": [
+    "A bar lens must currently be active — with no lens active there is no highlighted glyph and this press does not exist.",
+    "Selecting a different lens is an ordinary switch, not a clear; only re-clicking the active one clears."
+   ],
+   "expected_output": "The canvas returns to plain terrain (overlay_mode::none) — the state the campaign opens in. All lens tints, marks, and keys disappear. Always-on chrome survives: the player-identity tile wash and outline, the player's home ring and HQ star, selection outlines, and building/unit markers are not lens-dependent. Pointer clicks revert to resolving the lowest drawn entity (marker, else tile), routing to the Tile Ledger.",
+   "reason_to_select": "Return to the unskinned terrain read — when the current lens's tint is obscuring terrain, markers, or colours you need, or when a plain click should select the thing under the pointer rather than the lens's unit of meaning."
+  },
+  {
+   "id": "lens.continent",
+   "family": "lens",
+   "surface": "Minimap lens bar, slot 8 (the two-interlocking-plates-split-by-a-diagonal-seam glyph)",
+   "press": "Single left-click on the Continent glyph in the lens bar.",
+   "args": [],
+   "preconditions": [
+    "Always pressable; Planetary-only.",
+    "Needs the active body's generation-report plate record (matched by body name); a body with no record gets an honest 'no plate record' key instead of a tint.",
+    "Re-clicking while active clears the lens (see lens.clear)."
+   ],
+   "expected_output": "Each tectonic plate tints a categorical colour from a dedicated ten-colour earthy table at 0.80 opacity (deliberately not the nation wheel — plates are substrate, not identity). Boundary tiles — any neighbour on another plate — get a separate white lift at 0.45, so plate seams read pale. The key explains that pale tiles are boundaries and reports the plate count; a stagnant-lid body says 'one immobile plate' rather than drawing a meaningless single tint.",
+   "reason_to_select": "Why is the land shaped like that? Shows the plates that drifted the terrain into place, and above all where they meet — the seams the mountain ranges, rifts, and boundary-formed deposits came from. Honestly informational/orientational: it explains the map rather than driving an economic decision."
+  },
+  {
+   "id": "lens.corporation",
+   "family": "lens",
+   "surface": "Minimap lens bar, slot 1 (the seal-square glyph: filled square with centred inner dot)",
+   "press": "Single left-click on the Corporation glyph in the lens bar under the minimap inset.",
+   "args": [],
+   "preconditions": [
+    "The lens bar is always present on the minimap chrome, so the press is always available.",
+    "The lens only re-skins the Planetary canvas; selecting it while on Solar or Circumplanetary changes nothing visible until the player descends to a body surface.",
+    "If Corporation is already the active lens, this same press clears it instead (see lens.clear)."
+   ],
+   "expected_output": "On the Planetary canvas, every tile holding a corporate building tints to its owning corporation's identity colour (the literal building tile only — no influence radius). The player's tiles additionally get a thin white border. Each rival corporation's HQ-projected reach ring and HQ star draw on that corp's home body in its identity colour. Tiles with no corporate building keep their plain terrain colour — there is no nation underlay. Pointer clicks are NOT lens-dependent: selection resolves the same way under every lens — marker hit-test (building outranks market centre), else the tile under the pointer, with a built tile resolving to its building. The lens changes what is drawn, never what a click selects. No on-canvas colour key yet (glyph highlight + tooltip only).",
+   "reason_to_select": "Who owns what: where do rival corporations operate, how does my footprint sit against theirs, and where do their HQ reach rings suggest they will grow? Use it to find uncontested ground to expand into or to size up a rival's holdings before competing."
+  },
+  {
+   "id": "lens.country",
+   "family": "lens",
+   "surface": "Minimap lens bar, slot 2 (the downward-pointing shield glyph)",
+   "press": "Single left-click on the Country glyph in the lens bar.",
+   "args": [],
+   "preconditions": [
+    "Always pressable from the lens bar; Planetary-only surface — no Solar or Circumplanetary representation.",
+    "Re-clicking while active clears the lens (see lens.clear)."
+   ],
+   "expected_output": "Claimed tiles tint to their owning nation's identity colour; a dark border stroke draws on every hex edge between different owners (including claimed/unclaimed boundaries), so territories read as filled regions with hard outlines. Unclaimed tiles keep their plain terrain hue. An on-canvas per-nation key (one colour swatch + name per nation on the active body) folds out flush-left of the minimap. Pointer clicks are NOT lens-dependent: selection resolves the same way under every lens — marker hit-test (building outranks market centre), else the tile under the pointer, with a built tile resolving to its building. The lens changes what is drawn, never what a click selects.",
+   "reason_to_select": "Which nation holds which tile, and where the borders fall. Political context for siting: whose territory would I be building in, which nations border my operations, and how the body's political map is carved up."
+  },
+  {
+   "id": "lens.good_selector",
+   "family": "lens",
+   "surface": "The on-canvas lens legend — the key box that folds out flush-left of the minimap while the Resource, Market, or Scarcity lens is active. One shared combo (bound to a single shared lens_resource value), not three separate controls.",
+   "press": "Open the combo in the lens legend and pick a good from the list.",
+   "args": [
+    {
+     "name": "good",
+     "type": "resource name",
+     "meaning": "The good the active lens interrogates: whose deposits fill (Resource), which price line highlights in the Circumplanetary strip (Market), whose shortfall tints the catchments (Scarcity)."
+    }
+   ],
+   "preconditions": [
+    "One of the Resource, Market, or Scarcity lenses must be active — the combo only exists inside those lenses' legends.",
+    "This is a cross-cutting selector, exempt from the toggle rule: it switches a target rather than expressing an active state, so re-picking the current good is a no-op, not a clear."
+   ],
+   "expected_output": "The active lens's surface re-skins immediately for the newly selected good — new deposit fill (Resource), new highlighted price row (Market), or new shortfall blocks (Scarcity) — and the legend swatch/name update. The lens itself stays active. Because the value is shared, switching lenses afterwards carries the same good across all three.",
+   "reason_to_select": "Change the question's subject without changing the question: compare goods on the same surface — where is copper versus iron, which good is this market pricing high, what is each market short of — by flipping the good while the lens holds."
+  },
+  {
+   "id": "lens.industry",
+   "family": "lens",
+   "surface": "Off the lens bar (trimmed in BL-093 the day it shipped); the factory-silhouette glyph exists but is not on the strip",
+   "press": "No bar press — reachable only via the keyboard lens-cycle (controls family owns the hotkeys).",
+   "args": [],
+   "preconditions": [
+    "Only reachable by keyboard cycle.",
+    "Planetary-only. The economy should have ticked a few times so the nation-substrate injection has settled.",
+    "Cleared by cycling off it or the clear hotkey, not by a bar re-click."
+   ],
+   "expected_output": "A sequential dark-to-amber throughput tint: each tile's nation-owned substrate density weighted by its terrain deposit richness, normalised to the body's maximum — brightest where dense background occupation sits on rich terrain. Tiles with no substrate keep plain terrain. Low-to-high amber gradient key. Pure rendering — it changes nothing in the market arithmetic. Pointer clicks fall through to the tile (Tile Ledger); there is no dedicated ledger route.",
+   "reason_to_select": "Where does the existing, nation-owned background economy already operate — distinct from where people live (Population) and from player/corp production? Context for competition: the substrate is what injects background supply and demand into each market. Largely informational; it frames the world you are entering rather than pointing at a specific action."
+  },
+  {
+   "id": "lens.market",
+   "family": "lens",
+   "surface": "Minimap lens bar, slot 4 (the three-ascending-vertical-bars glyph)",
+   "press": "Single left-click on the Market glyph in the lens bar.",
+   "args": [
+    {
+     "name": "good",
+     "type": "resource name (optional)",
+     "meaning": "The good highlighted in the Circumplanetary price strip; set via the shared good selector (lens.good_selector). The Planetary catchment tint itself is per-market, not per-good."
+    }
+   ],
+   "preconditions": [
+    "Always pressable. Surfaces exist on Planetary and Circumplanetary rungs; Solar shows nothing (prices are per-body-market).",
+    "Prices must have resolved (the economy has ticked) for the strip to show meaningful numbers.",
+    "Re-clicking while active clears the lens (see lens.clear)."
+   ],
+   "expected_output": "Planetary: a catchment tint — one colour per market, so market boundaries read as colour boundaries — with a city-name swatch key and the shared good selector in the legend. Circumplanetary: a compact per-body price strip (good → price list, the selected good highlighted). Terrain shows through the tint. Pointer clicks are NOT lens-dependent: selection resolves the same way under every lens — marker hit-test (building outranks market centre), else the tile under the pointer, with a built tile resolving to its building. The lens changes what is drawn, never what a click selects.",
+   "reason_to_select": "Which market does a tile clear against, and where do market boundaries fall? Decide which catchment to build in (your output sells to the nearest centre) and read per-body prices on the Circumplanetary rung to pick where a good is dear enough to sell."
+  },
+  {
+   "id": "lens.opportunity",
+   "family": "lens",
+   "surface": "Minimap lens bar, slot 6 (the open circle with inner plus glyph)",
+   "press": "Single left-click on the Opportunity glyph in the lens bar.",
+   "args": [],
+   "preconditions": [
+    "Always pressable; Planetary-only.",
+    "The economy must have ticked so market prices have diverged from base — before that the surface reads flat/neutral.",
+    "Re-clicking while active clears the lens (see lens.clear)."
+   ],
+   "expected_output": "Per-tile red-to-green value marks (same mark idiom as Population), keyed to each tile's catchment market's demand-gap rank — a body-relative ranking on gap × volume — unmet demand quantity weighted by traded volume, not a price-above-base measure. All tiles of one catchment read uniformly (the market is the unit), so the surface shows blocks per catchment. Tiles with no catchment market keep plain terrain. Key is the red-to-green rank bar.",
+   "reason_to_select": "Where is demand going unmet, so the market will pay a premium to whoever supplies it? The forward-looking siting lens: green catchments are markets bidding above base — build or route supply there. Reads potential; the Production lens reads what is realised."
+  },
+  {
+   "id": "lens.population",
+   "family": "lens",
+   "surface": "Minimap lens bar, slot 5 (the small figure glyph: round head over tapered torso)",
+   "press": "Single left-click on the Population glyph in the lens bar.",
+   "args": [],
+   "preconditions": [
+    "Always pressable; Planetary-only. No selector — a whole-body surface with no per-good pick.",
+    "Re-clicking while active clears the lens (see lens.clear)."
+   ],
+   "expected_output": "Every buildable tile gets a small per-tile red-to-green value mark keyed by workforce efficiency — the same habitability-to-labour curve the economy applies (full 1.0x efficiency at habitability >= 0.6, ramping down to 0.5x at habitability 0). Tiles keep their terrain hue; the marks carry the signal. A gradient key labelled 'Workforce efficiency' labels the bar's ends 'low' and 'high' (the underlying curve spans 0.5x to 1.0x, but the key does not print the numbers). Note: this is the labour consequence, not raw habitability, and not population density (that lives on the population-centre markers).",
+   "reason_to_select": "Where does labour run at full efficiency? Site buildings where the marks read green (habitability >= 0.6 = full workforce), because the same wages buy less output on the red end. The siting complement to Resource's material read."
+  },
+  {
+   "id": "lens.production",
+   "family": "lens",
+   "surface": "Minimap lens bar, slot 7 (the filled upward triangle over a baseline glyph)",
+   "press": "Single left-click on the Production glyph in the lens bar.",
+   "args": [],
+   "preconditions": [
+    "Always pressable; Planetary today (a Circumplanetary per-body output badge is specified but owed).",
+    "The economy must have ticked so buildings have produced and the economy report is populated — otherwise everything reads cold.",
+    "Re-clicking while active clears the lens (see lens.clear)."
+   ],
+   "expected_output": "Each producing tile tints on the production ramp (production_colour: red → yellow → green) by its output value this tick (sum of output quantity x resolved price) relative to the body's producing-tile geometric mean, composited at 0.6 over terrain. Above-mean producers read green, below-mean red; idle, exhausted, or unbuilt tiles produce nothing and stay untinted. Honest caveat: a body of similar producers reads near-neutral — little spread to show. Low-to-high key. Pointer clicks are NOT lens-dependent: selection resolves the same way under every lens — marker hit-test (building outranks market centre), else the tile under the pointer, with a built tile resolving to its building. The lens changes what is drawn, never what a click selects.",
+   "reason_to_select": "Where is value actually being made right now? The realised-output counterpart to Opportunity's potential: spot the hot producers worth expanding and the cold ones worth investigating or idling."
+  },
+  {
+   "id": "lens.reach",
+   "family": "lens",
+   "surface": "Off the lens bar; currently reuses the convoy glyph (a dedicated glyph is an open TODO)",
+   "press": "No bar press — reachable only via the keyboard lens-cycle (controls family owns the hotkeys).",
+   "args": [],
+   "preconditions": [
+    "Only reachable by keyboard cycle.",
+    "Planetary key today; the specified Solar connected-body glow is owed.",
+    "Shows the player's own trade routes only (competitor-visibility rule — rival lanes stay private).",
+    "Cleared by cycling off it or the clear hotkey."
+   ],
+   "expected_output": "No tile re-skin. A connection-list key headed 'Reach (your trade network)' folds out flush-left of the minimap: one row per body the active body is routed to, name plus a recency dot — fresh routes green, gone-cold routes grey (the activity-fog colour convention). An unrouted body honestly reads 'no routes from this body'.",
+   "reason_to_select": "Which bodies does my commercial network actually touch from here, and which links have gone cold? The health check on your persistent trade network — a greying link is a market going stale in your activity fog."
+  },
+  {
+   "id": "lens.resource",
+   "family": "lens",
+   "surface": "Minimap lens bar, slot 3 (the three-stacked-strata glyph)",
+   "press": "Single left-click on the Resource glyph in the lens bar.",
+   "args": [
+    {
+     "name": "resource",
+     "type": "resource name (optional)",
+     "meaning": "The good whose deposits the lens fills. Set via the shared good selector in the on-canvas legend (lens.good_selector), not on this press; the lens opens showing the currently-set shared lens_resource."
+    }
+   ],
+   "preconditions": [
+    "Always pressable; Planetary-only. No simulation dependency — deposit data exists from tile generation, so it works from turn one.",
+    "Re-clicking while active clears the lens (see lens.clear)."
+   ],
+   "expected_output": "Every tile carrying any deposit of the selected good (deposit > 0) fills flat and uniform with that resource's identity colour at fixed 0.8 opacity — the shape of the contiguous deposit, not a magnitude gradient. Tiles without the good keep their terrain hue. The on-canvas key (flush-left of the minimap) shows the selected resource's swatch + name, the note 'filled = deposit present', and hosts the shared good selector. Deposit magnitude lives in tile detail, not this surface. Pointer clicks are NOT lens-dependent: selection resolves the same way under every lens — marker hit-test (building outranks market centre), else the tile under the pointer, with a built tile resolving to its building. The lens changes what is drawn, never what a click selects.",
+   "reason_to_select": "Where can a chosen good be extracted? The pre-economy siting lens: find the deposit blobs of iron, copper, etc. before placing extraction. Answers 'where is the iron' by shape; how rich each tile is comes from clicking it."
+  },
+  {
+   "id": "lens.scarcity",
+   "family": "lens",
+   "surface": "Off the lens bar (dropped in the BL-093 trim to 7-then-8 glyphs); the hollow downward-triangle glyph exists but is not on the strip",
+   "press": "No bar press — reachable only via the keyboard lens-cycle (L / Shift+L; those hotkeys are catalogued in the controls family, not here).",
+   "args": [
+    {
+     "name": "resource",
+     "type": "resource name (optional)",
+     "meaning": "The good whose shortfall is shown — scarcity of what? Set via the shared good selector (lens.good_selector), which appears in the on-canvas legend once the lens is active."
+    }
+   ],
+   "preconditions": [
+    "Only reachable by keyboard cycle — there is no glyph to click.",
+    "Planetary-only. The economy must have ticked so market supply/demand arrays are populated.",
+    "Cleared by cycling off it or pressing the clear hotkey (controls family), not by a bar re-click."
+   ],
+   "expected_output": "A market-level field, not per-tile: every tile in a market's catchment reads as one solid block, composited toward a hot red hue at opacity proportional to that market's supply shortfall of the selected good (max(0, demand - supply), normalised to the body's worst market). A met market keeps plain terrain; a short one reads hot. With one market per body the whole body is a single block — honest to the market structure. Abundant-to-scarce key plus the selected resource's swatch and the shared selector. Pointer clicks are NOT lens-dependent: selection resolves the same way under every lens — marker hit-test (building outranks market centre), else the tile under the pointer, with a built tile resolving to its building. The lens changes what is drawn, never what a click selects.",
+   "reason_to_select": "Where did demand outrun supply for a chosen good last tick? The inverse of the Resource lens — gaps, not concentrations. Pick a good you can produce and find the hot markets: that is where to sell into or build supply for."
+  },
+  {
+   "id": "lens.supply",
+   "family": "lens",
+   "surface": "Off the lens bar; the two-parallel-horizontal-lines convoy glyph exists but is not on the strip",
+   "press": "No bar press — reachable only via the keyboard lens-cycle (controls family owns the hotkeys).",
+   "args": [],
+   "preconditions": [
+    "Only reachable by keyboard cycle.",
+    "The one genuinely multi-rung lens: surfaces on all three canvases.",
+    "Shows player convoys only; nothing renders if no player convoy is in transit.",
+    "Cleared by cycling off it or the clear hotkey."
+   ],
+   "expected_output": "Solar: a route line per player convoy currently in transit between bodies. Circumplanetary: a convoy-count badge beside each body's label. Planetary: a convoy glyph on the active body's tiles while a player convoy touches them. Lines and badges use a single neutral logistics hue — flow, not ownership. Tiles are not re-tinted; supply annotates, it does not re-skin terrain. The throughput scale-key is still owed.",
+   "reason_to_select": "Where are my goods moving right now? Verify dispatched convoys are actually in flight and see the live shape of your logistics — the in-motion read; the standing lanes they carve belong to the Supply-routes lens."
+  },
+  {
+   "id": "lens.supply_routes",
+   "family": "lens",
+   "surface": "Off the lens bar; reuses the supply glyph",
+   "press": "Cycle lenses with L (forward) / Shift+L (backward) until Supply-routes is active — it is the last mode in the cycle. No lens-bar slot.",
+   "args": [],
+   "preconditions": [
+    "In-game on a canvas (the lens-cycle keys are live).",
+    "Off the bar: reachable only via the keyboard lens cycle. (A 2026-07-31 doc note claimed the cycle could not reach this lens; that was stale — canvas_command.cpp anchors overlay_mode_count to supply_routes+1 with a static_assert, so the cycle covers all 14 modes.)",
+    "Planetary key only (the specified Solar aggregated-graph render is owed); player routes only."
+   ],
+   "expected_output": "No tile re-skin. A lane-list key: one row per standing trade lane touching the active body (one entry per body pair), with a log-scaled thickness bar from that lane's cumulative convoy count (a single completion reads as a thin sliver; heavy repeat traffic saturates rather than growing linearly) and the same recency-tier colouring as Reach.",
+   "reason_to_select": "Which standing lanes carry my economy, and how heavily? The aggregate counterpart to Supply's in-flight convoys: the carved trade lanes and their traffic weight, for judging which routes are load-bearing and which are vestigial."
+  },
+  {
+   "id": "ledger.budget_tax_tier",
+   "family": "ledger",
+   "surface": "Balance Ledger (Budget), 'Taxes' tier control",
+   "press": "Click '-' / '+' to step, or a Roman numeral I-V to set, the tax tier",
+   "args": [
+    {
+     "name": "tier",
+     "type": "int 1-5",
+     "meaning": "Target tax tier; arrows step by one, numerals jump directly"
+    }
+   ],
+   "preconditions": [
+    "Balance Ledger is open"
+   ],
+   "expected_output": "The displayed tier changes and the active numeral highlights green. HONESTLY: this is a stub - it has NO economic effect yet (tax mechanics are owed to BL-155, the tooltip says so). Nothing else changes.",
+   "reason_to_select": "Will eventually set fiscal policy; today it only answers 'what tier is dialled in' - selecting it changes no outcome."
+  },
+  {
+   "id": "ledger.budget_wage_tier",
+   "family": "ledger",
+   "surface": "Balance Ledger (Budget), 'Wages' tier control",
+   "press": "Click '-' / '+' to step, or a Roman numeral I-V to set, the wage tier",
+   "args": [
+    {
+     "name": "tier",
+     "type": "int 1-5",
+     "meaning": "Target wage tier"
+    }
+   ],
+   "preconditions": [
+    "Balance Ledger is open"
+   ],
+   "expected_output": "The displayed tier changes and highlights. HONESTLY: a stub with NO economic effect yet (BL-155); distinct from the per-building workforce target, which is a real, separate control owned elsewhere.",
+   "reason_to_select": "Will eventually set corporate wage policy; today it is display-only."
+  },
+  {
+   "id": "ledger.build_ledger_close",
+   "family": "ledger",
+   "surface": "Tile construction ledger (the 'Construct · [x, y]' fold-out, BL-162), header",
+   "press": "Click the 'x' button at the right of the header",
+   "args": [],
+   "preconditions": [
+    "Tile construction ledger is open (opened from the tile Selection band's Construct button)"
+   ],
+   "expected_output": "Closes the ledger, returning attention to the tile Selection band. The ledger also closes itself automatically if the selection stops being a tile.",
+   "reason_to_select": "Done browsing build candidates (or deciding not to build) - exits without building anything."
+  },
+  {
+   "id": "ledger.chat_channel_tab",
+   "family": "ledger",
+   "surface": "Comms dock (bottom-left), channel button row",
+   "press": "Click a channel's name button (e.g. 'Public' or a created group)",
+   "args": [
+    {
+     "name": "channel",
+     "type": "string",
+     "meaning": "Which chat channel to make active"
+    }
+   ],
+   "preconditions": [
+    "In-game (the comms dock is permanent chrome)"
+   ],
+   "expected_output": "Switches the dock's log and input to that channel; the active channel's button renders pressed. A plain selector - clicking the active channel again does not close the dock (the dock has no open/closed state).",
+   "reason_to_select": "Chooses which conversation to read or post into - Public carries nation-voiced public communications (BL-212); groups are player-scoped. It does NOT carry rival corp reflex events — those were removed as a competitor-visibility violation."
+  },
+  {
+   "id": "ledger.chat_message_input",
+   "family": "ledger",
+   "surface": "Comms dock, message input line at the bottom",
+   "press": "Type a message and press Enter",
+   "args": [
+    {
+     "name": "text",
+     "type": "string",
+     "meaning": "The message to post"
+    }
+   ],
+   "preconditions": [
+    "In-game",
+    "Message is non-empty"
+   ],
+   "expected_output": "Posts the message into the active channel's log under the player's name. HONESTLY: no mechanical effect yet - it is the hook the future AI conversation route consumes; today nothing answers.",
+   "reason_to_select": "Speaks into the world's comms - currently expressive only, later the way to address rival corporations."
+  },
+  {
+   "id": "ledger.chat_new_group",
+   "family": "ledger",
+   "surface": "Comms dock, '+' button and the NEW GROUP popup it opens",
+   "press": "Click '+', type a group name, tick member corporations, click 'Create'",
+   "args": [
+    {
+     "name": "name",
+     "type": "string",
+     "meaning": "The new group channel's name"
+    },
+    {
+     "name": "members",
+     "type": "list of corporations",
+     "meaning": "Which corporations to include (the player is an implicit member)"
+    }
+   ],
+   "preconditions": [
+    "In-game",
+    "Create enables only once a name is typed and at least one member is ticked"
+   ],
+   "expected_output": "Creates a new chat channel with those members and adds its button to the channel row. Clicking away dismisses the popup without creating. Chat-only structure - no economic or diplomatic effect.",
+   "reason_to_select": "Sets up a scoped conversation with specific rivals - the substrate the future AI communication route (diplomacy-as-communication) will read."
+  },
+  {
+   "id": "ledger.construction_view_tab",
+   "family": "ledger",
+   "surface": "Construction panel, view tab strip",
+   "press": "Click the 'Construction' or 'Buildings' tab button",
+   "args": [
+    {
+     "name": "view",
+     "type": "enum",
+     "meaning": "'Construction' (in-progress builds) or 'Buildings' (owned buildings; the default)"
+    }
+   ],
+   "preconditions": [
+    "Construction panel is open"
+   ],
+   "expected_output": "Switches the view. Re-clicking the currently-active tab closes the whole Construction panel (toggle rule); switching tabs is an ordinary view change. Buildings lists owned buildings with their management surface; Construction lists what is currently being built.",
+   "reason_to_select": "Buildings answers 'what do I operate and how is each doing?'; Construction answers 'what is on the way and when does it land?'"
+  },
+  {
+   "id": "ledger.corp_card_expand",
+   "family": "ledger",
+   "surface": "Corporation dashboard, one of the four roll-up cards (Production / Trade / Workforce / Finance)",
+   "press": "Click the chevron on a card's title row",
+   "args": [
+    {
+     "name": "card",
+     "type": "enum",
+     "meaning": "Which roll-up: Production, Trade, Workforce, or Finance"
+    }
+   ],
+   "preconditions": [
+    "Corporation dashboard is open"
+   ],
+   "expected_output": "Opens that card as a full-screen overlay (the drill-through idiom, BL-214) - the card's full item list and charts at screen size. Only one thing can be expanded at a time; expanding a second card folds the first. Re-clicking the chevron (or pressing Esc) folds the overlay back to the one-line verdict.",
+   "reason_to_select": "The folded card is a verdict line; expanding answers 'what is BEHIND this verdict?' - the per-item breakdown that names which building, lane, or account moves the number."
+  },
+  {
+   "id": "ledger.corp_drill_back",
+   "family": "ledger",
+   "surface": "Corporation dashboard, drill breadcrumb ('Corporation > Card > Subject')",
+   "press": "Click the card-name link in the breadcrumb",
+   "args": [],
+   "preconditions": [
+    "A roll-up drill is open (a subject is being viewed)"
+   ],
+   "expected_output": "Pops the drill: returns the overlay to the card's full item list. (Esc also unwinds one drill level before folding the overlay itself.)",
+   "reason_to_select": "Returns to the comparison list to check a different subject against the one just read."
+  },
+  {
+   "id": "ledger.corp_rollup_drill",
+   "family": "ledger",
+   "surface": "Corporation dashboard, expanded roll-up overlay (Production, Trade, or Workforce card)",
+   "press": "Click one of the labelled magnitude-bar rows in the expanded card",
+   "args": [
+    {
+     "name": "row",
+     "type": "index",
+     "meaning": "Which item (a building, trade lane, or workforce site) to drill into"
+    }
+   ],
+   "preconditions": [
+    "A roll-up card is expanded",
+    "The card has drillable items (Production, Trade, Workforce do; Finance has no item rows)"
+   ],
+   "expected_output": "Drills to that subject's detail view inside the overlay, replacing the list; a 'Corporation > Card > Subject' breadcrumb appears at the top. Each row shows a 'Click to drill in' tooltip on hover.",
+   "reason_to_select": "Moves from 'production is down' to 'THIS building is the one dragging it' - the subject-level answer a decision needs."
+  },
+  {
+   "id": "ledger.corps_table_row_select",
+   "family": "ledger",
+   "surface": "All-corporations balance table (nav slot 8)",
+   "press": "Click a corporation's row",
+   "args": [
+    {
+     "name": "corporation",
+     "type": "entity",
+     "meaning": "Which corporation to select"
+    }
+   ],
+   "preconditions": [
+    "Corporations table is open"
+   ],
+   "expected_output": "Sets that corporation as the current selection: the Selection band at the bottom fills with its detail (name, home nation; corporations are non-spatial, so its go-to routes to a ledger). The table stays open - selection does not close ledgers.",
+   "reason_to_select": "The table gives one number per rival; selecting a row is how to ask 'tell me more about this one'."
+  },
+  {
+   "id": "ledger.history_body_selector",
+   "family": "ledger",
+   "surface": "History ledger, 'Body' combo (Story and Tiles views only)",
+   "press": "Open the Body combo and pick a body",
+   "args": [
+    {
+     "name": "body",
+     "type": "entity",
+     "meaning": "Which body's story or tile table to show"
+    }
+   ],
+   "preconditions": [
+    "History ledger is open",
+    "Active view is Story or Tiles (Chain has no per-body selector)"
+   ],
+   "expected_output": "Repoints the Story prose or the Tiles table at the chosen body. Cross-cutting selector - exempt from the toggle rule.",
+   "reason_to_select": "Chooses which body's generation record to read - e.g. checking a prospective mining body's deposit story before committing."
+  },
+  {
+   "id": "ledger.history_chain_round_tab",
+   "family": "ledger",
+   "surface": "History ledger, Chain view's round strip",
+   "press": "Click the 'System', 'Life', or 'Legacy' button",
+   "args": [
+    {
+     "name": "round",
+     "type": "enum",
+     "meaning": "Which generation round to chart: System (physical), Life (biosphere), or Legacy (aftermath)"
+    }
+   ],
+   "preconditions": [
+    "History ledger is open",
+    "Chain view is active"
+   ],
+   "expected_output": "Switches the Chain charts to that round's question (a caption states it). This strip is a plain selector - it does NOT close the ledger on re-click (no close flag is wired), unlike the top-level view tabs.",
+   "reason_to_select": "Each round answers a different comparison - which bodies are physically viable, which grew life, what remains - stepping through them builds the whole system picture."
+  },
+  {
+   "id": "ledger.history_view_expand",
+   "family": "ledger",
+   "surface": "History ledger, chevron on the tab row (Story and Tiles views)",
+   "press": "Click the fold chevron at the right end of the tab row",
+   "args": [],
+   "preconditions": [
+    "History ledger is open",
+    "Active view is Story or Tiles (Chain carries no view-level chevron)"
+   ],
+   "expected_output": "Opens the current view as a full-screen overlay - the honest fix for the Tiles table, whose ~29 columns overflow the 380 px column. Re-clicking the chevron (or Esc) folds back to the in-column view.",
+   "reason_to_select": "The Tiles table is unreadable at column width; expanding is how to actually read all its columns at once. Story gains room for long biographies."
+  },
+  {
+   "id": "ledger.history_view_tab",
+   "family": "ledger",
+   "surface": "History ledger, view tab strip",
+   "press": "Click the 'Story', 'Chain', or 'Tiles' tab button",
+   "args": [
+    {
+     "name": "view",
+     "type": "enum",
+     "meaning": "'Story' (body biography prose), 'Chain' (generation chain charts across all bodies), or 'Tiles' (raw per-tile data table)"
+    }
+   ],
+   "preconditions": [
+    "History ledger is open"
+   ],
+   "expected_output": "Switches the view. Re-clicking the currently-active tab closes the whole History ledger (toggle rule); switching tabs is an ordinary view change. Story and Tiles are about one body (see the Body selector); Chain compares every body side by side and hides the selector.",
+   "reason_to_select": "Story answers 'what is this body's biography?'; Chain answers 'how do the bodies compare through the generation stages?'; Tiles answers 'what are the exact numbers per tile?'"
+  },
+  {
+   "id": "ledger.market_body_selector",
+   "family": "ledger",
+   "surface": "Market Ledger, 'Body' combo",
+   "press": "Open the Body combo and pick a body",
+   "args": [
+    {
+     "name": "body",
+     "type": "entity",
+     "meaning": "Which body's markets to view; defaults to the home body"
+    }
+   ],
+   "preconditions": [
+    "Market Ledger is open",
+    "The body has at least one market"
+   ],
+   "expected_output": "Repoints the ledger at the chosen body; the Market selector refills with that body's markets and the price/order tables refresh. A cross-cutting target selector - exempt from the toggle rule (re-picking the same body is a no-op, it never closes anything).",
+   "reason_to_select": "Prices differ per body; this chooses WHERE the price question is being asked - essential for comparing sale destinations."
+  },
+  {
+   "id": "ledger.market_market_selector",
+   "family": "ledger",
+   "surface": "Market Ledger, 'Market' combo",
+   "press": "Open the Market combo and pick a market centre on the selected body",
+   "args": [
+    {
+     "name": "market",
+     "type": "entity",
+     "meaning": "Which market centre (city) on the selected body"
+    }
+   ],
+   "preconditions": [
+    "Market Ledger is open",
+    "Selected body has more than zero markets (auto-selects the first)"
+   ],
+   "expected_output": "Repoints the price and sell-order tables at that market centre. Cross-cutting selector - exempt from the toggle rule.",
+   "reason_to_select": "A body can host several market centres with different books; this picks the exact venue for a trade."
+  },
+  {
+   "id": "ledger.market_view_tab",
+   "family": "ledger",
+   "surface": "Market Ledger, view tab strip at the top",
+   "press": "Click the 'Prices' or 'Sell Orders' tab button",
+   "args": [
+    {
+     "name": "view",
+     "type": "enum",
+     "meaning": "'Prices' (default) or 'Sell Orders'"
+    }
+   ],
+   "preconditions": [
+    "Market Ledger is open"
+   ],
+   "expected_output": "Switches the ledger to that view. Re-clicking the CURRENTLY-ACTIVE tab closes the whole Market Ledger (toggle rule on tab strips); clicking the other tab is an ordinary view change. Prices shows the order book / price table for the selected market; Sell Orders shows the player's standing sell orders there.",
+   "reason_to_select": "Prices answers 'what is the market paying?'; Sell Orders answers 'what am I currently offering, at what floor?' - the two halves of a selling decision."
+  },
+  {
+   "id": "ledger.nav_budget",
+   "family": "ledger",
+   "surface": "Nav rail, slot 2 (Budget icon)",
+   "press": "Click the ledger glyph on the left icon rail",
+   "args": [],
+   "preconditions": [
+    "In-game"
+   ],
+   "expected_output": "Toggles the Balance Ledger (Budget) open in the fold-out column; re-click closes it; opening closes any other open ledger. Open, it shows the money loop: income, costs, where the money went, a profit-per-tick line chart, a per-building profit rank table, and the stubbed Taxes/Wages tier controls. Single view - no sub-tabs.",
+   "reason_to_select": "Answers 'am I making or losing money, and which flow or building is responsible?' - feeds every spend/expand/cut decision."
+  },
+  {
+   "id": "ledger.nav_construction",
+   "family": "ledger",
+   "surface": "Nav rail, slot 6 (Construction icon)",
+   "press": "Click the industry/factory glyph on the left icon rail",
+   "args": [],
+   "preconditions": [
+    "In-game"
+   ],
+   "expected_output": "Toggles the Construction panel open in the fold-out column; re-click closes; opening closes any other ledger. Open, it shows the Construction / Buildings split (defaults to Buildings): what is being built now, and the buildings the player owns with their management controls.",
+   "reason_to_select": "Answers 'what do I own and what is under way?' - the broad building overview; per-building operations (recipe, workforce, demolish) are reached from here but are separate presses."
+  },
+  {
+   "id": "ledger.nav_corporation",
+   "family": "ledger",
+   "surface": "Nav rail, slot 1 (Corporation overview icon)",
+   "press": "Click the corporation glyph on the left icon rail",
+   "args": [],
+   "preconditions": [
+    "In-game (the rail is permanent chrome)"
+   ],
+   "expected_output": "Toggles the Corporation dashboard open in the fold-out column. Opening it closes whichever other ledger was open (accordion). If it is already open, clicking again closes it (toggle rule). Open, it shows the player corporation's four roll-up cards - Production, Trade, Workforce, Finance - each a one-line verdict with an expand chevron.",
+   "reason_to_select": "Answers 'how is my corporation doing overall, and where is the weak card?' - the top-level health check that decides which subsystem to drill into next."
+  },
+  {
+   "id": "ledger.nav_corporations_table",
+   "family": "ledger",
+   "surface": "Nav rail, slot 8 (Diplomacy icon - provisionally hosts the corporations table)",
+   "press": "Click the diplomacy glyph on the left icon rail",
+   "args": [],
+   "preconditions": [
+    "In-game"
+   ],
+   "expected_output": "Toggles the all-corporations balance table open in the fold-out column; re-click closes; opening closes any other ledger. Open, it lists every corporation with its balance side by side (player row highlighted). Diplomacy itself is not built; this table is the slot's provisional occupant.",
+   "reason_to_select": "Answers 'how do rivals' finances compare to mine?' - the only side-by-side rival-balance read in the game."
+  },
+  {
+   "id": "ledger.nav_history",
+   "family": "ledger",
+   "surface": "Nav rail, slot 9 (History icon)",
+   "press": "Click the history glyph on the left icon rail",
+   "args": [],
+   "preconditions": [
+    "In-game"
+   ],
+   "expected_output": "Toggles the History ledger open in the fold-out column; re-click closes; opening closes any other ledger. Open, it shows how the world was generated, split into Story / Chain / Tiles views for a chosen body.",
+   "reason_to_select": "Answers 'why is this world the way it is?' - body biography, the generation chain, and the raw per-tile numbers; feeds site-selection and understanding of deposit placement."
+  },
+  {
+   "id": "ledger.nav_market",
+   "family": "ledger",
+   "surface": "Nav rail, slot 5 (Market Ledger icon)",
+   "press": "Click the market glyph on the left icon rail",
+   "args": [],
+   "preconditions": [
+    "In-game"
+   ],
+   "expected_output": "Toggles the Market Ledger open in the fold-out column; re-click closes; opening closes any other ledger. Open, it shows prices, supply and demand for one market on one body (chosen by the Body and Market selectors), split into Prices and Sell Orders views.",
+   "reason_to_select": "Answers 'what does this good trade for, where?' - the price signal behind every sell-order, extraction and routing decision."
+  },
+  {
+   "id": "ledger.selection_body_goto_surface",
+   "family": "ledger",
+   "surface": "Selection band, body kind's action column, 'Go to surface' button",
+   "press": "Click 'Go to surface'",
+   "args": [],
+   "preconditions": [
+    "A body (not the star) is selected",
+    "The body is surveyed (an unsurveyed body shows Dispatch Survey instead - a world-mutating press owned by the survey family)"
+   ],
+   "expected_output": "Descends the canvas to the body's planetary tile surface (the most informative rung). Equivalent to the header's '>' for a body. No world change.",
+   "reason_to_select": "Surveying is done; the move now is to look at the ground - tiles, deposits, and rival footprints."
+  },
+  {
+   "id": "ledger.selection_close",
+   "family": "ledger",
+   "surface": "Selection band header (all kinds, including the tile card), 'x' button",
+   "press": "Click the 'x' button at the right of the band's header row",
+   "args": [],
+   "preconditions": [
+    "Something is selected and the band is visible"
+   ],
+   "expected_output": "Hides the band for this selection. It is not destroyed: the next selection (clicking any entity) reopens it. There is no other way to reopen it - the band has no nav-rail slot; selection is its only opener.",
+   "reason_to_select": "Clears the bottom band to see the canvas; costs nothing since any click re-summons it."
+  },
+  {
+   "id": "ledger.selection_construct_open",
+   "family": "ledger",
+   "surface": "Selection band, tile card's right-hand 2x3 action grid, Construct (hammer) button",
+   "press": "Click the hammer icon button",
+   "args": [],
+   "preconditions": [
+    "A tile is selected",
+    "Something is actually placeable on the tile (otherwise the button disables with 'Nothing can be built on this tile')"
+   ],
+   "expected_output": "Opens the tile construction ledger (BL-162) in the fold-out column: every building type placeable on THIS tile, with full cost, expected-profit bar, and reason-coded validity. Opening it is non-mutating; the Build presses inside it belong to the construction action family. The button carries an accent ring ('primed') when the player has nothing under construction anywhere.",
+   "reason_to_select": "The front door to building on a specific tile - answers 'what could I put here and what would it earn?' before committing."
+  },
+  {
+   "id": "ledger.selection_drill_back",
+   "family": "ledger",
+   "surface": "Selection band, resource drill view, '<' button at the left of its header",
+   "press": "Click the '<' (Back) button",
+   "args": [],
+   "preconditions": [
+    "A resource drill is open (drill stack non-empty)"
+   ],
+   "expected_output": "Pops one drill frame, returning to the previous view (usually the tile's metric accordion).",
+   "reason_to_select": "Done with the history; back to comparing the tile's other metrics."
+  },
+  {
+   "id": "ledger.selection_drill_close",
+   "family": "ledger",
+   "surface": "Selection band, resource drill view, 'x' button at the right of its header",
+   "press": "Click the 'x' (Close) button",
+   "args": [],
+   "preconditions": [
+    "A resource drill is open"
+   ],
+   "expected_output": "Clears the entire drill stack AND hides the whole Selection band (unlike Back, which unwinds one level). The next selection reopens the band at its root.",
+   "reason_to_select": "Abandon the whole inspection in one press rather than backing out level by level."
+  },
+  {
+   "id": "ledger.selection_drill_scroll",
+   "family": "ledger",
+   "surface": "Selection band, resource drill view, horizontal slider under the chart",
+   "press": "Drag the slider left (older) or right (most recent)",
+   "args": [
+    {
+     "name": "window_start",
+     "type": "int",
+     "meaning": "Left edge of the 8-quarter viewing window within the recorded history"
+    }
+   ],
+   "preconditions": [
+    "A resource drill is open",
+    "More history is recorded than the 8-quarter window (otherwise no slider draws)"
+   ],
+   "expected_output": "Scrolls the 8-quarter window through the recorded series. Until dragged, the window tracks the most recent data as time advances; dragging pins it to the chosen position.",
+   "reason_to_select": "Reads earlier eras of the tile's output - was it always this productive, or is the deposit running down?"
+  },
+  {
+   "id": "ledger.selection_goto",
+   "family": "ledger",
+   "surface": "Selection band header, '>' (go-to) button",
+   "press": "Click the '>' button at the right of the band's header row",
+   "args": [],
+   "preconditions": [
+    "Something is selected and the band is visible",
+    "Selection kind is not a tile (the tile layout carries no go-to; a tile's go-to is a no-op today)"
+   ],
+   "expected_output": "Navigates to the selection - exactly equivalent to double-clicking it: a spatial entity (body, building, market, unit) moves the canvas (a body descends to its planetary surface); a non-spatial entity (nation, corporation) opens its ledger instead. The band itself stays; an open fold-out ledger is untouched.",
+   "reason_to_select": "The bridge from 'I am reading about it' to 'take me to where it lives' - the Host axis of the disclosure model."
+  },
+  {
+   "id": "ledger.selection_locate",
+   "family": "ledger",
+   "surface": "Selection band, market/unit kind's action column, 'Go to' button",
+   "press": "Click 'Go to'",
+   "args": [],
+   "preconditions": [
+    "A market or unit is selected"
+   ],
+   "expected_output": "Navigates the canvas to the entity's position (its body's surface / location) via the same focus routing as the header '>' button. No world change.",
+   "reason_to_select": "Places the abstract row on the map - where IS this market or unit, and what surrounds it?"
+  },
+  {
+   "id": "ledger.selection_manage_building",
+   "family": "ledger",
+   "surface": "Selection band, tile card's action grid, Manage (gear) button",
+   "press": "Click the gear icon button",
+   "args": [],
+   "preconditions": [
+    "A tile is selected",
+    "A building occupies the tile (otherwise disabled: 'No building here')"
+   ],
+   "expected_output": "Switches the selection to the occupying building: next frame the band shows the building's own layout (profitability, its operating controls). Pure re-selection - nothing in the world changes.",
+   "reason_to_select": "The route from ground to operator: 'there is a building here - show me its numbers and controls.'"
+  },
+  {
+   "id": "ledger.selection_metric_drill",
+   "family": "ledger",
+   "surface": "Selection band, tile card's metric chart (in-band or expanded)",
+   "press": "Click anywhere on a deposited-resource chart",
+   "args": [
+    {
+     "name": "resource",
+     "type": "resource",
+     "meaning": "Implicit - the resource of the page currently shown"
+    }
+   ],
+   "preconditions": [
+    "A tile is selected",
+    "The current page is a deposited resource (Habitability/Hazard pages are NOT drillable - no per-tile history is tracked for them; their tooltip says so)"
+   ],
+   "expected_output": "Drills into that resource's time-series history: the band (or overlay) replaces the comparison chart with the body's total as columns plus this tile's own series as a line, over a shared day axis. Hover tooltip announces 'Click for its history over time'. Pushes a frame onto the drill stack (max depth 20).",
+   "reason_to_select": "Moves from 'how good is this tile now?' to 'how has it produced over time?' - depletion and trend, the fact a long-term siting decision needs."
+  },
+  {
+   "id": "ledger.selection_metric_expand",
+   "family": "ledger",
+   "surface": "Selection band, tile card's metric accordion, fold chevron at the right of the pager row",
+   "press": "Click the chevron",
+   "args": [],
+   "preconditions": [
+    "A tile is selected"
+   ],
+   "expected_output": "Opens the current metric page as a full-screen overlay - the band rests expanded-in-place (its fixed rect cannot shrink), so the chevron means 'give this the whole screen', not 'fold'. Re-clicking (or Esc) closes the overlay back to the band. If a resource drill is open, the overlay shows the drilled time series instead.",
+   "reason_to_select": "The band's chart is 260 px tall; the overlay gives it the axis room and legend space to actually compare values."
+  },
+  {
+   "id": "ledger.selection_metric_pager",
+   "family": "ledger",
+   "surface": "Selection band, tile card's centre metric accordion, '<' / '>' arrow buttons",
+   "press": "Click the left or right arrow beside the metric title ('Name (i/N)')",
+   "args": [
+    {
+     "name": "direction",
+     "type": "enum",
+     "meaning": "'previous' or 'next' page"
+    }
+   ],
+   "preconditions": [
+    "A tile is selected",
+    "Not already at the first/last page (the arrow disables at the ends)"
+   ],
+   "expected_output": "Pages the accordion to the adjacent metric: one page per resource deposited on the tile (this tile's yield vs a top-10% tile), then the tile's Habitability and Hazard scalars (vs the body average). One titled chart shows at a time.",
+   "reason_to_select": "Walks every measurable fact about the tile one chart at a time - the read that grades a prospective build site."
+  },
+  {
+   "id": "chrome.esc",
+   "family": "chrome",
+   "surface": "Keyboard, in-game only",
+   "press": "Press Esc.",
+   "args": [],
+   "preconditions": [
+    "App is in game. On the main menu and the wizard, Esc does nothing (the key handler returns before Esc handling on those screens).",
+    "Works even while an ImGui panel holds keyboard focus — Esc is handled before the ImGui keyboard guard."
+   ],
+   "expected_output": "Exactly one rung of this precedence ladder fires, highest first: (1) an armed exit-confirm backs out (Really quit? disarms); (2) an open system menu closes; (3) if the sticky selection card is open and has a drill stack, one drill level unwinds; (4) if the corporation roll-up is drilled into a constituent, it returns to the roll-up; (5) if a fold overlay is expanded full-screen, it folds up; (6) an open sticky card hides (hidden for this selection, not destroyed); (7) otherwise the system menu opens. One press never does two of these — e.g. Esc reaches the menu only once the card is fully closed.",
+   "reason_to_select": "The universal step-out key: back out of a confirmation, close the menu, unwind a drill, fold an overlay, dismiss the card — or, with nothing open, reach the session menu."
+  },
+  {
+   "id": "chrome.f1_help",
+   "family": "chrome",
+   "surface": "Keyboard; opens a centred Key Bindings window",
+   "press": "Press F1 (press again, or click the window's X, to close).",
+   "args": [],
+   "preconditions": [
+    "App is in game (the binding table is gated off on the menu and wizard).",
+    "Not while an ImGui widget owns the keyboard (typing in a text field suppresses it)."
+   ],
+   "expected_output": "Toggles a two-column Action/Key cheat-sheet, generated from the same binding table the key handler loops over, so it can never drift from the real bindings. F11 and F12 sit outside that table and are appended to the sheet by hand.",
+   "reason_to_select": "To look up every keyboard shortcut without leaving the game."
+  },
+  {
+   "id": "chrome.f10_options",
+   "family": "chrome",
+   "surface": "Keyboard; opens the centred Options window",
+   "press": "Press F10 (press again, click Close, or click the window's X to dismiss).",
+   "args": [],
+   "preconditions": [
+    "App is in game.",
+    "Not while an ImGui widget owns the keyboard."
+   ],
+   "expected_output": "Toggles the Options window: a Display section (Resolution preset combo, Fullscreen, VSync), an Accessibility section (UI Scale), a live window-size readout, and Close. Every change applies live to the SDL window and persists to options.cfg immediately.",
+   "reason_to_select": "To adjust display and UI-scale settings mid-session."
+  },
+  {
+   "id": "chrome.f11_frame_hud",
+   "family": "chrome",
+   "surface": "Keyboard; works on every screen (menu, wizard, and in game)",
+   "press": "Press F11 (press again, or use the HUD's own close button, to put it away).",
+   "args": [],
+   "preconditions": [
+    "None — handled before the screen guard, so the frame budget can be watched on the menu and the generation screen too."
+   ],
+   "expected_output": "Toggles the frame-budget HUD, the per-frame timing instrument. In game it first anchors top-left of the canvas area (movable after); on the pre-play screens it insets from the top-left corner. Honest status: this is a dev/audit instrument (the v0.1.0 performance audit tool), not shipped player chrome, and it sits outside the shared canvas command vocabulary.",
+   "reason_to_select": "To watch build/submit/present frame costs while reproducing a performance concern."
+  },
+  {
+   "id": "chrome.f12_capture",
+   "family": "chrome",
+   "surface": "Keyboard; works on every screen and regardless of focus",
+   "press": "Press F12.",
+   "args": [],
+   "preconditions": [
+    "None — handled first in the key handler, before the screen guard and the ImGui keyboard guard."
+   ],
+   "expected_output": "The exact composited frame (captured before present) is written as a PNG to screenshots/io_<ticks>.png in the working directory, creating the screenshots/ folder if needed. In interactive play there is no golden comparison — named captures and golden diffing belong to the --verify harness, not F12.",
+   "reason_to_select": "To record what is on screen — evidence for a bug report, a layout question, or a state worth keeping."
+  },
+  {
+   "id": "chrome.f9_tech_tree",
+   "family": "chrome",
+   "surface": "Keyboard; opens the mock tech-tree viewer",
+   "press": "Press F9 (press again to close).",
+   "args": [],
+   "preconditions": [
+    "App is in game.",
+    "Not while an ImGui widget owns the keyboard."
+   ],
+   "expected_output": "Toggles a read-only viewer over scripts/tech_tree.lua, tabbed by era: Era -1 Antiquity (placeholder pointing at the BL-307 ladder store), Era 0, Era 1, and Standing lines; eras with no authored quests show a placeholder. Honest status: this is a mock — a design aid with no simulation coupling; nothing can be researched and nothing in the world reads it.",
+   "reason_to_select": "To browse the drafted tech-tree content; of no strategic use to an AI player yet."
+  },
+  {
+   "id": "chrome.tech_tree_era_tab",
+   "family": "chrome",
+   "surface": "Tech-tree viewer (F9), era tab strip",
+   "press": "Click the 'Era -1 Antiquity', 'Era 0 — Terrestrial', 'Era 1 — Early Space' or 'Standing lines' tab button",
+   "args": [
+    {
+     "name": "view",
+     "type": "enum",
+     "meaning": "'Era -1 Antiquity' (placeholder pointing at the BL-307 ladder store) / 'Era 0 — Terrestrial' (the default) / 'Era 1 — Early Space' / 'Standing lines' (span eras, never gate one)"
+    }
+   ],
+   "preconditions": [
+    "Tech-tree viewer is open (F9)"
+   ],
+   "expected_output": "Switches which era's tree is shown — each era carries its own tree; eras with no authored quests show a placeholder. Re-clicking the currently-active tab closes the viewer (toggle rule); switching tabs is an ordinary view change.",
+   "reason_to_select": "To browse a specific era's drafted content; of no strategic use to an AI player yet — the viewer is a mock with no simulation coupling."
+  },
+  {
+   "id": "chrome.gear_toggle",
+   "family": "chrome",
+   "surface": "In-game chrome, top-right gear button just left of the time column",
+   "press": "Click the gear (three-bar) button.",
+   "args": [],
+   "preconditions": [
+    "App is in game (app_screen::in_game)."
+   ],
+   "expected_output": "Toggles the small system-menu popup open or closed beneath the gear. Closing it via the gear also disarms any pending exit confirmation.",
+   "reason_to_select": "Mouse route to the session controls (Pause/Resume, Exit Game); Esc is the keyboard parity for the same popup."
+  },
+  {
+   "id": "chrome.menu_copy_seed",
+   "family": "chrome",
+   "surface": "Main menu, New World block, Copy seed button",
+   "press": "Click Copy seed.",
+   "args": [],
+   "preconditions": [
+    "App is on the main menu screen."
+   ],
+   "expected_output": "The current seed, formatted as 8 hex digits, is placed on the system clipboard. Nothing else changes.",
+   "reason_to_select": "To record or share the reproducible key for the world about to be generated."
+  },
+  {
+   "id": "chrome.menu_new_game",
+   "family": "chrome",
+   "surface": "Main menu, primary button column",
+   "press": "Click New Game.",
+   "args": [],
+   "preconditions": [
+    "App is on the main menu screen."
+   ],
+   "expected_output": "The screen transitions to the New World wizard (app_screen::generating), opening on round 1 of 3. Nothing is generated or committed by this press; the wizard only previews.",
+   "reason_to_select": "To start setting up a new world; this is the only route into play."
+  },
+  {
+   "id": "chrome.menu_quit",
+   "family": "chrome",
+   "surface": "Main menu, primary button column",
+   "press": "Click Quit.",
+   "args": [],
+   "preconditions": [
+    "App is on the main menu screen."
+   ],
+   "expected_output": "The application requests quit and exits. No confirmation is asked here (nothing exists to lose on the menu). Settings were already persisted to options.cfg as they changed.",
+   "reason_to_select": "To leave the application from the entry screen."
+  },
+  {
+   "id": "chrome.menu_roll_seed",
+   "family": "chrome",
+   "surface": "Main menu, New World block, Roll button beside the seed field",
+   "press": "Click Roll.",
+   "args": [],
+   "preconditions": [
+    "App is on the main menu screen."
+   ],
+   "expected_output": "The seed field is replaced with a fresh random draw (a one-shot random_device read; the only place entropy touches the pipeline). No world is generated yet.",
+   "reason_to_select": "To get a fresh world without caring which one; the seed shown remains the reproducible key."
+  },
+  {
+   "id": "chrome.menu_set_abundance",
+   "family": "chrome",
+   "surface": "Main menu, New World block, Resources radio row",
+   "press": "Click one of the three radio buttons: Sparse, Lean, or Standard.",
+   "args": [
+    {
+     "name": "level",
+     "type": "enum: sparse | lean | standard",
+     "meaning": "Resource abundance tier. Standard is the Earth-like ceiling; Sparse and Lean step down from it. There is no tier above Standard."
+    }
+   ],
+   "preconditions": [
+    "App is on the main menu screen."
+   ],
+   "expected_output": "The pending world parameters carry the chosen abundance level, consumed at Begin. The Bodies slider next to this row is disabled (fixed at 5) and cannot be pressed.",
+   "reason_to_select": "To choose how resource-rich the generated world is; leaner tiers make extraction siting and trade tighter."
+  },
+  {
+   "id": "chrome.menu_set_seed",
+   "family": "chrome",
+   "surface": "Main menu, New World block, Seed field",
+   "press": "Type an 8-digit hex value into the seed input box.",
+   "args": [
+    {
+     "name": "seed",
+     "type": "hex string (8 digits, u32)",
+     "meaning": "The world seed. Generation is a pure function of this value plus the knobs: same seed and knobs give an identical world."
+    }
+   ],
+   "preconditions": [
+    "App is on the main menu screen (app_screen::menu)."
+   ],
+   "expected_output": "The pending world parameters carry the typed seed. Nothing is generated; the seed is consumed only when the wizard's Begin is pressed.",
+   "reason_to_select": "To reproduce a specific known world, or to share/compare a world by its seed."
+  },
+  {
+   "id": "chrome.options_close",
+   "family": "chrome",
+   "surface": "Options window, bottom",
+   "press": "Click Close.",
+   "args": [],
+   "preconditions": [
+    "Options window open."
+   ],
+   "expected_output": "The Options window closes. All changes were already applied and saved as they were made; Close commits nothing.",
+   "reason_to_select": "To put the window away after adjusting settings."
+  },
+  {
+   "id": "chrome.options_fullscreen",
+   "family": "chrome",
+   "surface": "Options window, Display section",
+   "press": "Click the Fullscreen checkbox.",
+   "args": [
+    {
+     "name": "on",
+     "type": "bool",
+     "meaning": "Target state; the press toggles the current one."
+    }
+   ],
+   "preconditions": [
+    "Options window open."
+   ],
+   "expected_output": "Fullscreen applies live and persists to options.cfg immediately. While on, the Resolution combo is disabled; the stored windowed size is set first so leaving fullscreen restores it.",
+   "reason_to_select": "To switch between fullscreen and windowed play."
+  },
+  {
+   "id": "chrome.options_set_resolution",
+   "family": "chrome",
+   "surface": "Options window, Display section, Resolution combo",
+   "press": "Open the combo and click a preset.",
+   "args": [
+    {
+     "name": "preset",
+     "type": "enum: 1280x720 | 1600x900 | 1720x1080 | 1920x1080 | 2560x1440",
+     "meaning": "Windowed size preset. A free drag-resize of the frame shows as 'Custom' in the combo."
+    }
+   ],
+   "preconditions": [
+    "Options window open; Fullscreen is off (the combo is disabled while fullscreen)."
+   ],
+   "expected_output": "The SDL window resizes immediately and the choice persists to options.cfg at once.",
+   "reason_to_select": "To fit the window to the display or to a capture-friendly size."
+  },
+  {
+   "id": "chrome.options_set_ui_scale",
+   "family": "chrome",
+   "surface": "Options window, Accessibility section, UI Scale combo",
+   "press": "Open the combo and click a step.",
+   "args": [
+    {
+     "name": "step",
+     "type": "enum: 1.0x | 1.25x | 1.5x",
+     "meaning": "Global UI scale step (stored as index 0-2; a corrupt config clamps back into this range)."
+    }
+   ],
+   "preconditions": [
+    "Options window open."
+   ],
+   "expected_output": "UI scale applies live and persists to options.cfg immediately.",
+   "reason_to_select": "To make the interface legible on dense or high-DPI displays."
+  },
+  {
+   "id": "chrome.options_vsync",
+   "family": "chrome",
+   "surface": "Options window, Display section",
+   "press": "Click the VSync checkbox.",
+   "args": [
+    {
+     "name": "on",
+     "type": "bool",
+     "meaning": "Target state; the press toggles the current one."
+    }
+   ],
+   "preconditions": [
+    "Options window open."
+   ],
+   "expected_output": "Vertical sync applies live to the renderer and persists to options.cfg immediately.",
+   "reason_to_select": "To trade tearing against frame latency, or to uncap frames when measuring with the F11 HUD."
+  },
+  {
+   "id": "chrome.sysmenu_exit",
+   "family": "chrome",
+   "surface": "System menu popup, below the separator",
+   "press": "Click Exit Game.",
+   "args": [],
+   "preconditions": [
+    "App is in game; the system menu popup is open; no exit confirmation is currently armed."
+   ],
+   "expected_output": "Arms an inline confirmation: the button is replaced by a 'Really quit?' prompt with Yes, quit and Cancel. Nothing exits yet. The confirm exists because there is no save in the prototype — quitting discards the session.",
+   "reason_to_select": "First step of leaving a session deliberately, with a guard against a stray click."
+  },
+  {
+   "id": "chrome.sysmenu_exit_cancel",
+   "family": "chrome",
+   "surface": "System menu popup, armed exit confirmation",
+   "press": "Click Cancel (or press Esc, which backs the armed confirm out as its highest-precedence rung).",
+   "args": [],
+   "preconditions": [
+    "App is in game; the exit confirmation is armed."
+   ],
+   "expected_output": "The confirmation disarms and the popup returns to showing Exit Game. Play continues unaffected.",
+   "reason_to_select": "To back out of an exit started by mistake."
+  },
+  {
+   "id": "chrome.sysmenu_exit_confirm",
+   "family": "chrome",
+   "surface": "System menu popup, armed exit confirmation",
+   "press": "Click Yes, quit.",
+   "args": [],
+   "preconditions": [
+    "App is in game; the system menu is open and the exit confirmation is armed."
+   ],
+   "expected_output": "The application quits. The session is not saved (there is no save in the prototype); display settings already live in options.cfg.",
+   "reason_to_select": "To end the session for good."
+  },
+  {
+   "id": "chrome.sysmenu_pause",
+   "family": "chrome",
+   "surface": "System menu popup, top button",
+   "press": "Click Pause (or Resume — the label reflects the current sim state).",
+   "args": [],
+   "preconditions": [
+    "App is in game; the system menu popup is open."
+   ],
+   "expected_output": "Toggles simulation pause via the same pause_toggle path as the Space hotkey. Resuming restores the previous speed tier. The button label flips accordingly.",
+   "reason_to_select": "To halt or resume the simulation clock from the mouse-driven session menu."
+  },
+  {
+   "id": "chrome.wizard_back",
+   "family": "chrome",
+   "surface": "New World wizard, footer button row",
+   "press": "Click Back.",
+   "args": [],
+   "preconditions": [
+    "App is on the wizard screen."
+   ],
+   "expected_output": "On rounds 2-3: steps back one round (a plain revision — there is no per-round snapshot, since rounds are causal). On round 1: returns to the main menu. Leaving costs nothing (nothing is generated until Begin), and preferences survive the trip, so re-entering resumes the same leans from round 1.",
+   "reason_to_select": "To revise an earlier round's preferences, or to abandon world setup and return to the menu."
+  },
+  {
+   "id": "chrome.wizard_begin",
+   "family": "chrome",
+   "surface": "New World wizard, footer button row (right edge), final round",
+   "press": "Click Begin.",
+   "args": [],
+   "preconditions": [
+    "App is on the wizard screen, on the last round (round 3 of 3)."
+   ],
+   "expected_output": "The one and only generation call (start_new_game): the sim clock is rebased, the world is built from the pending parameters, the economy loads, a pre-game warm start runs 12 quarterly ticks (~3 in-game years) so play opens onto live markets and non-empty pools, the clock is rebased again, and the screen transitions to in_game. Play opens on the corporation's home planet at the Planetary rung with the home body selected.",
+   "reason_to_select": "To commit the chosen seed and preferences and start the campaign."
+  },
+  {
+   "id": "chrome.wizard_continue",
+   "family": "chrome",
+   "surface": "New World wizard, footer button row (right edge)",
+   "press": "Click Continue.",
+   "args": [],
+   "preconditions": [
+    "App is on the wizard screen, on round 1 or 2 (any round except the last)."
+   ],
+   "expected_output": "Advances to the next round. The button reads Continue on non-final rounds and Begin on the last; this press generates nothing.",
+   "reason_to_select": "To accept this round's roll and preferences and move to the next batch of decisions."
+  },
+  {
+   "id": "chrome.wizard_reroll",
+   "family": "chrome",
+   "surface": "New World wizard, footer button row",
+   "press": "Click Reroll.",
+   "args": [],
+   "preconditions": [
+    "App is on the wizard screen."
+   ],
+   "expected_output": "The current round is re-drawn from a fresh number under the same preferences, and — because the chain is causal — everything downstream of it re-draws too. Charts refresh; nothing is generated. Rounds already behind the player are not re-rolled by this press.",
+   "reason_to_select": "To get a different concrete roll for this round's stages without changing any stated preference."
+  },
+  {
+   "id": "chrome.wizard_set_lean",
+   "family": "chrome",
+   "surface": "New World wizard, the preference block at the bottom of the current round",
+   "press": "Click one of the four segmented options on a preference row: Any, or the row's low/mid/high named lean.",
+   "args": [
+    {
+     "name": "axis",
+     "type": "enum by round",
+     "meaning": "Round 1 rows: Star (Dimmer / Sun-like / Brighter), World (Small / Earth-like / Large), Interior (Old and cold / Moderate / Young and vigorous), Metal (Metal-poor / Normal / Metal-rich). Round 2 rows: Ocean (Continental / Balanced / Oceanic), Oxygen (Oxygenated early / Balanced / Oxygenated late), Coal basins (Seasonal / Mixed / Everwet). Round 3 row: Drawdown (Barely touched / Worked / Stripped)."
+    },
+    {
+     "name": "lean",
+     "type": "enum: any | low | mid | high",
+     "meaning": "A named lean, not a parameter: it narrows the range the seed is sampled from and never pins a value. No raw generated number is editable or shown in the decision area."
+    }
+   ],
+   "preconditions": [
+    "App is on the wizard screen, on the round that owns the row."
+   ],
+   "expected_output": "The preview chain re-runs as a pure throwaway (resolve_preferences + preview_system); the charts above update to show the new roll. The world itself (m_world) is untouched. Resolution internally rerolls until the homeworld clears the Earth-like floor; if it took more than one draw the screen says 'Found on attempt N', and if no draw cleared the floor it says so and shows the closest world found. The Oxygen row carries the one spelled-out trade: oxygenated early is coal-rich and iron-lean, oxygenated late is iron-rich and coal-lean.",
+   "reason_to_select": "To bias the generated world along a named axis — resource character, land/ocean split, remaining untapped deposits — while keeping generation seed-driven."
+  },
+  {
+   "id": "chrome.wizard_stage_fold",
+   "family": "chrome",
+   "surface": "New World wizard, the charts area of the current round",
+   "press": "Click a stage's fold row (its one-line verdict) to expand it; click again to fold it back to the verdict line.",
+   "args": [
+    {
+     "name": "stage",
+     "type": "chain stage within the current round",
+     "meaning": "Which of the round's Planetology stages to open. Round 1 covers the star/world/interior/metal stages, round 2 the ocean/oxygen/coal stages, round 3 the drawdown stage."
+    }
+   ],
+   "preconditions": [
+    "App is on the wizard screen (app_screen::generating)."
+   ],
+   "expected_output": "The stage expands from its verdict line into its full chart-and-explanation view, or folds back. Purely presentational; no preference or preview state changes. This is the same fold idiom the in-game ledgers use — the wizard is where it is taught.",
+   "reason_to_select": "To inspect what the current roll actually produced for a stage before setting or judging a preference; the charts are the only honest feedback (no raw values are printed)."
+  }
+ ]
+}
