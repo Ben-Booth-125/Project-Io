@@ -8266,6 +8266,70 @@
      "notes": "tech_tree_antiquity golden."
     }
    ]
+  },
+  {
+   "brief": "corp-standing-profile",
+   "title": "Corp standing profile — BL-262 first slice (reach / capital / market-share)",
+   "difficulty": 4,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-08-06",
+   "resolution": "First slice landed: reach/capital/market-share bands, player-exact + rival-banded ledger, no total row. standing_harness 41/41 PASS. Production axis deferred (R5) — no honest visible-information source exists yet.",
+   "promoted_from": "backlog.json BL-262 (SCORING_SYSTEM), first slice — production axis deferred, see notes",
+   "batch": null,
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "Brief-spanning: the Corporations ledger shows the player's own figures exact and every rival corporation's figures as a banded tier, never an exact rival number, and never any combined/total column.",
+     "verification": [
+      "visual: manual (no existing golden covers this panel); code review against BL-262's ratified design"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": "Production axis intentionally absent this slice (see R5) — the visible ledger is a 3-axis profile, not the full 4. Visual/manual leg still owed — Ben has not yet seen the panel in a running build."
+    },
+    {
+     "id": "R2",
+     "requirement": "Reach, capital, and market-share bands are computed deterministically: fixed integer/fixed-point boundaries, an explicit rule for a value exactly on a boundary, and a sorted (not hash-order) walk over corporations.",
+     "verification": [
+      "headless: tools/verify/standing_harness.cpp"
+     ],
+     "status": "complete",
+     "result_metric": "41/41 assertions PASS, standing_harness.exe",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "requirement": "Rival banding is computed only from information the player is already entitled to see (own's-eye visible facts, this-tick market clearing income, building ownership/tile) — no read of a rival's true balance, recipe, or workforce.",
+     "verification": [
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "",
+     "notes": "Market-share uses clear_markets' corp_cash_flow, a public per-tick clearing result, not any private ledger."
+    },
+    {
+     "id": "R4",
+     "requirement": "The standing computation is not unified with BL-202/203's corp_ai utility scorer — a separate quantity, per BL-262's ratified Call 5.",
+     "verification": [
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R5",
+     "requirement": "Deferred, tracked not silently dropped: BL-262 specifies four axes (reach/production/capital/market-share); this slice ships three. The production axis has no honest visible-information data source in the current engine (physical output requires recipe+workforce, both private per BL-068) — filed as a follow-on rather than approximated from private data or faked.",
+     "verification": [
+      "code: doc comment in standing.hpp naming the gap"
+     ],
+     "status": "complete",
+     "result_metric": "",
+     "notes": "Follow-on: a visible-information production proxy (e.g. building-type nominal capacity, independent of assigned recipe/workforce) would need its own design pass."
+    }
+   ]
   }
  ]
 }

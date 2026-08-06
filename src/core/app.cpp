@@ -515,6 +515,9 @@ void app::step_economy()
     auto flows = clear_markets(m_world, m_registry, m_last_econ_report, m_ui.sell_orders);
     apply_budget(m_world, m_registry, flows, m_last_econ_report.workforce_contention,
                  &m_last_econ_report.budgets);
+    // BL-262 first slice: cache this tick's standing profile for the Corporations panel
+    // (transient runtime cache, not serialised — same treatment as m_last_econ_report).
+    m_last_corp_standings = compute_corp_standings(m_world, flows);
     credit_arrived_convoys(m_world, static_cast<int>(m_sim_loop.day_tick()));
 
     // Surface this tick's background-corp agency actions (BL-079) as NATION-
@@ -2991,7 +2994,7 @@ void app::render()
     // and reachable from nav slot 8 until its real home is chosen. Deleting a file
     // because a similar view exists is the call that was wrong here — dormant beats
     // deleted, since intent is not recoverable from a diff.
-    ui::draw_corporation_panel(m_world, m_ui, m_ui.show_corporations_table);
+    ui::draw_corporation_panel(m_world, m_last_corp_standings, m_ui, m_ui.show_corporations_table);
 
     // Selection band (BL-213 — supersedes the BL-194/195 Selection band) — a FIXED
     // rect at the bottom of the screen, sandwiched between the shell column and

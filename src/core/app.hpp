@@ -14,7 +14,9 @@
 #include "scripting/persona_pack.hpp"
 #include "ui/chat_panel.hpp"
 #include "ui/plot_history.hpp"
+#include "world/market_clearing.hpp"
 #include "world/planetology.hpp"
+#include "world/standing.hpp"
 
 #include <cstdint>
 #include <deque>
@@ -210,6 +212,7 @@ private:
     recipe_registry m_registry;          ///< Recipes + economy constants, loaded from Lua at startup.
     tech_tree_registry m_tech_tree;      ///< BL-087 mock tech/quest tree, loaded from Lua at startup; F9 viewer only.
     economy_report  m_last_econ_report;  ///< Most recent economy-step report; read by the economy panel.
+    std::vector<corp_standing> m_last_corp_standings; ///< Per-corp standing profile (BL-262 first slice), recomputed each econ tick from m_last_econ_report's cash flow; read by the Corporations panel. Transient runtime cache — NOT serialised, same as m_last_econ_report.
     ui::chat_state  m_chat;              ///< Comms log state (BL-205): channels, messages, drafts.
     std::vector<persona::pack> m_persona_bench; ///< Seated mountain bench (BL-207 slice 1); empty if load_bench() failed.
     std::unordered_map<entity_id, int> m_counsel_channel; ///< corp -> its lazily-created Counsel chat_channel index.

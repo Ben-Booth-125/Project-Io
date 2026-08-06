@@ -1,5 +1,31 @@
 # Project Io — REFINED (active worklist)
 
+## Corp standing profile (promoted from BL-262, first slice) — **COMPLETE**
+
+Requirements: requirements.json § corp-standing-profile (R1–R5, all met bar R1's visual leg,
+which is manual/Ben's). `standing_harness` 41/41 PASS (boundary determinism for all three bands,
+zero-total/empty-map no-NaN cases, player-exact/rival-banded visibility split, byte-identical
+re-computation). Full app + harness both build clean (MSVC 14.44, `build_app.bat`). Production
+axis deliberately absent this slice — no honest visible-information source exists yet (BL-068
+privates recipe/workforce); documented in `standing.hpp`, tracked as a follow-on.
+
+- **[4] A — `src/world/standing.{hpp,cpp}` (new): compute the three-axis profile.**
+  Files: `src/world/standing.hpp`, `src/world/standing.cpp`. Deps: foundation.
+  Satisfies: R1, R2, R3, R4, R5.
+- **[2] B — wire into `corporation_panel.cpp`: own row exact, rival rows banded, no total.**
+  Files: `src/ui/corporation_panel.cpp`, `src/ui/corporation_panel.hpp`. Deps: A.
+  Satisfies: R1.
+- **[2] C — cache this-tick `corp_cash_flow` for the panel to read (no save-format change).**
+  Files: `src/core/app.cpp`, `src/core/app.hpp`. Deps: A. Parallel-safe with B (disjoint files);
+  both need A's signature first, so effectively sequential after A in one agent's pass.
+  Satisfies: R3.
+- **[2] D — `tools/verify/standing_harness.cpp` (new): boundary determinism + sorted walk.**
+  Files: `tools/verify/standing_harness.cpp`. Deps: A. Satisfies: R2.
+
+Parallelisation note: A is the foundation (new struct/function signatures everything else
+calls); B/C/D all depend on A's header. Single coherent vertical slice on a small, mostly-new
+file set — one agent, sequential A→{B,C,D}, not fanned out.
+
 # Mediterranean rift sea (BL-276, 2026-08-03) — **COMPLETE**
 
 Requirements: requirements.json § mediterranean-rift-sea (R1–R4 all met).
