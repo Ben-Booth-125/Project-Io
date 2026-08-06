@@ -31,9 +31,16 @@ struct tech_quest
 /// and docs/research/ERA1_TECH_LANDSCAPE.md § Itemisation schema.
 struct tech_node
 {
-    std::string id;        ///< e.g. "E1-PL-09".
-    std::string name;      ///< Display name.
-    std::string quest;     ///< Owning quest id.
+    std::string id;         ///< e.g. "E1-PL-09".
+    std::string name;       ///< Display name.
+    std::string short_name; ///< On-canvas label (BL-310 round 3) — 1-2 words,
+                             ///< "so players do not have to work out a
+                             ///< dictionary in their mind for each tech" (Ben,
+                             ///< 2026-08-06). Empty for most nodes today
+                             ///< (authoring 130+ by hand is its own pass); the
+                             ///< renderer falls back to a truncated `name`
+                             ///< rather than the bare id either way.
+    std::string quest;      ///< Owning quest id.
     std::string kind;      ///< "invention" | "tier" | "capstone".
     int         tier = 0;  ///< 2/3 for tier techs, 0 otherwise.
     std::vector<std::string> prereqs; ///< Tech ids; may cross quests (sparingly, marked).

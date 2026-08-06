@@ -21,6 +21,23 @@ std::string kind_label(const tech_node& t)
     return t.kind;
 }
 
+constexpr std::size_t kLabelBudget = 18; ///< Chars before an on-canvas label truncates.
+
+/// The on-canvas node label (BL-310 round 3) — never the bare id. Authored
+/// `short_name` wins; otherwise `name`, truncated past kLabelBudget chars
+/// rather than left to overlap its neighbours. ASCII "..." not a unicode
+/// ellipsis — BL-234's own lesson (missing codepoints render "?"), the same
+/// reason the return control draws its glyph rather than typing one. The
+/// full name and unlocks text are always in the hover tooltip regardless.
+std::string display_label(const tech_node& t)
+{
+    if (!t.short_name.empty())
+        return t.short_name;
+    if (t.name.size() <= kLabelBudget)
+        return t.name;
+    return t.name.substr(0, kLabelBudget - 3) + "...";
+}
+
 // ---------------------------------------------------------------------------
 // The radial constellation (BL-310) — ANCIENT_TECH_LADDER.md § Geometry,
 // transcribed for the two authored eras (views 1/2). Rings are graph depth
@@ -93,6 +110,127 @@ struct node_layout
     const tech_node* node = nullptr;
     ImVec2 canvas_pos{}; ///< Pre-pan/zoom canvas-space position (centre = origin).
 };
+
+// ---------------------------------------------------------------------------
+// Era-tab icons (BL-310 round 3, Ben 2026-08-06: "make the icons bigger,
+// with small icons of the map (no labels)"). Deliberately real data, not a
+// hand-drawn stand-in glyph: each icon is that era's actual node positions,
+// tiny — a literal small icon of the map. Position math is duplicated from
+// draw_constellation below rather than shared, since the icon needs none of
+// its edge/label/hover machinery and this keeps that already-golden-blessed
+// function untouched.
+// ---------------------------------------------------------------------------
+
+/// Normalised (roughly [-1, 1]) node positions for one era's gate quests, for
+/// icon-scale rendering only. Empty for an era with no authored quests (Era 2
+/// today) — the caller draws a placeholder ring instead.
+std::vector<ImVec2> compute_icon_positions(const tech_tree_registry& tree, int era)
+{
+    std::vector<const tech_quest*> quests;
+    for (const tech_quest& q : tree.quests())
+        if (q.type == "gate" && q.era == era)
+            quests.push_back(&q);
+    if (quests.empty())
+        return {};
+
+    std::unordered_map<std::string, const tech_node*> by_id;
+    for (const tech_node& t : tree.techs())
+        by_id[t.id] = &t;
+
+    std::unordered_map<std::string, int> ring_memo;
+    std::vector<std::string> in_progress;
+    int global_max_ring = 1;
+    for (const tech_quest* q : quests)
+        for (const tech_node& t : tree.techs())
+            if (t.quest == q->id)
+                global_max_ring = std::max(global_max_ring,
+                    compute_ring(t, q->id, by_id, ring_memo, in_progress));
+
+    std::vector<ImVec2> out;
+    const float wedge_width = 6.28318530718f / static_cast<float>(quests.size());
+    for (std::size_t qi = 0; qi < quests.size(); ++qi)
+    {
+        const tech_quest* q = quests[qi];
+        const float wedge_start = -1.57079632679f + static_cast<float>(qi) * wedge_width;
+        const float margin = wedge_width * 0.12f;
+
+        std::unordered_map<int, std::vector<const tech_node*>> by_ring;
+        for (const tech_node& t : tree.techs())
+            if (t.quest == q->id)
+                by_ring[compute_ring(t, q->id, by_id, ring_memo, in_progress)].push_back(&t);
+
+        for (auto& [ring, nodes] : by_ring)
+        {
+            const float radius = static_cast<float>(ring) / static_cast<float>(global_max_ring);
+            for (std::size_t i = 0; i < nodes.size(); ++i)
+            {
+                const float t_frac = nodes.size() == 1
+                    ? 0.5f
+                    : static_cast<float>(i) / static_cast<float>(nodes.size() - 1);
+                const float angle = wedge_start + margin + (wedge_width - 2.0f * margin) * t_frac;
+                out.push_back({ radius * std::cos(angle), radius * std::sin(angle) });
+            }
+        }
+    }
+    return out;
+}
+
+/// Draws one era's tiny constellation thumbnail — dots only, no edges or
+/// text (illegible at icon scale and unnecessary for a selector).
+void draw_era_icon(ImDrawList* dl, ImVec2 centre, float radius,
+                    const tech_tree_registry& tree, int era, ImU32 dot_colour)
+{
+    const std::vector<ImVec2> positions = compute_icon_positions(tree, era);
+    if (positions.empty())
+    {
+        // No authored quests (Era 2) — a dashed ring, so the placeholder
+        // still reads as "a map, not drawn yet" rather than a blank square.
+        constexpr int kSegments = 16;
+        for (int i = 0; i < kSegments; i += 2)
+        {
+            const float a0 = 6.28318530718f * static_cast<float>(i) / kSegments;
+            const float a1 = 6.28318530718f * static_cast<float>(i + 1) / kSegments;
+            dl->AddLine({centre.x + radius * 0.7f * std::cos(a0), centre.y + radius * 0.7f * std::sin(a0)},
+                        {centre.x + radius * 0.7f * std::cos(a1), centre.y + radius * 0.7f * std::sin(a1)},
+                        IM_COL32(110, 116, 128, 160), 1.5f);
+        }
+        return;
+    }
+    for (const ImVec2& p : positions)
+        dl->AddCircleFilled({centre.x + p.x * radius * 0.85f, centre.y + p.y * radius * 0.85f},
+                             std::max(1.2f, radius * 0.05f), dot_colour);
+}
+
+/// Icon-only era-tab button — replaces the text ui::nav_button row (Ben,
+/// 2026-08-06). Same toggle-rule semantics as ui::nav_button (re-click while
+/// active closes the panel via `close`); the tooltip carries the name that
+/// used to be printed on the button.
+void era_icon_button(const char* tooltip, int id, int& view, bool* close,
+                      const tech_tree_registry& tree, int era, ImU32 dot_colour, ImU32 bg_tint)
+{
+    constexpr float kSize = 72.0f;
+    const bool active = (view == id);
+    ImGui::PushID(id);
+    ImGui::InvisibleButton("##era_icon", {kSize, kSize});
+    const bool hot = ImGui::IsItemHovered();
+    if (ImGui::IsItemClicked())
+    {
+        if (active && close) *close = false; // BL-126 toggle rule
+        else                 view = id;
+    }
+    const ImVec2 mn = ImGui::GetItemRectMin();
+    const ImVec2 mx = ImGui::GetItemRectMax();
+    ImDrawList* dl = ImGui::GetWindowDrawList();
+    const ImU32 border = active ? IM_COL32(120, 170, 230, 255)
+                        : hot   ? IM_COL32(150, 158, 172, 220)
+                                : IM_COL32(70, 78, 92, 180);
+    dl->AddRectFilled(mn, mx, bg_tint, 6.0f);
+    dl->AddRect(mn, mx, border, 6.0f, 0, active ? 2.0f : 1.0f);
+    draw_era_icon(dl, {(mn.x + mx.x) * 0.5f, (mn.y + mx.y) * 0.5f}, kSize * 0.36f, tree, era, dot_colour);
+    if (hot)
+        ImGui::SetTooltip("%s", tooltip);
+    ImGui::PopID();
+}
 
 /// Draws one era's gate quests as a radial web. Returns true if it drew
 /// something (false ⇒ caller shows the "no quests authored" placeholder).
@@ -286,10 +424,15 @@ bool draw_constellation(const tech_tree_registry& tree, int era,
 
         if (zoom > 0.6f)
         {
-            const std::string short_id = nl.node->id;
-            const ImVec2 text_size = ImGui::CalcTextSize(short_id.c_str());
+            // Name, not id (BL-310 round 3, Ben: "so players do not have to
+            // work out a dictionary in their mind for each tech"). Authored
+            // short_name wins where it exists; otherwise a truncated `name`
+            // is still a name — never the bare id, which is what the player
+            // would have had to decode.
+            const std::string label = display_label(*nl.node);
+            const ImVec2 text_size = ImGui::CalcTextSize(label.c_str());
             dl->AddText({ spos.x - text_size.x * 0.5f, spos.y + r + 2.0f },
-                        IM_COL32(170, 178, 190, 210), short_id.c_str());
+                        IM_COL32(170, 178, 190, 210), label.c_str());
         }
 
         if (hovered)
@@ -354,13 +497,20 @@ void draw_tech_tree_panel(const tech_tree_registry& tree, bool& open, int& view,
         static_cast<int>(tree.quests().size()), static_cast<int>(tree.techs().size()));
     ImGui::Separator();
 
-    ui::nav_button("Era -1 Antiquity", 0, view, &open);
+    // Icon-only era tabs (BL-310 round 3) — bigger, no text labels, each icon
+    // a tiny real render of that era's own constellation. Fills the width the
+    // old text-pill row left empty; the tooltip carries the name.
+    era_icon_button("Era -1 Antiquity",     0, view, &open, tree, -1,
+                     IM_COL32(200, 170, 120, 255), IM_COL32(40, 36, 30, 200));
     ImGui::SameLine();
-    ui::nav_button("Era 0 — Terrestrial", 1, view, &open);
+    era_icon_button("Era 0 - Terrestrial",  1, view, &open, tree, 0,
+                     IM_COL32(120, 160, 210, 255), IM_COL32(24, 30, 42, 200));
     ImGui::SameLine();
-    ui::nav_button("Era 1 — Early Space", 2, view, &open);
+    era_icon_button("Era 1 - Early Space",  2, view, &open, tree, 1,
+                     IM_COL32(130, 200, 235, 255), IM_COL32(22, 34, 46, 200));
     ImGui::SameLine();
-    ui::nav_button("Era 2", 3, view, &open);
+    era_icon_button("Era 2 (unauthored)",   3, view, &open, tree, 2,
+                     IM_COL32(150, 150, 150, 255), IM_COL32(30, 30, 34, 200));
     ImGui::Separator();
     ImGui::Spacing();
 

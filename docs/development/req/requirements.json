@@ -8425,6 +8425,27 @@
      "status": "complete",
      "result_metric": "golden PASS, tech_tree_tabs shows 'Era 2' tab",
      "notes": "Ben, 2026-08-06: 'we don't need standing lines rendered. Just keep that as a placeholder for Era 2.'"
+    },
+    {
+     "id": "R9",
+     "requirement": "Era tabs are icon-only (no text labels), bigger than the old text pills, each icon a real miniature render of that era's own node positions (not a generic stand-in glyph) — tooltip on hover carries the era name. Same toggle-rule semantics as ui::nav_button.",
+     "verification": [
+      "visual: scripts/verify/tech_tree_panel.lua"
+     ],
+     "status": "complete",
+     "result_metric": "golden PASS, tech_tree_tabs shows four icon buttons",
+     "notes": "Ben, 2026-08-06: 'move our tabbed menu to the menu space, and make the icons bigger, with small icons of the map (no labels).'"
+    },
+    {
+     "id": "R10",
+     "requirement": "On-canvas node labels show the tech's name (or an authored short_name), never the bare id. Long names truncate with an ASCII ellipsis at a fixed budget rather than overlapping; the full name stays in the hover tooltip regardless.",
+     "verification": [
+      "visual: scripts/verify/tech_tree_panel.lua",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "golden PASS, all three captures show name-based labels",
+     "notes": "Ben, 2026-08-06: 'work on getting short names for each tech ... players do not have to work out a dictionary in their mind.' short_name hand-authored for the 4 Era-1 keystones + their 8 branch children this pass (the longest/most important labels); the other ~120 nodes fall back to truncated name, not authored short_name yet — a follow-on pass, not silently deferred."
     }
    ]
   }

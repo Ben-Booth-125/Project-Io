@@ -73,9 +73,10 @@ void tech_tree_registry::load_from_lua(lua_state& lua)
                 throw std::runtime_error("tech_tree_registry: tech entry "
                                          + std::to_string(i) + " is not a table");
             tech_node tn;
-            tn.id        = t->get_or<std::string>("id", "");
-            tn.name      = t->get_or<std::string>("name", "");
-            tn.quest     = t->get_or<std::string>("quest", "");
+            tn.id         = t->get_or<std::string>("id", "");
+            tn.name       = t->get_or<std::string>("name", "");
+            tn.short_name = t->get_or<std::string>("short_name", "");
+            tn.quest      = t->get_or<std::string>("quest", "");
             tn.kind      = t->get_or<std::string>("kind", "invention");
             tn.tier      = t->get_or("tier", 0);
             tn.cost      = t->get_or<std::string>("cost", "M");
