@@ -1340,6 +1340,27 @@
     "docs/development/backlog.json"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-068",
+   "title": "Red herrings need a quantity: Alarm as the second per-nation scalar beside BL-223's Ceiling",
+   "raised": "2026-08-05",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "BL-087 / BL-223 - Ben, 2026-08-05: 'can we put in little red herrings that make Era 1 failure (WW3) more likely... more advanced does not mean better... the player must be skilled at avoiding danger, in each dimension of play'.",
+   "what": "Red herrings with nothing to trigger are flavour, so the draft adds the quantity they feed. Taking BL-223's settled discipline verbatim (the deterrence ceiling is a per-nation SCALAR, not a nuclear-equivalent object), the model is TWO per-nation scalars: CEILING (BL-223's, unchanged - restraint carried from the averted rupture) and ALARM (new - how threatened a nation feels, moved by others' VISIBLE capability, severed trade ties, posture and domestic instability). The seeded Era-event date decides WHEN the rupture is tested, not the outcome: aggregate Alarm above aggregate Ceiling means it goes hot and Era 1 fails, with the event's selective destruction landing on the orbital and heavy-industrial assets the space programme needed. Seven herring kinds drafted (escalator, legibility trap, interdependence severer, brittle optimisation, contextual dud, tempo trap, domestic destabiliser), one per dimension of play, plus three mitigation nodes and one INVERSE herring (Hardened Dispersed Basing looks aggressive and is stabilising, so 'menacing' cannot become the tell).",
+   "why_it_matters": "Alarm is a new per-nation scalar and therefore new serialised state, and the rupture check is a new deterministic resolution point at the Era boundary - both sit inside BL-223's owed reconciliation. If Ben wants the future rupture to stay a pure seeded event with no player input, this whole design is out and the herrings become flavour. It also load-bears on trade: interdependence as the cheapest Alarm suppressant is what makes the Trade pillar defensive, which is a claim about the game's shape, not just a tuning knob.",
+   "options": [
+    "Adopt Alarm as a per-nation scalar tested against Ceiling at the seeded date (the draft).",
+    "Pairwise alarm (you can frighten one neighbour and reassure another) - truer, costs N^2 state.",
+    "Keep the future rupture a pure seeded event; herrings become flavour with no mechanical bite."
+   ],
+   "recommendation": "Option 1. It reuses BL-223's own scalar discipline, stays deterministic (seeded date, deterministic threshold, visible countdown), and it is the only version where 'skilled at avoiding danger' means anything. Four questions carried in the doc: per-nation vs pairwise, whether rivals' Alarm is visible, whether the rupture can be a partial failure, and whether Era 1 failure ends the campaign or delays it (lean: delays, expensively).",
+   "files": [
+    "docs/research/ERA1_TECH_LANDSCAPE.md",
+    "docs/development/backlog.json"
+   ],
+   "resolution": null
   }
  ]
 }

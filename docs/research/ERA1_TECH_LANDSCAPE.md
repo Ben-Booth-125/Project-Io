@@ -716,3 +716,144 @@ own rule is not to enumerate it until the combat system is mapped, and BL-157 (u
 4. **Does an unfired deed hide its keystone entirely, or show it locked?** The tech fog says
    unreachable nodes are not rendered at all. A hidden fork is a better surprise; a visible locked
    fork is a better goal.
+
+---
+
+# Red herrings and the rupture — the 1960s tree's danger model (2026-08-05)
+
+> **DRAFT FOR REVIEW.** Ben, 2026-08-05: *can we put in little red herrings that make Era 1 failure
+> (WW3) more likely? One obstacle for the player to navigate is the idea that more advanced does not
+> mean better. The player must be skilled at avoiding danger, in each dimension of play.*
+>
+> Sits on **BL-223**'s settled two-rupture model (2026-08-02): a **past averted** near-miss that
+> drives starting conditions, and a **future seeded catastrophic event** that ends Era 0 during
+> play — *the rupture averted then is not averted this time*. This section designs what the player
+> can do to bring that second one on, and how the tech tree tempts them into it.
+
+## The load-bearing half is not the herrings
+
+A red herring with nothing to trigger is flavour. For "more advanced does not mean better" to be a
+**skill**, three things must be true, and only the first is about the tech tree:
+
+1. Some attractive techs must carry a cost that is **not on their own stat line**.
+2. That cost must accumulate into something the player can **watch** and **act on**.
+3. The catastrophe must resolve **deterministically** from it — the standing rule forbids random
+   ruptures, and a dice-roll war would make the whole exercise unlearnable anyway.
+
+So the herrings need a quantity. BL-223 already fixed its shape: the deterrence ceiling is *"a
+per-nation scalar, NOT a nuclear-equivalent object"*. The same discipline applies here — **two
+per-nation scalars with named consumers**, no new world object:
+
+| scalar | meaning | moved by |
+|---|---|---|
+| **Ceiling** (BL-223's, unchanged) | how much restraint this nation carries — the memory of the rupture that *was* averted | history-ladder outcome at 1960; decays slowly as the memory ages |
+| **Alarm** | how threatened this nation feels *by others* | others' **visible** capability, severed trade ties, posture, domestic instability |
+
+**The rupture check.** The event arrives on its seeded date (the § Resolutions model, unchanged, with
+the visible countdown). What the date decides is *when it is tested*, not the outcome: if aggregate
+Alarm has risen above aggregate Ceiling, the rupture goes hot and **Era 1 fails** — the Era event's
+selective destruction lands on exactly the orbital and heavy-industrial assets the space programme
+needed. If it hasn't, it is averted a second time and the Era 1 quest trees open.
+
+Two consequences worth stating plainly. **The player is not the only source of Alarm** — rival corps
+and nations raise it too, so a careful player can still lose a world someone else wrecked, and
+managing *others'* alarm becomes a legitimate goal. And **Alarm is relievable**: it decays, and
+several nodes cut it directly. A pressure that only ever rises is not a skill test, it is a timer.
+
+## The seven kinds of red herring
+
+| kind | the trap | why it tempts | the tell |
+|---|---|---|---|
+| **Escalator** | genuinely better output, raises Alarm because the capability is dual-use | the numbers are simply good | the node's own dual-use description; rival alarm ticks on completion |
+| **Legibility trap** | the capability is fine; being *seen* to hold it is the cost | no downside on the stat line at all | it is a large, visible, single-site facility — rivals' fog tier reads it |
+| **Interdependence severer** | autarky and substitution: looks like resilience, cuts the trade ties that hold Alarm down | removes a supply risk you can see, for one you cannot | your own export routes go quiet |
+| **Brittle optimisation** | better numbers, catastrophically worse under blockade | strictly dominant in peacetime | the input it optimises is one you import |
+| **Contextual dud** | advanced, and wrong *here* — the Martian water mill inverted | it is the newest thing available | its prerequisite substrate is absent on this body |
+| **Tempo trap** | a fine tech that costs you the clock | it is safe, useful, and cheap | the countdown is visible and it does not move |
+| **Domestic destabiliser** | output up, unrest up — and unrest is what makes a nation reach for a foreign enemy | the productivity gain is immediate and large | the unrest surface moves the same tick |
+
+**Every trap needs a tell, and the tell must precede commitment.** That is the project's own tone
+rule — legible in hindsight, not locally clever — and the difference between a skill test and a
+gotcha. A player who reads the tells and takes the tech anyway has made a *decision*; a player who
+could not have known has been cheated.
+
+**And one inverse, deliberately.** *Hardened Dispersed Basing* looks aggressive and is **stabilising**
+— a survivable second strike removes the use-it-or-lose-it panic that drives first strikes. If every
+menacing-looking node were a trap, "menacing" would just become the tell and the lesson would
+collapse into a colour-coding exercise. One node has to punish that heuristic.
+
+## A danger in each dimension of play
+
+| dimension | the herring | the skilled play |
+|---|---|---|
+| **Economy** | Autarkic Substitution — replace imports with synthetics | keep cross-border routes live; trade interdependence is the cheapest Alarm suppressant in the game |
+| **Logistics** | Single-Corridor Efficiency — route everything through the cheapest chokepoint | pay for redundancy; a chokepoint is also a casus belli |
+| **Military** | Fissile Enrichment, Ballistic Lift | hold **capacity** without **posture** — the ladder's own artifact-vs-capacity split, now a diplomatic instrument |
+| **Information** | Integrated Air Defence — defensive, reads as war preparation | disclosure and inspection: voluntarily legible capability alarms less than concealed capability |
+| **Institutional** | Total Automation — workforce collapse into unrest | pace it against the Labour Doctrine you took; unrest is a foreign-policy input, not just a domestic cost |
+| **Space (Era 1 prep)** | **Heavy Ballistic Lift** — the same stack that reaches orbit is a missile | the Lift Doctrine fork, plus Open Launch Inspection: choose *how* you reach orbit, and let others watch |
+
+The space row is the one that makes the whole design work, because it is **unavoidable**. You cannot
+reach Era 1 without lift, and lift is what frightens everyone. The player's job is not to dodge the
+dangerous tech — it is to buy the reassurance that lets them hold it.
+
+## Draft nodes for the 1960s tree
+
+> Node names and placement are Ben's call, per the Era 1 draft above. Effects use the
+> `TECH_EFFECTS.md` vocabulary; `alarm` and `ceiling` are shown as `modifier` targets.
+
+### E0-HEAVY — Heavy Industry
+
+| node | kind | effects |
+|---|---|---|
+| **Fissile Enrichment** | escalator | `unlock` → fission power recipe · `modifier` → own alarm contribution **↑↑** |
+| **Autarkic Substitution** | severer | `unlock` → synthetic substitutes for imported inputs · `modifier` → import exposure ↓, rivals' alarm ↑ |
+| **Continuous Casting** | *clean* | `upgrade` → steel throughput. No hidden cost — the tree must contain plain goods, or the herrings are just a tax |
+
+### E0-ELEC — Electronics & Computing
+
+| node | kind | effects |
+|---|---|---|
+| **Integrated Air Defence** | legibility trap | `unlock` → defensive coverage · `modifier` → rivals' alarm ↑ (defence is unreadable from outside) |
+| **Automated Launch Authority** | escalator | `modifier` → response time ↓↓, rivals' alarm ↑↑, **rupture severity ↑** if it fires — the archetype of advanced-and-worse |
+| **Civil Telemetry Network** | *mitigation* | `intel` → shared observation · `modifier` → **all** alarm ↓. The node that buys the era |
+
+### E0-ROCKET — Rocketry
+
+| node | kind | effects |
+|---|---|---|
+| **Heavy Ballistic Lift** | escalator, unavoidable | `unlock` → the Era 1 lift path · `modifier` → rivals' alarm ↑↑ |
+| **Open Launch Inspection** | *mitigation* | `intel` → your launch schedule is public · `modifier` → rivals' alarm ↓↓ · `modifier` → your tempo ↓ |
+| **Hardened Dispersed Basing** | **inverse herring** | looks aggressive; `modifier` → rivals' alarm **↓** (a survivable force is not a panicked one) |
+
+### Standing lines
+
+| node | kind | effects |
+|---|---|---|
+| **Total Automation** (L-AUTO) | destabiliser | `modifier` → workforce scalar ↓↓, unrest ↑, own alarm ↑ |
+| **Single-Corridor Efficiency** (L-LOG) | brittle | `modifier` → haul cost ↓↓ · fails hard under blockade; the corridor becomes a claim |
+| L-MIL | **reserved** | not enumerated — BL-157 is still a stub and this doc's own rule holds |
+
+## What this must not become
+
+- **Not a morality meter.** Alarm is other nations' *reading* of you, not a judgement. A nation that
+  disarms and is read as weak has not become safe.
+- **Not unwinnable.** Alarm decays, three named nodes cut it, and trade suppresses it continuously.
+  If a playtest finds the rupture unavoidable, the mitigations are underpowered — that is a tuning
+  fault, not a lesson.
+- **Not random.** Seeded date, deterministic threshold, visible countdown. The player loses to a
+  choice, and can see which choice it was afterwards.
+- **Not one-dimensional.** If Alarm ends up driven 90% by military nodes, the "each dimension"
+  requirement has failed and the economic and information rows need re-weighting.
+
+## Open questions
+
+1. **Is Alarm per-nation-pair or per-nation?** Pairwise is truer (you can frighten one neighbour and
+   reassure another) and costs N² state. Lean: **per-nation**, with the pairwise version deferred —
+   BL-223's precedent is a plain per-nation scalar.
+2. **Does the player see rivals' Alarm, or only their own contribution?** The discovery model would
+   say: your own contribution always, rivals' level only where your intelligence reaches.
+3. **Can the rupture be a partial failure?** A limited war that wrecks one region's industry is more
+   interesting than a binary, and matches the Era event's "selectively destroys" clause.
+4. **Does Era 1 failure end the campaign or delay it?** Lean: delay, expensively. Losing the space
+   programme to a war you helped cause is a better story than a game-over screen.
