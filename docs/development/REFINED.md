@@ -2,14 +2,17 @@
 
 ## Tech tree radial canvas (promoted from BL-310) — **COMPLETE**
 
-Requirements: requirements.json § tech-tree-radial-canvas (R1–R5, all met). Era 0 and Era 1
-gate quests render as a radial constellation (rings = graph depth, sectors = quests) with
-middle-drag pan and scroll zoom; keystone/capstone nodes render larger and gold; the four
-Era-1 branch pairs render colour-differentiated (green/purple) with an orange "excludes" mark
-between siblings. Nav rail slot 4 (Research) is enabled and toggles the same viewer F9 drives,
-icon now lights when open. Standing lines / Antiquity views untouched. Verified via
+Requirements: requirements.json § tech-tree-radial-canvas (R1–R8, all met). Round 1: Era 0/1
+gate quests render as a radial constellation (rings = graph depth or authored tier, sectors =
+quests), keystones larger/gold, Era-1 branch pairs colour-differentiated with an "excludes"
+mark, nav slot 4 wired. Round 2 (same session, Ben's live-playtest feedback): converted to a
+full-canvas takeover (`ui::canvas_rect()`, BL-265's task 1, first consumer) with a drawn
+top-left `‹` return control; NR-054 resolved — the canonical ancient ladder JSON (71 nodes, 5
+keystones) now renders on the Antiquity tab as a muted read-only history; Standing lines
+dropped from rendering, tab 3 relabelled "Era 2" (placeholder only, data stays in
+`tech_tree.lua`). Pan tried left-click, reverted to middle-click for consistency. Verified via
 `scripts/verify/tech_tree_panel.lua` — 3/3 golden PASS (tabs, era1, antiquity), goldens
-re-blessed against the intentional changes.
+re-blessed against every intentional change.
 
 ## Corp standing profile (promoted from BL-262, first slice) — **COMPLETE**
 

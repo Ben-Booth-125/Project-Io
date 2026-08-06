@@ -21,92 +21,6 @@ std::string kind_label(const tech_node& t)
     return t.kind;
 }
 
-/// Join a string list with " + " for the prereqs / opens columns.
-std::string join(const std::vector<std::string>& parts)
-{
-    std::string out;
-    for (const std::string& p : parts)
-    {
-        if (!out.empty())
-            out += " + ";
-        out += p;
-    }
-    return out;
-}
-
-/// One quest's collapsing header + tech table. Still used by the Standing
-/// lines tab (view 3), which has no ring structure (BL-310: "deepen every
-/// Era, never gate one" — a standing line isn't a constellation region).
-void draw_quest(const tech_tree_registry& tree, const tech_quest& q)
-{
-    const std::string header = q.name + "  [" + q.id + ", " + q.status + "]###" + q.id;
-    if (!ImGui::CollapsingHeader(header.c_str()))
-        return;
-
-    if (!q.thesis.empty())
-        ImGui::TextDisabled("%s", q.thesis.c_str());
-    if (!q.opens.empty())
-        ImGui::Text("Capstone opens: %s", join(q.opens).c_str());
-
-    std::vector<const tech_node*> nodes;
-    for (const tech_node& t : tree.techs())
-        if (t.quest == q.id)
-            nodes.push_back(&t);
-
-    if (nodes.empty())
-    {
-        ImGui::TextDisabled("(no techs enumerated)");
-        return;
-    }
-
-    constexpr ImGuiTableFlags table_flags =
-        ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg | ImGuiTableFlags_SizingFixedFit;
-    const std::string table_id = "techs##" + q.id;
-    if (ImGui::BeginTable(table_id.c_str(), 7, table_flags))
-    {
-        ImGui::TableSetupColumn("Id");
-        ImGui::TableSetupColumn("Tech");
-        ImGui::TableSetupColumn("Kind");
-        ImGui::TableSetupColumn("Cost");
-        ImGui::TableSetupColumn("Payoff");
-        ImGui::TableSetupColumn("Condition");
-        ImGui::TableSetupColumn("Prereqs");
-        ImGui::TableHeadersRow();
-
-        for (const tech_node* t : nodes)
-        {
-            ImGui::TableNextRow();
-            const bool is_capstone = (t->kind == "capstone");
-            const bool is_economic = (t->condition == "surplus" || t->condition == "market"
-                                      || t->condition == "stockpile");
-            if (is_capstone)
-                ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1,
-                                       ImGui::GetColorU32(ImVec4{0.45f, 0.35f, 0.10f, 0.35f}));
-            else if (is_economic)
-                ImGui::TableSetBgColor(ImGuiTableBgTarget_RowBg1,
-                                       ImGui::GetColorU32(ImVec4{0.15f, 0.35f, 0.45f, 0.35f}));
-
-            ImGui::TableSetColumnIndex(0);
-            ImGui::TextUnformatted(t->id.c_str());
-            ImGui::TableSetColumnIndex(1);
-            ImGui::TextUnformatted(t->name.c_str());
-            if (!t->unlocks.empty() && ImGui::IsItemHovered(ImGuiHoveredFlags_DelayShort))
-                ImGui::SetTooltip("%s", t->unlocks.c_str());
-            ImGui::TableSetColumnIndex(2);
-            ImGui::TextUnformatted(kind_label(*t).c_str());
-            ImGui::TableSetColumnIndex(3);
-            ImGui::TextUnformatted(t->cost.c_str());
-            ImGui::TableSetColumnIndex(4);
-            ImGui::TextUnformatted(t->payoff.c_str());
-            ImGui::TableSetColumnIndex(5);
-            ImGui::TextUnformatted(t->condition.c_str());
-            ImGui::TableSetColumnIndex(6);
-            ImGui::TextUnformatted(join(t->prereqs).c_str());
-        }
-        ImGui::EndTable();
-    }
-}
-
 // ---------------------------------------------------------------------------
 // The radial constellation (BL-310) — ANCIENT_TECH_LADDER.md § Geometry,
 // transcribed for the two authored eras (views 1/2). Rings are graph depth
@@ -123,16 +37,22 @@ constexpr float kKeystoneMul  = 1.5f;   ///< Keystone/capstone nodes draw larger
 constexpr float kMinZoom      = 0.35f;
 constexpr float kMaxZoom      = 3.0f;
 
-/// Ring = 1 + longest same-quest-prereq chain length (memoized DFS). Computed
-/// from graph structure rather than the authored `tier` field, which the
-/// Era 0 data (predates this geometry) never populated consistently — a tech
-/// with no same-quest prereqs sits at ring 1, matching "can you get there at
-/// all?" (ANCIENT_TECH_LADDER.md's own ring-1 reading, R1 "Reach").
+/// Ring = the authored `tier` field when set (>0) — the Era 1 sectors set
+/// tier = R1/R2/R3 directly, and the Antiquity transcription sets tier =
+/// band index (T1=1..T6=6), both authoritative. Falls back to 1 + longest
+/// same-quest-prereq chain length (memoized DFS) when tier is unset, which is
+/// only the Era 0 data (predates this geometry and never populated tier
+/// consistently) — a tech with no same-quest prereqs sits at ring 1, matching
+/// "can you get there at all?" (ANCIENT_TECH_LADDER.md's own ring-1 reading,
+/// R1 "Reach").
 int compute_ring(const tech_node& t, const std::string& quest_id,
                   const std::unordered_map<std::string, const tech_node*>& by_id,
                   std::unordered_map<std::string, int>& memo,
                   std::vector<std::string>& in_progress)
 {
+    if (t.tier > 0)
+        return t.tier;
+
     auto memo_it = memo.find(t.id);
     if (memo_it != memo.end())
         return memo_it->second;
@@ -177,7 +97,7 @@ struct node_layout
 /// Draws one era's gate quests as a radial web. Returns true if it drew
 /// something (false ⇒ caller shows the "no quests authored" placeholder).
 bool draw_constellation(const tech_tree_registry& tree, int era,
-                         float& pan_x, float& pan_y, float& zoom)
+                         float& pan_x, float& pan_y, float& zoom, bool is_history)
 {
     std::vector<const tech_quest*> quests;
     for (const tech_quest& q : tree.quests())
@@ -245,6 +165,9 @@ bool draw_constellation(const tech_tree_registry& tree, int era,
     const ImVec2 origin = ImGui::GetCursorScreenPos();
     const ImVec2 centre{ origin.x + region.x * 0.5f + pan_x, origin.y + region.y * 0.5f + pan_y };
 
+    // Middle-drag pans, matching the zoom-ladder canvases' own idiom
+    // (body_surface_canvas.cpp) — Ben tried left-click-pans (2026-08-06) and
+    // preferred consistency with the rest of the app instead.
     if (ImGui::IsWindowHovered())
     {
         ImGuiIO& io = ImGui::GetIO();
@@ -330,14 +253,29 @@ bool draw_constellation(const tech_tree_registry& tree, int era,
     {
         const ImVec2 spos = to_screen(nl.canvas_pos);
         const bool is_capstone = (nl.node->kind == "capstone");
+        const bool is_regime   = (nl.node->kind == "regime");
         const bool branch_a = is_branch_suffix(nl.node->id) && nl.node->id.back() == 'A';
         const bool branch_b = is_branch_suffix(nl.node->id) && nl.node->id.back() == 'B';
 
         const float r = kNodeRadius * zoom * (is_capstone ? kKeystoneMul : 1.0f);
-        ImU32 fill = IM_COL32(90, 130, 180, 230);
-        if (branch_a) fill = IM_COL32(90, 170, 110, 230);
-        else if (branch_b) fill = IM_COL32(150, 110, 190, 230);
-        else if (is_capstone) fill = IM_COL32(215, 175, 70, 230);
+        ImU32 fill;
+        if (is_history)
+        {
+            // History palette (Era -1) — muted/sepia, deliberately less saturated
+            // than Era 1's bright draft palette: this content is settled record,
+            // not a proposal awaiting a decision. Keystones read as a warm bronze
+            // rather than gold; regime (roster) nodes read distinctly from techs.
+            if (is_capstone)    fill = IM_COL32(180, 140, 90, 220);
+            else if (is_regime) fill = IM_COL32(140, 120, 100, 210);
+            else                fill = IM_COL32(120, 130, 140, 200);
+        }
+        else
+        {
+            fill = IM_COL32(90, 130, 180, 230);
+            if (branch_a) fill = IM_COL32(90, 170, 110, 230);
+            else if (branch_b) fill = IM_COL32(150, 110, 190, 230);
+            else if (is_capstone) fill = IM_COL32(215, 175, 70, 230);
+        }
 
         const bool hovered = ImGui::IsWindowHovered() &&
             (mouse.x - spos.x) * (mouse.x - spos.x) + (mouse.y - spos.y) * (mouse.y - spos.y) <= r * r * 2.25f;
@@ -376,52 +314,85 @@ void draw_tech_tree_panel(const tech_tree_registry& tree, bool& open, int& view,
     if (!open)
         return;
 
-    const ImVec2 disp = ImGui::GetIO().DisplaySize;
-    ImGui::SetNextWindowPos(
-        ImVec2{disp.x * 0.5f, disp.y * 0.5f}, ImGuiCond_Appearing, ImVec2{0.5f, 0.5f});
-    ImGui::SetNextWindowSize(ImVec2{900.0f, 620.0f}, ImGuiCond_Appearing);
-    if (ImGui::Begin("Tech Tree (mock)", &open, ImGuiWindowFlags_NoCollapse))
+    // Full-canvas takeover (BL-310, per BL-265's settled geometry): bounded to
+    // ui::canvas_rect() rather than a floating popup, so the shell chrome,
+    // header and Selection band survive. ImGuiCond_Always because canvas_rect()
+    // is a function of DisplaySize, re-derived every frame like the pre-BL-265
+    // fold overlay it replaces (detail_level.cpp).
+    const foldout_rect canvas = ui::canvas_rect();
+    ImGui::SetNextWindowPos({canvas.x, canvas.y}, ImGuiCond_Always);
+    ImGui::SetNextWindowSize({canvas.w, canvas.h}, ImGuiCond_Always);
+    constexpr ImGuiWindowFlags flags =
+        ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+        ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings |
+        ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
+    ImGui::Begin("##tech_tree_canvas", nullptr, flags);
+
+    // BL-265's return control: top-left, drawn (not typed — BL-234), acts on
+    // the whole view. Foldable-row controls stay right-gutter-aligned; this is
+    // the one-thing-that-leaves-a-view case, which is always top-left.
     {
-        ImGui::TextDisabled(
-            "BL-087 design mock — read-only; the tech system is post-prototype. "
-            "%d quests, %d techs. Middle-drag to pan, scroll to zoom, hover a node for its unlock.",
-            static_cast<int>(tree.quests().size()), static_cast<int>(tree.techs().size()));
-        ImGui::Separator();
-
-        ui::nav_button("Era -1 Antiquity", 0, view, &open);
+        const float h = ImGui::GetFrameHeight();
+        ImGui::InvisibleButton("##tt_return", {h, h});
+        const bool hot = ImGui::IsItemHovered();
+        const ImVec2 mn = ImGui::GetItemRectMin();
+        const ImVec2 c{ mn.x + h * 0.5f, mn.y + h * 0.5f };
+        const float r = h * 0.22f;
+        ImDrawList* dl = ImGui::GetWindowDrawList();
+        const ImU32 col = hot ? IM_COL32(255, 255, 255, 255) : IM_COL32(190, 197, 208, 220);
+        dl->AddTriangleFilled({c.x + r, c.y - r * 1.15f}, {c.x - r * 0.9f, c.y}, {c.x + r, c.y + r * 1.15f}, col);
+        if (ImGui::IsItemClicked())
+            open = false;
         ImGui::SameLine();
-        ui::nav_button("Era 0 — Terrestrial", 1, view, &open);
-        ImGui::SameLine();
-        ui::nav_button("Era 1 — Early Space", 2, view, &open);
-        ImGui::SameLine();
-        ui::nav_button("Standing lines", 3, view, &open);
-        ImGui::Separator();
-        ImGui::Spacing();
-
-        if (view == 0)
-        {
-            ImGui::TextDisabled("Placeholder — no in-engine tree yet.");
-            ImGui::TextWrapped(
-                "The ancient ladder (0 CE to campaign epoch): derived by the Era -1 "
-                "sim from endowment and contact, never clicked. Its 58 techs, 8 "
-                "vertex quests and 3 keystones are data in "
-                "docs/research/ancient_tech_ladder.json; whether this surface "
-                "renders them is BL-296's open question 4.");
-        }
-        else if (view == 1 || view == 2)
-        {
-            const int era = view - 1;
-            if (!draw_constellation(tree, era, pan_x, pan_y, zoom))
-                ImGui::TextDisabled("Placeholder — no quests authored for this era yet.");
-        }
-        else
-        {
-            ImGui::TextDisabled("Deepen every Era; never gate an Era.");
-            for (const tech_quest& q : tree.quests())
-                if (q.type == "standing")
-                    draw_quest(tree, q);
-        }
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextUnformatted("Tech Tree (mock)");
     }
+
+    ImGui::TextDisabled(
+        "BL-087 design mock — read-only; the tech system is post-prototype. "
+        "%d quests, %d techs. Middle-drag to pan, scroll to zoom, hover a node for its unlock.",
+        static_cast<int>(tree.quests().size()), static_cast<int>(tree.techs().size()));
+    ImGui::Separator();
+
+    ui::nav_button("Era -1 Antiquity", 0, view, &open);
+    ImGui::SameLine();
+    ui::nav_button("Era 0 — Terrestrial", 1, view, &open);
+    ImGui::SameLine();
+    ui::nav_button("Era 1 — Early Space", 2, view, &open);
+    ImGui::SameLine();
+    ui::nav_button("Era 2", 3, view, &open);
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    if (view == 0)
+    {
+        // Real render (BL-310, NR-054, Ben 2026-08-06: "render ancient tech,
+        // even just as a history"). Read-only — nothing here is ever chosen,
+        // only derived (BL-274's endowment/diffusion mechanism); the history
+        // palette (draw_constellation's is_history branch) marks that.
+        if (!draw_constellation(tree, -1, pan_x, pan_y, zoom, /*is_history=*/true))
+            ImGui::TextDisabled("Placeholder — no quests authored for this era yet.");
+    }
+    else if (view == 1 || view == 2)
+    {
+        const int era = view - 1;
+        if (!draw_constellation(tree, era, pan_x, pan_y, zoom, /*is_history=*/false))
+            ImGui::TextDisabled("Placeholder — no quests authored for this era yet.");
+    }
+    else
+    {
+        // Era 2 — placeholder only (Ben, 2026-08-06: standing lines don't need
+        // rendering; keep this slot for Era 2 instead). Standing-line DATA
+        // (L-LOG/L-AUTO/L-MIL) stays in tech_tree.lua — Era 1's E1-EX-KEYSTONE
+        // still prereqs L-AU-01 — it simply has no view of its own any more.
+        ImGui::TextDisabled("Placeholder — no in-engine tree yet.");
+        ImGui::TextWrapped(
+            "Era 2 has no design pass yet (ROADMAP.md's post-v0.1.0 arc). "
+            "Standing lines (Logistics, Automation, Military) still deepen every "
+            "era in the data — L-AU-01 still gates Era 1's Autonomy Doctrine — "
+            "they just no longer have a rendered view of their own.");
+    }
+
     ImGui::End();
 }
 

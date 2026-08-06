@@ -1,5 +1,6 @@
 #include "foldout_column.hpp"
 
+#include "header_panel.hpp"  // header_panel_height
 #include "nav_pane.hpp"      // nav_pane_width
 #include "profile_panel.hpp" // profile_panel_height
 #include "selection_card.hpp" // selection_band_height (the comms dock shares it)
@@ -76,6 +77,18 @@ foldout_rect comms_dock_rect()
         disp.y - h,                                // y: shares the Selection band's top edge
         (W - nav_pane_width) * 0.75f,              // w: three quarters of the column
         h,                                         // h: identical to the band, by design
+    };
+}
+
+foldout_rect canvas_rect()
+{
+    const ImVec2 disp = ImGui::GetIO().DisplaySize;
+    const float  x    = shell_column_width(disp.x);
+    return {
+        x,                                                                        // x: right of the shell column
+        header_panel_height,                                                     // y: below the header strip
+        std::max(0.0f, disp.x - x),                                              // w: to the screen edge (minimap floats inside)
+        std::max(0.0f, disp.y - header_panel_height - selection_band_height(disp.x, disp.y)), // h: above the bottom strip
     };
 }
 

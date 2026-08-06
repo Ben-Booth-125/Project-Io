@@ -8393,6 +8393,38 @@
      "status": "complete",
      "result_metric": "golden PASS at 0.0157% (icon lit-state within tolerance, visually confirmed)",
      "notes": ""
+    },
+    {
+     "id": "R6",
+     "requirement": "The viewer is a full-canvas takeover bounded to ui::canvas_rect() (BL-265's settled geometry), not a floating popup — shell chrome (nav rail, header, Selection band, minimap) survives around it, with a drawn top-left '<' return control.",
+     "verification": [
+      "visual: scripts/verify/tech_tree_panel.lua",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "golden PASS, all three captures",
+     "notes": "Added 2026-08-06, Ben: 'fit it to a full canvas, rather than a popout menu.'"
+    },
+    {
+     "id": "R7",
+     "requirement": "The Antiquity tab (view 0) renders the real ancient tech ladder (docs/research/ancient_tech_ladder.json) as a read-only history on the same radial geometry, muted/history-toned rather than Era 1's bright draft palette.",
+     "verification": [
+      "visual: scripts/verify/tech_tree_panel.lua"
+     ],
+     "status": "complete",
+     "result_metric": "golden PASS, tech_tree_antiquity",
+     "notes": "NR-054 (Ben, 2026-08-06): render ancient tech, even just as a history. Vertex quests (12) and crossings (4) NOT transcribed this pass (not point objects) - documented gap in scripts/tech_tree.lua's header comment, not silently dropped."
+    },
+    {
+     "id": "R8",
+     "requirement": "Standing lines no longer have a rendered view; tab 3 is relabelled 'Era 2' and shows a placeholder. Standing-line DATA (L-LOG/L-AUTO/L-MIL) stays in tech_tree.lua, still referenced by Era 1's cross-links.",
+     "verification": [
+      "visual: scripts/verify/tech_tree_panel.lua",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "golden PASS, tech_tree_tabs shows 'Era 2' tab",
+     "notes": "Ben, 2026-08-06: 'we don't need standing lines rendered. Just keep that as a placeholder for Era 2.'"
     }
    ]
   }
