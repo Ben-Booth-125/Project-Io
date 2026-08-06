@@ -10,7 +10,45 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — The Era 1 tree, first draft: keystones opened by deeds (2026-08-05, latest)
+## Session — Red herrings and the rupture: making Era 1 failure a skill test (2026-08-05, latest)
+
+Light mode, doc-only, continuing the tech-tree sitting. Ben: *little red herrings that make Era 1
+failure (WW3) more likely — more advanced does not mean better; the player must be skilled at
+avoiding danger, in each dimension of play.* Runtime: ~30 min.
+
+**The load-bearing half isn't the herrings.** A red herring with nothing to trigger is flavour. So
+the draft supplies the quantity they feed — and takes BL-223's own discipline verbatim (the
+deterrence ceiling is *a per-nation scalar, not a nuclear-equivalent object*): **two per-nation
+scalars**, **Ceiling** (BL-223's, unchanged) and **Alarm** (new — how threatened a nation feels,
+moved by others' *visible* capability, severed trade, posture, domestic instability).
+
+**The rupture check.** The seeded date decides when the rupture is *tested*, not the outcome. Alarm
+above Ceiling and it goes hot: Era 1 fails, and the Era event's selective destruction lands on
+exactly the orbital and heavy-industrial assets the space programme needed. Deterministic
+threshold, seeded date, visible countdown — no random ruptures.
+
+**Seven herring kinds**, one danger per dimension of play: escalator, legibility trap,
+interdependence severer, brittle optimisation, contextual dud, tempo trap, domestic destabiliser.
+Every one carries a **tell that precedes commitment** — the legible-in-hindsight rule, and the
+difference between a skill test and a gotcha.
+
+**The space row makes it work, because it is unavoidable.** Heavy Ballistic Lift is on the critical
+path to Era 1 and is the biggest single Alarm source — the same stack that reaches orbit is a
+missile. The player's job isn't to dodge the dangerous tech; it's to buy the reassurance that lets
+them hold it (Open Launch Inspection, Civil Telemetry Network).
+
+**One inverse herring, deliberately.** Hardened Dispersed Basing looks aggressive and is
+*stabilising* — a survivable second strike removes the use-it-or-lose-it panic. If every
+menacing-looking node were a trap, "menacing" would just become the tell.
+
+**Also settled in passing:** trade interdependence as the cheapest Alarm suppressant makes the
+Trade pillar **defensive** — a claim about the game's shape, not a tuning knob. NR-068 carries the
+scalar for Ben's call; four questions open, including whether Era 1 failure ends the campaign or
+delays it (lean: delays, expensively).
+
+---
+
+## Session — The Era 1 tree, first draft: keystones opened by deeds (2026-08-05)
 
 Light mode, doc-only, same sitting as the effects pass below. Ben: *consider the shape of the
 Era 1 tree — it will be the first tech tree to gate keystones via quests, i.e. tangible actions
