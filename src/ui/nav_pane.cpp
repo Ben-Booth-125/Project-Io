@@ -47,6 +47,10 @@ void close_all_panels(ui_state& state)
     state.show_tile_ledger       = false;
     state.show_economy_panel     = false;
     state.show_build_ledger      = false; // tile build ledger (BL-162) is a column occupant too
+    // BL-310 round 4: the tech-tree era-selector menu is now a real shell-
+    // column occupant (draw_tech_tree_menu), so it must yield to every other
+    // ledger the same way they yield to it — its canvas takeover closes with it.
+    state.show_tech_tree         = false;
 }
 
 bool any_panel_open(const ui_state& state)
@@ -54,7 +58,8 @@ bool any_panel_open(const ui_state& state)
     return state.show_corporation_panel || state.show_corporations_table ||
            state.show_balance_ledger    ||
            state.show_market_ledger     || state.show_construction_panel ||
-           state.show_tile_ledger       || state.show_economy_panel;
+           state.show_tile_ledger       || state.show_economy_panel ||
+           state.show_tech_tree;
 }
 
 void draw_nav_pane(ui_state& state, float top_offset)

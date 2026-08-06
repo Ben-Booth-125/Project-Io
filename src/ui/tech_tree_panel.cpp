@@ -451,6 +451,57 @@ bool draw_constellation(const tech_tree_registry& tree, int era,
 
 } // namespace
 
+/// One era row in the fold-out menu (BL-310 round 4) — the icon thumbnail
+/// AND the name are both independently clickable, either selects the era
+/// (Ben, 2026-08-06: "a player's selection of each Era's tech tree should be
+/// a button click for the name, or the map click ... both of these should be
+/// in menu space"). Same toggle-rule semantics as ui::nav_button throughout.
+void era_menu_row(const char* label, int id, int& view, bool* close,
+                   const tech_tree_registry& tree, int era, ImU32 dot_colour, ImU32 bg_tint)
+{
+    ImGui::PushID(id);
+    era_icon_button(label, id, view, close, tree, era, dot_colour, bg_tint);
+    ImGui::SameLine();
+    ImGui::BeginGroup();
+    ImGui::Dummy({0, 6.0f}); // rough vertical centring against the 72px icon
+    ui::nav_button(label, id, view, close);
+    ImGui::EndGroup();
+    ImGui::PopID();
+}
+
+void draw_tech_tree_menu(const tech_tree_registry& tree, ui_state& s)
+{
+    if (!s.show_tech_tree)
+        return;
+    if (!ui::foldout_begin("Tech Tree"))
+    {
+        ui::foldout_end();
+        return;
+    }
+
+    // Short line, not TextDisabled's %s form — the shell column is ~380px
+    // and the old "N quests, M techs" tail clipped rather than wrapped there.
+    ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+    ImGui::TextWrapped("BL-087 design mock - read-only.");
+    ImGui::PopStyleColor();
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    era_menu_row("Era -1 Antiquity",    0, s.tech_tree_view, &s.show_tech_tree, tree, -1,
+                 IM_COL32(200, 170, 120, 255), IM_COL32(40, 36, 30, 200));
+    ImGui::Spacing();
+    era_menu_row("Era 0 - Terrestrial", 1, s.tech_tree_view, &s.show_tech_tree, tree, 0,
+                 IM_COL32(120, 160, 210, 255), IM_COL32(24, 30, 42, 200));
+    ImGui::Spacing();
+    era_menu_row("Era 1 - Early Space", 2, s.tech_tree_view, &s.show_tech_tree, tree, 1,
+                 IM_COL32(130, 200, 235, 255), IM_COL32(22, 34, 46, 200));
+    ImGui::Spacing();
+    era_menu_row("Era 2 (unauthored)",  3, s.tech_tree_view, &s.show_tech_tree, tree, 2,
+                 IM_COL32(150, 150, 150, 255), IM_COL32(30, 30, 34, 200));
+
+    ui::foldout_end();
+}
+
 void draw_tech_tree_panel(const tech_tree_registry& tree, bool& open, int& view,
                            float& pan_x, float& pan_y, float& zoom)
 {
@@ -462,6 +513,13 @@ void draw_tech_tree_panel(const tech_tree_registry& tree, bool& open, int& view,
     // header and Selection band survive. ImGuiCond_Always because canvas_rect()
     // is a function of DisplaySize, re-derived every frame like the pre-BL-265
     // fold overlay it replaces (detail_level.cpp).
+    //
+    // PURE CONSTELLATION (BL-310 round 4, Ben: "ignore the tech navigation for
+    // canvas - this is just tech constellation"). No title, no instructions,
+    // no era tabs, no return control — era selection lives entirely in the
+    // shell-column menu (draw_tech_tree_menu) now, which already carries its
+    // own toggle-rule close (re-click the active era). This window is the
+    // rendered graph and nothing else.
     const foldout_rect canvas = ui::canvas_rect();
     ImGui::SetNextWindowPos({canvas.x, canvas.y}, ImGuiCond_Always);
     ImGui::SetNextWindowSize({canvas.w, canvas.h}, ImGuiCond_Always);
@@ -470,49 +528,6 @@ void draw_tech_tree_panel(const tech_tree_registry& tree, bool& open, int& view,
         ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoSavedSettings |
         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse;
     ImGui::Begin("##tech_tree_canvas", nullptr, flags);
-
-    // BL-265's return control: top-left, drawn (not typed — BL-234), acts on
-    // the whole view. Foldable-row controls stay right-gutter-aligned; this is
-    // the one-thing-that-leaves-a-view case, which is always top-left.
-    {
-        const float h = ImGui::GetFrameHeight();
-        ImGui::InvisibleButton("##tt_return", {h, h});
-        const bool hot = ImGui::IsItemHovered();
-        const ImVec2 mn = ImGui::GetItemRectMin();
-        const ImVec2 c{ mn.x + h * 0.5f, mn.y + h * 0.5f };
-        const float r = h * 0.22f;
-        ImDrawList* dl = ImGui::GetWindowDrawList();
-        const ImU32 col = hot ? IM_COL32(255, 255, 255, 255) : IM_COL32(190, 197, 208, 220);
-        dl->AddTriangleFilled({c.x + r, c.y - r * 1.15f}, {c.x - r * 0.9f, c.y}, {c.x + r, c.y + r * 1.15f}, col);
-        if (ImGui::IsItemClicked())
-            open = false;
-        ImGui::SameLine();
-        ImGui::AlignTextToFramePadding();
-        ImGui::TextUnformatted("Tech Tree (mock)");
-    }
-
-    ImGui::TextDisabled(
-        "BL-087 design mock — read-only; the tech system is post-prototype. "
-        "%d quests, %d techs. Middle-drag to pan, scroll to zoom, hover a node for its unlock.",
-        static_cast<int>(tree.quests().size()), static_cast<int>(tree.techs().size()));
-    ImGui::Separator();
-
-    // Icon-only era tabs (BL-310 round 3) — bigger, no text labels, each icon
-    // a tiny real render of that era's own constellation. Fills the width the
-    // old text-pill row left empty; the tooltip carries the name.
-    era_icon_button("Era -1 Antiquity",     0, view, &open, tree, -1,
-                     IM_COL32(200, 170, 120, 255), IM_COL32(40, 36, 30, 200));
-    ImGui::SameLine();
-    era_icon_button("Era 0 - Terrestrial",  1, view, &open, tree, 0,
-                     IM_COL32(120, 160, 210, 255), IM_COL32(24, 30, 42, 200));
-    ImGui::SameLine();
-    era_icon_button("Era 1 - Early Space",  2, view, &open, tree, 1,
-                     IM_COL32(130, 200, 235, 255), IM_COL32(22, 34, 46, 200));
-    ImGui::SameLine();
-    era_icon_button("Era 2 (unauthored)",   3, view, &open, tree, 2,
-                     IM_COL32(150, 150, 150, 255), IM_COL32(30, 30, 34, 200));
-    ImGui::Separator();
-    ImGui::Spacing();
 
     if (view == 0)
     {
