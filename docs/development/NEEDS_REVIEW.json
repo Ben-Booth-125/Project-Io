@@ -1361,6 +1361,23 @@
     "docs/development/backlog.json"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-069",
+   "title": "Ben's 'race the player' answer for first_footing leans the Era 1 tree's deed-scoping question toward world-scoped keystone deeds",
+   "raised": "2026-08-06",
+   "kind": "observation",
+   "status": "open",
+   "source": "Strategy-library design session (docs/ai/STRATEGIES.md) - Ben's elicitation answers, 2026-08-06.",
+   "what": "The Era 1 tree draft left deed scoping open (its Q2: are keystone deeds world firsts or per-corporation?). In the strategy session Ben approved the first_footing seed card - the rival contests firsts - which only exists if deeds are world-scoped: a race needs a single trophy. Recorded so the tree review sees the lean it has already half-taken; the tree doc's Q2 is not formally resolved by this.",
+   "why_it_matters": "World-scoped deeds change the keystone experience for every corporation: losing a race means your doctrine fork opens on the winner's schedule (or closes). If Ben wants deeds personal after all, ST-10 (first_footing) dies with that answer, and the strategy doc says so on the card.",
+   "options": [],
+   "recommendation": "Resolve tree Q2 as 'world-scoped for the four keystone deeds, personal for smaller deeds' (the tree draft's own lean), which makes both docs consistent.",
+   "files": [
+    "docs/ai/STRATEGIES.md",
+    "docs/research/ERA1_TECH_LANDSCAPE.md"
+   ],
+   "resolution": null
   }
  ]
 }
