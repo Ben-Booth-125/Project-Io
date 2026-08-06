@@ -8396,14 +8396,14 @@
     },
     {
      "id": "R6",
-     "requirement": "The viewer is a full-canvas takeover bounded to ui::canvas_rect() (BL-265's settled geometry), not a floating popup — shell chrome (nav rail, header, Selection band, minimap) survives around it, with a drawn top-left '<' return control.",
+     "requirement": "The constellation renders as a full-canvas takeover bounded to ui::canvas_rect() (BL-265's settled geometry), not a floating popup - shell chrome (nav rail, header, Selection band, minimap) survives around it. Superseded by R11: the canvas is now PURE rendering (no title/tabs/return control of its own) - closing happens via the menu's toggle rule.",
      "verification": [
       "visual: scripts/verify/tech_tree_panel.lua",
       "code"
      ],
      "status": "complete",
      "result_metric": "golden PASS, all three captures",
-     "notes": "Added 2026-08-06, Ben: 'fit it to a full canvas, rather than a popout menu.'"
+     "notes": "Amended round 4 (Ben: 'ignore the tech navigation for canvas - this is just tech constellation'). The in-canvas return control from round 2 was removed; see R11."
     },
     {
      "id": "R7",
@@ -8446,6 +8446,94 @@
      "status": "complete",
      "result_metric": "golden PASS, all three captures show name-based labels",
      "notes": "Ben, 2026-08-06: 'work on getting short names for each tech ... players do not have to work out a dictionary in their mind.' short_name hand-authored for the 4 Era-1 keystones + their 8 branch children this pass (the longest/most important labels); the other ~120 nodes fall back to truncated name, not authored short_name yet — a follow-on pass, not silently deferred."
+    },
+    {
+     "id": "R11",
+     "requirement": "Era selection lives entirely in a shell-column fold-out menu (ui::foldout_begin, same idiom as every other ledger) - one row per era, with BOTH a real map-thumbnail icon AND the era's name independently clickable, either selects the era. The canvas shows nothing but the rendered graph.",
+     "verification": [
+      "visual: scripts/verify/tech_tree_panel.lua",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "golden PASS, tech_tree_tabs shows the shell-column menu with icon+name rows, canvas has no chrome",
+     "notes": "Ben, 2026-08-06, correcting round 3: '\"menu space\" is the shell column (MENU.md's own vocabulary) where every other ledger folds out - this session's rounds 1-3 kept era selection inside the canvas. A player's selection of each Era's tech tree should be a button click for the name, or the map click. Both of these should be in menu space.'"
+    },
+    {
+     "id": "R12",
+     "requirement": "The tech-tree menu participates in the standing nav-rail mutual-exclusion rule: opening another ledger closes it (close_all_panels), and it closes every other ledger when opened, same as every other nav slot.",
+     "verification": [
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "",
+     "notes": "nav_pane.cpp's close_all_panels/any_panel_open extended with show_tech_tree."
+    }
+   ]
+  },
+  {
+   "brief": "header-chrome-tightening",
+   "title": "Minimap flush edges (BL-312) + time panel header reflow (BL-313)",
+   "difficulty": 2,
+   "importance": "C",
+   "evaluated_difficulty": null,
+   "status": "active",
+   "resolved": null,
+   "resolution": null,
+   "promoted_from": "backlog.json BL-312, BL-313",
+   "batch": null,
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "The minimap's right edge sits flush against the screen's right edge (no margin gap).",
+     "verification": [
+      "visual: manual (no golden covers full-screen chrome layout yet)",
+      "code"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "The minimap's bottom edge relationship to the Selection band / comms dock (chrome_margin, selection_band_height) is preserved or deliberately re-derived - not silently broken.",
+     "verification": [
+      "code",
+      "visual: manual"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "requirement": "The time/speed panel's total height fits within header_panel_height (92px) - no overflow below the header strip.",
+     "verification": [
+      "visual: manual"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R4",
+     "requirement": "Layout is two columns sharing one row-band: left ~1/3 holds date + quarter-progress bar, right ~2/3 holds the pause/speed-tier buttons + active-rate label.",
+     "verification": [
+      "visual: manual",
+      "code"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R5",
+     "requirement": "No functional change: pause toggle, speed tiers I-V, active-speed highlight, and the rate/runway tooltip text all behave exactly as before.",
+     "verification": [
+      "code"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
     }
    ]
   }

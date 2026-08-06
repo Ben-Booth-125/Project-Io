@@ -1,5 +1,20 @@
 # Project Io — REFINED (active worklist)
 
+## Header chrome tightening (promoted from BL-312, BL-313)
+
+Requirements: requirements.json § header-chrome-tightening (R1–R5)
+
+- **[2] A — Minimap flush to the right edge (and bottom, if it doesn't break the
+  selection-band alignment).** Files: `src/core/app.cpp`. Deps: foundation.
+  Satisfies: R1, R2.
+- **[2] B — Time panel: two-column reflow (left 1/3 progress, right 2/3 controls).**
+  Files: `src/core/app.cpp`. Deps: independent of A (disjoint code regions in the
+  same file). Satisfies: R3, R4, R5.
+
+Parallelisation note: both tasks touch `app.cpp` but disjoint blocks (the minimap
+draw block vs the time-panel draw block) — one session, sequential, not fanned out
+(too small to be worth worktree overhead).
+
 ## Tech tree radial canvas (promoted from BL-310) — **COMPLETE**
 
 Requirements: requirements.json § tech-tree-radial-canvas (R1–R10, all met). Round 1: Era 0/1
