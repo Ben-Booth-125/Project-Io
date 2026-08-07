@@ -1,0 +1,289 @@
+{
+ "_schema": "The NL-phrasing sub-dictionary (Rival-authored, 2026-08-06). Per action id: readings [{sentence, stance, binds, via, resolution}]. stance ∈ imperative | outcome | future-anchored | corrective | deictic | composite | gated. binds maps each of the action's args to how the sentence references it. via lists other action ids the resolution routes through (empty when direct). resolution is the one-line recovery: how the sentence maps back to the canonical press+args.",
+ "_note": [
+  "Companion to ACTIONS.json (the working mirror alongside this file) — the fourth leg of the word interface: press (dictionary), read (blackboard), write (corp-command), and now PHRASING (how far a sentence can stand from the command and still resolve to it).",
+  "Purpose (Ben, 2026-08-06): a rich dictionary of SENTENCES, not aliases. Each sentence is a path back to the intended output, and may consider future use of the action (future-anchored stance). Every reading doubles as a labelled training pair for the compressed local model (BL-279 corpus leg) — the dictionary does the reasoning work so the small model doesn't have to.",
+  "Stance taxonomy settled 2026-08-06: imperative (direct restatement), outcome (names the result, resolved via expected_output), future-anchored (justified by a later action's preconditions), corrective (names a problem; resolves to a candidate set disambiguated by blackboard state), deictic (action plain, args contextual), composite (one sentence, a legal sequence), gated (asks for something currently illegal; resolves to the enabling action). future-anchored and gated are the same relation seen from opposite ends — both carry `via`.",
+  "Register drift (ancient/divine idiom) is deliberately NOT in this file — era-voiced variants live in the 0 CE test battery (SANDBOX-0CE.md), which tests whether these resolutions survive a register shift.",
+  "Pilot scope: the gameplay family only (11 entries). Canvas/lens/ledger/chrome phrasings wait until the pilot proves the shape.",
+  "AMENDMENT (Battery A run 1, 2026-08-06 — annals/battery-0ce-A-run1.md): stance is a SET, not a scalar. A sentence can be corrective AND composite (A5), corrective AND outcome (A7). Readings below keep a single primary stance; resolvers must not be penalised for choosing a defensible secondary one. Action resolution scored 10/10 under full register drift, so the taxonomy's action axis is validated as-is.",
+  "Landing path: this file is Rival's design artifact; it lands into Io (as a `readings` field in ACTIONS.json or a sibling file, Io's call) via an explicit backlog item, never by silent merge."
+ ],
+ "entries": {
+  "gameplay.build": {
+   "readings": [
+    {
+     "sentence": "Raise an iron extraction site on the tile we just selected.",
+     "stance": "imperative",
+     "binds": { "tile": "current selection", "type": "extraction_site (named)", "target": "iron (named)", "recipe": "no_recipe" },
+     "via": [],
+     "resolution": "Direct restatement: press the iron extraction row in the construction ledger on the selected tile."
+    },
+    {
+     "sentence": "Get iron flowing into our pool from this deposit.",
+     "stance": "outcome",
+     "binds": { "tile": "the deposit under discussion", "type": "inferred: extraction_site is the only type whose output is pool stock of a raw resource", "target": "iron", "recipe": "no_recipe" },
+     "via": [],
+     "resolution": "Match desired state ('iron in the pool') to the action whose expected_output produces it: build extraction_site targeting iron on the deposit tile."
+    },
+    {
+     "sentence": "We will need propellant on hand before the launchpad can earn its keep — lay in the refinery now.",
+     "stance": "future-anchored",
+     "binds": { "tile": "a tile with the refinery recipe available, agent's choice", "type": "processing_facility", "target": "n/a", "recipe": "the propellant recipe" },
+     "via": [ "gameplay.build" ],
+     "resolution": "The named future press (launchpad operation) has an input need this build satisfies; resolve to build processing_facility with the propellant recipe, sited ahead of demand."
+    },
+    {
+     "sentence": "Another one, same as this, right here.",
+     "stance": "deictic",
+     "binds": { "tile": "the selected building's tile", "type": "copied from selection", "target": "copied from selection", "recipe": "copied from selection" },
+     "via": [],
+     "resolution": "The alternate press exists for exactly this sentence: 'Build another here' on the selected owned building, gated by stack capacity."
+    },
+    {
+     "sentence": "Open a route to sea for this region's goods.",
+     "stance": "outcome",
+     "binds": { "tile": "a coastal tile in the region", "type": "port", "target": "n/a", "recipe": "no_recipe" },
+     "via": [],
+     "resolution": "The output 'cheaper off-body/coastal freight' belongs to the port; resolve to build port on a coastal tile — the precondition (coast) narrows the tile bind."
+    },
+    {
+     "sentence": "Put a launchpad on this world.",
+     "stance": "gated",
+     "binds": { "tile": "any legal tile on the body", "type": "launchpad", "target": "n/a", "recipe": "no_recipe" },
+     "via": [ "gameplay.survey" ],
+     "resolution": "If the body is unsurveyed the build is illegal — the sentence resolves first to survey (the enabling press), then to build launchpad; note the per-body cap of 1."
+    }
+   ]
+  },
+  "gameplay.demolish": {
+   "readings": [
+    {
+     "sentence": "Tear the old wharf down — we need the ground.",
+     "stance": "imperative",
+     "binds": { "building": "the named/selected building" },
+     "via": [],
+     "resolution": "Direct: select the building, Demolish, confirm. The stated reason ('need the ground') matches the doc's only good reason — the tile is worth more re-purposed."
+    },
+    {
+     "sentence": "Clear this tile for the smelter we are about to raise.",
+     "stance": "future-anchored",
+     "binds": { "building": "whatever currently occupies the capacity-capped tile" },
+     "via": [ "gameplay.build" ],
+     "resolution": "The future build's precondition (a free slot) is what demolition provides; demolish the occupant, then build. Irreversible and refundless — only correct when the successor is decided."
+    },
+    {
+     "sentence": "This mine is finished; the seam is empty and it will never pay again.",
+     "stance": "corrective",
+     "binds": { "building": "the exhausted extraction site" },
+     "via": [ "gameplay.idle" ],
+     "resolution": "A loss-maker normally resolves to idle (reversible), but 'never pay again' removes the option value — a depleted deposit resolves past idle to demolish. Blackboard check: deposit remaining ≈ 0."
+    }
+   ]
+  },
+  "gameplay.idle": {
+   "readings": [
+    {
+     "sentence": "Shut the smelter down for now, but keep it.",
+     "stance": "imperative",
+     "binds": { "building": "the named building" },
+     "via": [],
+     "resolution": "'For now, but keep it' is exactly idle's contract — reversible, asset retained, tile held."
+    },
+    {
+     "sentence": "Stop the bleeding at the steelworks.",
+     "stance": "corrective",
+     "binds": { "building": "the loss-making building" },
+     "via": [ "gameplay.set_recipe", "gameplay.set_workforce" ],
+     "resolution": "Names a problem, not a press. Candidate set: set_recipe (if another recipe clears better), set_workforce (throttle), idle (stop wages entirely). Disambiguate on blackboard: no profitable recipe and no acceptable throttle → idle."
+    },
+    {
+     "sentence": "Mothball everything on that continent until prices recover.",
+     "stance": "composite",
+     "binds": { "building": "each running owned building on the named continent, one press per building" },
+     "via": [],
+     "resolution": "Decomposes to one idle press per building; 'until prices recover' pre-registers the future resume trigger, it is not an argument."
+    }
+   ]
+  },
+  "gameplay.resume": {
+   "readings": [
+    {
+     "sentence": "Wake the smelter back up.",
+     "stance": "imperative",
+     "binds": { "building": "the idled building" },
+     "via": [],
+     "resolution": "Direct: select the idled building, Resume."
+    },
+    {
+     "sentence": "Steel is clearing high again — capture it with what we already own.",
+     "stance": "outcome",
+     "binds": { "building": "idled buildings whose output is steel" },
+     "via": [],
+     "resolution": "'With what we already own' excludes build (capex); the zero-capex margin-capture press on an idled asset is resume. This is the doc's own signal: prices recovered."
+    }
+   ]
+  },
+  "gameplay.place_road": {
+   "readings": [
+    {
+     "sentence": "Lay a track through the pass between the mine and the market town.",
+     "stance": "imperative",
+     "binds": { "tile": "each tile on the named route, one press per tile", "road_tier": "1 (Track, named)" },
+     "via": [],
+     "resolution": "One place_road press per tile along the route; 'track' names tier 1."
+    },
+    {
+     "sentence": "Our ore is paying too much to reach the smelter.",
+     "stance": "corrective",
+     "binds": { "tile": "the tiles the ore freight actually traverses (blackboard: route)", "road_tier": "lowest tier whose saving beats its cost" },
+     "via": [],
+     "resolution": "High haul cost on a real freight lane resolves to roads along that lane — the doc's own criterion: worth it on tiles carrying real freight."
+    },
+    {
+     "sentence": "Upgrade the road to a highway before the new port opens and traffic doubles.",
+     "stance": "future-anchored",
+     "binds": { "tile": "tiles on the port's inland approach", "road_tier": "3 (Highway)" },
+     "via": [ "gameplay.build" ],
+     "resolution": "The future press (port build) creates the freight this tier-raise serves; upgrade-in-place is legal since current level is below 3."
+    }
+   ]
+  },
+  "gameplay.place_sell_order": {
+   "readings": [
+    {
+     "sentence": "List two hundred grain a quarter on the home market, but take nothing under 4.",
+     "stance": "imperative",
+     "binds": { "body": "the home body", "resource": "grain/food", "quantity": "200", "floor_price": "4" },
+     "via": [],
+     "resolution": "Direct: Sell Orders tab on the home body's market, resource + quantity + floor as stated."
+    },
+    {
+     "sentence": "Don't let our copper be dumped into this crash.",
+     "stance": "outcome",
+     "binds": { "body": "the crashed market's body", "resource": "copper", "quantity": "current surplus rate", "floor_price": "above the crashed price, at the acceptable minimum" },
+     "via": [],
+     "resolution": "Floor-protection is this action's stated purpose; place a sell order whose floor sits above the crash. WARNING the resolution must carry: the triple leaves the auto-sell path — a floor set too high stockpiles silently."
+    },
+    {
+     "sentence": "Hold half the steel back — the shipyard will want it next year.",
+     "stance": "future-anchored",
+     "binds": { "body": "the steel pool's body", "resource": "steel", "quantity": "half the surplus rate", "floor_price": "0" },
+     "via": [ "gameplay.build" ],
+     "resolution": "Rationing toward a future construction spend: a metered order (reduced quantity, floor 0) replaces auto-sell-everything, keeping stock for the named future build's material bill."
+    }
+   ]
+  },
+  "gameplay.remove_sell_order": {
+   "readings": [
+    {
+     "sentence": "Cancel the copper order on the home market.",
+     "stance": "imperative",
+     "binds": { "order": "the row matching (home body, copper)" },
+     "via": [],
+     "resolution": "Direct: Remove on the matching row."
+    },
+    {
+     "sentence": "The copper is piling up and selling nothing — let the market have it again.",
+     "stance": "corrective",
+     "binds": { "order": "the standing copper order whose floor cleared nothing" },
+     "via": [ "gameplay.place_sell_order" ],
+     "resolution": "The silent-stockpile failure mode of a too-high floor; removing the last order returns the triple to auto-sell. If control should be kept at a lower floor, the path is remove then re-add (there is no edit)."
+    }
+   ]
+  },
+  "gameplay.set_recipe": {
+   "readings": [
+    {
+     "sentence": "Switch the plant to rations.",
+     "stance": "imperative",
+     "binds": { "building": "the selected processor", "recipe": "the food-rations recipe" },
+     "via": [],
+     "resolution": "Direct: production-method combo, pick the rations row."
+    },
+    {
+     "sentence": "Steel is losing money here; make this plant earn.",
+     "stance": "corrective",
+     "binds": { "building": "the loss-making processor", "recipe": "the recipe with the best local margin (blackboard: per-recipe clearing prices)" },
+     "via": [ "gameplay.idle" ],
+     "resolution": "First lever on a processor, free of capex — try the recipe switch before idle. Disambiguation: if no recipe clears profitably, fall through to idle."
+    },
+    {
+     "sentence": "Every new plant we raise starts on steel — put this one to its real work.",
+     "stance": "deictic",
+     "binds": { "building": "the just-completed processor", "recipe": "the recipe the build was priced on / intended for" },
+     "via": [ "gameplay.build" ],
+     "resolution": "The doc's own note: new processors default to steel, so set_recipe is typically the first press after building one. 'Its real work' binds to the intent recorded at build time."
+    }
+   ]
+  },
+  "gameplay.set_workforce": {
+   "readings": [
+    {
+     "sentence": "Run the mine at half crew.",
+     "stance": "imperative",
+     "binds": { "building": "the named mine", "workforce": "50" },
+     "via": [],
+     "resolution": "Direct: untick Auto, set the slider to 50. Note the side effect the resolution must carry: a manual value pins the dial (clears workforce_auto)."
+    },
+    {
+     "sentence": "Feed the smelter whatever ore it takes, even if the mine itself runs at a loss.",
+     "stance": "future-anchored",
+     "binds": { "building": "the upstream mine", "workforce": "above 100, sized to the smelter's input demand" },
+     "via": [ "gameplay.set_recipe" ],
+     "resolution": "Overdrive past 100% to feed a downstream chain at a per-building loss — the doc's own third case. The downstream building's input need sizes the value."
+    },
+    {
+     "sentence": "Park the quarry cheaply but keep the crew ready to return.",
+     "stance": "outcome",
+     "binds": { "building": "the quarry", "workforce": "0" },
+     "via": [ "gameplay.idle" ],
+     "resolution": "Staff-to-0 versus idle is a real fork: workforce 0 stops wages but keeps the building formally running. Resolve to set_workforce 0 when the sentence implies fast per-tick recovery; idle when it implies a season-scale stop."
+    }
+   ]
+  },
+  "gameplay.set_workforce_auto": {
+   "readings": [
+    {
+     "sentence": "Hand the staffing back to the solver.",
+     "stance": "imperative",
+     "binds": { "building": "the manually-pinned building" },
+     "via": [],
+     "resolution": "Direct: tick Auto. Mostly exists to undo an earlier manual pin — fresh builds start with it on."
+    },
+    {
+     "sentence": "Stop micromanaging that mill; just let it make what it can.",
+     "stance": "outcome",
+     "binds": { "building": "the mill" },
+     "via": [],
+     "resolution": "'Let it maximise its own profit' is exactly the solver's contract; resolve to set_workforce_auto."
+    }
+   ]
+  },
+  "gameplay.survey": {
+   "readings": [
+    {
+     "sentence": "Dispatch a survey to the second moon.",
+     "stance": "imperative",
+     "binds": { "body": "the named body" },
+     "via": [],
+     "resolution": "Direct: select the body, Dispatch Survey. Cost debited up front; results arrive region-by-region."
+    },
+    {
+     "sentence": "We are running out of ground here — find the next place worth digging.",
+     "stance": "corrective",
+     "binds": { "body": "an unsurveyed body chosen by cost/ETA against the balance" },
+     "via": [],
+     "resolution": "Tile saturation at home is the doc's own trigger for discovery spend; resolve to survey the cheapest promising hidden body within the solvency floor."
+    },
+    {
+     "sentence": "Before we commit to a launchpad there, we must know what the ground holds.",
+     "stance": "future-anchored",
+     "binds": { "body": "the launchpad candidate body" },
+     "via": [ "gameplay.build" ],
+     "resolution": "The future build's evaluation needs surveyed tiles; survey is the enabling press. Same relation as the gated reading of build, seen from the forward end."
+    }
+   ]
+  }
+ }
+}
