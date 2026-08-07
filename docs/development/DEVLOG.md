@@ -10,7 +10,70 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Red herrings and the rupture: making Era 1 failure a skill test (2026-08-05, latest)
+## Session — The Era -1 arc's second day: Ages view, sweep verdict, review, and the fixes (2026-08-05, latest)
+
+Retroactive entry, written 2026-08-07: this session's five commits reached `main` that day by
+rebase onto `origin/main`, and the arc had no DEVLOG record until this repair (NR-079). Full
+mode, delivery. Runtime: reconstructed from commit stamps — 08:42 to 12:26, ~3.7 h.
+
+**The Ages view** (*The Ages view: two thousand years of borders, scrubbable*). A fourth History
+tab replaying the Era -1 sim's ownership change list: year scrubber, Play/Restart transport,
+provinces coloured by polity, the run's own cost printed under it. The sim runs lazily over a
+COPY of the body's settlement state — deliberately not in the generation path, so BL-271's
+(Era -1 history sim) open question 2 stayed open rather than being answered by accident. Delta
+encoding is what makes it possible: any year materialises from 654 changes / 5.2 KB. Captures
+inspected, NOT blessed — the software renderer fails on this machine, so a golden blessed here
+would be GPU-specific.
+
+**The sweep, and the answer is no** (*The history sweep, and the answer it gives is no*).
+BL-275 (history sweep distributions) landed as `tools/verify/history_sweep.cpp` — reports, does
+not gate. First spread: hegemony 0/12, elimination 0/12, powers-at-epoch equals powers-at-start
+in every world. BL-224's non-hegemony invariant satisfied for a degenerate reason — elimination
+and collapse are unreachable — which is the false confidence the sweep existed to expose. Filed
+in-session as the no-elimination finding, priority A (see the id note below).
+
+**Rosters and two great powers** (*Rosters, two great powers, and a death spiral that does not
+quite kill*). BL-274 (era-keyed rosters) landed as `src/world/unit_roster.{hpp,cpp}` — 19 rows
+over four bands, availability derived from province endowment, resolving INTO combat's types
+rather than combat gaining a roster table it was designed not to have. BL-299 (great-power
+seed) seeds two majors with opposed creeds off `history_sim_params`. The first no-elimination
+fix attempt (cohesion, a settle gate, a sack, transfer relief) made hegemony reachable (0/12 to
+1/12) but not elimination (still 0/12); the weakest power measures median 6 provinces, range
+1..22 — the model "gets to the brink and stops", recorded as a FAILED requirement row rather
+than re-scoped.
+
+**The review that reframed it** (*The review lands, and the sim stops in year 458*). Cold
+review, nine findings. The severe one: the four verbs score on incommensurable scales, so
+Invest pins at its ceiling once populations mature and no other verb can win the argmax again.
+Measured: last ownership change at median year 458 of a 0–1960 run, 36% of changes in the first
+tenth. Three quarters of every run inert — which supersedes the no-elimination diagnosis. Four
+items filed (see the id note below).
+
+**Four review items: three land, one reverts** (*Four review items: three land, one reverts,
+and the stall was never real*). The settle-stacking fix was the biggest lever in the arc: an
+occupancy search instead of nine untested candidates, conquests 201 → 3568, LAST CHANGE YEAR
+458 → 967, first-tenth share 36% → 5%. The Ages cache re-keyed on a generation fingerprint. The
+verb-scales fix REVERTED — normalising by each verb's own range structurally favours the
+narrowest range; the real fix is one scale by construction, a scorer redesign. And the
+vacuous-stall finding exposed the arc's biggest design correction: with the radius widened and
+`w_dist` zeroed, under-supplied campaigns still TAKE the far province — the stall that BL-277's
+(Era -1 military strategy) Q2 attributed to supply decay is a score preference, not a physical
+limit. Full-run cost measured at ~2.1 s (749 real provinces instead of 191 — the growth is the
+improvement).
+
+**The id note (2026-08-07 rebase).** These sessions filed their findings as backlog ids 308–313
+and review-queue notes 064–066; the rebase onto `origin/main` kept origin's ids, which the
+2026-08-06 sessions had already spent on unrelated items (propellant, deeds, tech tree, works
+doctrine, minimap, time panel). The landed fixes need no re-file. The two still-open findings —
+no-elimination and verb scales — currently have NO backlog id (the scorer redesign sits
+unnumbered in the 2026-08-07 working tree), and BL-277's (Era -1 military strategy) design
+prose lost both its five answers and the Q2 correction. NR-079 records the debt; requirement
+groups `history-sweep`, `era-rosters-and-great-powers` and `era-minus-1-review-fixes` carry the
+corrected citations.
+
+---
+
+## Session — Red herrings and the rupture: making Era 1 failure a skill test (2026-08-05)
 
 Light mode, doc-only, continuing the tech-tree sitting. Ben: *little red herrings that make Era 1
 failure (WW3) more likely — more advanced does not mean better; the player must be skilled at
@@ -163,6 +226,40 @@ choice to differentiate it; a band that opens 3-band gaps needs the gaps explain
 checked rather than asserted — region 38 objects, web-wide 88, extrapolating to ~120–135. Open,
 in NR-064: whether Works Doctrine gates corporation generation (lean yes — file it when BL-296
 lands), and whether the region earns its own viewer tab (lean no — the era strip means eras).
+
+---
+
+## Session — Roster bands become a partition, and the Era -1 sim lands (2026-08-04)
+
+Retroactive entry, written 2026-08-07 alongside the 2026-08-05 arc entry above — the rebased
+commits carried no DEVLOG record (NR-079). A late-evening sitting, commits at 23:06 and 23:30.
+Full mode, design then delivery. Runtime: reconstructed from commit stamps; the visible span is
+the last ~25 min of a longer evening.
+
+**The partition** (*Roster bands become a partition, and the Era -1 scorer is designed*). The
+ladder's roster grouping had T2 in two groups at once — never a partition, so never
+implementable. Settled off the Military column: classical=T1, medieval=T2–T3, gunpowder=T4,
+industrial=T5–T6, the T1/T2 break resolving forward because stirrup heavy cavalry IS the
+medieval military revolution. Consequence: a 0 CE start is classical alone; shock cavalry is a
+T2 unlock, not an epoch unit. BL-277 (Era -1 military strategy) had all five of its questions
+answered in design: ring-closure objectives, supply-decay force commitment, naval as
+crossing-enabler only, marginal-score peace at province granularity, creed-led doctrine.
+Seasonality amended against BL-271 (Era -1 history sim): season is an axis of the action, not a
+phase of the clock — a year tick stands, and "campaign in winter" is a scored candidate.
+Convergence settled as rejection sampling on the 1960 output, reusing the C1 rejection-census
+idiom. (The rebase later dropped these design-prose edits from `backlog.json`; the answers
+survive in the commit message and this entry — see the id note in the entry above.)
+
+**The sim** (*Era -1 history sim: the year tick runs, and the scorer decides*). Landed as
+`src/world/history_sim.{hpp,cpp}` — a year tick over polities seeded from cultures, each
+picking from a bounded candidate set by integer score: the corp-AI stage-A idiom, reused
+because BL-271's transfer contract says the architecture graduates and the constants do not.
+Territory moves at province granularity, never tile; `combat.{hpp,cpp}` untouched. The harness
+flushed three defects, all fixed rather than tuned around: the 1.87 MB per-year ownership grid
+delta-encoded down to 6 KB; a quadratic candidate scan cut from 2554 ms to 626 ms with a
+prebuilt neighbour index; and winter campaigns scored-but-never-chosen until the defender
+readiness penalty entered the score. The first Linux CTest baseline was recorded in-session:
+43/49, six failures predating the work (Windows-blessed goldens and sweep timeouts).
 
 ---
 

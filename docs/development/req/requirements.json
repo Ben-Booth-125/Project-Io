@@ -8539,13 +8539,13 @@
   },
   {
    "brief": "history-ages-view",
-   "title": "History ledger: the Ages view — the Era -1 political time-lapse (BL-277)",
+   "title": "History ledger: the Ages view — the Era -1 political time-lapse over BL-271's history sim (landed 2026-08-05, 'The Ages view: two thousand years of borders, scrubbable')",
    "difficulty": 2,
    "importance": "B",
    "evaluated_difficulty": 2,
    "status": "complete",
    "resolved": "2026-08-04",
-   "resolution": "Complete. Fourth History tab; the sim runs lazily over a COPY of the body's settlement state when the view opens, so world generation is untouched. scripts/verify/history_ages.lua captures three years. Captures inspected; NOT blessed as goldens — the software renderer fails on this machine (see NR-065), so any golden blessed here would be GPU-specific and would widen the drift NR-064 already records.",
+   "resolution": "Complete. Fourth History tab; the sim runs lazily over a COPY of the body's settlement state when the view opens, so world generation is untouched. scripts/verify/history_ages.lua captures three years. Captures inspected; NOT blessed as goldens — the software renderer fails on this machine, so any golden blessed here would be GPU-specific and would widen the Windows-vs-Linux golden drift the first Linux CTest baseline (43/49, 2026-08-04) recorded. (The review notes for both — pre-rebase ids NR-064/NR-065 — did not survive the 2026-08-07 rebase; those ids now name unrelated 2026-08-06 entries.)",
    "promoted_from": "Ben, 2026-08-04: 'How can you transform this into something viewable in the history ledger?' -> build it now.",
    "batch": null,
    "rows": [
@@ -8587,7 +8587,7 @@
    "evaluated_difficulty": 3,
    "status": "complete",
    "resolved": "2026-08-04",
-   "resolution": "Complete. tools/verify/history_sweep.cpp reports and does not gate, per the item's own instruction. First spread (12 seeds) found hegemony 0/12 and elimination 0/12 — filed as BL-308, since a model where no polity can die makes BL-224's invariant unmeasurable.",
+   "resolution": "Complete. tools/verify/history_sweep.cpp reports and does not gate, per the item's own instruction. First spread (12 seeds) found hegemony 0/12 and elimination 0/12 — filed in-session as the no-elimination finding (pre-rebase id BL-308; the 2026-08-07 rebase reassigned that id to an unrelated item, and the still-open finding has no current backlog id), since a model where no polity can die makes BL-224's invariant unmeasurable.",
    "promoted_from": "Ben, 2026-08-04, choosing the sweep as the next work.",
    "batch": null,
    "rows": [
@@ -8630,13 +8630,13 @@
   },
   {
    "brief": "era-rosters-and-great-powers",
-   "title": "Era-keyed rosters (BL-274), the great-power seed (BL-299), and the first BL-308 fix attempt",
+   "title": "Era-keyed rosters (BL-274), the great-power seed (BL-299), and the first fix attempt at the no-elimination finding (pre-rebase id BL-308)",
    "difficulty": 3,
    "importance": "B",
    "evaluated_difficulty": 3,
    "status": "complete",
    "resolved": "2026-08-04",
-   "resolution": "Complete for BL-274 and BL-299; BL-308 PARTIAL and stays open. Hegemony became reachable (0/12 -> 1/12) but elimination did not (still 0/12), with the weakest power now measured at median 6 provinces, range 1..22 — a sharper diagnosis rather than a fix.",
+   "resolution": "Complete for BL-274 and BL-299; the no-elimination fix (pre-rebase id BL-308) PARTIAL and stays open. Hegemony became reachable (0/12 -> 1/12) but elimination did not (still 0/12), with the weakest power now measured at median 6 provinces, range 1..22 — a sharper diagnosis rather than a fix.",
    "promoted_from": "Ben, 2026-08-04: complete the remaining items, then review.",
    "batch": "era-minus-1",
    "rows": [
@@ -8684,22 +8684,22 @@
     },
     {
      "id": "R7",
-     "requirement": "BL-308's target outcome — a polity is eliminated in at least one world of a seed spread — is NOT met. Recorded as failed rather than re-scoped.",
+     "requirement": "The no-elimination finding's target outcome (pre-rebase id BL-308) — a polity is eliminated in at least one world of a seed spread — is NOT met. Recorded as failed rather than re-scoped.",
      "class": "headless",
      "status": "failed",
-     "notes": "Elimination 0/12 after the fix. Weakest power median 6 provinces, range 1..22. BL-308 stays open with a sharper diagnosis."
+     "notes": "Elimination 0/12 after the fix. Weakest power median 6 provinces, range 1..22. The finding stays open with a sharper diagnosis — and with no current backlog id, since the 2026-08-07 rebase reassigned pre-rebase BL-308 to an unrelated item."
     }
    ]
   },
   {
    "brief": "era-minus-1-review-fixes",
-   "title": "Review fixes: province stacking, Ages cache key, and the vacuous stall assertion (BL-310/311/312)",
+   "title": "Review fixes: province stacking, Ages cache key, and the vacuous stall assertion (pre-rebase ids BL-310/311/312; landed 2026-08-05, 'Four review items: three land, one reverts, and the stall was never real')",
    "difficulty": 3,
    "importance": "A",
    "evaluated_difficulty": 3,
    "status": "complete",
    "resolved": "2026-08-04",
-   "resolution": "BL-310, BL-311 and BL-312 complete. BL-309 attempted and REVERTED — range-based normalisation structurally favours the narrowest-range verb, so it needs a scorer redesign. BL-310 carried most of the benefit anyway: LAST CHANGE YEAR 458 -> 967, first-tenth share 36% -> 5%.",
+   "resolution": "Settle stacking, the Ages cache key and the vacuous-stall batch (pre-rebase ids BL-310/311/312 — reassigned to unrelated items by the 2026-08-07 rebase) complete. The verb-scales fix (pre-rebase id BL-309) attempted and REVERTED — range-based normalisation structurally favours the narrowest-range verb, so it needs a scorer redesign (unnumbered in the 2026-08-07 working tree; re-file if it stalls). The stacking fix carried most of the benefit anyway: LAST CHANGE YEAR 458 -> 967, first-tenth share 36% -> 5%.",
    "promoted_from": "Ben, 2026-08-04: batch deliver the review items.",
    "batch": "era-minus-1",
    "rows": [
@@ -8729,7 +8729,7 @@
      "requirement": "The supply-decay stall assertion is non-vacuous: the far objective is genuinely scored and attacked, and the test states which mechanism actually stops distant expansion.",
      "class": "headless",
      "status": "complete",
-     "notes": "R3a2/R3a3/R3b/R3b2. Found that supply decay ALONE does not stop conquest — the w_dist score penalty does. BL-277 Q2 corrected."
+     "notes": "R3a2/R3a3/R3b/R3b2. Found that supply decay ALONE does not stop conquest — the w_dist score penalty does. Q2 of BL-277 (Era -1 military strategy) corrected accordingly in-session; the correction to that item's design prose did not survive the 2026-08-07 rebase, so the record of it lives here and in the 2026-08-05 commit."
     },
     {
      "id": "R5",

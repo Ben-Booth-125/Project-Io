@@ -201,10 +201,13 @@ void draw_tile_inspector(const world& w, ui_state& s,
     // (BL-271 open question 2, still unanswered).
     //
     // The cache is keyed on body name and survives across frames, because a
-    // 2000-year run costs ~600 ms and re-running it per frame would stall the UI.
+    // 2000-year run costs ~2.1 s and re-running it per frame would stall the UI.
+    // (~600 ms before the settle-occupancy fix; ~749 real provinces instead of
+    // ~191 is roughly four times the work, and the growth is the improvement.)
     if (view == view_ages)
     {
-        // Keyed on the body name AND the generation's own identity (BL-311).
+        // Keyed on the body name AND the generation's own identity (the Ages
+        // stale-cache review fix, landed 2026-08-05).
         // Name alone is not enough: body names are hard-coded literals, so
         // regenerating the world left the key matching and the view rendered the
         // PREVIOUS world's political history over the previous world's
