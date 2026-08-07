@@ -1,26 +1,32 @@
 // ---------------------------------------------------------------------------
-// Headless Era -1 works-table harness (BL-321 S1; no SDL / Lua / ImGui)
+// Headless Era -1 works-table harness (BL-321; no SDL / Lua / ImGui)
 // ---------------------------------------------------------------------------
-// Exercises src/world/works_roster.cpp — the pre-history building list. The
-// table is authored and availability is derived, so everything here is a pure
-// function of a hand-built province: no world generation involved.
+// Exercises the works LOGIC in src/world/works_roster.cpp — the gate rule, the
+// availability derivation, and effect accumulation. Everything here is a pure
+// function of a hand-built province and a hand-built registry: no world
+// generation, and no Lua.
 //
-//   R1  Every row carries a generic mechanism name, a band, and at least one
-//       non-zero effect field — no row exists that does nothing.
-//   R2  Availability is DERIVED from the ground: a province that fails a gate
-//       is not offered that row, and two provinces at the same band with
-//       different endowments are offered different sets (asymmetry is the point).
-//   R3  Bands are CUMULATIVE — an industrial-band province is still offered
-//       classical works; nothing un-invents a granary.
-//   R4  available_works is deterministic and order-stable: repeated calls on
-//       the same province return an identical sequence.
-//   R5  total_work_effect sums per-mille effects additively and SKIPS unknown
-//       ids rather than reading a neighbouring row.
-//   R6  work_id round-trips a row back to its index, and rejects a foreign
-//       pointer with -1.
-//   R7  Every reach-bearing row is reachable by some province — the reach_mod
-//       field is the counter-move to BL-316's burden of breadth, so a reach
-//       work no ground can ever gate would be dead weight.
+// WHY THE TABLE ITSELF IS NOT ASSERTED HERE. The works data moved to
+// scripts/works.lua (Ben, 2026-08-07, NR-081), so this harness cannot see it
+// without linking the Lua-bound TU and losing its headless property. The data
+// invariants that used to live here — no duplicate names, every row has an
+// effect, a reach work exists and one of them is reachable on poor ground —
+// moved INTO works_registry::load_from_lua, which throws on violation. They now
+// run on every startup rather than only when someone remembers to run a
+// harness, which is a stronger guarantee, not a weaker one. This file covers
+// what that check cannot: that the derivation over a valid table is correct.
+//
+//   R1  work_gate_met is a pure AND over the five axes, and an absent gate
+//       (zero) never rejects.
+//   R2  Availability is DERIVED from the ground: a province failing a gate is
+//       not offered that row, and two provinces with different endowments at
+//       the same band are offered different sets.
+//   R3  Bands are CUMULATIVE — a later band offers everything an earlier one
+//       does; nothing un-invents a granary.
+//   R4  available() is deterministic and order-stable, cheapest gate first.
+//   R5  total_effect sums per-mille effects additively and SKIPS unknown ids
+//       rather than reading a neighbouring row.
+//   R6  id_of/row_at round-trip a row by name, and reject the unknown.
 //
 // The process exits non-zero if any assertion FAILs.
 
@@ -28,8 +34,6 @@
 #include "world/settlement.hpp"
 
 #include <cstdio>
-#include <cstring>
-#include <set>
 #include <string>
 #include <vector>
 
@@ -43,7 +47,30 @@ void check(bool ok, const char* what)
     ok ? ++g_pass : ++g_fail;
 }
 
-/// A province with everything dialled up — passes every gate in the table.
+work_row make_row(const char* name, roster_band band, work_gate gate, work_effect eff, int weight = 100)
+{
+    work_row r;
+    r.name = name; r.band = band; r.gate = gate; r.effect = eff; r.weight = weight;
+    return r;
+}
+
+/// A registry shaped like works.lua — an ungated reach row, endowment-gated rows
+/// on each axis, and rows in every band. Deliberately hand-built rather than
+/// loaded, so this harness stays Lua-free.
+works_registry make_registry()
+{
+    works_registry reg;
+    // name                band                     gate{ore,farm,port,energy,pop}  effect{cap,man,reach,def,ind}
+    reg.add_row(make_row("Way Station",   roster_band::classical,  {   0,   0,   0,   0,  3000}, {   0,   0, 120,   0,   0}));
+    reg.add_row(make_row("Granary",       roster_band::classical,  {   0, 300,   0,   0,  4000}, { 180,  40,   0,   0,   0}));
+    reg.add_row(make_row("Ore Pits",      roster_band::classical,  { 400,   0,   0,   0,  5000}, {   0,  60,   0,   0, 120}));
+    reg.add_row(make_row("Harbour Mole",  roster_band::classical,  {   0,   0, 400,   0,  5000}, { 120,   0, 200,   0,  40}));
+    reg.add_row(make_row("Stone Fortress",roster_band::medieval,   { 350,   0,   0,   0, 15000}, {   0,  80,   0, 480,   0}));
+    reg.add_row(make_row("Bastion Fort",  roster_band::gunpowder,  { 500,   0,   0, 350, 25000}, {   0, 100,   0, 640,   0}));
+    reg.add_row(make_row("Rail Head",     roster_band::industrial, { 550,   0,   0, 550, 45000}, { 220,  80, 700,   0, 380}));
+    return reg;
+}
+
 province rich_province()
 {
     province p;
@@ -52,7 +79,6 @@ province rich_province()
     return p;
 }
 
-/// A province with nothing but people — passes only the ungated rows.
 province bare_province()
 {
     province p;
@@ -65,160 +91,133 @@ std::vector<std::string> names_of(const std::vector<const work_row*>& rows)
 {
     std::vector<std::string> out;
     out.reserve(rows.size());
-    for (const work_row* r : rows) out.emplace_back(r->name);
+    for (const work_row* r : rows) out.push_back(r->name);
     return out;
-}
-
-bool has_effect(const work_effect& e)
-{
-    return e.capacity_mod || e.manpower_mod || e.reach_mod
-        || e.defence_mod  || e.industrial_mod;
 }
 
 } // namespace
 
 int main()
 {
-    const std::vector<work_row>& table = works_table();
+    const works_registry reg = make_registry();
 
-    // --- R1: every row is well-formed and does something -------------------
-    {
-        bool named = true, effective = true, unique = true;
-        std::set<std::string> seen;
-        for (const work_row& r : table)
-        {
-            if (r.name == nullptr || std::strlen(r.name) == 0) named = false;
-            if (!has_effect(r.effect))                          effective = false;
-            if (!seen.insert(r.name).second)                    unique = false;
-        }
-        check(!table.empty(), "R1 the works table is non-empty");
-        check(named,     "R1 every row carries a name");
-        check(unique,    "R1 row names are unique");
-        check(effective, "R1 every row has at least one non-zero effect field");
-    }
-
-    // --- R2: availability is derived from the ground -----------------------
+    // --- R1: the gate rule -------------------------------------------------
     {
         const province rich = rich_province();
         const province bare = bare_province();
 
-        const auto rich_rows = available_works(rich, roster_band::industrial);
-        const auto bare_rows = available_works(bare, roster_band::industrial);
+        check(work_gate_met(work_gate{}, bare),
+              "R1 an empty gate accepts any province");
+        check(work_gate_met(work_gate{0, 300, 0, 0, 4000}, rich),
+              "R1 a met gate accepts");
+        check(!work_gate_met(work_gate{0, 300, 0, 0, 4000}, bare),
+              "R1 an unmet endowment axis rejects");
 
-        check(rich_rows.size() == table.size(),
+        province few;
+        few.ore_q = few.farm_q = few.port_q = few.energy_q = 1000;
+        few.population = 10;
+        check(!work_gate_met(work_gate{0, 0, 0, 0, 4000}, few),
+              "R1 an unmet population floor rejects on its own");
+
+        // Every axis is ANDed: one failure is enough.
+        province ore_only = bare_province();
+        ore_only.ore_q = 1000;
+        check(!work_gate_met(work_gate{400, 300, 0, 0, 0}, ore_only),
+              "R1 the gate is an AND — meeting one axis is not enough");
+    }
+
+    // --- R2: availability is derived from the ground -----------------------
+    {
+        const auto rich_rows = reg.available(rich_province(), roster_band::industrial);
+        const auto bare_rows = reg.available(bare_province(), roster_band::industrial);
+
+        check(rich_rows.size() == reg.size(),
               "R2 a province meeting every gate is offered the whole table");
         check(bare_rows.size() < rich_rows.size(),
               "R2 a province with no endowment is offered strictly fewer works");
         check(!bare_rows.empty(),
               "R2 an endowment-poor province is still offered the ungated works");
 
-        // Asymmetry: ore country and port country diverge at the same band.
         province ore = bare_province();  ore.ore_q  = 1000;
         province port = bare_province(); port.port_q = 1000;
-        const auto ore_names  = names_of(available_works(ore,  roster_band::medieval));
-        const auto port_names = names_of(available_works(port, roster_band::medieval));
-        check(ore_names != port_names,
+        check(names_of(reg.available(ore,  roster_band::medieval)) !=
+              names_of(reg.available(port, roster_band::medieval)),
               "R2 two provinces at the same band with different ground field different works");
 
-        // A population floor is a real gate, not decoration.
         province depopulated = rich_province();
         depopulated.population = 0;
-        check(available_works(depopulated, roster_band::industrial).empty(),
+        check(reg.available(depopulated, roster_band::industrial).empty(),
               "R2 a province with no population is offered nothing");
     }
 
     // --- R3: bands are cumulative ------------------------------------------
     {
         const province rich = rich_province();
-        const auto classical  = available_works(rich, roster_band::classical);
-        const auto industrial = available_works(rich, roster_band::industrial);
+        const auto classical  = names_of(reg.available(rich, roster_band::classical));
+        const auto industrial = names_of(reg.available(rich, roster_band::industrial));
 
         check(classical.size() < industrial.size(),
               "R3 a later band offers strictly more rows than an earlier one");
 
-        bool classical_survives = false;
-        for (const work_row* r : industrial)
-            if (r->band == roster_band::classical) { classical_survives = true; break; }
-        check(classical_survives,
-              "R3 an industrial-band province is still offered classical works");
+        bool earlier_survives = true;
+        for (const std::string& n : classical)
+        {
+            bool found = false;
+            for (const std::string& m : industrial) if (m == n) { found = true; break; }
+            if (!found) earlier_survives = false;
+        }
+        check(earlier_survives,
+              "R3 every classical row remains offered at the industrial band");
 
         bool no_future_rows = true;
-        for (const work_row* r : classical)
+        for (const work_row* r : reg.available(rich, roster_band::classical))
             if (static_cast<int>(r->band) > static_cast<int>(roster_band::classical))
                 no_future_rows = false;
         check(no_future_rows,
               "R3 a classical-band province is offered no later-band work");
     }
 
-    // --- R4: deterministic, order-stable -----------------------------------
+    // --- R4: deterministic, order-stable, cheapest gate first --------------
     {
         const province rich = rich_province();
-        const auto a = names_of(available_works(rich, roster_band::gunpowder));
-        const auto b = names_of(available_works(rich, roster_band::gunpowder));
+        const auto a = names_of(reg.available(rich, roster_band::gunpowder));
+        const auto b = names_of(reg.available(rich, roster_band::gunpowder));
         check(a == b, "R4 repeated calls return an identical sequence");
+        check(!a.empty() && a.front() == "Way Station",
+              "R4 the cheapest-gated work is offered first");
     }
 
     // --- R5: effects sum additively; unknown ids are skipped ---------------
     {
-        const work_effect none = total_work_effect({});
-        check(!has_effect(none), "R5 an empty build list yields a zero effect");
+        const work_effect none = reg.total_effect({});
+        check(none.capacity_mod == 0 && none.reach_mod == 0,
+              "R5 an empty build list yields a zero effect");
 
-        const work_effect one  = total_work_effect({0});
-        const work_effect twice = total_work_effect({0, 0});
-        check(twice.capacity_mod   == one.capacity_mod   * 2 &&
-              twice.manpower_mod   == one.manpower_mod   * 2 &&
-              twice.reach_mod      == one.reach_mod      * 2 &&
-              twice.defence_mod    == one.defence_mod    * 2 &&
-              twice.industrial_mod == one.industrial_mod * 2,
+        const work_effect one   = reg.total_effect({0});
+        const work_effect twice = reg.total_effect({0, 0});
+        check(twice.reach_mod == one.reach_mod * 2,
               "R5 effects are additive in per-mille");
 
-        const work_effect with_junk = total_work_effect({0, 250});
-        check(with_junk.capacity_mod   == one.capacity_mod &&
-              with_junk.reach_mod      == one.reach_mod &&
-              with_junk.industrial_mod == one.industrial_mod,
+        const work_effect mixed = reg.total_effect({0, 1});
+        check(mixed.reach_mod == 120 && mixed.capacity_mod == 180 && mixed.manpower_mod == 40,
+              "R5 distinct rows accumulate field by field");
+
+        const work_effect with_junk = reg.total_effect({0, 250});
+        check(with_junk.reach_mod == one.reach_mod && with_junk.capacity_mod == 0,
               "R5 an out-of-range id is skipped, not clamped onto a real row");
     }
 
-    // --- R6: work_id round-trips -------------------------------------------
+    // --- R6: id_of / row_at round-trip -------------------------------------
     {
         bool round_trips = true;
-        for (std::size_t i = 0; i < table.size(); ++i)
-            if (work_id(&table[i]) != static_cast<int>(i)) round_trips = false;
-        check(round_trips, "R6 work_id returns each row's own index");
-        check(work_id(nullptr) == -1, "R6 work_id rejects null with -1");
-
-        const work_row foreign = {"Not In Table", roster_band::classical, {}, {1, 0, 0, 0, 0}, 1};
-        check(work_id(&foreign) == -1, "R6 work_id rejects a foreign pointer with -1");
-    }
-
-    // --- R7: every reach work is reachable by some ground ------------------
-    // reach_mod is the field BL-316's burden of breadth is answered with. A row
-    // carrying reach that no province could ever gate would be dead weight.
-    {
-        const province rich = rich_province();
-        const auto all = available_works(rich, roster_band::industrial);
-
-        std::set<std::string> offered;
-        for (const work_row* r : all) offered.insert(r->name);
-
-        bool all_reachable = true;
-        int reach_rows = 0;
-        for (const work_row& r : table)
-            if (r.effect.reach_mod != 0)
-            {
-                ++reach_rows;
-                if (offered.find(r.name) == offered.end()) all_reachable = false;
-            }
-        check(reach_rows > 0,      "R7 the table carries reach-bearing works at all");
-        check(all_reachable,       "R7 every reach-bearing work is gateable by some ground");
-
-        // And at least one is available to a bare province — a polity with poor
-        // ground must still have SOME way to buy reach, or breadth is a ceiling.
-        bool bare_has_reach = false;
-        for (const work_row* r : available_works(bare_province(), roster_band::classical))
-            if (r->effect.reach_mod != 0) { bare_has_reach = true; break; }
-        check(bare_has_reach,
-              "R7 an endowment-poor province can still raise a reach work");
+        for (std::size_t i = 0; i < reg.size(); ++i)
+        {
+            const work_row* r = reg.row_at(i);
+            if (r == nullptr || reg.id_of(r->name) != static_cast<int>(i)) round_trips = false;
+        }
+        check(round_trips, "R6 id_of returns each row's own index");
+        check(reg.id_of("No Such Work") == -1, "R6 id_of rejects an unknown name with -1");
+        check(reg.row_at(reg.size()) == nullptr, "R6 row_at rejects an out-of-range id with null");
     }
 
     std::printf("\n=== %s ===\n", g_fail == 0 ? "ALL PASS" : "FAILURES PRESENT");

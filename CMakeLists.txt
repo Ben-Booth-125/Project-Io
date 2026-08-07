@@ -322,7 +322,7 @@ target_compile_features(commercial_fog_harness PRIVATE cxx_std_20)
 enable_testing()
 
 file(GLOB IO_WORLD_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/world/*.cpp")
-list(FILTER IO_WORLD_SOURCES EXCLUDE REGEX "(recipe_registry|tech_tree|world_gen_config)\\.cpp$")
+list(FILTER IO_WORLD_SOURCES EXCLUDE REGEX "(recipe_registry|works_registry|tech_tree|world_gen_config)\\.cpp$")
 
 # ---------------------------------------------------------------------------
 # The world layer, compiled ONCE (BL-287)

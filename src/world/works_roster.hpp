@@ -1,15 +1,14 @@
 #pragma once
 
 // ---------------------------------------------------------------------------
-// Era -1 works (BL-321) — the pre-history building list, as an authored TABLE.
-// Authority: docs/lore/HISTORY.md.
+// Era -1 works (BL-321) — the pre-history building list.
+// Authority: docs/lore/HISTORY.md. Data: scripts/works.lua.
 // ---------------------------------------------------------------------------
 //
 // The noun axis of the Era -1 sim had exactly one half built: unit_roster.hpp
-// says what a polity can FIELD. This says what it can BUILD. Same shape, same
-// rules — an authored table, gated on the province endowment windows the
-// settlement pass already surveyed, availability DERIVED from the ground with
-// no research, no unlock events and no player choice.
+// says what a polity can FIELD. This says what it can BUILD. Availability is
+// DERIVED — a row is offered when the province's ground and population clear
+// its gate — with no research, no unlock events and no player choice.
 //
 // THIS IS NOT `building_component`. components.hpp's building is the campaign
 // era's: an entity on a tile carrying a recipe index, a workforce target and
@@ -21,17 +20,18 @@
 // the PROVINCE, and its effects are per-mille deltas on quantities the sim
 // already computes.
 //
-// AUTHORED IN C++, NOT LUA — deliberately, and against the letter of
-// TECH_FOUNDATIONS.md's scripting boundary (which names "building definitions"
-// as a Lua concern, and which the campaign era honours: building_economics from
-// scripts/economy.lua, recipes from scripts/recipes.lua). The reason is the
-// headless build. recipe_registry.cpp is the one TU in the project that pulls
-// sol2/Lua; every other world/*.cpp stays Lua-free so the verify harnesses
-// compile with a bare C++20 compiler, and the Era -1 sim is verified only by
-// those harnesses. A Lua works table would either drag Lua into the headless
-// layer or need a second loader for the same data. unit_roster.cpp set this
-// precedent in this layer already. Recorded as a decision-taken in
-// NEEDS_REVIEW.json (NR-081) rather than silently.
+// AUTHORED IN LUA (scripts/works.lua), per Ben's call 2026-08-07 (NR-081), and
+// this header is the seam that keeps that free. It follows recipe_registry's
+// shape exactly: THIS HEADER IS PURE DATA — no sol2, no Lua — and every lookup
+// below is inline, so the SDL/Lua-free world superset and the headless
+// harnesses link without the Lua-bound translation unit. Only
+// works_registry.cpp pulls the Lua state.
+//
+// The consequence for the sim: `history_sim` takes a `works_registry` as a
+// PARAMETER rather than calling a global. The app passes the Lua-loaded one; a
+// harness hand-builds one. This is the same dependency-injection seam
+// `clear_markets` already uses for recipe_registry, and it is what lets the
+// table live in Lua without costing the Era -1 sim its headless verification.
 //
 // BANDS are unit_roster.hpp's `roster_band`, reused rather than duplicated: the
 // two tables turn over at the same boundaries because they are gated on the
@@ -40,9 +40,14 @@
 #include "unit_roster.hpp"
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 struct province;
+
+// Forward-declared so this header carries no sol2/Lua dependency — the same
+// reason recipe_registry.hpp forward-declares it.
+class lua_state;
 
 /// What a work needs from the ground before a polity can raise it. The four
 /// endowment axes are thresholds on the province windows (0-1000); zero means
@@ -77,36 +82,96 @@ struct work_effect
     int industrial_mod = 0;
 };
 
-/// One buildable work.
+/// One buildable work. `name` is a generic mechanism noun, never an Earth
+/// proper noun — the loader does not police that (no code can), but works.lua
+/// states the rule at the point of authoring.
 struct work_row
 {
-    const char* name;   ///< Generic mechanism noun. Never an Earth proper noun.
-    roster_band band;
+    std::string name;
+    roster_band band = roster_band::classical;
     work_gate   gate;
     work_effect effect;
 
     /// Relative weight when a polity scores which work to raise next. Not a
     /// count and not a cost — the pull this row exerts among the available set.
-    int weight;
+    int weight = 0;
 };
 
-/// The whole table, in band order. Exposed so a harness can assert over it
-/// rather than re-deriving what it thinks the table says.
-const std::vector<work_row>& works_table();
-
-/// The works @p p's ground and @p band make available, cheapest gate first.
-/// Two provinces at the same date offer different works because their ground
-/// differs — the same asymmetry the unit roster exists to make visible.
+/// The works table, loaded from scripts/works.lua.
 ///
-/// Bands are cumulative: a gunpowder-band province may still raise a Granary.
-std::vector<const work_row*> available_works(const province& p, roster_band band);
+/// Every accessor is inline and Lua-free; only `load_from_lua` lives in the
+/// Lua-bound TU. A harness builds one with `add_row` and never links it.
+class works_registry
+{
+public:
+    /// Populate from scripts/works.lua via the embedded Lua state (protected
+    /// calls only), VALIDATING as it goes.
+    ///
+    /// Validation is the loader's job rather than a harness's, because the data
+    /// now lives outside the compiler's reach: an unknown band, a row with no
+    /// effect at all, a duplicate name, or a reach-bearing row no ground can
+    /// gate would otherwise produce a quietly degraded world. Failing at
+    /// startup makes a bad edit loud and immediate.
+    ///
+    /// @throws std::runtime_error on a Lua error or an invalid table.
+    void load_from_lua(lua_state& lua);
 
-/// Index of @p row in `works_table()`, i.e. the id a province stores. Returns
-/// -1 for a row that is not from the table.
-int work_id(const work_row* row);
+    /// The whole table, in authored order.
+    const std::vector<work_row>& rows() const { return m_rows; }
 
-/// Sum the effects of the works @p built (ids into `works_table()`). Unknown
-/// ids are skipped rather than clamped, so a save from an older table shrinks
-/// gracefully instead of reading garbage. Effects are additive in per-mille;
-/// the sim decides how to apply each field.
-work_effect total_work_effect(const std::vector<uint8_t>& built);
+    std::size_t size() const { return m_rows.size(); }
+
+    /// The row at @p id, or nullptr when out of range.
+    const work_row* row_at(std::size_t id) const
+    {
+        return id < m_rows.size() ? &m_rows[id] : nullptr;
+    }
+
+    /// Id of a row by name, or -1. Lets a caller name a work stably rather than
+    /// hard-coding an index that authoring order can move.
+    int id_of(const std::string& name) const
+    {
+        for (std::size_t i = 0; i < m_rows.size(); ++i)
+            if (m_rows[i].name == name)
+                return static_cast<int>(i);
+        return -1;
+    }
+
+    /// The works @p p's ground and @p band make available, cheapest gate first.
+    /// Two provinces at the same date offer different works because their ground
+    /// differs — the asymmetry the roster pair exists to make visible.
+    ///
+    /// Bands are cumulative: a gunpowder-band province may still raise a Granary.
+    std::vector<const work_row*> available(const province& p, roster_band band) const;
+
+    /// Sum the effects of the works @p built (ids into `rows()`). Unknown ids
+    /// are SKIPPED, not clamped: a record written against an older, shorter
+    /// table shrinks gracefully rather than reading a neighbouring row's
+    /// effects as if they were its own.
+    work_effect total_effect(const std::vector<uint8_t>& built) const
+    {
+        work_effect t;
+        for (const uint8_t id : built)
+        {
+            if (id >= m_rows.size()) continue;
+            const work_effect& e = m_rows[id].effect;
+            t.capacity_mod   += e.capacity_mod;
+            t.manpower_mod   += e.manpower_mod;
+            t.reach_mod      += e.reach_mod;
+            t.defence_mod    += e.defence_mod;
+            t.industrial_mod += e.industrial_mod;
+        }
+        return t;
+    }
+
+    // --- direct construction for tests (headless harness builds these by hand) ---
+    void add_row(const work_row& r) { m_rows.push_back(r); }
+    void clear() { m_rows.clear(); }
+
+private:
+    std::vector<work_row> m_rows;
+};
+
+/// True iff @p p clears @p g. Free function rather than a member so the gate
+/// rule can be asserted directly by a harness without a registry.
+bool work_gate_met(const work_gate& g, const province& p);
