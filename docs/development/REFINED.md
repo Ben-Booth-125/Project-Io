@@ -1,5 +1,63 @@
 # Project Io — REFINED (active worklist)
 
+## Header chrome tightening (promoted from BL-312, BL-313)
+
+Requirements: requirements.json § header-chrome-tightening (R1–R5)
+
+- **[2] A — Minimap flush to the right edge (and bottom, if it doesn't break the
+  selection-band alignment).** Files: `src/core/app.cpp`. Deps: foundation.
+  Satisfies: R1, R2.
+- **[2] B — Time panel: two-column reflow (left 1/3 progress, right 2/3 controls).**
+  Files: `src/core/app.cpp`. Deps: independent of A (disjoint code regions in the
+  same file). Satisfies: R3, R4, R5.
+
+Parallelisation note: both tasks touch `app.cpp` but disjoint blocks (the minimap
+draw block vs the time-panel draw block) — one session, sequential, not fanned out
+(too small to be worth worktree overhead).
+
+## Tech tree radial canvas (promoted from BL-310) — **COMPLETE**
+
+Requirements: requirements.json § tech-tree-radial-canvas (R1–R10, all met). Round 1: Era 0/1
+gate quests render as a radial constellation (rings = graph depth or authored tier, sectors =
+quests), keystones larger/gold, Era-1 branch pairs colour-differentiated with an "excludes"
+mark, nav slot 4 wired. Round 2 (same session, Ben's live-playtest feedback): converted to a
+full-canvas takeover (`ui::canvas_rect()`, BL-265's task 1, first consumer) with a drawn
+top-left `‹` return control; NR-054 resolved — the canonical ancient ladder JSON (71 nodes, 5
+keystones) now renders on the Antiquity tab as a muted read-only history; Standing lines
+dropped from rendering, tab 3 relabelled "Era 2" (placeholder only, data stays in
+`tech_tree.lua`). Pan tried left-click, reverted to middle-click for consistency. Round 3 (same session): era
+tabs are now icon-only, bigger, each icon a real tiny render of that era's own nodes (not a
+generic glyph); on-canvas labels switched from bare id to name/short_name (short_name
+hand-authored for the Era-1 keystones + branches this pass, other ~120 nodes fall back to
+truncated name). Verified via `scripts/verify/tech_tree_panel.lua` — 3/3 golden PASS (tabs,
+era1, antiquity), goldens re-blessed against every intentional change across all three rounds.
+
+## Corp standing profile (promoted from BL-262, first slice) — **COMPLETE**
+
+Requirements: requirements.json § corp-standing-profile (R1–R5, all met bar R1's visual leg,
+which is manual/Ben's). `standing_harness` 41/41 PASS (boundary determinism for all three bands,
+zero-total/empty-map no-NaN cases, player-exact/rival-banded visibility split, byte-identical
+re-computation). Full app + harness both build clean (MSVC 14.44, `build_app.bat`). Production
+axis deliberately absent this slice — no honest visible-information source exists yet (BL-068
+privates recipe/workforce); documented in `standing.hpp`, tracked as a follow-on.
+
+- **[4] A — `src/world/standing.{hpp,cpp}` (new): compute the three-axis profile.**
+  Files: `src/world/standing.hpp`, `src/world/standing.cpp`. Deps: foundation.
+  Satisfies: R1, R2, R3, R4, R5.
+- **[2] B — wire into `corporation_panel.cpp`: own row exact, rival rows banded, no total.**
+  Files: `src/ui/corporation_panel.cpp`, `src/ui/corporation_panel.hpp`. Deps: A.
+  Satisfies: R1.
+- **[2] C — cache this-tick `corp_cash_flow` for the panel to read (no save-format change).**
+  Files: `src/core/app.cpp`, `src/core/app.hpp`. Deps: A. Parallel-safe with B (disjoint files);
+  both need A's signature first, so effectively sequential after A in one agent's pass.
+  Satisfies: R3.
+- **[2] D — `tools/verify/standing_harness.cpp` (new): boundary determinism + sorted walk.**
+  Files: `tools/verify/standing_harness.cpp`. Deps: A. Satisfies: R2.
+
+Parallelisation note: A is the foundation (new struct/function signatures everything else
+calls); B/C/D all depend on A's header. Single coherent vertical slice on a small, mostly-new
+file set — one agent, sequential A→{B,C,D}, not fanned out.
+
 # Mediterranean rift sea (BL-276, 2026-08-03) — **COMPLETE**
 
 Requirements: requirements.json § mediterranean-rift-sea (R1–R4 all met).

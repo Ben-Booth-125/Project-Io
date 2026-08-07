@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*68 entries — 10 open, 58 resolved.*
+*69 entries — 11 open, 58 resolved.*
 
 ---
 
@@ -162,6 +162,17 @@ Red herrings with nothing to trigger are flavour, so the draft adds the quantity
 > **Recommendation:** Option 1. It reuses BL-223's own scalar discipline, stays deterministic (seeded date, deterministic threshold, visible countdown), and it is the only version where 'skilled at avoiding danger' means anything. Four questions carried in the doc: per-nation vs pairwise, whether rivals' Alarm is visible, whether the rupture can be a partial failure, and whether Era 1 failure ends the campaign or delays it (lean: delays, expensively).
 
 *Files: `docs/research/ERA1_TECH_LANDSCAPE.md`, `docs/development/backlog.json`*
+
+### NR-069 — Ben's 'race the player' answer for first_footing leans the Era 1 tree's deed-scoping question toward world-scoped keystone deeds
+*observation · raised 2026-08-06 · from Strategy-library design session (docs/ai/STRATEGIES.md) - Ben's elicitation answers, 2026-08-06.*
+
+The Era 1 tree draft left deed scoping open (its Q2: are keystone deeds world firsts or per-corporation?). In the strategy session Ben approved the first_footing seed card - the rival contests firsts - which only exists if deeds are world-scoped: a race needs a single trophy. Recorded so the tree review sees the lean it has already half-taken; the tree doc's Q2 is not formally resolved by this.
+
+**Why it matters.** World-scoped deeds change the keystone experience for every corporation: losing a race means your doctrine fork opens on the winner's schedule (or closes). If Ben wants deeds personal after all, ST-10 (first_footing) dies with that answer, and the strategy doc says so on the card.
+
+> **Recommendation:** Resolve tree Q2 as 'world-scoped for the four keystone deeds, personal for smaller deeds' (the tree draft's own lean), which makes both docs consistent.
+
+*Files: `docs/ai/STRATEGIES.md`, `docs/research/ERA1_TECH_LANDSCAPE.md`*
 
 ---
 

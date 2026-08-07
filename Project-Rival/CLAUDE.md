@@ -68,6 +68,13 @@ The rival dossier: Han's cosmology of preservation (the creed we are set against
 **`annals/README.md`**
 The annal format — one record per campaign year, chronicle plus data. The campaign's durable output lives here.
 
+**`docs/ai/ACTIONS.json`** (pulled 2026-08-06)
+Working mirror of Io's `docs/ai/ACTIONS.json` — the action dictionary an AI player reads. Pulled
+into Rival because AI-thinking design (the per-action NL-phrasing sub-dictionary, `docs/ai/AI_OPPONENT.md`
+§ 10) belongs here. Source of truth stays Io's copy; land changes back explicitly, don't let the
+two silently diverge, re-pull if Io's copy moves upstream. `ACTIONS.md`/`ACTIONS_INDEX.json`
+alongside it are generated snapshots, not kept in sync automatically.
+
 ## Response style
 
 Match Project Io's register: terse, max 2 sentences per paragraph, short clauses.

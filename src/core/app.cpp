@@ -515,6 +515,9 @@ void app::step_economy()
     auto flows = clear_markets(m_world, m_registry, m_last_econ_report, m_ui.sell_orders);
     apply_budget(m_world, m_registry, flows, m_last_econ_report.workforce_contention,
                  &m_last_econ_report.budgets);
+    // BL-262 first slice: cache this tick's standing profile for the Corporations panel
+    // (transient runtime cache, not serialised — same treatment as m_last_econ_report).
+    m_last_corp_standings = compute_corp_standings(m_world, flows);
     credit_arrived_convoys(m_world, static_cast<int>(m_sim_loop.day_tick()));
 
     // Surface this tick's background-corp agency actions (BL-079) as NATION-
@@ -1081,7 +1084,7 @@ int app::run_verify(const std::string& script_path, bool bless)
         else if (name == "corporation")  m_ui.show_corporation_panel = open;
         else if (name == "build")        m_ui.show_build_ledger = open; // tile construction ledger (BL-162)
         else if (name == "frame_hud")    m_ui.show_frame_hud = open;    // frame-budget HUD (BL-249)
-        else if (name == "tech_tree")    m_show_tech_tree = open;       // F9 mock viewer (BL-087)
+        else if (name == "tech_tree")    m_ui.show_tech_tree = open;    // F9 mock viewer (BL-087)
     });
 
     // Park a fold-out ledger on one of its button-strip views (BL-117 sweep), so a
@@ -2063,7 +2066,7 @@ void app::dispatch_action(ui::canvas_command cmd)
             m_show_options = !m_show_options;
             return;
         case ui::canvas_command::tech_tree_toggle:
-            m_show_tech_tree = !m_show_tech_tree;
+            m_ui.show_tech_tree = !m_ui.show_tech_tree;
             return;
 
         // Everything else is a canvas navigation command.
@@ -2577,7 +2580,18 @@ void app::render()
     // formula is also written out here.
     const float  mm_w   = ui::minimap_width(disp.x, disp.y);
     const float  mm_h   = ui::minimap_height(disp.x, disp.y);
-    const ImVec2 mm_origin = {disp.x - margin - mm_w, disp.y - margin - mm_h};
+    // Right edge flush to the screen edge (BL-312, Ben 2026-08-06: "wrap the
+    // minimap to the full edges of the canvas ... we aren't using the space
+    // effectively") — was `disp.x - margin - mm_w`, an unused 8px gap with no
+    // neighbour to its right to justify it. The BOTTOM edge keeps its margin
+    // deliberately: selection_band_height (foldout_column.hpp) is
+    // `minimap_height + chrome_margin`, computed so the Selection band's top
+    // edge lands exactly on the minimap's top edge (both equal
+    // `disp.y - mm_h - 8`, chrome_margin and this local `margin` both being
+    // 8.0f) — the "one band across the full width" fix from 2026-07-30.
+    // Flushing the bottom too would drop the minimap 8px lower than the strip
+    // and break that alignment; not done here.
+    const ImVec2 mm_origin = {disp.x - mm_w, disp.y - margin - mm_h};
 
     // --- Primary canvases (Layer 2) — the zoom ladder ---
     // The primary rung fills the window; the rung one step *out* renders in the
@@ -2686,15 +2700,19 @@ void app::render()
     }
 
     // Time panel — top-right, same width as the minimap (BL-138 compact redesign,
-    // proportions revised on Ben's 2026-07-10 review). Four left-aligned stacked
-    // rows: the year and the date/quarter line at the SAME size (the year is no
-    // longer an oversized centred heading), then a full-width quarter-progress bar
-    // aligned with the full-width speed-control row directly below it. The panel
-    // takes input (the speed buttons), so it is not flagged NoInputs.
+    // proportions revised on Ben's 2026-07-10 review). REFLOWED (BL-313, Ben
+    // 2026-08-06: "make sure the time bar is within the header bound ... left
+    // 1/3 for the progress, right 2/3 for time controls") — was four stacked
+    // full-width rows whose total height exceeded header_panel_height and
+    // overflowed the header strip. Now two COLUMNS sharing one row-band: left
+    // third is "the progress" (date line + quarter-progress bar), right two
+    // thirds is "time controls" (the pause/speed-tier buttons + active-rate
+    // label) — half the row count, so it fits. The panel takes input (the
+    // speed buttons), so it is not flagged NoInputs.
     const float tick_w = mm_w;
-    // Height is content-derived (BL-097), not a fraction of the minimap's
-    // resolution-scaled mm_h (the BL-093 anti-pattern): year + date lines, the thin
-    // progress bar, and the speed-button row, plus the inter-row spacing.
+    const float col_gap  = ImGui::GetStyle().ItemSpacing.x;
+    const float prog_w   = tick_w / 3.0f - col_gap * 0.5f;
+    const float ctrl_w   = tick_w - prog_w - col_gap;
     const float time_line_h    = ImGui::GetTextLineHeightWithSpacing();
     // BL-178: the 10 px bar was easy to miss and carried no label. Tall enough to
     // seat a centred overlay ("58 d to Q2"), which is what actually makes the
@@ -2706,11 +2724,18 @@ void app::render()
     // critique BL-174 made of the nav rail), so the current speed's meaning is
     // stated on screen; the per-button tooltips carry the full ladder.
     const float time_rate_h    = ImGui::GetTextLineHeightWithSpacing();
-    // Year + date now share one row (Ben's 2026-07-15 review), so the reclaimed
-    // line height goes to a taller speed-button row rather than shrinking the panel.
-    const float time_btn_h     = ImGui::GetFrameHeight() * 2.0f;
-    const float time_content_h = time_line_h + time_prog_h + time_btn_h + time_rate_h
-                               + time_spacing * 3.0f;
+    // BL-313: one frame height, not two — the two-column layout gives the
+    // button row half the width it used to have, and a half-width row of six
+    // buttons reads fine at the ordinary control height; the extra height the
+    // old single-column layout spent here is exactly what put the panel over
+    // header_panel_height.
+    const float time_btn_h     = ImGui::GetFrameHeight();
+    // Date line full-width, then one shared row where the left third (progress
+    // bar) and right two-thirds (buttons + rate label) are measured
+    // independently and the taller of the two sets the row's height.
+    const float prog_col_h     = time_prog_h;
+    const float ctrl_col_h     = time_btn_h + time_rate_h + time_spacing;
+    const float time_content_h = time_line_h + std::max(prog_col_h, ctrl_col_h);
     const float time_h         = time_content_h + ImGui::GetStyle().WindowPadding.y * 2.0f;
     {
         ImGui::SetNextWindowPos({disp.x - margin - tick_w, margin});
@@ -2729,41 +2754,58 @@ void app::render()
         const uint64_t day = m_sim_loop.day_tick();
         const ui::fmt::calendar_date date = ui::fmt::date_from_day(day);
 
-        // --- Year + date/quarter on ONE row (Ben's 2026-07-15 review), left-aligned
-        // at the base font size. Sharing a horizontal level frees vertical room for a
-        // taller speed-control row below. Quarter is bracketed [Qn].
-        ImGui::Text("%s   %s %s [Q%d]", std::to_string(date.year).c_str(),
+        // --- Date/quarter line, full width — NOT confined to the left third:
+        // "1960 Jan 1st [Q1]" runs wider than a 1/3 column at this panel's
+        // width, and a fixed-width column has no wrap/clip of its own (a
+        // BeginGroup is not a clip region), so an early version of this
+        // reflow let the text bleed into the button row below it. The
+        // 1/3-vs-2/3 split applies to the row underneath, where both sides
+        // ARE sized elements (a progress bar, a button row) that actually
+        // respect a width argument.
+        ImGui::Text("%s %s %s [Q%d]", std::to_string(date.year).c_str(),
                     ui::fmt::month_abbrev(date.month),
                     ui::fmt::ordinal_day(date.day).c_str(), date.quarter);
 
-        // --- Quarter-progress bar: full width, so it aligns with the speed-control
-        // row directly below it (the economy resolves on the quarter boundary).
-        // BL-178: the bar is now text-height and carries a centred overlay naming
-        // the distance to the next resolution, because "how close am I to the
-        // economy resolving" was the fact the bare bar failed to convey.
+        const ImVec2 row_start = ImGui::GetCursorPos();
+
+        // --- LEFT THIRD: "the progress" — the quarter-progress bar. BL-178:
+        // text-height, carries a centred overlay naming the distance to the
+        // next resolution ("how close am I to the economy resolving").
+        ImGui::BeginGroup();
         const float quarter_frac = ui::fmt::quarter_progress(day);
         char         prog_label[32];
         const int    days_left = static_cast<int>(
             std::lround((1.0f - quarter_frac) * static_cast<float>(sim_loop::econ_tick_days)));
         std::snprintf(prog_label, sizeof(prog_label), "%d d to Q%d",
                       days_left, (date.quarter % 4) + 1);
-        ImGui::ProgressBar(quarter_frac,
-                           {ImGui::GetContentRegionAvail().x, time_prog_h}, prog_label);
+        ImGui::ProgressBar(quarter_frac, {prog_w, time_prog_h}, prog_label);
         ImGui::SetItemTooltip(
             "Quarter progress. The economy resolves on the quarter boundary:\n"
             "prices clear, production banks, and the budget settles.");
+        ImGui::EndGroup();
 
-        // --- Speed controls: a full-width row of pause + speed-tier buttons, aligned
-        // with the progress bar above. The active speed is highlighted. When running,
-        // the pause slot is a blank button carrying a filled square glyph (drawn
-        // below); when paused it flips to a play ">" so it reflects the toggle state.
-        // Speed tiers use Roman numerals (I–V); the square avoids "||" reading as II.
+        // --- RIGHT TWO-THIRDS: "time controls" — pause/speed-tier buttons +
+        // the active-rate label, top-aligned with the progress bar (explicit
+        // cursor, not SameLine — SameLine would anchor to the left group's
+        // LAST item, not its top; harmless here since the bar is the only
+        // item, but explicit stays correct if that ever changes).
+        ImGui::SetCursorPos({row_start.x + prog_w + col_gap, row_start.y});
+        ImGui::BeginGroup();
+
+        // Speed controls: pause + speed-tier buttons, sized to the control
+        // column's own width (NOT GetContentRegionAvail — a group is not a
+        // clipping region, so that would still measure the whole window).
+        // The active speed is highlighted. When running, the pause slot is a
+        // blank button carrying a filled square glyph (drawn below); when
+        // paused it flips to a play ">" so it reflects the toggle state.
+        // Speed tiers use Roman numerals (I–V); the square avoids "||"
+        // reading as II.
         {
             const char* labels[] = {m_sim_loop.paused() ? ">" : "##pause", "I", "II", "III", "IV", "V"};
             const int   speeds[] = { 0,    1,   2,   3,   4,   5 };
             const int   n        = 6;
             const float spacing  = ImGui::GetStyle().ItemSpacing.x;
-            const float bw       = (ImGui::GetContentRegionAvail().x - spacing * (n - 1)) / n;
+            const float bw       = (ctrl_w - spacing * (n - 1)) / n;
 
             for (int i = 0; i < n; ++i)
             {
@@ -2823,7 +2865,9 @@ void app::render()
 
         // --- BL-178: the active tier's rate, always visible. Guaranteed-fit per
         // LAYOUT.md container 5 (the time panel is authored to fit): the string is
-        // measured and only the compact form is drawn if the long one would not fit.
+        // measured against the control column's own width — a group is not a
+        // clipping region, so GetContentRegionAvail() would still measure the
+        // whole window (the BL-313 bug this whole block was rewritten to avoid).
         {
             char rate[64];
             if (m_sim_loop.paused())
@@ -2833,12 +2877,12 @@ void app::render()
                               speed_rate_label(m_sim_loop.speed()),
                               speed_quarter_label(m_sim_loop.speed()));
 
-            const float avail = ImGui::GetContentRegionAvail().x;
-            if (!m_sim_loop.paused() && ImGui::CalcTextSize(rate).x > avail)
+            if (!m_sim_loop.paused() && ImGui::CalcTextSize(rate).x > ctrl_w)
                 std::snprintf(rate, sizeof(rate), "%s",
                               speed_rate_label(m_sim_loop.speed()));
             ImGui::TextDisabled("%s", rate);
         }
+        ImGui::EndGroup();
 
         ImGui::End();
     }
@@ -2991,7 +3035,13 @@ void app::render()
     // and reachable from nav slot 8 until its real home is chosen. Deleting a file
     // because a similar view exists is the call that was wrong here — dormant beats
     // deleted, since intent is not recoverable from a diff.
-    ui::draw_corporation_panel(m_world, m_ui, m_ui.show_corporations_table);
+    ui::draw_corporation_panel(m_world, m_last_corp_standings, m_ui, m_ui.show_corporations_table);
+
+    // Tech tree era-selector menu (BL-310 round 4) — nav slot 4 (Research), a
+    // real fold-out ledger like every other menu now, not chrome bolted onto
+    // the canvas takeover. draw_tech_tree_panel (below, F11 HUD's neighbour)
+    // is the canvas itself; this is where the era is actually chosen.
+    ui::draw_tech_tree_menu(m_tech_tree, m_ui);
 
     // Selection band (BL-213 — supersedes the BL-194/195 Selection band) — a FIXED
     // rect at the bottom of the screen, sandwiched between the shell column and
@@ -3257,9 +3307,11 @@ void app::render()
         ImGui::End();
     }
 
-    // F9 mock tech-tree viewer (BL-087). Read-only design aid over
-    // scripts/tech_tree.lua; no simulation coupling.
-    ui::draw_tech_tree_panel(m_tech_tree, m_show_tech_tree, m_ui.tech_tree_view);
+    // F9 mock tech-tree viewer (BL-087), also reachable from nav rail slot 4
+    // (BL-310). Read-only design aid over scripts/tech_tree.lua; no simulation
+    // coupling.
+    ui::draw_tech_tree_panel(m_tech_tree, m_ui.show_tech_tree, m_ui.tech_tree_view,
+                              m_ui.tech_tree_pan_x, m_ui.tech_tree_pan_y, m_ui.tech_tree_zoom);
 
     // F11 frame-budget HUD (BL-249) — the v0.1.0 audit instrument. Drawn last so it
     // measures a full frame's worth of panels, and anchored (first use only; it is

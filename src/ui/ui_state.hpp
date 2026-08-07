@@ -173,6 +173,12 @@ struct ui_state
     /// nothing is displaced; when Diplomacy is actually designed this occupant moves.
     bool show_corporations_table = false;
 
+    /// F9 mock tech-tree viewer (BL-087), also reachable from nav rail slot 4
+    /// (BL-310, 2026-08-06 — the slot was a hard-disabled placeholder before).
+    /// Moved here from app.hpp's m_show_tech_tree so nav_pane.cpp can toggle it
+    /// the same way as every other panel flag.
+    bool show_tech_tree = false;
+
     // --- one-question-per-view nav selectors (BL-117 sweep) ---
     // Each fold-out ledger with more than one question splits its content into
     // button-strip views (ui::nav_button_strip); this is the selected view per panel,
@@ -191,6 +197,15 @@ struct ui_state
     /// F9 mock tech-tree viewer: one era per view — 0=Era -1 Antiquity (placeholder),
     /// 1=Era 0, 2=Era 1, 3=Standing lines. Defaults to Era 0, the campaign's era.
     int  tech_tree_view = 1;
+
+    /// Radial constellation canvas (BL-310) — views 1/2 only. Pan offset of the
+    /// web centre from the canvas centre (screen px) and scroll-wheel zoom,
+    /// same idiom as planetary_pan_x/planetary_zoom (body_surface_canvas.cpp).
+    /// Kept per-view-agnostic (one camera for both era tabs) since switching
+    /// tabs is a content change, not a navigation the player needs to retain.
+    float tech_tree_pan_x = 0.0f;
+    float tech_tree_pan_y = 0.0f;
+    float tech_tree_zoom  = 1.0f;
 
     // --- drill-through disclosure (BL-214 / BL-247) ---
     // The one idiom every dense surface obeys: folded (a verdict line + a chevron)

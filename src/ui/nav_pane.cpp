@@ -47,6 +47,10 @@ void close_all_panels(ui_state& state)
     state.show_tile_ledger       = false;
     state.show_economy_panel     = false;
     state.show_build_ledger      = false; // tile build ledger (BL-162) is a column occupant too
+    // BL-310 round 4: the tech-tree era-selector menu is now a real shell-
+    // column occupant (draw_tech_tree_menu), so it must yield to every other
+    // ledger the same way they yield to it — its canvas takeover closes with it.
+    state.show_tech_tree         = false;
 }
 
 bool any_panel_open(const ui_state& state)
@@ -54,7 +58,8 @@ bool any_panel_open(const ui_state& state)
     return state.show_corporation_panel || state.show_corporations_table ||
            state.show_balance_ledger    ||
            state.show_market_ledger     || state.show_construction_panel ||
-           state.show_tile_ledger       || state.show_economy_panel;
+           state.show_tile_ledger       || state.show_economy_panel ||
+           state.show_tech_tree;
 }
 
 void draw_nav_pane(ui_state& state, float top_offset)
@@ -123,11 +128,16 @@ void draw_nav_pane(ui_state& state, float top_offset)
             ImGui::EndDisabled();
             slot_tooltip("Workforce", "Labour supply, contention, and habitability.", true);
             break;
-        case 4: // Research — placeholder
-            ImGui::BeginDisabled();
-            ImGui::Selectable(id, false, 0, {slot_size, slot_size});
-            ImGui::EndDisabled();
-            slot_tooltip("Research", "Technology unlocks and the route to space.", true);
+        case 4: // Research (BL-310, 2026-08-06): opens the F9 mock tech-tree
+                // viewer, same flag F9 drives. Was a hard-disabled placeholder;
+                // the real research system stays post-prototype (BL-087
+                // resolution 6) — this slot shows the design mock, not gameplay.
+            if (ImGui::Selectable(id, state.show_tech_tree, 0, {slot_size, slot_size})) {
+                const bool was_open = state.show_tech_tree;
+                close_all_panels(state);
+                state.show_tech_tree = !was_open;
+            }
+            slot_tooltip("Research", "Technology unlocks and the route to space (design mock).", false);
             break;
         case 5: // Market Ledger (BL-027)
             if (ImGui::Selectable(id, state.show_market_ledger, 0, {slot_size, slot_size})) {
@@ -200,7 +210,7 @@ void draw_nav_pane(ui_state& state, float top_offset)
         case 1: icons::corporation(dl, centre, r, lit(state.show_corporation_panel));  break;
         case 2: icons::ledger(dl, centre, r, lit(state.show_balance_ledger));          break;
         case 3: icons::population(dl, centre, r, dim);   break;  // Workforce (reserved)
-        case 4: icons::research(dl, centre, r, dim);     break;  // Research (reserved)
+        case 4: icons::research(dl, centre, r, lit(state.show_tech_tree)); break;  // Research (BL-310)
         case 5: icons::market(dl, centre, r, lit(state.show_market_ledger));           break;
         // Slot 6 draws the factory, NOT building(processing_facility): that glyph
         // is a plain filled square, and slot 1's corporation seal is the same

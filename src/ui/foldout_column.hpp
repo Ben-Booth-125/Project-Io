@@ -68,6 +68,18 @@ foldout_rect foldout_column_rect();
 /// "the menu and ledgers are always shorter" true.
 foldout_rect comms_dock_rect();
 
+/// The canvas region — BL-265's task 1: "there is currently no canvas rect in
+/// the codebase to take." Bounded by the shell column on the left, the header
+/// strip on top, and the bottom strip (Selection band / comms dock); the
+/// minimap floats inside this region at its bottom-right corner rather than
+/// reserving a column of its own. A full-canvas takeover (a ledger's `›`
+/// control, per BL-265) is sized/positioned to this rect rather than the
+/// whole window, so the shell chrome, header and Selection band survive.
+/// First consumer: the tech-tree viewer (BL-310). Migrating the pre-BL-265
+/// call sites onto this (header_panel HUD anchor, ledger_chrome) is a
+/// follow-on, not done by this addition.
+foldout_rect canvas_rect();
+
 /// Begin a fold-out ledger window pinned to foldout_column_rect(): borderless,
 /// non-moving, non-resizing, scroll allowed for overflow. Mirrors ImGui::Begin's
 /// return (false when fully clipped). Pair with foldout_end().
