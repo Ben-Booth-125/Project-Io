@@ -236,20 +236,42 @@ added by Ben 2026-08-04).
   dual-endpoint trade-route log entries (BL-282), corp placement constrained to the home
   province (BL-283), exclave measurement reopened from BL-054 (BL-284), and harness golden
   coherence (BL-285).
-- **v0.1.2 — Laws** (**BL-155** law/policy surface design, **BL-186** laws ledger UI). First pass
+- **v0.1.2 — Buildings rework** (**BL-323**). *(Added by Ben, 2026-08-07: "we need to pad out the
+  number of available buildings, and start enforcing placement rules. Especially for logistical
+  max building range… We need to put a lot of work into this before any simulated games can
+  occur.")* The band's second concrete build minor, and the one the simulated-play arc waits on.
+  Four strands: **pad the roster** out toward `PRODUCTION.md`'s designed ~26 (against 5 generic
+  kinds and 4 recipes today), mostly as Lua authoring rather than enum churn; **enforce a
+  logistical max range** on placement — the rule with no code at all today, built as a reach query
+  over the terrain-weighted cost function `logistics.cpp` already provides; **make build time
+  depend on the site** (landform, logistics distance, established stack) rather than staying a
+  flat per-type constant; and **surface construction on the canvas**.
+
+  **Why it gates simulated play.** With remoteness free, the optimal siting strategy is "the
+  richest tile anywhere" — a lookup, not a decision. An AI player driving the corp-command seam
+  finds that immediately and plays it forever, so neither the v0.2.0 opponent nor a text-driven
+  session tests anything until siting carries a trade-off. It is the placement-side counterpart to
+  the constraint **BL-316** is landing in the Era −1 sim: breadth must cost something.
+
+  **Sequenced first in the band (Ben, 2026-08-07, resolving NR-084).** Originally slotted last to
+  avoid renumbering; moved ahead of the design-forward stub minors, which shift up one
+  (Laws v0.1.3, Techs v0.1.4, Military v0.1.5, Politics v0.1.6, Generation visibility v0.1.7).
+  None of them depends on this work and it depends on none of them, so the old order delayed the
+  concrete blocker behind four design passes for no technical reason.
+- **v0.1.3 — Laws** (**BL-155** law/policy surface design, **BL-186** laws ledger UI). First pass
   at the law / policy surface — what a law *is* as a data object, how it gates or modifies
   economic (and later political) behaviour, and its ledger surface. Design + stub.
-- **v0.1.3 — Techs** (**BL-156**). Early design toward the tech / quest system — the condition-set
+- **v0.1.4 — Techs** (**BL-156**). Early design toward the tech / quest system — the condition-set
   gate model (gate = quest = tech) that BL-087 reframed and the v0.4.0 filter system formalises.
   Design only; precursor to BL-087.
-- **v0.1.4 — Military systems** (**BL-157**). The Conflict dimension's first data-model footing —
+- **v0.1.5 — Military systems** (**BL-157**). The Conflict dimension's first data-model footing —
   units, forces, and the seams they need in the world model. Stub, not mechanics (Conflict proper
   stays post-cut scope).
-- **v0.1.5 — Politics (stub)** (**BL-158**). A data-model stub only — enough political layer for
+- **v0.1.6 — Politics (stub)** (**BL-158**). A data-model stub only — enough political layer for
   the v0.3.0 governing actor to have something to own, deferring the working system to v0.4.0.
-- **v0.1.6 — Generation visibility + UI alignment.** *(Added by Ben, 2026-08-04: "a pass on
+- **v0.1.7 — Generation visibility + UI alignment.** *(Added by Ben, 2026-08-04: "a pass on
   generation visibility... visualising the world at each step — we haven't yet done that.")* The
-  band's last minor before the refocus, and its second concrete build minor. Two themes:
+  band's last minor before the refocus, and its third concrete build minor. Two themes:
 
   **Generation visibility.** Every generation step earns a surface the player (and Ben) can
   watch it through: the Generation Ledger build (**BL-303** — the window `GENERATION_LEDGER.md`
@@ -265,28 +287,6 @@ added by Ben 2026-08-04).
   user-story review) is the vehicle, retargeted here from v0.1.1; it consumes
   `user_stories.json` and closes the loop between the band's new systems and the surfaces that
   serve them.
-- **v0.1.7 — Buildings rework** (**BL-323**). *(Added by Ben, 2026-08-07: "we need to pad out the
-  number of available buildings, and start enforcing placement rules. Especially for logistical
-  max building range… We need to put a lot of work into this before any simulated games can
-  occur.")* The band's third concrete build minor, and the one the simulated-play arc waits on.
-  Four strands: **pad the roster** out toward `PRODUCTION.md`'s designed ~26 (against 5 generic
-  kinds and 4 recipes today), mostly as Lua authoring rather than enum churn; **enforce a
-  logistical max range** on placement — the rule with no code at all today, built as a reach query
-  over the terrain-weighted cost function `logistics.cpp` already provides; **make build time
-  depend on the site** (landform, logistics distance, established stack) rather than staying a
-  flat per-type constant; and **surface construction on the canvas**.
-
-  **Why it gates simulated play.** With remoteness free, the optimal siting strategy is "the
-  richest tile anywhere" — a lookup, not a decision. An AI player driving the corp-command seam
-  finds that immediately and plays it forever, so neither the v0.2.0 opponent nor a text-driven
-  session tests anything until siting carries a trade-off. It is the placement-side counterpart to
-  the constraint **BL-316** is landing in the Era −1 sim: breadth must cost something.
-
-  **Sequencing is Ben's call.** Placed last in the band to avoid renumbering the stub minors, but
-  it is *concrete* work that the design-forward minors (v0.1.2–v0.1.5) do not depend on — so
-  pulling it ahead of them is reasonable if simulated play is wanted sooner. Flagged rather than
-  decided.
-
 ### v0.2.0 — The AI opponent
 
 *Versioned theme: the AI opponent.* The backlog's live v0.2.0 set is the corp-AI arc: stage A —
