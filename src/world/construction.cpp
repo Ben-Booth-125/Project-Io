@@ -1,5 +1,7 @@
 #include "construction.hpp"
 
+#include "logistics.hpp"
+
 #include "market_clearing.hpp" // market_for_tile
 #include "placement_rules.hpp"
 
@@ -25,10 +27,18 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     if (!placement_rules::can_place(tile_it->second, type, target))
         return construction_result::invalid_tile;
 
-    // World-level checks: coastal (Port), body-count cap (Launchpad).
-    // can_place passed, so failures here are world-state reasons, not terrain.
-    if (!placement_rules::can_place_in_world(w, tile, type, target))
+    // World-level checks: coastal (Port), body-count cap (Launchpad), and the
+    // BL-323 S2 logistics-reach budget. The reach field is built HERE rather than
+    // inside the check, because the check takes a const world and must not trigger
+    // a Dijkstra; this is the authoritative gate and it holds a mutable world.
+    body_reach_field(w, tile_it->second.body);
+    const placement_rules::placement_result pr =
+        placement_rules::can_place_in_world(w, tile, type, target,
+                                            reg.construction().max_logistics_reach);
+    if (!pr)
     {
+        if (pr.reason == placement_rules::placement_reason::out_of_logistics_range)
+            return construction_result::out_of_range;
         if (type == building_type::launchpad)
             return construction_result::slot_occupied;
         return construction_result::invalid_tile; // Port not coastal
@@ -186,6 +196,7 @@ construction_result place_road(world& w, const recipe_registry& reg,
     cc.balance -= total_cost;
     tile_it->second.road_level = tier; // BL-172: 1=Track, 2=Road, 3=Highway (upgrade-in-place).
     w.astar_cost_cache.clear();
+    w.body_reach_cost.clear(); // a port or hub just became (or stopped being) an anchor
 
     return construction_result::placed;
 }

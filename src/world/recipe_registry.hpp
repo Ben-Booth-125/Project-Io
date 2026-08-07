@@ -65,6 +65,19 @@ struct substrate_params
 struct construction_params
 {
     float max_stretch = 10.0f; ///< longest a material-starved build stretches to (×base duration); below 1/max_stretch it pauses.
+
+    /// BL-323 S2: furthest a new building may sit from its nearest supply anchor,
+    /// in `logistics.hpp`'s weighted cost units. Negative disables the rule.
+    ///
+    /// DEFAULTS OFF, unlike its siblings above, and deliberately: reach is only
+    /// meaningful against a GENERATED world, where cities exist to anchor supply.
+    /// A hand-built harness world has no population centres, so every tile on it
+    /// is infinitely far from an anchor and the rule would refuse every placement
+    /// — turning a construction test into a reach test by accident. scripts/
+    /// economy.lua authors the real value (24.0), so the shipped game enforces it;
+    /// a harness that wants the rule passes a budget explicitly, as
+    /// tools/verify/logistics_reach_harness.cpp does.
+    float max_logistics_reach = -1.0f;
 };
 
 /// BL-148/149 logistics-node discount tunables, authored in scripts/economy.lua under

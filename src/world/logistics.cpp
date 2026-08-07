@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <limits>
 #include <queue>
 #include <tuple>
 #include <vector>
@@ -239,4 +240,140 @@ logistics_path intra_body_path(world& w, entity_id body, entity_id src_tile, ent
     }
     w.astar_cost_cache.emplace(key, res);
     return res;
+}
+
+// ---------------------------------------------------------------------------
+// Logistics reach (BL-323 S2)
+// ---------------------------------------------------------------------------
+
+bool is_supply_anchor(const world& w, entity_id tile)
+{
+    if (tile == null_entity)
+        return false;
+
+    // A city anchors supply for free — the same free-hub discount BL-149 gives it.
+    for (const auto& [centre, ctile] : w.population_centre_tile)
+    {
+        (void)centre;
+        if (ctile == tile)
+            return true;
+    }
+
+    // So does a port or an inland logistics hub: the two buildings whose whole
+    // purpose is to be a node. A launchpad is deliberately NOT an anchor — it
+    // dispatches off-world and supplies nothing on the surface.
+    for (const auto& [bid, bc] : w.buildings)
+    {
+        (void)bid;
+        if (bc.tile != tile)
+            continue;
+        if (bc.type == building_type::port || bc.type == building_type::inland_logistics_hub)
+            return true;
+    }
+    return false;
+}
+
+const std::vector<float>& body_reach_field(world& w, entity_id body)
+{
+    if (const auto it = w.body_reach_cost.find(body); it != w.body_reach_cost.end())
+        return it->second;
+
+    constexpr float inf = std::numeric_limits<float>::infinity();
+    std::vector<float> cost;
+
+    const auto bit = w.bodies.find(body);
+    if (bit == w.bodies.end())
+        return w.body_reach_cost.emplace(body, std::move(cost)).first->second;
+
+    const int gw = bit->second.grid_width;
+    const int gh = bit->second.grid_height;
+    const std::vector<entity_id>& grid = body_tile_grid(w, body);
+    if (gw <= 0 || gh <= 0 || grid.empty())
+        return w.body_reach_cost.emplace(body, std::move(cost)).first->second;
+
+    const int total = gw * gh;
+    cost.assign(static_cast<std::size_t>(total), inf);
+
+    // Seed every anchor at zero. RASTER ORDER, never tiles-map order — this runs
+    // inside a deterministic simulation and the seed order must not depend on
+    // hash-map iteration.
+    std::priority_queue<pq_entry, std::vector<pq_entry>, std::greater<pq_entry>> open;
+    for (int i = 0; i < total; ++i)
+    {
+        const entity_id tid = grid[static_cast<std::size_t>(i)];
+        if (tid == null_entity || !is_supply_anchor(w, tid))
+            continue;
+        cost[static_cast<std::size_t>(i)] = 0.0f;
+        open.push(pq_entry{ 0.0f, i % gw, i / gw });
+    }
+
+    // Multi-source Dijkstra over the same 4-cardinal, column-wrapping grid the
+    // A* uses, with the same edge cost (mean of the two node weights). Sharing
+    // the cost function is the point: reach means "suppliable", not a second
+    // distance metric invented for placement.
+    while (!open.empty())
+    {
+        const pq_entry cur = open.top();
+        open.pop();
+        const int cur_idx = raster_idx(cur.col, cur.row, gw);
+        if (cur.cost > cost[static_cast<std::size_t>(cur_idx)])
+            continue;
+
+        const int row = cur.row;
+        const int col = cur.col;
+        const auto cur_tc = w.tiles.find(grid[static_cast<std::size_t>(cur_idx)]);
+        if (cur_tc == w.tiles.end())
+            continue;
+        const float cur_weight = tile_traversal_cost(cur_tc->second);
+
+        const int dr[4] = { -1, 1, 0, 0 };
+        const int dc[4] = { 0, 0, -1, 1 };
+        for (int d = 0; d < 4; ++d)
+        {
+            const int nrow = row + dr[d];
+            if (nrow < 0 || nrow >= gh) // rows do not wrap; columns do
+                continue;
+            const int nidx = raster_idx(col + dc[d], nrow, gw);
+            const entity_id ntid = grid[static_cast<std::size_t>(nidx)];
+            if (ntid == null_entity)
+                continue;
+            const auto n_tc = w.tiles.find(ntid);
+            if (n_tc == w.tiles.end())
+                continue;
+
+            const float edge = 0.5f * (cur_weight + tile_traversal_cost(n_tc->second));
+            const float next = cur.cost + edge;
+            if (next < cost[static_cast<std::size_t>(nidx)])
+            {
+                cost[static_cast<std::size_t>(nidx)] = next;
+                open.push(pq_entry{ next, nidx % gw, nidx / gw });
+            }
+        }
+    }
+
+    return w.body_reach_cost.emplace(body, std::move(cost)).first->second;
+}
+
+float tile_reach_cost(const world& w, entity_id tile)
+{
+    const auto tit = w.tiles.find(tile);
+    if (tit == w.tiles.end())
+        return -1.0f;
+
+    const auto fit = w.body_reach_cost.find(tit->second.body);
+    if (fit == w.body_reach_cost.end() || fit->second.empty())
+        return -1.0f; // not computed — distinct from computed-and-unreachable
+
+    const auto bit = w.bodies.find(tit->second.body);
+    if (bit == w.bodies.end())
+        return -1.0f;
+
+    const int gw = bit->second.grid_width;
+    if (gw <= 0)
+        return -1.0f;
+    const std::size_t idx = static_cast<std::size_t>(tit->second.grid_y) * static_cast<std::size_t>(gw)
+                          + static_cast<std::size_t>(tit->second.grid_x);
+    if (idx >= fit->second.size())
+        return -1.0f;
+    return fit->second[idx];
 }

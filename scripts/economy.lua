@@ -158,6 +158,20 @@ economy = {
     -- so a starved build takes up to max_stretch × its base duration, then stalls.
     construction = {
         max_stretch = 10.0, -- longest a starved build stretches to (×base duration); below 1/max_stretch it pauses.
+
+        -- BL-323 S2 — LOGISTICAL MAX BUILDING RANGE.
+        -- The furthest a new building may sit from its nearest supply anchor (a
+        -- city, a port, or an inland logistics hub), in the same weighted units
+        -- the convoy A* pays: per-tile landform cost (plains 1.0 → mountain 2.0),
+        -- discounted by road tier, averaged across each edge.
+        --
+        -- So ~24 means roughly two dozen tiles of easy roaded plains, or barely a
+        -- dozen of trackless mountain. Remote ground is not forbidden — it is
+        -- forbidden UNTIL you pay for a hub or a road to reach it, which is the
+        -- decision the rule exists to create.
+        --
+        -- Negative disables the rule entirely (the pre-BL-323 behaviour).
+        max_logistics_reach = 24.0,
     },
 }
 

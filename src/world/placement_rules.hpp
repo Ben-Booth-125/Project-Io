@@ -41,6 +41,7 @@ enum class placement_reason : uint8_t
     no_tile,           ///< Tile entity does not exist (defensive; mirrors construction_result::no_tile).
     already_road,      ///< Road placement onto a tile that already carries a road (BL-147).
     deposit_present,   ///< Hydroponics Bay (BL-166): tile already carries the terrain deposit a Farm would use.
+    out_of_logistics_range, ///< BL-323 S2: too far from any city / port / logistics hub to be supplied.
 };
 
 /// Human-readable one-line explanation for a placement reason, for surfacing on
@@ -159,8 +160,16 @@ bool is_coastal(const world& w, entity_id tile_id);
 /// @return        A placement_result: `ok`, the tile-level reason from can_place, or
 ///                `not_coastal` / `launchpad_exists`. Converts to bool for existing
 ///                boolean call sites.
+/// @param max_reach  BL-323 S2 logistics-reach budget, in the same weighted units
+///                   `logistics.hpp`'s cost function uses. **Negative disables the
+///                   rule** — the default, so every pre-existing call site keeps its
+///                   old meaning and only callers that opt in enforce reach. Requires
+///                   `body_reach_field()` to have been built for the tile's body; when
+///                   it has not, the rule is skipped rather than guessed at (see
+///                   `tile_reach_cost`'s -1 contract).
 placement_result can_place_in_world(const world& w, entity_id tile_id,
-                                    building_type type, resource_type target);
+                                    building_type type, resource_type target,
+                                    float max_reach = -1.0f);
 
 // ---------------------------------------------------------------------------
 // Building stacks (Ben's 2026-07-22 call: "buildings can be stacked, so you can

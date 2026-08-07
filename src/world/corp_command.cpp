@@ -29,6 +29,7 @@ corp_command_result map_construction(construction_result r)
         case construction_result::no_corp:                return corp_command_result::rejected_no_corp;
         case construction_result::no_tile:                return corp_command_result::rejected_invalid;
         case construction_result::invalid_tile:
+        case construction_result::out_of_range:
         case construction_result::slot_occupied:
         case construction_result::insufficient_materials: return corp_command_result::rejected_placement;
     }

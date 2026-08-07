@@ -235,6 +235,17 @@ struct world
     /// dispatch hot path.
     std::map<std::tuple<entity_id, entity_id, entity_id>, logistics_path> astar_cost_cache;
 
+    /// Per-body LOGISTICS REACH FIELD (BL-323 S2): raster-indexed weighted cost from each
+    /// tile to its nearest supply anchor — a city, a port, or an inland logistics hub.
+    /// Infinity where no anchor is reachable. A derived cache like the two above, built on
+    /// first use by `body_reach_field()` and invalidated wherever `astar_cost_cache` is
+    /// (road placement, building placement/demolition), because the same mutations move it.
+    ///
+    /// One multi-source Dijkstra per body rather than an A* per candidate tile: placement
+    /// asks this question for every tile under the cursor, and the armed-build tint asks it
+    /// for the whole visible grid at once, so a per-query search would be the wrong shape.
+    std::unordered_map<entity_id, std::vector<float>> body_reach_cost;
+
     /// Strategic AI decision log (BL-202): a fixed 256-entry ring of the most
     /// recent corp commands + score rationale, in deterministic application
     /// order. Derived observability (the chat feed / harness read it), not

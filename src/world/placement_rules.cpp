@@ -1,5 +1,6 @@
 #include "world/placement_rules.hpp"
 
+#include "world/logistics.hpp"
 #include "world/world.hpp"
 
 namespace placement_rules {
@@ -20,6 +21,7 @@ const char* placement_reason_text(placement_reason r)
         case placement_reason::no_tile:           return "No such tile";
         case placement_reason::already_road:      return "This tile already has an equal or better road";
         case placement_reason::deposit_present:   return "This terrain already supports a Farm — no Hydroponics Bay needed here";
+        case placement_reason::out_of_logistics_range: return "Too far from a city, port or logistics hub to be supplied";
     }
     return "Cannot build here";
 }
@@ -173,7 +175,8 @@ bool is_coastal(const world& w, entity_id tile_id)
 }
 
 placement_result can_place_in_world(const world& w, entity_id tile_id,
-                                    building_type type, resource_type target)
+                                    building_type type, resource_type target,
+                                    float max_reach)
 {
     const auto tc_it = w.tiles.find(tile_id);
     if (tc_it == w.tiles.end())
@@ -207,6 +210,22 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
             if (btc_it != w.tiles.end() && btc_it->second.body == body)
                 return placement_reason::launchpad_exists; // Already one on this body.
         }
+    }
+
+    // Logistics reach (BL-323 S2): the site must be suppliable. Checked after the
+    // terrain reasons (which teach more) and before the stack ceiling (which teaches
+    // least). Skipped entirely when the caller passes no budget, or when the body's
+    // reach field has not been built — a rule enforced on a guess is worse than one
+    // not enforced, so `tile_reach_cost`'s -1 means "unknown", never "unreachable".
+    //
+    // A supply anchor itself always passes: a port or hub IS the anchor, so gating it
+    // on being near one would make the first node on a fresh coast unplaceable and
+    // the rule unbootstrappable.
+    if (max_reach >= 0.0f && !::is_supply_anchor(w, tile_id))
+    {
+        const float reach = ::tile_reach_cost(w, tile_id);
+        if (reach >= 0.0f && !(reach <= max_reach))
+            return placement_reason::out_of_logistics_range;
     }
 
     // Stack ceiling: a tile carries several sites working one deposit, but not

@@ -44,3 +44,37 @@ const std::vector<entity_id>& body_tile_grid(world& w, entity_id body);
 /// (edge cost is the average of the two tiles' costs, so the path is symmetric). Returns
 /// {reachable=false} if either tile is unknown or not on `body`.
 logistics_path intra_body_path(world& w, entity_id body, entity_id src_tile, entity_id dst_tile);
+
+// ---------------------------------------------------------------------------
+// Logistics reach (BL-323 S2 — the placement-side "breadth must cost something")
+// ---------------------------------------------------------------------------
+// Until this, placement had no distance rule of any kind: a corp could site a
+// building arbitrarily far from any road, hub, city or port at no cost and with
+// no refusal. That makes optimal siting "the richest tile anywhere" — a lookup
+// rather than a decision, and the first thing an AI on the corp-command seam
+// finds. Reach is the constraint that gives siting a trade-off.
+//
+// Deliberately the SAME cost function convoys already pay (landform weight x
+// road discount), so the rule reads as "you must be able to supply it", not as
+// a second, invented distance metric.
+
+/// True iff @p tile carries something that anchors supply: a city (population
+/// centre), a port, or an inland logistics hub. These are exactly BL-148/149's
+/// logistics nodes — the places a convoy can already start cheaply — so reach
+/// inherits that vocabulary rather than introducing a rival one.
+bool is_supply_anchor(const world& w, entity_id tile);
+
+/// Weighted cost from every tile of @p body to its NEAREST supply anchor, raster
+/// indexed (grid_y*grid_width + grid_x). Infinity where no anchor is reachable
+/// (an unanchored body, or an island cut off from one).
+///
+/// One multi-source Dijkstra over the body, cached on `world.body_reach_cost`
+/// and invalidated wherever `astar_cost_cache` is. Deterministic: seeded from
+/// the anchor set in raster order, never in tiles-map iteration order.
+const std::vector<float>& body_reach_field(world& w, entity_id body);
+
+/// Reach cost for one tile, read-only. Returns -1 when the field has not been
+/// built for that body yet, so a caller can tell "not computed" from "computed
+/// and unreachable" (which returns infinity). The const half of the pair above:
+/// UI surfaces hold a `const world&` and must not trigger the Dijkstra.
+float tile_reach_cost(const world& w, entity_id tile);

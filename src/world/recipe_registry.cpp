@@ -133,6 +133,7 @@ void recipe_registry::load_from_lua(lua_state& lua)
     {
         construction_params cp;
         cp.max_stretch = construction->get_or("max_stretch", cp.max_stretch);
+        cp.max_logistics_reach = construction->get_or("max_logistics_reach", cp.max_logistics_reach);
         m_construction = cp;
     }
 

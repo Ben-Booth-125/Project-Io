@@ -10,6 +10,7 @@ enum class construction_result : uint8_t
 {
     placed = 0,          ///< Building created, added to the corp, and paid for.
     invalid_tile,        ///< placement_rules::can_place_in_world rejected the tile (ocean / wrong deposit / not coastal).
+    out_of_range,        ///< BL-323 S2: too far from a city / port / logistics hub to be supplied.
     insufficient_funds,  ///< The corporation cannot afford the build cost.
     no_corp,             ///< The corporation entity does not exist.
     no_tile,             ///< The tile entity does not exist.
