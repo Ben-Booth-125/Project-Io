@@ -136,9 +136,22 @@ struct history_sim_params
     // Capping Invest would have hidden that rather than fixed it. The error was
     // comparing incommensurable quantities, so the fix is to make them
     // commensurable.
-    int campaign_threshold_q  = 220; ///< Minimum score for a campaign to be launched.
-    int settle_threshold_q    = 380; ///< Minimum score for founding a new province.
-    int invest_threshold_q    = 160; ///< Minimum score for a capacity investment.
+    // All four are now MINIMA IN THE SHARED CURRENCY — expected annual gain in
+    // endowment value held — rather than cut-offs on four private scales.
+    int campaign_threshold_q  = 40;
+    int settle_threshold_q    = 60;
+    int invest_threshold_q    = 50;
+    int consolidate_threshold_q = 30;
+
+    /// Share of a target's endowment value a conqueror expects to keep.
+    int campaign_gain_q = 700;
+    /// Cost charged per per-mille of missing supply, in the shared currency.
+    int campaign_supply_cost_q = 260;
+    /// Capacity yield as a fraction of holdings value, and its payback years.
+    int invest_yield_q        = 90;
+    int invest_amortise_years = 12;
+    /// Divisor turning holdings-value-at-risk into a comparable annual figure.
+    int consolidate_divisor = 24;
 
     // BL-309 ATTEMPTED AND REVERTED, 2026-08-04. Normalising each verb onto
     // `(raw - threshold) / (ceiling - threshold)` and running the argmax over
@@ -163,6 +176,30 @@ struct history_sim_params
     /// Adjacency radius in tiles — two provinces closer than this are
     /// neighbours, and only neighbours are campaign candidates.
     int neighbour_radius = 9;
+
+    // --- Logistics (BL-314) -----------------------------------------------
+    //
+    // Ben, 2026-08-04: "it should definitely be tangibly harder to supply more
+    // provinces, and fight further away battles." Before this item neither was
+    // true. Supply was straight-line Chebyshev distance feeding a term whose
+    // whole dynamic range was 10% of combat power, and breadth cost nothing at
+    // all — holding 500 provinces cost exactly what holding 5 cost.
+
+    /// Extra supply cost per tile of TERRAIN-WEIGHTED reach, on top of the
+    /// per-tile decay. Mountains cost roughly twice what plains cost, using the
+    /// same landform ratios logistics.cpp already defines for the 1960 era.
+    int terrain_reach_cost_q = 10;
+
+    /// THE BURDEN OF BREADTH. Supply lost per province held beyond
+    /// `free_holdings`, in per-mille. An empire spread thin supplies every
+    /// campaign worse, so expansion eventually pays for itself in reach — the
+    /// arithmetic stall BL-277 Q2 claimed but never had.
+    int holdings_burden_q = 4;
+    /// Holdings a polity may carry before the burden begins to bite.
+    int free_holdings = 40;
+    /// Floor the burden may drag supply to, so a large empire is hampered
+    /// rather than instantly unable to fight anywhere.
+    int holdings_burden_floor_q = 250;
 
     /// Supply below which an arriving force counts as STALLED. This is what
     /// `history_sim_state::stalled_campaigns` measures — a campaign that was

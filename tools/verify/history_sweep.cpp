@@ -17,6 +17,7 @@
 
 #include "world/hard_coded_world.hpp"
 #include "world/history_sim.hpp"
+#include "world/sim_terrain_build.hpp"
 #include "world/settlement.hpp"
 #include "world/world.hpp"
 
@@ -168,7 +169,6 @@ int main(int argc, char** argv)
         wp.seed = static_cast<uint32_t>(i);
         generation_report rep;
         const world w = make_hard_coded_world(wp, &rep);
-        (void)w;
 
         const generation_report::body_entry* k = kepler_of(rep);
         if (!k) continue;
@@ -183,10 +183,16 @@ int main(int argc, char** argv)
         history_sim_params params;
         params.start_year = 0;
         params.stop_year  = 1960;
-        const sim_terrain_view no_terrain{};
+
+        // REAL TERRAIN (BL-314 S1). Kepler's own ground, so mountains cost what
+        // mountains cost and terrain_combat is finally live.
+        entity_id kepler_id = null_entity;
+        for (const auto& [bid, b] : w.bodies)
+            if (b.name == k->name) { kepler_id = bid; break; }
+        const sim_terrain_arrays terr = build_sim_terrain(w, kepler_id, 168, 90);
 
         const history_sim_state sim =
-            run_history_sim(ss, nullptr, no_terrain, 168, 90, params, wp.seed);
+            run_history_sim(ss, nullptr, terr.view(), 168, 90, params, wp.seed);
 
         {
             int64_t early = 0;

@@ -50,6 +50,24 @@ int jitter(int base, uint32_t s, uint32_t axis, int spread)
     return base + (base * d) / 1000;
 }
 
+/// THE COMMON CURRENCY (BL-309). Every verb scores in ONE unit: expected
+/// annual gain in ENDOWMENT VALUE HELD, where a province is worth the mean of
+/// its three endowment windows (0-1000).
+///
+/// This replaces comparing four incommensurable numbers. The first cut compared
+/// raw scores directly, and Invest — whose score was population/4000 clamped —
+/// pinned at its ceiling and won forever. The second cut normalised each verb
+/// by its own range, which structurally favours the NARROWEST range and simply
+/// handed the win to Settle instead. Neither was fixable by tuning, because the
+/// error was upstream of the constants: quantities that mean different things
+/// cannot be ranked. So each verb now answers the same question — what is this
+/// worth to me this year, in provinces-worth-of-endowment — and the argmax is
+/// an honest comparison rather than a coincidence of scales.
+int province_value_q(const province& p)
+{
+    return (p.farm_q + p.ore_q + p.port_q) / 3;
+}
+
 terrain_composition comp_at(const sim_terrain_view& t, int idx)
 {
     if (!t.composition || idx < 0 || idx >= static_cast<int>(t.composition->size()))
@@ -271,6 +289,61 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 neighbours[j].push_back(static_cast<int>(i));
             }
 
+    // --- Terrain-weighted reach (BL-314 S2) -------------------------------
+    //
+    // Distance from the capital is a COST over the neighbour graph, not a
+    // straight line: crossing a mountain range costs about twice what crossing
+    // plains does, using the landform ratios logistics.cpp already defines for
+    // the 1960 era. Computed by Dijkstra from the capital and cached until the
+    // capital moves, so the per-year cost stays a lookup.
+    std::vector<int> reach;            // Per-province cost from the current capital.
+    int reach_capital = -2;            // Which capital `reach` was built for.
+
+    const auto tile_cost = [&](const province& p) {
+        // Landform ratios, x100: plains 100, highland 125, mountain 200, ...
+        switch (lf_at(terrain, p.anchor))
+        {
+        case terrain_landform::mountain: return 200;
+        case terrain_landform::rift:     return 160;
+        case terrain_landform::canyon:   return 150;
+        case terrain_landform::crater:   return 130;
+        case terrain_landform::highland: return 125;
+        case terrain_landform::valley:   return 110;
+        default:                         return 100;
+        }
+    };
+
+    const auto rebuild_reach = [&](int capital) {
+        reach.assign(ss.provinces.size(), 1 << 28);
+        if (capital < 0 || capital >= static_cast<int>(ss.provinces.size())) return;
+        reach[static_cast<std::size_t>(capital)] = 0;
+
+        // Dijkstra without a heap: province counts are hundreds, and a simple
+        // scan keeps the order deterministic without depending on a tie-break
+        // inside a priority queue.
+        std::vector<bool> done(ss.provinces.size(), false);
+        for (std::size_t iter = 0; iter < ss.provinces.size(); ++iter)
+        {
+            int best = -1, best_c = 1 << 28;
+            for (std::size_t i = 0; i < reach.size(); ++i)
+                if (!done[i] && reach[i] < best_c) { best_c = reach[i]; best = static_cast<int>(i); }
+            if (best < 0) break;
+            done[static_cast<std::size_t>(best)] = true;
+
+            const province& bp = ss.provinces[static_cast<std::size_t>(best)];
+            for (int nb : neighbours[static_cast<std::size_t>(best)])
+            {
+                const province& np2 = ss.provinces[static_cast<std::size_t>(nb)];
+                const int step = province_distance(bp, np2, gw)
+                               * (tile_cost(bp) + tile_cost(np2)) / 200;
+                const int cand = best_c + (step > 0 ? step : 1);
+                if (cand < reach[static_cast<std::size_t>(nb)])
+                    reach[static_cast<std::size_t>(nb)] = cand;
+            }
+        }
+        reach_capital = capital;
+    };
+
     // --- Time-lapse change list -------------------------------------------
     out.owner_changes.clear();
     for (std::size_t i = 0; i < owner.size(); ++i)
@@ -323,6 +396,14 @@ history_sim_state run_history_sim(settlement_state&         ss,
             const province& cap = ss.provinces[static_cast<std::size_t>(q.capital)];
             const uint32_t  qs  = salt(seed, static_cast<uint32_t>(q.id));
 
+            if (reach_capital != q.capital || reach.size() != ss.provinces.size())
+                rebuild_reach(q.capital);
+
+            // THE BURDEN OF BREADTH (BL-314 S3). Every province held past
+            // `free_holdings` costs supply on every campaign this polity runs.
+            const int over = static_cast<int>(held.size()) - params.free_holdings;
+            const int burden = over > 0 ? over * params.holdings_burden_q : 0;
+
             // ---- Build the bounded candidate set -------------------------
             //
             // Four verbs. The set is bounded by construction: neighbours only,
@@ -370,7 +451,36 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         value += (params.w_ring * ring_closure_q) / 1000;
                     }
 
+                    // In the currency: expected value TAKEN, discounted by the
+                    // odds of taking it, less what the attempt costs.
+                    value = (value * params.campaign_gain_q) / 1000;
+
+                    // Odds from the power ratio the sim can actually estimate:
+                    // levy x supply x cohesion against the defender's levy.
+                    const int reach_here = (ti < reach.size() && reach[ti] < (1 << 27))
+                                         ? static_cast<int>(reach[ti]) : cap_dist;
+                    const int supply_here = clampi(1000
+                                          - cap_dist * params.supply_decay_per_tile_q
+                                          - reach_here * params.terrain_reach_cost_q / 100
+                                          - clampi(burden, 0, 1000 - params.holdings_burden_floor_q),
+                                          0, 1000);
+
+                    int64_t atk_men = 0;
+                    for (int hi2 : held)
+                        if (ss.provinces[static_cast<std::size_t>(hi2)].manpower_stock > atk_men)
+                            atk_men = ss.provinces[static_cast<std::size_t>(hi2)].manpower_stock;
+                    const int64_t atk_est = (atk_men * supply_here / 1000)
+                                          * clampi(q.cohesion_q, 1, 1000) / 1000;
+                    const int64_t def_est = tgt.manpower_stock > 0 ? tgt.manpower_stock : 1;
+                    const int p_win_q = static_cast<int>(
+                        clampi64((atk_est * 1000) / (atk_est + def_est), 0, 1000));
+
+                    value = (value * p_win_q) / 1000;
+
+                    // Costs, in the same unit: distance is a real logistics
+                    // cost now (BL-314), not just a preference.
                     value -= params.w_dist * cap_dist / 10;
+                    value -= (1000 - supply_here) * params.campaign_supply_cost_q / 1000;
                     if (tgt.culture != q.culture) value -= params.w_cult;
 
                     // Season as an action axis: summer and winter are two
@@ -389,7 +499,7 @@ history_sim_state run_history_sim(settlement_state&         ss,
                         const int def_ready = winter ? (1000 - params.winter_readiness_penalty_q) : 1000;
                         const int def_eff   = (def_scaled * def_ready) / 1000;
 
-                        int s = value - (params.w_def * def_eff) / 1000;
+                        int s = value - (params.w_def * def_eff) / 2000;
                         if (winter) s -= params.winter_score_premium_q;
                         s += static_cast<int>(salt(qs, static_cast<uint32_t>(ti)) % 16u); // Stable tie-break.
 
@@ -423,7 +533,11 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 const bool may_settle = q.cohesion_q >= params.settle_cohesion_gate_q;
                 if (may_settle && pressure_src >= 0 && pressure_best >= params.settle_pressure_q)
                 {
-                    const int s = pressure_best - params.settle_pressure_q + params.settle_threshold_q;
+                    const province& sp = ss.provinces[static_cast<std::size_t>(pressure_src)];
+                    const int daughter_value = (province_value_q(sp) * 800) / 1000;
+                    const int s = (daughter_value * pressure_best) / 1000
+                                - (static_cast<int>(held.size()) > params.free_holdings
+                                   ? params.holdings_burden_q * 4 : 0);
                     if (s > best_score && s >= params.settle_threshold_q)
                     {
                         best_score = s; best_verb = sim_verb::settle; best_target = pressure_src;
@@ -446,8 +560,15 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // to want, so investment does not pin at its ceiling the moment
                 // a polity has a few mature provinces (BL-309). Marginal value,
                 // not accumulated size.
-                const int64_t denom = 4000LL * static_cast<int64_t>(clampi(q.capacity[dom], 1, 6));
-                const int s = static_cast<int>(clampi64(pop / denom, 0, 1000));
+                int64_t holdings_value = 0;
+                for (int hi : held)
+                    holdings_value += province_value_q(ss.provinces[static_cast<std::size_t>(hi)]);
+                const int band_now = clampi(q.capacity[dom], 1, 6);
+                const int s = static_cast<int>(clampi64(
+                    (holdings_value * params.invest_yield_q)
+                        / (1000LL * params.invest_amortise_years * band_now),
+                    0, 1000));
+                (void)pop;
                 if (s > best_score && s >= params.invest_threshold_q)
                 {
                     best_score = s; best_verb = sim_verb::invest; best_target = dom;
@@ -462,6 +583,19 @@ history_sim_state run_history_sim(settlement_state&         ss,
             // BL-308 death-spiral escape reachable at all: under raw-score
             // comparison Consolidate was never chosen after ~year 176, so the
             // recovery the header promised could not happen.
+            {
+                int64_t hv = 0;
+                for (int hi : held)
+                    hv += province_value_q(ss.provinces[static_cast<std::size_t>(hi)]);
+                const int shortfall = 1000 - clampi(q.cohesion_q, 0, 1000);
+                const int s = static_cast<int>(clampi64(
+                    (hv * shortfall) / (1000LL * params.consolidate_divisor), 0, 1000));
+                if (s > best_score && s >= params.consolidate_threshold_q)
+                {
+                    best_score = s; best_verb = sim_verb::consolidate;
+                    best_target = -1; best_winter = false;
+                }
+            }
             if (best_verb == sim_verb::none) best_verb = sim_verb::consolidate;
 
             // ---- Execute -------------------------------------------------
@@ -491,7 +625,18 @@ history_sim_state run_history_sim(settlement_state&         ss,
                 // stall: far enough out, the arriving force is under the
                 // defender's and the frontier stops on arithmetic alone.
                 const int cap_dist = province_distance(cap, tgt, gw);
-                const int atk_supply = clampi(1000 - cap_dist * params.supply_decay_per_tile_q, 0, 1000);
+
+                // Terrain-weighted reach where it is known, straight-line
+                // otherwise (a target outside the connected component).
+                const int reach_cost = (static_cast<std::size_t>(best_target) < reach.size()
+                                        && reach[static_cast<std::size_t>(best_target)] < (1 << 27))
+                                     ? reach[static_cast<std::size_t>(best_target)] : cap_dist;
+
+                const int supply_raw = 1000
+                                     - cap_dist * params.supply_decay_per_tile_q
+                                     - reach_cost * params.terrain_reach_cost_q / 100
+                                     - clampi(burden, 0, 1000 - params.holdings_burden_floor_q);
+                const int atk_supply = clampi(supply_raw, 0, 1000);
                 const int def_supply = 1000;
 
                 // The stall, counted where it actually happens (BL-312). The

@@ -6,6 +6,7 @@
 #include "presentation.hpp"
 #include "world/components.hpp"
 #include "world/history_sim.hpp"  // the Era -1 time-lapse the Ages view replays (BL-277)
+#include "world/sim_terrain_build.hpp" // real ground for the sim to fight over (BL-314)
 
 #include <imgui.h>
 
@@ -238,8 +239,11 @@ void draw_tile_inspector(const world& w, ui_state& s,
             history_sim_params p;
             p.start_year = 0;
             p.stop_year  = static_cast<int64_t>(fmt::campaign_epoch_year);
-            const sim_terrain_view no_terrain{};
-            cached_sim = run_history_sim(cached_ss, nullptr, no_terrain,
+            // Real terrain, so the replayed history is fought over this body's
+            // actual mountains and marshes rather than an imagined plain.
+            const sim_terrain_arrays terr =
+                build_sim_terrain(w, selected_body, sel_body.grid_width, sel_body.grid_height);
+            cached_sim = run_history_sim(cached_ss, nullptr, terr.view(),
                                          sel_body.grid_width, sel_body.grid_height,
                                          p, 7u);
             cached_body   = sel_body.name;
