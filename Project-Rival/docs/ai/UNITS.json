@@ -1,0 +1,144 @@
+{
+  "_schema": "The unit roster dictionary (Rival-authored, 2026-08-07, per the military design session). Each row is a UNIT TYPE a nation can field: {era_band, unit_class (combat.hpp enum), type_power_mod (per-mille, layered on the class matchup), doctrine_options (named doctrine_row presets this type may fight under), available_when (the DERIVATION of availability — endowment classes + industrialisation year from settlement_state, never research or player choice), named_substitutions (stand-in signals, flagged per the BL-221 convention)}. This is the NOUN half of the unit dictionary; the VERB half is BL-314 (unit verb family), filed design-owed with its transcription debt named.",
+  "_note": [
+    "Sibling of ACTIONS.json (verbs) on the noun axis: its natural Io analogue is the recipe/building-type registry, not the action dictionary. unit_component.type's opaque uint16_t is the index into this table when it lands.",
+    "Era-keying lives HERE and only here (Ben, 2026-08-07): verbs stay era-invariant; a single verb precondition points at this table's derivation. combat.hpp is era-blind by contract and resolve_battle takes fully-resolved stacks, so nothing in this file leaks into the engine.",
+    "Availability is DERIVED, not unlocked: a nation's available rows are a pure function of its provinces' endowment classes and its industrialisation year (both already in settlement_state, BL-273/BL-218). No research, no unlock events. The forge-god culture fields iron early; the late industrialiser fields pike against rifles. (BL-274's filing position, ratified.)",
+    "Four era bands (decision taken 2026-08-07, lean ratified by session): classical / medieval-equivalent / gunpowder / industrial. The 1960 campaign era is just the last rows of the same table — BL-272's engine-parity contract made concrete.",
+    "Unit-type names are generic mechanism nouns (levy foot, horse raiders, pike block), never Earth proper nouns, per the standing naming rule. Doctrine preset names likewise.",
+    "NAVAL rows are strategic-only: combat.hpp gives naval zero tactical power. They exist so crossings and blockades have a noun; no naval battle verb exists (honest first cut — flagged, since players and agents will expect one).",
+    "Landing path: Rival design artifact, lands into Io explicitly with BL-274 (era-keyed rosters), never by silent merge. type_power_mod values are authored by judgement and calibrate against BL-271 sweep evidence when the sim runs.",
+    "Position/grain contract (session rulings, 2026-08-07): units sit on a TILE (BL-157 stands; the shipped unit_component's body field is the divergence to fix at landing), and verbs act at UNIT grain."
+  ],
+  "doctrine_presets": {
+    "shield_wall": { "frontal_bonus": 250, "flank_fragility": 300, "mountain_penalty": 400, "stance": "field", "note": "Devastating frontal, brittle flank, poor in mountains — the close-order block." },
+    "loose_skirmish": { "frontal_bonus": -150, "flank_fragility": 50, "mountain_penalty": 0, "stance": "field", "note": "Weak head-on, nearly unflankable, terrain-indifferent." },
+    "mounted_sweep": { "frontal_bonus": 100, "flank_fragility": 150, "mountain_penalty": 500, "stance": "field", "note": "Strong charge, useless in mountains." },
+    "storm": { "frontal_bonus": 200, "flank_fragility": 200, "mountain_penalty": 200, "stance": "assault", "note": "Take the walls now, pay in blood." },
+    "starve_out": { "frontal_bonus": -200, "flank_fragility": 100, "mountain_penalty": 0, "stance": "invest", "note": "Sit, entrench, let attrition decide." },
+    "massed_volley": { "frontal_bonus": 300, "flank_fragility": 250, "mountain_penalty": 300, "stance": "field", "note": "Gunpowder line discipline: murderous frontal arcs, exposed flanks." },
+    "entrenched_fire": { "frontal_bonus": 150, "flank_fragility": 100, "mountain_penalty": 100, "stance": "field", "note": "Industrial defence-in-depth." }
+  },
+  "era_bands": ["classical", "medieval", "gunpowder", "industrial"],
+  "units": {
+    "levy_foot": {
+      "era_band": "classical", "unit_class": "infantry", "type_power_mod": -100,
+      "doctrine_options": ["shield_wall", "loose_skirmish"],
+      "available_when": { "endowment": [], "industrialised": false },
+      "named_substitutions": {},
+      "note": "The floor: any province with population fields these. Manpower cost only."
+    },
+    "bronze_spear_block": {
+      "era_band": "classical", "unit_class": "infantry", "type_power_mod": 50,
+      "doctrine_options": ["shield_wall"],
+      "available_when": { "endowment": ["ore_q >= modest"], "industrialised": false },
+      "named_substitutions": { "copper_and_tin": "single ore_q axis stands in for the two-metal trade signal — flagged" },
+      "note": "Close-order metal-armed foot; the first endowment-gated row."
+    },
+    "iron_line": {
+      "era_band": "classical", "unit_class": "infantry", "type_power_mod": 150,
+      "doctrine_options": ["shield_wall", "storm", "starve_out"],
+      "available_when": { "endowment": ["ore_q >= rich", "furnace_stage >= bloomery"], "industrialised": false },
+      "named_substitutions": {},
+      "note": "The forge-god row: iron early is the classical band's decisive asymmetry."
+    },
+    "horse_raiders": {
+      "era_band": "classical", "unit_class": "cavalry", "type_power_mod": 100,
+      "doctrine_options": ["mounted_sweep", "loose_skirmish"],
+      "available_when": { "endowment": ["grassland_share >= high"], "industrialised": false },
+      "named_substitutions": { "horses": "grassland share of the province window stands in for a pasture/domesticable-clade axis that does not exist — flagged (BL-274 open question 2, resolved as this substitution)" },
+      "note": "Horse-country's answer to the shield wall."
+    },
+    "foot_archers": {
+      "era_band": "classical", "unit_class": "ranged", "type_power_mod": 0,
+      "doctrine_options": ["loose_skirmish"],
+      "available_when": { "endowment": ["forest_share >= modest"], "industrialised": false },
+      "named_substitutions": { "bow_staves": "forest share stands in for a bow-wood signal — flagged" },
+      "note": ""
+    },
+    "rams_and_towers": {
+      "era_band": "classical", "unit_class": "siege", "type_power_mod": 0,
+      "doctrine_options": ["storm", "starve_out"],
+      "available_when": { "endowment": ["forest_share >= modest"], "industrialised": false },
+      "named_substitutions": {},
+      "note": "The classical siege train; slow, exists to make walls answerable."
+    },
+    "war_galleys": {
+      "era_band": "classical", "unit_class": "naval", "type_power_mod": 0,
+      "doctrine_options": [],
+      "available_when": { "endowment": ["coastal_province", "forest_share >= modest"], "industrialised": false },
+      "named_substitutions": {},
+      "note": "Strategic-only: carries crossings and blockades, zero tactical power."
+    },
+    "armoured_lancers": {
+      "era_band": "medieval", "unit_class": "cavalry", "type_power_mod": 250,
+      "doctrine_options": ["mounted_sweep"],
+      "available_when": { "endowment": ["grassland_share >= high", "ore_q >= rich"], "industrialised": false },
+      "named_substitutions": { "horses": "grassland share — flagged, as above" },
+      "note": "Horse country plus iron country in one polity: the medieval band's apex."
+    },
+    "pike_block": {
+      "era_band": "medieval", "unit_class": "infantry", "type_power_mod": 200,
+      "doctrine_options": ["shield_wall"],
+      "available_when": { "endowment": ["ore_q >= modest"], "industrialised": false },
+      "named_substitutions": {},
+      "note": "The lancer's answer; holds the gunpowder transition's losing side."
+    },
+    "crossbow_ranks": {
+      "era_band": "medieval", "unit_class": "ranged", "type_power_mod": 150,
+      "doctrine_options": ["loose_skirmish", "massed_volley"],
+      "available_when": { "endowment": ["ore_q >= modest", "forest_share >= modest"], "industrialised": false },
+      "named_substitutions": {},
+      "note": ""
+    },
+    "counterweight_engines": {
+      "era_band": "medieval", "unit_class": "siege", "type_power_mod": 200,
+      "doctrine_options": ["storm", "starve_out"],
+      "available_when": { "endowment": ["forest_share >= modest"], "industrialised": false },
+      "named_substitutions": {},
+      "note": ""
+    },
+    "matchlock_foot": {
+      "era_band": "gunpowder", "unit_class": "infantry", "type_power_mod": 350,
+      "doctrine_options": ["massed_volley", "storm"],
+      "available_when": { "endowment": ["energy_class >= combustible"], "industrialised": false },
+      "named_substitutions": { "saltpetre_and_sulphur": "energy class stands in for a dedicated saltpetre/sulphur signal — flagged (BL-274's filing substitution, ratified)" },
+      "note": "The band-breaker: pike loses to this, and diffusion along contact decides who has it (BL-271 sim mechanic, per BL-274 open question 3's lean)."
+    },
+    "field_bombards": {
+      "era_band": "gunpowder", "unit_class": "siege", "type_power_mod": 400,
+      "doctrine_options": ["storm", "starve_out"],
+      "available_when": { "endowment": ["energy_class >= combustible", "ore_q >= rich"], "industrialised": false },
+      "named_substitutions": { "saltpetre_and_sulphur": "energy class — flagged, as above" },
+      "note": "Walls stop mattering; the medieval defensive equilibrium ends here."
+    },
+    "sail_gunships": {
+      "era_band": "gunpowder", "unit_class": "naval", "type_power_mod": 0,
+      "doctrine_options": [],
+      "available_when": { "endowment": ["coastal_province", "energy_class >= combustible", "forest_share >= high"], "industrialised": false },
+      "named_substitutions": {},
+      "note": "Strategic-only, as all naval."
+    },
+    "rifle_line": {
+      "era_band": "industrial", "unit_class": "infantry", "type_power_mod": 550,
+      "doctrine_options": ["entrenched_fire", "massed_volley", "storm"],
+      "available_when": { "endowment": [], "industrialised": true },
+      "named_substitutions": {},
+      "note": "Gated on the Stage 4 furnace date alone: the first industrialiser fields these against pike, which is the philosophical-development instrument in one row."
+    },
+    "field_guns": {
+      "era_band": "industrial", "unit_class": "siege", "type_power_mod": 600,
+      "doctrine_options": ["entrenched_fire", "storm", "starve_out"],
+      "available_when": { "endowment": ["ore_q >= rich"], "industrialised": true },
+      "named_substitutions": {},
+      "note": ""
+    },
+    "steam_squadrons": {
+      "era_band": "industrial", "unit_class": "naval", "type_power_mod": 0,
+      "doctrine_options": [],
+      "available_when": { "endowment": ["coastal_province"], "industrialised": true },
+      "named_substitutions": {},
+      "note": "Strategic-only. The 1960 campaign navy is later rows of this same column."
+    }
+  }
+}

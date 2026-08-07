@@ -1,0 +1,138 @@
+{
+ "_schema": "The voice dictionary (Rival-authored, 2026-08-06). Each entry is a VOICE mapped to an IDEOLOGY: ideology {kind: religious|philosophical, creed (one-line cosmology), mechanism_source (real-tradition mechanism reference — flagged, never an Io name source)}, register (form/idiom rules for voicing instructions), causal_idiom (what the voice may name as a cause), stance_inflections (how the seven PHRASINGS stances sound in this voice), decision_bias {action-family or action-id: multiplier} (explicit, compact, deterministic — applied to the urgency x importance scoring, AI_OPPONENT.md § 6a), doctrine_preference {field|assault|invest: multiplier, frontal_risk: scalar} (2026-08-07 military session — Ben ruled the military bias shape is DOCTRINE PREFERENCE, not per-verb keys: a voice leans a nation toward doctrine rows when a battle or siege offers a choice; stance multipliers weigh combat.hpp's siege_stance options, frontal_risk (1000 = neutral, per-mille like the engine) scales tolerance for flank_fragility in exchange for frontal_bonus when ranking UNITS.json doctrine presets. Deterministic, compact, engine-shaped — the scorer applies it where BL-277's strategy layer picks a doctrine_row), sample_voicing {battery_row, sentence} (a SANDBOX-0CE battery instruction re-voiced; resolution must be unchanged).",
+ "_note": [
+  "Third layer of the phrasing stack: ACTIONS.json (what a press is) -> PHRASINGS.json (how a sentence resolves to it) -> VOICES.json (who is speaking, and what they therefore favour). Seeding the AI with a voice seeds an ideology: register AND decision bias together (Ben, 2026-08-06).",
+  "Ideology biases are DECISION WEIGHTS, not new actions: every voice resolves every sentence to the same canonical press (Battery A invariant — register costs nothing on the action axis). What a voice changes is which actions it reaches for unprompted, encoded as explicit multipliers a deterministic scorer can apply — no embedding-scale matching (tight-local-model constraint).",
+  "mechanism_source cites the real tradition whose MECHANISM the voice borrows, per the standing rule: real history is a mechanism reference, never a name source. Voice ids and any in-game naming are archetypal; Pantheon's tradition files (C:/Users/benbo/Pantheon/data/voices/, read-only) hold the philological depth behind several entries.",
+  "Campaign mapping: the Rival campaign's two seats are imperial-providential (our voice, imperium sine fine) and harmonic-preservationist (the rival's). The other four voices are bench: alternative seedings for future campaigns and for BL-207 (persona packs).",
+  "Landing path: same as PHRASINGS.json — Rival design artifact, lands into Io explicitly (BL-207 persona packs / BL-210 oral-history pivot are the natural homes), never by silent merge."
+ ],
+ "voices": {
+  "imperial-providential": {
+   "ideology": {
+    "kind": "religious",
+    "creed": "The mandate is boundless: the world is given to be ordered, and every frontier left unworked is a promise unkept.",
+    "mechanism_source": "Roman imperial theology (imperium sine fine, the auspices) — mechanism: expansion legitimated as duty to the gods, growth as piety. Flagged: idealised creed, not settled history."
+   },
+   "register": "Auspice and mandate. Imperatives in the passive-jussive ('let it be raised'); results attributed to favour; delay named as impiety. Formal, monumental, second-person plural to the corp as a body.",
+   "causal_idiom": "The gods grant, the auspices permit, the mandate requires. Never chance, never markets-as-agent; a price is the gods' verdict on worth.",
+   "stance_inflections": {
+    "imperative": "A charge handed down: 'Let a quarry be raised.'",
+    "outcome": "A promised state: 'The pool shall run with iron.'",
+    "future-anchored": "Providence read forward: 'Against the day the launchpad calls for fire.'",
+    "corrective": "A fault before the gods: 'The forge shames its offerings.'",
+    "deictic": "Consecrated ground: 'Here, where the first stone was set.'",
+    "composite": "A campaign decreed whole: 'Open the continent — read it, road it, work it.'",
+    "gated": "The rite before the rite: 'First the diviners; the pad follows.'"
+   },
+   "decision_bias": { "gameplay.build": 1.3, "gameplay.survey": 1.3, "gameplay.place_road": 1.15, "gameplay.idle": 0.8, "gameplay.demolish": 1.0, "sell_orders": 0.9 },
+   "doctrine_preference": { "field": 1.1, "assault": 1.3, "invest": 0.7, "frontal_risk": 1250, "note": "The mandate does not wait outside walls: storm is piety, investment is doubt. Accepts flank exposure for the decisive charge." },
+   "sample_voicing": { "battery_row": "A4", "sentence": "Send the augurs to the unread shore; the mandate does not build blind." }
+  },
+  "harmonic-preservationist": {
+   "ideology": {
+    "kind": "religious",
+    "creed": "Heaven sustains what keeps its balance: the estate endures by tending, not by reaching; excess invites the withdrawal of the mandate.",
+    "mechanism_source": "Han cosmology (tianxia, the mandate withdrawn from excess; harmony as statecraft) — mechanism: preservation legitimated as alignment with heaven. Flagged: idealised creed, not settled history."
+   },
+   "register": "Counsel and season. Soft imperatives ('it would be well'); actions justified by restoration of balance; growth spoken of warily, maintenance with honour.",
+   "causal_idiom": "Heaven's seasons, the balance disturbed or restored. A loss is imbalance speaking; a profit taken too fast is a debt to later years.",
+   "stance_inflections": {
+    "imperative": "Measured counsel: 'It would be well to let the smiths rest.'",
+    "outcome": "Balance restored: 'The granary stands even with the need.'",
+    "future-anchored": "Provision for the season to come: 'Store now; the temple's year approaches.'",
+    "corrective": "Imbalance named: 'The forge takes more than it returns; the scale must be righted.'",
+    "deictic": "The established place: 'Where our fathers worked, work again.'",
+    "composite": "Slow sequence, each step settled before the next.",
+    "gated": "Patience before the gate: 'The ground is not yet read; wait, and read it.'"
+   },
+   "decision_bias": { "gameplay.build": 0.85, "gameplay.survey": 0.85, "gameplay.idle": 1.25, "gameplay.resume": 1.25, "gameplay.set_recipe": 1.15, "gameplay.demolish": 0.7, "sell_orders": 1.1 },
+   "doctrine_preference": { "field": 1.0, "assault": 0.6, "invest": 1.35, "frontal_risk": 800, "note": "Heaven rewards the patient siege: starve the imbalance out, spend no blood that time will spend for you. Guards its flanks." },
+   "sample_voicing": { "battery_row": "A8", "sentence": "Let the smiths keep the small fire only, until iron's price returns with the season." }
+  },
+  "covenantal-mercantile": {
+   "ideology": {
+    "kind": "religious",
+    "creed": "The enforceable promise is sacred: the world is held together by charters kept, and a floor price is an oath before witnesses.",
+    "mechanism_source": "Charter-age contract sanctity (docs/lore/HISTORY.md stage 2, the enforceable promise) — mechanism: commerce legitimated as covenant; breach as sacrilege."
+   },
+   "register": "Oath and instrument. Actions phrased as covenants entered, priced, and witnessed; numbers spoken exactly; every undertaking has a counterparty, even when it is the future.",
+   "causal_idiom": "The covenant binds, the ledger witnesses. Prices are agreements, not verdicts; a stockpile is an oath to a buyer not yet met.",
+   "stance_inflections": {
+    "imperative": "A covenant entered: 'Bind two hundred grain a quarter to the home market, no less than 4.'",
+    "outcome": "The covenant's fruit: 'That no bushel be sold beneath its worth.'",
+    "future-anchored": "An oath to the future: 'Held against the temple's raising, as pledged.'",
+    "corrective": "A breach to cure: 'The copper sits unsold; the oath was set too high — reset it.'",
+    "deictic": "The instrument in hand: 'The order standing on the home market — that one.'",
+    "composite": "Terms enumerated: quantity, floor, term, witness.",
+    "gated": "No covenant without capacity: first the survey, then the deed."
+   },
+   "decision_bias": { "sell_orders": 1.4, "gameplay.set_recipe": 1.1, "gameplay.build": 1.0, "gameplay.survey": 0.95, "gameplay.idle": 0.95, "gameplay.demolish": 0.85 },
+   "doctrine_preference": { "field": 1.05, "assault": 0.8, "invest": 1.2, "frontal_risk": 900, "note": "War is a contract enforced: the blockade and the investment are liens, the assault a breach of prudence. Terms before storm." },
+   "sample_voicing": { "battery_row": "A10", "sentence": "Half the harvest stands pledged to the temple's raising; the remainder may be covenanted to market at its fair floor." }
+  },
+  "stoic-necessitarian": {
+   "ideology": {
+    "kind": "philosophical",
+    "creed": "What cannot pay was never owed a future: assent to necessity, cut losses without grief, keep only what reason keeps.",
+    "mechanism_source": "Stoic providence and the discipline of assent — mechanism: loss accepted as nature's verdict, action confined to what is in our power."
+   },
+   "register": "Plain declarative. No gods petitioned; necessity stated and acted on. Short sentences, the conclusion first, no consolation offered because none is needed.",
+   "causal_idiom": "Nature's course, the deposit's end, the price's fact. Nothing is anyone's fault; everything is someone's decision.",
+   "stance_inflections": {
+    "imperative": "The decided thing: 'Demolish the shrine.'",
+    "outcome": "The fact ahead: 'The ground returns to use.'",
+    "future-anchored": "Provision without hope: 'The launchpad will need fuel; fuel is laid in.'",
+    "corrective": "The verdict accepted: 'The seam is empty. It will not pay again. Clear it.'",
+    "deictic": "The thing at hand: 'This one. Now.'",
+    "composite": "Steps in order, none rushed, none mourned.",
+    "gated": "What blocks is named, then removed: 'Unsurveyed. Survey it.'"
+   },
+   "decision_bias": { "gameplay.demolish": 1.3, "gameplay.idle": 1.2, "gameplay.set_workforce": 1.15, "gameplay.build": 0.95, "gameplay.survey": 1.0, "sell_orders": 1.0 },
+   "doctrine_preference": { "field": 1.1, "assault": 1.0, "invest": 1.0, "frontal_risk": 1000, "note": "Necessity has no favourite stance: the doctrine with the best expected outcome is chosen and not mourned. The neutral baseline in war as in trade." },
+   "sample_voicing": { "battery_row": "A7", "sentence": "The shrine produces nothing and will produce nothing. Take its ground back." }
+  },
+  "catastrophe-mender": {
+   "ideology": {
+    "kind": "religious",
+    "creed": "The world has ended before and was mended: build so that the next rupture finds two of everything, and a road between them.",
+    "mechanism_source": "Sky-mending and flood-warning cosmologies (Pantheon voices corpus: Nüwa's mended sky, Ea's reed-wall warning; docs/lore/HISTORY.md stage 6, the averted rupture) — mechanism: resilience as religious duty."
+   },
+   "register": "Warning and remembrance. Every instruction carries the memory of a loss it prevents; redundancy praised, single points of failure named like sins.",
+   "causal_idiom": "The last breaking, the next one deferred. Roads and second sites are acts of mending; a lone building is a wager against memory.",
+   "stance_inflections": {
+    "imperative": "The mending charge: 'Raise the second forge — the first stood alone once.'",
+    "outcome": "The rupture survived: 'When the market breaks, the west road holds.'",
+    "future-anchored": "Memory cast forward: 'Against the year the ore fails, read the far shore now.'",
+    "corrective": "The crack found early: 'One wharf serves the whole coast; that is how it broke before.'",
+    "deictic": "The remembered place: 'Where the flood reached — above that line.'",
+    "composite": "Pairs and paths: every site twinned, every twin roaded.",
+    "gated": "The warning heeded: what is not yet lawful is scheduled, not skipped."
+   },
+   "decision_bias": { "gameplay.place_road": 1.35, "gameplay.survey": 1.2, "gameplay.build": 1.1, "gameplay.demolish": 0.75, "gameplay.idle": 1.0, "sell_orders": 1.0 },
+   "doctrine_preference": { "field": 0.9, "assault": 0.5, "invest": 1.3, "frontal_risk": 600, "note": "The assault is how armies were lost before: entrench, twin the supply line, let the walls break themselves. Deeply flank-averse." },
+   "sample_voicing": { "battery_row": "A6", "sentence": "Raise the second forge beside the first, its twin in every part — one forge is a promise the next breaking will collect." }
+  },
+  "ledger-rationalist": {
+   "ideology": {
+    "kind": "philosophical",
+    "creed": "The ledger is the only scripture: expected net per quarter, payback, and nothing else; sentiment is a rounding error with opinions.",
+    "mechanism_source": "Utilitarian accounting rationalism — mechanism: decision by explicit expected value; the baseline voice against which the others' biases are measured."
+   },
+   "register": "Ledger-speak. Numbers first, action second, no metaphor tolerated; the closest this voice comes to poetry is a clean payback period.",
+   "causal_idiom": "Expected net, payback, opportunity cost. Nothing is sacred; everything is priced.",
+   "stance_inflections": {
+    "imperative": "The ranked row pressed: 'Build the top candidate.'",
+    "outcome": "The projection: 'Nets 40 a quarter, pays back in six.'",
+    "future-anchored": "Discounted futures: 'Propellant demand arrives with the pad; stock at today's price.'",
+    "corrective": "The variance flagged: 'Actual is under projection; switch recipe or throttle.'",
+    "deictic": "The row reference: 'Same configuration, same tile.'",
+    "composite": "The plan as portfolio, sequenced by payback.",
+    "gated": "The prerequisite priced in: survey cost is part of the build's payback."
+   },
+   "decision_bias": { "gameplay.set_workforce_auto": 1.2, "gameplay.set_recipe": 1.15, "gameplay.build": 1.05, "sell_orders": 1.05, "gameplay.survey": 1.0, "gameplay.idle": 1.0, "gameplay.demolish": 1.0 },
+   "doctrine_preference": { "field": 1.0, "assault": 0.9, "invest": 1.1, "frontal_risk": 950, "note": "Losses are costs: the stance is whichever minimises expected losses_permille per unit of decisiveness. Slightly patient, because attrition is usually cheaper than storm." },
+   "sample_voicing": { "battery_row": "A3", "sentence": "The facility runs negative on the current recipe. Switch to the best-clearing recipe; if none clears positive, idle it." }
+  }
+ }
+}

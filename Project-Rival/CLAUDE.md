@@ -75,6 +75,33 @@ into Rival because AI-thinking design (the per-action NL-phrasing sub-dictionary
 two silently diverge, re-pull if Io's copy moves upstream. `ACTIONS.md`/`ACTIONS_INDEX.json`
 alongside it are generated snapshots, not kept in sync automatically.
 
+**`docs/ai/PHRASINGS.json`**
+The NL-phrasing sub-dictionary (2026-08-06) — per gameplay action, a rich set of *sentences* with
+their paths back to the canonical press: seven stances (imperative / outcome / future-anchored /
+corrective / deictic / composite / gated), arg binds, and `via` routing. Each reading doubles as a
+training pair for the compressed local opponent (BL-279 corpus leg). Lands into Io explicitly, never
+by silent merge.
+
+**`docs/ai/VOICES.json`**
+The voice dictionary (2026-08-06) — six voices, each mapped to an ideology (religious or
+philosophical): creed, register, causal idiom, per-stance inflections, and an explicit
+`decision_bias` weight table the deterministic scorer can apply. Seeding a voice seeds an ideology —
+register and decision bias together. Campaign seats: imperial-providential (ours) vs
+harmonic-preservationist (the rival's); four bench voices for BL-207 (persona packs). Real
+traditions are cited as mechanism sources only, never as Io names.
+
+**`docs/ai/UNITS.json`**
+The unit roster dictionary (2026-08-07, military design session) — the noun half of the unit
+dictionary: four era bands, 17 unit types, 7 doctrine presets over BL-272's `doctrine_row` shape,
+availability derived from endowment + industrialisation (never research). Era-keying lives here
+only; verbs (BL-314, design-owed) stay era-invariant. Lands into Io with BL-274 (era rosters),
+never by silent merge.
+
+**`docs/ai/SANDBOX-0CE.md`**
+The 0 CE sandbox battery — era-voiced instructions (register drift, the eighth axis) tested against
+PHRASINGS.json's resolutions. Battery A (buildings) runnable now over the MCP seam; Battery B (units)
+design-owed, blocked on BL-271 (Era −1 sim) / BL-274 (era-keyed rosters).
+
 ## Response style
 
 Match Project Io's register: terse, max 2 sentences per paragraph, short clauses.

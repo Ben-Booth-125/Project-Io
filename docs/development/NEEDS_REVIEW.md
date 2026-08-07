@@ -23,156 +23,76 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*69 entries — 11 open, 58 resolved.*
+*77 entries — 6 open, 71 resolved.*
 
 ---
 
 ## Open
 
-### NR-054 — The 'ancient tech tree' ask was delivered as a derived ladder, not a player-facing research tree
-*decision taken on your behalf · raised 2026-08-04 · from BL-296 (ancient tech ladder) — remote mockup session*
+### NR-072 — NL-phrasing sub-dictionary designed in Rival: seven-stance readings over the gameplay family, plus a 0 CE register battery
+*decision taken on your behalf · raised 2026-08-06 · from Rival session with Ben, 2026-08-06 — Ben directed pulling ACTIONS.json into Rival as the AI-thinking home and authoring a rich sentence dictionary, not aliases*
 
-Ben asked to 'mock up an ancient tech tree'. BL-274 (era-keyed rosters) records his standing position that a player-facing tech tree only works in a 1900s+ start, and that the ancient side is derived from endowment, not researched. The mockup keeps the tree STRUCTURE (nodes, prereqs, gates) as sim-consumed data, but no nation ever chooses a node: acquisition is invention-at-the-frontier + diffusion + endowment gates, per the settlement pass's endowment-not-virtue mechanism.
+Authored Project-Rival/docs/ai/PHRASINGS.json — a per-action sub-dictionary of natural-language readings for all 11 gameplay entries (33 readings). Each reading is {sentence, stance, binds, via, resolution}: a sentence standing at a deliberate deviation from the canonical press, with its explicit path back. Stance taxonomy settled in-session: imperative, outcome, future-anchored, corrective, deictic, composite, gated — future-anchored and gated are the same precondition relation seen from opposite ends, both carrying a via field routing through other action ids. Register drift (ancient/divine idiom) is held out as an eighth axis in Project-Rival/docs/ai/SANDBOX-0CE.md, a runnable Battery A (buildings, over the MCP seam) plus a design-owed Battery B (units, blocked on BL-271 Era -1 sim / BL-274 era-keyed rosters — Io has no unit actions today). ACTIONS.json was mirrored into Project-Rival/docs/ai/ with provenance notes; Io’s copy untouched.
 
-**Why it matters.** If Ben actually wanted a clickable ancient research tree (a Paradox-style pre-1960 layer), this reading forecloses it. Recorded so the framing can be overturned before BL-271 (Era -1 sim) builds against it.
+**Why it matters.** This is the fourth leg of the word interface (press/read/write/PHRASING) and doubles as labelled SFT material for the BL-279 corpus — the compressed local opponent (no cloud) needs the dictionary to carry the reasoning. Decisions taken on Ben’s behalf: readings live in a sibling file keyed by action id rather than injected into ACTIONS.json (keeps the mirror byte-comparable for re-pulls); pilot scope is the gameplay family only.
 
-> **Recommendation:** Keep the derived reading — it is consistent with BL-274's recorded stance and with how BL-218 already derives industrialisation timing. A player-facing rendering can be added later as a codex view without changing the data.
+- Ratify the stance taxonomy and sibling-file shape, then file the Io-landing backlog item (readings field vs sibling file in Io is Io’s call)
+- Run Battery A over the MCP seam and let instructive fails grow PHRASINGS.json before landing anything
+- Redirect the shape before more families are authored
 
-*Files: `docs/research/ANCIENT_TECH_LADDER.md`*
+### NR-073 — Battery A (0 CE phrasing test) run over the live MCP seam: 10/10 action resolution; BL-293 order-book gap measured at 20% of a basic instruction set
+*observation · raised 2026-08-06 · from Rival session 2026-08-06 — blind resolver (cloud, corpus-generation role) over ProjectIo --serve via tools/mcp/server.js, player corp discovered via the CORPS opcode*
 
-### NR-055 — Six ladder bands vs BL-274's four-band lean — grouped, not contradicted, but Ben has not confirmed
-*decision taken on your behalf · raised 2026-08-04 · from BL-296 (ancient tech ladder) mockup vs BL-274 (era-keyed rosters) open question 1*
+Ten era-voiced building instructions (Project-Rival/docs/ai/SANDBOX-0CE.md Battery A) resolved blind against ACTIONS_INDEX.json + the stance taxonomy, grounded on the live blackboard (corp 30318). All ten resolved to the expected action id; two stance labels diverged defensibly (stance is a set, not a scalar — PHRASINGS.json amended). Full record: Project-Rival/annals/battery-0ce-A-run1.md.
 
-BL-274 leaned to four roster era bands (classical / medieval / gunpowder / industrial). The ladder mockup uses six (T1 Classical, T2 Post-Classical, T3 High Medieval, T4 Gunpowder, T5 Industrial, T6 Machine Age), because the economic divergence that answers 'what differs by 1960' happens across the T4/T5/T6 split the four-band lean merges. Proposed reconciliation: roster bands are a coarser grouping of the same six-band spine, so the two items share one timeline.
+**Why it matters.** Two of ten basic instructions resolve cleanly to place_sell_order, which has no corp_verb — BL-293 (order book unreachable by command) is now a measured 20% hole in an era-basic instruction set, strengthening its case. Also: the IO-EARTHLIKE-TESTS gap list is stale on corp discovery — --serve now answers a CORPS opcode.
 
-**Why it matters.** Both items author data against a band count; whichever lands first sets the de-facto spine. If Ben prefers four bands everywhere, T4/T5 and T5/T6 merge and the 1960 capacity-spread analysis (3-4 bands) must be restated in coarser units.
+- Raise BL-293 (order book verbs) priority on the strength of the 20% measurement
+- Leave BL-293 as sequenced; note the measurement on the item
+- No action — observation only
 
-> **Recommendation:** Six-band spine, four-band roster grouping — divergence resolution for the economy, authoring economy for the rosters.
+### NR-074 — Voice dictionary authored in Rival: six ideology-mapped voices with explicit decision-bias weights
+*decision taken on your behalf · raised 2026-08-06 · from Rival session 2026-08-06 — Ben directed a voice dictionary where each entry maps to an ideology, seeding the AI with a religious or philosophical voice*
 
-*Files: `docs/research/ANCIENT_TECH_LADDER.md`*
+Authored Project-Rival/docs/ai/VOICES.json: six voices (imperial-providential, harmonic-preservationist, covenantal-mercantile, stoic-necessitarian, catastrophe-mender, ledger-rationalist), each carrying creed, register, causal idiom, per-stance inflections over the PHRASINGS taxonomy, an explicit decision_bias multiplier table, and a re-voiced Battery A sample whose resolution is unchanged. Campaign seats mapped: imperial-providential is our voice, harmonic-preservationist the rival’s; the other four are bench for BL-207 (persona packs).
 
-### NR-058 — The v0.1.6 generation-visibility minor: the shape chosen for your one-line instruction
-*decision taken on your behalf · raised 2026-08-04 · from Ben, 2026-08-04, mid-session: "Add a release before v0.2.0 for a pass on generation visibility... items in the backlog about visualising the world at each step - we haven't yet done that... reviewing [UI alignment] towards the end of v0.1.x."*
+**Why it matters.** Decisions taken on Ben’s behalf: (1) ideology = register + decision bias together, with bias as compact explicit multipliers on the urgency-importance scoring (AI_OPPONENT.md § 6a) so a deterministic scorer and a tightly compressed local model can both consume it — no embedding-scale matching; (2) the Battery A invariant is load-bearing: every voice must resolve every sentence to the same canonical press, bias changes only what a voice reaches for unprompted; (3) real traditions cited as mechanism sources only, per the naming rule — Pantheon voices corpus consumed read-only. Natural Io homes when landing: BL-207 (persona packs), BL-210 (oral-history pivot).
 
-The release is numbered v0.1.6 — the end of the v0.1.x band, before v0.2.0, which also satisfies "towards the end of v0.1.x" for the UI review. Items filed: BL-303 (Generation Ledger build — the window GENERATION_LEDGER.md designed but nothing carried), BL-304 (field-overlay lenses for the generation intermediates), BL-305 (nation/corp generation visibility, design-owed — the political steps are the one part of generation with no visibility designed anywhere). BL-098 (UX user-story review) retargeted v0.1.1 -> v0.1.6 as the UI-alignment review vehicle. NOT retargeted: BL-256 (generation globe) and BL-211 (history ledger) keep their existing goals — they are siblings of this theme, not children, and pulling landed-or-versioned work into a new minor re-litigates settled sequencing.
+- Ratify the shape and the six-voice bench
+- Adjust the bias tables (numbers were set by judgement, not measurement — a battery run per voice would calibrate them)
+- Fold decision_bias out and keep voices register-only
 
-**Why it matters.** Three calls were interpretation rather than instruction: the v0.1.6 number (you said "before v0.2.0", not which slot), BL-098 as the review vehicle (you said "reviewing that", not which item), and the three-item decomposition of "each step" (physical steps had designed visibility; only the ledger build, the lenses, and the political steps were genuinely missing). Each is cheap to reverse.
+### NR-075 — Cut audit executed: ten items closed as already-landed or settled-in-design
+*decision taken on your behalf · raised 2026-08-07 · from Rival session 2026-08-07 — Ben asked for a cut audit and approved executing bands 1-2*
 
-> **Recommendation:** No action needed unless a call reads wrong — the likeliest candidate is BL-098 as the review vehicle, if you meant a fresh dedicated review rather than the standing user-story one.
+Flipped to complete with dated closure notes, prose archived to the cold store: BL-267 (GPU/multicore perf — re-measure gate passed, residual owned by BL-269), BL-312/BL-313 (header chrome — landed in 9ecbbcf, never flipped), BL-286 (logistics enum — shipped, follow-ons owned by BL-295), BL-205 (corp chat log — self-declared inactive, C-route now the BL-278/BL-279 arc), BL-131 (market destruction — dissolved into BL-263 dormancy), BL-189 (coastal defense — answered free by BL-157 tile position), BL-169 (solar geometry — feasibility note delivered in-item), BL-051 (tile-gen refinements — split to BL-040/BL-210, cosmetic residue), BL-054 (nation behaviour — redistributed to BL-155/BL-158/BL-284, actor residual is BL-094 v0.3.0 work). Incidental: archive_designs.js was also run and swept three already-terminal items (BL-287, BL-307, BL-310) into the cold store.
 
-*Files: `docs/development/ROADMAP.md`, `docs/development/backlog.json`*
+**Why it matters.** Ben approved the bands, but each per-item closure case is an agent judgement — recorded so any single closure can be overturned rather than becoming silent precedent. BL-131, BL-189, BL-051 and BL-054 carry their intent into named heir items; if any heir is later cut, the intent needs a new home.
 
-### NR-061 — The word interface could not answer "who am I?" — a CORPS opcode and list_corps tool were added (Light mode)
-*decision taken on your behalf · raised 2026-08-04 · from BL-306 (text Rival harness) — io_smoke_test.js, the first agent-shaped consumer of the MCP seam.*
+- Ratify all ten closures
+- Reopen any item whose closure case reads wrong (each note names its heirs)
 
-The smoke test could not obtain any corporation entity id through the seam: get_blackboard and issue_command both require a corp id, but nothing on the protocol enumerates corps or identifies the player. Corp entity ids in the generated world are non-obvious (the player corp landed at 30318). Fixed by extending run_serve with a CORPS opcode (one JSON line per corp: id, name, is_player, home_nation, then END) and mirroring it as a list_corps MCP tool. Read-only export, two files (src/main.cpp, tools/mcp/server.js), no determinism surface — taken as Light mode without a requirement group.
+### NR-076 — Band 3 scope calls pending, and the Era −1 arc has no roadmap home
+*question · raised 2026-08-07 · from Rival session 2026-08-07 — cut-audit findings Ben has not yet ruled on*
 
-**Why it matters.** This touches the BL-278 (Io MCP server) seam, whose design is otherwise settled prose — the tool roster there now differs from what AI_OPPONENT.md § 10 describes (six tools, not five). If you would rather the discovery leg live elsewhere (e.g. in the blackboard itself as a self-identity fact), the opcode is easy to move; the smoke test is its only consumer so far.
+Three deliberate scope decisions remain from the audit: (1) BL-160 (auto exchange policy) — cut and re-scope BL-161 (exchange allow/deny) to stand alone; (2) BL-207 (persona packs) — cut or park at F behind BL-279 local-model evidence; (3) the generation-flavour group — cut BL-209 (molecular trace) and BL-289 (sky-event extinctions) outright, keep BL-300 (myth generation) and BL-301 (GOE calibration) only as notes. Separately: the Era −1 arc (~25 open items, most recent commits) appears nowhere in ROADMAP.md, whose arc section stops at v0.4.0.
 
-- Keep list_corps as the sixth tool; amend AI_OPPONENT.md § 10's roster when BL-306 lands.
-- Fold self-identity into the blackboard export (a who-am-i fact per BL-206) and retire the opcode.
+**Why it matters.** All three Band 3 calls hinge on BL-094’s military-reach test and are Ben’s to make. The roadmap gap is the larger issue: until the Era −1 arc has a named version band, committed work and brainstorm residue are indistinguishable there — which is where the next round of cut candidates hides.
 
-> **Recommendation:** Option 1. Enumeration serves the multi-agent future (a diplomacy campaign needs to see all seats, not just its own), and the blackboard staying visibility-honest argues against it carrying a world-level corp roster.
+- Rule on the three Band 3 cuts
+- Amend ROADMAP.md to name the Era −1 arc and its version band
+- Defer both until after the military design session
 
-*Files: `src/main.cpp`, `tools/mcp/server.js`, `Project-Rival/tools/harness/io_smoke_test.js`*
+### NR-077 — Military design session executed: six rulings filed, roster dictionary and doctrine-preference field authored
+*decision taken on your behalf · raised 2026-08-07 · from Rival session 2026-08-07 — Ben ruled the six session questions by form; execution details were delegated*
 
-### NR-062 — Ladder store schema calls taken while delivering BL-307
-*decision taken on your behalf · raised 2026-08-04 · from BL-307 (ladder data store) — filed and delivered on Bens backlog-then-deliver instruction during the constellation review.*
+Ben’s rulings: roster-now-verbs-design-owed; unit-grain verbs; tile position canonical; era-keying roster-only; doctrine-preference as the voice bias shape; BL-094’s conflict spine filed now. Executed as: UNITS.json authored in Project-Rival/docs/ai (4 era bands, 17 unit types, 7 doctrine presets); doctrine_preference added to all six VOICES.json voices; BL-274 and BL-157 amended with the rulings; BL-314 (unit verb family, design-owed, B) and BL-315 (governing-body conflict spine, design-owed, A, v0.3.0) filed; BL-094 updated to point at BL-315.
 
-Four calls were interpretation: (1) gate and diffusion are ARRAYS (ore_q+fuel becomes two atoms; T6-ME-01 is practice+artifact) rather than strings with separators. (2) The density-slice objects — the three Institutions quests (Enforceable Promise / Disciplined Sovereign / Lettered Public), Sovereign Doctrine and Fuel Doctrine — are included as STANDING objects with provenance density-slice, not left as doc-only examples; the grain is settled at medium so the worked slices read as the webs first authored regions. (3) Placeholder thresholds (X, N) are kept verbatim as strings until tuning. (4) The neighbourhood count drift the lint caught (19 techs / 27 objects vs the prose 20 / ~28) was fixed in both the doc and BL-296s design prose, dated.
+**Why it matters.** Delegated judgement calls inside the execution: (1) four era bands taken as ratified from BL-274’s lean since Ben left the notes box empty; (2) all type_power_mod and doctrine_preference numbers set by judgement, to calibrate against BL-271 sweep evidence; (3) horses resolved as the grassland-share named substitution; (4) naval kept strategic-only with no naval battle verb — flagged in UNITS.json because players and agents will expect one; (5) BL-315 scoped thin with promotion gated behind BL-094’s sequence.
 
-**Why it matters.** If the density-slice trio was meant as illustration only, those five objects should carry a sketch flag or come out; everything downstream (the sim, any codex UI) will otherwise treat them as authored content.
-
-> **Recommendation:** Keep all four as taken — provenance already lets a consumer filter density-slice objects if wanted.
-
-*Files: `docs/research/ancient_tech_ladder.json`, `tools/session/ladder_lint.js`, `docs/research/ANCIENT_TECH_LADDER.md`*
-
-### NR-063 — Industrial-neighbourhood calls taken while working the rings T4-T5 region
-*decision taken on your behalf · raised 2026-08-05 · from BL-296 (ancient tech ladder) - Ben: 'another pre-game tech tree centred around the industrial revolution, to go alongside the pre-game early Civilisation tech tree'.*
-
-Five calls were interpretation. (1) SCOPE: 'another tech tree' was read as a second worked REGION of the one shared web (rings T4-T5 and the T4/T5 crossings), not a second web - the settled constellation geometry is one object, and a per-era viewer tab can still present the region separately. (2) FUEL DOCTRINE MOVED from ring T5 to ring T4 so the new Materials vertex (The Cheap Ton) can require it taken, repeating the ring-1 Written-Ledger interlock; the fuel choice genuinely predates the industrial band. (3) SEVEN NEW TECHS were added to the band tables to bring rings T4-T5 to medium grain (T4 Medicine had no node at all): Coal Haulage & Urban Fuel, Patent Grants, Preventive Inoculation, High-Pressure & Compound Engines, Framed Construction & Cement, Soil Chemistry & Fertiliser Trade, General Incorporation. (4) TELEGRAPH gained a Railway prereq - rail signalling drove the network - which is a change to an already-authored node, flagged with an `amended` field in the store. (5) A NEW RULE was adopted rather than proposed: fork count scales with the band's divergence (ring 1 carries one keystone, this region carries four), which is why two new keystones - Labour Doctrine and Works Doctrine - were authored in one region.
-
-**Why it matters.** Call 1 decides whether there is one tech object or two, which every later surface inherits. Calls 2 and 4 edit objects an earlier pass authored - if the density slices were meant to be frozen examples, both should be reverted. Call 5 sets an authoring rule the remaining three crossings will be worked under.
-
-> **Recommendation:** Keep all five. The store records provenance ('industrial-pass') and `amended` on both edited objects, so any of them can be reverted by inspection rather than archaeology.
-
-*Files: `docs/research/ANCIENT_TECH_LADDER.md`, `docs/research/ancient_tech_ladder.json`, `tools/session/ladder_lint.js`*
-
-### NR-064 — Works Doctrine may gate corporation generation - and does the industrial region get its own viewer tab?
-*question · raised 2026-08-05 · from BL-296 (ancient tech ladder) SS The industrial neighbourhood - surfaced while authoring the region's keystones.*
-
-Two open questions from the same pass. (a) WORKS DOCTRINE (State Arsenal vs Private Works, ring T5 Materials) says whether a 1960 nation's heavy plant is the sovereign's or is chartered and owned. If that is load-bearing, it is a real dependency from the ladder into CORPORATION_GENERATION.md's nation assignment and into BL-094 (governing-body pivot): a State-Arsenal nation may be one where a specialist space-interested corporation cannot be chartered at all, which changes who the player can be. (b) SURFACE: the F9 tech-tree mock has one tab per era; this region is one ring band inside Era -1, not an era. Either it earns an 'Era -1 - Industrial' tab beside Antiquity, or Antiquity is one web the reader zooms within.
-
-**Why it matters.** (a) is the difference between a flavour fork and a generation input - if it is the latter it should be a filed backlog item, not a note in a research doc. (b) decides whether the era strip is an ERA selector or a REGION selector, which is easier to settle before a second tab exists than after.
-
-- (a) Flavour only - Works Doctrine tints the 1960 economy, corporation generation ignores it.
-- (a) Generation input - file an item wiring the doctrine into nation assignment and the charter terms.
-- (b) Its own tab - the strip becomes a region selector, one per worked neighbourhood.
-- (b) One Antiquity web - the strip stays an era selector and the reader zooms.
-
-> **Recommendation:** (a) Generation input, filed as its own item once BL-296 lands - it is the most campaign-relevant object the ladder has produced and it costs nothing to honour at generation time. (b) One Antiquity web; the strip means eras, and a region is a zoom, not a tab.
-
-*Files: `docs/research/ANCIENT_TECH_LADDER.md`, `docs/generation/CORPORATION_GENERATION.md`, `src/ui/tech_tree_panel.cpp`*
-
-### NR-066 — Retirement breaks the monotonic unlocked set - three calls, plus whether pre-game effects ever fire
-*question · raised 2026-08-05 · from BL-156 (tech system early design) / BL-296 - raised by Ben's category C, 'retire buildings or units so they cannot be built when a qualitatively better option becomes available'.*
-
-BL-156 settled that the unlocked set is MONOTONIC: techs complete, never un-complete, so the set only grows and there is no revocation path to get wrong. Category C breaks that deliberately. The sanctioned mechanism exists - BL-087's availability windows, a predicate over the same set rather than a different structure - but three questions come with it and none are answered anywhere. (1) GRANDFATHERING: what happens to already-built content? Grandfather (it runs, cannot be re-placed) or force obsolescence (it degrades or must be replaced)? (2) AVAILABILITY VS ECONOMICS: a charcoal smelter nobody builds because coke is cheaper has retired itself; explicit retirement is only needed where the game wants to STOP the player, not out-price them. (3) REVERSIBILITY: under blockade a T5-capacity nation may need the T3 route back, and the ladder's own diffusion axis says capacity can be destroyed but awareness cannot. FOURTH, separate: do pre-game effects ever FIRE? On the ancient layer nobody clicks, so the ladder's effects may only be read at the 1960 handoff - making them a DESCRIPTION of the capacity band rather than events, with only the campaign tree's effects firing live.
-
-**Why it matters.** (1)-(3) decide whether retirement is a UI rule, an economic outcome, or a simulation event - and the answer changes what BL-087 has to build. (4) decides whether the two trees share one effect runtime or only one vocabulary, which is the difference between a shared system and a shared spreadsheet.
-
-- Grandfather + retire by window, explicit retirement mostly on units and doctrine branches (the doc's lean).
-- Force obsolescence - retired content degrades, making the turnover felt rather than merely offered.
-- Price-only retirement - no explicit mechanism; better options simply dominate.
-- (4) Ladder effects are descriptive; only campaign-tree effects fire.
-- (4) One effect runtime, with the ladder's effects evaluated by the BL-271 year-tick sim.
-
-> **Recommendation:** Option 1 for (1)-(3): grandfather, retire by window not erasure, and use explicit retirement sparingly - for buildings and recipes, price is usually the better retirement. For (4), lean descriptive: it keeps the derived/clicked distinction the whole ladder rests on, and BL-271 can promote it later without rework.
-
-> **RESOLVED.** PARTIAL (Ben, 2026-08-05): question (1) settled on the VISIBILITY axis - obsolete content is NOT RENDERED AT ALL ('there's no use for a player to see water mill if they will never build it'). No greyed row, no struck-through entry: the absent-not-disabled rule (BL-156, BL-229) extended to the far end of the lifecycle. His Martian-water-mill aside adds the constraint that OBSOLESCENCE IS CONTEXTUAL, not global - a mill obsolete on a 1960 homeworld is not obviously obsolete on a body where nothing better runs - so retirement is a per-context predicate, which is what a BL-087 availability window already is. Rule recorded: hide what this player cannot build HERE, not what the tech tree has moved past. STILL OPEN: whether an already-built obsolete building keeps running (grandfathering, as distinct from whether it is re-placeable), question (2) availability-vs-economics, question (3) reversibility under blockade, and question (4) whether pre-game effects ever fire.
-
-*Files: `docs/research/TECH_EFFECTS.md`, `docs/research/ancient_tech_ladder.json`, `docs/development/backlog.json`*
-
-### NR-067 — Era 1 draft introduces a seventh condition primitive: the deed (a tangible act, not a state)
-*decision taken on your behalf · raised 2026-08-05 · from BL-087 (filter system / Era 1 content) - Ben, 2026-08-05: the Era 1 tree 'will be the first tech tree to gate keystones via quests, i.e. tangible actions done in game'.*
-
-The existing condition vocabulary (ERA1_TECH_LANDSCAPE.md, carried into BL-156's condition_set) is entirely STATE: research, structure, stockpile, market, surplus, era are predicates sampled at a tick, each of which can be true today and false tomorrow. None can express 'you did this'. The draft adds a seventh primitive - `deed` {subject, scope, count, recorded} - a one-time event that fires at a tick and stays true. All four Era 1 keystones are gated on deeds rather than thresholds: Ten Flights, The First Tank, The First Truss, The Empty Shift. Also drafted on Ben's behalf, pending his node review: five sectors (Launch / Volatiles / Mobility / Yards / Extraction) x three rings (Reach / Foothold / Industry), Power-Automation kept as a standing line rather than a sector, ~45 objects, and four binary keystone forks each keyed to a different axis (cadence, chemistry, geometry, labour).
-
-**Why it matters.** A deed is a new serialised primitive - a flag plus a tick - so it touches the save format and BL-156's condition_set shape, which is settled. It is cheap and monotonic, but it is an addition to a closed vocabulary and should be Ben's call, not mine. If it is rejected, keystone gating falls back to structure + stockpile combinations, which express the shopping list but not the act.
-
-- Adopt `deed` as a seventh condition primitive.
-- Fake it with structure + stockpile predicates - no new primitive, weaker expression.
-- Adopt it only for keystones, keeping ordinary techs on state conditions.
-
-> **Recommendation:** Adopt it (option 1 or 3). It is monotonic, deterministic and trivially serialised, and it is the only way the tree can ask for an ACT rather than a balance sheet - which is what the whole framing asks for. Four review questions carried in the doc: whether four keystones is right, whether a deed is a world first or a personal one, whether rivals see your deeds, and whether an unfired deed hides its keystone or shows it locked.
-
-*Files: `docs/research/ERA1_TECH_LANDSCAPE.md`, `docs/development/backlog.json`*
-
-### NR-068 — Red herrings need a quantity: Alarm as the second per-nation scalar beside BL-223's Ceiling
-*decision taken on your behalf · raised 2026-08-05 · from BL-087 / BL-223 - Ben, 2026-08-05: 'can we put in little red herrings that make Era 1 failure (WW3) more likely... more advanced does not mean better... the player must be skilled at avoiding danger, in each dimension of play'.*
-
-Red herrings with nothing to trigger are flavour, so the draft adds the quantity they feed. Taking BL-223's settled discipline verbatim (the deterrence ceiling is a per-nation SCALAR, not a nuclear-equivalent object), the model is TWO per-nation scalars: CEILING (BL-223's, unchanged - restraint carried from the averted rupture) and ALARM (new - how threatened a nation feels, moved by others' VISIBLE capability, severed trade ties, posture and domestic instability). The seeded Era-event date decides WHEN the rupture is tested, not the outcome: aggregate Alarm above aggregate Ceiling means it goes hot and Era 1 fails, with the event's selective destruction landing on the orbital and heavy-industrial assets the space programme needed. Seven herring kinds drafted (escalator, legibility trap, interdependence severer, brittle optimisation, contextual dud, tempo trap, domestic destabiliser), one per dimension of play, plus three mitigation nodes and one INVERSE herring (Hardened Dispersed Basing looks aggressive and is stabilising, so 'menacing' cannot become the tell).
-
-**Why it matters.** Alarm is a new per-nation scalar and therefore new serialised state, and the rupture check is a new deterministic resolution point at the Era boundary - both sit inside BL-223's owed reconciliation. If Ben wants the future rupture to stay a pure seeded event with no player input, this whole design is out and the herrings become flavour. It also load-bears on trade: interdependence as the cheapest Alarm suppressant is what makes the Trade pillar defensive, which is a claim about the game's shape, not just a tuning knob.
-
-- Adopt Alarm as a per-nation scalar tested against Ceiling at the seeded date (the draft).
-- Pairwise alarm (you can frighten one neighbour and reassure another) - truer, costs N^2 state.
-- Keep the future rupture a pure seeded event; herrings become flavour with no mechanical bite.
-
-> **Recommendation:** Option 1. It reuses BL-223's own scalar discipline, stays deterministic (seeded date, deterministic threshold, visible countdown), and it is the only version where 'skilled at avoiding danger' means anything. Four questions carried in the doc: per-nation vs pairwise, whether rivals' Alarm is visible, whether the rupture can be a partial failure, and whether Era 1 failure ends the campaign or delays it (lean: delays, expensively).
-
-*Files: `docs/research/ERA1_TECH_LANDSCAPE.md`, `docs/development/backlog.json`*
-
-### NR-069 — Ben's 'race the player' answer for first_footing leans the Era 1 tree's deed-scoping question toward world-scoped keystone deeds
-*observation · raised 2026-08-06 · from Strategy-library design session (docs/ai/STRATEGIES.md) - Ben's elicitation answers, 2026-08-06.*
-
-The Era 1 tree draft left deed scoping open (its Q2: are keystone deeds world firsts or per-corporation?). In the strategy session Ben approved the first_footing seed card - the rival contests firsts - which only exists if deeds are world-scoped: a race needs a single trophy. Recorded so the tree review sees the lean it has already half-taken; the tree doc's Q2 is not formally resolved by this.
-
-**Why it matters.** World-scoped deeds change the keystone experience for every corporation: losing a race means your doctrine fork opens on the winner's schedule (or closes). If Ben wants deeds personal after all, ST-10 (first_footing) dies with that answer, and the strategy doc says so on the card.
-
-> **Recommendation:** Resolve tree Q2 as 'world-scoped for the four keystone deeds, personal for smaller deeds' (the tree draft's own lean), which makes both docs consistent.
-
-*Files: `docs/ai/STRATEGIES.md`, `docs/research/ERA1_TECH_LANDSCAPE.md`*
+- Ratify the execution
+- Adjust the authored numbers (power mods, doctrine preferences, band boundaries)
+- Reverse any delegated call — each is one field or one row
 
 ---
 
@@ -1030,6 +950,32 @@ STILL OPEN AND NOT DECIDED HERE: BL-094 has no version_goal (the NR-045 question
 
 > **RESOLVED.** ACCEPTED (Ben, 2026-08-04, bulk): "I'm happy to accept what's just flagged as 'Ben should see this', I was watching the previous session." The forward-looking shape of the pivot docs stands. The stale "14 nations" count in BL-094's design got a dated correction note this session (the claim is "one of the generated nations"; the count is ~43 and immaterial). The version-goal question stays open in NR-045.
 
+### NR-054 — The 'ancient tech tree' ask was delivered as a derived ladder, not a player-facing research tree
+*decision taken on your behalf · raised 2026-08-04 · from BL-296 (ancient tech ladder) — remote mockup session*
+
+Ben asked to 'mock up an ancient tech tree'. BL-274 (era-keyed rosters) records his standing position that a player-facing tech tree only works in a 1900s+ start, and that the ancient side is derived from endowment, not researched. The mockup keeps the tree STRUCTURE (nodes, prereqs, gates) as sim-consumed data, but no nation ever chooses a node: acquisition is invention-at-the-frontier + diffusion + endowment gates, per the settlement pass's endowment-not-virtue mechanism.
+
+**Why it matters.** If Ben actually wanted a clickable ancient research tree (a Paradox-style pre-1960 layer), this reading forecloses it. Recorded so the framing can be overturned before BL-271 (Era -1 sim) builds against it.
+
+> **Recommendation:** Keep the derived reading — it is consistent with BL-274's recorded stance and with how BL-218 already derives industrialisation timing. A player-facing rendering can be added later as a codex view without changing the data.
+
+> **RESOLVED.** CONFIRMED STANDING (2026-08-06 review sweep) — ANCIENT_TECH_LADDER.md still states derived-not-chosen; no contradiction found. Closed without change.
+
+*Files: `docs/research/ANCIENT_TECH_LADDER.md`*
+
+### NR-055 — Six ladder bands vs BL-274's four-band lean — grouped, not contradicted, but Ben has not confirmed
+*decision taken on your behalf · raised 2026-08-04 · from BL-296 (ancient tech ladder) mockup vs BL-274 (era-keyed rosters) open question 1*
+
+BL-274 leaned to four roster era bands (classical / medieval / gunpowder / industrial). The ladder mockup uses six (T1 Classical, T2 Post-Classical, T3 High Medieval, T4 Gunpowder, T5 Industrial, T6 Machine Age), because the economic divergence that answers 'what differs by 1960' happens across the T4/T5/T6 split the four-band lean merges. Proposed reconciliation: roster bands are a coarser grouping of the same six-band spine, so the two items share one timeline.
+
+**Why it matters.** Both items author data against a band count; whichever lands first sets the de-facto spine. If Ben prefers four bands everywhere, T4/T5 and T5/T6 merge and the 1960 capacity-spread analysis (3-4 bands) must be restated in coarser units.
+
+> **Recommendation:** Six-band spine, four-band roster grouping — divergence resolution for the economy, authoring economy for the rosters.
+
+> **RESOLVED.** CONFIRMED STANDING (2026-08-06 review sweep) — ANCIENT_TECH_LADDER.md already carries the six-band/four-band-grouping reconciliation as landed prose, not a proposal; BL-274 shows no override. Closed without change.
+
+*Files: `docs/research/ANCIENT_TECH_LADDER.md`*
+
 ### NR-056 — Tech-web density grain — coarse, medium, or fine, judged against the worked steam-slice examples
 *question · raised 2026-08-04 · from BL-296 (ancient tech ladder) § Density test — Ben asked to test detail level against examples of technology*
 
@@ -1061,6 +1007,19 @@ Project-Rival/CLAUDE.md and docs/ENVIRONMENT.md both state 0 A.D. exposes no age
 
 *Files: `Project-Rival/CLAUDE.md`, `Project-Rival/docs/ENVIRONMENT.md`*
 
+### NR-058 — The v0.1.6 generation-visibility minor: the shape chosen for your one-line instruction
+*decision taken on your behalf · raised 2026-08-04 · from Ben, 2026-08-04, mid-session: "Add a release before v0.2.0 for a pass on generation visibility... items in the backlog about visualising the world at each step - we haven't yet done that... reviewing [UI alignment] towards the end of v0.1.x."*
+
+The release is numbered v0.1.6 — the end of the v0.1.x band, before v0.2.0, which also satisfies "towards the end of v0.1.x" for the UI review. Items filed: BL-303 (Generation Ledger build — the window GENERATION_LEDGER.md designed but nothing carried), BL-304 (field-overlay lenses for the generation intermediates), BL-305 (nation/corp generation visibility, design-owed — the political steps are the one part of generation with no visibility designed anywhere). BL-098 (UX user-story review) retargeted v0.1.1 -> v0.1.6 as the UI-alignment review vehicle. NOT retargeted: BL-256 (generation globe) and BL-211 (history ledger) keep their existing goals — they are siblings of this theme, not children, and pulling landed-or-versioned work into a new minor re-litigates settled sequencing.
+
+**Why it matters.** Three calls were interpretation rather than instruction: the v0.1.6 number (you said "before v0.2.0", not which slot), BL-098 as the review vehicle (you said "reviewing that", not which item), and the three-item decomposition of "each step" (physical steps had designed visibility; only the ledger build, the lenses, and the political steps were genuinely missing). Each is cheap to reverse.
+
+> **Recommendation:** No action needed unless a call reads wrong — the likeliest candidate is BL-098 as the review vehicle, if you meant a fresh dedicated review rather than the standing user-story one.
+
+> **RESOLVED.** CONFIRMED STANDING (2026-08-06 review sweep) — ROADMAP.md carries v0.1.6 Generation visibility + UI alignment as a dated minor, and BL-098 carries version_goal v0.1.6. Matches what was recorded. Closed without change.
+
+*Files: `docs/development/ROADMAP.md`, `docs/development/backlog.json`*
+
 ### NR-059 — ID collision on pull: the remote tech-ladder session and the local Rival/diplomacy WIP both minted BL-296 and NR-054/055 — local side renumbered
 *decision taken on your behalf · raised 2026-08-04 · from Integrating origin/claude/ancient-tech-tree-mockup-m3fgk3 into main (Ben: pull the tech tree mockup back from origin).*
 
@@ -1083,6 +1042,66 @@ The Rival docs (2026-08-03) framed Wildfire Games' 0 A.D. (Release 28) as the ne
 
 *Files: `Project-Rival/CLAUDE.md`, `Project-Rival/docs/ENVIRONMENT.md`, `Project-Rival/tools/harness/smoke_test.js`*
 
+### NR-061 — The word interface could not answer "who am I?" — a CORPS opcode and list_corps tool were added (Light mode)
+*decision taken on your behalf · raised 2026-08-04 · from BL-306 (text Rival harness) — io_smoke_test.js, the first agent-shaped consumer of the MCP seam.*
+
+The smoke test could not obtain any corporation entity id through the seam: get_blackboard and issue_command both require a corp id, but nothing on the protocol enumerates corps or identifies the player. Corp entity ids in the generated world are non-obvious (the player corp landed at 30318). Fixed by extending run_serve with a CORPS opcode (one JSON line per corp: id, name, is_player, home_nation, then END) and mirroring it as a list_corps MCP tool. Read-only export, two files (src/main.cpp, tools/mcp/server.js), no determinism surface — taken as Light mode without a requirement group.
+
+**Why it matters.** This touches the BL-278 (Io MCP server) seam, whose design is otherwise settled prose — the tool roster there now differs from what AI_OPPONENT.md § 10 describes (six tools, not five). If you would rather the discovery leg live elsewhere (e.g. in the blackboard itself as a self-identity fact), the opcode is easy to move; the smoke test is its only consumer so far.
+
+- Keep list_corps as the sixth tool; amend AI_OPPONENT.md § 10's roster when BL-306 lands.
+- Fold self-identity into the blackboard export (a who-am-i fact per BL-206) and retire the opcode.
+
+> **Recommendation:** Option 1. Enumeration serves the multi-agent future (a diplomacy campaign needs to see all seats, not just its own), and the blackboard staying visibility-honest argues against it carrying a world-level corp roster.
+
+> **RESOLVED.** RESOLVED (2026-08-06) — AI_OPPONENT.md § 10a amended to list list_corps as the sixth MCP tool (added a dedicated paragraph). Doc now matches the shipped seam.
+
+*Files: `src/main.cpp`, `tools/mcp/server.js`, `Project-Rival/tools/harness/io_smoke_test.js`*
+
+### NR-062 — Ladder store schema calls taken while delivering BL-307
+*decision taken on your behalf · raised 2026-08-04 · from BL-307 (ladder data store) — filed and delivered on Bens backlog-then-deliver instruction during the constellation review.*
+
+Four calls were interpretation: (1) gate and diffusion are ARRAYS (ore_q+fuel becomes two atoms; T6-ME-01 is practice+artifact) rather than strings with separators. (2) The density-slice objects — the three Institutions quests (Enforceable Promise / Disciplined Sovereign / Lettered Public), Sovereign Doctrine and Fuel Doctrine — are included as STANDING objects with provenance density-slice, not left as doc-only examples; the grain is settled at medium so the worked slices read as the webs first authored regions. (3) Placeholder thresholds (X, N) are kept verbatim as strings until tuning. (4) The neighbourhood count drift the lint caught (19 techs / 27 objects vs the prose 20 / ~28) was fixed in both the doc and BL-296s design prose, dated.
+
+**Why it matters.** If the density-slice trio was meant as illustration only, those five objects should carry a sketch flag or come out; everything downstream (the sim, any codex UI) will otherwise treat them as authored content.
+
+> **Recommendation:** Keep all four as taken — provenance already lets a consumer filter density-slice objects if wanted.
+
+> **RESOLVED.** CONFIRMED STANDING (2026-08-06 review sweep) — ladder_lint.js runs clean and object counts match the doc's corrected numbers; no sign of reversion. Closed without change.
+
+*Files: `docs/research/ancient_tech_ladder.json`, `tools/session/ladder_lint.js`, `docs/research/ANCIENT_TECH_LADDER.md`*
+
+### NR-063 — Industrial-neighbourhood calls taken while working the rings T4-T5 region
+*decision taken on your behalf · raised 2026-08-05 · from BL-296 (ancient tech ladder) - Ben: 'another pre-game tech tree centred around the industrial revolution, to go alongside the pre-game early Civilisation tech tree'.*
+
+Five calls were interpretation. (1) SCOPE: 'another tech tree' was read as a second worked REGION of the one shared web (rings T4-T5 and the T4/T5 crossings), not a second web - the settled constellation geometry is one object, and a per-era viewer tab can still present the region separately. (2) FUEL DOCTRINE MOVED from ring T5 to ring T4 so the new Materials vertex (The Cheap Ton) can require it taken, repeating the ring-1 Written-Ledger interlock; the fuel choice genuinely predates the industrial band. (3) SEVEN NEW TECHS were added to the band tables to bring rings T4-T5 to medium grain (T4 Medicine had no node at all): Coal Haulage & Urban Fuel, Patent Grants, Preventive Inoculation, High-Pressure & Compound Engines, Framed Construction & Cement, Soil Chemistry & Fertiliser Trade, General Incorporation. (4) TELEGRAPH gained a Railway prereq - rail signalling drove the network - which is a change to an already-authored node, flagged with an `amended` field in the store. (5) A NEW RULE was adopted rather than proposed: fork count scales with the band's divergence (ring 1 carries one keystone, this region carries four), which is why two new keystones - Labour Doctrine and Works Doctrine - were authored in one region.
+
+**Why it matters.** Call 1 decides whether there is one tech object or two, which every later surface inherits. Calls 2 and 4 edit objects an earlier pass authored - if the density slices were meant to be frozen examples, both should be reverted. Call 5 sets an authoring rule the remaining three crossings will be worked under.
+
+> **Recommendation:** Keep all five. The store records provenance ('industrial-pass') and `amended` on both edited objects, so any of them can be reverted by inspection rather than archaeology.
+
+> **RESOLVED.** CONFIRMED STANDING (2026-08-06 review sweep) — lint confirms the industrial neighbourhood (27 techs/5 quests/4 keystones/2 regimes) is present and clean; doc text reflects the region as delivered. Closed without change.
+
+*Files: `docs/research/ANCIENT_TECH_LADDER.md`, `docs/research/ancient_tech_ladder.json`, `tools/session/ladder_lint.js`*
+
+### NR-064 — Works Doctrine may gate corporation generation - and does the industrial region get its own viewer tab?
+*question · raised 2026-08-05 · from BL-296 (ancient tech ladder) SS The industrial neighbourhood - surfaced while authoring the region's keystones.*
+
+Two open questions from the same pass. (a) WORKS DOCTRINE (State Arsenal vs Private Works, ring T5 Materials) says whether a 1960 nation's heavy plant is the sovereign's or is chartered and owned. If that is load-bearing, it is a real dependency from the ladder into CORPORATION_GENERATION.md's nation assignment and into BL-094 (governing-body pivot): a State-Arsenal nation may be one where a specialist space-interested corporation cannot be chartered at all, which changes who the player can be. (b) SURFACE: the F9 tech-tree mock has one tab per era; this region is one ring band inside Era -1, not an era. Either it earns an 'Era -1 - Industrial' tab beside Antiquity, or Antiquity is one web the reader zooms within.
+
+**Why it matters.** (a) is the difference between a flavour fork and a generation input - if it is the latter it should be a filed backlog item, not a note in a research doc. (b) decides whether the era strip is an ERA selector or a REGION selector, which is easier to settle before a second tab exists than after.
+
+- (a) Flavour only - Works Doctrine tints the 1960 economy, corporation generation ignores it.
+- (a) Generation input - file an item wiring the doctrine into nation assignment and the charter terms.
+- (b) Its own tab - the strip becomes a region selector, one per worked neighbourhood.
+- (b) One Antiquity web - the strip stays an era selector and the reader zooms.
+
+> **Recommendation:** (a) Generation input, filed as its own item once BL-296 lands - it is the most campaign-relevant object the ladder has produced and it costs nothing to honour at generation time. (b) One Antiquity web; the strip means eras, and a region is a zoom, not a tab.
+
+> **RESOLVED.** RESOLVED (2026-08-06, Ben via Q&A widget) — Works Doctrine is a generation input, not flavour. Filed as BL-311 (design-owed, blocked on BL-296) to wire State-Arsenal-vs-Private-Works into CORPORATION_GENERATION.md nation assignment. (b), the tab-vs-zoom half, was already settled as one Antiquity web with no separate tab.
+
+*Files: `docs/research/ANCIENT_TECH_LADDER.md`, `docs/generation/CORPORATION_GENERATION.md`, `src/ui/tech_tree_panel.cpp`*
+
 ### NR-065 — Ladder nodes carry no effect field - the campaign tree types its techs, the pre-game web does not
 *question · raised 2026-08-05 · from BL-296 (ancient tech ladder) - surfaced by Ben asking whether ladder techs give new options or upgrades.*
 
@@ -1099,4 +1118,103 @@ scripts/tech_tree.lua types every tech by kind: 30 invention (new option), 17 ti
 > **RESOLVED.** SUPERSEDED BY THE EFFECTS PASS (2026-08-05, same day): Ben asked for the mapping directly ('let's map this to real buildings and units'), which answers the question in the affirmative and goes further. Rather than borrowing scripts/tech_tree.lua's three-value kind field, an eleven-kind closed vocabulary was authored in docs/research/TECH_EFFECTS.md and applied to every rings T4-T5 object as {kind, target, status}. The campaign tree's invention/tier/capstone maps onto it as unlock/upgrade/open. Remaining open calls moved to NR-066.
 
 *Files: `docs/research/ancient_tech_ladder.json`, `scripts/tech_tree.lua`, `docs/research/ANCIENT_TECH_LADDER.md`*
+
+### NR-066 — Retirement breaks the monotonic unlocked set - three calls, plus whether pre-game effects ever fire
+*question · raised 2026-08-05 · from BL-156 (tech system early design) / BL-296 - raised by Ben's category C, 'retire buildings or units so they cannot be built when a qualitatively better option becomes available'.*
+
+BL-156 settled that the unlocked set is MONOTONIC: techs complete, never un-complete, so the set only grows and there is no revocation path to get wrong. Category C breaks that deliberately. The sanctioned mechanism exists - BL-087's availability windows, a predicate over the same set rather than a different structure - but three questions come with it and none are answered anywhere. (1) GRANDFATHERING: what happens to already-built content? Grandfather (it runs, cannot be re-placed) or force obsolescence (it degrades or must be replaced)? (2) AVAILABILITY VS ECONOMICS: a charcoal smelter nobody builds because coke is cheaper has retired itself; explicit retirement is only needed where the game wants to STOP the player, not out-price them. (3) REVERSIBILITY: under blockade a T5-capacity nation may need the T3 route back, and the ladder's own diffusion axis says capacity can be destroyed but awareness cannot. FOURTH, separate: do pre-game effects ever FIRE? On the ancient layer nobody clicks, so the ladder's effects may only be read at the 1960 handoff - making them a DESCRIPTION of the capacity band rather than events, with only the campaign tree's effects firing live.
+
+**Why it matters.** (1)-(3) decide whether retirement is a UI rule, an economic outcome, or a simulation event - and the answer changes what BL-087 has to build. (4) decides whether the two trees share one effect runtime or only one vocabulary, which is the difference between a shared system and a shared spreadsheet.
+
+- Grandfather + retire by window, explicit retirement mostly on units and doctrine branches (the doc's lean).
+- Force obsolescence - retired content degrades, making the turnover felt rather than merely offered.
+- Price-only retirement - no explicit mechanism; better options simply dominate.
+- (4) Ladder effects are descriptive; only campaign-tree effects fire.
+- (4) One effect runtime, with the ladder's effects evaluated by the BL-271 year-tick sim.
+
+> **Recommendation:** Option 1 for (1)-(3): grandfather, retire by window not erasure, and use explicit retirement sparingly - for buildings and recipes, price is usually the better retirement. For (4), lean descriptive: it keeps the derived/clicked distinction the whole ladder rests on, and BL-271 can promote it later without rework.
+
+> **RESOLVED.** RESOLVED (2026-08-06, Ben via Q&A widget) — Grandfather (matches the 2026-08-05 absent-not-disabled settlement); explicit retirement kept but used sparingly (units + doctrine forks, price handles buildings/recipes); reversibility is PERMANENT — no blockade-driven fallback (overrides this doc's prior lean toward reversibility); pre-game ladder effects are descriptive only, read once at the 1960 handoff — only the campaign tree's effects fire live. Propagated into TECH_EFFECTS.md (§ Retirement, § Open questions).
+
+*Files: `docs/research/TECH_EFFECTS.md`, `docs/research/ancient_tech_ladder.json`, `docs/development/backlog.json`*
+
+### NR-067 — Era 1 draft introduces a seventh condition primitive: the deed (a tangible act, not a state)
+*decision taken on your behalf · raised 2026-08-05 · from BL-087 (filter system / Era 1 content) - Ben, 2026-08-05: the Era 1 tree 'will be the first tech tree to gate keystones via quests, i.e. tangible actions done in game'.*
+
+The existing condition vocabulary (ERA1_TECH_LANDSCAPE.md, carried into BL-156's condition_set) is entirely STATE: research, structure, stockpile, market, surplus, era are predicates sampled at a tick, each of which can be true today and false tomorrow. None can express 'you did this'. The draft adds a seventh primitive - `deed` {subject, scope, count, recorded} - a one-time event that fires at a tick and stays true. All four Era 1 keystones are gated on deeds rather than thresholds: Ten Flights, The First Tank, The First Truss, The Empty Shift. Also drafted on Ben's behalf, pending his node review: five sectors (Launch / Volatiles / Mobility / Yards / Extraction) x three rings (Reach / Foothold / Industry), Power-Automation kept as a standing line rather than a sector, ~45 objects, and four binary keystone forks each keyed to a different axis (cadence, chemistry, geometry, labour).
+
+**Why it matters.** A deed is a new serialised primitive - a flag plus a tick - so it touches the save format and BL-156's condition_set shape, which is settled. It is cheap and monotonic, but it is an addition to a closed vocabulary and should be Ben's call, not mine. If it is rejected, keystone gating falls back to structure + stockpile combinations, which express the shopping list but not the act.
+
+- Adopt `deed` as a seventh condition primitive.
+- Fake it with structure + stockpile predicates - no new primitive, weaker expression.
+- Adopt it only for keystones, keeping ordinary techs on state conditions.
+
+> **Recommendation:** Adopt it (option 1 or 3). It is monotonic, deterministic and trivially serialised, and it is the only way the tree can ask for an ACT rather than a balance sheet - which is what the whole framing asks for. Four review questions carried in the doc: whether four keystones is right, whether a deed is a world first or a personal one, whether rivals see your deeds, and whether an unfired deed hides its keystone or shows it locked.
+
+> **RESOLVED.** RESOLVED (2026-08-06, Ben via Q&A widget) — adopt the deed primitive for keystones only; ordinary Era 1 techs stay on state conditions. Recorded in ERA1_TECH_LANDSCAPE.md § The deed primitive.
+
+*Files: `docs/research/ERA1_TECH_LANDSCAPE.md`, `docs/development/backlog.json`*
+
+### NR-068 — Red herrings need a quantity: Alarm as the second per-nation scalar beside BL-223's Ceiling
+*decision taken on your behalf · raised 2026-08-05 · from BL-087 / BL-223 - Ben, 2026-08-05: 'can we put in little red herrings that make Era 1 failure (WW3) more likely... more advanced does not mean better... the player must be skilled at avoiding danger, in each dimension of play'.*
+
+Red herrings with nothing to trigger are flavour, so the draft adds the quantity they feed. Taking BL-223's settled discipline verbatim (the deterrence ceiling is a per-nation SCALAR, not a nuclear-equivalent object), the model is TWO per-nation scalars: CEILING (BL-223's, unchanged - restraint carried from the averted rupture) and ALARM (new - how threatened a nation feels, moved by others' VISIBLE capability, severed trade ties, posture and domestic instability). The seeded Era-event date decides WHEN the rupture is tested, not the outcome: aggregate Alarm above aggregate Ceiling means it goes hot and Era 1 fails, with the event's selective destruction landing on the orbital and heavy-industrial assets the space programme needed. Seven herring kinds drafted (escalator, legibility trap, interdependence severer, brittle optimisation, contextual dud, tempo trap, domestic destabiliser), one per dimension of play, plus three mitigation nodes and one INVERSE herring (Hardened Dispersed Basing looks aggressive and is stabilising, so 'menacing' cannot become the tell).
+
+**Why it matters.** Alarm is a new per-nation scalar and therefore new serialised state, and the rupture check is a new deterministic resolution point at the Era boundary - both sit inside BL-223's owed reconciliation. If Ben wants the future rupture to stay a pure seeded event with no player input, this whole design is out and the herrings become flavour. It also load-bears on trade: interdependence as the cheapest Alarm suppressant is what makes the Trade pillar defensive, which is a claim about the game's shape, not just a tuning knob.
+
+- Adopt Alarm as a per-nation scalar tested against Ceiling at the seeded date (the draft).
+- Pairwise alarm (you can frighten one neighbour and reassure another) - truer, costs N^2 state.
+- Keep the future rupture a pure seeded event; herrings become flavour with no mechanical bite.
+
+> **Recommendation:** Option 1. It reuses BL-223's own scalar discipline, stays deterministic (seeded date, deterministic threshold, visible countdown), and it is the only version where 'skilled at avoiding danger' means anything. Four questions carried in the doc: per-nation vs pairwise, whether rivals' Alarm is visible, whether the rupture can be a partial failure, and whether Era 1 failure ends the campaign or delays it (lean: delays, expensively).
+
+> **RESOLVED.** RESOLVED (2026-08-06, Ben via Q&A widget) — adopt Alarm as pairwise (not per-nation), overriding this doc's and BL-223's prior per-nation lean; the per-nation-vs-pairwise reduction against Ceiling is now open work (BL-223 reconciliation). Visibility leans toward a shared/legible 'global alert' surface per Ben's follow-up note, exact rule still open. Recorded in ERA1_TECH_LANDSCAPE.md § Open questions. Partial failure and end-vs-delay-campaign questions remain unanswered.
+
+*Files: `docs/research/ERA1_TECH_LANDSCAPE.md`, `docs/development/backlog.json`*
+
+### NR-069 — Ben's 'race the player' answer for first_footing leans the Era 1 tree's deed-scoping question toward world-scoped keystone deeds
+*observation · raised 2026-08-06 · from Strategy-library design session (docs/ai/STRATEGIES.md) - Ben's elicitation answers, 2026-08-06.*
+
+The Era 1 tree draft left deed scoping open (its Q2: are keystone deeds world firsts or per-corporation?). In the strategy session Ben approved the first_footing seed card - the rival contests firsts - which only exists if deeds are world-scoped: a race needs a single trophy. Recorded so the tree review sees the lean it has already half-taken; the tree doc's Q2 is not formally resolved by this.
+
+**Why it matters.** World-scoped deeds change the keystone experience for every corporation: losing a race means your doctrine fork opens on the winner's schedule (or closes). If Ben wants deeds personal after all, ST-10 (first_footing) dies with that answer, and the strategy doc says so on the card.
+
+> **Recommendation:** Resolve tree Q2 as 'world-scoped for the four keystone deeds, personal for smaller deeds' (the tree draft's own lean), which makes both docs consistent.
+
+> **RESOLVED.** RESOLVED (2026-08-06, Ben via Q&A widget) — deeds are personal, not world-scoped, overriding this doc's own 'world' lean. This directly conflicts with STRATEGIES.md ST-10 (first_footing), resolved 2026-08-06 as 'wanted' on the opposite premise (a world-scoped race). New conflict filed as NR-070.
+
+*Files: `docs/ai/STRATEGIES.md`, `docs/research/ERA1_TECH_LANDSCAPE.md`*
+
+### NR-070 — ST-10 (first_footing) was resolved "wanted" on a world-scoped-deed premise that NR-069 just overturned
+*question · raised 2026-08-06 · from NR-069 resolution (deed scoping settled personal) vs docs/ai/STRATEGIES.md ST-10 resolution (settled wanted, world-scoped)*
+
+ERA1_TECH_LANDSCAPE.md § Open questions for the review, Q2, is now settled: keystone deeds are personal to each corporation, not world firsts. STRATEGIES.md's ST-10 (first_footing) card was independently resolved 2026-08-06 as "wanted", with its thesis stated as "if keystone deeds are world-scoped, every rival's doctrine fork waits on a race you can win cheaply." With deeds personal, there is no race — no single trophy to contest — so the card's mechanic as written no longer has a target to fire on.
+
+**Why it matters.** ST-10 is in the live strategy roster (docs/ai/STRATEGIES.md), consumed by the AI opponent's deck. Leaving it as-is means the rival AI carries a strategy card whose premise the design no longer supports.
+
+- Cut ST-10 — personal deeds give it nothing to race.
+- Rework ST-10 around a different observable — e.g. racing to be FASTER than a rival's own deed pace (a tempo comparison) rather than contesting a single world-scoped trophy.
+- Reopen deed scoping instead — reconsider NR-069's "personal" answer given it was made without seeing this consequence.
+
+> **Recommendation:** Option 2 if the tempo-race flavour is worth keeping (it is the one PvP-flavoured card in the roster); option 1 is the cheap, honest fallback.
+
+> **RESOLVED.** RESOLVED (2026-08-06, Ben via Q&A widget) — reworked, not cut. ST-10 now races tempo (fire your own keystone deed before a rival fires theirs, an early-mover lead on your chosen fork's economy) rather than contesting a world-scoped trophy. Card thesis/when/opening/watch/abandon/wins_by/note rewritten in STRATEGIES.md; the two roster-table rows referencing it updated to match. The 2026-08-06 Resolutions-log line that originally leaned tree Q2 toward world-scoped is marked superseded rather than rewritten.
+
+*Files: `docs/ai/STRATEGIES.md`, `docs/research/ERA1_TECH_LANDSCAPE.md`*
+
+### NR-071 — ST-04 (propellant_first) has the same stale world-scoped-deed assumption NR-070 just fixed on ST-10
+*observation · raised 2026-08-06 · from Fixing STRATEGIES.md for NR-070 (first_footing reworked to a tempo race after deeds settled personal, NR-069)*
+
+ST-04 (propellant_first) abandon line reads "a rival fires the world-first and the fork closes badly (contingent on deed scoping, tree Q2)", and its table/compliance rows call it "the Tank race" — all written on the same world-scoped-deed premise ST-10 was. Tree Q2 settled personal (NR-069): a rival firing their own First Tank does not close your Propellant Doctrine fork. Not fixed here — Ben asked specifically about ST-10 (NR-070); this is the same fallout on a second card, surfaced in passing while editing the first.
+
+**Why it matters.** Same defect class as NR-070: a strategy card's abandon/watch logic keyed to a premise the design no longer holds. Left as-is, the AI opponent's deck carries a card that will abandon on an event (a rival's Tank) that can no longer affect it.
+
+- Same tempo-race treatment as ST-10 — reframe around your own First Tank pace vs. rivals' visible volatiles programmes, drop the fork-closes-badly abandon clause.
+- Leave the abandon clause but change its trigger to something deed-scoping-independent, e.g. losing the substrate read (wrong chemistry for the body).
+
+> **Recommendation:** Option 1, for consistency with how ST-10 was just reworked — same fix, same card family (both gate on the same deed-scoping axis).
+
+> **RESOLVED.** RESOLVED (2026-08-06, Ben) — applied the same tempo-race rework as ST-10 (NR-070). ST-04's watch/abandon no longer treat a rival's First Tank as closing your fork; abandon now triggers on the early-mover WINDOW closing (a mature rival programme makes your own Tank pointlessly late), not on losing a shared trophy. Roster-table row updated to match. Ben's note: the earlier NR-071 filing was overly cautious given this was the same fix already applied and approved on ST-10 moments earlier — judgement was right, should have just applied it.
+
+*Files: `docs/ai/STRATEGIES.md`*
 
