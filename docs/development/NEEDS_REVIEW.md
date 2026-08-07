@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*77 entries — 6 open, 71 resolved.*
+*85 entries — 10 open, 75 resolved.*
 
 ---
 
@@ -93,6 +93,48 @@ Ben’s rulings: roster-now-verbs-design-owed; unit-grain verbs; tile position c
 - Ratify the execution
 - Adjust the authored numbers (power mods, doctrine preferences, band boundaries)
 - Reverse any delegated call — each is one field or one row
+
+### NR-078 — Wizard pre-history timelapse filed as BL-317; BL-271's harness-only bound superseded for the generation path
+*decision taken on your behalf · raised 2026-08-07 · from Ben, 2026-08-07: 'Moving to render the timelapse of pre-history ... should be a documented aim by now' + the ultracode coverage workflow (8 agents) + adversarial checks*
+
+Filed BL-317 (wizard pre-history timelapse, designed, B, post-v0.1.0). Decisions taken on Ben's stated aim: BL-271 open Q2 answered YES (sim runs at generation time, world seed); Q3 answered YES-for-watching (skippable playback; sim always completes identically watched or skipped - determinism guard); BL-271's 'never in the shipped campaign path' bound superseded for the generation path only, dated 2026-08-07. Scope fences written against BL-305 (keeps the 1960 carve, loses the scrubber idea) and BL-256 (globe not-in-scope list amended only when BL-317 lands). The full Rival-to-timelapse plan is a second workflow, reported in-session.
+
+### NR-080 — Two unit rosters exist and disagree; the engine table landed ahead of the item that owns it
+*decision-needed · raised 2026-08-07 · from Ben's question 2026-08-07: 'do we have a list of units available?'*
+
+There are two unit rosters. (1) SHIPPED, in-engine: src/world/unit_roster.{hpp,cpp} - 19 rows across four bands, gated on the four province endowment windows, no doctrine data. (2) DESIGN DRAFT, Rival-side: Project-Rival/docs/ai/UNITS.json - 17 types plus 7 doctrine presets and per-row named_substitutions. They share the four-band structure and nothing else: different counts, entirely different names (iron_line vs Iron Foot), and pike_block / war_galleys have no engine row while Plated Foot / Crossbow Corps / Mechanised Column have no JSON row.
+
+**Why it matters.** BL-274 (era-keyed unit rosters) says the Rival artifact 'lands into Io explicitly with this item, never by silent merge' - but an Io table landed anyway in efe97ba, and BL-274 is still status designed (not complete). So the item's own landing contract has already been bypassed, and there is now no single answer to 'what units exist'. The doctrine presets in particular are pure design debt: combat.cpp has the doctrine_row shape and nothing populates it.
+
+- A - Engine table wins. Retire UNITS.json to a design-history note; port only the doctrine presets across. Cheapest; loses the named_substitutions documentation.
+- B - JSON wins. Rewrite unit_roster.cpp from UNITS.json as BL-274 intended, keeping the engine's gate mechanism. Honours the item; costs a rewrite of a table that already works.
+- C - Merge deliberately, then mark BL-274 complete. Reconcile row by row into the engine table, port the doctrine presets, and record which rows came from where.
+
+> **Recommendation:** C, and close BL-274 when it lands. The engine table's gate mechanism is the better half; the JSON's doctrine presets and named_substitutions are the better half of the other. Neither should simply be discarded, and leaving BL-274 open with a shipped table under it is the state that caused the confusion.
+
+*Files: `src/world/unit_roster.cpp`, `Project-Rival/docs/ai/UNITS.json`, `docs/development/backlog.json`*
+
+### NR-080 — Generation arc parked on Ben's ruling; scope call: the three session items, not the wider generation family
+*decision taken on your behalf · raised 2026-08-07 · from Ben, 2026-08-07, end of session: 'we will park generation. Really it should've been pre-v0.1.0 work. What we're doing now is coming too early, since many game systems don't exist yet.'*
+
+Parked BL-316 (Era -1 logistics), BL-317 (wizard pre-history timelapse, carrying the six-stage Rival-to-timelapse route in its design), and BL-320 (Era -1 sim runtime). The scope interpretation is the delegated call: 'park generation' was read as THIS session's pre-history/generation-transparency arc, not the wider generation family - BL-297/BL-298 (diplomacy seam + battery), BL-305 (generation political visibility), BL-256 (generation globe), BL-300 (myth & theology) were left unparked since they predate the arc and other work may reach them first. Extend the parking to those if the ruling meant the whole theme. Landed work is unaffected: BL-318 (scorer), BL-319 (wizard preview pane) and the BL-271/BL-275 sim family are committed and live.
+
+### NR-082 — Kepler's wetland biome is effectively extinct (12 tiles); is world_audit's 3% forest+wetland target still right?
+*decision-needed · raised 2026-08-07 · from BL-291 (world_audit) work, 2026-08-07 — the one assertion that genuinely fails.*
+
+world_audit's S2 check wants forest + wetland >= 3% of Kepler's tiles. Measured today: 2.41% — forest 353 (2.33%), wetland 12 (0.08%). Twelve wetland tiles on the entire home body. The harness is otherwise green (25 of 26 assertions PASS); this is the only failure, and it is a world-generation finding, not a harness defect.
+
+**Why it matters.** Two separate questions are tangled in one failing line. (1) IS 2.41% WRONG? The likely cause is collateral from the 2026-08-04 relief commits (802421c, 71e8a9b): more highland displaces the low wet ground forest and wetland both need. If so this is a real regression in biome variety on the body the player actually plays, and retuning the target would hide it. (2) IS THE TARGET EVEN MEASURED RIGHT? The denominator is ALL Kepler tiles including ocean. Against LAND tiles the same measurement reads 6.0%, comfortably over. A target whose denominator is arguable will keep producing arguable failures.
+
+Wetland at 0.08% is the part that should not be tuned away regardless: RESOURCES.md and TILES.md both give wetland a terrain affinity, and a biome present on twelve tiles cannot carry one.
+
+- A - Treat 2.41% as a regression. Investigate the relief commits' effect on the moisture/height bands and restore wetland generation; leave the target at 3%.
+- B - Re-base the denominator to land tiles (6.0% today), keep 3%, and close the failure. Cheapest, but it makes the check pass without anyone looking at the 12 wetland tiles.
+- C - Both: re-base the denominator AND open a separate item on wetland generation specifically, since 0.08% is indefensible at any denominator.
+
+> **Recommendation:** C. The denominator genuinely is wrong — an ocean-inclusive share of a biome that can only occur on land measures the hydrology, not the biome — but fixing it alone would turn a red light green while wetland stays extinct. Split the two.
+
+*Files: `tools/verify/world_audit.cpp`, `src/world/tile_generation.cpp`, `docs/economy/TILES.md`*
 
 ---
 
@@ -1217,4 +1259,68 @@ ST-04 (propellant_first) abandon line reads "a rival fires the world-first and t
 > **RESOLVED.** RESOLVED (2026-08-06, Ben) — applied the same tempo-race rework as ST-10 (NR-070). ST-04's watch/abandon no longer treat a rival's First Tank as closing your fork; abandon now triggers on the early-mover WINDOW closing (a mature rival programme makes your own Tank pointlessly late), not on losing a shared trophy. Roster-table row updated to match. Ben's note: the earlier NR-071 filing was overly cautious given this was the same fix already applied and approved on ST-10 moments earlier — judgement was right, should have just applied it.
 
 *Files: `docs/ai/STRATEGIES.md`*
+
+### NR-079 — Rebase fallout: era-minus-1 citations point at renumbered ids; history-sim arc has no DEVLOG entries
+*observation · raised 2026-08-07 · from Coverage workflow readers, verified against the tree: the 2026-08-07 rebase onto origin/main kept origin's ids for the 2026-08-06 items*
+
+Three repair debts from the history rewrite: (1) requirements.json's era-minus-1 groups and BL-316's prose cite BL-277/BL-308/BL-310..313 - ids now held by unrelated 2026-08-06 items (propellant, deeds, tech tree, works doctrine, minimap, time panel); (2) the whole history-sim implementation arc (7 rebased commits) has no DEVLOG entries and the index does not know it; (3) prose citing pre-rebase hashes (88f8c83, 341e5ad) points at orphaned commits - current equivalents f4e4c4c, 26510fb. Also stale: tile_inspector.cpp:205's ~600ms runtime comment predates the province-growth fix (~2.1s measured). A background-task chip was spawned for the repair.
+
+> **RESOLVED.** Repaired 2026-08-07 (commits 9cc23c9 + follow-up on claude/silly-cray-6d1b07, merged to main). (1) Every stale citation in the era-minus-1 requirement groups and BL-316's (era -1 logistics) prose rewritten to name the finding with its id marked pre-rebase; the stale NR-064/065 pointers in the Ages-view group went descriptive; the stale hashes appear only in this entry, which already names the current equivalents. (2) Two retroactive DEVLOG entries (2026-08-04, 2026-08-05) cover the seven-commit arc, with an id note; index regenerated. (3) tile_inspector.cpp's runtime comment corrected to ~2.1 s. Rulings taken by Ben, same day: the no-elimination finding is RETIRED as a standalone item - its target (elimination possible, subject-nation release possible) is recorded as design intent on BL-271 (Era -1 history sim); the lost pre-rebase prose (BL-277's answered questions, the sim-landing requirements group) is IGNORED, the commits and DEVLOG remaining its record. BL-275 (history sweep) status flipped to complete; its design prose stays hot until the next archive sweep. The verb-scales scorer redesign stays unnumbered per BL-317's re-file-if-it-stalls note.
+
+### NR-081 — Decision taken: the Era -1 works table is authored in C++, not Lua, against the stated scripting boundary
+*decision taken on your behalf · raised 2026-08-07 · from Ben's question 2026-08-07: 'Should the building list be in Lua?'*
+
+Filed BL-321 (Era -1 works) specifying an authored C++ table in src/world/works_roster.{hpp,cpp}, mirroring unit_roster.cpp - NOT a Lua data file alongside scripts/recipes.lua and scripts/economy.lua.
+
+**Why it matters.** This cuts against TECH_FOUNDATIONS.md, which names 'building definitions' as a sanctioned Lua scripting boundary (line 103) and the campaign era does exactly that: building_economics comes from economy.lua, recipes from recipes.lua. The reason to deviate is the headless build. recipe_registry.cpp is the ONE TU in the project that pulls sol2/Lua; every other src/world/*.cpp is deliberately Lua-free so the verify harnesses compile with a bare C++20 compiler (TECH_FOUNDATIONS.md:142-145). The Era -1 sim is verified exclusively by those harnesses (history_sweep.cpp, history_sim_harness.cpp). A Lua works table would either drag Lua into the headless world layer or need a second loading path for the same data. unit_roster.cpp already set this precedent in the same layer, unremarked.
+
+- A - C++ table (taken). Consistent with unit_roster.cpp; keeps the headless layer Lua-free; the table is not player-tunable.
+- B - Lua table. Consistent with the stated boundary and with campaign buildings; costs the headless guarantee for history_sim, or a duplicate loader.
+- C - C++ now, promote both rosters to Lua later as one deliberate move if live retuning is ever wanted.
+
+> **Recommendation:** A, with C as the escape hatch, and TECH_FOUNDATIONS.md line 103 amended to say the Lua boundary applies to CAMPAIGN-ERA definitions - the generation layer is authored in C++ because it must stay headlessly buildable. Right now the doc and the code disagree and the code is winning silently.
+
+> **RESOLVED.** RESOLVED 2026-08-07 (Ben): use Lua. Option B. The works table moves to scripts/works.lua. The headless objection is answered by DEPENDENCY INJECTION rather than by keeping it in C++: works_roster.hpp stays pure data (no sol2), a separate TU loads the table from Lua exactly as recipe_registry.cpp does, and history_sim takes the table as a parameter. The app passes the Lua-loaded table; the harnesses build one directly. Same seam recipe_registry already proves. TECH_FOUNDATIONS' scripting boundary therefore stands unamended and unit_roster.cpp becomes the outlier to revisit, not the precedent to follow.
+
+*Files: `docs/tech/TECH_FOUNDATIONS.md`, `src/world/unit_roster.cpp`, `docs/development/backlog.json`*
+
+### NR-083 — BL-293 is much larger than filed: the order book is UI state, not world state, and is never saved
+*decision-needed · raised 2026-08-07 · from Starting BL-293 (order book unreachable by command), 2026-08-07.*
+
+BL-293 reads as 'three presses have no corp_verb — add them'. They cannot be added as filed. `sell_order` is DEFINED in world/components.hpp:368 but STORED in src/ui/ui_state.hpp:273 (`std::vector<sell_order> sell_orders`), and passed into `clear_markets` from app.cpp:566 as the caller's argument. The world holds no order book at all. A corp_verb operates on `world&`, so there is nothing for it to mutate.
+
+Second finding, independent and arguably worse: because the order book is UI state, standing sell orders appear NOT TO PERSIST. No serialisation path references sell_order or buy_order. A player's standing orders look like they vanish on save/load.
+
+**Why it matters.** The real work is 'move the order book into the world', which is a different item: a world data-model change, a SERIALISATION-SEAM change (save format), a signature change to clear_markets, and a change to what the economy tick reads. That is Full-mode, and it is not what BL-293's difficulty reflects.
+
+THIRD, AND THE ONE THAT NEEDS BEN BEFORE ANY CODE: putting place_sell_order into corp_verb makes it reachable by the deterministic rival-corp AI, which drives every non-player corp through that exact seam (corp_ai.cpp, BL-202/BL-203). The standing rules permit rival corps a scored-utility layer over the corp-command seam and enumerate what it may do — build, demolish, survey, road, plus predictive spending. TRADING IS NOT IN THAT LIST. Widening the seam widens the AI's reach as a side effect, whether or not the scorer is taught to use it. That is a standing-rules decision, not an implementation detail, so I stopped rather than proceed.
+
+- A - Re-scope BL-293 into two: (i) move the order book into world + serialise it, (ii) add the verbs on top. Sequence (i) with the other seam work; treat the AI-reach question as a gate on (ii).
+- B - Add the verbs but have them operate on a world-side order book that corp_ai is explicitly forbidden to score, documented as a player/agent-only verb subset. Keeps the word interface honest without widening AI behaviour.
+- C - Leave BL-293 as filed and accept ACTIONS.md's overclaim, narrowing its preamble instead (the item itself names this as the fallback).
+
+> **Recommendation:** A, with B's fence carried into it. The order book belongs in the world regardless — the persistence gap is a real defect independent of the word interface. But the verb should land behind an explicit statement that corp_ai does not score it, or BL-202's carefully enumerated exception quietly grows a trading arm.
+
+> **RESOLVED.** RESOLVED 2026-08-07 (Ben): 'Order book needs to be a background process, the AI must be able to trade as a player does.' Option A, with B's fence explicitly REJECTED. So: (1) the order book moves from ui_state into world state and is serialised; (2) order matching runs in the economy tick as a background process, not driven by the UI caller; (3) place_sell_order / remove_sell_order / set_workforce_auto join corp_verb; (4) corp_ai MAY score them - rival corps trade on the same seam the player uses. CONSEQUENCE TO LAND WITH THE WORK: .claude/rules/io-standing-rules.md enumerates the rival-corp exception's permitted verbs and trading is not among them. That list must be widened as part of this item, not left to contradict the code.
+
+*Files: `src/world/corp_command.hpp`, `src/ui/ui_state.hpp`, `src/world/components.hpp`, `src/core/app.cpp`, `.claude/rules/io-standing-rules.md`*
+
+### NR-084 — Where does the buildings rework sit in the band? It is concrete work parked behind four design-forward stub minors
+*decision-needed · raised 2026-08-07 · from Ben, 2026-08-07: 'If it isn't on the roadmap as a buildings rework, then add it now.'*
+
+BL-323 (buildings rework) is on the roadmap as v0.1.7, at the end of the v0.1.x band. That slot was chosen to avoid renumbering v0.1.2-v0.1.5, not because the work belongs last.
+
+**Why it matters.** Ben's own framing was 'we need to put a lot of work into this before any simulated games can occur'. As placed, four minors sit in front of it - Laws, Techs, Military, Politics - and all four are explicitly design-forward stubs. None of them depends on the buildings rework, and the buildings rework depends on none of them. So the ordering delays the concrete blocker behind four design passes for no technical reason.
+
+It also has a knock-on: v0.2.0 is the AI opponent. An opponent driving the corp-command seam against free remoteness will find 'richest tile anywhere' and play it forever, so v0.2.0 tests less than it appears to until BL-323 lands.
+
+- A - Renumber: buildings rework becomes v0.1.2 and the four stub minors each shift up one. Honest sequencing; costs a version_goal edit across the affected items and some doc churn.
+- B - Leave at v0.1.7 as filed. No churn; the concrete blocker waits behind four design minors.
+- C - Pull it forward without renumbering: run it as a second thread inside v0.1.1 (already the concrete build minor). Fastest to start; makes an overloaded minor heavier - v0.1.1 already carries 26 open items.
+
+> **Recommendation:** A. The band's stub minors are deliberately cheap and design-only, and the buildings rework is the thing standing between here and a simulated game. Renumbering is a one-off edit; the sequencing error would be paid every session until it lands. If the renumber churn is unwelcome, C is the pragmatic second - but v0.1.1 is already the most overloaded minor in the plan.
+
+> **RESOLVED.** RESOLVED 2026-08-07 (Ben): option A, renumber. Buildings rework is v0.1.2; the four design-forward stub minors and the generation-visibility minor each shift up one — Laws v0.1.3, Techs v0.1.4, Military v0.1.5, Politics v0.1.6, Generation visibility + UI alignment v0.1.7. ROADMAP.md reordered and 14 backlog items had version_goal updated (BL-098, 155, 156, 157, 158, 186, 280, 287, 288, 303, 304, 305, 323, 324). No v0.1.x minor past v0.1.1 has been cut, so every one of these was a live target rather than a shipped record — including BL-287, which is complete but unreleased and moved with its cohort.
+
+*Files: `docs/development/ROADMAP.md`, `docs/development/backlog.json`*
 

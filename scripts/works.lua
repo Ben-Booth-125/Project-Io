@@ -210,3 +210,5 @@ works = {
         weight = 140,
     },
 }
+
+print(string.format("[Lua] works.lua loaded  work_count=%d", #works))
