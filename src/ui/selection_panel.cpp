@@ -797,7 +797,8 @@ void draw_tile_selection(world& w, ui_state& ui)
         bool any_placeable = false;
         for (const resource_type er : placement_rules::k_extractable)
             if (tile.resource_deposit[static_cast<std::size_t>(er)] > 0.0f &&
-                placement_rules::can_place_in_world(w, sel, building_type::extraction_site, er).ok())
+                placement_rules::can_place_in_world(w, sel, building_type::extraction_site, er,
+                                                   ui.max_logistics_reach).ok())
             { any_placeable = true; break; }
         if (!any_placeable)
         {
@@ -805,7 +806,8 @@ void draw_tile_selection(world& w, ui_state& ui)
                                            building_type::port,
                                            building_type::launchpad,
                                            building_type::inland_logistics_hub})
-                if (placement_rules::can_place_in_world(w, sel, bt, resource_type::iron_ore).ok())
+                if (placement_rules::can_place_in_world(w, sel, bt, resource_type::iron_ore,
+                                                       ui.max_logistics_reach).ok())
                 { any_placeable = true; break; }
         }
 
@@ -1512,7 +1514,8 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
     for (candidate& c : cands)
     {
         const building_economics& econ = reg.economics(c.type);
-        c.pr = placement_rules::can_place_in_world(w, tile_id, c.type, c.target);
+        c.pr = placement_rules::can_place_in_world(w, tile_id, c.type, c.target,
+                                                  ui.max_logistics_reach);
 
         // Capex is the figure construction.cpp actually gates on: build cost PLUS the
         // materials priced at the local market. This ledger used to gate on build_cost

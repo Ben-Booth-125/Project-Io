@@ -272,6 +272,18 @@ struct ui_state
     /// management panel. See sell_order, docs/SYSTEMS.md § Trade.
     std::vector<sell_order> sell_orders;
 
+    /// BL-323 S2b: the logistics-reach budget the UI must filter on, mirrored here
+    /// from `recipe_registry::construction().max_logistics_reach` at load time.
+    ///
+    /// Carried on ui_state rather than threaded through every draw signature for a
+    /// specific reason: the placement surfaces disagree about what they hold — the
+    /// canvas and the construction ledger take a `const world&` plus a registry,
+    /// while `draw_tile_selection` takes a mutable world and no registry. One
+    /// mirrored float lets all of them apply the SAME rule the authoritative gate
+    /// applies, which is the point: a tile offered and then refused at commit reads
+    /// as a broken build rather than a rule. Negative disables, as everywhere else.
+    float max_logistics_reach = -1.0f;
+
     // --- solar system canvas view (primary only; the minimap always shows the
     // default framing) ---
     float solar_zoom  = 1.0f; ///< Scroll-wheel zoom factor. 1.0 = default auto-fit framing.

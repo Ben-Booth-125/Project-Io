@@ -2378,7 +2378,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // ghost is red — and the reason legible — *before* the click, not after
         // construct_building refuses it (BL-071).
         const placement_rules::placement_result pr = placement_rules::can_place_in_world(
-            w, hovered_tile, state.construction.type, state.construction.target);
+            w, hovered_tile, state.construction.type, state.construction.target,
+            state.max_logistics_reach);
         const ImU32 ghost_col = pr ? palette::positive : palette::negative;
 
         icons::building(dl, {gx, gy}, mr, state.construction.type, ghost_col);
