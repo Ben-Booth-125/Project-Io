@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*76 entries — 5 open, 71 resolved.*
+*77 entries — 6 open, 71 resolved.*
 
 ---
 
@@ -82,6 +82,17 @@ Three deliberate scope decisions remain from the audit: (1) BL-160 (auto exchang
 - Rule on the three Band 3 cuts
 - Amend ROADMAP.md to name the Era −1 arc and its version band
 - Defer both until after the military design session
+
+### NR-077 — Military design session executed: six rulings filed, roster dictionary and doctrine-preference field authored
+*decision taken on your behalf · raised 2026-08-07 · from Rival session 2026-08-07 — Ben ruled the six session questions by form; execution details were delegated*
+
+Ben’s rulings: roster-now-verbs-design-owed; unit-grain verbs; tile position canonical; era-keying roster-only; doctrine-preference as the voice bias shape; BL-094’s conflict spine filed now. Executed as: UNITS.json authored in Project-Rival/docs/ai (4 era bands, 17 unit types, 7 doctrine presets); doctrine_preference added to all six VOICES.json voices; BL-274 and BL-157 amended with the rulings; BL-314 (unit verb family, design-owed, B) and BL-315 (governing-body conflict spine, design-owed, A, v0.3.0) filed; BL-094 updated to point at BL-315.
+
+**Why it matters.** Delegated judgement calls inside the execution: (1) four era bands taken as ratified from BL-274’s lean since Ben left the notes box empty; (2) all type_power_mod and doctrine_preference numbers set by judgement, to calibrate against BL-271 sweep evidence; (3) horses resolved as the grassland-share named substitution; (4) naval kept strategic-only with no naval battle verb — flagged in UNITS.json because players and agents will expect one; (5) BL-315 scoped thin with promotion gated behind BL-094’s sequence.
+
+- Ratify the execution
+- Adjust the authored numbers (power mods, doctrine preferences, band boundaries)
+- Reverse any delegated call — each is one field or one row
 
 ---
 
