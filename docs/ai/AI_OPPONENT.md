@@ -735,13 +735,18 @@ writes one response per line, reusing the existing `export_corp_blackboard`/`to_
 and `apply_corp_command` (no bypass) underneath. `tools/mcp/server.js` spawns that process and
 speaks MCP-over-stdio to it — hand-rolled JSON-RPC 2.0 (no SDK dependency; none was installed in
 this repo) covering `initialize`, `tools/list`, `tools/call` (`get_blackboard`, `issue_command`,
-`advance_tick`, `lookup_action`, `list_actions`), `resources/templates/list` and `resources/read`
-(`blackboard://<corp>`). `get_blackboard` always returns the full current-tick blackboard — the
-push-not-pull call from § 10c.5. Smoke-tested end-to-end (tool list, blackboard read, a
-`set_workforce` command applying, a resource read) 2026-08-03; no golden/visual requirement
+`advance_tick`, `lookup_action`, `list_actions`, `list_corps`), `resources/templates/list` and
+`resources/read` (`blackboard://<corp>`). `get_blackboard` always returns the full current-tick
+blackboard — the push-not-pull call from § 10c.5. Smoke-tested end-to-end (tool list, blackboard
+read, a `set_workforce` command applying, a resource read) 2026-08-03; no golden/visual requirement
 applies (doc-only surface, no rendering). Prompts (the `reason_to_select` leg) are not yet
 exposed as MCP `prompts/*` — `lookup_action`/`list_actions` cover the same data via tools for now;
 left as a follow-on rather than blocking the first attach.
+
+**`list_corps` (added 2026-08-04, BL-306).** The seam had no way to enumerate corps or identify
+the player — `get_blackboard`/`issue_command` both require a corp id, and corp ids in a generated
+world are non-obvious. Read-only export from a new `CORPS` opcode in `run_serve`: one JSON line
+per corp (`id`, `name`, `is_player`, `home_nation`), then `END`. Six tools, not five (NR-061).
 
 ### 10f. Sources added 2026-08-03
 

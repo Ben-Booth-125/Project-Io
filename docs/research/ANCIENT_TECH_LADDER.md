@@ -705,11 +705,11 @@ Per year-tick, per nation, per domain — all integer, seeded, deterministic:
    has one tab per era; this region is one *ring band* inside Era −1, not an era of its own. Two
    readings — an "Era −1 · Industrial" tab beside Antiquity, or one Antiquity web the reader zooms
    within. Filed as NR-064; no code either way until BL-296 lands.
-7. **Does Works Doctrine gate corporation generation?** (2026-08-05) The State Arsenal branch says
-   a 1960 nation owns its heavy plant, which is a strong statement about whether a specialist
-   corporation can be chartered there at all. If the answer is yes, this is a real dependency from
-   BL-296 into `CORPORATION_GENERATION.md` and BL-094 (governing-body pivot), and should be filed
-   as work rather than left as a note. NR-064 carries it.
+7. **Does Works Doctrine gate corporation generation?** **SETTLED 2026-08-06 (Ben, NR-064): yes —
+   generation input, not flavour.** A State-Arsenal nation may be one where a specialist
+   corporation cannot be chartered at all. Filed as **BL-311** (design-owed, blocked on BL-296
+   landing) — the exact charter rule against `CORPORATION_GENERATION.md`'s nation-assignment pass
+   is not yet worked out.
 8. **Does the T5/T6 Energy crossing want two vertices?** (2026-08-05) Electrification and internal
    combustion are two prime-mover shifts inside one band — the only crossing in the ladder where
    the one-vertex-per-sector convention looks wrong. Deferred to the Machine-Age pass.

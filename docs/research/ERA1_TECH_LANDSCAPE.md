@@ -580,6 +580,11 @@ Three properties make it worth adding rather than faking with `structure` + `sto
 Deeds are also the honest home for **firsts** — the moments an Era is remembered by. A campaign log
 line ("First footing on Ganymede analogue, day 4,412") comes free with the record.
 
+> **SETTLED 2026-08-06 (Ben, NR-067): adopt the deed primitive for keystones only.** The four
+> keystone forks (Lift, Propellant, Yard, Autonomy Doctrine) gate on deeds; ordinary Era 1 techs
+> stay on the existing state vocabulary (`research`/`structure`/`stockpile`/`market`/`surplus`/
+> `era`). Deeds do not become a general-purpose condition type in this pass.
+
 ## Shape
 
 **Five sectors, three rings, one substrate line.** Sectors are the threads (§ The threads); rings
@@ -708,8 +713,15 @@ own rule is not to enumerate it until the combat system is mapped, and BL-157 (u
    an L-AUTO tier rather than a fork.
 2. **Does a deed belong to the corporation or the world?** "First footing" reads as a world first
    (only one corporation can have it) or a personal first (each corporation gets its own). World
-   firsts create a race; personal firsts create a checklist. Lean: **world** for the four keystone
-   deeds, personal for anything smaller.
+   firsts create a race; personal firsts create a checklist.
+
+> **SETTLED 2026-08-06 (Ben, NR-069): personal.** Overrides this document's prior "world" lean —
+> each corporation fires its own keystone deeds independently; there is no race to be first.
+> **Conflict this creates:** `docs/ai/STRATEGIES.md` ST-10 (`first_footing`) was resolved
+> 2026-08-06 as "wanted" on the *opposite* premise — its thesis is literally "if keystone deeds
+> are world-scoped, every rival's doctrine fork waits on a race you can win cheaply." With deeds
+> personal, that race does not exist and the card's mechanic needs to change or the card needs to
+> be cut. Not resolved here — flagged back to Ben as NR-070.
 3. **Do rival corporations see your deeds?** The activity fog says buildings are visible and
    internals are private (BL-068). A landing is arguably visible; a propellant surplus is arguably
    not. This is the first place the tech system touches the discovery model.
@@ -849,10 +861,21 @@ dangerous tech — it is to buy the reassurance that lets them hold it.
 ## Open questions
 
 1. **Is Alarm per-nation-pair or per-nation?** Pairwise is truer (you can frighten one neighbour and
-   reassure another) and costs N² state. Lean: **per-nation**, with the pairwise version deferred —
-   BL-223's precedent is a plain per-nation scalar.
+   reassure another) and costs N² state.
+
+> **SETTLED 2026-08-06 (Ben, NR-068): pairwise.** Overrides this document's per-nation lean and
+> BL-223's plain-scalar precedent — Alarm is tracked nation-A-toward-nation-B, N² state. BL-223's
+> reconciliation (still owed) needs to account for Ceiling staying a plain per-nation scalar while
+> Alarm is pairwise; the two are tested against each other per § The load-bearing half, so the
+> comparison needs a defined reduction (e.g. a nation's aggregate Alarm = its highest or summed
+> pairwise reading) — not yet specified, carried forward as open work.
 2. **Does the player see rivals' Alarm, or only their own contribution?** The discovery model would
    say: your own contribution always, rivals' level only where your intelligence reaches.
+
+> **PARTIALLY SETTLED 2026-08-06 (Ben, NR-068):** Ben's framing — *"I think this can be a global
+> alert system"* — reads as visibility leaning toward a shared, legible surface rather than
+> intelligence-gated per BL-068. Exact rule (a literal global Alarm display vs. "your own always,
+> rivals' where intelligence reaches") is not pinned down — carried forward as open work.
 3. **Can the rupture be a partial failure?** A limited war that wrecks one region's industry is more
    interesting than a binary, and matches the Era event's "selectively destroys" clause.
 4. **Does Era 1 failure end the campaign or delay it?** Lean: delay, expensively. Losing the space

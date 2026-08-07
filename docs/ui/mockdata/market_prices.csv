@@ -1,68 +1,68 @@
 market_id,market_label,body_name,resource,tick,price,supply,demand
-30288,"Kumere","Kepler",Iron Ore,0,2.6156,396.624,473.375
-30288,"Kumere","Kepler",Iron Ore,1,2.6734,414.538,456.563
-30288,"Kumere","Kepler",Iron Ore,2,2.7023,407.907,448.649
-30288,"Kumere","Kepler",Iron Ore,3,2.71675,404.688,444.806
-30288,"Kumere","Kepler",Iron Ore,4,2.72397,403.101,442.913
-30288,"Kumere","Kepler",Iron Ore,5,2.72758,402.313,441.972
-30288,"Kumere","Kepler",Iron Ore,6,2.72939,401.921,441.504
-30288,"Kumere","Kepler",Iron Ore,7,2.73029,401.725,441.27
-30288,"Kumere","Kepler",Iron Ore,8,2.73075,401.627,441.154
-30288,"Kumere","Kepler",Iron Ore,9,2.73097,401.578,441.095
-30288,"Kumere","Kepler",Iron Ore,10,2.73108,401.554,441.066
-30288,"Kumere","Kepler",Iron Ore,11,2.73114,401.542,441.052
-30288,"Kumere","Kepler",Iron Ore,12,2.73117,401.536,441.044
-30288,"Kumere","Kepler",Iron Ore,13,2.73118,401.532,441.041
-30288,"Kumere","Kepler",Iron Ore,14,2.73119,401.531,441.039
-30288,"Kumere","Kepler",Iron Ore,15,2.73119,401.53,441.038
-30288,"Kumere","Kepler",Petroleum,0,4.12925,219.51,405.75
-30288,"Kumere","Kepler",Petroleum,1,4.44388,192.314,355.481
-30288,"Kumere","Kepler",Petroleum,2,4.60119,181.342,335.2
-30288,"Kumere","Kepler",Petroleum,3,4.67984,176.365,326
-30288,"Kumere","Kepler",Petroleum,4,4.71917,173.99,321.609
-30288,"Kumere","Kepler",Petroleum,5,4.73884,172.829,319.463
-30288,"Kumere","Kepler",Petroleum,6,4.74867,172.255,318.402
-30288,"Kumere","Kepler",Petroleum,7,4.75358,171.969,317.874
-30288,"Kumere","Kepler",Petroleum,8,4.75604,171.827,317.611
-30288,"Kumere","Kepler",Petroleum,9,4.75727,171.756,317.48
-30288,"Kumere","Kepler",Petroleum,10,4.75789,171.721,317.414
-30288,"Kumere","Kepler",Petroleum,11,4.75819,171.703,317.382
-30288,"Kumere","Kepler",Petroleum,12,4.75835,171.694,317.365
-30288,"Kumere","Kepler",Petroleum,13,4.75842,171.69,317.357
-30288,"Kumere","Kepler",Petroleum,14,4.75846,171.687,317.353
-30288,"Kumere","Kepler",Petroleum,15,4.75848,171.686,317.351
-30288,"Kumere","Kepler",Agricultural Produce,0,3.09506,664.042,750.875
-30288,"Kumere","Kepler",Agricultural Produce,1,3.14278,647.676,732.54
-30288,"Kumere","Kepler",Agricultural Produce,2,3.16673,639.797,723.714
-30288,"Kumere","Kepler",Agricultural Produce,3,3.17875,635.922,719.374
-30288,"Kumere","Kepler",Agricultural Produce,4,3.18479,633.997,717.217
-30288,"Kumere","Kepler",Agricultural Produce,5,3.18782,633.036,716.141
-30288,"Kumere","Kepler",Agricultural Produce,6,3.18934,632.554,715.601
-30288,"Kumere","Kepler",Agricultural Produce,7,3.1901,632.313,715.331
-30288,"Kumere","Kepler",Agricultural Produce,8,3.19049,632.192,715.195
-30288,"Kumere","Kepler",Agricultural Produce,9,3.19068,632.131,715.127
-30288,"Kumere","Kepler",Agricultural Produce,10,3.19078,632.101,715.093
-30288,"Kumere","Kepler",Agricultural Produce,11,3.19082,632.086,715.076
-30288,"Kumere","Kepler",Agricultural Produce,12,3.19085,632.078,715.068
-30288,"Kumere","Kepler",Agricultural Produce,13,3.19086,632.074,715.063
-30288,"Kumere","Kepler",Agricultural Produce,14,3.19087,632.072,715.061
-30288,"Kumere","Kepler",Agricultural Produce,15,3.19087,632.071,715.06
-30288,"Kumere","Kepler",Water,0,2.13058,159.66,541
-30288,"Kumere","Kepler",Water,1,2.44587,120.579,408.575
-30288,"Kumere","Kepler",Water,2,2.60352,107.975,365.867
-30288,"Kumere","Kepler",Water,3,2.68234,102.712,348.034
-30288,"Kumere","Kepler",Water,4,2.72175,100.29,339.828
-30288,"Kumere","Kepler",Water,5,2.74146,99.1267,335.886
-30288,"Kumere","Kepler",Water,6,2.75131,98.5562,333.953
-30288,"Kumere","Kepler",Water,7,2.75624,98.2738,332.996
-30288,"Kumere","Kepler",Water,8,2.7587,98.1332,332.52
-30288,"Kumere","Kepler",Water,9,2.75993,98.0631,332.282
-30288,"Kumere","Kepler",Water,10,2.76055,98.0281,332.163
-30288,"Kumere","Kepler",Water,11,2.76085,98.0106,332.104
-30288,"Kumere","Kepler",Water,12,2.76101,98.0019,332.075
-30288,"Kumere","Kepler",Water,13,2.76108,97.9975,332.06
-30288,"Kumere","Kepler",Water,14,2.76112,97.9953,332.052
-30288,"Kumere","Kepler",Water,15,2.76114,97.9942,332.049
+30288,"Kumere","Kepler",Iron Ore,0,2.60393,322.678,378.569
+30288,"Kumere","Kepler",Iron Ore,1,2.6559,328.333,366.431
+30288,"Kumere","Kepler",Iron Ore,2,2.68189,339.434,360.684
+30288,"Kumere","Kepler",Iron Ore,3,2.69488,326.299,357.886
+30288,"Kumere","Kepler",Iron Ore,4,2.70137,335.459,356.505
+30288,"Kumere","Kepler",Iron Ore,5,2.70462,324.333,355.819
+30288,"Kumere","Kepler",Iron Ore,6,2.70624,334.481,355.477
+30288,"Kumere","Kepler",Iron Ore,7,2.70706,323.846,355.306
+30288,"Kumere","Kepler",Iron Ore,8,2.70746,334.238,355.221
+30288,"Kumere","Kepler",Iron Ore,9,2.70767,323.724,355.179
+30288,"Kumere","Kepler",Iron Ore,10,2.70777,334.177,355.157
+30288,"Kumere","Kepler",Iron Ore,11,2.70782,323.694,355.147
+30288,"Kumere","Kepler",Iron Ore,12,2.70784,334.162,355.141
+30288,"Kumere","Kepler",Iron Ore,13,2.70786,323.687,355.139
+30288,"Kumere","Kepler",Iron Ore,14,2.70786,334.158,355.137
+30288,"Kumere","Kepler",Iron Ore,15,2.70787,323.685,355.137
+30288,"Kumere","Kepler",Petroleum,0,4.99223,94.5338,324.488
+30288,"Kumere","Kepler",Petroleum,1,5.73834,71.1551,244.24
+30288,"Kumere","Kepler",Petroleum,2,6.1114,63.652,218.486
+30288,"Kumere","Kepler",Petroleum,3,6.29793,60.5242,207.749
+30288,"Kumere","Kepler",Petroleum,4,6.39119,59.0858,202.812
+30288,"Kumere","Kepler",Petroleum,5,6.43782,58.395,200.441
+30288,"Kumere","Kepler",Petroleum,6,6.46114,58.0564,199.279
+30288,"Kumere","Kepler",Petroleum,7,6.4728,57.8887,198.703
+30288,"Kumere","Kepler",Petroleum,8,6.47863,57.8053,198.417
+30288,"Kumere","Kepler",Petroleum,9,6.48154,57.7637,198.274
+30288,"Kumere","Kepler",Petroleum,10,6.483,57.7429,198.203
+30288,"Kumere","Kepler",Petroleum,11,6.48373,57.7325,198.167
+30288,"Kumere","Kepler",Petroleum,12,6.48409,57.7273,198.149
+30288,"Kumere","Kepler",Petroleum,13,6.48427,57.7247,198.14
+30288,"Kumere","Kepler",Petroleum,14,6.48437,57.7234,198.136
+30288,"Kumere","Kepler",Petroleum,15,6.48441,57.7228,198.134
+30288,"Kumere","Kepler",Agricultural Produce,0,3.10025,528.846,601.894
+30288,"Kumere","Kepler",Agricultural Produce,1,3.15062,515.121,586.455
+30288,"Kumere","Kepler",Agricultural Produce,2,3.17593,508.522,579.032
+30288,"Kumere","Kepler",Agricultural Produce,3,3.18864,505.277,575.382
+30288,"Kumere","Kepler",Agricultural Produce,4,3.19503,503.664,573.568
+30288,"Kumere","Kepler",Agricultural Produce,5,3.19824,502.858,572.661
+30288,"Kumere","Kepler",Agricultural Produce,6,3.19986,502.454,572.207
+30288,"Kumere","Kepler",Agricultural Produce,7,3.20067,502.252,571.979
+30288,"Kumere","Kepler",Agricultural Produce,8,3.20107,502.15,571.864
+30288,"Kumere","Kepler",Agricultural Produce,9,3.20128,502.099,571.807
+30288,"Kumere","Kepler",Agricultural Produce,10,3.20138,502.073,571.778
+30288,"Kumere","Kepler",Agricultural Produce,11,3.20143,502.06,571.763
+30288,"Kumere","Kepler",Agricultural Produce,12,3.20146,502.054,571.756
+30288,"Kumere","Kepler",Agricultural Produce,13,3.20147,502.051,571.752
+30288,"Kumere","Kepler",Agricultural Produce,14,3.20148,502.049,571.751
+30288,"Kumere","Kepler",Agricultural Produce,15,3.20148,502.048,571.75
+30288,"Kumere","Kepler",Water,0,1.93505,173.295,432.65
+30288,"Kumere","Kepler",Water,1,2.15257,141.353,352.904
+30288,"Kumere","Kepler",Water,2,2.26134,129.805,324.073
+30288,"Kumere","Kepler",Water,3,2.31572,124.786,311.543
+30288,"Kumere","Kepler",Water,4,2.34291,122.436,305.676
+30288,"Kumere","Kepler",Water,5,2.3565,121.298,302.835
+30288,"Kumere","Kepler",Water,6,2.3633,120.738,301.436
+30288,"Kumere","Kepler",Water,7,2.3667,120.46,300.742
+30288,"Kumere","Kepler",Water,8,2.3684,120.322,300.397
+30288,"Kumere","Kepler",Water,9,2.36925,120.253,300.224
+30288,"Kumere","Kepler",Water,10,2.36967,120.218,300.138
+30288,"Kumere","Kepler",Water,11,2.36989,120.201,300.095
+30288,"Kumere","Kepler",Water,12,2.36999,120.192,300.073
+30288,"Kumere","Kepler",Water,13,2.37005,120.188,300.063
+30288,"Kumere","Kepler",Water,14,2.37007,120.186,300.057
+30288,"Kumere","Kepler",Water,15,2.37009,120.185,300.055
 30288,"Kumere","Kepler",Tobacco,0,7.55798,0,0
 30288,"Kumere","Kepler",Tobacco,1,7.55798,0,0
 30288,"Kumere","Kepler",Tobacco,2,7.55798,0,0
@@ -95,54 +95,54 @@ market_id,market_label,body_name,resource,tick,price,supply,demand
 30288,"Kumere","Kepler",Coffee,13,2.44206,0,0
 30288,"Kumere","Kepler",Coffee,14,2.44206,0,0
 30288,"Kumere","Kepler",Coffee,15,2.44206,0,0
-30288,"Kumere","Kepler",Steel,0,20,0,608.625
-30288,"Kumere","Kepler",Steel,1,26,0,292.414
-30288,"Kumere","Kepler",Steel,2,29,0,237.052
-30288,"Kumere","Kepler",Steel,3,30.5,0,217.222
-30288,"Kumere","Kepler",Steel,4,31.25,0,208.632
-30288,"Kumere","Kepler",Steel,5,31.625,0,204.617
-30288,"Kumere","Kepler",Steel,6,31.8125,0,202.674
-30288,"Kumere","Kepler",Steel,7,31.9062,0,201.717
-30288,"Kumere","Kepler",Steel,8,31.9531,0,201.243
-30288,"Kumere","Kepler",Steel,9,31.9766,0,201.007
-30288,"Kumere","Kepler",Steel,10,31.9883,0,200.889
-30288,"Kumere","Kepler",Steel,11,31.9941,0,200.83
-30288,"Kumere","Kepler",Steel,12,31.9971,0,200.801
-30288,"Kumere","Kepler",Steel,13,31.9985,0,200.786
-30288,"Kumere","Kepler",Steel,14,31.9993,0,200.779
-30288,"Kumere","Kepler",Steel,15,31.9996,0,200.775
-30288,"Kumere","Kepler",Refined Fuel,0,25,0,541
-30288,"Kumere","Kepler",Refined Fuel,1,32.5,0,259.923
-30288,"Kumere","Kepler",Refined Fuel,2,36.25,0,210.713
-30288,"Kumere","Kepler",Refined Fuel,3,38.125,0,193.086
-30288,"Kumere","Kepler",Refined Fuel,4,39.0625,0,185.451
-30288,"Kumere","Kepler",Refined Fuel,5,39.5312,0,181.882
-30288,"Kumere","Kepler",Refined Fuel,6,39.7656,0,180.154
-30288,"Kumere","Kepler",Refined Fuel,7,39.8828,0,179.304
-30288,"Kumere","Kepler",Refined Fuel,8,39.9414,0,178.883
-30288,"Kumere","Kepler",Refined Fuel,9,39.9707,0,178.673
-30288,"Kumere","Kepler",Refined Fuel,10,39.9854,0,178.568
-30288,"Kumere","Kepler",Refined Fuel,11,39.9927,0,178.516
-30288,"Kumere","Kepler",Refined Fuel,12,39.9963,0,178.49
-30288,"Kumere","Kepler",Refined Fuel,13,39.9982,0,178.477
-30288,"Kumere","Kepler",Refined Fuel,14,39.9991,0,178.47
-30288,"Kumere","Kepler",Refined Fuel,15,39.9995,0,178.467
-30288,"Kumere","Kepler",Food Rations,0,15,0,946.75
-30288,"Kumere","Kepler",Food Rations,1,19.5,0,454.866
-30288,"Kumere","Kepler",Food Rations,2,21.75,0,368.747
-30288,"Kumere","Kepler",Food Rations,3,22.875,0,337.901
-30288,"Kumere","Kepler",Food Rations,4,23.4375,0,324.539
-30288,"Kumere","Kepler",Food Rations,5,23.7188,0,318.293
-30288,"Kumere","Kepler",Food Rations,6,23.8594,0,315.27
-30288,"Kumere","Kepler",Food Rations,7,23.9297,0,313.783
-30288,"Kumere","Kepler",Food Rations,8,23.9648,0,313.045
-30288,"Kumere","Kepler",Food Rations,9,23.9824,0,312.677
-30288,"Kumere","Kepler",Food Rations,10,23.9912,0,312.494
-30288,"Kumere","Kepler",Food Rations,11,23.9956,0,312.403
-30288,"Kumere","Kepler",Food Rations,12,23.9978,0,312.357
-30288,"Kumere","Kepler",Food Rations,13,23.9989,0,312.334
-30288,"Kumere","Kepler",Food Rations,14,23.9995,0,312.322
-30288,"Kumere","Kepler",Food Rations,15,23.9997,0,312.317
+30288,"Kumere","Kepler",Steel,0,20,0,486.731
+30288,"Kumere","Kepler",Steel,1,26,0,233.85
+30288,"Kumere","Kepler",Steel,2,29,0,189.576
+30288,"Kumere","Kepler",Steel,3,30.5,0,173.717
+30288,"Kumere","Kepler",Steel,4,31.25,0,166.848
+30288,"Kumere","Kepler",Steel,5,31.625,0,163.637
+30288,"Kumere","Kepler",Steel,6,31.8125,0,162.083
+30288,"Kumere","Kepler",Steel,7,31.9062,0,161.318
+30288,"Kumere","Kepler",Steel,8,31.9531,0,160.939
+30288,"Kumere","Kepler",Steel,9,31.9766,0,160.75
+30288,"Kumere","Kepler",Steel,10,31.9883,0,160.656
+30288,"Kumere","Kepler",Steel,11,31.9941,0,160.608
+30288,"Kumere","Kepler",Steel,12,31.9971,0,160.585
+30288,"Kumere","Kepler",Steel,13,31.9985,0,160.573
+30288,"Kumere","Kepler",Steel,14,31.9993,0,160.567
+30288,"Kumere","Kepler",Steel,15,31.9996,0,160.564
+30288,"Kumere","Kepler",Refined Fuel,0,25,0,432.65
+30288,"Kumere","Kepler",Refined Fuel,1,32.5,0,207.867
+30288,"Kumere","Kepler",Refined Fuel,2,36.25,0,168.512
+30288,"Kumere","Kepler",Refined Fuel,3,38.125,0,154.415
+30288,"Kumere","Kepler",Refined Fuel,4,39.0625,0,148.309
+30288,"Kumere","Kepler",Refined Fuel,5,39.5312,0,145.455
+30288,"Kumere","Kepler",Refined Fuel,6,39.7656,0,144.074
+30288,"Kumere","Kepler",Refined Fuel,7,39.8828,0,143.394
+30288,"Kumere","Kepler",Refined Fuel,8,39.9414,0,143.057
+30288,"Kumere","Kepler",Refined Fuel,9,39.9707,0,142.889
+30288,"Kumere","Kepler",Refined Fuel,10,39.9854,0,142.805
+30288,"Kumere","Kepler",Refined Fuel,11,39.9927,0,142.763
+30288,"Kumere","Kepler",Refined Fuel,12,39.9963,0,142.742
+30288,"Kumere","Kepler",Refined Fuel,13,39.9982,0,142.732
+30288,"Kumere","Kepler",Refined Fuel,14,39.9991,0,142.727
+30288,"Kumere","Kepler",Refined Fuel,15,39.9995,0,142.724
+30288,"Kumere","Kepler",Food Rations,0,15,0,757.138
+30288,"Kumere","Kepler",Food Rations,1,19.5,0,363.767
+30288,"Kumere","Kepler",Food Rations,2,21.75,0,294.895
+30288,"Kumere","Kepler",Food Rations,3,22.875,0,270.227
+30288,"Kumere","Kepler",Food Rations,4,23.4375,0,259.542
+30288,"Kumere","Kepler",Food Rations,5,23.7188,0,254.546
+30288,"Kumere","Kepler",Food Rations,6,23.8594,0,252.129
+30288,"Kumere","Kepler",Food Rations,7,23.9297,0,250.939
+30288,"Kumere","Kepler",Food Rations,8,23.9648,0,250.349
+30288,"Kumere","Kepler",Food Rations,9,23.9824,0,250.055
+30288,"Kumere","Kepler",Food Rations,10,23.9912,0,249.909
+30288,"Kumere","Kepler",Food Rations,11,23.9956,0,249.835
+30288,"Kumere","Kepler",Food Rations,12,23.9978,0,249.799
+30288,"Kumere","Kepler",Food Rations,13,23.9989,0,249.781
+30288,"Kumere","Kepler",Food Rations,14,23.9995,0,249.771
+30288,"Kumere","Kepler",Food Rations,15,23.9997,0,249.767
 30288,"Kumere","Kepler",(unnamed resource),0,2,0,0
 30288,"Kumere","Kepler",(unnamed resource),1,2,0,0
 30288,"Kumere","Kepler",(unnamed resource),2,2,0,0
@@ -271,70 +271,70 @@ market_id,market_label,body_name,resource,tick,price,supply,demand
 30288,"Kumere","Kepler",(unnamed resource),13,15,0,0
 30288,"Kumere","Kepler",(unnamed resource),14,15,0,0
 30288,"Kumere","Kepler",(unnamed resource),15,15,0,0
-30289,"New WaeVaillham","Kepler",Iron Ore,0,1.5625,3498.26,101.806
-30289,"New WaeVaillham","Kepler",Iron Ore,1,1.09375,6605.58,148.276
-30289,"New WaeVaillham","Kepler",Iron Ore,2,0.859375,6649.65,197.239
-30289,"New WaeVaillham","Kepler",Iron Ore,3,0.742188,6687.42,239.211
-30289,"New WaeVaillham","Kepler",Iron Ore,4,0.683594,6701.2,254.516
-30289,"New WaeVaillham","Kepler",Iron Ore,5,0.654297,6701.2,254.516
-30289,"New WaeVaillham","Kepler",Iron Ore,6,0.639648,6701.2,254.516
-30289,"New WaeVaillham","Kepler",Iron Ore,7,0.632324,6701.2,254.516
-30289,"New WaeVaillham","Kepler",Iron Ore,8,0.628662,6701.2,254.516
-30289,"New WaeVaillham","Kepler",Iron Ore,9,0.626831,6701.2,254.516
-30289,"New WaeVaillham","Kepler",Iron Ore,10,0.625916,6701.2,254.516
-30289,"New WaeVaillham","Kepler",Iron Ore,11,0.625458,6701.2,254.516
-30289,"New WaeVaillham","Kepler",Iron Ore,12,0.625229,6701.2,254.516
-30289,"New WaeVaillham","Kepler",Iron Ore,13,0.625114,6701.2,254.516
-30289,"New WaeVaillham","Kepler",Iron Ore,14,0.625057,6701.2,254.516
-30289,"New WaeVaillham","Kepler",Iron Ore,15,0.625029,6701.2,254.516
-30289,"New WaeVaillham","Kepler",Petroleum,0,3.1895,128.967,87.2625
-30289,"New WaeVaillham","Kepler",Petroleum,1,8.59475,0,93.9948
-30289,"New WaeVaillham","Kepler",Petroleum,2,11.2974,0,42.53
-30289,"New WaeVaillham","Kepler",Petroleum,3,12.6487,0,34.1743
-30289,"New WaeVaillham","Kepler",Petroleum,4,13.3243,0,31.2209
-30289,"New WaeVaillham","Kepler",Petroleum,5,13.6622,0,29.9478
-30289,"New WaeVaillham","Kepler",Petroleum,6,13.8311,0,29.3539
-30289,"New WaeVaillham","Kepler",Petroleum,7,13.9155,0,29.0668
-30289,"New WaeVaillham","Kepler",Petroleum,8,13.9578,0,28.9256
-30289,"New WaeVaillham","Kepler",Petroleum,9,13.9789,0,28.8555
-30289,"New WaeVaillham","Kepler",Petroleum,10,13.9894,0,28.8207
-30289,"New WaeVaillham","Kepler",Petroleum,11,13.9947,0,28.8033
-30289,"New WaeVaillham","Kepler",Petroleum,12,13.9974,0,28.7946
-30289,"New WaeVaillham","Kepler",Petroleum,13,13.9987,0,28.7902
-30289,"New WaeVaillham","Kepler",Petroleum,14,13.9993,0,28.7881
-30289,"New WaeVaillham","Kepler",Petroleum,15,13.9997,0,28.787
-30289,"New WaeVaillham","Kepler",Agricultural Produce,0,2.17013,826.598,164.981
-30289,"New WaeVaillham","Kepler",Agricultural Produce,1,1.69648,1277.73,212.289
-30289,"New WaeVaillham","Kepler",Agricultural Produce,2,1.51107,1318.35,257.422
-30289,"New WaeVaillham","Kepler",Agricultural Produce,3,1.44344,1340.39,281.91
-30289,"New WaeVaillham","Kepler",Agricultural Produce,4,1.41971,1349.68,292.241
-30289,"New WaeVaillham","Kepler",Agricultural Produce,5,1.41151,1353.14,296.077
-30289,"New WaeVaillham","Kepler",Agricultural Produce,6,1.40869,1354.35,297.429
-30289,"New WaeVaillham","Kepler",Agricultural Produce,7,1.40773,1354.77,297.896
-30289,"New WaeVaillham","Kepler",Agricultural Produce,8,1.4074,1354.92,298.057
-30289,"New WaeVaillham","Kepler",Agricultural Produce,9,1.40728,1354.97,298.112
-30289,"New WaeVaillham","Kepler",Agricultural Produce,10,1.40724,1354.98,298.131
-30289,"New WaeVaillham","Kepler",Agricultural Produce,11,1.40723,1354.99,298.137
-30289,"New WaeVaillham","Kepler",Agricultural Produce,12,1.40723,1354.99,298.139
-30289,"New WaeVaillham","Kepler",Agricultural Produce,13,1.40722,1354.99,298.14
-30289,"New WaeVaillham","Kepler",Agricultural Produce,14,1.40722,1354.99,298.14
-30289,"New WaeVaillham","Kepler",Agricultural Produce,15,1.40722,1354.99,298.14
-30289,"New WaeVaillham","Kepler",Water,0,1.26895,243.017,116.35
-30289,"New WaeVaillham","Kepler",Water,1,1.42504,119.709,133.01
-30289,"New WaeVaillham","Kepler",Water,2,1.50309,109.099,121.221
-30289,"New WaeVaillham","Kepler",Water,3,1.54212,104.543,116.158
-30289,"New WaeVaillham","Kepler",Water,4,1.56163,102.421,113.801
-30289,"New WaeVaillham","Kepler",Water,5,1.57138,101.396,112.662
-30289,"New WaeVaillham","Kepler",Water,6,1.57626,100.892,112.102
-30289,"New WaeVaillham","Kepler",Water,7,1.5787,100.642,111.824
-30289,"New WaeVaillham","Kepler",Water,8,1.57992,100.518,111.686
-30289,"New WaeVaillham","Kepler",Water,9,1.58053,100.456,111.617
-30289,"New WaeVaillham","Kepler",Water,10,1.58083,100.425,111.583
-30289,"New WaeVaillham","Kepler",Water,11,1.58099,100.409,111.566
-30289,"New WaeVaillham","Kepler",Water,12,1.58106,100.401,111.557
-30289,"New WaeVaillham","Kepler",Water,13,1.5811,100.397,111.553
-30289,"New WaeVaillham","Kepler",Water,14,1.58112,100.396,111.551
-30289,"New WaeVaillham","Kepler",Water,15,1.58113,100.395,111.549
+30289,"New WaeVaillham","Kepler",Iron Ore,0,2.56762,88.6725,98.525
+30289,"New WaeVaillham","Kepler",Iron Ore,1,2.60142,86.7994,96.4438
+30289,"New WaeVaillham","Kepler",Iron Ore,2,2.61833,85.8958,95.4398
+30289,"New WaeVaillham","Kepler",Iron Ore,3,2.62678,94.9959,94.9466
+30289,"New WaeVaillham","Kepler",Iron Ore,4,2.63101,85.2319,94.7021
+30289,"New WaeVaillham","Kepler",Iron Ore,5,2.63312,94.5926,94.5804
+30289,"New WaeVaillham","Kepler",Iron Ore,6,2.63417,85.0677,94.5197
+30289,"New WaeVaillham","Kepler",Iron Ore,7,2.6347,94.4924,94.4893
+30289,"New WaeVaillham","Kepler",Iron Ore,8,2.63497,85.0268,94.4742
+30289,"New WaeVaillham","Kepler",Iron Ore,9,2.6351,94.4674,94.4666
+30289,"New WaeVaillham","Kepler",Iron Ore,10,2.63517,85.0165,94.4628
+30289,"New WaeVaillham","Kepler",Iron Ore,11,2.6352,94.4611,94.4609
+30289,"New WaeVaillham","Kepler",Iron Ore,12,2.63521,85.014,94.46
+30289,"New WaeVaillham","Kepler",Iron Ore,13,2.63522,94.4595,94.4595
+30289,"New WaeVaillham","Kepler",Iron Ore,14,2.63523,85.0133,94.4593
+30289,"New WaeVaillham","Kepler",Iron Ore,15,2.63523,94.4592,94.4591
+30289,"New WaeVaillham","Kepler",Petroleum,0,8.75,0,84.45
+30289,"New WaeVaillham","Kepler",Petroleum,1,11.375,0,40.574
+30289,"New WaeVaillham","Kepler",Petroleum,2,12.6875,0,32.8922
+30289,"New WaeVaillham","Kepler",Petroleum,3,13.3438,0,30.1407
+30289,"New WaeVaillham","Kepler",Petroleum,4,13.6719,0,28.9489
+30289,"New WaeVaillham","Kepler",Petroleum,5,13.8359,0,28.3917
+30289,"New WaeVaillham","Kepler",Petroleum,6,13.918,0,28.1221
+30289,"New WaeVaillham","Kepler",Petroleum,7,13.959,0,27.9894
+30289,"New WaeVaillham","Kepler",Petroleum,8,13.9795,0,27.9236
+30289,"New WaeVaillham","Kepler",Petroleum,9,13.9897,0,27.8908
+30289,"New WaeVaillham","Kepler",Petroleum,10,13.9949,0,27.8744
+30289,"New WaeVaillham","Kepler",Petroleum,11,13.9974,0,27.8663
+30289,"New WaeVaillham","Kepler",Petroleum,12,13.9987,0,27.8622
+30289,"New WaeVaillham","Kepler",Petroleum,13,13.9994,0,27.8602
+30289,"New WaeVaillham","Kepler",Petroleum,14,13.9997,0,27.8591
+30289,"New WaeVaillham","Kepler",Petroleum,15,13.9998,0,27.8586
+30289,"New WaeVaillham","Kepler",Agricultural Produce,0,3.10647,139.342,159.825
+30289,"New WaeVaillham","Kepler",Agricultural Produce,1,3.16041,135.509,155.565
+30289,"New WaeVaillham","Kepler",Agricultural Produce,2,3.18774,133.655,153.506
+30289,"New WaeVaillham","Kepler",Agricultural Produce,3,3.20159,132.738,152.486
+30289,"New WaeVaillham","Kepler",Agricultural Produce,4,3.2086,132.278,151.976
+30289,"New WaeVaillham","Kepler",Agricultural Produce,5,3.21216,132.047,151.719
+30289,"New WaeVaillham","Kepler",Agricultural Produce,6,3.21396,131.93,151.589
+30289,"New WaeVaillham","Kepler",Agricultural Produce,7,3.21487,131.871,151.523
+30289,"New WaeVaillham","Kepler",Agricultural Produce,8,3.21533,131.841,151.49
+30289,"New WaeVaillham","Kepler",Agricultural Produce,9,3.21556,131.826,151.473
+30289,"New WaeVaillham","Kepler",Agricultural Produce,10,3.21568,131.818,151.464
+30289,"New WaeVaillham","Kepler",Agricultural Produce,11,3.21574,131.814,151.46
+30289,"New WaeVaillham","Kepler",Agricultural Produce,12,3.21577,131.812,151.458
+30289,"New WaeVaillham","Kepler",Agricultural Produce,13,3.21579,131.811,151.457
+30289,"New WaeVaillham","Kepler",Agricultural Produce,14,3.2158,131.811,151.456
+30289,"New WaeVaillham","Kepler",Agricultural Produce,15,3.2158,131.81,151.456
+30289,"New WaeVaillham","Kepler",Water,0,1.54057,101.34,112.6
+30289,"New WaeVaillham","Kepler",Water,1,1.56085,99.1994,110.222
+30289,"New WaeVaillham","Kepler",Water,2,1.571,98.1667,109.074
+30289,"New WaeVaillham","Kepler",Water,3,1.57607,97.6593,108.51
+30289,"New WaeVaillham","Kepler",Water,4,1.5786,97.4079,108.231
+30289,"New WaeVaillham","Kepler",Water,5,1.57987,97.2827,108.092
+30289,"New WaeVaillham","Kepler",Water,6,1.5805,97.2202,108.022
+30289,"New WaeVaillham","Kepler",Water,7,1.58082,97.189,107.988
+30289,"New WaeVaillham","Kepler",Water,8,1.58098,97.1734,107.97
+30289,"New WaeVaillham","Kepler",Water,9,1.58106,97.1656,107.962
+30289,"New WaeVaillham","Kepler",Water,10,1.5811,97.1617,107.957
+30289,"New WaeVaillham","Kepler",Water,11,1.58112,97.1598,107.955
+30289,"New WaeVaillham","Kepler",Water,12,1.58113,97.1588,107.954
+30289,"New WaeVaillham","Kepler",Water,13,1.58113,97.1583,107.954
+30289,"New WaeVaillham","Kepler",Water,14,1.58114,97.1581,107.953
+30289,"New WaeVaillham","Kepler",Water,15,1.58114,97.158,107.953
 30289,"New WaeVaillham","Kepler",Tobacco,0,7.2997,0,0
 30289,"New WaeVaillham","Kepler",Tobacco,1,7.2997,0,0
 30289,"New WaeVaillham","Kepler",Tobacco,2,7.2997,0,0
@@ -367,54 +367,54 @@ market_id,market_label,body_name,resource,tick,price,supply,demand
 30289,"New WaeVaillham","Kepler",Coffee,13,2.12092,0,0
 30289,"New WaeVaillham","Kepler",Coffee,14,2.12092,0,0
 30289,"New WaeVaillham","Kepler",Coffee,15,2.12092,0,0
-30289,"New WaeVaillham","Kepler",Steel,0,11.9085,33.4847,130.894
-30289,"New WaeVaillham","Kepler",Steel,1,21.9543,0,95.2147
-30289,"New WaeVaillham","Kepler",Steel,2,26.9771,0,58.3681
-30289,"New WaeVaillham","Kepler",Steel,3,29.4886,0,49.4988
-30289,"New WaeVaillham","Kepler",Steel,4,30.7443,0,46.0965
-30289,"New WaeVaillham","Kepler",Steel,5,31.3721,0,44.584
-30289,"New WaeVaillham","Kepler",Steel,6,31.6861,0,43.8688
-30289,"New WaeVaillham","Kepler",Steel,7,31.843,0,43.5207
-30289,"New WaeVaillham","Kepler",Steel,8,31.9215,0,43.349
-30289,"New WaeVaillham","Kepler",Steel,9,31.9608,0,43.2637
-30289,"New WaeVaillham","Kepler",Steel,10,31.9804,0,43.2212
-30289,"New WaeVaillham","Kepler",Steel,11,31.9902,0,43.2
-30289,"New WaeVaillham","Kepler",Steel,12,31.9951,0,43.1894
-30289,"New WaeVaillham","Kepler",Steel,13,31.9975,0,43.1841
-30289,"New WaeVaillham","Kepler",Steel,14,31.9988,0,43.1815
-30289,"New WaeVaillham","Kepler",Steel,15,31.9994,0,43.1802
-30289,"New WaeVaillham","Kepler",Refined Fuel,0,15.4626,26.5721,116.35
-30289,"New WaeVaillham","Kepler",Refined Fuel,1,27.7313,0,82.0994
-30289,"New WaeVaillham","Kepler",Refined Fuel,2,33.8657,0,51.4506
-30289,"New WaeVaillham","Kepler",Refined Fuel,3,36.9328,0,43.8489
-30289,"New WaeVaillham","Kepler",Refined Fuel,4,38.4664,0,40.9106
-30289,"New WaeVaillham","Kepler",Refined Fuel,5,39.2332,0,39.6005
-30289,"New WaeVaillham","Kepler",Refined Fuel,6,39.6166,0,38.9801
-30289,"New WaeVaillham","Kepler",Refined Fuel,7,39.8083,0,38.6781
-30289,"New WaeVaillham","Kepler",Refined Fuel,8,39.9042,0,38.529
-30289,"New WaeVaillham","Kepler",Refined Fuel,9,39.9521,0,38.4549
-30289,"New WaeVaillham","Kepler",Refined Fuel,10,39.976,0,38.418
-30289,"New WaeVaillham","Kepler",Refined Fuel,11,39.988,0,38.3996
-30289,"New WaeVaillham","Kepler",Refined Fuel,12,39.994,0,38.3904
-30289,"New WaeVaillham","Kepler",Refined Fuel,13,39.997,0,38.3858
-30289,"New WaeVaillham","Kepler",Refined Fuel,14,39.9985,0,38.3835
-30289,"New WaeVaillham","Kepler",Refined Fuel,15,39.9993,0,38.3823
-30289,"New WaeVaillham","Kepler",Food Rations,0,10.6815,31.0567,203.613
-30289,"New WaeVaillham","Kepler",Food Rations,1,17.3407,0,128.357
-30289,"New WaeVaillham","Kepler",Food Rations,2,20.6704,0,87.1106
-30289,"New WaeVaillham","Kepler",Food Rations,3,22.3352,0,75.6914
-30289,"New WaeVaillham","Kepler",Food Rations,4,23.1676,0,71.1433
-30289,"New WaeVaillham","Kepler",Food Rations,5,23.5838,0,69.0909
-30289,"New WaeVaillham","Kepler",Food Rations,6,23.7919,0,68.1137
-30289,"New WaeVaillham","Kepler",Food Rations,7,23.896,0,67.6367
-30289,"New WaeVaillham","Kepler",Food Rations,8,23.948,0,67.4009
-30289,"New WaeVaillham","Kepler",Food Rations,9,23.974,0,67.2838
-30289,"New WaeVaillham","Kepler",Food Rations,10,23.987,0,67.2254
-30289,"New WaeVaillham","Kepler",Food Rations,11,23.9935,0,67.1962
-30289,"New WaeVaillham","Kepler",Food Rations,12,23.9967,0,67.1816
-30289,"New WaeVaillham","Kepler",Food Rations,13,23.9984,0,67.1744
-30289,"New WaeVaillham","Kepler",Food Rations,14,23.9992,0,67.1707
-30289,"New WaeVaillham","Kepler",Food Rations,15,23.9996,0,67.1689
+30289,"New WaeVaillham","Kepler",Steel,0,20,0,126.675
+30289,"New WaeVaillham","Kepler",Steel,1,26,0,60.861
+30289,"New WaeVaillham","Kepler",Steel,2,29,0,49.3383
+30289,"New WaeVaillham","Kepler",Steel,3,30.5,0,45.211
+30289,"New WaeVaillham","Kepler",Steel,4,31.25,0,43.4233
+30289,"New WaeVaillham","Kepler",Steel,5,31.625,0,42.5876
+30289,"New WaeVaillham","Kepler",Steel,6,31.8125,0,42.1831
+30289,"New WaeVaillham","Kepler",Steel,7,31.9062,0,41.9841
+30289,"New WaeVaillham","Kepler",Steel,8,31.9531,0,41.8854
+30289,"New WaeVaillham","Kepler",Steel,9,31.9766,0,41.8362
+30289,"New WaeVaillham","Kepler",Steel,10,31.9883,0,41.8117
+30289,"New WaeVaillham","Kepler",Steel,11,31.9941,0,41.7994
+30289,"New WaeVaillham","Kepler",Steel,12,31.9971,0,41.7933
+30289,"New WaeVaillham","Kepler",Steel,13,31.9985,0,41.7902
+30289,"New WaeVaillham","Kepler",Steel,14,31.9993,0,41.7887
+30289,"New WaeVaillham","Kepler",Steel,15,31.9996,0,41.7879
+30289,"New WaeVaillham","Kepler",Refined Fuel,0,25,0,112.6
+30289,"New WaeVaillham","Kepler",Refined Fuel,1,32.5,0,54.0986
+30289,"New WaeVaillham","Kepler",Refined Fuel,2,36.25,0,43.8563
+30289,"New WaeVaillham","Kepler",Refined Fuel,3,38.125,0,40.1876
+30289,"New WaeVaillham","Kepler",Refined Fuel,4,39.0625,0,38.5985
+30289,"New WaeVaillham","Kepler",Refined Fuel,5,39.5312,0,37.8556
+30289,"New WaeVaillham","Kepler",Refined Fuel,6,39.7656,0,37.4961
+30289,"New WaeVaillham","Kepler",Refined Fuel,7,39.8828,0,37.3192
+30289,"New WaeVaillham","Kepler",Refined Fuel,8,39.9414,0,37.2314
+30289,"New WaeVaillham","Kepler",Refined Fuel,9,39.9707,0,37.1877
+30289,"New WaeVaillham","Kepler",Refined Fuel,10,39.9854,0,37.1659
+30289,"New WaeVaillham","Kepler",Refined Fuel,11,39.9927,0,37.155
+30289,"New WaeVaillham","Kepler",Refined Fuel,12,39.9963,0,37.1496
+30289,"New WaeVaillham","Kepler",Refined Fuel,13,39.9982,0,37.1469
+30289,"New WaeVaillham","Kepler",Refined Fuel,14,39.9991,0,37.1455
+30289,"New WaeVaillham","Kepler",Refined Fuel,15,39.9995,0,37.1448
+30289,"New WaeVaillham","Kepler",Food Rations,0,15,0,197.05
+30289,"New WaeVaillham","Kepler",Food Rations,1,19.5,0,94.6726
+30289,"New WaeVaillham","Kepler",Food Rations,2,21.75,0,76.7485
+30289,"New WaeVaillham","Kepler",Food Rations,3,22.875,0,70.3283
+30289,"New WaeVaillham","Kepler",Food Rations,4,23.4375,0,67.5474
+30289,"New WaeVaillham","Kepler",Food Rations,5,23.7188,0,66.2473
+30289,"New WaeVaillham","Kepler",Food Rations,6,23.8594,0,65.6182
+30289,"New WaeVaillham","Kepler",Food Rations,7,23.9297,0,65.3086
+30289,"New WaeVaillham","Kepler",Food Rations,8,23.9648,0,65.155
+30289,"New WaeVaillham","Kepler",Food Rations,9,23.9824,0,65.0785
+30289,"New WaeVaillham","Kepler",Food Rations,10,23.9912,0,65.0404
+30289,"New WaeVaillham","Kepler",Food Rations,11,23.9956,0,65.0213
+30289,"New WaeVaillham","Kepler",Food Rations,12,23.9978,0,65.0118
+30289,"New WaeVaillham","Kepler",Food Rations,13,23.9989,0,65.007
+30289,"New WaeVaillham","Kepler",Food Rations,14,23.9995,0,65.0046
+30289,"New WaeVaillham","Kepler",Food Rations,15,23.9997,0,65.0034
 30289,"New WaeVaillham","Kepler",(unnamed resource),0,2,0,0
 30289,"New WaeVaillham","Kepler",(unnamed resource),1,2,0,0
 30289,"New WaeVaillham","Kepler",(unnamed resource),2,2,0,0
@@ -543,547 +543,1091 @@ market_id,market_label,body_name,resource,tick,price,supply,demand
 30289,"New WaeVaillham","Kepler",(unnamed resource),13,15,0,0
 30289,"New WaeVaillham","Kepler",(unnamed resource),14,15,0,0
 30289,"New WaeVaillham","Kepler",(unnamed resource),15,15,0,0
-30290,"Kidford","Kepler",Iron Ore,0,2.56762,82.0969,91.2188
-30290,"Kidford","Kepler",Iron Ore,1,2.60142,80.3627,89.2919
-30290,"Kidford","Kepler",Iron Ore,2,2.61833,79.5261,88.3624
-30290,"Kidford","Kepler",Iron Ore,3,2.62678,79.1151,87.9057
-30290,"Kidford","Kepler",Iron Ore,4,2.63101,78.9114,87.6793
-30290,"Kidford","Kepler",Iron Ore,5,2.63312,78.81,87.5667
-30290,"Kidford","Kepler",Iron Ore,6,2.63417,78.7594,87.5104
-30290,"Kidford","Kepler",Iron Ore,7,2.6347,78.7341,87.4824
-30290,"Kidford","Kepler",Iron Ore,8,2.63497,78.7215,87.4683
-30290,"Kidford","Kepler",Iron Ore,9,2.6351,78.7152,87.4613
-30290,"Kidford","Kepler",Iron Ore,10,2.63517,78.712,87.4578
-30290,"Kidford","Kepler",Iron Ore,11,2.6352,78.7104,87.456
-30290,"Kidford","Kepler",Iron Ore,12,2.63521,78.7097,87.4552
-30290,"Kidford","Kepler",Iron Ore,13,2.63522,78.7093,87.4547
-30290,"Kidford","Kepler",Iron Ore,14,2.63523,78.7091,87.4545
-30290,"Kidford","Kepler",Iron Ore,15,2.63523,78.709,87.4544
-30290,"Kidford","Kepler",Petroleum,0,8.75,0,78.1875
-30290,"Kidford","Kepler",Petroleum,1,11.375,0,37.5652
-30290,"Kidford","Kepler",Petroleum,2,12.6875,0,30.453
-30290,"Kidford","Kepler",Petroleum,3,13.3438,0,27.9056
-30290,"Kidford","Kepler",Petroleum,4,13.6719,0,26.8021
-30290,"Kidford","Kepler",Petroleum,5,13.8359,0,26.2863
-30290,"Kidford","Kepler",Petroleum,6,13.918,0,26.0366
-30290,"Kidford","Kepler",Petroleum,7,13.959,0,25.9138
-30290,"Kidford","Kepler",Petroleum,8,13.9795,0,25.8529
-30290,"Kidford","Kepler",Petroleum,9,13.9897,0,25.8225
-30290,"Kidford","Kepler",Petroleum,10,13.9949,0,25.8074
-30290,"Kidford","Kepler",Petroleum,11,13.9974,0,25.7998
-30290,"Kidford","Kepler",Petroleum,12,13.9987,0,25.796
-30290,"Kidford","Kepler",Petroleum,13,13.9994,0,25.7941
-30290,"Kidford","Kepler",Petroleum,14,13.9997,0,25.7932
-30290,"Kidford","Kepler",Petroleum,15,13.9998,0,25.7927
-30290,"Kidford","Kepler",Agricultural Produce,0,7.5,0,148.344
-30290,"Kidford","Kepler",Agricultural Produce,1,9.75,0,73.8695
-30290,"Kidford","Kepler",Agricultural Produce,2,10.875,0,60.8306
-30290,"Kidford","Kepler",Agricultural Produce,3,11.4375,0,56.1602
-30290,"Kidford","Kepler",Agricultural Produce,4,11.7188,0,54.1372
-30290,"Kidford","Kepler",Agricultural Produce,5,11.8594,0,53.1915
-30290,"Kidford","Kepler",Agricultural Produce,6,11.9297,0,52.7338
-30290,"Kidford","Kepler",Agricultural Produce,7,11.9648,0,52.5086
-30290,"Kidford","Kepler",Agricultural Produce,8,11.9824,0,52.3969
-30290,"Kidford","Kepler",Agricultural Produce,9,11.9912,0,52.3413
-30290,"Kidford","Kepler",Agricultural Produce,10,11.9956,0,52.3135
-30290,"Kidford","Kepler",Agricultural Produce,11,11.9978,0,52.2997
-30290,"Kidford","Kepler",Agricultural Produce,12,11.9989,0,52.2927
-30290,"Kidford","Kepler",Agricultural Produce,13,11.9995,0,52.2893
-30290,"Kidford","Kepler",Agricultural Produce,14,11.9997,0,52.2875
-30290,"Kidford","Kepler",Agricultural Produce,15,11.9999,0,52.2867
-30290,"Kidford","Kepler",Water,0,1.54057,93.825,104.25
-30290,"Kidford","Kepler",Water,1,1.56085,91.8431,102.048
-30290,"Kidford","Kepler",Water,2,1.571,90.887,100.986
-30290,"Kidford","Kepler",Water,3,1.57607,90.4173,100.464
-30290,"Kidford","Kepler",Water,4,1.5786,90.1844,100.205
-30290,"Kidford","Kepler",Water,5,1.57987,90.0686,100.076
-30290,"Kidford","Kepler",Water,6,1.5805,90.0107,100.012
-30290,"Kidford","Kepler",Water,7,1.58082,89.9818,99.9798
-30290,"Kidford","Kepler",Water,8,1.58098,89.9674,99.9638
-30290,"Kidford","Kepler",Water,9,1.58106,89.9602,99.9558
-30290,"Kidford","Kepler",Water,10,1.5811,89.9566,99.9518
-30290,"Kidford","Kepler",Water,11,1.58112,89.9548,99.9498
-30290,"Kidford","Kepler",Water,12,1.58113,89.9539,99.9488
-30290,"Kidford","Kepler",Water,13,1.58113,89.9534,99.9483
-30290,"Kidford","Kepler",Water,14,1.58114,89.9532,99.948
-30290,"Kidford","Kepler",Water,15,1.58114,89.9531,99.9479
-30290,"Kidford","Kepler",Tobacco,0,4.16999,0,0
-30290,"Kidford","Kepler",Tobacco,1,4.16999,0,0
-30290,"Kidford","Kepler",Tobacco,2,4.16999,0,0
-30290,"Kidford","Kepler",Tobacco,3,4.16999,0,0
-30290,"Kidford","Kepler",Tobacco,4,4.16999,0,0
-30290,"Kidford","Kepler",Tobacco,5,4.16999,0,0
-30290,"Kidford","Kepler",Tobacco,6,4.16999,0,0
-30290,"Kidford","Kepler",Tobacco,7,4.16999,0,0
-30290,"Kidford","Kepler",Tobacco,8,4.16999,0,0
-30290,"Kidford","Kepler",Tobacco,9,4.16999,0,0
-30290,"Kidford","Kepler",Tobacco,10,4.16999,0,0
-30290,"Kidford","Kepler",Tobacco,11,4.16999,0,0
-30290,"Kidford","Kepler",Tobacco,12,4.16999,0,0
-30290,"Kidford","Kepler",Tobacco,13,4.16999,0,0
-30290,"Kidford","Kepler",Tobacco,14,4.16999,0,0
-30290,"Kidford","Kepler",Tobacco,15,4.16999,0,0
-30290,"Kidford","Kepler",Coffee,0,4.48392,0,0
-30290,"Kidford","Kepler",Coffee,1,4.48392,0,0
-30290,"Kidford","Kepler",Coffee,2,4.48392,0,0
-30290,"Kidford","Kepler",Coffee,3,4.48392,0,0
-30290,"Kidford","Kepler",Coffee,4,4.48392,0,0
-30290,"Kidford","Kepler",Coffee,5,4.48392,0,0
-30290,"Kidford","Kepler",Coffee,6,4.48392,0,0
-30290,"Kidford","Kepler",Coffee,7,4.48392,0,0
-30290,"Kidford","Kepler",Coffee,8,4.48392,0,0
-30290,"Kidford","Kepler",Coffee,9,4.48392,0,0
-30290,"Kidford","Kepler",Coffee,10,4.48392,0,0
-30290,"Kidford","Kepler",Coffee,11,4.48392,0,0
-30290,"Kidford","Kepler",Coffee,12,4.48392,0,0
-30290,"Kidford","Kepler",Coffee,13,4.48392,0,0
-30290,"Kidford","Kepler",Coffee,14,4.48392,0,0
-30290,"Kidford","Kepler",Coffee,15,4.48392,0,0
-30290,"Kidford","Kepler",Steel,0,20,0,117.281
-30290,"Kidford","Kepler",Steel,1,26,0,56.3477
-30290,"Kidford","Kepler",Steel,2,29,0,45.6796
-30290,"Kidford","Kepler",Steel,3,30.5,0,41.8584
-30290,"Kidford","Kepler",Steel,4,31.25,0,40.2032
-30290,"Kidford","Kepler",Steel,5,31.625,0,39.4294
-30290,"Kidford","Kepler",Steel,6,31.8125,0,39.055
-30290,"Kidford","Kepler",Steel,7,31.9062,0,38.8707
-30290,"Kidford","Kepler",Steel,8,31.9531,0,38.7793
-30290,"Kidford","Kepler",Steel,9,31.9766,0,38.7338
-30290,"Kidford","Kepler",Steel,10,31.9883,0,38.7111
-30290,"Kidford","Kepler",Steel,11,31.9941,0,38.6997
-30290,"Kidford","Kepler",Steel,12,31.9971,0,38.694
-30290,"Kidford","Kepler",Steel,13,31.9985,0,38.6912
-30290,"Kidford","Kepler",Steel,14,31.9993,0,38.6898
-30290,"Kidford","Kepler",Steel,15,31.9996,0,38.6891
-30290,"Kidford","Kepler",Refined Fuel,0,25,0,104.25
-30290,"Kidford","Kepler",Refined Fuel,1,32.5,0,50.0869
-30290,"Kidford","Kepler",Refined Fuel,2,36.25,0,40.6041
-30290,"Kidford","Kepler",Refined Fuel,3,38.125,0,37.2074
-30290,"Kidford","Kepler",Refined Fuel,4,39.0625,0,35.7362
-30290,"Kidford","Kepler",Refined Fuel,5,39.5312,0,35.0484
-30290,"Kidford","Kepler",Refined Fuel,6,39.7656,0,34.7155
-30290,"Kidford","Kepler",Refined Fuel,7,39.8828,0,34.5517
-30290,"Kidford","Kepler",Refined Fuel,8,39.9414,0,34.4705
-30290,"Kidford","Kepler",Refined Fuel,9,39.9707,0,34.43
-30290,"Kidford","Kepler",Refined Fuel,10,39.9854,0,34.4098
-30290,"Kidford","Kepler",Refined Fuel,11,39.9927,0,34.3998
-30290,"Kidford","Kepler",Refined Fuel,12,39.9963,0,34.3947
-30290,"Kidford","Kepler",Refined Fuel,13,39.9982,0,34.3922
-30290,"Kidford","Kepler",Refined Fuel,14,39.9991,0,34.3909
-30290,"Kidford","Kepler",Refined Fuel,15,39.9995,0,34.3903
-30290,"Kidford","Kepler",Food Rations,0,15,0,182.438
-30290,"Kidford","Kepler",Food Rations,1,19.5,0,87.6521
-30290,"Kidford","Kepler",Food Rations,2,21.75,0,71.0571
-30290,"Kidford","Kepler",Food Rations,3,22.875,0,65.113
-30290,"Kidford","Kepler",Food Rations,4,23.4375,0,62.5383
-30290,"Kidford","Kepler",Food Rations,5,23.7188,0,61.3347
-30290,"Kidford","Kepler",Food Rations,6,23.8594,0,60.7522
-30290,"Kidford","Kepler",Food Rations,7,23.9297,0,60.4655
-30290,"Kidford","Kepler",Food Rations,8,23.9648,0,60.3234
-30290,"Kidford","Kepler",Food Rations,9,23.9824,0,60.2525
-30290,"Kidford","Kepler",Food Rations,10,23.9912,0,60.2172
-30290,"Kidford","Kepler",Food Rations,11,23.9956,0,60.1996
-30290,"Kidford","Kepler",Food Rations,12,23.9978,0,60.1907
-30290,"Kidford","Kepler",Food Rations,13,23.9989,0,60.1863
-30290,"Kidford","Kepler",Food Rations,14,23.9995,0,60.1841
-30290,"Kidford","Kepler",Food Rations,15,23.9997,0,60.183
-30290,"Kidford","Kepler",(unnamed resource),0,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),1,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),2,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),3,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),4,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),5,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),6,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),7,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),8,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),9,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),10,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),11,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),12,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),13,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),14,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),15,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),0,1.2,0,0
-30290,"Kidford","Kepler",(unnamed resource),1,1.2,0,0
-30290,"Kidford","Kepler",(unnamed resource),2,1.2,0,0
-30290,"Kidford","Kepler",(unnamed resource),3,1.2,0,0
-30290,"Kidford","Kepler",(unnamed resource),4,1.2,0,0
-30290,"Kidford","Kepler",(unnamed resource),5,1.2,0,0
-30290,"Kidford","Kepler",(unnamed resource),6,1.2,0,0
-30290,"Kidford","Kepler",(unnamed resource),7,1.2,0,0
-30290,"Kidford","Kepler",(unnamed resource),8,1.2,0,0
-30290,"Kidford","Kepler",(unnamed resource),9,1.2,0,0
-30290,"Kidford","Kepler",(unnamed resource),10,1.2,0,0
-30290,"Kidford","Kepler",(unnamed resource),11,1.2,0,0
-30290,"Kidford","Kepler",(unnamed resource),12,1.2,0,0
-30290,"Kidford","Kepler",(unnamed resource),13,1.2,0,0
-30290,"Kidford","Kepler",(unnamed resource),14,1.2,0,0
-30290,"Kidford","Kepler",(unnamed resource),15,1.2,0,0
-30290,"Kidford","Kepler",(unnamed resource),0,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),1,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),2,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),3,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),4,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),5,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),6,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),7,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),8,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),9,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),10,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),11,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),12,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),13,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),14,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),15,2,0,0
-30290,"Kidford","Kepler",(unnamed resource),0,5,0,0
-30290,"Kidford","Kepler",(unnamed resource),1,5,0,0
-30290,"Kidford","Kepler",(unnamed resource),2,5,0,0
-30290,"Kidford","Kepler",(unnamed resource),3,5,0,0
-30290,"Kidford","Kepler",(unnamed resource),4,5,0,0
-30290,"Kidford","Kepler",(unnamed resource),5,5,0,0
-30290,"Kidford","Kepler",(unnamed resource),6,5,0,0
-30290,"Kidford","Kepler",(unnamed resource),7,5,0,0
-30290,"Kidford","Kepler",(unnamed resource),8,5,0,0
-30290,"Kidford","Kepler",(unnamed resource),9,5,0,0
-30290,"Kidford","Kepler",(unnamed resource),10,5,0,0
-30290,"Kidford","Kepler",(unnamed resource),11,5,0,0
-30290,"Kidford","Kepler",(unnamed resource),12,5,0,0
-30290,"Kidford","Kepler",(unnamed resource),13,5,0,0
-30290,"Kidford","Kepler",(unnamed resource),14,5,0,0
-30290,"Kidford","Kepler",(unnamed resource),15,5,0,0
-30290,"Kidford","Kepler",(unnamed resource),0,4,0,0
-30290,"Kidford","Kepler",(unnamed resource),1,4,0,0
-30290,"Kidford","Kepler",(unnamed resource),2,4,0,0
-30290,"Kidford","Kepler",(unnamed resource),3,4,0,0
-30290,"Kidford","Kepler",(unnamed resource),4,4,0,0
-30290,"Kidford","Kepler",(unnamed resource),5,4,0,0
-30290,"Kidford","Kepler",(unnamed resource),6,4,0,0
-30290,"Kidford","Kepler",(unnamed resource),7,4,0,0
-30290,"Kidford","Kepler",(unnamed resource),8,4,0,0
-30290,"Kidford","Kepler",(unnamed resource),9,4,0,0
-30290,"Kidford","Kepler",(unnamed resource),10,4,0,0
-30290,"Kidford","Kepler",(unnamed resource),11,4,0,0
-30290,"Kidford","Kepler",(unnamed resource),12,4,0,0
-30290,"Kidford","Kepler",(unnamed resource),13,4,0,0
-30290,"Kidford","Kepler",(unnamed resource),14,4,0,0
-30290,"Kidford","Kepler",(unnamed resource),15,4,0,0
-30290,"Kidford","Kepler",(unnamed resource),0,6,0,0
-30290,"Kidford","Kepler",(unnamed resource),1,6,0,0
-30290,"Kidford","Kepler",(unnamed resource),2,6,0,0
-30290,"Kidford","Kepler",(unnamed resource),3,6,0,0
-30290,"Kidford","Kepler",(unnamed resource),4,6,0,0
-30290,"Kidford","Kepler",(unnamed resource),5,6,0,0
-30290,"Kidford","Kepler",(unnamed resource),6,6,0,0
-30290,"Kidford","Kepler",(unnamed resource),7,6,0,0
-30290,"Kidford","Kepler",(unnamed resource),8,6,0,0
-30290,"Kidford","Kepler",(unnamed resource),9,6,0,0
-30290,"Kidford","Kepler",(unnamed resource),10,6,0,0
-30290,"Kidford","Kepler",(unnamed resource),11,6,0,0
-30290,"Kidford","Kepler",(unnamed resource),12,6,0,0
-30290,"Kidford","Kepler",(unnamed resource),13,6,0,0
-30290,"Kidford","Kepler",(unnamed resource),14,6,0,0
-30290,"Kidford","Kepler",(unnamed resource),15,6,0,0
-30290,"Kidford","Kepler",(unnamed resource),0,50,0,0
-30290,"Kidford","Kepler",(unnamed resource),1,50,0,0
-30290,"Kidford","Kepler",(unnamed resource),2,50,0,0
-30290,"Kidford","Kepler",(unnamed resource),3,50,0,0
-30290,"Kidford","Kepler",(unnamed resource),4,50,0,0
-30290,"Kidford","Kepler",(unnamed resource),5,50,0,0
-30290,"Kidford","Kepler",(unnamed resource),6,50,0,0
-30290,"Kidford","Kepler",(unnamed resource),7,50,0,0
-30290,"Kidford","Kepler",(unnamed resource),8,50,0,0
-30290,"Kidford","Kepler",(unnamed resource),9,50,0,0
-30290,"Kidford","Kepler",(unnamed resource),10,50,0,0
-30290,"Kidford","Kepler",(unnamed resource),11,50,0,0
-30290,"Kidford","Kepler",(unnamed resource),12,50,0,0
-30290,"Kidford","Kepler",(unnamed resource),13,50,0,0
-30290,"Kidford","Kepler",(unnamed resource),14,50,0,0
-30290,"Kidford","Kepler",(unnamed resource),15,50,0,0
-30290,"Kidford","Kepler",(unnamed resource),0,15,0,0
-30290,"Kidford","Kepler",(unnamed resource),1,15,0,0
-30290,"Kidford","Kepler",(unnamed resource),2,15,0,0
-30290,"Kidford","Kepler",(unnamed resource),3,15,0,0
-30290,"Kidford","Kepler",(unnamed resource),4,15,0,0
-30290,"Kidford","Kepler",(unnamed resource),5,15,0,0
-30290,"Kidford","Kepler",(unnamed resource),6,15,0,0
-30290,"Kidford","Kepler",(unnamed resource),7,15,0,0
-30290,"Kidford","Kepler",(unnamed resource),8,15,0,0
-30290,"Kidford","Kepler",(unnamed resource),9,15,0,0
-30290,"Kidford","Kepler",(unnamed resource),10,15,0,0
-30290,"Kidford","Kepler",(unnamed resource),11,15,0,0
-30290,"Kidford","Kepler",(unnamed resource),12,15,0,0
-30290,"Kidford","Kepler",(unnamed resource),13,15,0,0
-30290,"Kidford","Kepler",(unnamed resource),14,15,0,0
-30290,"Kidford","Kepler",(unnamed resource),15,15,0,0
-30291,"Boundmarch","Kepler",Iron Ore,0,1.5625,5952.08,121.713
-30291,"Boundmarch","Kepler",Iron Ore,1,1.09375,5219.78,209.268
-30291,"Boundmarch","Kepler",Iron Ore,2,0.859375,5272.46,267.805
-30291,"Boundmarch","Kepler",Iron Ore,3,0.742954,5317.62,333.984
-30291,"Boundmarch","Kepler",Iron Ore,4,0.692713,5334.09,352.281
-30291,"Boundmarch","Kepler",Iron Ore,5,0.667593,5334.09,352.281
-30291,"Boundmarch","Kepler",Iron Ore,6,0.655033,5334.09,352.281
-30291,"Boundmarch","Kepler",Iron Ore,7,0.640016,5334.09,320.281
-30291,"Boundmarch","Kepler",Iron Ore,8,0.632508,5334.09,320.281
-30291,"Boundmarch","Kepler",Iron Ore,9,0.628754,5334.09,320.281
-30291,"Boundmarch","Kepler",Iron Ore,10,0.626877,5334.09,320.281
-30291,"Boundmarch","Kepler",Iron Ore,11,0.634675,5334.09,352.281
-30291,"Boundmarch","Kepler",Iron Ore,12,0.638574,5334.09,352.281
-30291,"Boundmarch","Kepler",Iron Ore,13,0.640523,5334.09,352.281
-30291,"Boundmarch","Kepler",Iron Ore,14,0.641498,5334.09,352.281
-30291,"Boundmarch","Kepler",Iron Ore,15,0.633249,5334.09,320.281
-30291,"Boundmarch","Kepler",Petroleum,0,2.38163,800.824,104.325
-30291,"Boundmarch","Kepler",Petroleum,1,3.03548,127.757,141.953
-30291,"Boundmarch","Kepler",Petroleum,2,3.3624,105.221,116.913
-30291,"Boundmarch","Kepler",Petroleum,3,3.52586,96.954,107.727
-30291,"Boundmarch","Kepler",Petroleum,4,3.60759,93.3411,103.712
-30291,"Boundmarch","Kepler",Petroleum,5,3.64846,91.6455,101.828
-30291,"Boundmarch","Kepler",Petroleum,6,3.66889,90.8234,100.915
-30291,"Boundmarch","Kepler",Petroleum,7,3.95261,90.4185,132.465
-30291,"Boundmarch","Kepler",Petroleum,8,4.11012,85.1879,126.653
-30291,"Boundmarch","Kepler",Petroleum,9,4.19742,82.566,123.74
-30291,"Boundmarch","Kepler",Petroleum,10,4.24576,81.1894,122.21
-30291,"Boundmarch","Kepler",Petroleum,11,3.96754,80.449,89.3878
-30291,"Boundmarch","Kepler",Petroleum,12,3.82843,84.9313,94.3682
-30291,"Boundmarch","Kepler",Petroleum,13,3.75888,87.3914,97.1015
-30291,"Boundmarch","Kepler",Petroleum,14,3.7241,88.6827,98.5363
-30291,"Boundmarch","Kepler",Petroleum,15,3.98329,89.3446,131.272
-30291,"Boundmarch","Kepler",Agricultural Produce,0,2.14217,1174.51,215.262
-30291,"Boundmarch","Kepler",Agricultural Produce,1,2.14612,534.233,274.406
-30291,"Boundmarch","Kepler",Agricultural Produce,2,1.9284,842.768,274.037
-30291,"Boundmarch","Kepler",Agricultural Produce,3,1.8433,862.873,296.376
-30291,"Boundmarch","Kepler",Agricultural Produce,4,1.81085,871.886,306.39
-30291,"Boundmarch","Kepler",Agricultural Produce,5,1.79861,875.524,310.432
-30291,"Boundmarch","Kepler",Agricultural Produce,6,1.79401,876.926,311.99
-30291,"Boundmarch","Kepler",Agricultural Produce,7,1.79229,877.458,312.581
-30291,"Boundmarch","Kepler",Agricultural Produce,8,1.79164,877.658,312.803
-30291,"Boundmarch","Kepler",Agricultural Produce,9,1.7914,877.733,312.886
-30291,"Boundmarch","Kepler",Agricultural Produce,10,1.79131,877.761,312.917
-30291,"Boundmarch","Kepler",Agricultural Produce,11,1.79127,877.771,312.929
-30291,"Boundmarch","Kepler",Agricultural Produce,12,1.79126,877.775,312.933
-30291,"Boundmarch","Kepler",Agricultural Produce,13,1.79125,877.777,312.935
-30291,"Boundmarch","Kepler",Agricultural Produce,14,1.79125,877.777,312.935
-30291,"Boundmarch","Kepler",Agricultural Produce,15,1.79125,877.777,312.936
-30291,"Boundmarch","Kepler",Water,0,1.06915,768.175,139.1
-30291,"Boundmarch","Kepler",Water,1,1.32514,164.139,182.377
-30291,"Boundmarch","Kepler",Water,2,1.45314,138.239,153.599
-30291,"Boundmarch","Kepler",Water,3,1.51714,128.409,142.677
-30291,"Boundmarch","Kepler",Water,4,1.54914,124.057,137.841
-30291,"Boundmarch","Kepler",Water,5,1.56514,122.003,135.559
-30291,"Boundmarch","Kepler",Water,6,1.57314,121.004,134.449
-30291,"Boundmarch","Kepler",Water,7,1.57714,120.512,133.902
-30291,"Boundmarch","Kepler",Water,8,1.57914,120.267,133.63
-30291,"Boundmarch","Kepler",Water,9,1.58014,120.145,133.495
-30291,"Boundmarch","Kepler",Water,10,1.58064,120.084,133.427
-30291,"Boundmarch","Kepler",Water,11,1.58089,120.054,133.393
-30291,"Boundmarch","Kepler",Water,12,1.58101,120.039,133.376
-30291,"Boundmarch","Kepler",Water,13,1.58108,120.031,133.368
-30291,"Boundmarch","Kepler",Water,14,1.58111,120.027,133.364
-30291,"Boundmarch","Kepler",Water,15,1.58112,120.025,133.362
-30291,"Boundmarch","Kepler",Tobacco,0,2.49829,0,0
-30291,"Boundmarch","Kepler",Tobacco,1,2.49829,0,0
-30291,"Boundmarch","Kepler",Tobacco,2,2.49829,0,0
-30291,"Boundmarch","Kepler",Tobacco,3,2.49829,0,0
-30291,"Boundmarch","Kepler",Tobacco,4,2.49829,0,0
-30291,"Boundmarch","Kepler",Tobacco,5,2.49829,0,0
-30291,"Boundmarch","Kepler",Tobacco,6,2.49829,0,0
-30291,"Boundmarch","Kepler",Tobacco,7,2.49829,0,0
-30291,"Boundmarch","Kepler",Tobacco,8,2.49829,0,0
-30291,"Boundmarch","Kepler",Tobacco,9,2.49829,0,0
-30291,"Boundmarch","Kepler",Tobacco,10,2.49829,0,0
-30291,"Boundmarch","Kepler",Tobacco,11,2.49829,0,0
-30291,"Boundmarch","Kepler",Tobacco,12,2.49829,0,0
-30291,"Boundmarch","Kepler",Tobacco,13,2.49829,0,0
-30291,"Boundmarch","Kepler",Tobacco,14,2.49829,0,0
-30291,"Boundmarch","Kepler",Tobacco,15,2.49829,0,0
-30291,"Boundmarch","Kepler",Coffee,0,8.01784,0,0
-30291,"Boundmarch","Kepler",Coffee,1,8.01784,0,0
-30291,"Boundmarch","Kepler",Coffee,2,8.01784,0,0
-30291,"Boundmarch","Kepler",Coffee,3,8.01784,0,0
-30291,"Boundmarch","Kepler",Coffee,4,8.01784,0,0
-30291,"Boundmarch","Kepler",Coffee,5,8.01784,0,0
-30291,"Boundmarch","Kepler",Coffee,6,8.01784,0,0
-30291,"Boundmarch","Kepler",Coffee,7,8.01784,0,0
-30291,"Boundmarch","Kepler",Coffee,8,8.01784,0,0
-30291,"Boundmarch","Kepler",Coffee,9,8.01784,0,0
-30291,"Boundmarch","Kepler",Coffee,10,8.01784,0,0
-30291,"Boundmarch","Kepler",Coffee,11,8.01784,0,0
-30291,"Boundmarch","Kepler",Coffee,12,8.01784,0,0
-30291,"Boundmarch","Kepler",Coffee,13,8.01784,0,0
-30291,"Boundmarch","Kepler",Coffee,14,8.01784,0,0
-30291,"Boundmarch","Kepler",Coffee,15,8.01784,0,0
-30291,"Boundmarch","Kepler",Steel,0,6.07584,581.049,156.488
-30291,"Boundmarch","Kepler",Steel,1,17.0027,16,195.014
-30291,"Boundmarch","Kepler",Steel,2,17.754,16,85.6126
-30291,"Boundmarch","Kepler",Steel,3,16.3023,24,82.7016
-30291,"Boundmarch","Kepler",Steel,4,15.8341,24,88.5428
-30291,"Boundmarch","Kepler",Steel,5,15.6901,24,90.6309
-30291,"Boundmarch","Kepler",Steel,6,15.6466,24,91.2957
-30291,"Boundmarch","Kepler",Steel,7,21.351,8,91.4989
-30291,"Boundmarch","Kepler",Steel,8,22.6215,8,71.3539
-30291,"Boundmarch","Kepler",Steel,9,22.9837,8,68.1294
-30291,"Boundmarch","Kepler",Steel,10,23.0909,8,67.269
-30291,"Boundmarch","Kepler",Steel,11,18.2297,24,67.0191
-30291,"Boundmarch","Kepler",Steel,12,16.462,24,80.9706
-30291,"Boundmarch","Kepler",Steel,13,15.8841,24,87.8548
-30291,"Boundmarch","Kepler",Steel,14,15.7053,24,90.4027
-30291,"Boundmarch","Kepler",Steel,15,21.3601,8,91.225
-30291,"Boundmarch","Kepler",Refined Fuel,0,7.56314,529.324,139.1
-30291,"Boundmarch","Kepler",Refined Fuel,1,23.7816,0,173.926
-30291,"Boundmarch","Kepler",Refined Fuel,2,31.8908,0,69.556
-30291,"Boundmarch","Kepler",Refined Fuel,3,35.9454,0,55.0041
-30291,"Boundmarch","Kepler",Refined Fuel,4,37.9727,0,49.9819
-30291,"Boundmarch","Kepler",Refined Fuel,5,38.9863,0,47.8355
-30291,"Boundmarch","Kepler",Refined Fuel,6,39.4932,0,46.8379
-30291,"Boundmarch","Kepler",Refined Fuel,7,28.2573,16,46.3564
-30291,"Boundmarch","Kepler",Refined Fuel,8,23.8588,16,60.5931
-30291,"Boundmarch","Kepler",Refined Fuel,9,22.3409,16,69.3758
-30291,"Boundmarch","Kepler",Refined Fuel,10,21.8594,16,73.1217
-30291,"Boundmarch","Kepler",Refined Fuel,11,30.9297,0,74.4076
-30291,"Boundmarch","Kepler",Refined Fuel,12,35.4648,0,56.3672
-30291,"Boundmarch","Kepler",Refined Fuel,13,37.7324,0,50.5229
-30291,"Boundmarch","Kepler",Refined Fuel,14,38.8662,0,48.079
-30291,"Boundmarch","Kepler",Refined Fuel,15,27.9984,16,46.9537
-30291,"Boundmarch","Kepler",Food Rations,0,5.20166,451.969,243.425
-30291,"Boundmarch","Kepler",Food Rations,1,14.6008,0,272.881
-30291,"Boundmarch","Kepler",Food Rations,2,19.3004,0,119.504
-30291,"Boundmarch","Kepler",Food Rations,3,21.6502,0,95.5945
-30291,"Boundmarch","Kepler",Food Rations,4,22.8251,0,87.2
-30291,"Boundmarch","Kepler",Food Rations,5,23.4126,0,83.5903
-30291,"Boundmarch","Kepler",Food Rations,6,23.7063,0,81.9082
-30291,"Boundmarch","Kepler",Food Rations,7,23.8531,0,81.0953
-30291,"Boundmarch","Kepler",Food Rations,8,23.9266,0,80.6956
-30291,"Boundmarch","Kepler",Food Rations,9,23.9633,0,80.4974
-30291,"Boundmarch","Kepler",Food Rations,10,23.9816,0,80.3987
-30291,"Boundmarch","Kepler",Food Rations,11,23.9908,0,80.3495
-30291,"Boundmarch","Kepler",Food Rations,12,23.9954,0,80.3249
-30291,"Boundmarch","Kepler",Food Rations,13,23.9977,0,80.3126
-30291,"Boundmarch","Kepler",Food Rations,14,23.9989,0,80.3064
-30291,"Boundmarch","Kepler",Food Rations,15,23.9994,0,80.3034
-30291,"Boundmarch","Kepler",(unnamed resource),0,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),1,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),2,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),3,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),4,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),5,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),6,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),7,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),8,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),9,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),10,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),11,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),12,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),13,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),14,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),15,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),0,1.2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),1,1.2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),2,1.2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),3,1.2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),4,1.2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),5,1.2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),6,1.2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),7,1.2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),8,1.2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),9,1.2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),10,1.2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),11,1.2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),12,1.2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),13,1.2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),14,1.2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),15,1.2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),0,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),1,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),2,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),3,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),4,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),5,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),6,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),7,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),8,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),9,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),10,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),11,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),12,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),13,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),14,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),15,2,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),0,5,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),1,5,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),2,5,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),3,5,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),4,5,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),5,5,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),6,5,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),7,5,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),8,5,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),9,5,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),10,5,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),11,5,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),12,5,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),13,5,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),14,5,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),15,5,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),0,4,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),1,4,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),2,4,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),3,4,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),4,4,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),5,4,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),6,4,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),7,4,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),8,4,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),9,4,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),10,4,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),11,4,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),12,4,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),13,4,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),14,4,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),15,4,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),0,6,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),1,6,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),2,6,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),3,6,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),4,6,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),5,6,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),6,6,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),7,6,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),8,6,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),9,6,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),10,6,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),11,6,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),12,6,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),13,6,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),14,6,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),15,6,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),0,50,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),1,50,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),2,50,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),3,50,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),4,50,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),5,50,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),6,50,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),7,50,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),8,50,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),9,50,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),10,50,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),11,50,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),12,50,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),13,50,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),14,50,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),15,50,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),0,15,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),1,15,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),2,15,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),3,15,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),4,15,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),5,15,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),6,15,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),7,15,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),8,15,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),9,15,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),10,15,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),11,15,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),12,15,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),13,15,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),14,15,0,0
-30291,"Boundmarch","Kepler",(unnamed resource),15,15,0,0
+30290,"Flaullmarch","Kepler",Iron Ore,0,2.56762,75.3047,83.6719
+30290,"Flaullmarch","Kepler",Iron Ore,1,2.60142,73.714,81.9044
+30290,"Flaullmarch","Kepler",Iron Ore,2,2.61833,72.9466,81.0518
+30290,"Flaullmarch","Kepler",Iron Ore,3,2.62678,80.6748,80.6329
+30290,"Flaullmarch","Kepler",Iron Ore,4,2.63101,72.3828,80.4253
+30290,"Flaullmarch","Kepler",Iron Ore,5,2.63312,80.3323,80.3219
+30290,"Flaullmarch","Kepler",Iron Ore,6,2.63417,72.2433,80.2704
+30290,"Flaullmarch","Kepler",Iron Ore,7,2.6347,80.2472,80.2446
+30290,"Flaullmarch","Kepler",Iron Ore,8,2.63497,72.2086,80.2317
+30290,"Flaullmarch","Kepler",Iron Ore,9,2.6351,80.2259,80.2253
+30290,"Flaullmarch","Kepler",Iron Ore,10,2.63517,72.1999,80.2221
+30290,"Flaullmarch","Kepler",Iron Ore,11,2.6352,80.2206,80.2205
+30290,"Flaullmarch","Kepler",Iron Ore,12,2.63521,72.1977,80.2197
+30290,"Flaullmarch","Kepler",Iron Ore,13,2.63522,80.2193,80.2193
+30290,"Flaullmarch","Kepler",Iron Ore,14,2.63523,72.1972,80.2191
+30290,"Flaullmarch","Kepler",Iron Ore,15,2.63523,80.219,80.219
+30290,"Flaullmarch","Kepler",Petroleum,0,3.59466,64.5469,71.7188
+30290,"Flaullmarch","Kepler",Petroleum,1,3.64199,63.1834,70.2038
+30290,"Flaullmarch","Kepler",Petroleum,2,3.66566,62.5257,69.473
+30290,"Flaullmarch","Kepler",Petroleum,3,3.67749,62.2025,69.1139
+30290,"Flaullmarch","Kepler",Petroleum,4,3.68341,62.0424,68.936
+30290,"Flaullmarch","Kepler",Petroleum,5,3.68637,61.9626,68.8474
+30290,"Flaullmarch","Kepler",Petroleum,6,3.68784,61.9229,68.8032
+30290,"Flaullmarch","Kepler",Petroleum,7,3.68858,61.903,68.7811
+30290,"Flaullmarch","Kepler",Petroleum,8,3.68895,61.8931,68.7701
+30290,"Flaullmarch","Kepler",Petroleum,9,3.68914,61.8881,68.7645
+30290,"Flaullmarch","Kepler",Petroleum,10,3.68923,61.8856,68.7618
+30290,"Flaullmarch","Kepler",Petroleum,11,3.68928,61.8844,68.7604
+30290,"Flaullmarch","Kepler",Petroleum,12,3.6893,61.8837,68.7597
+30290,"Flaullmarch","Kepler",Petroleum,13,3.68931,61.8834,68.7594
+30290,"Flaullmarch","Kepler",Petroleum,14,3.68932,61.8833,68.7592
+30290,"Flaullmarch","Kepler",Petroleum,15,3.68932,61.8832,68.7591
+30290,"Flaullmarch","Kepler",Agricultural Produce,0,3.10501,118.336,135.484
+30290,"Flaullmarch","Kepler",Agricultural Produce,1,3.15817,115.123,131.915
+30290,"Flaullmarch","Kepler",Agricultural Produce,2,3.18509,113.57,130.189
+30290,"Flaullmarch","Kepler",Agricultural Produce,3,3.19872,112.802,129.335
+30290,"Flaullmarch","Kepler",Agricultural Produce,4,3.20561,112.417,128.908
+30290,"Flaullmarch","Kepler",Agricultural Produce,5,3.20911,112.224,128.693
+30290,"Flaullmarch","Kepler",Agricultural Produce,6,3.21087,112.126,128.584
+30290,"Flaullmarch","Kepler",Agricultural Produce,7,3.21177,112.077,128.53
+30290,"Flaullmarch","Kepler",Agricultural Produce,8,3.21222,112.052,128.502
+30290,"Flaullmarch","Kepler",Agricultural Produce,9,3.21245,112.039,128.488
+30290,"Flaullmarch","Kepler",Agricultural Produce,10,3.21257,112.033,128.481
+30290,"Flaullmarch","Kepler",Agricultural Produce,11,3.21263,112.029,128.477
+30290,"Flaullmarch","Kepler",Agricultural Produce,12,3.21266,112.028,128.475
+30290,"Flaullmarch","Kepler",Agricultural Produce,13,3.21267,112.027,128.474
+30290,"Flaullmarch","Kepler",Agricultural Produce,14,3.21268,112.026,128.474
+30290,"Flaullmarch","Kepler",Agricultural Produce,15,3.21268,112.026,128.474
+30290,"Flaullmarch","Kepler",Water,0,1.54057,86.0625,95.625
+30290,"Flaullmarch","Kepler",Water,1,1.56085,84.2446,93.6051
+30290,"Flaullmarch","Kepler",Water,2,1.571,83.3676,92.6306
+30290,"Flaullmarch","Kepler",Water,3,1.57607,82.9367,92.1519
+30290,"Flaullmarch","Kepler",Water,4,1.5786,82.7232,91.9146
+30290,"Flaullmarch","Kepler",Water,5,1.57987,82.6168,91.7965
+30290,"Flaullmarch","Kepler",Water,6,1.5805,82.5638,91.7375
+30290,"Flaullmarch","Kepler",Water,7,1.58082,82.5373,91.7081
+30290,"Flaullmarch","Kepler",Water,8,1.58098,82.5241,91.6934
+30290,"Flaullmarch","Kepler",Water,9,1.58106,82.5174,91.6861
+30290,"Flaullmarch","Kepler",Water,10,1.5811,82.5141,91.6824
+30290,"Flaullmarch","Kepler",Water,11,1.58112,82.5125,91.6805
+30290,"Flaullmarch","Kepler",Water,12,1.58113,82.5117,91.6796
+30290,"Flaullmarch","Kepler",Water,13,1.58113,82.5112,91.6792
+30290,"Flaullmarch","Kepler",Water,14,1.58114,82.511,91.6789
+30290,"Flaullmarch","Kepler",Water,15,1.58114,82.5109,91.6788
+30290,"Flaullmarch","Kepler",Tobacco,0,1.92645,0,0
+30290,"Flaullmarch","Kepler",Tobacco,1,1.92645,0,0
+30290,"Flaullmarch","Kepler",Tobacco,2,1.92645,0,0
+30290,"Flaullmarch","Kepler",Tobacco,3,1.92645,0,0
+30290,"Flaullmarch","Kepler",Tobacco,4,1.92645,0,0
+30290,"Flaullmarch","Kepler",Tobacco,5,1.92645,0,0
+30290,"Flaullmarch","Kepler",Tobacco,6,1.92645,0,0
+30290,"Flaullmarch","Kepler",Tobacco,7,1.92645,0,0
+30290,"Flaullmarch","Kepler",Tobacco,8,1.92645,0,0
+30290,"Flaullmarch","Kepler",Tobacco,9,1.92645,0,0
+30290,"Flaullmarch","Kepler",Tobacco,10,1.92645,0,0
+30290,"Flaullmarch","Kepler",Tobacco,11,1.92645,0,0
+30290,"Flaullmarch","Kepler",Tobacco,12,1.92645,0,0
+30290,"Flaullmarch","Kepler",Tobacco,13,1.92645,0,0
+30290,"Flaullmarch","Kepler",Tobacco,14,1.92645,0,0
+30290,"Flaullmarch","Kepler",Tobacco,15,1.92645,0,0
+30290,"Flaullmarch","Kepler",Coffee,0,7.70333,0,0
+30290,"Flaullmarch","Kepler",Coffee,1,7.70333,0,0
+30290,"Flaullmarch","Kepler",Coffee,2,7.70333,0,0
+30290,"Flaullmarch","Kepler",Coffee,3,7.70333,0,0
+30290,"Flaullmarch","Kepler",Coffee,4,7.70333,0,0
+30290,"Flaullmarch","Kepler",Coffee,5,7.70333,0,0
+30290,"Flaullmarch","Kepler",Coffee,6,7.70333,0,0
+30290,"Flaullmarch","Kepler",Coffee,7,7.70333,0,0
+30290,"Flaullmarch","Kepler",Coffee,8,7.70333,0,0
+30290,"Flaullmarch","Kepler",Coffee,9,7.70333,0,0
+30290,"Flaullmarch","Kepler",Coffee,10,7.70333,0,0
+30290,"Flaullmarch","Kepler",Coffee,11,7.70333,0,0
+30290,"Flaullmarch","Kepler",Coffee,12,7.70333,0,0
+30290,"Flaullmarch","Kepler",Coffee,13,7.70333,0,0
+30290,"Flaullmarch","Kepler",Coffee,14,7.70333,0,0
+30290,"Flaullmarch","Kepler",Coffee,15,7.70333,0,0
+30290,"Flaullmarch","Kepler",Steel,0,20,0,107.578
+30290,"Flaullmarch","Kepler",Steel,1,26,0,51.6859
+30290,"Flaullmarch","Kepler",Steel,2,29,0,41.9003
+30290,"Flaullmarch","Kepler",Steel,3,30.5,0,38.3953
+30290,"Flaullmarch","Kepler",Steel,4,31.25,0,36.877
+30290,"Flaullmarch","Kepler",Steel,5,31.625,0,36.1673
+30290,"Flaullmarch","Kepler",Steel,6,31.8125,0,35.8238
+30290,"Flaullmarch","Kepler",Steel,7,31.9062,0,35.6548
+30290,"Flaullmarch","Kepler",Steel,8,31.9531,0,35.5709
+30290,"Flaullmarch","Kepler",Steel,9,31.9766,0,35.5292
+30290,"Flaullmarch","Kepler",Steel,10,31.9883,0,35.5084
+30290,"Flaullmarch","Kepler",Steel,11,31.9941,0,35.4979
+30290,"Flaullmarch","Kepler",Steel,12,31.9971,0,35.4927
+30290,"Flaullmarch","Kepler",Steel,13,31.9985,0,35.4901
+30290,"Flaullmarch","Kepler",Steel,14,31.9993,0,35.4888
+30290,"Flaullmarch","Kepler",Steel,15,31.9996,0,35.4882
+30290,"Flaullmarch","Kepler",Refined Fuel,0,25,0,95.625
+30290,"Flaullmarch","Kepler",Refined Fuel,1,32.5,0,45.943
+30290,"Flaullmarch","Kepler",Refined Fuel,2,36.25,0,37.2447
+30290,"Flaullmarch","Kepler",Refined Fuel,3,38.125,0,34.1291
+30290,"Flaullmarch","Kepler",Refined Fuel,4,39.0625,0,32.7796
+30290,"Flaullmarch","Kepler",Refined Fuel,5,39.5312,0,32.1487
+30290,"Flaullmarch","Kepler",Refined Fuel,6,39.7656,0,31.8434
+30290,"Flaullmarch","Kepler",Refined Fuel,7,39.8828,0,31.6931
+30290,"Flaullmarch","Kepler",Refined Fuel,8,39.9414,0,31.6186
+30290,"Flaullmarch","Kepler",Refined Fuel,9,39.9707,0,31.5815
+30290,"Flaullmarch","Kepler",Refined Fuel,10,39.9854,0,31.563
+30290,"Flaullmarch","Kepler",Refined Fuel,11,39.9927,0,31.5537
+30290,"Flaullmarch","Kepler",Refined Fuel,12,39.9963,0,31.5491
+30290,"Flaullmarch","Kepler",Refined Fuel,13,39.9982,0,31.5468
+30290,"Flaullmarch","Kepler",Refined Fuel,14,39.9991,0,31.5456
+30290,"Flaullmarch","Kepler",Refined Fuel,15,39.9995,0,31.5451
+30290,"Flaullmarch","Kepler",Food Rations,0,15,0,167.344
+30290,"Flaullmarch","Kepler",Food Rations,1,19.5,0,80.4003
+30290,"Flaullmarch","Kepler",Food Rations,2,21.75,0,65.1783
+30290,"Flaullmarch","Kepler",Food Rations,3,22.875,0,59.726
+30290,"Flaullmarch","Kepler",Food Rations,4,23.4375,0,57.3643
+30290,"Flaullmarch","Kepler",Food Rations,5,23.7188,0,56.2602
+30290,"Flaullmarch","Kepler",Food Rations,6,23.8594,0,55.7259
+30290,"Flaullmarch","Kepler",Food Rations,7,23.9297,0,55.463
+30290,"Flaullmarch","Kepler",Food Rations,8,23.9648,0,55.3326
+30290,"Flaullmarch","Kepler",Food Rations,9,23.9824,0,55.2676
+30290,"Flaullmarch","Kepler",Food Rations,10,23.9912,0,55.2352
+30290,"Flaullmarch","Kepler",Food Rations,11,23.9956,0,55.219
+30290,"Flaullmarch","Kepler",Food Rations,12,23.9978,0,55.2109
+30290,"Flaullmarch","Kepler",Food Rations,13,23.9989,0,55.2069
+30290,"Flaullmarch","Kepler",Food Rations,14,23.9995,0,55.2049
+30290,"Flaullmarch","Kepler",Food Rations,15,23.9997,0,55.2039
+30290,"Flaullmarch","Kepler",(unnamed resource),0,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),1,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),2,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),3,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),4,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),5,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),6,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),7,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),8,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),9,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),10,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),11,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),12,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),13,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),14,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),15,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),0,1.2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),1,1.2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),2,1.2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),3,1.2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),4,1.2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),5,1.2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),6,1.2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),7,1.2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),8,1.2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),9,1.2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),10,1.2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),11,1.2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),12,1.2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),13,1.2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),14,1.2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),15,1.2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),0,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),1,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),2,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),3,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),4,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),5,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),6,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),7,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),8,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),9,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),10,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),11,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),12,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),13,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),14,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),15,2,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),0,5,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),1,5,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),2,5,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),3,5,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),4,5,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),5,5,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),6,5,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),7,5,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),8,5,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),9,5,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),10,5,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),11,5,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),12,5,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),13,5,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),14,5,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),15,5,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),0,4,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),1,4,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),2,4,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),3,4,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),4,4,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),5,4,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),6,4,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),7,4,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),8,4,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),9,4,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),10,4,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),11,4,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),12,4,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),13,4,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),14,4,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),15,4,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),0,6,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),1,6,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),2,6,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),3,6,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),4,6,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),5,6,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),6,6,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),7,6,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),8,6,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),9,6,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),10,6,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),11,6,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),12,6,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),13,6,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),14,6,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),15,6,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),0,50,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),1,50,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),2,50,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),3,50,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),4,50,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),5,50,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),6,50,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),7,50,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),8,50,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),9,50,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),10,50,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),11,50,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),12,50,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),13,50,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),14,50,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),15,50,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),0,15,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),1,15,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),2,15,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),3,15,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),4,15,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),5,15,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),6,15,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),7,15,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),8,15,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),9,15,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),10,15,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),11,15,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),12,15,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),13,15,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),14,15,0,0
+30290,"Flaullmarch","Kepler",(unnamed resource),15,15,0,0
+30291,"Kroundmarch","Kepler",Iron Ore,0,1.5625,9447.18,36.9688
+30291,"Kroundmarch","Kepler",Iron Ore,1,1.09375,8529.44,69.8432
+30291,"Kroundmarch","Kepler",Iron Ore,2,0.859375,12877.9,87.623
+30291,"Kroundmarch","Kepler",Iron Ore,3,0.742188,12891.7,118.864
+30291,"Kroundmarch","Kepler",Iron Ore,4,0.683594,12896.7,101.427
+30291,"Kroundmarch","Kepler",Iron Ore,5,0.654297,12896.7,115.049
+30291,"Kroundmarch","Kepler",Iron Ore,6,0.639648,12912.7,101.518
+30291,"Kroundmarch","Kepler",Iron Ore,7,0.632324,12912.7,92.4219
+30291,"Kroundmarch","Kepler",Iron Ore,8,0.628662,12912.7,92.4219
+30291,"Kroundmarch","Kepler",Iron Ore,9,0.626831,12912.7,92.4219
+30291,"Kroundmarch","Kepler",Iron Ore,10,0.625916,12896.7,92.4219
+30291,"Kroundmarch","Kepler",Iron Ore,11,0.625458,12896.7,115.12
+30291,"Kroundmarch","Kepler",Iron Ore,12,0.625229,12896.7,101.721
+30291,"Kroundmarch","Kepler",Iron Ore,13,0.625114,12896.7,115.121
+30291,"Kroundmarch","Kepler",Iron Ore,14,0.625057,12912.7,101.722
+30291,"Kroundmarch","Kepler",Iron Ore,15,0.625029,12912.7,92.4219
+30291,"Kroundmarch","Kepler",Petroleum,0,2.1875,1115.61,31.6875
+30291,"Kroundmarch","Kepler",Petroleum,1,1.72104,359.184,46.1513
+30291,"Kroundmarch","Kepler",Petroleum,2,1.54268,367.969,55.9125
+30291,"Kroundmarch","Kepler",Petroleum,3,1.4796,372.572,61.0269
+30291,"Kroundmarch","Kepler",Petroleum,4,1.45819,374.437,63.0996
+30291,"Kroundmarch","Kepler",Petroleum,5,1.45105,375.103,63.8396
+30291,"Kroundmarch","Kepler",Petroleum,6,1.44868,375.33,64.091
+30291,"Kroundmarch","Kepler",Petroleum,7,1.6101,375.405,96.1749
+30291,"Kroundmarch","Kepler",Petroleum,8,1.67196,370.724,90.9738
+30291,"Kroundmarch","Kepler",Petroleum,9,1.69633,369.148,89.222
+30291,"Kroundmarch","Kepler",Petroleum,10,1.70602,368.555,88.5634
+30291,"Kroundmarch","Kepler",Petroleum,11,1.53724,368.323,56.3061
+30291,"Kroundmarch","Kepler",Petroleum,12,1.47773,372.728,61.1998
+30291,"Kroundmarch","Kepler",Petroleum,13,1.45757,374.495,63.1634
+30291,"Kroundmarch","Kepler",Petroleum,14,1.45084,375.123,63.8616
+30291,"Kroundmarch","Kepler",Petroleum,15,1.61091,375.336,96.0984
+30291,"Kroundmarch","Kepler",Agricultural Produce,0,1.875,2346.47,72.0938
+30291,"Kroundmarch","Kepler",Agricultural Produce,1,1.3125,1607.37,98.6107
+30291,"Kroundmarch","Kepler",Agricultural Produce,2,1.07388,1632.51,126.55
+30291,"Kroundmarch","Kepler",Agricultural Produce,3,0.983343,1650.15,146.148
+30291,"Kroundmarch","Kepler",Agricultural Produce,4,0.951364,1658.83,155.795
+30291,"Kroundmarch","Kepler",Agricultural Produce,5,0.939987,1661.93,159.234
+30291,"Kroundmarch","Kepler",Agricultural Produce,6,0.934299,1661.93,159.234
+30291,"Kroundmarch","Kepler",Agricultural Produce,7,0.931455,1661.93,159.234
+30291,"Kroundmarch","Kepler",Agricultural Produce,8,0.930033,1661.93,159.234
+30291,"Kroundmarch","Kepler",Agricultural Produce,9,0.929322,1661.93,159.234
+30291,"Kroundmarch","Kepler",Agricultural Produce,10,0.928966,1661.93,159.234
+30291,"Kroundmarch","Kepler",Agricultural Produce,11,0.928788,1661.93,159.234
+30291,"Kroundmarch","Kepler",Agricultural Produce,12,0.928699,1661.93,159.234
+30291,"Kroundmarch","Kepler",Agricultural Produce,13,0.928655,1661.93,159.234
+30291,"Kroundmarch","Kepler",Agricultural Produce,14,0.928633,1661.93,159.234
+30291,"Kroundmarch","Kepler",Agricultural Produce,15,0.928622,1661.93,159.234
+30291,"Kroundmarch","Kepler",Water,0,0.9375,729.068,42.25
+30291,"Kroundmarch","Kepler",Water,1,3.46875,0,61.5351
+30291,"Kroundmarch","Kepler",Water,2,4.73438,0,21.6054
+30291,"Kroundmarch","Kepler",Water,3,5.36719,0,16.8457
+30291,"Kroundmarch","Kepler",Water,4,5.68359,0,15.2371
+30291,"Kroundmarch","Kepler",Water,5,5.8418,0,14.5546
+30291,"Kroundmarch","Kepler",Water,6,5.9209,0,14.2384
+30291,"Kroundmarch","Kepler",Water,7,5.96045,0,14.0861
+30291,"Kroundmarch","Kepler",Water,8,5.98022,0,14.0112
+30291,"Kroundmarch","Kepler",Water,9,5.99011,0,13.9742
+30291,"Kroundmarch","Kepler",Water,10,5.99506,0,13.9557
+30291,"Kroundmarch","Kepler",Water,11,5.99753,0,13.9465
+30291,"Kroundmarch","Kepler",Water,12,5.99876,0,13.9419
+30291,"Kroundmarch","Kepler",Water,13,5.99938,0,13.9396
+30291,"Kroundmarch","Kepler",Water,14,5.99969,0,13.9384
+30291,"Kroundmarch","Kepler",Water,15,5.99985,0,13.9379
+30291,"Kroundmarch","Kepler",Tobacco,0,8.059,0,0
+30291,"Kroundmarch","Kepler",Tobacco,1,8.059,0,0
+30291,"Kroundmarch","Kepler",Tobacco,2,8.059,0,0
+30291,"Kroundmarch","Kepler",Tobacco,3,8.059,0,0
+30291,"Kroundmarch","Kepler",Tobacco,4,8.059,0,0
+30291,"Kroundmarch","Kepler",Tobacco,5,8.059,0,0
+30291,"Kroundmarch","Kepler",Tobacco,6,8.059,0,0
+30291,"Kroundmarch","Kepler",Tobacco,7,8.059,0,0
+30291,"Kroundmarch","Kepler",Tobacco,8,8.059,0,0
+30291,"Kroundmarch","Kepler",Tobacco,9,8.059,0,0
+30291,"Kroundmarch","Kepler",Tobacco,10,8.059,0,0
+30291,"Kroundmarch","Kepler",Tobacco,11,8.059,0,0
+30291,"Kroundmarch","Kepler",Tobacco,12,8.059,0,0
+30291,"Kroundmarch","Kepler",Tobacco,13,8.059,0,0
+30291,"Kroundmarch","Kepler",Tobacco,14,8.059,0,0
+30291,"Kroundmarch","Kepler",Tobacco,15,8.059,0,0
+30291,"Kroundmarch","Kepler",Coffee,0,3.61855,0,0
+30291,"Kroundmarch","Kepler",Coffee,1,3.61855,0,0
+30291,"Kroundmarch","Kepler",Coffee,2,3.61855,0,0
+30291,"Kroundmarch","Kepler",Coffee,3,3.61855,0,0
+30291,"Kroundmarch","Kepler",Coffee,4,3.61855,0,0
+30291,"Kroundmarch","Kepler",Coffee,5,3.61855,0,0
+30291,"Kroundmarch","Kepler",Coffee,6,3.61855,0,0
+30291,"Kroundmarch","Kepler",Coffee,7,3.61855,0,0
+30291,"Kroundmarch","Kepler",Coffee,8,3.61855,0,0
+30291,"Kroundmarch","Kepler",Coffee,9,3.61855,0,0
+30291,"Kroundmarch","Kepler",Coffee,10,3.61855,0,0
+30291,"Kroundmarch","Kepler",Coffee,11,3.61855,0,0
+30291,"Kroundmarch","Kepler",Coffee,12,3.61855,0,0
+30291,"Kroundmarch","Kepler",Coffee,13,3.61855,0,0
+30291,"Kroundmarch","Kepler",Coffee,14,3.61855,0,0
+30291,"Kroundmarch","Kepler",Coffee,15,3.61855,0,0
+30291,"Kroundmarch","Kepler",Steel,0,5.25497,482.869,47.5312
+30291,"Kroundmarch","Kepler",Steel,1,14.1623,8,66.5265
+30291,"Kroundmarch","Kepler",Steel,2,14.8398,8,30.0984
+30291,"Kroundmarch","Kepler",Steel,3,12.8045,16,28.994
+30291,"Kroundmarch","Kepler",Steel,4,12.1142,16,32.6258
+30291,"Kroundmarch","Kepler",Steel,5,11.897,16,34.1049
+30291,"Kroundmarch","Kepler",Steel,6,11.8309,16,34.602
+30291,"Kroundmarch","Kepler",Steel,7,21.9154,0,34.7567
+30291,"Kroundmarch","Kepler",Steel,8,26.9577,0,21.2252
+30291,"Kroundmarch","Kepler",Steel,9,29.4789,0,17.9848
+30291,"Kroundmarch","Kepler",Steel,10,30.7394,0,16.7434
+30291,"Kroundmarch","Kepler",Steel,11,19.3936,16,16.1918
+30291,"Kroundmarch","Kepler",Steel,12,14.5348,16,23.4058
+30291,"Kroundmarch","Kepler",Steel,13,12.6969,16,29.4798
+30291,"Kroundmarch","Kepler",Steel,14,12.0797,16,32.8468
+30291,"Kroundmarch","Kepler",Steel,15,22.0398,0,34.1828
+30291,"Kroundmarch","Kepler",Refined Fuel,0,6.54828,440.624,42.25
+30291,"Kroundmarch","Kepler",Refined Fuel,1,23.2741,0,59.2823
+30291,"Kroundmarch","Kepler",Refined Fuel,2,31.6371,0,21.4945
+30291,"Kroundmarch","Kepler",Refined Fuel,3,35.8185,0,16.8139
+30291,"Kroundmarch","Kepler",Refined Fuel,4,37.9093,0,15.2244
+30291,"Kroundmarch","Kepler",Refined Fuel,5,38.9546,0,14.5489
+30291,"Kroundmarch","Kepler",Refined Fuel,6,39.4773,0,14.2357
+30291,"Kroundmarch","Kepler",Refined Fuel,7,24.4299,16,14.0847
+30291,"Kroundmarch","Kepler",Refined Fuel,8,17.8989,16,20.6771
+30291,"Kroundmarch","Kepler",Refined Fuel,9,15.3866,16,26.5195
+30291,"Kroundmarch","Kepler",Refined Fuel,10,14.5319,16,29.9304
+30291,"Kroundmarch","Kepler",Refined Fuel,11,27.2659,0,31.3306
+30291,"Kroundmarch","Kepler",Refined Fuel,12,33.633,0,18.9378
+30291,"Kroundmarch","Kepler",Refined Fuel,13,36.8165,0,16.0109
+30291,"Kroundmarch","Kepler",Refined Fuel,14,38.4082,0,14.8934
+30291,"Kroundmarch","Kepler",Refined Fuel,15,23.9471,16,14.3975
+30291,"Kroundmarch","Kepler",Food Rations,0,4.28517,402.888,73.9375
+30291,"Kroundmarch","Kepler",Food Rations,1,14.1426,0,96.7857
+30291,"Kroundmarch","Kepler",Food Rations,2,19.0713,0,37.236
+30291,"Kroundmarch","Kepler",Food Rations,3,21.5356,0,29.3144
+30291,"Kroundmarch","Kepler",Food Rations,4,22.7678,0,26.5986
+30291,"Kroundmarch","Kepler",Food Rations,5,23.3839,0,25.4407
+30291,"Kroundmarch","Kepler",Food Rations,6,23.692,0,24.903
+30291,"Kroundmarch","Kepler",Food Rations,7,23.846,0,24.6436
+30291,"Kroundmarch","Kepler",Food Rations,8,23.923,0,24.5162
+30291,"Kroundmarch","Kepler",Food Rations,9,23.9615,0,24.4531
+30291,"Kroundmarch","Kepler",Food Rations,10,23.9807,0,24.4216
+30291,"Kroundmarch","Kepler",Food Rations,11,23.9904,0,24.4059
+30291,"Kroundmarch","Kepler",Food Rations,12,23.9952,0,24.3981
+30291,"Kroundmarch","Kepler",Food Rations,13,23.9976,0,24.3942
+30291,"Kroundmarch","Kepler",Food Rations,14,23.9988,0,24.3922
+30291,"Kroundmarch","Kepler",Food Rations,15,23.9994,0,24.3913
+30291,"Kroundmarch","Kepler",(unnamed resource),0,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),1,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),2,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),3,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),4,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),5,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),6,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),7,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),8,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),9,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),10,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),11,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),12,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),13,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),14,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),15,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),0,1.2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),1,1.2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),2,1.2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),3,1.2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),4,1.2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),5,1.2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),6,1.2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),7,1.2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),8,1.2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),9,1.2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),10,1.2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),11,1.2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),12,1.2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),13,1.2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),14,1.2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),15,1.2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),0,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),1,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),2,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),3,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),4,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),5,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),6,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),7,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),8,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),9,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),10,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),11,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),12,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),13,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),14,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),15,2,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),0,5,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),1,5,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),2,5,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),3,5,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),4,5,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),5,5,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),6,5,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),7,5,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),8,5,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),9,5,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),10,5,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),11,5,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),12,5,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),13,5,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),14,5,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),15,5,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),0,4,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),1,4,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),2,4,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),3,4,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),4,4,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),5,4,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),6,4,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),7,4,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),8,4,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),9,4,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),10,4,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),11,4,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),12,4,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),13,4,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),14,4,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),15,4,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),0,6,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),1,6,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),2,6,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),3,6,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),4,6,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),5,6,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),6,6,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),7,6,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),8,6,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),9,6,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),10,6,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),11,6,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),12,6,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),13,6,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),14,6,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),15,6,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),0,50,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),1,50,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),2,50,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),3,50,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),4,50,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),5,50,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),6,50,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),7,50,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),8,50,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),9,50,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),10,50,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),11,50,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),12,50,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),13,50,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),14,50,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),15,50,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),0,15,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),1,15,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),2,15,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),3,15,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),4,15,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),5,15,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),6,15,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),7,15,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),8,15,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),9,15,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),10,15,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),11,15,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),12,15,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),13,15,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),14,15,0,0
+30291,"Kroundmarch","Kepler",(unnamed resource),15,15,0,0
+30292,"Kidford","Kepler",Iron Ore,0,2.56762,96.0356,106.706
+30292,"Kidford","Kepler",Iron Ore,1,2.60142,94.007,104.452
+30292,"Kidford","Kepler",Iron Ore,2,2.61833,93.0284,103.365
+30292,"Kidford","Kepler",Iron Ore,3,2.62678,101.648,102.831
+30292,"Kidford","Kepler",Iron Ore,4,2.63101,93.4918,102.566
+30292,"Kidford","Kepler",Iron Ore,5,2.63312,101.265,102.434
+30292,"Kidford","Kepler",Iron Ore,6,2.63417,93.3008,102.368
+30292,"Kidford","Kepler",Iron Ore,7,2.6347,94.3563,102.335
+30292,"Kidford","Kepler",Iron Ore,8,2.63497,100.066,102.319
+30292,"Kidford","Kepler",Iron Ore,9,2.6351,94.3325,102.311
+30292,"Kidford","Kepler",Iron Ore,10,2.63517,100.054,102.307
+30292,"Kidford","Kepler",Iron Ore,11,2.6352,94.3265,102.305
+30292,"Kidford","Kepler",Iron Ore,12,2.63521,100.051,102.304
+30292,"Kidford","Kepler",Iron Ore,13,2.63522,94.3251,102.303
+30292,"Kidford","Kepler",Iron Ore,14,2.63523,100.051,102.303
+30292,"Kidford","Kepler",Iron Ore,15,2.63523,94.3247,102.303
+30292,"Kidford","Kepler",Petroleum,0,3.59466,82.3162,91.4625
+30292,"Kidford","Kepler",Petroleum,1,3.64199,80.5775,89.5305
+30292,"Kidford","Kepler",Petroleum,2,3.66566,79.7386,88.5985
+30292,"Kidford","Kepler",Petroleum,3,3.67749,79.3265,88.1406
+30292,"Kidford","Kepler",Petroleum,4,3.68341,79.1223,87.9136
+30292,"Kidford","Kepler",Petroleum,5,3.68637,79.0206,87.8006
+30292,"Kidford","Kepler",Petroleum,6,3.68784,78.9698,87.7443
+30292,"Kidford","Kepler",Petroleum,7,3.68858,78.9445,87.7161
+30292,"Kidford","Kepler",Petroleum,8,3.68895,78.9318,87.702
+30292,"Kidford","Kepler",Petroleum,9,3.68914,78.9255,87.695
+30292,"Kidford","Kepler",Petroleum,10,3.68923,78.9223,87.6915
+30292,"Kidford","Kepler",Petroleum,11,3.68928,78.9208,87.6897
+30292,"Kidford","Kepler",Petroleum,12,3.6893,78.92,87.6889
+30292,"Kidford","Kepler",Petroleum,13,3.68931,78.9196,87.6884
+30292,"Kidford","Kepler",Petroleum,14,3.68932,78.9194,87.6882
+30292,"Kidford","Kepler",Petroleum,15,3.68932,78.9193,87.6881
+30292,"Kidford","Kepler",Agricultural Produce,0,7.5,0,172.681
+30292,"Kidford","Kepler",Agricultural Produce,1,9.75,0,85.5624
+30292,"Kidford","Kepler",Agricultural Produce,2,10.875,0,70.3097
+30292,"Kidford","Kepler",Agricultural Produce,3,11.4375,0,64.8464
+30292,"Kidford","Kepler",Agricultural Produce,4,11.7188,0,62.48
+30292,"Kidford","Kepler",Agricultural Produce,5,11.8594,0,61.3737
+30292,"Kidford","Kepler",Agricultural Produce,6,11.9297,0,60.8383
+30292,"Kidford","Kepler",Agricultural Produce,7,11.9648,0,60.5748
+30292,"Kidford","Kepler",Agricultural Produce,8,11.9824,0,60.4442
+30292,"Kidford","Kepler",Agricultural Produce,9,11.9912,0,60.3791
+30292,"Kidford","Kepler",Agricultural Produce,10,11.9956,0,60.3466
+30292,"Kidford","Kepler",Agricultural Produce,11,11.9978,0,60.3304
+30292,"Kidford","Kepler",Agricultural Produce,12,11.9989,0,60.3223
+30292,"Kidford","Kepler",Agricultural Produce,13,11.9995,0,60.3182
+30292,"Kidford","Kepler",Agricultural Produce,14,11.9997,0,60.3162
+30292,"Kidford","Kepler",Agricultural Produce,15,11.9999,0,60.3152
+30292,"Kidford","Kepler",Water,0,1.54057,109.755,121.95
+30292,"Kidford","Kepler",Water,1,1.56085,107.437,119.374
+30292,"Kidford","Kepler",Water,2,1.571,106.318,118.131
+30292,"Kidford","Kepler",Water,3,1.57607,105.769,117.521
+30292,"Kidford","Kepler",Water,4,1.5786,105.496,117.218
+30292,"Kidford","Kepler",Water,5,1.57987,105.361,117.068
+30292,"Kidford","Kepler",Water,6,1.5805,105.293,116.992
+30292,"Kidford","Kepler",Water,7,1.58082,105.259,116.955
+30292,"Kidford","Kepler",Water,8,1.58098,105.242,116.936
+30292,"Kidford","Kepler",Water,9,1.58106,105.234,116.927
+30292,"Kidford","Kepler",Water,10,1.5811,105.23,116.922
+30292,"Kidford","Kepler",Water,11,1.58112,105.228,116.92
+30292,"Kidford","Kepler",Water,12,1.58113,105.227,116.918
+30292,"Kidford","Kepler",Water,13,1.58113,105.226,116.918
+30292,"Kidford","Kepler",Water,14,1.58114,105.226,116.918
+30292,"Kidford","Kepler",Water,15,1.58114,105.226,116.917
+30292,"Kidford","Kepler",Tobacco,0,4.16999,0,0
+30292,"Kidford","Kepler",Tobacco,1,4.16999,0,0
+30292,"Kidford","Kepler",Tobacco,2,4.16999,0,0
+30292,"Kidford","Kepler",Tobacco,3,4.16999,0,0
+30292,"Kidford","Kepler",Tobacco,4,4.16999,0,0
+30292,"Kidford","Kepler",Tobacco,5,4.16999,0,0
+30292,"Kidford","Kepler",Tobacco,6,4.16999,0,0
+30292,"Kidford","Kepler",Tobacco,7,4.16999,0,0
+30292,"Kidford","Kepler",Tobacco,8,4.16999,0,0
+30292,"Kidford","Kepler",Tobacco,9,4.16999,0,0
+30292,"Kidford","Kepler",Tobacco,10,4.16999,0,0
+30292,"Kidford","Kepler",Tobacco,11,4.16999,0,0
+30292,"Kidford","Kepler",Tobacco,12,4.16999,0,0
+30292,"Kidford","Kepler",Tobacco,13,4.16999,0,0
+30292,"Kidford","Kepler",Tobacco,14,4.16999,0,0
+30292,"Kidford","Kepler",Tobacco,15,4.16999,0,0
+30292,"Kidford","Kepler",Coffee,0,4.48392,0,0
+30292,"Kidford","Kepler",Coffee,1,4.48392,0,0
+30292,"Kidford","Kepler",Coffee,2,4.48392,0,0
+30292,"Kidford","Kepler",Coffee,3,4.48392,0,0
+30292,"Kidford","Kepler",Coffee,4,4.48392,0,0
+30292,"Kidford","Kepler",Coffee,5,4.48392,0,0
+30292,"Kidford","Kepler",Coffee,6,4.48392,0,0
+30292,"Kidford","Kepler",Coffee,7,4.48392,0,0
+30292,"Kidford","Kepler",Coffee,8,4.48392,0,0
+30292,"Kidford","Kepler",Coffee,9,4.48392,0,0
+30292,"Kidford","Kepler",Coffee,10,4.48392,0,0
+30292,"Kidford","Kepler",Coffee,11,4.48392,0,0
+30292,"Kidford","Kepler",Coffee,12,4.48392,0,0
+30292,"Kidford","Kepler",Coffee,13,4.48392,0,0
+30292,"Kidford","Kepler",Coffee,14,4.48392,0,0
+30292,"Kidford","Kepler",Coffee,15,4.48392,0,0
+30292,"Kidford","Kepler",Steel,0,20,0,137.194
+30292,"Kidford","Kepler",Steel,1,26,0,65.9147
+30292,"Kidford","Kepler",Steel,2,29,0,53.4352
+30292,"Kidford","Kepler",Steel,3,30.5,0,48.9652
+30292,"Kidford","Kepler",Steel,4,31.25,0,47.0291
+30292,"Kidford","Kepler",Steel,5,31.625,0,46.1239
+30292,"Kidford","Kepler",Steel,6,31.8125,0,45.6859
+30292,"Kidford","Kepler",Steel,7,31.9062,0,45.4703
+30292,"Kidford","Kepler",Steel,8,31.9531,0,45.3634
+30292,"Kidford","Kepler",Steel,9,31.9766,0,45.3102
+30292,"Kidford","Kepler",Steel,10,31.9883,0,45.2836
+30292,"Kidford","Kepler",Steel,11,31.9941,0,45.2703
+30292,"Kidford","Kepler",Steel,12,31.9971,0,45.2637
+30292,"Kidford","Kepler",Steel,13,31.9985,0,45.2604
+30292,"Kidford","Kepler",Steel,14,31.9993,0,45.2587
+30292,"Kidford","Kepler",Steel,15,31.9996,0,45.2579
+30292,"Kidford","Kepler",Refined Fuel,0,25,0,121.95
+30292,"Kidford","Kepler",Refined Fuel,1,32.5,0,58.5909
+30292,"Kidford","Kepler",Refined Fuel,2,36.25,0,47.498
+30292,"Kidford","Kepler",Refined Fuel,3,38.125,0,43.5247
+30292,"Kidford","Kepler",Refined Fuel,4,39.0625,0,41.8036
+30292,"Kidford","Kepler",Refined Fuel,5,39.5312,0,40.9991
+30292,"Kidford","Kepler",Refined Fuel,6,39.7656,0,40.6097
+30292,"Kidford","Kepler",Refined Fuel,7,39.8828,0,40.4181
+30292,"Kidford","Kepler",Refined Fuel,8,39.9414,0,40.323
+30292,"Kidford","Kepler",Refined Fuel,9,39.9707,0,40.2757
+30292,"Kidford","Kepler",Refined Fuel,10,39.9854,0,40.2521
+30292,"Kidford","Kepler",Refined Fuel,11,39.9927,0,40.2403
+30292,"Kidford","Kepler",Refined Fuel,12,39.9963,0,40.2344
+30292,"Kidford","Kepler",Refined Fuel,13,39.9982,0,40.2314
+30292,"Kidford","Kepler",Refined Fuel,14,39.9991,0,40.23
+30292,"Kidford","Kepler",Refined Fuel,15,39.9995,0,40.2292
+30292,"Kidford","Kepler",Food Rations,0,15,0,213.412
+30292,"Kidford","Kepler",Food Rations,1,19.5,0,102.534
+30292,"Kidford","Kepler",Food Rations,2,21.75,0,83.1215
+30292,"Kidford","Kepler",Food Rations,3,22.875,0,76.1682
+30292,"Kidford","Kepler",Food Rations,4,23.4375,0,73.1563
+30292,"Kidford","Kepler",Food Rations,5,23.7188,0,71.7483
+30292,"Kidford","Kepler",Food Rations,6,23.8594,0,71.0669
+30292,"Kidford","Kepler",Food Rations,7,23.9297,0,70.7316
+30292,"Kidford","Kepler",Food Rations,8,23.9648,0,70.5653
+30292,"Kidford","Kepler",Food Rations,9,23.9824,0,70.4825
+30292,"Kidford","Kepler",Food Rations,10,23.9912,0,70.4411
+30292,"Kidford","Kepler",Food Rations,11,23.9956,0,70.4205
+30292,"Kidford","Kepler",Food Rations,12,23.9978,0,70.4102
+30292,"Kidford","Kepler",Food Rations,13,23.9989,0,70.405
+30292,"Kidford","Kepler",Food Rations,14,23.9995,0,70.4024
+30292,"Kidford","Kepler",Food Rations,15,23.9997,0,70.4012
+30292,"Kidford","Kepler",(unnamed resource),0,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),1,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),2,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),3,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),4,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),5,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),6,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),7,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),8,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),9,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),10,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),11,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),12,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),13,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),14,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),15,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),0,1.2,0,0
+30292,"Kidford","Kepler",(unnamed resource),1,1.2,0,0
+30292,"Kidford","Kepler",(unnamed resource),2,1.2,0,0
+30292,"Kidford","Kepler",(unnamed resource),3,1.2,0,0
+30292,"Kidford","Kepler",(unnamed resource),4,1.2,0,0
+30292,"Kidford","Kepler",(unnamed resource),5,1.2,0,0
+30292,"Kidford","Kepler",(unnamed resource),6,1.2,0,0
+30292,"Kidford","Kepler",(unnamed resource),7,1.2,0,0
+30292,"Kidford","Kepler",(unnamed resource),8,1.2,0,0
+30292,"Kidford","Kepler",(unnamed resource),9,1.2,0,0
+30292,"Kidford","Kepler",(unnamed resource),10,1.2,0,0
+30292,"Kidford","Kepler",(unnamed resource),11,1.2,0,0
+30292,"Kidford","Kepler",(unnamed resource),12,1.2,0,0
+30292,"Kidford","Kepler",(unnamed resource),13,1.2,0,0
+30292,"Kidford","Kepler",(unnamed resource),14,1.2,0,0
+30292,"Kidford","Kepler",(unnamed resource),15,1.2,0,0
+30292,"Kidford","Kepler",(unnamed resource),0,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),1,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),2,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),3,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),4,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),5,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),6,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),7,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),8,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),9,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),10,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),11,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),12,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),13,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),14,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),15,2,0,0
+30292,"Kidford","Kepler",(unnamed resource),0,5,0,0
+30292,"Kidford","Kepler",(unnamed resource),1,5,0,0
+30292,"Kidford","Kepler",(unnamed resource),2,5,0,0
+30292,"Kidford","Kepler",(unnamed resource),3,5,0,0
+30292,"Kidford","Kepler",(unnamed resource),4,5,0,0
+30292,"Kidford","Kepler",(unnamed resource),5,5,0,0
+30292,"Kidford","Kepler",(unnamed resource),6,5,0,0
+30292,"Kidford","Kepler",(unnamed resource),7,5,0,0
+30292,"Kidford","Kepler",(unnamed resource),8,5,0,0
+30292,"Kidford","Kepler",(unnamed resource),9,5,0,0
+30292,"Kidford","Kepler",(unnamed resource),10,5,0,0
+30292,"Kidford","Kepler",(unnamed resource),11,5,0,0
+30292,"Kidford","Kepler",(unnamed resource),12,5,0,0
+30292,"Kidford","Kepler",(unnamed resource),13,5,0,0
+30292,"Kidford","Kepler",(unnamed resource),14,5,0,0
+30292,"Kidford","Kepler",(unnamed resource),15,5,0,0
+30292,"Kidford","Kepler",(unnamed resource),0,4,0,0
+30292,"Kidford","Kepler",(unnamed resource),1,4,0,0
+30292,"Kidford","Kepler",(unnamed resource),2,4,0,0
+30292,"Kidford","Kepler",(unnamed resource),3,4,0,0
+30292,"Kidford","Kepler",(unnamed resource),4,4,0,0
+30292,"Kidford","Kepler",(unnamed resource),5,4,0,0
+30292,"Kidford","Kepler",(unnamed resource),6,4,0,0
+30292,"Kidford","Kepler",(unnamed resource),7,4,0,0
+30292,"Kidford","Kepler",(unnamed resource),8,4,0,0
+30292,"Kidford","Kepler",(unnamed resource),9,4,0,0
+30292,"Kidford","Kepler",(unnamed resource),10,4,0,0
+30292,"Kidford","Kepler",(unnamed resource),11,4,0,0
+30292,"Kidford","Kepler",(unnamed resource),12,4,0,0
+30292,"Kidford","Kepler",(unnamed resource),13,4,0,0
+30292,"Kidford","Kepler",(unnamed resource),14,4,0,0
+30292,"Kidford","Kepler",(unnamed resource),15,4,0,0
+30292,"Kidford","Kepler",(unnamed resource),0,6,0,0
+30292,"Kidford","Kepler",(unnamed resource),1,6,0,0
+30292,"Kidford","Kepler",(unnamed resource),2,6,0,0
+30292,"Kidford","Kepler",(unnamed resource),3,6,0,0
+30292,"Kidford","Kepler",(unnamed resource),4,6,0,0
+30292,"Kidford","Kepler",(unnamed resource),5,6,0,0
+30292,"Kidford","Kepler",(unnamed resource),6,6,0,0
+30292,"Kidford","Kepler",(unnamed resource),7,6,0,0
+30292,"Kidford","Kepler",(unnamed resource),8,6,0,0
+30292,"Kidford","Kepler",(unnamed resource),9,6,0,0
+30292,"Kidford","Kepler",(unnamed resource),10,6,0,0
+30292,"Kidford","Kepler",(unnamed resource),11,6,0,0
+30292,"Kidford","Kepler",(unnamed resource),12,6,0,0
+30292,"Kidford","Kepler",(unnamed resource),13,6,0,0
+30292,"Kidford","Kepler",(unnamed resource),14,6,0,0
+30292,"Kidford","Kepler",(unnamed resource),15,6,0,0
+30292,"Kidford","Kepler",(unnamed resource),0,50,0,0
+30292,"Kidford","Kepler",(unnamed resource),1,50,0,0
+30292,"Kidford","Kepler",(unnamed resource),2,50,0,0
+30292,"Kidford","Kepler",(unnamed resource),3,50,0,0
+30292,"Kidford","Kepler",(unnamed resource),4,50,0,0
+30292,"Kidford","Kepler",(unnamed resource),5,50,0,0
+30292,"Kidford","Kepler",(unnamed resource),6,50,0,0
+30292,"Kidford","Kepler",(unnamed resource),7,50,0,0
+30292,"Kidford","Kepler",(unnamed resource),8,50,0,0
+30292,"Kidford","Kepler",(unnamed resource),9,50,0,0
+30292,"Kidford","Kepler",(unnamed resource),10,50,0,0
+30292,"Kidford","Kepler",(unnamed resource),11,50,0,0
+30292,"Kidford","Kepler",(unnamed resource),12,50,0,0
+30292,"Kidford","Kepler",(unnamed resource),13,50,0,0
+30292,"Kidford","Kepler",(unnamed resource),14,50,0,0
+30292,"Kidford","Kepler",(unnamed resource),15,50,0,0
+30292,"Kidford","Kepler",(unnamed resource),0,15,0,0
+30292,"Kidford","Kepler",(unnamed resource),1,15,0,0
+30292,"Kidford","Kepler",(unnamed resource),2,15,0,0
+30292,"Kidford","Kepler",(unnamed resource),3,15,0,0
+30292,"Kidford","Kepler",(unnamed resource),4,15,0,0
+30292,"Kidford","Kepler",(unnamed resource),5,15,0,0
+30292,"Kidford","Kepler",(unnamed resource),6,15,0,0
+30292,"Kidford","Kepler",(unnamed resource),7,15,0,0
+30292,"Kidford","Kepler",(unnamed resource),8,15,0,0
+30292,"Kidford","Kepler",(unnamed resource),9,15,0,0
+30292,"Kidford","Kepler",(unnamed resource),10,15,0,0
+30292,"Kidford","Kepler",(unnamed resource),11,15,0,0
+30292,"Kidford","Kepler",(unnamed resource),12,15,0,0
+30292,"Kidford","Kepler",(unnamed resource),13,15,0,0
+30292,"Kidford","Kepler",(unnamed resource),14,15,0,0
+30292,"Kidford","Kepler",(unnamed resource),15,15,0,0
+30293,"Boundmarch","Kepler",Iron Ore,0,2.29347,120.072,83.6719
+30293,"Boundmarch","Kepler",Iron Ore,1,2.46435,80.6826,89.6473
+30293,"Boundmarch","Kepler",Iron Ore,2,2.54979,76.1749,84.6388
+30293,"Boundmarch","Kepler",Iron Ore,3,2.59251,74.126,82.3622
+30293,"Boundmarch","Kepler",Iron Ore,4,2.61387,81.3834,81.2746
+30293,"Boundmarch","Kepler",Iron Ore,5,2.62455,72.6686,80.7429
+30293,"Boundmarch","Kepler",Iron Ore,6,2.62989,80.5062,80.4799
+30293,"Boundmarch","Kepler",Iron Ore,7,2.63256,72.3142,80.3491
+30293,"Boundmarch","Kepler",Iron Ore,8,2.6339,73.5451,80.284
+30293,"Boundmarch","Kepler",Iron Ore,9,2.63456,72.2489,80.2514
+30293,"Boundmarch","Kepler",Iron Ore,10,2.6349,73.5083,80.2351
+30293,"Boundmarch","Kepler",Iron Ore,11,2.63506,78.9311,80.227
+30293,"Boundmarch","Kepler",Iron Ore,12,2.63515,73.4965,80.2229
+30293,"Boundmarch","Kepler",Iron Ore,13,2.63519,78.9252,80.2209
+30293,"Boundmarch","Kepler",Iron Ore,14,2.63521,73.4936,80.2199
+30293,"Boundmarch","Kepler",Iron Ore,15,2.63522,72.2241,80.2194
+30293,"Boundmarch","Kepler",Petroleum,0,3.11207,118.389,71.7188
+30293,"Boundmarch","Kepler",Petroleum,1,3.4007,70.9072,78.7858
+30293,"Boundmarch","Kepler",Petroleum,2,3.54501,66.0504,73.3893
+30293,"Boundmarch","Kepler",Petroleum,3,3.61717,63.8904,70.9893
+30293,"Boundmarch","Kepler",Petroleum,4,3.65325,62.8687,69.8542
+30293,"Boundmarch","Kepler",Petroleum,5,3.67128,62.3716,69.3017
+30293,"Boundmarch","Kepler",Petroleum,6,3.6803,62.1263,69.0292
+30293,"Boundmarch","Kepler",Petroleum,7,3.68481,62.0044,68.8938
+30293,"Boundmarch","Kepler",Petroleum,8,3.68707,61.9437,68.8263
+30293,"Boundmarch","Kepler",Petroleum,9,3.6882,61.9134,68.7927
+30293,"Boundmarch","Kepler",Petroleum,10,3.68876,61.8983,68.7758
+30293,"Boundmarch","Kepler",Petroleum,11,3.68904,61.8907,68.7674
+30293,"Boundmarch","Kepler",Petroleum,12,3.68918,61.8869,68.7632
+30293,"Boundmarch","Kepler",Petroleum,13,3.68925,61.885,68.7611
+30293,"Boundmarch","Kepler",Petroleum,14,3.68929,61.8841,68.7601
+30293,"Boundmarch","Kepler",Petroleum,15,3.68931,61.8836,68.7596
+30293,"Boundmarch","Kepler",Agricultural Produce,0,2.86899,165.058,137.484
+30293,"Boundmarch","Kepler",Agricultural Produce,1,3.05007,122.64,142.266
+30293,"Boundmarch","Kepler",Agricultural Produce,2,3.14232,116.779,135.755
+30293,"Boundmarch","Kepler",Agricultural Produce,3,3.1893,114.029,132.698
+30293,"Boundmarch","Kepler",Agricultural Produce,4,3.21323,112.683,131.203
+30293,"Boundmarch","Kepler",Agricultural Produce,5,3.22542,112.011,130.456
+30293,"Boundmarch","Kepler",Agricultural Produce,6,3.23163,111.672,130.08
+30293,"Boundmarch","Kepler",Agricultural Produce,7,3.23479,111.5,129.889
+30293,"Boundmarch","Kepler",Agricultural Produce,8,3.2364,111.413,129.793
+30293,"Boundmarch","Kepler",Agricultural Produce,9,3.23722,111.369,129.743
+30293,"Boundmarch","Kepler",Agricultural Produce,10,3.23763,111.346,129.718
+30293,"Boundmarch","Kepler",Agricultural Produce,11,3.23785,111.335,129.706
+30293,"Boundmarch","Kepler",Agricultural Produce,12,3.23795,111.329,129.699
+30293,"Boundmarch","Kepler",Agricultural Produce,13,3.23801,111.326,129.696
+30293,"Boundmarch","Kepler",Agricultural Produce,14,3.23804,111.325,129.694
+30293,"Boundmarch","Kepler",Agricultural Produce,15,3.23805,111.324,129.693
+30293,"Boundmarch","Kepler",Water,0,1.38513,133.343,95.625
+30293,"Boundmarch","Kepler",Water,1,1.48313,91.7265,101.918
+30293,"Boundmarch","Kepler",Water,2,1.53214,86.8446,96.494
+30293,"Boundmarch","Kepler",Water,3,1.55664,84.6153,94.017
+30293,"Boundmarch","Kepler",Water,4,1.56889,83.5482,92.8313
+30293,"Boundmarch","Kepler",Water,5,1.57501,83.0259,92.251
+30293,"Boundmarch","Kepler",Water,6,1.57808,82.7674,91.9638
+30293,"Boundmarch","Kepler",Water,7,1.57961,82.6389,91.821
+30293,"Boundmarch","Kepler",Water,8,1.58037,82.5748,91.7498
+30293,"Boundmarch","Kepler",Water,9,1.58076,82.5428,91.7142
+30293,"Boundmarch","Kepler",Water,10,1.58095,82.5268,91.6965
+30293,"Boundmarch","Kepler",Water,11,1.58104,82.5188,91.6876
+30293,"Boundmarch","Kepler",Water,12,1.58109,82.5148,91.6831
+30293,"Boundmarch","Kepler",Water,13,1.58111,82.5128,91.6809
+30293,"Boundmarch","Kepler",Water,14,1.58113,82.5118,91.6798
+30293,"Boundmarch","Kepler",Water,15,1.58113,82.5113,91.6793
+30293,"Boundmarch","Kepler",Tobacco,0,2.49829,0,0
+30293,"Boundmarch","Kepler",Tobacco,1,2.49829,0,0
+30293,"Boundmarch","Kepler",Tobacco,2,2.49829,0,0
+30293,"Boundmarch","Kepler",Tobacco,3,2.49829,0,0
+30293,"Boundmarch","Kepler",Tobacco,4,2.49829,0,0
+30293,"Boundmarch","Kepler",Tobacco,5,2.49829,0,0
+30293,"Boundmarch","Kepler",Tobacco,6,2.49829,0,0
+30293,"Boundmarch","Kepler",Tobacco,7,2.49829,0,0
+30293,"Boundmarch","Kepler",Tobacco,8,2.49829,0,0
+30293,"Boundmarch","Kepler",Tobacco,9,2.49829,0,0
+30293,"Boundmarch","Kepler",Tobacco,10,2.49829,0,0
+30293,"Boundmarch","Kepler",Tobacco,11,2.49829,0,0
+30293,"Boundmarch","Kepler",Tobacco,12,2.49829,0,0
+30293,"Boundmarch","Kepler",Tobacco,13,2.49829,0,0
+30293,"Boundmarch","Kepler",Tobacco,14,2.49829,0,0
+30293,"Boundmarch","Kepler",Tobacco,15,2.49829,0,0
+30293,"Boundmarch","Kepler",Coffee,0,8.01784,0,0
+30293,"Boundmarch","Kepler",Coffee,1,8.01784,0,0
+30293,"Boundmarch","Kepler",Coffee,2,8.01784,0,0
+30293,"Boundmarch","Kepler",Coffee,3,8.01784,0,0
+30293,"Boundmarch","Kepler",Coffee,4,8.01784,0,0
+30293,"Boundmarch","Kepler",Coffee,5,8.01784,0,0
+30293,"Boundmarch","Kepler",Coffee,6,8.01784,0,0
+30293,"Boundmarch","Kepler",Coffee,7,8.01784,0,0
+30293,"Boundmarch","Kepler",Coffee,8,8.01784,0,0
+30293,"Boundmarch","Kepler",Coffee,9,8.01784,0,0
+30293,"Boundmarch","Kepler",Coffee,10,8.01784,0,0
+30293,"Boundmarch","Kepler",Coffee,11,8.01784,0,0
+30293,"Boundmarch","Kepler",Coffee,12,8.01784,0,0
+30293,"Boundmarch","Kepler",Coffee,13,8.01784,0,0
+30293,"Boundmarch","Kepler",Coffee,14,8.01784,0,0
+30293,"Boundmarch","Kepler",Coffee,15,8.01784,0,0
+30293,"Boundmarch","Kepler",Steel,0,7.57903,134.373,107.578
+30293,"Boundmarch","Kepler",Steel,1,19.7895,0,112.332
+30293,"Boundmarch","Kepler",Steel,2,25.8948,0,52.1252
+30293,"Boundmarch","Kepler",Steel,3,28.9474,0,42.0365
+30293,"Boundmarch","Kepler",Steel,4,30.4737,0,38.4511
+30293,"Boundmarch","Kepler",Steel,5,31.2368,0,36.9025
+30293,"Boundmarch","Kepler",Steel,6,31.6184,0,36.1795
+30293,"Boundmarch","Kepler",Steel,7,31.8092,0,35.8298
+30293,"Boundmarch","Kepler",Steel,8,31.9046,0,35.6577
+30293,"Boundmarch","Kepler",Steel,9,31.9523,0,35.5724
+30293,"Boundmarch","Kepler",Steel,10,31.9762,0,35.5299
+30293,"Boundmarch","Kepler",Steel,11,31.9881,0,35.5087
+30293,"Boundmarch","Kepler",Steel,12,31.994,0,35.4981
+30293,"Boundmarch","Kepler",Steel,13,31.997,0,35.4928
+30293,"Boundmarch","Kepler",Steel,14,31.9985,0,35.4902
+30293,"Boundmarch","Kepler",Steel,15,31.9993,0,35.4889
+30293,"Boundmarch","Kepler",Refined Fuel,0,9.83286,102.354,95.625
+30293,"Boundmarch","Kepler",Refined Fuel,1,24.9164,0,96.9232
+30293,"Boundmarch","Kepler",Refined Fuel,2,32.4582,0,46.0662
+30293,"Boundmarch","Kepler",Refined Fuel,3,36.2291,0,37.2831
+30293,"Boundmarch","Kepler",Refined Fuel,4,38.1146,0,34.1449
+30293,"Boundmarch","Kepler",Refined Fuel,5,39.0573,0,32.7868
+30293,"Boundmarch","Kepler",Refined Fuel,6,39.5286,0,32.1521
+30293,"Boundmarch","Kepler",Refined Fuel,7,39.7643,0,31.845
+30293,"Boundmarch","Kepler",Refined Fuel,8,39.8822,0,31.694
+30293,"Boundmarch","Kepler",Refined Fuel,9,39.9411,0,31.619
+30293,"Boundmarch","Kepler",Refined Fuel,10,39.9705,0,31.5817
+30293,"Boundmarch","Kepler",Refined Fuel,11,39.9853,0,31.5631
+30293,"Boundmarch","Kepler",Refined Fuel,12,39.9926,0,31.5538
+30293,"Boundmarch","Kepler",Refined Fuel,13,39.9963,0,31.5491
+30293,"Boundmarch","Kepler",Refined Fuel,14,39.9982,0,31.5468
+30293,"Boundmarch","Kepler",Refined Fuel,15,39.9991,0,31.5456
+30293,"Boundmarch","Kepler",Food Rations,0,7.0486,91.8846,167.344
+30293,"Boundmarch","Kepler",Food Rations,1,15.5243,0,147.112
+30293,"Boundmarch","Kepler",Food Rations,2,19.7621,0,78.2206
+30293,"Boundmarch","Kepler",Food Rations,3,21.8811,0,64.4857
+30293,"Boundmarch","Kepler",Food Rations,4,22.9405,0,59.4396
+30293,"Boundmarch","Kepler",Food Rations,5,23.4703,0,57.2331
+30293,"Boundmarch","Kepler",Food Rations,6,23.7351,0,56.1974
+30293,"Boundmarch","Kepler",Food Rations,7,23.8676,0,55.6951
+30293,"Boundmarch","Kepler",Food Rations,8,23.9338,0,55.4478
+30293,"Boundmarch","Kepler",Food Rations,9,23.9669,0,55.325
+30293,"Boundmarch","Kepler",Food Rations,10,23.9834,0,55.2638
+30293,"Boundmarch","Kepler",Food Rations,11,23.9917,0,55.2333
+30293,"Boundmarch","Kepler",Food Rations,12,23.9959,0,55.2181
+30293,"Boundmarch","Kepler",Food Rations,13,23.9979,0,55.2105
+30293,"Boundmarch","Kepler",Food Rations,14,23.999,0,55.2067
+30293,"Boundmarch","Kepler",Food Rations,15,23.9995,0,55.2048
+30293,"Boundmarch","Kepler",(unnamed resource),0,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),1,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),2,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),3,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),4,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),5,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),6,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),7,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),8,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),9,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),10,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),11,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),12,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),13,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),14,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),15,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),0,1.2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),1,1.2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),2,1.2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),3,1.2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),4,1.2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),5,1.2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),6,1.2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),7,1.2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),8,1.2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),9,1.2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),10,1.2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),11,1.2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),12,1.2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),13,1.2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),14,1.2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),15,1.2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),0,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),1,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),2,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),3,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),4,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),5,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),6,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),7,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),8,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),9,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),10,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),11,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),12,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),13,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),14,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),15,2,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),0,5,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),1,5,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),2,5,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),3,5,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),4,5,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),5,5,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),6,5,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),7,5,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),8,5,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),9,5,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),10,5,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),11,5,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),12,5,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),13,5,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),14,5,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),15,5,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),0,4,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),1,4,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),2,4,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),3,4,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),4,4,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),5,4,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),6,4,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),7,4,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),8,4,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),9,4,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),10,4,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),11,4,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),12,4,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),13,4,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),14,4,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),15,4,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),0,6,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),1,6,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),2,6,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),3,6,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),4,6,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),5,6,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),6,6,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),7,6,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),8,6,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),9,6,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),10,6,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),11,6,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),12,6,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),13,6,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),14,6,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),15,6,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),0,50,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),1,50,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),2,50,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),3,50,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),4,50,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),5,50,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),6,50,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),7,50,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),8,50,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),9,50,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),10,50,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),11,50,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),12,50,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),13,50,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),14,50,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),15,50,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),0,15,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),1,15,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),2,15,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),3,15,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),4,15,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),5,15,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),6,15,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),7,15,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),8,15,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),9,15,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),10,15,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),11,15,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),12,15,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),13,15,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),14,15,0,0
+30293,"Boundmarch","Kepler",(unnamed resource),15,15,0,0

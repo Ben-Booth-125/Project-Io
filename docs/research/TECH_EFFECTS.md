@@ -137,13 +137,19 @@ answered anywhere yet:
 2. **Does retirement fire on availability or on economics?** A charcoal smelter that nobody builds
    because coke is cheaper has retired itself. Explicit retirement is only needed where the game
    wants to *stop* the player, not merely out-price them.
+
+> **SETTLED 2026-08-06 (Ben, NR-066): explicit, used sparingly.** Retirement stays a window
+> predicate, not a global flag, and it is authored mostly on **units** (where a roster genuinely
+> turns over) and on **doctrine** branches (where exclusion is the point). For buildings and
+> recipes, price is the retirement mechanism — no explicit gate needed.
 3. **Is retirement ever reversible?** Under blockade a T5-capacity nation may need the T3 route
    back. The diffusion axis already says capacity can be destroyed but awareness cannot — which
    argues retirement should be an availability window, never an erasure.
 
-**Lean:** grandfather, retire by window not erasure, and use explicit retirement sparingly —
-mostly on **units** (where a roster genuinely turns over) and on **doctrine** branches (where
-exclusion is the point). For buildings and recipes, price is usually the better retirement.
+> **SETTLED 2026-08-06 (Ben, NR-066): permanent.** Once a window closes it does not reopen — no
+> blockade-driven fallback to an earlier route. This overrides the lean this document previously
+> carried (which argued for reversibility from the diffusion axis); the diffusion axis still holds
+> for *awareness* (a nation remembers a route existed), it just does not restore *capacity*.
 
 ---
 
@@ -252,12 +258,13 @@ every time the game grows a new subject.
    `scripts/tech_tree.lua` would both need the same closed enum. Lean: declare it once in the
    ladder store's header (as the gate/diffusion vocabularies already are), and mirror it into the
    Lua tree when BL-087 authors content.
-2. **Retirement's three questions** (§ Retirement) — grandfathering, availability-vs-economics, and
-   reversibility under blockade.
-3. **Do pre-game effects ever fire?** On the ancient layer nobody clicks, so effects are only read
-   at the **1960 handoff** — which argues they are a *description* of the capacity band rather than
-   events. If so, the ladder's effects are documentation for the sim's tuning, and only the campaign
-   tree's fire live. This is the difference between the two trees, and it is not yet settled.
+2. **Retirement's three questions** (§ Retirement) — **resolved 2026-08-06 (NR-066).** Grandfather
+   (absent-not-disabled, settled 2026-08-05); explicit retirement used sparingly, mostly units and
+   doctrine forks; permanent, no blockade-driven reversal.
+3. **Do pre-game effects ever fire?** — **resolved 2026-08-06 (NR-066): descriptive only.** On the
+   ancient layer nobody clicks, so its effects are read once at the **1960 handoff** as a
+   description of the starting capacity band, not fired as live events. Only the campaign tree's
+   effects fire live — the two trees do not share one effect runtime, only one vocabulary.
 4. **One `modifier` target vocabulary, or per-system?** A summed-rate modifier needs a named
    subject (farm output, hazard, construction pacing, invention roll). That list wants to be closed
    too, and it does not exist yet.

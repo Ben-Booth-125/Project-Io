@@ -44,6 +44,9 @@ differently in their light.
   so a deck patch is a data update, not a retrain.
 - **first_footing stays: race the player.** Side-effect for the tree review: a race needs a
   single trophy, so this leans tree Q2 toward **world-scoped** keystone deeds.
+  **Superseded 2026-08-06 (NR-069/NR-070):** tree Q2 actually settled **personal**, killing the
+  single-trophy premise. ST-10 was reworked into a tempo race (fire your own deed before a
+  rival fires theirs) rather than cut — see its card below.
 - **The deterministic layer stays unbound.** The `weights` line remains in the schema but does
   not compile into `corp_ai` until the invention loop has validated the deck.
 
@@ -202,21 +205,23 @@ weights: corp_strategy=trade; convoy dispatch ↑ · road builds ↑
 ### The Era 1 arc *(all [draft-tree] — written against the unreviewed first draft)*
 
 ```
-ST-04 · propellant_first — space · [draft-tree]
-thesis:  the space economy has no customer until propellant is made off-world; make the
-         customer, then sell to everyone who follows.
+ST-04 · propellant_first — space · [draft-tree · reworked 2026-08-06 per NR-071]
+thesis:  the space economy has no customer until propellant is made off-world; fire your OWN
+         First Tank before rivals fire theirs, and be the demand sink everyone else sells into.
 when:    Era 1 quests open ⚠ · launch capacity owned · a volatile-bearing body surveyed
          (tile_deposit ice bands ⚠)
-opening: Volatile Prospecting → Ice Extraction → Electrolysis → fire The First Tank ⚠
+opening: Volatile Prospecting → Ice Extraction → Electrolysis → fire The First Tank ⚠, paced
+         against the visible maturity of rivals' volatiles programmes
 doctrine: read the substrate, not the brochure — water-ice body → Hydrolox; carbon source →
          Methalox. The contextual-dud herring is exactly this choice made off-map.
 posture: mid-capex; deliberately builds the demand sink before any supply play
-watch:   rival volatiles buildings on the same body (rival_building_type) — the Tank race is live
-abandon: a rival fires the world-first and the fork closes badly (contingent on deed scoping,
-         tree Q2)
+watch:   rival volatiles buildings on the same body (rival_building_type) — a pacing clock, not
+         a race clock; a rival's own Tank does not close your fork (deeds are personal, NR-069)
+abandon: a rival's mature volatiles programme makes your own Tank pointlessly late — the
+         early-mover window has closed, not the fork itself
 pivot:   yard_master (sell structure instead of fuel) · cadence (lift what you cannot make)
 wins_by: the propellant loop — every other space card's abandon test is "is there a buyer";
-         this card IS the buyer
+         this card IS the buyer, and firing first means being the *cheapest* buyer rivals sell into
 weights: volatiles-sector builds ↑ · ice-band survey ↑
 ```
 
@@ -317,21 +322,25 @@ weights: space-extraction builds ↑, gated hard on visible demand
 ```
 
 ```
-ST-10 · first_footing — race · [draft-tree · resolved 2026-08-06: wanted]
-thesis:  firsts are territory; if keystone deeds are world-scoped, every rival's doctrine fork
-         waits on a race you can win cheaply.
-when:    keystone deeds are world firsts (unresolved) · a deed is contestable at low cost
-opening: minimal viable probes — the smallest landing, tank, truss that fires the deed ahead
-         of a rival's full programme
-posture: asset-light, tempo-pure, openly parasitic on rivals' visible programmes
-         (rival_building_type as a race clock)
-watch:   rival programme maturity per keystone · own burn on probes with no economy behind them
-abandon: two consecutive races lost · the deed-scoping answer comes back "personal"
-pivot:   long_haul (the probe network is also a route network) · whichever card's fork you won
-wins_by: doctrine-timing control — rivals take YOUR leftover branches
+ST-10 · first_footing — tempo race · [draft-tree · reworked 2026-08-06 per NR-070]
+thesis:  firsts are tempo, not territory. Deeds are personal (NR-069) — there is no shared
+         trophy — but firing your keystone deed before a rival fires theirs still buys an
+         early-mover lead on your chosen fork's economy, ahead of theirs coming online.
+when:    rival programme maturity is visible (BL-068) · a deed is contestable at low cost
+opening: minimal viable probes — the smallest landing, tank, truss that fires your OWN deed,
+         paced against the visible maturity of rivals' programmes rather than contesting them
+posture: asset-light, tempo-pure, benchmarked openly against rivals' visible programmes
+         (rival_building_type as a pacing clock, not a race clock)
+watch:   rival programme maturity per keystone (relative pace) · own burn on probes with no
+         economy behind them
+abandon: two consecutive keystones where a faster opening would not have changed the payoff ·
+         programme costs outrun the early-mover gain
+pivot:   long_haul (the probe network is also a route network) · whichever fork you land on
+wins_by: doctrine-timing control — your fork's ramp is running before rivals' own deeds fire
 weights: probe builds ↑ · everything durable ↓
-note:    Ben (2026-08-06): yes — race the player. The mechanics stay contingent on tree Q2
-         (deed scoping), and this answer leans that question toward world-scoped deeds.
+note:    Ben (2026-08-06, NR-070): reworked from a world-scoped race to a tempo race after
+         NR-069 settled deeds as personal — no single trophy to contest, but "fire first" still
+         reads as a real strategy, just against your own clock instead of a shared one.
 ```
 
 **Military family — reserved.** L-MIL is unenumerated until BL-157 (units) is mapped; the tree
@@ -350,10 +359,10 @@ inference is a lookup, not a mind-read — this table is itself card content (`w
 | dense extractors, one body, few processors | deep_seam | beat it to the survey; its rent dies with the price |
 | processors clustered on one hub | mill_gate | corner its raw input — its margin is your sell order |
 | routes everywhere, assets thin | long_haul | it sees the whole map; watch what it suddenly buys |
-| early launchpads + volatiles buildings on ice | propellant_first | the First Tank race is live — win it or become its customer |
+| early launchpads + volatiles buildings on ice | propellant_first | it's pacing toward its own First Tank — beat it there or become its customer |
 | high launch tempo, rising alarm ⚠ | cadence | let its alarm spend itself; quiet_foothold beats it at the rupture |
 | enormous capex parked on one site | bedrock | it has bet the runway — apply tempo pressure elsewhere |
-| minimal probes shadowing your programme | first_footing | it wants your firsts, not your economy; accelerate or feint |
+| minimal probes paced against your programme | first_footing | it wants to fire its own keystone deed first; accelerate or feint |
 
 ## The invention loop — the AI writes its own deck
 
@@ -392,7 +401,7 @@ never *whether it worked*:
 | quiet_foothold | alarm contribution ≤ Y through the countdown AND orbit ≤ T+Δ |
 | yard_master | port throughput-fee share |
 | iron_belt | yard-input share; **zero** Earth-side PGM sales |
-| first_footing | world-firsts won per probe spend |
+| first_footing | own keystone deeds fired ahead of visible rival programme maturity, per probe spend |
 
 A card that never wins its own favourable scenario is underpowered or fiction; a card that wins
 everywhere flattens the meta — both are reward-gate readings, visible in the existing numbers.
