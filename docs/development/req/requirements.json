@@ -8587,7 +8587,7 @@
    "evaluated_difficulty": 3,
    "status": "complete",
    "resolved": "2026-08-04",
-   "resolution": "Complete. tools/verify/history_sweep.cpp reports and does not gate, per the item's own instruction. First spread (12 seeds) found hegemony 0/12 and elimination 0/12 — filed in-session as the no-elimination finding (pre-rebase id BL-308; the 2026-08-07 rebase reassigned that id to an unrelated item, and the still-open finding has no current backlog id), since a model where no polity can die makes BL-224's invariant unmeasurable.",
+   "resolution": "Complete. tools/verify/history_sweep.cpp reports and does not gate, per the item's own instruction. First spread (12 seeds) found hegemony 0/12 and elimination 0/12 — filed in-session as the no-elimination finding (pre-rebase id BL-308; the 2026-08-07 rebase reassigned that id, and Ben's same-day ruling retired the finding as a standalone item — its target, elimination possible and subject-nation release possible, is recorded on BL-271), since a model where no polity can die makes BL-224's invariant unmeasurable.",
    "promoted_from": "Ben, 2026-08-04, choosing the sweep as the next work.",
    "batch": null,
    "rows": [
@@ -8687,7 +8687,7 @@
      "requirement": "The no-elimination finding's target outcome (pre-rebase id BL-308) — a polity is eliminated in at least one world of a seed spread — is NOT met. Recorded as failed rather than re-scoped.",
      "class": "headless",
      "status": "failed",
-     "notes": "Elimination 0/12 after the fix. Weakest power median 6 provinces, range 1..22. The finding stays open with a sharper diagnosis — and with no current backlog id, since the 2026-08-07 rebase reassigned pre-rebase BL-308 to an unrelated item."
+     "notes": "Elimination 0/12 after the fix. Weakest power median 6 provinces, range 1..22. The finding kept the sharper diagnosis and was then retired as a standalone item (Ben, 2026-08-07): elimination possible and subject-nation release possible stand as design intent on BL-271 (Era -1 history sim)."
     }
    ]
   },
