@@ -265,6 +265,27 @@ added by Ben 2026-08-04).
   user-story review) is the vehicle, retargeted here from v0.1.1; it consumes
   `user_stories.json` and closes the loop between the band's new systems and the surfaces that
   serve them.
+- **v0.1.7 — Buildings rework** (**BL-323**). *(Added by Ben, 2026-08-07: "we need to pad out the
+  number of available buildings, and start enforcing placement rules. Especially for logistical
+  max building range… We need to put a lot of work into this before any simulated games can
+  occur.")* The band's third concrete build minor, and the one the simulated-play arc waits on.
+  Four strands: **pad the roster** out toward `PRODUCTION.md`'s designed ~26 (against 5 generic
+  kinds and 4 recipes today), mostly as Lua authoring rather than enum churn; **enforce a
+  logistical max range** on placement — the rule with no code at all today, built as a reach query
+  over the terrain-weighted cost function `logistics.cpp` already provides; **make build time
+  depend on the site** (landform, logistics distance, established stack) rather than staying a
+  flat per-type constant; and **surface construction on the canvas**.
+
+  **Why it gates simulated play.** With remoteness free, the optimal siting strategy is "the
+  richest tile anywhere" — a lookup, not a decision. An AI player driving the corp-command seam
+  finds that immediately and plays it forever, so neither the v0.2.0 opponent nor a text-driven
+  session tests anything until siting carries a trade-off. It is the placement-side counterpart to
+  the constraint **BL-316** is landing in the Era −1 sim: breadth must cost something.
+
+  **Sequencing is Ben's call.** Placed last in the band to avoid renumbering the stub minors, but
+  it is *concrete* work that the design-forward minors (v0.1.2–v0.1.5) do not depend on — so
+  pulling it ahead of them is reasonable if simulated play is wanted sooner. Flagged rather than
+  decided.
 
 ### v0.2.0 — The AI opponent
 
