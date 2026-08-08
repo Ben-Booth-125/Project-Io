@@ -10,7 +10,40 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Military base S1: the muster building lands (2026-08-08, latest)
+## Session — Live critique: seven items filed, the building-selection bypass fixed (2026-08-08, latest)
+
+Light-to-Full mix: Ben played the day's landed work in the live app and critiqued surface by
+surface; the sliced-globe render (committed separately, same sitting: 48 slices, Ben's pick from
+a six-form comparison) came out of the same session. Runtime: not tracked.
+
+**Filed from the critique, one item per directive** (all dated, all carrying Ben's words):
+BL-326 (build-ledger groups — expandable, two-tier alphabetical, explicitly NOT profit-first),
+BL-327 (a dedicated under-construction glyph REPLACING the BL-323 S4 dimming — superseded
+same-day, the dimming read as "faded" not "building"), BL-328 (pre-commit "this building won't
+get materials" warning — construction_rate already computes it, the ledger just never shows it),
+BL-329 (retire the corp-reach circle now the reach fog shows supply properly; blocked on
+BL-333), BL-330 (player starts with a military base + one unit), BL-331 (nuclear weapons develop
+in-game — WW3 is a nuclear threat; design-owed, hangs off BL-223's averted rupture and the
+BL-087 tech constellation), BL-332 (military points produced by bases + a dedicated research
+building, because nothing today measures how tech gets done; design-owed, the two halves
+designed together).
+
+**The one outright bug, fixed in-session (BL-333).** Selecting a player building bypassed the
+Selection element entirely — draw_selection_content routed it straight into the full management
+card (the 2026-07-22 "four-numbers card is useless" layout call, now superseded). A building now
+takes the same action|facts Selection view as every other kind: construction status, an
+Operate → **Manage** button (opens the construction ledger's Buildings tab, which already keys
+off selected_entity), profitability facts right. The ~300-line rich management card is PARKED
+`[[maybe_unused]]`, not deleted — whether it becomes the Buildings tab's detail pane or dies is
+NR-093, Ben's call. Verified by capture: the Selection band shows header / status / Manage /
+profitability on a fresh player building.
+
+**Approved in the same critique, no action needed:** the wizard globe (committed as the sliced
+render) and the reach-fog display of supply reach.
+
+---
+
+## Session — Military base S1: the muster building lands (2026-08-08)
 
 Full mode, Delivery: BL-325 (military bases + supply) promoted, S1 delivered and drained; S2
 (hire-at-base) and S3 (out-of-supply decay) deliberately left in the item. Same sitting as the

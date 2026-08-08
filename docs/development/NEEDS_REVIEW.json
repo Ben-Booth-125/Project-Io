@@ -1779,6 +1779,26 @@
     "docs/development/backlog.json"
    ],
    "resolution": null
+  },
+  {
+   "id": "NR-093",
+   "title": "Building-selection bypass reversed; the rich management card is parked, not deleted",
+   "raised": "2026-08-08",
+   "kind": "decision-taken",
+   "status": "open",
+   "source": "Ben, 2026-08-08 live critique: 'selection of a building skips the selection menu, going straight to manage. This is a bug.'",
+   "what": "The bypass at draw_selection_content (a selected player building rendered the full management card as its Selection content, per the 2026-07-22 'four-numbers card is useless' ruling) is removed. A building now takes the shared action|facts Selection view: construction status, an Operate/Manage button (opens the construction ledger's Buildings tab, which already keys off selected_entity), and the profitability facts column. The old rich vertical card (draw_building_selection, ~300 lines: workforce slider, recipe picker, production status) is PARKED [[maybe_unused]] rather than deleted.",
+   "why_it_matters": "Two calls taken on Ben's behalf: (1) Manage routes to the construction ledger's Buildings tab rather than resurrecting the card in a full-screen takeover -- chosen because that tab already exists, already focuses the selected building, and already carries management detail; (2) the parked card is kept compiled because its content (per-building workforce/recipe controls) may be wanted as the Buildings tab's detail pane. If the Buildings tab's existing inline detail is judged sufficient, the parked function should be deleted instead.",
+   "options": [
+    "Keep Manage -> construction ledger Buildings tab; delete the parked card",
+    "Fold the parked card's content into the Buildings tab as its detail pane, then delete the standalone function",
+    "Different destination for Manage entirely (a dedicated management surface)"
+   ],
+   "recommendation": null,
+   "files": [
+    "src/ui/selection_panel.cpp"
+   ],
+   "resolution": null
   }
  ]
 }

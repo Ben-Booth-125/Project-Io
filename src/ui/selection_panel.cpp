@@ -504,8 +504,16 @@ void draw_selection_action(const world& w, const recipe_registry& reg,
                     ImGui::TextColored(construction_status_colour(rate), "%s",
                         construction_status(rate, b.ticks_remaining).c_str());
                 }
-                // The tile-scoped Manage front door was removed (Ben's 2026-07-15
-                // review) — a selected building shows its facts / build status only.
+                // Manage is a deliberate step now, not the selection itself
+                // (2026-08-08: selecting a building must land on the Selection
+                // view first). The button opens the management ledger's
+                // Buildings tab, which already keys off selected_entity.
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Operate");
+                if (ImGui::Button("Manage"))
+                {
+                    ui.show_construction_panel  = true;
+                    ui.construction.panel_view  = 1; // the Buildings tab
+                }
             }
             else
             {
@@ -965,6 +973,14 @@ const char* production_status(const building_component& b,
     return "Active";
 }
 
+// PARKED 2026-08-08 (kept compiled, no caller): this rich vertical management
+// card WAS the selection content for a player building until Ben ruled the
+// bypass a bug ("selection of a building skips the selection menu, going
+// straight to manage"). Selection now takes the shared action|facts view with a
+// Manage button routing to the construction ledger's Buildings tab. Whether
+// this card becomes that tab's detail pane or is deleted is Ben's call — see
+// NEEDS_REVIEW.
+[[maybe_unused]]
 void draw_building_selection(world& w, const recipe_registry& reg,
                              const economy_report& report, ui_state& ui)
 {
@@ -1337,14 +1353,11 @@ void draw_selection_content(world& w, const recipe_registry& reg,
 
     ImGui::Separator();
 
-    // A selected player building takes its own vertical layout (Ben's 2026-07-22
-    // review: the old four-numbers card "is useless"). Rival buildings stay on the
-    // action|facts split — intel only, nothing to operate.
-    if (kind == selection_kind::building && is_player_owned(w, ui.selected_entity))
-    {
-        draw_building_selection(w, reg, report, ui);
-        return;
-    }
+    // A selected player building used to BYPASS this layout and render the full
+    // management view as its card (2026-07-22). Reversed 2026-08-08 (Ben: "selection
+    // of a building skips the selection menu, going straight to manage. This is a
+    // bug.") — a building now takes the same action|facts Selection view as every
+    // other kind, with an explicit Manage action routing to the management ledger.
 
     // ── Action (left, dominant) │ Facts (right, muted) ──
     const float content_w = bar_w;

@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*92 entries — 14 open, 78 resolved.*
+*93 entries — 15 open, 78 resolved.*
 
 ---
 
@@ -183,6 +183,19 @@ A building that exists beyond the reach budget (grandfathered, or placed while t
 **Why it matters.** Not a bug — the placement gate was the designed slice — but the asymmetry will read as inconsistent the moment a player notices it, and the BL-325 unit-decay mechanic makes the contrast sharper (units decay out of range; buildings do not). Noted so BL-288's design starts from this.
 
 *Files: `src/world/supply_system.cpp`, `docs/development/backlog.json`*
+
+### NR-093 — Building-selection bypass reversed; the rich management card is parked, not deleted
+*decision taken on your behalf · raised 2026-08-08 · from Ben, 2026-08-08 live critique: 'selection of a building skips the selection menu, going straight to manage. This is a bug.'*
+
+The bypass at draw_selection_content (a selected player building rendered the full management card as its Selection content, per the 2026-07-22 'four-numbers card is useless' ruling) is removed. A building now takes the shared action|facts Selection view: construction status, an Operate/Manage button (opens the construction ledger's Buildings tab, which already keys off selected_entity), and the profitability facts column. The old rich vertical card (draw_building_selection, ~300 lines: workforce slider, recipe picker, production status) is PARKED [[maybe_unused]] rather than deleted.
+
+**Why it matters.** Two calls taken on Ben's behalf: (1) Manage routes to the construction ledger's Buildings tab rather than resurrecting the card in a full-screen takeover -- chosen because that tab already exists, already focuses the selected building, and already carries management detail; (2) the parked card is kept compiled because its content (per-building workforce/recipe controls) may be wanted as the Buildings tab's detail pane. If the Buildings tab's existing inline detail is judged sufficient, the parked function should be deleted instead.
+
+- Keep Manage -> construction ledger Buildings tab; delete the parked card
+- Fold the parked card's content into the Buildings tab as its detail pane, then delete the standalone function
+- Different destination for Manage entirely (a dedicated management surface)
+
+*Files: `src/ui/selection_panel.cpp`*
 
 ---
 

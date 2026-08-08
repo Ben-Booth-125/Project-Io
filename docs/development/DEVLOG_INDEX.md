@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 137 entries across 2 volume(s).
+One line per session, newest first — 138 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-08-08 | [Live critique: seven items filed, the building-selection bypass fixed](DEVLOG.md) | BL-087 BL-223 BL-323 BL-326 BL-327 BL-328 BL-329 BL-330 BL-331 BL-332 BL-333 | DEVLOG.md |
 | 2026-08-08 | [Military base S1: the muster building lands](DEVLOG.md) | BL-323 BL-325 | DEVLOG.md |
 | 2026-08-08 | [Reach-rule hardening: three S2 defects ruled and fixed, and the military-base design settled](DEVLOG.md) | BL-068 BL-288 BL-323 BL-324 BL-325 | DEVLOG.md |
 | 2026-08-08 | [Buildings rework, first slice: extraction padding, site-dependent build time, construction legibility](DEVLOG.md) | BL-323 | DEVLOG.md |
