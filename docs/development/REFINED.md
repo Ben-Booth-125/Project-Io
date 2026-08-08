@@ -1,5 +1,9 @@
 # Project Io — REFINED (active worklist)
 
+> Drained 2026-08-08: critique batch (BL-326/327/328/329/330), all 3 tasks COMPLETE — removed
+> per the retain-one policy. Record lives in DEVLOG.md (2026-08-08 entry), backlog.json's five
+> `resolution` fields, and requirements.json § critique-batch-ui-polish (R1–R6).
+>
 > Drained 2026-08-08: unit hire surface (BL-324), all 5 tasks COMPLETE — removed per the
 > retain-one policy. Record lives in DEVLOG.md (2026-08-08 entry), backlog.json BL-324/BL-157
 > `resolution` fields, and requirements.json § unit-hire-surface (R1–R7).

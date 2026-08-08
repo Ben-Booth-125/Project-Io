@@ -9099,6 +9099,85 @@
      "notes": ""
     }
    ]
+  },
+  {
+   "brief": "critique-batch-ui-polish",
+   "title": "Critique batch: build-ledger grouping + warning, construction glyph, reach-circle retirement, military start",
+   "difficulty": null,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-08-08",
+   "resolution": "All 6 rows met. BL-326: build ledger candidates grouped (Extraction/Processing/Infrastructure/Military), two-tier alphabetical sort replacing profit-first ranking, TreeNodeEx fold per group. BL-328: construction_rate() surfaced pre-commit on every candidate row, gated on placement validity so it never stacks with an existing rejection reason; row height bumped to avoid clipping. BL-327: a dedicated crane glyph (icons::under_construction) replaces the BL-323 S4 dimming, drawn in place of the type silhouette while ticks_remaining > 0; cataloged in ICONS.md. BL-329: draw_corp_border's AddCircle ring removed (renamed draw_corp_hq), the icons::hq marker kept; LENSES.md/PLANETARY.md/components.hpp updated to match, corporate_reach.lua's own comments corrected. BL-330: player corp seeded with one military_base + one unit at generation, deterministic, via a nearest-valid-tile search from the HQ. Verified: full ProjectIo build clean; CTest 45/55 pass -- the 10 non-passing all reproduce identically on the pre-batch baseline (isolated via git stash), confirming none are regressions from this batch. Visual checks via --verify captures for the grouped ledger, the crane glyph, and the retired ring.",
+   "promoted_from": "backlog.json BL-326, BL-327, BL-328, BL-329, BL-330 (Ben's 2026-08-08 live critique)",
+   "batch": true,
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "BL-326: the tile construction ledger groups candidates into expandable groups (Extraction / Processing / Infrastructure / Military), sorted two-tier alphabetical (group, then row) -- not by expected profit.",
+     "verification": [
+      "visual: manual",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "Visual: tile_build_ledger.lua captures show Extraction/Infrastructure folds; code review confirms Military/Processing groups wired",
+     "notes": "src/ui/selection_panel.cpp"
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-328: a candidate row whose prospective material rate is 0 (or a material-starved partial rate) shows a warning/ETA line BEFORE commit, using the existing construction_rate() function.",
+     "verification": [
+      "visual: manual",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "Visual: material-supply warning renders on candidate rows, gated correctly against invalid placement (fixed a real stacking bug found in review)",
+     "notes": "src/ui/selection_panel.cpp"
+    },
+    {
+     "id": "R3",
+     "requirement": "BL-327: a building with ticks_remaining > 0 renders a dedicated under-construction glyph IN PLACE OF its type silhouette, not a desaturated version of it; the BL-323 S4 dimming path is removed.",
+     "verification": [
+      "visual: manual",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "Visual: glyph_check captures show the crane glyph rendering in place of the type silhouette on a building under construction",
+     "notes": "src/ui/icons.cpp, src/ui/body_surface_canvas.cpp, docs/ui/ICONS.md"
+    },
+    {
+     "id": "R4",
+     "requirement": "BL-329: the corp-border ring (draw_corp_border's AddCircle) is removed for both the player's always-on chrome and rival borders under the Corporation lens; the HQ marker glyph itself is kept.",
+     "verification": [
+      "visual: manual",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "Visual: corporate_reach.lua captures confirm the ring is gone; HQ star marker unaffected",
+     "notes": "src/ui/body_surface_canvas.cpp"
+    },
+    {
+     "id": "R5",
+     "requirement": "BL-330: a fresh campaign seeds the player corporation with one military_base and one unit, deterministically (same seed -> same placement).",
+     "verification": [
+      "headless",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "Code review + determinism/world_audit/corp_terrain_matrix harnesses all pass; visual capture confirms placement",
+     "notes": "src/world/corporation_generation.cpp"
+    },
+    {
+     "id": "R6",
+     "requirement": "Full ProjectIo build stays clean; buildings_rework_harness and any new/existing headless harnesses touched by BL-330 still pass.",
+     "verification": [
+      "headless"
+     ],
+     "status": "complete",
+     "result_metric": "Full build clean (0 errors); CTest 45/55 -- the 10 non-passing reproduce identically on the pre-batch baseline, isolated via git stash",
+     "notes": ""
+    }
+   ]
   }
  ]
 }

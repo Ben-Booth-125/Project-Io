@@ -10,7 +10,66 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Live critique: seven items filed, the building-selection bypass fixed (2026-08-08, latest)
+## Session — Critique batch delivered: build ledger grouping, construction glyph, reach-circle retirement, military start (2026-08-08, latest)
+
+Full mode, Batch Delivery, sub-agent fan-out (Ben's steer). Promoted BL-326, BL-327, BL-328,
+BL-329, BL-330 from the prior session's critique into REFINED.md as a three-way file-disjoint
+split; delivered, verified, drained. Runtime: not tracked.
+
+**A — build ledger grouping + pre-commit warning (BL-326 + BL-328), one sub-agent, worktree-
+isolated.** `selection_panel.cpp`'s candidate list now groups by building family (Extraction /
+Processing / Infrastructure / Military) and sorts two-tier alphabetical — group, then row name —
+replacing the profit-ranked flat list Ben rejected ("not most profit first"). Each row also
+surfaces `construction_rate()` before commit: a stalled or supply-limited build says so up front
+instead of via the post-hoc paused status. **The agent's own worktree had branched from a stale
+base** (missing the Military Base row landed earlier this session) — its diff was extracted and
+hand-applied onto current `main` rather than merged wholesale. **One real bug found integrating
+it**: the warning rendered even on an already-invalid candidate ("Cannot build on water" AND
+"Local market can't supply materials" stacked on the same row) — fixed by gating the warning on
+`c.pr.ok()`, and the row height (four lines, hardcoded) clipped the new fifth line — fixed by
+reserving it unconditionally so every row stays a uniform height.
+
+**B — construction glyph + reach-circle retirement (BL-327 + BL-329), main session (same file,
+recently-authored code).** A new `icons::under_construction` — a stroke-only crane silhouette
+(mast, boom, back-stay, hook) — draws IN PLACE OF a building's type silhouette while
+`ticks_remaining > 0`, replacing the BL-323 S4 desaturation Ben found read as "faded" not "being
+built"; full owner-tinted colour, so identity still reads. `draw_corp_border`'s `AddCircle` ring
+is gone (renamed `draw_corp_hq`) for both the player's always-on chrome and rival borders under
+the Corporation lens — Ben's read: a fixed-radius ring that never grew as the player built
+outward showed nothing informative once the BL-323 reach fog existed to show supply reach
+properly. The `hq` star marker is unaffected. `influence_range` stays computed and stored (a
+future operate-gate may want it); LENSES.md, PLANETARY.md, `components.hpp`'s own doc comment,
+and `corporate_reach.lua`'s comments all updated to describe the marker rather than the retired
+ring.
+
+**C — military start (BL-330), one sub-agent, twice.** The first dispatch returned a placeholder
+("I'll report back once it completes") without actually editing anything; its worktree was
+auto-cleaned (no changes made) before the resume could reach it. The SECOND dispatch (or the
+same agent, retried) implemented it directly — the diff simply appeared in the main tree,
+complete and correct: the player corporation is seeded with one `military_base` and one unit
+(roster index 0, manpower 50, mirroring `hire_unit`'s own constant) at generation, on the nearest
+valid land tile to its HQ, skipped gracefully on a degenerate land-poor world. Rival corps are
+NOT seeded — player-only, per scope. `author_building`'s zero-staff condition extended to
+`military_base` to match.
+
+**Verification, all three slices.** Full `ProjectIo` build clean throughout. CTest: 45/55 —
+**investigated the one count that changed** (`home_surface_bench`, not in the prior session's
+documented baseline) by re-running it standalone (0 failures — a CTest parallel-load timing
+artifact, not a regression) and separately **isolated `ai_skill_harness`'s 7 failures** by
+`git stash`-ing this session's entire diff and re-running against the pre-batch commit: identical
+7 failures, confirming they predate this batch rather than being caused by BL-330's extra RNG
+draws (a real question worth checking, not assumed). Visual: `tile_build_ledger.lua`,
+`corporate_reach.lua`, and two ad-hoc zoomed captures (`glyph_check`, `mil_zoom`) inspected by eye
+per DEVELOPMENT_PRACTICES.md's Windows-authoritative rule (Linux golden-diffs on these all FAIL
+by the expected 4–7% platform noise; not re-blessed since none of the touched surfaces have a
+Windows-blessed baseline to diff against in this environment).
+
+**REFINED.md drained** per the retain-one policy. Requirements: requirements.json §
+critique-batch-ui-polish (R1–R6, all complete).
+
+---
+
+## Session — Live critique: seven items filed, the building-selection bypass fixed (2026-08-08)
 
 Light-to-Full mix: Ben played the day's landed work in the live app and critiqued surface by
 surface; the sliced-globe render (committed separately, same sitting: 48 slices, Ben's pick from

@@ -7191,8 +7191,8 @@
    "short_name": "BUILD_LEDGER_GROUPING",
    "category": "UI",
    "title": "Construction ledger: expandable building groups, two-tier alphabetical sort",
-   "status": "designed",
-   "glyph": "✓",
+   "status": "complete",
+   "glyph": "✔",
    "priority": "B",
    "difficulty": 2,
    "parked": false,
@@ -7205,15 +7205,16 @@
    ],
    "authority_doc": "docs/ui/SELECTION.md",
    "summary": "Ben, 2026-08-08 live critique: with 15 extraction targets the flat candidate list no longer scans. Group candidates into expandable groups (Extraction / Processing / Infrastructure), sorted on a two-tier alphabetical system (group name, then row name) - explicitly NOT most-profit-first.",
-   "design": "Ben's ruling, 2026-08-08 (live playtest of the BL-323 first slice): 'I think we should group yeah. Probably worth having expandable groups of buildings. Sorted on a two tier alphabetical system, not most profit first.'\n\nShape: the tile construction ledger's candidate list gains collapsible group headers (the BL-214 fold idiom - reuse, not reinvent). Tier 1 = group (Extraction, Processing, Infrastructure), alphabetical; tier 2 = rows inside the group, alphabetical by display name. The existing per-row pricing/payback columns are unchanged - the sort is what changes: profit ranking is dropped as the ORDER (it survives as a visible column the eye can scan).\n\nOpen question deliberately not settled here: default fold state (all collapsed vs first group open vs remember-last)."
+   "design": "Ben's ruling, 2026-08-08 (live playtest of the BL-323 first slice): 'I think we should group yeah. Probably worth having expandable groups of buildings. Sorted on a two tier alphabetical system, not most profit first.'\n\nShape: the tile construction ledger's candidate list gains collapsible group headers (the BL-214 fold idiom - reuse, not reinvent). Tier 1 = group (Extraction, Processing, Infrastructure), alphabetical; tier 2 = rows inside the group, alphabetical by display name. The existing per-row pricing/payback columns are unchanged - the sort is what changes: profit ranking is dropped as the ORDER (it survives as a visible column the eye can scan).\n\nOpen question deliberately not settled here: default fold state (all collapsed vs first group open vs remember-last).",
+   "resolution": "Landed 2026-08-08. Build ledger candidates grouped (Extraction/Processing/Infrastructure/Military, assigned by building_type not parsed from display name), two-tier alphabetical sort (group then row name) replacing the profit-first ranking Ben rejected. TreeNodeEx fold per group (DefaultOpen), matching the fold idiom used elsewhere. Requirements: requirements.json § critique-batch-ui-polish R1."
   },
   {
    "id": "BL-327",
    "short_name": "CONSTRUCTION_GLYPH",
    "category": "UI",
    "title": "Under-construction glyph replaces the dimmed-marker treatment",
-   "status": "designed",
-   "glyph": "✓",
+   "status": "complete",
+   "glyph": "✔",
    "priority": "B",
    "difficulty": 2,
    "parked": false,
@@ -7228,15 +7229,16 @@
    ],
    "authority_doc": "docs/ui/ICONS.md",
    "summary": "Ben, 2026-08-08 live critique of BL-323 S4: 'Now that we have timed buildings, we need an under construction glyph. Replace dimming with under construction as a new glyph.' A dedicated scaffold/crane glyph drawn in place of the building silhouette while ticks_remaining > 0, instead of desaturating the final silhouette.",
-   "design": "Supersedes the BL-323 S4 dimming treatment (landed 2026-08-08, same day): the dimmed silhouette read as 'faded building', not 'building in progress'. A construction site is a DIFFERENT THING from the building it becomes, so it gets its own glyph, not a modified version of the target glyph.\n\nShape: a new icons:: glyph (scaffold/crane silhouette, per ICONS.md's add-a-glyph recipe + catalogue row) drawn INSTEAD OF the building silhouette when ticks_remaining > 0. Owner emblem tag and hit zone unchanged. The hover card's 'Under construction - N ticks remaining' line (landed with S4) stays."
+   "design": "Supersedes the BL-323 S4 dimming treatment (landed 2026-08-08, same day): the dimmed silhouette read as 'faded building', not 'building in progress'. A construction site is a DIFFERENT THING from the building it becomes, so it gets its own glyph, not a modified version of the target glyph.\n\nShape: a new icons:: glyph (scaffold/crane silhouette, per ICONS.md's add-a-glyph recipe + catalogue row) drawn INSTEAD OF the building silhouette when ticks_remaining > 0. Owner emblem tag and hit zone unchanged. The hover card's 'Under construction - N ticks remaining' line (landed with S4) stays.",
+   "resolution": "Landed 2026-08-08, same-day supersession of BL-323 S4's dimming. New icons::under_construction (a stroke-only crane silhouette: mast, boom, back-stay, hook line) drawn IN PLACE OF the type silhouette while ticks_remaining > 0, at full owner-tinted colour. Cataloged in ICONS.md. Requirements: requirements.json § critique-batch-ui-polish R3."
   },
   {
    "id": "BL-328",
    "short_name": "PRE_BUILD_MATERIAL_WARNING",
    "category": "UI",
    "title": "Construction ledger warns 'this build will starve' before commitment",
-   "status": "designed",
-   "glyph": "✓",
+   "status": "complete",
+   "glyph": "✔",
    "priority": "B",
    "difficulty": 2,
    "parked": false,
@@ -7249,15 +7251,16 @@
    ],
    "authority_doc": "docs/ui/SELECTION.md",
    "summary": "Ben, 2026-08-08 live critique: the player needs 'a way to tell the user: this building won't get materials, BEFORE they start attempting construction' - today the 'Paused - market can't supply materials' diagnosis only appears after committing.",
-   "design": "The machinery already exists: selection_panel.cpp's construction_rate() computes the prospective material rate for a (tile, type) BEFORE placement - it is already called for the front door's analog status. What is missing is surfacing it on the LEDGER ROWS: a candidate whose rate is 0 (or below some legibility threshold) should carry a visible warning ('will stall - market lacks steel') next to its Build button, in the same reason-coded idiom the invalid rows already use ('Cannot build on water', ...). Not a gate - the player may still commit (the market may recover); it is a warning, not a refusal."
+   "design": "The machinery already exists: selection_panel.cpp's construction_rate() computes the prospective material rate for a (tile, type) BEFORE placement - it is already called for the front door's analog status. What is missing is surfacing it on the LEDGER ROWS: a candidate whose rate is 0 (or below some legibility threshold) should carry a visible warning ('will stall - market lacks steel') next to its Build button, in the same reason-coded idiom the invalid rows already use ('Cannot build on water', ...). Not a gate - the player may still commit (the market may recover); it is a warning, not a refusal.",
+   "resolution": "Landed 2026-08-08. Each build-ledger candidate row now surfaces construction_rate() before commit: 'No local supply - build will stall' (rate <= 0) or 'Supply-limited - will stretch' (partial rate), gated on placement validity so it never stacks with an existing rejection reason (a real bug found and fixed in review). Row height reserves the line unconditionally so rows stay uniform. Requirements: requirements.json § critique-batch-ui-polish R2."
   },
   {
    "id": "BL-329",
    "short_name": "CORP_REACH_CIRCLE_RETIREMENT",
    "category": "UI",
    "title": "Retire the corp-building reach circle - fog/reach now carries that information",
-   "status": "designed",
-   "glyph": "✓",
+   "status": "complete",
+   "glyph": "✔",
    "priority": "C",
    "difficulty": 1,
    "parked": false,
@@ -7272,15 +7275,16 @@
    ],
    "authority_doc": "docs/ui/CANVASES.md",
    "summary": "Ben, 2026-08-08: 'fog of war displays reach. We should retire the circle around corp buildings. It doesn't show anything informative.' Blocked in practice on BL-330 (building selection skips the Selection element) - the circle currently doubles as the only selection affordance a building click leaves behind.",
-   "design": "Ben's ruling, 2026-08-08: the reach information the circle once carried is now visible through the fog/reach rendering, so the circle is decoration. Retire it. Sequenced AFTER BL-330 (the selection-skip bug): today clicking a rival/own building jumps straight to the management surface, so the circle is incidentally the only visible acknowledgment of what was clicked; with BL-330 fixed, the Selection element carries that and the circle retires clean."
+   "design": "Ben's ruling, 2026-08-08: the reach information the circle once carried is now visible through the fog/reach rendering, so the circle is decoration. Retire it. Sequenced AFTER BL-330 (the selection-skip bug): today clicking a rival/own building jumps straight to the management surface, so the circle is incidentally the only visible acknowledgment of what was clicked; with BL-330 fixed, the Selection element carries that and the circle retires clean.",
+   "resolution": "Landed 2026-08-08. draw_corp_border's AddCircle ring removed for both the player's always-on chrome and rival borders under the Corporation lens; renamed draw_corp_hq, the icons::hq marker itself unaffected. influence_range stays computed/stored (a future operate-gate may want it) with its doc comment updated to explain the render-side retirement. LENSES.md, PLANETARY.md, and corporate_reach.lua's comments updated to match. Requirements: requirements.json § critique-batch-ui-polish R4."
   },
   {
    "id": "BL-330",
    "short_name": "BUILDING_SELECT_SKIPS_SELECTION",
    "category": "UI",
    "title": "BUG: clicking a building skips the Selection element and jumps straight to management",
-   "status": "designed",
-   "glyph": "✓",
+   "status": "complete",
+   "glyph": "✔",
    "priority": "A",
    "difficulty": 2,
    "parked": false,
@@ -7295,7 +7299,8 @@
    ],
    "authority_doc": "docs/ui/SELECTION.md",
    "summary": "Ben, 2026-08-08, live: selecting a building skips the Selection element, going straight to manage. SELECTION.md's click model says single-click SELECTS (fills the Selection element); double-click navigates/opens. A building click that jumps to management violates the model.",
-   "design": "SELECTION.md's settled click model: single-click selects and fills the polymorphic Selection element; double-click is the navigation/open gesture. Ben confirms the current behaviour (building click -> management surface immediately) is a BUG against that model, found while trying to retire the reach circle (BL-329). Fix: a building click sets selection to the building entity and lets the Selection element render its building content (which already exists - entity_summary's building builder); management opens from the Selection element's own affordance or double-click, per the doc."
+   "design": "SELECTION.md's settled click model: single-click selects and fills the polymorphic Selection element; double-click is the navigation/open gesture. Ben confirms the current behaviour (building click -> management surface immediately) is a BUG against that model, found while trying to retire the reach circle (BL-329). Fix: a building click sets selection to the building entity and lets the Selection element render its building content (which already exists - entity_summary's building builder); management opens from the Selection element's own affordance or double-click, per the doc.",
+   "resolution": "Landed 2026-08-08. The player corporation is seeded with one military_base and one unit (roster index 0, manpower 50) at generation, on the nearest valid land tile to its HQ (grid-distance search, deterministic tie-break on entity id), gracefully skipped on a degenerate land-poor world. author_building's zero-staff condition extended to military_base. Rival corps are NOT seeded (player-only, per scope). Requirements: requirements.json § critique-batch-ui-polish R5."
   },
   {
    "id": "BL-331",
