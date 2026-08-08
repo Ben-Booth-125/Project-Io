@@ -1511,7 +1511,9 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
         building_profit profit;
         float           capex    = 0.0f; ///< build_cost + materials at the local market.
         bool            produces = false; ///< Extraction/processing earn directly; infrastructure does not.
-        int             group    = 0;    ///< Sort band: 0 = ranked, 1 = valid unranked, 2 = invalid.
+        int             group    = 0;    ///< Render band: 0 = ranked/priced, 1 = valid unranked, 2 = invalid.
+        std::string     category;        ///< Fold group (BL-326): Extraction / Processing / Infrastructure / Military.
+        float           material_rate = 1.0f; ///< construction_rate at this tile (BL-328 pre-commit warning).
     };
     std::vector<candidate> cands;
     for (const resource_type er : placement_rules::k_extractable)
@@ -1536,11 +1538,22 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
     cands.push_back({building_type::inland_logistics_hub, resource_type::iron_ore, "Inland Logistics Hub"}); // BL-149
     cands.push_back({building_type::military_base,        resource_type::iron_ore, "Military Base"});        // BL-325 S1
 
+    // BL-326: fold group by building family — Ben rejected the profit-ranked flat list
+    // for named, expandable groups. Assigned by type rather than parsed from the display
+    // name, so a future rename of "Extraction: X" can't silently drop a row into the
+    // wrong group.
+    for (candidate& c : cands)
+        c.category = (c.type == building_type::extraction_site)     ? "Extraction"
+                    : (c.type == building_type::processing_facility) ? "Processing"
+                    : (c.type == building_type::military_base)       ? "Military"
+                                                                      : "Infrastructure";
+
     for (candidate& c : cands)
     {
         const building_economics& econ = reg.economics(c.type);
         c.pr = placement_rules::can_place_in_world(w, tile_id, c.type, c.target,
                                                   ui.max_logistics_reach);
+        c.material_rate = construction_rate(w, reg, c.type, tile_id); // BL-328 pre-commit warning
 
         // Capex is the figure construction.cpp actually gates on: build cost PLUS the
         // materials priced at the local market. This ledger used to gate on build_cost
@@ -1559,17 +1572,16 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
                                                          : 1;
     }
 
-    // Ranked candidates first, by expected net descending; then valid infrastructure
-    // (and anything the market cannot price); then the unbuildable, which keep their
-    // reason text because that vocabulary is the ledger's teaching surface. stable_sort
-    // with a declaration-order tie-break keeps the order frame-stable and deterministic.
+    // Two-tier alphabetical (BL-326): group name, then row name — Ben's explicit call
+    // against the old profit-ranked flat list ("not most profit first"). A refused
+    // candidate stays in its group rather than dropping out, so the reason text (the
+    // ledger's teaching surface) is still visible under its fold. stable_sort with a
+    // declaration-order tie-break keeps ties frame-stable and deterministic.
     std::stable_sort(cands.begin(), cands.end(),
                      [](const candidate& a, const candidate& b) {
-                         if (a.group != b.group)
-                             return a.group < b.group;
-                         if (a.group != 0)
-                             return false;
-                         return a.profit.net() > b.profit.net();
+                         if (a.category != b.category)
+                             return a.category < b.category;
+                         return a.name < b.name;
                      });
 
     // One ceiling shared across the whole list, so the bars compare directly. Only the
@@ -1599,11 +1611,14 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
                        "the bar; see payback.");
     ImGui::PopStyleColor();
 
-    // Four lines per candidate: name / cost + payback / profit bar / action.
+    // Five lines per candidate: name / cost + payback / supply warning (BL-328,
+    // reserved unconditionally so a warning row never clips against a fixed-height
+    // sibling that lacks one) / profit bar / action.
     constexpr float bar_h = 14.0f;
     const float     row_h = style.WindowPadding.y * 2.0f
                           + ImGui::GetTextLineHeightWithSpacing()       // name
                           + ImGui::GetTextLineHeightWithSpacing()       // cost + payback
+                          + ImGui::GetTextLineHeightWithSpacing()       // supply warning (blank if none)
                           + std::max(bar_h, ImGui::GetTextLineHeight()) // profit bar or its text
                           + style.ItemSpacing.y
                           + ImGui::GetFrameHeight();                    // Build / reason
@@ -1614,8 +1629,24 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
 
     ImGui::BeginChild("##build_list", {0.0f, 0.0f}, false,
                       ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysVerticalScrollbar);
+    // BL-326: candidates are pre-sorted category-then-name, so each category's rows are
+    // contiguous — walk the list opening a TreeNodeEx (this file's existing fold idiom,
+    // e.g. economy_panel.cpp) whenever the category changes, and close it once its rows
+    // are drawn. Defaulted open, matching the fold usage elsewhere in the UI.
+    std::string open_category;
+    bool        category_open = false;
     for (const candidate& c : cands)
     {
+        if (c.category != open_category)
+        {
+            if (category_open)
+                ImGui::TreePop();
+            open_category = c.category;
+            category_open = ImGui::TreeNodeEx(open_category.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
+        }
+        if (!category_open)
+            continue;
+
         const bool affordable = balance >= c.capex;
 
         ImGui::BeginChild(c.name.c_str(), {0.0f, row_h}, true,
@@ -1646,6 +1677,22 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
                     : " - payback ~" + std::to_string(static_cast<int>(pb)) + " qtrs";
         }
         ImGui::TextDisabled("%s", cost.c_str());
+
+        // Pre-commit material-supply warning (BL-328): the same construction_rate the
+        // in-progress building card reads, checked before the player commits capex —
+        // "will this stall" answered up front instead of via a post-hoc paused status.
+        // Gated on c.pr.ok(): an already-invalid tile (ocean, wrong deposit, ...) shows
+        // ITS reason below and needs no second, redundant warning stacked on top. The
+        // line always occupies its row_h slot (blank when there is nothing to say) so
+        // rows stay a uniform height rather than the sibling below clipping into it.
+        if (c.pr.ok() && c.material_rate <= 0.0f)
+            ImGui::TextColored(construction_status_colour(0.0f), "%s",
+                               "No local supply - build will stall");
+        else if (c.pr.ok() && c.material_rate < 1.0f)
+            ImGui::TextColored(construction_status_colour(c.material_rate), "%s",
+                               "Supply-limited - will stretch");
+        else
+            ImGui::Dummy({0.0f, ImGui::GetTextLineHeight()});
 
         // Profit row — exactly one of three states.
         if (c.group == 0)
@@ -1695,6 +1742,8 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
         ImGui::EndChild();
         ImGui::Spacing();
     }
+    if (category_open)
+        ImGui::TreePop();
 
     // Hire (BL-324) — the campaign roster gated on the player corp's OWN
     // stockpile/market access (unit_roster.hpp), not this tile's deposit or
