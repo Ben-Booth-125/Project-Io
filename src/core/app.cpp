@@ -512,7 +512,7 @@ void app::step_economy()
                      m_registry.logistics_cost(convoy_mode::space));
     advance_convoys(m_world);
     m_last_econ_report = run_economy_step(m_world, m_registry);
-    auto flows = clear_markets(m_world, m_registry, m_last_econ_report, m_ui.sell_orders);
+    auto flows = clear_markets(m_world, m_registry, m_last_econ_report);
     apply_budget(m_world, m_registry, flows, m_last_econ_report.workforce_contention,
                  &m_last_econ_report.budgets);
     // BL-262 first slice: cache this tick's standing profile for the Corporations panel
@@ -541,6 +541,11 @@ void app::step_economy()
             case agency_event::kind::road_placed:       return 1;
             case agency_event::kind::workforce_set:     return 1;
             case agency_event::kind::survey_dispatched: return 1;
+            // Order-book traffic is the quietest thing a corp does — routine
+            // commerce, not a change in the industrial landscape — so it only
+            // reaches the nation feed on a tick where nothing else happened.
+            case agency_event::kind::order_placed:      return 1;
+            case agency_event::kind::order_removed:     return 1;
             }
             return 0;
         };
@@ -594,6 +599,12 @@ void app::step_economy()
                 break;
             case agency_event::kind::survey_dispatched:
                 text = "We confirm new exploratory activity within our claims.";
+                break;
+            case agency_event::kind::order_placed:
+                text = "Domestic producers are bringing stock to market.";
+                break;
+            case agency_event::kind::order_removed:
+                text = "A domestic producer has withdrawn stock from sale.";
                 break;
             }
             ui::chat_post(m_chat, static_cast<int>(m_sim_loop.day_tick()), nid, 0, std::move(text));
@@ -1339,23 +1350,34 @@ int app::run_verify(const std::string& script_path, bool bless)
     });
 
     // --- US-008: standing sell-order placement ------------------------------
-    // Place a standing sell order through the SAME path the construction panel's
-    // "Add sell order" button uses: push a sell_order onto m_ui.sell_orders, the
-    // vector step_economy() feeds to clear_markets. Body resolves to the player's
-    // home body. Returns the resulting sell_orders count so a script can assert the
-    // order registered. Realises the placement half of US-008.
+    // Place a standing sell order through the SAME path the Market Ledger's
+    // "Add sell order" button uses — which since BL-293 is the corp-command seam,
+    // not a push onto a UI vector. Applied immediately here rather than enqueued:
+    // a verify script is a caller with a mutable world in hand, so it takes the
+    // same route app::render takes when it drains m_ui.pending_order_commands.
+    // Body resolves to the player's home body. Returns the resulting count of the
+    // player's standing orders, so a script can assert the order registered — and
+    // a REJECTED order now returns the unchanged count rather than silently
+    // registering, which the old UI-vector path could not express at all.
     v.set_function("place_sell_order",
         [this](const std::string& res, double qty, double floor) -> int {
-            sell_order o;
-            o.corp        = m_world.player_entity;
-            o.body        = m_world.home_body;
-            o.resource    = resource_from_name(res);
-            o.quantity    = static_cast<float>(qty);
-            o.floor_price = static_cast<float>(floor);
-            m_ui.sell_orders.push_back(o);
-            SDL_Log("verify.place_sell_order: %s x%.0f >= %.1f (n=%zu)",
-                    res.c_str(), qty, floor, m_ui.sell_orders.size());
-            return static_cast<int>(m_ui.sell_orders.size());
+            corp_command cmd;
+            cmd.tick        = static_cast<int>(m_sim_loop.day_tick());
+            cmd.corp        = m_world.player_entity;
+            cmd.verb        = corp_verb::place_sell_order;
+            cmd.subject     = m_world.home_body;
+            cmd.target      = resource_from_name(res);
+            cmd.quantity    = static_cast<float>(qty);
+            cmd.floor_price = static_cast<float>(floor);
+            const corp_command_result r = apply_corp_command(m_world, m_registry, cmd);
+
+            int n = 0;
+            for (const sell_order& o : m_world.sell_orders)
+                if (o.corp == m_world.player_entity) ++n;
+            SDL_Log("verify.place_sell_order: %s x%.0f >= %.1f (applied=%d, n=%d)",
+                    res.c_str(), qty, floor,
+                    r == corp_command_result::applied ? 1 : 0, n);
+            return n;
         });
 
     // Read the resolved market price of `res` on the player's home body — lets a
@@ -3189,6 +3211,19 @@ void app::render()
         dispatch_survey(m_world, m_ui.pending_survey_dispatch);
         m_ui.pending_survey_dispatch = null_entity; // consume the request
     }
+
+    // Order-book presses (BL-293) — same seam-consuming shape as the survey
+    // dispatch above, applied through apply_corp_command so the player's press
+    // and a rival corp's command share one implementation. A rejection is not
+    // reported to the surface: the ledger's own form already enforces the same
+    // preconditions, so a rejection here means a race (the body's market gone,
+    // the order already removed) and the correct response is to do nothing.
+    for (corp_command& cmd : m_ui.pending_order_commands)
+    {
+        cmd.tick = static_cast<int>(m_sim_loop.day_tick());
+        apply_corp_command(m_world, m_registry, cmd);
+    }
+    m_ui.pending_order_commands.clear(); // consume the requests
 
     // F1 key-binding cheat-sheet — generated from s_bindings so it never drifts.
     if (m_show_help)

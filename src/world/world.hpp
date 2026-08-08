@@ -246,6 +246,40 @@ struct world
     /// for the whole visible grid at once, so a per-query search would be the wrong shape.
     std::unordered_map<entity_id, std::vector<float>> body_reach_cost;
 
+    /// THE ORDER BOOK (BL-293) — standing sell orders, world-wide, in the order
+    /// they were placed. Read by `clear_markets` every economy tick; written only
+    /// through the `place_sell_order` / `remove_sell_order` corp verbs, by the
+    /// player and by rival corps alike (Ben, 2026-08-07: "the AI must be able to
+    /// trade as a player does").
+    ///
+    /// It lived on `ui_state` until 2026-08-07, which had two costs: a
+    /// `corp_command` had nothing to mutate, so no text-driven player could trade;
+    /// and a standing order sat outside the save seam entirely. Both are the same
+    /// mistake — the player's game-intent was being held by the surface that draws
+    /// it rather than by the world that runs it.
+    ///
+    /// A `std::vector`, insertion-ordered, exactly like `convoys` and
+    /// `trade_routes`: the order book is a queue, and price-time priority means
+    /// TIME is load-bearing, so insertion order is semantic and must not be
+    /// re-sorted. Erasure is by `id`, not by index, so a removal never renumbers a
+    /// surviving order.
+    std::vector<sell_order> sell_orders;
+
+    /// The buy side of the same book. `clear_markets` matches it against
+    /// `sell_orders`; no press authors one yet (see buy_order).
+    std::vector<buy_order> buy_orders;
+
+    /// Next stable order handle. Save-format state: it must persist, or a load
+    /// followed by a placement would mint an id a live order already holds.
+    /// Monotonic and never reused — an erased order's id does not come back.
+    uint32_t next_order_id = 1;
+
+    /// Allocate the next stable order id. Deterministic (a plain counter, in
+    /// command-application order); the single point ids are minted from.
+    ///
+    /// @return A fresh, never-before-issued order handle (always nonzero).
+    uint32_t allocate_order_id() { return next_order_id++; }
+
     /// Strategic AI decision log (BL-202): a fixed 256-entry ring of the most
     /// recent corp commands + score rationale, in deterministic application
     /// order. Derived observability (the chat feed / harness read it), not
@@ -292,11 +326,13 @@ struct world
 
     /// Tick-boundary state hash (BL-204): an FNV-1a checksum over a deterministic
     /// canonicalisation of the econ-tick snapshot — every corporation's balance,
-    /// every building's dial state (workforce target/assigned, recipe, decommissioned,
-    /// ticks_remaining), every market's resolved price array, and every corp/body
-    /// stockpile pool. Sorted by entity id (map/unordered_map iteration order is not
-    /// itself trusted) so two structurally-identical worlds hash identically
-    /// regardless of container internals.
+    /// every building's dial state (workforce target/assigned/auto, recipe,
+    /// decommissioned, ticks_remaining), every market's resolved price array, every
+    /// corp/body stockpile pool, and the order book. Sorted by entity id
+    /// (map/unordered_map iteration order is not itself trusted) so two
+    /// structurally-identical worlds hash identically regardless of container
+    /// internals — with the deliberate exception of the order book, whose *stored*
+    /// sequence is itself state (price-time priority), so it is hashed as stored.
     ///
     /// Two roles, one function: (1) today, a same-seed-two-runs regression primitive
     /// for the AI skill harness (BL-204) — a divergence flags a determinism leak in

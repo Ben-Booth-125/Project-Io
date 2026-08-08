@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 130 entries across 2 volume(s).
+One line per session, newest first — 131 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-08-08 | [The order book stops being a picture and starts being state](DEVLOG.md) | BL-204 BL-293 BL-323 BL-325 | DEVLOG.md |
 | 2026-08-05 | [The Era -1 arc's second day: Ages view, sweep verdict, review, and the fixes](DEVLOG.md) | BL-224 BL-271 BL-274 BL-275 BL-277 BL-299 | DEVLOG.md |
 | 2026-08-05 | [Red herrings and the rupture: making Era 1 failure a skill test](DEVLOG.md) | BL-223 | DEVLOG.md |
 | 2026-08-05 | [The Era 1 tree, first draft: keystones opened by deeds](DEVLOG.md) | — | DEVLOG.md |

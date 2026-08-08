@@ -1,5 +1,54 @@
 # Project Io — REFINED (active worklist)
 
+## Order book in the world (promoted from BL-293, order book unreachable by command) — **COMPLETE**
+
+Requirements: requirements.json § order-book-in-world (R0–R8; R7's visual leg pending, blocked by
+an unrelated pre-existing build break — NR-091). All eight tasks A–H completed, none cancelled.
+`order_book_harness` 43/43 PASS. Full mode: the order book is save-format state, so this crosses
+the serialisation seam.
+
+Settled by Ben, 2026-08-07 (NR-083): *"Order book needs to be a background process, the AI must
+be able to trade as a player does."* The player-only fence proposed in that entry was rejected —
+`corp_ai` may score the trade verbs.
+
+- **[1] A — The order book becomes world state.** `sell_order`/`buy_order` gain a stable `id`;
+  `world` gains `sell_orders`, `buy_orders` and the id counter; `state_hash` folds them (and
+  `workforce_auto`, a dial it was already missing). Files: `src/world/components.hpp`,
+  `src/world/world.hpp`, `src/world/world.cpp`. Deps: foundation. Satisfies: R1, R5.
+- **[1] B — Flat-binary serialiser.** `src/world/order_book.{hpp,cpp}`, modelled on
+  `history_log.{hpp,cpp}` — magic `IOOB` + version, count-prefixed records, rejection rather than
+  reinterpretation on a bad stream. Files: `src/world/order_book.{hpp,cpp}`, `CMakeLists.txt`.
+  Deps: A. Satisfies: R2.
+- **[2] C — Clearing reads the world.** `clear_markets` drops its two order-list parameters and
+  reads `w.sell_orders` / `w.buy_orders`; every call site updated. Files:
+  `src/world/market_clearing.{hpp,cpp}`, `src/main.cpp`, `src/core/app.cpp`, `tools/verify/*`.
+  Deps: A. Satisfies: R3.
+- **[2] D — The three verbs join the seam.** `place_sell_order`, `remove_sell_order`,
+  `set_workforce_auto` in `corp_verb`, with player-grade validation and the per-corp book cap.
+  Also: `set_workforce` now clears `workforce_auto`, which is what the press has always done and
+  the seam never did. Files: `src/world/corp_command.{hpp,cpp}`. Deps: A. Satisfies: R4.
+- **[3] E — The player's presses go through the seam.** `ui_state.sell_orders` is deleted; the
+  Market Ledger reads `w.sell_orders` and queues `corp_command`s that `app` applies, mirroring the
+  `pending_survey_dispatch` idiom. Files: `src/ui/ui_state.hpp`, `src/ui/market_ledger.cpp`,
+  `src/core/app.cpp`. Deps: C, D. Satisfies: R7.
+- **[3] F — Rival corps trade.** A conservative sell candidate in the scored-utility layer:
+  surplus above a stockpile threshold, floored at a margin over the market's rarity floor, one
+  order per evaluation, never duplicating a standing order. Tunable, not a market strategy. Files:
+  `src/world/corp_ai.{hpp,cpp}`, `src/world/economy_system.hpp`, `src/core/app.cpp`. Deps: D.
+  Satisfies: R6.
+- **[4] G — `order_book_harness`.** The determinism assertion the move earns: same-seed runs hash
+  identically with order traffic, and the hash moves when an order does. Files:
+  `tools/verify/order_book_harness.cpp`, `CMakeLists.txt`, `tools/verify/README.md`,
+  `.claude/skills/verifier-headless/SKILL.md`. Deps: A–F. Satisfies: R0, R2, R5.
+- **[5] H — Docs.** Standing-rules amendment (flagged to Ben, not slipped in), `ACTIONS.json`
+  re-transcribed from the seam + mirror re-rendered, MARKETS.md and AI_OPPONENT.md updated. Files:
+  `.claude/rules/io-standing-rules.md`, `docs/ai/ACTIONS.json`, `docs/ai/ACTIONS.md`,
+  `docs/economy/MARKETS.md`, `docs/ai/AI_OPPONENT.md`. Deps: G. Satisfies: R8.
+
+Parallelisation note: A is the foundation every other task reads, and C/D/E/F form one dependency
+chain through the same three headers. Run sequentially in the main session — the collision map
+carves no independent vertical slice worth a worktree here.
+
 ## Header chrome tightening (promoted from BL-312, BL-313)
 
 Requirements: requirements.json § header-chrome-tightening (R1–R5)

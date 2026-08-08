@@ -84,14 +84,17 @@ struct agency_event
         resumed,           ///< An idled building was brought back online.
         road_placed,       ///< A road was laid (`tile` set; `value` = tier 1–3).
         survey_dispatched, ///< A survey was dispatched (`building` unused; `tile` = body id).
+        // --- BL-293: the order book (`building` unused; `tile` = body id) ---
+        order_placed,      ///< A standing sell order was placed (`value` = resource id).
+        order_removed,     ///< A standing sell order was withdrawn (`value` = resource id).
     };
 
     entity_id corp;
     entity_id building;
     kind      what;
     uint16_t  new_recipe = 0;           ///< recipe_switch only: the recipe switched to.
-    entity_id tile       = null_entity; ///< built / road_placed: target tile; survey_dispatched: body.
-    int       value      = 0;           ///< workforce_set: new target; road_placed: tier.
+    entity_id tile       = null_entity; ///< built / road_placed: target tile; survey_dispatched / order_*: body.
+    int       value      = 0;           ///< workforce_set: new target; road_placed: tier; order_*: resource id.
 };
 
 /// Result of one economy step: the per-building reports plus the auto-bought

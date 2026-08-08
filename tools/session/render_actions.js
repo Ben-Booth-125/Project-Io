@@ -87,8 +87,14 @@ md.push('Every control in the game: what pressing it does, and why you would. Re
 md.push('mirror of [`ACTIONS.json`](ACTIONS.json), which is canonical — the JSON is the');
 md.push('machine-consumable half an AI player reads (BL-270). Pair it with the corp');
 md.push('blackboard export (BL-206, the read channel) and the corp-command seam');
-md.push('(`src/world/corp_command.hpp`, the write channel) and an LLM has the full');
-md.push('word interface to play through.');
+md.push('(`src/world/corp_command.hpp`, the write channel) and an LLM has the word');
+md.push('interface to play through.');
+md.push('');
+md.push('**What that does and does not cover.** Every entry in the *gameplay* family is');
+md.push('issuable as a `corp_verb` — true since BL-293 (2026-08-08) closed the last three');
+md.push('gaps, and worth restating here because this line claimed it for a while before it');
+md.push('was so. The other four families are view controls that were never on the command');
+md.push('seam by design, and the order book\'s buy side has a save format but no verb yet.');
 md.push('');
 md.push('> **Generated file.** Produced by `node tools/session/render_actions.js`.');
 md.push('> Edit the JSON, then re-run; hand edits here are overwritten.');

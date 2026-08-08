@@ -52,7 +52,17 @@ entity_id resolve_command_body(const world& w, const corp_command& cmd)
         case corp_verb::place_road:
             return tile_body(w, cmd.tile);
         case corp_verb::survey:
-            return cmd.subject; // subject IS the body for this verb
+        case corp_verb::place_sell_order:
+            return cmd.subject; // subject IS the body for these verbs
+        case corp_verb::remove_sell_order:
+        {
+            // The order names no body directly; resolve it from the book while
+            // the order still exists (this runs before the command applies).
+            for (const sell_order& o : w.sell_orders)
+                if (o.id == cmd.order)
+                    return o.body;
+            return null_entity;
+        }
         default:
         {
             const auto bit = w.buildings.find(cmd.subject);
@@ -73,6 +83,9 @@ const char* corp_verb_label(corp_verb v)
         case corp_verb::resume:        return "resume";
         case corp_verb::place_road:    return "road placement";
         case corp_verb::survey:        return "survey";
+        case corp_verb::place_sell_order:   return "sell order";
+        case corp_verb::remove_sell_order:  return "sell-order withdrawal";
+        case corp_verb::set_workforce_auto: return "workforce auto";
     }
     return "action";
 }
@@ -87,6 +100,7 @@ const char* corp_decision_reason_label(corp_decision_reason r)
         case corp_decision_reason::dial_idle:      return "sustained losses";
         case corp_decision_reason::dial_resume:    return "now profitable";
         case corp_decision_reason::survey_expand:  return "discovery within budget";
+        case corp_decision_reason::trade_surplus:  return "stock piled up past the hold threshold";
     }
     return "unspecified";
 }
@@ -117,6 +131,8 @@ const char* agency_kind_label(agency_event::kind k)
         case agency_event::kind::resumed:             return "resumed an idled facility";
         case agency_event::kind::road_placed:         return "placed a road";
         case agency_event::kind::survey_dispatched:   return "dispatched a survey";
+        case agency_event::kind::order_placed:        return "listed stock for sale";
+        case agency_event::kind::order_removed:       return "withdrew a sell order";
     }
     return "took an agency action";
 }
@@ -249,6 +265,12 @@ corp_priority_bucket bucket_for_reason(corp_decision_reason reason)
         case corp_decision_reason::dial_workforce:
         case corp_decision_reason::dial_resume:
             return corp_priority_bucket::should_have; // feeds/tunes a running asset
+        case corp_decision_reason::trade_surplus:
+            // Should-Have, not Nice-to-Have: listing accumulated stock carries no
+            // capex — it BRINGS cash in — so it can never starve a higher bucket,
+            // which is the whole test the buckets apply. It is not Must-Have
+            // because nothing breaks if the stock sits another quarter.
+            return corp_priority_bucket::should_have;
         case corp_decision_reason::best_build:
         case corp_decision_reason::survey_expand:
         default:
@@ -610,12 +632,97 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             }
         }
 
+        // ---- Trade candidates: list accumulated stock, floored (BL-293) ------
+        //
+        // Ben, 2026-08-07: "the AI must be able to trade as a player does." This
+        // is the scored-utility layer reaching the order book through the same
+        // corp_command seam it reaches build/demolish/survey through — no
+        // separate trading brain, no privileged path.
+        //
+        // The rule is deliberately the narrowest thing that is still trading:
+        // stock past the hold threshold, half of the excess listed, floored at
+        // the market's rarity floor. It exists so the AI does not sit on a
+        // mountain of unsold goods while the auto-surplus path clears them at
+        // whatever the ratio says; it is NOT a market strategy, and the three
+        // numbers behind it are corp_ai_params fields precisely so tuning it
+        // never needs this code changed. See AI_OPPONENT.md § 6.
+        {
+            // Lowest-id market on a body, or null. Lowest id (not map order) so
+            // the choice is stable across container internals.
+            auto market_on_body = [&w](entity_id body) -> entity_id {
+                entity_id best = null_entity;
+                for (const auto& [mid, mc] : w.markets)
+                    if (mc.body == body && (best == null_entity || mid < best))
+                        best = mid;
+                return best;
+            };
+
+            // corp_body_pools is a std::map, so this walk is already ordered by
+            // (corp, body) — the deterministic iteration the whole scorer rests on.
+            for (const auto& [key, pool] : w.corp_body_pools)
+            {
+                if (key.first != corp)
+                    continue;
+                const entity_id body = key.second;
+                const entity_id mid  = market_on_body(body);
+                if (mid == null_entity)
+                    continue;
+                const market_component& mc = w.markets.at(mid);
+
+                for (std::size_t r = 0; r < resource_count; ++r)
+                {
+                    if (mc.base_price[r] <= 0.0f)
+                        continue; // this market does not price the good
+
+                    const float excess = pool.quantities[r] - p.trade_hold_threshold;
+                    if (excess <= 0.0f)
+                        continue;
+
+                    // Never duplicate a standing order on the same triple: a
+                    // second order would not sell more (the pool is the cap), it
+                    // would just grow the book every evaluation forever.
+                    bool already = false;
+                    for (const sell_order& o : w.sell_orders)
+                        if (o.corp == corp && o.body == body &&
+                            static_cast<std::size_t>(o.resource) == r)
+                        { already = true; break; }
+                    if (already)
+                        continue;
+
+                    const float qty   = excess * p.trade_release_fraction;
+                    const float floor = mc.base_price[r] * p.trade_floor_multiple;
+                    if (qty <= 0.0f)
+                        continue;
+
+                    // Score in the same currency every other candidate uses —
+                    // expected cash — so it competes honestly against a dial or a
+                    // build rather than needing a hand-tuned weight. Valued at the
+                    // floor, not at the current price: the floor is what the corp
+                    // is actually willing to accept, so this is the conservative
+                    // estimate, and it keeps a listing on a crashed market from
+                    // outscoring a genuinely profitable dial.
+                    candidate c;
+                    c.cmd.tick        = tick;
+                    c.cmd.corp        = corp;
+                    c.cmd.verb        = corp_verb::place_sell_order;
+                    c.cmd.subject     = body;
+                    c.cmd.target      = static_cast<resource_type>(r);
+                    c.cmd.quantity    = qty;
+                    c.cmd.floor_price = floor;
+                    c.score  = qty * floor * jitter;
+                    c.reason = corp_decision_reason::trade_surplus;
+                    c.bucket = bucket_for_reason(c.reason);
+                    cands.push_back(c);
+                }
+            }
+        }
+
         if (cands.empty())
             continue;
         std::sort(cands.begin(), cands.end(), candidate_before);
 
         // ---- Greedy selection under the action budget + solvency gate -------
-        int   builds = 0, dials = 0, surveys = 0;
+        int   builds = 0, dials = 0, surveys = 0, trades = 0;
         float committed = 0.0f;
         std::vector<entity_id> touched_this_eval;
         for (std::size_t i = 0; i < cands.size(); ++i)
@@ -623,10 +730,17 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             const candidate& c = cands[i];
             const bool is_build  = (c.cmd.verb == corp_verb::build);
             const bool is_survey = (c.cmd.verb == corp_verb::survey);
-            const bool is_dial   = !is_build && !is_survey;
+            // Trade gets its own budget rather than sharing the dial budget: its
+            // subject is a BODY, not a building, so neither the dial cap nor the
+            // one-touch-per-building rule below means anything for it, and folding
+            // it in would let a listing consume a dial slot a loss-maker needed.
+            const bool is_trade  = (c.cmd.verb == corp_verb::place_sell_order ||
+                                    c.cmd.verb == corp_verb::remove_sell_order);
+            const bool is_dial   = !is_build && !is_survey && !is_trade;
             if (is_build  && builds  >= p.max_builds) continue;
             if (is_dial   && dials   >= p.max_dials)  continue;
             if (is_survey && surveys >= 1)            continue;
+            if (is_trade  && trades  >= p.max_trades) continue;
             // One touch per building per evaluation: a second dial on a
             // building already commanded this eval is contradictory.
             if (is_dial && std::find(touched_this_eval.begin(), touched_this_eval.end(),
@@ -657,12 +771,18 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
             if (is_build)  ++builds;
             if (is_dial)   ++dials;
             if (is_survey) ++surveys;
+            if (is_trade)  ++trades;
 
-            // Cooldown on the touched building (anti-thrash).
-            const entity_id touched = is_build ? built : c.cmd.subject;
-            if (const auto tb = w.buildings.find(touched); tb != w.buildings.end())
-                tb->second.ai_cooldown = p.cooldown_evals;
-            touched_this_eval.push_back(touched);
+            // Cooldown on the touched building (anti-thrash). A trade command's
+            // subject is a body, so it records no touch — the anti-duplicate rule
+            // in the trade block above is what stops it thrashing.
+            if (!is_trade)
+            {
+                const entity_id touched = is_build ? built : c.cmd.subject;
+                if (const auto tb = w.buildings.find(touched); tb != w.buildings.end())
+                    tb->second.ai_cooldown = p.cooldown_evals;
+                touched_this_eval.push_back(touched);
+            }
 
             // Decision log: command + winning score vs the next-best candidate.
             corp_decision d;
@@ -710,6 +830,20 @@ void run_corp_strategic_step(world& w, const recipe_registry& reg,
                     ev.value = c.cmd.road_tier; break;
                 case corp_verb::survey:
                     ev.what = agency_event::kind::survey_dispatched; ev.tile = c.cmd.subject; break;
+                case corp_verb::place_sell_order:
+                    ev.what = agency_event::kind::order_placed; ev.tile = c.cmd.subject;
+                    ev.value = static_cast<int>(c.cmd.target); break;
+                case corp_verb::remove_sell_order:
+                    ev.what = agency_event::kind::order_removed; ev.tile = log_body; break;
+                case corp_verb::set_workforce_auto:
+                    // No agency kind of its own: handing one dial back to the
+                    // solver is not an event the chat feed should narrate, and the
+                    // scorer never emits it (it is a player/agent press). Reported
+                    // as a workforce move, which is what it is.
+                    ev.what = agency_event::kind::workforce_set;
+                    ev.value = w.buildings.count(c.cmd.subject)
+                                   ? w.buildings.at(c.cmd.subject).workforce_target : 0;
+                    break;
             }
             report.agency_events.push_back(ev);
 

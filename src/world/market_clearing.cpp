@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <map>
+#include <tuple>
 #include <vector>
 
 namespace {
@@ -236,12 +238,18 @@ void inject_population_demand(world& w)
 std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     world& w,
     const recipe_registry& reg,
-    const economy_report& report,
-    const std::vector<sell_order>& player_orders,
-    const std::vector<buy_order>&  player_buy_orders)
+    const economy_report& report)
 {
     std::unordered_map<entity_id, corp_cash_flow> flows;
     const auto by_body = markets_by_body(w);
+
+    // The standing order book, read from the world (BL-293). Bound by reference
+    // rather than copied: nothing below resizes either vector — this pass mutates
+    // markets and pools, never the book — so the references stay valid, and the
+    // iteration order is the book's own insertion order, which is the TIME half
+    // of price-time priority and must not be re-sorted here.
+    const std::vector<sell_order>& standing_sells = w.sell_orders;
+    const std::vector<buy_order>&  standing_buys  = w.buy_orders;
 
     for (auto& [mid, mc] : w.markets)
     {
@@ -259,11 +267,12 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     // the population's pull reaches price resolution.
     inject_population_demand(w);
 
-    // A (corp, body, resource) the player has a standing sell order for is under
-    // manual control: the auto-surplus path yields it so the player's floor-priced
-    // order governs the sale, not the greedy auto path.
-    auto player_sell_controls = [&player_orders](entity_id corp, entity_id body, std::size_t r) {
-        for (const sell_order& o : player_orders)
+    // A (corp, body, resource) with a standing sell order against it is under
+    // manual control: the auto-surplus path yields so the floor-priced order
+    // governs the sale, not the greedy auto path. True for any corp's order now,
+    // not just the player's — a rival that places an order gets the same deal.
+    auto order_controls = [&standing_sells](entity_id corp, entity_id body, std::size_t r) {
+        for (const sell_order& o : standing_sells)
             if (o.corp == corp && o.body == body &&
                 static_cast<std::size_t>(o.resource) == r && o.quantity > 0.0f)
                 return true;
@@ -282,7 +291,7 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     std::vector<auto_sell_entry> auto_sells;
     std::vector<auto_buy_entry>  auto_buys;
 
-    // Explicit priced player orders: supply/demand recorded into mc AND into order books.
+    // Explicit priced standing orders: supply/demand recorded into mc AND into order books.
     std::unordered_map<entity_id, std::unordered_map<std::size_t, std::vector<ob_sell_entry>>> sell_books;
     std::unordered_map<entity_id, std::unordered_map<std::size_t, std::vector<ob_buy_entry>>>  buy_books;
 
@@ -305,7 +314,7 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         {
             if (mc.base_price[r] <= 0.0f)
                 continue;
-            if (player_sell_controls(corp, body, r))
+            if (order_controls(corp, body, r))
                 continue;
 
             const float surplus = pool.quantities[r] - reserve[r];
@@ -317,8 +326,19 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         }
     }
 
-    // Player sell orders: into mc.supply and the explicit sell book.
-    for (const sell_order& order : player_orders)
+    // Standing sell orders: into mc.supply and the explicit sell book.
+    //
+    // Several orders may name the same (corp, body, resource) — the command seam
+    // permits it deliberately (only the AI's scorer declines to duplicate), and a
+    // player can always add two overlapping orders in the ledger. So the pool has
+    // to be RESERVED across them: each order lists against what the earlier orders
+    // on the same triple have not already claimed. Without this the pool is
+    // debited once per order downstream and the corp is paid for goods it never
+    // held — money and goods from nothing. Insertion order decides who gets the
+    // stock, which is the same time priority the matching pass uses.
+    std::map<std::tuple<entity_id, entity_id, std::size_t>, float> listed_from_pool;
+
+    for (const sell_order& order : standing_sells)
     {
         if (order.quantity <= 0.0f)
             continue;
@@ -329,9 +349,14 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         const auto pkit = w.corp_body_pools.find(std::make_pair(order.corp, order.body));
         if (pkit == w.corp_body_pools.end())
             continue;
-        const float available = std::min(order.quantity, pkit->second.quantities[r]);
+
+        float& claimed = listed_from_pool[{order.corp, order.body, r}];
+        const float unclaimed = pkit->second.quantities[r] - claimed;
+        const float available = std::min(order.quantity, unclaimed);
         if (available <= 0.0f)
-            continue;
+            continue; // an earlier order already spoke for the whole pool
+        claimed += available;
+
         w.markets.at(mid).supply[r] += available;
         sell_books[mid][r].push_back({order.corp, available, order.floor_price});
     }
@@ -356,8 +381,8 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
         }
     }
 
-    // Player buy orders: into mc.demand and the explicit buy book.
-    for (const buy_order& order : player_buy_orders)
+    // Standing buy orders: into mc.demand and the explicit buy book.
+    for (const buy_order& order : standing_buys)
     {
         if (order.quantity <= 0.0f)
             continue;
@@ -517,12 +542,17 @@ std::unordered_map<entity_id, corp_cash_flow> clear_markets(
                 const float rp = ref_price[mid][r];
                 for (const ob_sell_entry& se : sellers)
                 {
-                    const float already_matched =
-                        [&]() -> float {
-                            auto it = matched_sell.find({se.corp, mid, r});
-                            return it != matched_sell.end() ? it->second : 0.0f;
-                        }();
-                    const float unmatched = se.qty - already_matched;
+                    // CONSUME the matched total rather than re-reading it: a corp
+                    // may hold several orders on this (market, resource), and
+                    // subtracting the same aggregate from each of them charged one
+                    // corp's matched volume against every one of its orders — the
+                    // mirror of the over-listing bug above, under-selling instead
+                    // of over-selling. Draw it down order by order.
+                    float&      remaining_matched = matched_sell[{se.corp, mid, r}];
+                    const float applied           = std::min(se.qty, remaining_matched);
+                    remaining_matched -= applied;
+
+                    const float unmatched = se.qty - applied;
                     if (unmatched <= 0.0f)
                         continue;
                     const float clearing = std::max(rp, se.floor_price);

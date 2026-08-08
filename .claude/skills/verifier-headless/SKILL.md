@@ -169,6 +169,19 @@ in `tools/verify/README.md`.
   0 CE dossier** (provinces by population, nations by tiles) — the instrument for eyeballing
   an antiquity world. Links the generation TU superset (as `world_audit`); CMake target
   `era_world_harness` via the generic glob.
+- **`order_book_harness`** — The order book in world state (BL-293): the item-spanning check
+  that a corp places, holds and removes a standing sell order entirely through
+  `apply_corp_command` with no UI (R0), that the economy tick sells against the book with
+  nobody passing it in (R1), that `write_order_book`/`read_order_book` round-trip the book
+  **in its stored order** and refuse a wrong-magic / wrong-version / truncated stream without
+  writing anything partial (R2), that every rejection reason of the three new verbs is
+  distinguishable and mutates nothing (R3), that `state_hash` is identical across two same-seed
+  runs *with order traffic* and MOVES when an order changes — including when the same orders
+  sit in a different sequence, since price-time priority makes the book's order state (R4), and
+  that the rival-corp scorer reaches the trade verb conservatively: never below the rarity
+  floor, never under the hold threshold, never a duplicate, never on the player's corp (R5).
+  Links the world superset; CMake target `order_book_harness` via the generic glob. 43
+  assertions, ~instant.
 
 ## Running the whole suite (CTest — BL-104)
 

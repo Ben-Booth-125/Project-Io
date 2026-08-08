@@ -74,7 +74,7 @@ void tick(world& w, const recipe_registry& reg, int t)
                      reg.logistics_cost(convoy_mode::space));
     advance_convoys(w);
     const economy_report report = run_economy_step(w, reg);
-    const auto flows = clear_markets(w, reg, report, {});
+    const auto flows = clear_markets(w, reg, report);
     apply_budget(w, reg, flows, report.workforce_contention, nullptr);
     credit_arrived_convoys(w, t);
 }

@@ -143,7 +143,7 @@ void run_tick(world& w, const recipe_registry& reg, int tick)
 {
     w.current_day_tick = tick;
     const economy_report rep = run_economy_step(w, reg);
-    const auto flows = clear_markets(w, reg, rep, {});
+    const auto flows = clear_markets(w, reg, rep);
     apply_budget(w, reg, flows, rep.workforce_contention, nullptr);
 }
 

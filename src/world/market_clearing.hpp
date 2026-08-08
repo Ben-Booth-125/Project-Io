@@ -36,9 +36,9 @@ void inject_population_demand(world& w);
 /// Clear every body market for one economy tick using a per-(body, resource)
 /// matched order book. For each market and resource:
 ///   - Sell side: each corp's pool surplus above its processors' next-run need,
-///     plus any explicit player sell orders (floor-priced).
-///   - Buy side: processor input shortfalls from the economy report, plus any
-///     explicit player buy orders (max-price limited).
+///     plus every standing sell order in `w.sell_orders` (floor-priced).
+///   - Buy side: processor input shortfalls from the economy report, plus every
+///     standing buy order in `w.buy_orders` (max-price limited).
 /// Orders are sorted by price priority (cheapest seller first, highest bidder
 /// first) with corp id as the deterministic tiebreaker. Matching proceeds buyer-
 /// first: each buyer draws from the cheapest compatible seller; a preferred_seller
@@ -48,21 +48,23 @@ void inject_population_demand(world& w);
 /// surplus/shortfall still updates mc.supply/demand for the UI. Pools are debited
 /// only for matched sell quantities.
 ///
-/// With empty explicit order lists the algorithm is equivalent to the prior pooled
-/// model — existing econ_harness tests should continue to pass.
+/// THE BOOK IS READ FROM THE WORLD, NOT PASSED IN (BL-293, 2026-08-07). It used
+/// to arrive as two caller-supplied vectors owned by `ui_state`, which made
+/// clearing something the UI *drove* rather than something the simulation *does*
+/// — a headless tick sold nothing standing, and no corp_command could reach the
+/// book. Ben's ruling: "Order book needs to be a background process, the AI must
+/// be able to trade as a player does." An empty book is the prior pooled model
+/// exactly, so existing econ_harness expectations are unchanged.
 ///
-/// @param w                  World; markets and (corp, body) pools are mutated.
-/// @param reg                Loaded registry (for processor input reservations).
-/// @param report             Economy step report (its purchases drive buy side).
-/// @param player_orders      Optional player sell orders (empty in Layer 3).
-/// @param player_buy_orders  Optional player buy orders (empty in Layer 3).
-/// @return                   Per-corporation cash flow valued at matched prices.
+/// @param w      World; markets and (corp, body) pools are mutated, and the
+///               standing order book (`sell_orders` / `buy_orders`) is read.
+/// @param reg    Loaded registry (for processor input reservations).
+/// @param report Economy step report (its purchases drive the buy side).
+/// @return       Per-corporation cash flow valued at matched prices.
 std::unordered_map<entity_id, corp_cash_flow> clear_markets(
     world& w,
     const recipe_registry& reg,
-    const economy_report& report,
-    const std::vector<sell_order>& player_orders      = {},
-    const std::vector<buy_order>&  player_buy_orders  = {});
+    const economy_report& report);
 
 /// Resolve which market a tile clears against (its market catchment). Among the
 /// markets on the tile's body: a body with a single market routes there

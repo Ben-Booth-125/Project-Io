@@ -3,6 +3,7 @@
 #include "components.hpp"
 #include "entity.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 
@@ -22,17 +23,33 @@ class recipe_registry;
 // policy (stage C/D) would return.
 
 /// The AI's verbs — exactly the player's action surface.
+///
+/// APPEND-ONLY. The value is what a `corp_command` carries and what a decision
+/// log records, so inserting a verb mid-enum would silently re-interpret every
+/// stored command. New verbs go on the end.
 enum class corp_verb : uint8_t
 {
     build = 0,     ///< construct_building(type, tile, target) — durative, pay-as-you-build.
     demolish,      ///< demolish_building(building).
     set_recipe,    ///< building_component.recipe := recipe (BL-079 idiom, validated).
-    set_workforce, ///< building_component.workforce_target := value (0–200).
+    set_workforce, ///< building_component.workforce_target := value (0–200); clears workforce_auto.
     idle,          ///< building_component.decommissioned := true.
     resume,        ///< building_component.decommissioned := false.
     place_road,    ///< place_road(tile, tier).
     survey,        ///< dispatch_survey(body) on behalf of the corp.
+    // --- BL-293: the order book joins the seam (2026-08-07) ---
+    place_sell_order,   ///< Push a standing sell order onto world.sell_orders (subject = body).
+    remove_sell_order,  ///< Erase the standing sell order with id `order`.
+    set_workforce_auto, ///< building_component.workforce_auto := true (hand the dial back).
 };
+
+/// Ceiling on one corporation's outstanding sell orders. The book is now
+/// reachable by command, so it is reachable by a scorer with a bug in it — this
+/// is the bound that keeps a runaway from growing the save format without limit.
+/// Far above any real book: the Market Ledger lists a handful per body, and the
+/// AI places at most one per evaluation. `place_sell_order` returns
+/// `rejected_state` at the cap rather than silently dropping the order.
+inline constexpr std::size_t max_sell_orders_per_corp = 64;
 
 /// One serialisable intent: {tick, corp, verb, fixed-size args}. Which args are
 /// meaningful depends on the verb; unused args stay at their defaults so two
@@ -44,16 +61,22 @@ struct corp_command
     corp_verb  verb = corp_verb::build;
 
     /// Primary subject: the building (demolish / set_recipe / set_workforce /
-    /// idle / resume) or the body (survey). null for build / place_road, whose
-    /// subject is `tile`.
+    /// idle / resume / set_workforce_auto) or the body (survey,
+    /// place_sell_order). null for build / place_road, whose subject is `tile`,
+    /// and for remove_sell_order, whose subject is `order`.
     entity_id  subject = null_entity;
 
     entity_id     tile      = null_entity;              ///< build / place_road target tile.
     building_type type      = building_type::none;      ///< build only.
-    resource_type target    = resource_type::iron_ore;  ///< build (extraction) only.
+    resource_type target    = resource_type::iron_ore;  ///< build (extraction) AND place_sell_order: what to sell.
     uint16_t      recipe    = no_recipe;                ///< set_recipe (and build seed).
     int           workforce = 100;                      ///< set_workforce value [0, 200].
     uint8_t       road_tier = 1;                        ///< place_road tier (1–3).
+
+    // --- BL-293 order-book args ---
+    float    quantity    = 0.0f; ///< place_sell_order: max units offered per tick (> 0).
+    float    floor_price = 0.0f; ///< place_sell_order: minimum unit price (>= 0; 0 = market price).
+    uint32_t order       = 0;    ///< remove_sell_order: the sell_order::id to erase.
 };
 
 /// Outcome of applying a command. Only `applied` mutates the world; every
@@ -89,6 +112,7 @@ enum class corp_decision_reason : uint8_t
     dial_idle,        ///< Sustained loss; idling saves more than running.
     dial_resume,      ///< Idled asset now reads profitable.
     survey_expand,    ///< Discovery spend within the solvency floor.
+    trade_surplus,    ///< BL-293: stock piled up past the hold threshold; list it with a floor.
 };
 
 /// One ring-buffer entry: the command plus its score rationale.

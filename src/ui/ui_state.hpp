@@ -1,7 +1,8 @@
 #pragma once
 
 #include "detail_level.hpp"     // fold_state — the drill-through disclosure target (BL-214)
-#include "world/components.hpp" // building_type / resource_type / sell_order
+#include "world/components.hpp"   // building_type / resource_type / sell_order
+#include "world/corp_command.hpp" // corp_command — the seam the order-book presses queue onto
 #include "world/entity.hpp"
 
 #include <imgui.h>
@@ -266,11 +267,18 @@ struct ui_state
     /// the UI surfaces hold a const world. null_entity = nothing pending.
     entity_id pending_survey_dispatch = null_entity;
 
-    /// Player-authored standing sell orders (the manual market side). Re-evaluated
-    /// every economy tick — passed to `clear_markets` by `app::step_economy`. Held
-    /// here as player game-intent; authored from the construction / building-
-    /// management panel. See sell_order, docs/SYSTEMS.md § Trade.
-    std::vector<sell_order> sell_orders;
+    /// Pending order-book commands (BL-293). The standing orders themselves moved
+    /// to `world::sell_orders` on 2026-08-07; what lives here is the REQUEST, for
+    /// the reason `pending_survey_dispatch` above lives here — the Market Ledger
+    /// holds a `const world&` and cannot mutate it, so it enqueues and
+    /// `app::render` applies.
+    ///
+    /// Applied through `apply_corp_command`, the same seam the rival-corp AI
+    /// drives, so the player's press and the AI's command are the same code path
+    /// by construction rather than by two implementations agreeing. A queue rather
+    /// than a single slot because a frame can carry more than one press (add an
+    /// order, remove another); drained in order each frame.
+    std::vector<corp_command> pending_order_commands;
 
     /// BL-323 S2b: the logistics-reach budget the UI must filter on, mirrored here
     /// from `recipe_registry::construction().max_logistics_reach` at load time.

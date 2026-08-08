@@ -27,18 +27,25 @@ rule has a fuller authority, it is cited — this file does not redefine it.
   persistently loss-making building, switch a floored recipe, throttle extraction as a
   deposit depletes. The player's own corp is never auto-acted on **strategically**.
   See `src/world/economy_system.cpp` (run_economy_step § agency).
-  **Rival-corp strategic exception (BL-202/BL-203, landed 2026-08-01/02):** background
-  corporations run a **deterministic scored-utility** layer over the corp-command seam —
-  build, demolish, survey and road decisions scored each tick, plus predictive spending
+  **Rival-corp strategic exception (BL-202/BL-203, landed 2026-08-01/02; widened by
+  BL-293, 2026-08-08):** background corporations run a **deterministic scored-utility**
+  layer over the corp-command seam — build, demolish, survey and road decisions scored
+  each tick, plus predictive spending, **plus standing sell orders on the open market**
   (`src/world/corp_ai.cpp`). Determinism is the binding constraint, not simplicity: the
   scorer is pure, seeded and replayable, and it issues only legal `corp_command` verbs.
-  What stays deferred is **nation** behaviour (backlog.json § BL-054) and any planner that
-  is not deterministic. Authority: `docs/ai/AI_OPPONENT.md`.
+  The trading grant is Ben's, 2026-08-07: *"Order book needs to be a background process,
+  the AI must be able to trade as a player does."* It is deliberately a grant of **reach,
+  not of skill** — a rival lists surplus stock above a hold threshold at a floor over the
+  market's rarity price, and that first-cut rule lives in `corp_ai_params` so tuning it is
+  a data change. What stays deferred is **nation** behaviour (backlog.json § BL-054) and
+  any planner that is not deterministic. Authority: `docs/ai/AI_OPPONENT.md`.
   **Player-corp exception (BL-181, landed 2026-07-15):** the *workforce target* of a
   player building may be auto-solved each tick to maximise that building's profit — a
   **narrow, local, deterministic, opt-out** convenience for a single micromanagement dial,
   not strategic agency. It is opt-out per building (`building_component.workforce_auto`; a
-  manual target in the management UI pins it), and it never places, relocates, retargets,
+  manual target pins it — from the management UI *or* from the `set_workforce` command verb,
+  which since BL-293 clears the flag exactly as the press always has), and the
+  `set_workforce_auto` verb hands the dial back. It never places, relocates, retargets,
   or decommissions. This is the *only* sanctioned auto-action on the player's corp; anything
   beyond this one dial stays prohibited. See `solve_workforce_target` in economy_system.cpp.
 - Do **not** introduce a retained-mode UI framework in place of ImGui for the prototype.

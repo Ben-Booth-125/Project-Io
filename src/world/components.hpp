@@ -358,15 +358,30 @@ struct market_component
     std::array<float, resource_count> base_price = {}; ///< Rarity-derived floor; authored at world creation.
 };
 
-/// A player-authored standing sell order — the manual side of the market. Each
-/// economy tick the order lists up to `quantity` of `resource` from the (corp,
-/// body) pool for sale at no less than `floor_price` (the order clears at
-/// `max(resolved_price, floor_price)`; an unmet floor simply means less or nothing
-/// sells that tick). Held in `ui_state.sell_orders` and passed to `clear_markets`.
-/// Defined here (rather than in market_clearing.hpp) so both the UI state and the
-/// clearing system can name it without an include cycle.
+/// A standing sell order — the manual side of the market. Each economy tick the
+/// order lists up to `quantity` of `resource` from the (corp, body) pool for sale
+/// at no less than `floor_price` (the order clears at `max(resolved_price,
+/// floor_price)`; an unmet floor simply means less or nothing sells that tick).
+/// Defined here (rather than in market_clearing.hpp) so the clearing system, the
+/// command seam and the UI can all name it without an include cycle.
+///
+/// HELD IN `world::sell_orders` (BL-293, 2026-08-07). It used to live in
+/// `ui_state` and be handed to `clear_markets` by the caller, which made it
+/// unreachable by `corp_command` (a verb mutates `world&`, and there was nothing
+/// in the world to mutate) and invisible to the save seam. It is world state now:
+/// the player and a rival corp place orders through the same verb, and the
+/// clearing tick reads the book itself.
+///
+/// SAVE-FORMAT RECORD — see order_book.hpp. `id` leads the struct because it is
+/// the order's identity, and identity is what `remove_sell_order` names; the
+/// remaining fields keep their original order and meaning.
 struct sell_order
 {
+    /// Stable handle, allocated by `world::allocate_order_id()`. Nonzero on any
+    /// order that has been placed; 0 marks a default-constructed order that never
+    /// entered the book. Stable across a tick, an erase of a *different* order,
+    /// and a save/load round-trip — which an index into the vector is not.
+    uint32_t      id          = 0;
     entity_id     corp        = null_entity;
     entity_id     body        = null_entity;
     resource_type resource    = resource_type::iron_ore;
@@ -377,9 +392,13 @@ struct sell_order
 /// A buy order for one resource — the demand side of the order book. Each
 /// economy tick the clearing system matches buy orders against sell orders
 /// by price-time priority (cheapest seller first; highest bidder first).
-/// Defined alongside sell_order so both the UI and clearing system can name it.
+/// Held in `world::buy_orders`, alongside `sell_orders`; see that struct for why
+/// the book is world state and what `id` is for. No press authors one yet — the
+/// buy side exists in the clearing algorithm and in the save format, waiting for
+/// its verb.
 struct buy_order
 {
+    uint32_t      id               = 0;           ///< Stable handle; see sell_order::id.
     entity_id     corp             = null_entity;
     entity_id     body             = null_entity;
     resource_type resource         = resource_type::iron_ore;
@@ -387,6 +406,15 @@ struct buy_order
     float         max_price        = 0.0f; ///< Maximum acceptable unit price; 999 = pay anything.
     entity_id     preferred_seller = null_entity; ///< Optional counterparty preference.
 };
+
+// Save-format guards, following `molecular_event`'s precedent in
+// chemistry_tables.hpp: the order book is written field-by-field rather than as a
+// raw blob, but a silent layout change is still the failure mode a stale save
+// exhibits, and it is far easier to diagnose at compile time than at load time.
+// Tripping one of these means the record changed — bump `order_book_version`
+// (order_book.hpp) in the same edit, then update the size here.
+static_assert(sizeof(sell_order) == 24, "sell_order is a save-format record — see order_book.hpp");
+static_assert(sizeof(buy_order)  == 28, "buy_order is a save-format record — see order_book.hpp");
 
 /// Land-use classification of a tile or zone. Drives the trade-off between
 /// residential, industrial, agricultural, and undeveloped land.

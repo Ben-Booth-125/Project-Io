@@ -99,7 +99,7 @@ bool run_and_report_idled(int ticks)
         for (const agency_event& ev : rep.agency_events)
             if (ev.what == agency_event::kind::idled && ev.building == s.bg_bld)
                 ++idle_events;
-        const auto flows = clear_markets(s.w, reg, rep, {});
+        const auto flows = clear_markets(s.w, reg, rep);
         apply_budget(s.w, reg, flows, rep.workforce_contention, nullptr);
     }
     const bool bg_idled = s.w.buildings[s.bg_bld].decommissioned;
@@ -127,7 +127,7 @@ int main()
         for (int t = 1; t <= 3; ++t)
         {
             const economy_report rep = run_economy_step(s.w, reg);
-            const auto flows = clear_markets(s.w, reg, rep, {});
+            const auto flows = clear_markets(s.w, reg, rep);
             apply_budget(s.w, reg, flows, rep.workforce_contention, nullptr);
         }
         check(!s.w.buildings[s.bg_bld].decommissioned,
