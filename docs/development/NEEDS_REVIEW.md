@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*78 entries — 6 open, 72 resolved.*
+*79 entries — 7 open, 72 resolved.*
 
 ---
 
@@ -93,6 +93,22 @@ Ben’s rulings: roster-now-verbs-design-owed; unit-grain verbs; tile position c
 - Ratify the execution
 - Adjust the authored numbers (power mods, doctrine preferences, band boundaries)
 - Reverse any delegated call — each is one field or one row
+
+### NR-079 — C-route feasibility assessed: both of Ben's gates pass, but the recommendation is to move the model off the action path
+*decision taken on your behalf · raised 2026-08-08 · from Ben, 2026-08-08 — "I personally believe that play via language opens up the door to diplomatic thinking and larger strategy. However if it can't be compressed, or if it is not technically possible on our machines, then it's not worth pursuing, and we can use traditional RL methods."*
+
+New research note docs/ai/LANGUAGE_POLICY_FEASIBILITY.md, answering the two gates Ben set on the C-route (AI_OPPONENT.md § 10d). BOTH PASS: compression is supported at 3–8B on current distillation evidence (§ 4), and latency clears with margin at ordinary play speeds when computed from sim_loop's own constants rather than estimated (§ 5) — ~90 s per decision at 1x and ~22 s at 4x for 8 rival corps, against ~3–7 s of measured 8B-Q4 decode on consumer GPUs, with the out-of-process design meaning a late decision never blocks the sim. Three calls were then made on Ben's behalf. (1) The note RECOMMENDS AGAINST making the language model the action generator, on three grounds independent of the two gates: distilling corp_ai.cpp cannot exceed corp_ai.cpp (the BC ceiling already noted in § Area 3); the constraint tax is a live risk at exactly the targeted scale (hard schema constraints roughly halve executable accuracy on small open-weight models); and the sought capability does not require it. (2) It recommends INSTEAD the Cicero configuration — the planner keeps the actions, a small conditioned dialogue model carries diplomacy over the existing corp_decision intent stream — on the finding that Cicero's dialogue model was 2.7B and did not choose moves. (3) It proposes that higher-order strategy belongs at a goal layer above the scorer, not in per-command generation. The note carries a ⟳ flag and states explicitly that it does NOT supersede § 10d.
+
+**Why it matters.** § 10d is an ACCEPTED direction Ben ruled on 2026-08-03; this note argues for revising which layer the model occupies, which is a change to that ruling and is not the assistant's to make. Recorded so it can be overturned rather than becoming precedent by sitting in docs/ai/ unchallenged. The distinction that matters for the ruling: the two feasibility findings (§ 4, § 5) are evidence and stand on their own; the layer recommendation (§ 7, § 9) is a judgement call — Ben can accept the first and reject the second. Note also that the note's framing of the fallback differs from the question as posed: it argues language and RL are complements rather than alternatives (Cicero being RL-regularised planning plus a language module), so a 'no' to the language action-generator is not automatically a 'yes' to RL-only.
+
+- Accept the layer recommendation: amend § 10d so the local model is a dialogue/goal layer over the deterministic scorer, and re-scope BL-279's corpus to intent→dialogue pairs rather than blackboard→command pairs.
+- Reject it and keep § 10d as ruled: the small local model remains the action generator — in which case § 6's constraint-tax mitigation (a deliberation span before the constrained action span) should still be adopted as a build constraint on BL-279.
+- Defer pending measurement: § 10 flags the ~300-token-per-decision figure as an assumption, not a measurement. One real decision through the BL-278 MCP server settles the § 5 budget at essentially zero cost, and is the cheapest thing that could change the answer.
+- Split the ruling: accept the dialogue-layer addition as new scope without removing the action-generator experiment, treating them as independent threads.
+
+> **Recommendation:** Take option 3 first — it is nearly free, and § 5's budget currently rests on an assumed token count that the already-landed MCP server can replace with a measurement in one session. Then rule between 1 and 2 with that number in hand. Independently of which is chosen, adopt § 6's mitigation: it costs nothing if the layer recommendation is rejected, and the measured degradation it guards against (91.5% → 48.0% executable accuracy on a 1.5B model under hard tool-call schema) lands squarely on the small-local-model target.
+
+*Files: `docs/ai/LANGUAGE_POLICY_FEASIBILITY.md`, `docs/ai/AI_OPPONENT.md`*
 
 ---
 
