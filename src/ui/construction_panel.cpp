@@ -13,6 +13,7 @@
 #include <cfloat>  // FLT_MAX (PlotLines auto-scale)
 
 #include "world/budget_system.hpp"     // building_opex / compute_building_opex, body_mean_habitability (BL-143)
+#include "world/logistics.hpp"         // invalidate_logistics_caches (decommission flips the anchor set)
 #include "world/building_profit.hpp"   // estimate_building_profit (BL-143 Buildings tab)
 #include "world/components.hpp"
 #include "world/economy_system.hpp"    // economy_report (BL-143 status column)
@@ -402,7 +403,11 @@ void draw_selected_section(world& w, const recipe_registry& reg,
     if (b.decommissioned)
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative), "DECOMMISSIONED");
     else if (ImGui::Button("Decommission"))
+    {
         b.decommissioned = true;
+        // A decommissioned port/hub stops anchoring supply — reach field stale.
+        invalidate_logistics_caches(w);
+    }
 }
 
 // --- Sell orders (player) ----------------------------------------------------

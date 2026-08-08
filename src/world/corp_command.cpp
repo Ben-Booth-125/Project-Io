@@ -1,6 +1,7 @@
 #include "corp_command.hpp"
 
 #include "construction.hpp"
+#include "logistics.hpp" // invalidate_logistics_caches (idle/resume flips the anchor set)
 #include "recipe_registry.hpp"
 #include "survey_system.hpp"
 #include "unit_roster.hpp"
@@ -214,6 +215,9 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                 return corp_command_result::rejected_state; // already there
             b.decommissioned = want;
             b.loss_streak    = 0;
+            // An idled port/hub stops anchoring supply (is_supply_anchor);
+            // resume restores it — either way the reach field is stale.
+            invalidate_logistics_caches(w);
             return corp_command_result::applied;
         }
 

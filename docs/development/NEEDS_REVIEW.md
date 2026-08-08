@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*89 entries — 11 open, 78 resolved.*
+*92 entries — 14 open, 78 resolved.*
 
 ---
 
@@ -148,6 +148,41 @@ The landed pane paints a hex-sampled orthographic globe of the wizard's ACTUAL g
 - Leave both as-is: this pane ships as an interim improvement, BL-256 stays queued for its full design untouched
 
 *Files: `src/ui/generation_preview.hpp`, `src/ui/generation_preview.cpp`, `src/core/app.cpp`*
+
+### NR-090 — Rival construction state is publicly visible on the canvas — BL-068 never ruled on it
+*question · raised 2026-08-08 · from Ben's outside-the-box review prompt during BL-323; found reviewing the S4 dimming against DISCOVERY.md's visibility model*
+
+The BL-323 S4 under-construction dimming applies to ALL buildings, rivals included — so a rival's construction sites (and therefore their expansion frontier) are readable at a glance. BL-068's ruling covers type + owner (public) vs production/stockpile (private) but never classified construction state. The rival hover card correctly hides tick counts; only the canvas dimming leaks.
+
+**Why it matters.** Currently public by accident, not by decision. Arguably GOOD gameplay (scaffolding is externally observable; watching a rival build teaches the competitive map), but it also telegraphs reach frontiers the activity-fog design (BL-089) never priced. Needs a one-line ruling either way, recorded in DISCOVERY.md's visibility model when next touched.
+
+- Ratify: construction state is public (scaffolding is observable) — document in BL-068's model
+- Restrict: rivals render at full brightness regardless of construction state (state becomes private)
+
+> **Recommendation:** Ratify as public — it is realistic, legible, and creates counterplay.
+
+*Files: `src/ui/body_surface_canvas.cpp`, `docs/ui/DISCOVERY.md`*
+
+### NR-091 — Interpretation taken: one shared reach field — the military base is NOT a supply anchor
+*decision taken on your behalf · raised 2026-08-08 · from Ben's custom Q&A answer on military supply: 'This feeds into the logistics system (directional). So a nation's reach for economy is also the military reach. Beyond the boundary, units slowly deplete...'*
+
+Recorded in BL-325 (military base + supply) as: ONE reach field, computed off the existing economic anchors (cities, built ports, built hubs); the military_base is a muster/hire building only and does NOT anchor or extend reach. To project force farther, the player extends the same road/hub network the economy uses. The alternative reading — bases join the anchor set so a forward base extends supply for armies (and, as a side effect, economic placement) — was NOT taken.
+
+**Why it matters.** The word 'directional' could mean the dependency direction (military depends on economic logistics — the reading taken) or a directional/forward extension (bases push the envelope outward). The taken reading is cleaner (no second field, no base-extends-economy side effect) but it removes the classic forward-operating-base move. Overturnable in one line in BL-325 if misread.
+
+- Confirm: bases never anchor; forward projection = extend the road/hub network
+- Overturn: a completed military_base joins the anchor set (forward operating bases exist, and also extend economic placement reach)
+
+*Files: `docs/development/backlog.json`*
+
+### NR-092 — Reach gates placement only, never operation — asymmetry stands until BL-288
+*observation · raised 2026-08-08 · from The BL-323 outside-the-box review (buildings x unfinished logistics)*
+
+A building that exists beyond the reach budget (grandfathered, or placed while the rule was off) operates forever at zero penalty, and convoy dispatch has no reach check — so you cannot PLACE at reach 25 but a stale building at reach 40 ships freely. The ongoing-cost half is BL-288's unbuilt transport_capacity good.
+
+**Why it matters.** Not a bug — the placement gate was the designed slice — but the asymmetry will read as inconsistent the moment a player notices it, and the BL-325 unit-decay mechanic makes the contrast sharper (units decay out of range; buildings do not). Noted so BL-288's design starts from this.
+
+*Files: `src/world/supply_system.cpp`, `docs/development/backlog.json`*
 
 ---
 

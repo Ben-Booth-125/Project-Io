@@ -3,13 +3,14 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 135 entries across 2 volume(s).
+One line per session, newest first — 136 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
 
 | Date | Session | Items | Volume |
 |---|---|---|---|
+| 2026-08-08 | [Reach-rule hardening: three S2 defects ruled and fixed, and the military-base design settled](DEVLOG.md) | BL-068 BL-288 BL-323 BL-324 BL-325 | DEVLOG.md |
 | 2026-08-08 | [Buildings rework, first slice: extraction padding, site-dependent build time, construction legibility](DEVLOG.md) | BL-323 | DEVLOG.md |
 | 2026-08-08 | [landing the uncommitted generation-preview / Era -1 terrain work](DEVLOG.md) | BL-256 BL-265 BL-316 BL-321 BL-323 | DEVLOG.md |
 | 2026-08-08 | [military design thread + BL-324 batch delivery](DEVLOG.md) | BL-079 BL-157 BL-181 BL-202 BL-280 BL-305 BL-324 | DEVLOG.md |

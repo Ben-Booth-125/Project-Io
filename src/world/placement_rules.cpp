@@ -221,11 +221,27 @@ placement_result can_place_in_world(const world& w, entity_id tile_id,
     // A supply anchor itself always passes: a port or hub IS the anchor, so gating it
     // on being near one would make the first node on a fresh coast unplaceable and
     // the rule unbootstrappable.
+    //
+    // FIRST-ANCHOR BOOTSTRAP (Ben's ruling, 2026-08-08). The anchor-tile exemption
+    // above only covers tiles that already ARE anchors, which no tile on a virgin
+    // body is — so before this, a body with no city/port/hub refused every
+    // placement including the first hub, and Era 1 off-world expansion was
+    // impossible. An anchor-TYPE placement therefore skips the rule when the body
+    // has no anchor of any kind yet. Existence ends the exemption (see
+    // body_has_supply_anchor): the second hub must chain within reach of the
+    // first, which is the discipline the rule exists to create.
     if (max_reach >= 0.0f && !::is_supply_anchor(w, tile_id))
     {
-        const float reach = ::tile_reach_cost(w, tile_id);
-        if (reach >= 0.0f && !(reach <= max_reach))
-            return placement_reason::out_of_logistics_range;
+        const bool placing_anchor = type == building_type::port
+                                 || type == building_type::inland_logistics_hub;
+        const bool bootstrap = placing_anchor
+                            && !::body_has_supply_anchor(w, tc_it->second.body);
+        if (!bootstrap)
+        {
+            const float reach = ::tile_reach_cost(w, tile_id);
+            if (reach >= 0.0f && !(reach <= max_reach))
+                return placement_reason::out_of_logistics_range;
+        }
     }
 
     // Stack ceiling: a tile carries several sites working one deposit, but not

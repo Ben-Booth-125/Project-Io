@@ -262,12 +262,46 @@ bool is_supply_anchor(const world& w, entity_id tile)
     // So does a port or an inland logistics hub: the two buildings whose whole
     // purpose is to be a node. A launchpad is deliberately NOT an anchor — it
     // dispatches off-world and supplies nothing on the surface.
+    //
+    // Built AND active only (Ben's ruling, 2026-08-08): a hub that is still a
+    // construction site anchors nothing — the same completion contract the
+    // convoy discount already applies (supply_system.cpp § collect_logistics_nodes).
+    // Before this the two paths disagreed: an unbuilt shell extended placement
+    // reach while conferring no discount.
     for (const auto& [bid, bc] : w.buildings)
     {
         (void)bid;
         if (bc.tile != tile)
             continue;
-        if (bc.type == building_type::port || bc.type == building_type::inland_logistics_hub)
+        if ((bc.type == building_type::port || bc.type == building_type::inland_logistics_hub)
+            && bc.ticks_remaining <= 0 && !bc.decommissioned)
+            return true;
+    }
+    return false;
+}
+
+bool body_has_supply_anchor(const world& w, entity_id body)
+{
+    // Cities count, wherever they are on the body.
+    for (const auto& [centre, ctile] : w.population_centre_tile)
+    {
+        (void)centre;
+        const auto tit = w.tiles.find(ctile);
+        if (tit != w.tiles.end() && tit->second.body == body)
+            return true;
+    }
+    // Anchor-TYPE buildings count by EXISTENCE, deliberately ignoring the
+    // completion/decommission state is_supply_anchor requires. This is the
+    // first-anchor bootstrap's guard (Ben's ruling, 2026-08-08): the exemption
+    // ends the moment the first port/hub is COMMITTED, so a player cannot spam
+    // free anchors across a virgin body while the first one is still building.
+    for (const auto& [bid, bc] : w.buildings)
+    {
+        (void)bid;
+        if (bc.type != building_type::port && bc.type != building_type::inland_logistics_hub)
+            continue;
+        const auto tit = w.tiles.find(bc.tile);
+        if (tit != w.tiles.end() && tit->second.body == body)
             return true;
     }
     return false;

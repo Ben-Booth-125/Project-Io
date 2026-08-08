@@ -3,6 +3,7 @@
 #include "budget_system.hpp"   // compute_building_opex, body_mean_habitability (BL-181 solver)
 #include "building_profit.hpp" // estimate_building_profit (BL-079 corp agency)
 #include "corp_ai.hpp"         // run_corp_strategic_step (BL-202 strategic tier)
+#include "logistics.hpp"       // invalidate_logistics_caches (anchor-set changes)
 #include "market_clearing.hpp" // market_for_tile (BL-095 construction gate)
 #include "workforce.hpp"
 
@@ -408,7 +409,13 @@ void run_construction(world& w, const recipe_registry& reg, economy_report& repo
             --b.ticks_remaining;
         }
         if (b.ticks_remaining <= 0)
+        {
             b.construction_progress = 0.0f;
+            // COMPLETION is when a port/hub starts anchoring supply
+            // (is_supply_anchor's ticks_remaining contract, 2026-08-08), so the
+            // reach field goes stale at this moment too, not only at placement.
+            invalidate_logistics_caches(w);
+        }
     }
 }
 
@@ -772,6 +779,8 @@ economy_report run_economy_step(world& w, const recipe_registry& reg)
                     if (++b.loss_streak >= loss_streak_to_idle)
                     {
                         b.decommissioned = true;
+                        // An idled port/hub stops anchoring supply — reach stale.
+                        invalidate_logistics_caches(w);
                         report.agency_events.push_back(
                             {corp, bid, agency_event::kind::idled, 0});
                         log_reflex_agency(w, corp, building_body(w, b), "idled a loss-making building");

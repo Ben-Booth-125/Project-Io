@@ -8977,6 +8977,61 @@
      "notes": "src/ui/hover_content.cpp hover_building_supply"
     }
    ]
+  },
+  {
+   "brief": "reach-rule-hardening",
+   "title": "Reach-rule hardening — cache invalidation, first-anchor bootstrap, anchor completion",
+   "difficulty": null,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-08-08",
+   "resolution": "All rows met. Three BL-323 S2 defects found by Ben's outside-the-box review, each ruled on live: (1) every place/demolish/completion/decommission-flip now invalidates the logistics caches via the shared invalidate_logistics_caches helper (Ben chose the simple every-event rule); (2) the first anchor-type placement on an anchor-less body skips the reach rule (existence of any committed anchor ends the exemption — no free-anchor spam); (3) is_supply_anchor now requires completion + not-decommissioned, matching the convoy-discount contract. logistics_reach_harness extended R9-R11: 26/26 PASS.",
+   "promoted_from": "backlog.json BL-323 (reach-rule S2 hardening, rulings 2026-08-08)",
+   "batch": null,
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "Brief-spanning: the reach field never lies — every event that changes the anchor set or traversal costs (place, demolish, completion, decommission/resume, road) invalidates the caches; the first anchor on a virgin body is placeable; an unbuilt or decommissioned port/hub anchors nothing.",
+     "verification": [
+      "headless: logistics_reach_harness R9-R11"
+     ],
+     "status": "complete",
+     "result_metric": "26/26 PASS",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "construct_building and demolish_building invalidate both caches themselves; a hub placed or demolished through the real path changes the reach field with no manual clear.",
+     "verification": [
+      "headless: logistics_reach_harness R11"
+     ],
+     "status": "complete",
+     "result_metric": "R11 rows PASS",
+     "notes": "invalidate_logistics_caches helper, logistics.hpp"
+    },
+    {
+     "id": "R3",
+     "requirement": "An anchor-type placement (port/hub) on a body with NO anchor of any kind skips the reach rule; a non-anchor building is still refused there; committing the first anchor (even under construction) ends the exemption.",
+     "verification": [
+      "headless: logistics_reach_harness R10"
+     ],
+     "status": "complete",
+     "result_metric": "R10 rows PASS",
+     "notes": "body_has_supply_anchor, placement_rules.cpp"
+    },
+    {
+     "id": "R4",
+     "requirement": "is_supply_anchor requires ticks_remaining <= 0 and !decommissioned for port/hub — the same completion contract as the convoy discount; completion and decommission flips invalidate the caches at all five flip sites.",
+     "verification": [
+      "headless: logistics_reach_harness R9",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "R9 rows PASS",
+     "notes": "corp_command idle verb, selection_panel Idle/Resume, construction_panel Decommission, economy_system idle-loser + completion"
+    }
+   ]
   }
  ]
 }

@@ -59,10 +59,20 @@ logistics_path intra_body_path(world& w, entity_id body, entity_id src_tile, ent
 // a second, invented distance metric.
 
 /// True iff @p tile carries something that anchors supply: a city (population
-/// centre), a port, or an inland logistics hub. These are exactly BL-148/149's
-/// logistics nodes — the places a convoy can already start cheaply — so reach
-/// inherits that vocabulary rather than introducing a rival one.
+/// centre), or a BUILT, ACTIVE port or inland logistics hub (the completion
+/// contract matches the convoy discount — an unbuilt or decommissioned node
+/// anchors nothing). These are exactly BL-148/149's logistics nodes — the
+/// places a convoy can already start cheaply — so reach inherits that
+/// vocabulary rather than introducing a rival one.
 bool is_supply_anchor(const world& w, entity_id tile);
+
+/// True iff @p body carries any anchor at all: a city, or a port/hub building
+/// in ANY state (under construction and decommissioned included — existence,
+/// not activity). The first-anchor bootstrap reads this: on a body where it is
+/// false, an anchor-type placement skips the reach rule, and committing that
+/// first anchor immediately makes it true again so the exemption cannot be
+/// used twice while the first hub is still building.
+bool body_has_supply_anchor(const world& w, entity_id body);
 
 /// Weighted cost from every tile of @p body to its NEAREST supply anchor, raster
 /// indexed (grid_y*grid_width + grid_x). Infinity where no anchor is reachable
@@ -78,3 +88,16 @@ const std::vector<float>& body_reach_field(world& w, entity_id body);
 /// and unreachable" (which returns infinity). The const half of the pair above:
 /// UI surfaces hold a `const world&` and must not trigger the Dijkstra.
 float tile_reach_cost(const world& w, entity_id tile);
+
+/// Clear the path-cost and reach-field caches together. Call after ANY event
+/// that can change traversal cost or the anchor set: a building placed,
+/// demolished, completed, or decommissioned/resumed, or a road laid (Ben's
+/// 2026-08-08 ruling: the simple every-event rule over per-type cleverness —
+/// each of these is rare against the per-frame reads the caches serve). The
+/// caches rebuild lazily on next read, so an over-clear costs one Dijkstra,
+/// never a wrong answer; a MISSED clear is a reach field that lies.
+inline void invalidate_logistics_caches(world& w)
+{
+    w.astar_cost_cache.clear();
+    w.body_reach_cost.clear();
+}

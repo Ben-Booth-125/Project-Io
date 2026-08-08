@@ -32,6 +32,7 @@
 //
 // The process exits non-zero if any assertion FAILs.
 
+#include "world/construction.hpp" // R11: the real place/demolish invalidation path
 #include "world/logistics.hpp"
 #include "world/placement_rules.hpp"
 #include "world/world.hpp"
@@ -237,6 +238,109 @@ int main()
             g.w, at(g, 5, 0), building_type::extraction_site, resource_type::iron_ore, 1.0f);
         check(unknown.ok(),
               "R8 the gate skips the rule when the field is unbuilt, rather than guessing");
+    }
+
+    // --- R9: anchors require completion (Ben's ruling, 2026-08-08) ---------
+    {
+        fixture f = make_body();
+        // A hub still under construction anchors nothing.
+        {
+            const entity_id b = f.w.create_entity();
+            building_component bc;
+            bc.tile            = at(f, 0, 0);
+            bc.type            = building_type::inland_logistics_hub;
+            bc.ticks_remaining = 3;
+            f.w.buildings.emplace(b, bc);
+        }
+        const std::vector<float>& field = body_reach_field(f.w, f.body);
+        bool all_inf = !field.empty();
+        for (const float v : field) if (!std::isinf(v)) all_inf = false;
+        check(all_inf, "R9 an under-construction hub is not an anchor (field stays infinite)");
+
+        // Completing it (and invalidating, as run_construction now does) makes it one.
+        for (auto& [bid, bc] : f.w.buildings) bc.ticks_remaining = 0;
+        invalidate_logistics_caches(f.w);
+        check(reach_at(f, 0, 0) == 0.0f, "R9 the same hub anchors once complete");
+
+        // Decommissioning it (the idle flip) takes the anchor away again.
+        for (auto& [bid, bc] : f.w.buildings) bc.decommissioned = true;
+        invalidate_logistics_caches(f.w);
+        check(std::isinf(reach_at(f, 0, 0)), "R9 a decommissioned hub is not an anchor");
+    }
+
+    // --- R10: the first-anchor bootstrap (Ben's ruling, 2026-08-08) --------
+    {
+        fixture f = make_body();
+        body_reach_field(f.w, f.body); // built and all-infinite: no anchor anywhere
+
+        // Before the fix this refused EVERYTHING on a virgin body, the first hub
+        // included, making Era 1 off-world expansion impossible.
+        const auto first_hub = placement_rules::can_place_in_world(
+            f.w, at(f, 5, 3), building_type::inland_logistics_hub, resource_type::iron_ore, 5.0f);
+        check(first_hub.ok(), "R10 the FIRST hub on an anchor-less body skips the reach rule");
+
+        const auto site = placement_rules::can_place_in_world(
+            f.w, at(f, 5, 3), building_type::extraction_site, resource_type::iron_ore, 5.0f);
+        check(!site.ok(), "R10 a non-anchor building is still refused on an anchor-less body");
+
+        // Committing the first hub — even still under construction — ends the
+        // exemption: a second hub cannot use it, and (the first not yet
+        // anchoring) is refused until the first completes. No free-anchor spam.
+        {
+            const entity_id b = f.w.create_entity();
+            building_component bc;
+            bc.tile            = at(f, 5, 3);
+            bc.type            = building_type::inland_logistics_hub;
+            bc.ticks_remaining = 3; // still building
+            f.w.buildings.emplace(b, bc);
+            invalidate_logistics_caches(f.w);
+        }
+        body_reach_field(f.w, f.body);
+        const auto second_hub = placement_rules::can_place_in_world(
+            f.w, at(f, 10, 3), building_type::inland_logistics_hub, resource_type::iron_ore, 5.0f);
+        check(!second_hub.ok(),
+              "R10 a second hub is refused while the first is still building (exemption ends on commit)");
+
+        // Once the first completes, a second hub within reach chains normally.
+        for (auto& [bid, bc] : f.w.buildings) bc.ticks_remaining = 0;
+        invalidate_logistics_caches(f.w);
+        body_reach_field(f.w, f.body);
+        const auto chained = placement_rules::can_place_in_world(
+            f.w, at(f, 8, 3), building_type::inland_logistics_hub, resource_type::iron_ore, 5.0f);
+        check(chained.ok(), "R10 a second hub chains within reach once the first completes");
+    }
+
+    // --- R11: construct/demolish invalidate the caches themselves ----------
+    {
+        fixture f = make_body();
+        recipe_registry reg;
+        { building_economics hub; hub.build_cost = 10.0f; hub.build_duration_ticks = 0.0f;
+          reg.set_economics(building_type::inland_logistics_hub, hub); }
+        construction_params cp; cp.max_logistics_reach = 5.0f;
+        reg.set_construction(cp);
+
+        const entity_id corp = f.w.create_entity();
+        corporation_component cc; cc.balance = 1000.0f;
+        f.w.corporations.emplace(corp, cc);
+
+        body_reach_field(f.w, f.body); // cache an all-infinite field
+
+        // Place the bootstrap hub through the REAL path. 0-duration = instant
+        // completion, so it anchors immediately — and construct_building's own
+        // invalidation (no manual clear here) must be what makes the field see it.
+        entity_id hub = null_entity;
+        const construction_result r = construct_building(f.w, reg, corp, at(f, 0, 0),
+            building_type::inland_logistics_hub, resource_type::iron_ore, hub);
+        check(r == construction_result::placed, "R11 setup: bootstrap hub placed via construct_building");
+        check(reach_at(f, 3, 0) > 0.0f && !std::isinf(reach_at(f, 3, 0)),
+              "R11 placement invalidates the caches itself (no manual clear needed)");
+
+        // Demolition through the real path takes the anchor away — again with no
+        // manual clear. Before the fix the stale field kept offering tiles
+        // anchored on the ghost.
+        check(demolish_building(f.w, corp, hub), "R11 setup: hub demolished");
+        check(std::isinf(reach_at(f, 3, 0)),
+              "R11 demolition invalidates the caches itself (no ghost anchor)");
     }
 
     std::printf("\n=== %s ===\n", g_fail == 0 ? "ALL PASS" : "FAILURES PRESENT");

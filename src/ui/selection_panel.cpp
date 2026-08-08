@@ -15,6 +15,7 @@
 #include "world/economy_system.hpp" // economy_report (workforce cap, BL-069)
 #include "world/market_clearing.hpp"
 #include "world/construction.hpp"    // demolish path (the building element's Demolish)
+#include "world/logistics.hpp"       // invalidate_logistics_caches (idle/resume flips the anchor set)
 #include "world/placement_rules.hpp" // buildable-type validity + stack capacity
 #include "world/recipe_registry.hpp" // recipe/economics lookups for the building element
 #include "world/survey_system.hpp"
@@ -1222,12 +1223,20 @@ void draw_building_selection(world& w, const recipe_registry& reg,
         if (b.decommissioned)
         {
             if (ImGui::Button("Resume##sel_idle", {bw, frame_h * 1.4f}))
+            {
                 b.decommissioned = false;
+                // A resumed port/hub anchors supply again — reach field stale.
+                invalidate_logistics_caches(w);
+            }
         }
         else
         {
             if (ImGui::Button("Idle##sel_idle", {bw, frame_h * 1.4f}))
+            {
                 b.decommissioned = true;
+                // An idled port/hub stops anchoring supply — reach field stale.
+                invalidate_logistics_caches(w);
+            }
         }
         if (ImGui::IsItemHovered())
             ImGui::SetTooltip(b.decommissioned

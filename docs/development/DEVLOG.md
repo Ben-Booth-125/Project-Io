@@ -10,7 +10,58 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Buildings rework, first slice: extraction padding, site-dependent build time, construction legibility (2026-08-08, latest)
+## Session — Reach-rule hardening: three S2 defects ruled and fixed, and the military-base design settled (2026-08-08, latest)
+
+Full mode, same sitting as the first-slice delivery below. Ben's steer: consider outside-the-box
+problems with BL-323 (buildings × visibility, buildings × the unfinished logistics system,
+buildings × military), then work the bugs one by one with a Q&A. Runtime: not tracked.
+
+**The review found three real defects in the already-landed S2, each ruled live via Q&A.**
+
+- **Stale caches (Ben: invalidate on EVERY event, the simple rule).** Placing a port/hub never
+  cleared `body_reach_cost` — the new anchor took effect only when an unrelated road placement
+  happened to clear the cache. Demolition cleared nothing, leaving ghost anchors. Fixed with a
+  shared `invalidate_logistics_caches` helper (logistics.hpp) called at every place, demolish,
+  construction completion, decommission/resume flip (all five flip sites: the corp-command idle
+  verb, the Selection panel's Idle/Resume pair, the construction panel's Decommission button, the
+  economy system's idle-a-loser reflex) and road placement.
+- **The virgin-body bootstrap was broken (Ben: first anchor free on anchor-less bodies).** The
+  anchor-tile exemption only covered tiles that already WERE anchors — none exist on a virgin
+  body, so the all-infinite field refused everything including the first hub, making Era 1
+  off-world expansion impossible once reach is enforced. An anchor-type placement now skips the
+  rule when `body_has_supply_anchor` is false. The guard: EXISTENCE of any committed anchor
+  (under construction included) ends the exemption, so the player cannot spam free hubs across a
+  virgin body while the first is still building.
+- **An unbuilt hub anchored supply (Ben: anchor only when complete).** `is_supply_anchor` ignored
+  `ticks_remaining` while the convoy-discount path required completion — the two disagreed, and a
+  construction-site shell extended placement reach. Now both use the same contract
+  (`ticks_remaining <= 0 && !decommissioned`), and hub-chaining outward gains natural build-time
+  pacing: the next reach step waits for the hub to finish.
+
+**Verified.** `logistics_reach_harness` extended with R9–R11 (completion contract, bootstrap with
+its no-spam guard, invalidation through the REAL construct/demolish path with no manual clears):
+26/26 PASS. Sibling harnesses re-run clean (buildings_rework, construction, corp_ai,
+supply_advance, trade_routes, econ). Full app build clean. Requirements:
+requirements.json § reach-rule-hardening (R1–R4, all complete).
+
+**The military thread settled into BL-325 (military bases + supply), four rulings via Q&A.**
+One new `building_type::military_base` (muster building, distinct rule + glyph); hiring moves
+onto the base (superseding BL-324's hire-anywhere — the base becomes the economy→military
+interface); **one reach field, not two** — Ben's own words: "a nation's reach for economy is also
+the military reach," so the economic logistics network IS the military supply envelope and the
+base is NOT an anchor (recorded as an interpretation in NR-091, overturnable — his "directional"
+could also have meant forward bases extend the envelope); units beyond the boundary suffer
+deterministic per-tick strength decay, the campaign twin of the Era −1 sim's supply attrition.
+Filed `designed`, priority B, v0.1.5 (the military-systems minor), requires BL-324.
+
+**Also logged.** NR-090 (question): rival construction state is publicly visible via the S4
+dimming — BL-068 never ruled on it; recommended ratifying it as public. NR-092 (observation):
+reach gates placement but never operation — a grandfathered remote building operates and ships
+freely; the asymmetry stands until BL-288's transport-capacity work and is noted for its design.
+
+---
+
+## Session — Buildings rework, first slice: extraction padding, site-dependent build time, construction legibility (2026-08-08)
 
 Full mode, Delivery lifecycle: promote BL-323 (Buildings rework) into REFINED.md, deliver, drain.
 Runtime: not tracked. Ben's steer: pull from origin, work the roadmap, land the uncommitted

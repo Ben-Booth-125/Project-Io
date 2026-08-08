@@ -154,6 +154,13 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     // BL-095: no up-front debit — run_construction charges build_cost + materials
     // incrementally as the build progresses (pay-as-you-build).
 
+    // Before this clear existed, a newly placed port/hub extended the reach
+    // field only when something unrelated (a road) happened to clear the cache —
+    // the rule took effect at an arbitrary later moment. The anchor still waits
+    // on completion (is_supply_anchor's ticks_remaining contract); the clear
+    // just guarantees the field is honest whenever it is next read.
+    invalidate_logistics_caches(w);
+
     out_building = bld_id;
     return construction_result::placed;
 }
@@ -179,6 +186,10 @@ bool demolish_building(world& w, entity_id corp, entity_id building)
     cc.assets.erase(asset_it);
     w.buildings.erase(bld_it);
     w.stockpiles.erase(building); // no-op if the building never had one
+
+    // A demolished port/hub stops anchoring supply; before this clear the stale
+    // reach field kept offering tiles anchored on the ghost.
+    invalidate_logistics_caches(w);
 
     return true;
 }
@@ -226,12 +237,12 @@ construction_result place_road(world& w, const recipe_registry& reg,
     if (cc.balance < total_cost)
         return construction_result::insufficient_funds;
 
-    // Commit: debit, raise the tile to the chosen road tier, invalidate the A* cost cache
-    // (road_level changed, so cached path costs are stale — world.hpp invalidation contract).
+    // Commit: debit, raise the tile to the chosen road tier, invalidate the
+    // logistics caches (road_level changed, so cached path and reach costs are
+    // stale — world.hpp invalidation contract).
     cc.balance -= total_cost;
     tile_it->second.road_level = tier; // BL-172: 1=Track, 2=Road, 3=Highway (upgrade-in-place).
-    w.astar_cost_cache.clear();
-    w.body_reach_cost.clear(); // a port or hub just became (or stopped being) an anchor
+    invalidate_logistics_caches(w);
 
     return construction_result::placed;
 }
