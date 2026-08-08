@@ -194,15 +194,17 @@ void paint_system(ImDrawList* dl, ImVec2 p0, ImVec2 sz,
 // ---------------------------------------------------------------------------
 // The homeworld — shared by rounds 1 and 2.
 //
-// Drawn as a HEX-SAMPLED orthographic globe: a pointy-top hex grid covers the
-// disc, and each hex centre is inverse-projected to (longitude, latitude) on
-// the sphere, then classified land / ocean / ice from continent blobs defined
-// in sphere coordinates. Two things fall out of sampling on the sphere rather
-// than painting on the disc:
-//   * the surface honestly previews the game's hex-tile world (the outlines
-//     ARE the reading of the map the player will inherit), and
+// Drawn as a SLICED orthographic globe (Ben, 2026-08-08 — replacing the
+// original hex-sampled lattice, whose hex outlines read as artefacts at this
+// size): 48 meridian slices, each subdivided in latitude, every cell a quad
+// between the two bounding half-ellipse meridians, sampled on the sphere in
+// absolute coordinates. Sampling on the sphere keeps the two properties the
+// hex version had:
+//   * the surface honestly previews the generated map (the real raster when
+//     built, the stylised blobs as the async fallback), and
 //   * rotation is just an offset on the sampled longitude — the far side
-//     comes around for free.
+//     comes around for free, and a cell keeps its identity (and its scar)
+//     for the whole revolution.
 // ---------------------------------------------------------------------------
 
 /// One continent blob on the sphere, in (lon, lat_n) where lat_n = sin(latitude)
@@ -265,65 +267,94 @@ void paint_homeworld(ImDrawList* dl, ImVec2 c, float R, const planetology_state&
     land_blob blobs[blob_count];
     derive_blobs(st, blobs);
 
-    // The hex lattice lives ON THE SPHERE — rows of constant latitude, each
-    // ring closed by an even longitude step — and every tile is projected to
-    // screen per frame. So the tiles themselves travel as the world turns:
-    // fresh hexes roll in over the limb, foreshortening as they cross it,
-    // and a tile keeps its identity (and its scar) for the whole revolution.
-    constexpr float ha       = 0.040f;             // angular circumradius (rad)
+    // SLICED GLOBE (Ben, 2026-08-08: "remove the hex artefacts, and just render
+    // with vertical slices"). The sphere is carved into meridian slices — in
+    // orthographic projection each slice boundary
+    // is a half-ellipse, so the globe reads as clean nested lunes rather than a
+    // hex lattice. Within a slice, latitude subdivides finely and each cell is
+    // a quad between the two bounding meridians; small quads approximate the
+    // ellipse arcs smoothly, and NO cell outlines are drawn — the limb
+    // darkening alone supplies the shape. Slices sit at fixed ABSOLUTE
+    // longitudes, so the surface (and its scars) travels with the rotation
+    // exactly as the hexes did.
+    // 48 slices — Ben's pick from the 2026-08-08 form comparison (24 read as a
+    // beach ball, 72+ dissolved the slice aesthetic into a pixel planet; 48
+    // keeps the sliced look while the continents stay recognisable).
+    constexpr int n_slices = 48;
+    const int     n_rows   = real ? surface.gh : 48; // latitude cells per slice
     constexpr float half_pi  = 1.5707963f;
     constexpr float two_pi   = 6.2831853f;
-    const float     dlat     = ha * 1.5f;
-    const int       n_rows   = static_cast<int>(3.14159265f / dlat);
+    const float     lon_step = two_pi / static_cast<float>(n_slices);
+    const float     dlat     = 3.14159265f / static_cast<float>(n_rows);
 
     const uint32_t scar_salt = body_hash(st) ^ 0x9E3779B9u;
 
-    for (int row = 0; row <= n_rows; ++row)
+    // Screen point for (lat, relative lon), the relative lon clamped to the
+    // near hemisphere so boundary cells flatten against the limb rather than
+    // folding through it (the same clamp the hex path used).
+    const auto project = [&](float lat, float lon_rel) {
+        lon_rel = std::clamp(lon_rel, -half_pi, half_pi);
+        return ImVec2{ c.x + std::cos(lat) * std::sin(lon_rel) * R,
+                       c.y - std::sin(lat) * R };
+    };
+
+    for (int s = 0; s < n_slices; ++s)
     {
-        const float lat = -half_pi + (static_cast<float>(row) + 0.5f) * dlat;
-        if (std::fabs(lat) > 1.53f) continue;      // the polar sliver
-        const float cl = std::cos(lat);
+        const float lon0_abs = static_cast<float>(s) * lon_step;
+        const float lon_mid  = lon0_abs + lon_step * 0.5f;
+        float lon_rel = lon_mid - rot;
+        while (lon_rel >  3.14159265f) lon_rel -= two_pi;
+        while (lon_rel < -3.14159265f) lon_rel += two_pi;
+        if (std::cos(lon_rel) < 0.02f) continue;   // slice centre on the far side
 
-        // Close each ring with an even step near the target hex width, so the
-        // seam at lon 0 never shows; rings shed tiles toward the poles.
-        const int n_cols = std::max(3,
-            static_cast<int>(two_pi * cl / (ha * 1.7320508f)));
-        const float lon_step = two_pi / static_cast<float>(n_cols);
-        const float base     = (row & 1) ? lon_step * 0.5f : 0.0f;
+        const float rel0 = lon_rel - lon_step * 0.5f;
+        const float rel1 = lon_rel + lon_step * 0.5f;
 
-        for (int col = 0; col < n_cols; ++col)
+        for (int row = 0; row < n_rows; ++row)
         {
-            const float lon_abs = base + static_cast<float>(col) * lon_step;
-            float lon_rel = lon_abs - rot;
-            while (lon_rel >  3.14159265f) lon_rel -= two_pi;
-            while (lon_rel < -3.14159265f) lon_rel += two_pi;
+            const float lat0 = -half_pi + static_cast<float>(row) * dlat;
+            const float lat1 = lat0 + dlat;
+            const float lat  = lat0 + dlat * 0.5f;
 
-            const float zc = cl * std::cos(lon_rel);
-            if (zc < 0.02f) continue;              // far hemisphere
-
-            // Classification in ABSOLUTE sphere coordinates: the tile is the
-            // same tile whatever the viewing angle. With a real surface the hex
-            // samples the actual generated raster (nearest tile: rows run
-            // north-pole-first, linear in latitude — band_for_row's own
-            // convention); the blob path remains only as the fallback while
-            // the first async build is in flight.
+            // Classification in ABSOLUTE sphere coordinates, sampled at the
+            // cell centre: the real raster when built, the blob painting as
+            // the fallback while the first async build is in flight.
             const float lat_n = std::sin(lat);
             ImU32 fill;
             bool  on_land = false;
             if (real)
             {
-                float lw = lon_abs;
+                // POSTPROCESS: a slice spans several raster columns (180 cols /
+                // 24 slices = 7.5), so centre-sampling let one arbitrary column
+                // win the whole cell and the continents read as noise. Majority
+                // vote across the slice's span instead — the cell shows what
+                // MOST of its ground is.
+                float lw = lon0_abs;
                 while (lw < 0.0f)        lw += two_pi;
                 while (lw >= two_pi)     lw -= two_pi;
-                const int tc = std::min(surface.gw - 1,
-                    static_cast<int>(lw / two_pi * static_cast<float>(surface.gw)));
+                const int c0    = static_cast<int>(lw / two_pi * static_cast<float>(surface.gw));
+                const int span  = std::max(1, surface.gw / n_slices);
+                const auto vote = [&](int tr) {
+                    int counts[16] = {};
+                    for (int k = 0; k <= span; ++k)
+                    {
+                        const int tc = (c0 + k) % surface.gw;
+                        const uint8_t comp = surface.comp[
+                            static_cast<std::size_t>(tr) * static_cast<std::size_t>(surface.gw)
+                            + static_cast<std::size_t>(tc)];
+                        if (comp < 16) ++counts[comp];
+                    }
+                    int best = 0;
+                    for (int k = 1; k < 16; ++k)
+                        if (counts[k] > counts[best]) best = k;
+                    return static_cast<terrain_composition>(best);
+                };
+
                 const float p  = 0.5f - lat / 3.14159265f;
-                const int   tr = std::clamp(
-                    static_cast<int>(p * static_cast<float>(surface.gh - 1) + 0.5f),
-                    0, surface.gh - 1);
-                const auto comp = static_cast<terrain_composition>(
-                    surface.comp[static_cast<std::size_t>(tr) * static_cast<std::size_t>(surface.gw)
-                                 + static_cast<std::size_t>(tc)]);
+                const float fr = std::clamp(p * static_cast<float>(surface.gh - 1),
+                                            0.0f, static_cast<float>(surface.gh - 1));
+                const int   tr = std::clamp(static_cast<int>(fr + 0.5f), 0, surface.gh - 1);
+                const auto  comp = vote(tr);
                 fill    = terrain_colour(comp);
                 on_land = comp != terrain_composition::ocean;
             }
@@ -332,42 +363,33 @@ void paint_homeworld(ImDrawList* dl, ImVec2 c, float R, const planetology_state&
                                                        != hydrological_state::none)
                                                      fill = ic;
             else if (!has_ocean)                   { fill = lc; on_land = true; }
-            else if (land_at(blobs, lon_abs, lat_n)) { fill = lc; on_land = true; }
+            else if (land_at(blobs, lon_mid, lat_n)) { fill = lc; on_land = true; }
             else                                     fill = oc;
 
-            // Limb darkening from the tile normal's view-depth.
-            const float shade  = 0.55f + 0.45f * std::sqrt(zc);
+            // Limb darkening from the cell normal's view-depth.
+            const float zc = std::cos(lat) * std::cos(lon_rel);
+            if (zc < 0.0f) continue;
+            const float shade  = 0.55f + 0.45f * std::sqrt(std::max(zc, 0.0f));
             const ImU32 shaded = lerp_col(IM_COL32(8, 9, 12, 255), fill, shade);
 
-            // Worked-surface scars keyed to the LATTICE cell — stable per tile.
+            // Worked-surface scars keyed to the (slice, row) cell — stable per
+            // cell across the whole revolution, as the hex scars were.
             bool scarred = false;
             if (on_land && drawdown_shown > 0.005f)
             {
                 const uint32_t h = ((static_cast<uint32_t>(row) * 92821u
-                                     + static_cast<uint32_t>(col)) ^ scar_salt)
+                                     + static_cast<uint32_t>(s)) ^ scar_salt)
                                    * 2654435761u;
                 scarred = (h >> 24) < static_cast<uint32_t>(drawdown_shown * 190.0f);
             }
 
-            // Project the six corners individually; a corner past the limb is
-            // clamped to it, so boundary tiles flatten against the edge as
-            // they arrive rather than folding through it.
-            ImVec2 v[6];
-            for (int k = 0; k < 6; ++k)
-            {
-                const float a     = (static_cast<float>(k) * 60.0f - 30.0f)
-                                        * 0.01745329f;
-                const float lat_v = lat + ha * std::sin(a);
-                const float lon_v = std::clamp(
-                    lon_rel + ha * std::cos(a) / std::max(cl, 0.05f),
-                    -half_pi, half_pi);
-                v[k] = {c.x + std::cos(lat_v) * std::sin(lon_v) * R,
-                        c.y - std::sin(lat_v) * R};
-            }
-            dl->AddConvexPolyFilled(v, 6, scarred
+            // The cell: a quad between the two bounding meridian ellipses.
+            const ImVec2 v[4] = {
+                project(lat0, rel0), project(lat0, rel1),
+                project(lat1, rel1), project(lat1, rel0),
+            };
+            dl->AddQuadFilled(v[0], v[1], v[2], v[3], scarred
                 ? lerp_col(shaded, IM_COL32(26, 24, 22, 255), 0.75f) : shaded);
-            // The hexagonal outline — the tile grid the campaign will inherit.
-            dl->AddPolyline(v, 6, IM_COL32(10, 12, 16, 90), ImDrawFlags_Closed, 1.0f);
         }
     }
 
