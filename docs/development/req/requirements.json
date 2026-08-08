@@ -9032,6 +9032,73 @@
      "notes": "corp_command idle verb, selection_panel Idle/Resume, construction_panel Decommission, economy_system idle-loser + completion"
     }
    ]
+  },
+  {
+   "brief": "military-base-s1",
+   "title": "Military base S1 — the muster building exists end-to-end",
+   "difficulty": null,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-08-08",
+   "resolution": "All 5 rows met. building_type::military_base = 6 end-to-end: economics array bumped 6->7, Lua name-map + economy.lua entry (produces nothing, staffs at zero), explicit can_place case (any non-ocean land, reach rule applies, NO anchor exemption), shield glyph in icons::building + ICONS.md row, name in presentation.cpp, build ledger candidate + primed-check rows, gameplay.build dictionary entry updated + mirror regenerated, verify place_mode extended (launchpad/logistics_hub/military_base). buildings_rework_harness extended R6/R7: 19/19 PASS. Campaign visual check: base placed via the real path at tile (135,83), shield renders (dimmed under construction per BL-323 S4), Selection band names it. Ruling 3 held in code: a completed base is not a supply anchor and the reach field is unchanged by building one.",
+   "promoted_from": "backlog.json BL-325 (military base + supply), S1 only",
+   "batch": null,
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "Brief-spanning: building_type::military_base exists end-to-end — enum, economics (Lua-authored), placement rule, glyph, naming — and is offered/placeable through the campaign build surfaces.",
+     "verification": [
+      "headless: buildings_rework_harness",
+      "visual: manual"
+     ],
+     "status": "complete",
+     "result_metric": "19/19 harness PASS; campaign placement verified via --verify (mb_zoom capture)",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "Placement: valid on any non-ocean land tile within the logistics reach budget, no deposit requirement; ocean refused; the reach rule applies (a base placement is NOT exempt — it is not an anchor type).",
+     "verification": [
+      "headless: buildings_rework_harness"
+     ],
+     "status": "complete",
+     "result_metric": "R6 rows PASS (land-in-reach ok, ocean refused, beyond-reach refused, no exemption)",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "requirement": "Economics: authored in economy.lua (produces nothing, base_rate 0); the built base staffs at zero workforce like the port/hub; the BL-323 S3 site-time multiplier applies unchanged.",
+     "verification": [
+      "headless: buildings_rework_harness",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "R7 staffs-at-zero PASS; economics Lua-authored; S3 multiplier applies via the shared path",
+     "notes": ""
+    },
+    {
+     "id": "R4",
+     "requirement": "Ruling 3 holds in code: a military_base is NOT a supply anchor — placing and completing one changes neither is_supply_anchor nor the reach field.",
+     "verification": [
+      "headless: buildings_rework_harness"
+     ],
+     "status": "complete",
+     "result_metric": "R7 rows PASS (completed base not an anchor; reach field unchanged)",
+     "notes": ""
+    },
+    {
+     "id": "R5",
+     "requirement": "The glyph: a distinct shield silhouette in icons::building (not the fallback circle), catalogued in ICONS.md per its add-a-glyph rule.",
+     "verification": [
+      "code",
+      "visual: manual"
+     ],
+     "status": "complete",
+     "result_metric": "Shield glyph renders distinct (mb_zoom capture); ICONS.md row added",
+     "notes": ""
+    }
+   ]
   }
  ]
 }

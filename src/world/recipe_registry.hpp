@@ -250,8 +250,8 @@ private:
     std::vector<recipe> m_recipes;
 
     /// Indexed by building_type (none / extraction_site / processing_facility / port /
-    /// launchpad / inland_logistics_hub — BL-149 bumped the count 5 → 6).
-    std::array<building_economics, 6> m_building_econ = {};
+    /// launchpad / inland_logistics_hub / military_base — BL-325 bumped the count 6 → 7).
+    std::array<building_economics, 7> m_building_econ = {};
 
     float m_t_full = 1.0f;
     float m_t_idle = 0.2f;

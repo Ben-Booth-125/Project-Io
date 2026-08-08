@@ -807,7 +807,8 @@ void draw_tile_selection(world& w, ui_state& ui)
             for (const building_type bt : {building_type::processing_facility,
                                            building_type::port,
                                            building_type::launchpad,
-                                           building_type::inland_logistics_hub})
+                                           building_type::inland_logistics_hub,
+                                           building_type::military_base})
                 if (placement_rules::can_place_in_world(w, sel, bt, resource_type::iron_ore,
                                                        ui.max_logistics_reach).ok())
                 { any_placeable = true; break; }
@@ -1520,6 +1521,7 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
     cands.push_back({building_type::port,                 resource_type::iron_ore, "Port"});
     cands.push_back({building_type::launchpad,            resource_type::iron_ore, "Launchpad"});
     cands.push_back({building_type::inland_logistics_hub, resource_type::iron_ore, "Inland Logistics Hub"}); // BL-149
+    cands.push_back({building_type::military_base,        resource_type::iron_ore, "Military Base"});        // BL-325 S1
 
     for (candidate& c : cands)
     {

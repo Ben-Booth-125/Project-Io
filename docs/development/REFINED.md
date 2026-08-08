@@ -10,6 +10,11 @@
 > requirements.json § buildings-rework-first-slice (R1–R7). **Not closed**: BL-323's full S1
 > (processing chains needing new resource_type values) stays `designed`, next slice ready.
 
+> Drained 2026-08-08: military base S1 (BL-325), all 4 tasks COMPLETE — removed per the
+> retain-one policy. Record lives in DEVLOG.md (2026-08-08 entry), backlog.json BL-325's design
+> field (§ S1 landed), and requirements.json § military-base-s1 (R1–R5). **Not closed**: BL-325's
+> S2 (hire moves onto the base) and S3 (out-of-supply decay) stay `designed`, next slices ready.
+
 ## Nation/corp generation visibility (promoted from BL-305) — **PAUSED, no tasks started**
 
 **Resume here.** Paused 2026-08-08 before any code (see NR-085): task A's file scope

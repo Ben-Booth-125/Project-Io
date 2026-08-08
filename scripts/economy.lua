@@ -95,6 +95,20 @@ economy = {
             build_duration_ticks = 3.0,
             resource_costs = { steel = 30.0 },
         },
+        -- BL-325 S1: Military Base — the unit muster building. Produces nothing
+        -- (base_rate 0, staffs at zero like the port/hub); its value is where
+        -- units are raised (hire moves onto it in BL-325 S2). Deliberately NOT a
+        -- supply anchor: military reach IS the economic reach field (ruling 3),
+        -- so a base extends nothing. Dearer than a hub (a garrison installation,
+        -- not a waypoint), cheaper than a launchpad.
+        military_base = {
+            base_rate   = 0.0,
+            maintenance = 15.0,
+            base_wage   = 10.0,
+            build_cost  = 300.0,
+            build_duration_ticks = 4.0,
+            resource_costs = { steel = 35.0 },
+        },
     },
 
     -- Player-placeable roads, now a three-tier ladder (BL-172; BL-147 shipped a single tier). A

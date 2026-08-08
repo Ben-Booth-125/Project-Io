@@ -183,6 +183,70 @@ int main()
               "R5 a 0-duration building type stays instant regardless of site");
     }
 
+    // --- R6/R7 (BL-325 S1): the military base --------------------------------
+    {
+        recipe_registry reg;
+        building_economics base; base.build_cost = 300.0f; base.build_duration_ticks = 4.0f;
+        reg.set_economics(building_type::military_base, base);
+        construction_params cp; cp.max_logistics_reach = 5.0f;
+        reg.set_construction(cp);
+
+        world w;
+        const entity_id body = w.create_entity();
+        constexpr int GW = 12, GH = 2;
+        body_component bcmp; bcmp.grid_width = GW; bcmp.grid_height = GH;
+        w.bodies.emplace(body, bcmp);
+        entity_id grid[GH][GW];
+        for (int r = 0; r < GH; ++r)
+            for (int c = 0; c < GW; ++c)
+                grid[r][c] = make_tile(w, body, c, r);
+        w.tiles.at(grid[1][0]).composition = terrain_composition::ocean;
+
+        // A hub anchor at (0,0), so reach is measurable.
+        {
+            const entity_id hub = w.create_entity();
+            building_component hbc; hbc.tile = grid[0][0]; hbc.type = building_type::inland_logistics_hub;
+            w.buildings.emplace(hub, hbc);
+        }
+        body_reach_field(w, body);
+
+        // Placement: land within reach OK (no deposit needed), ocean refused,
+        // beyond-reach refused — the base earns NO anchor exemption.
+        check(placement_rules::can_place_in_world(w, grid[0][2],
+                  building_type::military_base, resource_type::iron_ore, 5.0f).ok(),
+              "R6 a military base is placeable on bare land within reach (no deposit needed)");
+        check(!placement_rules::can_place_in_world(w, grid[1][0],
+                  building_type::military_base, resource_type::iron_ore, 5.0f).ok(),
+              "R6 a military base is refused on ocean");
+        // Column 6 is 6 steps away (columns wrap at 12, so the short way is 6).
+        check(!placement_rules::can_place_in_world(w, grid[0][6],
+                  building_type::military_base, resource_type::iron_ore, 5.0f).ok(),
+              "R6 a military base beyond the reach budget is refused (no anchor-type exemption)");
+
+        // Built through the real path: staffs at zero, and — ruling 3 — the
+        // completed base is NOT a supply anchor, so the reach field is unchanged.
+        const entity_id corp = w.create_entity();
+        corporation_component cc; cc.balance = 100000.0f;
+        w.corporations.emplace(corp, cc);
+
+        const float reach_before = tile_reach_cost(w, grid[0][4]);
+        entity_id built = null_entity;
+        const construction_result r = construct_building(w, reg, corp, grid[0][2],
+            building_type::military_base, resource_type::iron_ore, built);
+        check(r == construction_result::placed && built != null_entity,
+              "R6 setup: base placed via construct_building");
+        check(built != null_entity && w.buildings.at(built).workforce_assigned == 0.0f,
+              "R7 a military base staffs at zero (passive infrastructure)");
+
+        for (auto& [bid, bc2] : w.buildings) bc2.ticks_remaining = 0; // complete it
+        invalidate_logistics_caches(w);
+        body_reach_field(w, body);
+        check(!is_supply_anchor(w, grid[0][2]),
+              "R7 a COMPLETED military base is not a supply anchor (BL-325 ruling 3)");
+        check(tile_reach_cost(w, grid[0][4]) == reach_before,
+              "R7 building a base changes nothing in the reach field");
+    }
+
     if (g_fail)
         std::printf("\nFAILURES: %d (of %d)\n", g_fail, g_pass + g_fail);
     else

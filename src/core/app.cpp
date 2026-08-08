@@ -1214,6 +1214,9 @@ int app::run_verify(const std::string& script_path, bool bless)
             if (type == "extraction")      bt = building_type::extraction_site;
             else if (type == "processing") bt = building_type::processing_facility;
             else if (type == "port")       bt = building_type::port;
+            else if (type == "launchpad")  bt = building_type::launchpad;
+            else if (type == "logistics_hub") bt = building_type::inland_logistics_hub;
+            else if (type == "military_base") bt = building_type::military_base; // BL-325 S1
             if (bt == building_type::none)
                 return;
             m_ui.construction.active = true;

@@ -10,7 +10,41 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Reach-rule hardening: three S2 defects ruled and fixed, and the military-base design settled (2026-08-08, latest)
+## Session — Military base S1: the muster building lands (2026-08-08, latest)
+
+Full mode, Delivery: BL-325 (military bases + supply) promoted, S1 delivered and drained; S2
+(hire-at-base) and S3 (out-of-supply decay) deliberately left in the item. Same sitting as the
+hardening entry below. Runtime: not tracked.
+
+**The type, end to end.** `building_type::military_base = 6` — economics array bumped 6 → 7 (the
+kind of silent-size bug the array's own comment now names), Lua name-map + `economy.lua` entry
+(produces nothing, staffs at zero alongside port/hub, dearer than a hub, cheaper than a
+launchpad), an explicit `can_place` case (any non-ocean land, no deposit requirement), named in
+`presentation.cpp`. The BL-323 machinery applies without a line of new code: the reach rule gates
+placement (deliberately NO anchor-type exemption — ruling 3 says the base extends nothing), the
+S3 site-time multiplier prices its build, and the S4 construction dimming renders it.
+
+**The glyph.** A filled shield — flat top, shoulders tapering to a bottom point — in
+`icons::building`, catalogued in ICONS.md per its add-a-glyph rule. Echoes the unit chevron's
+martial downward-point reading while staying unconfusable with it: the chevron is stroke-only,
+every building glyph is filled.
+
+**The surfaces and the dictionary.** Offered in the tile build ledger and the Selection primed
+check; `gameplay.build`'s ACTIONS.json entry updated (typed-args domain + reason_to_select names
+the base as where units muster once S2 moves hire onto it) and the mirror regenerated. The verify
+seam's `place_mode` was also missing launchpad and logistics_hub, not just the new type — all
+three added, so scripts can now arm any placeable building.
+
+**Verified.** `buildings_rework_harness` extended R6/R7: 19/19 PASS — land-in-reach placeable,
+ocean refused, beyond-reach refused (no exemption), staffs at zero, and ruling 3 held in code (a
+COMPLETED base is not a supply anchor; building one changes nothing in the reach field). A
+campaign `--verify` run placed one through the real construct path (tile 135,83) and the zoomed
+capture shows the shield rendering dimmed-under-construction with the Selection band naming it.
+Requirements: requirements.json § military-base-s1 (R1–R5, all complete).
+
+---
+
+## Session — Reach-rule hardening: three S2 defects ruled and fixed, and the military-base design settled (2026-08-08)
 
 Full mode, same sitting as the first-slice delivery below. Ben's steer: consider outside-the-box
 problems with BL-323 (buildings × visibility, buildings × the unfinished logistics system,

@@ -125,6 +125,9 @@ enum class building_type : uint8_t
     port                = 3,
     launchpad           = 4, ///< Space-launch facility; gates space-mode convoy dispatch.
     inland_logistics_hub = 5, ///< BL-149: land-mode logistics node; its tile discounts intra-body haul cost (like a city).
+    military_base       = 6, ///< BL-325 S1: unit muster building. Produces nothing, staffs at zero,
+                             ///< and is deliberately NOT a supply anchor — military reach IS the
+                             ///< economic reach field (BL-325 ruling 3). Hire moves onto it in S2.
 };
 
 /// Sentinel `building_component.recipe` value meaning "no processing recipe is

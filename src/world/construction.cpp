@@ -91,10 +91,12 @@ construction_result construct_building(world& w, const recipe_registry& reg,
     building_component bc;
     bc.tile               = tile;
     bc.type               = type;
-    // Staff producing buildings so they run; ports and logistics hubs take no L3
-    // production action (they are passive infrastructure), so they staff at zero.
+    // Staff producing buildings so they run; ports, logistics hubs and military
+    // bases take no L3 production action (passive infrastructure), so they staff
+    // at zero.
     bc.workforce_assigned =
-        (type == building_type::port || type == building_type::inland_logistics_hub) ? 0.0f : 0.5f;
+        (type == building_type::port || type == building_type::inland_logistics_hub
+         || type == building_type::military_base) ? 0.0f : 0.5f;
     // Build-time pacing (playtest patch, 2026-07-06): the building sits idle
     // for build_duration_ticks economy ticks before economy_system lets it produce.
     //

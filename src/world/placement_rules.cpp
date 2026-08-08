@@ -121,6 +121,9 @@ placement_result can_place(const tile_component& tc, building_type type, resourc
 
         case building_type::port:
         case building_type::inland_logistics_hub: // BL-149: any non-ocean land tile (the land-network node).
+        case building_type::military_base:        // BL-325 S1: any non-ocean land tile, no deposit — the
+                                                  // reach rule still applies at the world level, and the
+                                                  // base is NOT an anchor, so it earns no exemption there.
         case building_type::none:
         default:
             // Any non-ocean land tile is valid for non-extraction buildings.
