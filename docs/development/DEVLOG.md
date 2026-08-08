@@ -10,7 +10,63 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Critique batch delivered: build ledger grouping, construction glyph, reach-circle retirement, military start (2026-08-08, latest)
+## Session — C-route feasibility: both gates pass, and Cicero says the model is on the wrong layer (2026-08-08, latest)
+
+Full mode, doc-only (no `src/` touched, so the item-spanning requirement gate doesn't apply).
+Ben, carrying context from the 2023 entailment-tree dissertation into Io: *see what patterns we
+can use for one-shot generation of actions (not reasoning structures this time)* — then the gate:
+*if it can't be compressed, or if it is not technically possible on our machines, then it's not
+worth pursuing, and we can use traditional RL methods.* Runtime: ~50 min.
+
+**Both gates pass, and the second was computed rather than estimated.** Compression is supported
+at 3–8B on current distillation evidence — the bar is low because Vox Deorum's 2,327 games showed
+open weights tying the tuned algorithmic AI with *no* fine-tuning, so the fine-tune's job is to
+reach a bar already cleared untrained. Latency was derived from `sim_loop`'s own constants
+(`econ_tick_days = 90`, `seconds_per_day_1x = 2.0`, the `{0.25, 0.5, 1, 4, 16}` curve) against
+`corp_ai_params::cadence_k = 4`: with 8 rival corps the per-decision budget is ~90 s at 1x, ~22 s
+at 4x and ~5.6 s at 16x, versus ~3–7 s of measured 8B-Q4 decode on consumer GPUs. The load-bearing
+detail is that the planner is out-of-process and the scorer runs every tick regardless, so a late
+decision never blocks the sim — latency gates only how *stale* the macro layer may be, which is a
+far weaker requirement than a per-tick deadline.
+
+**The 2023 negative result does not transfer, and the reason is prescriptive.** The dissertation
+rejected its H1 because *selection* was the bottleneck: candidate fact-pairings grow factorially
+and the model had no admissibility oracle, only a single gold tree to be scored against. Io
+inverts every term — `corp_command` is a flat fixed-arity record rather than a recursive tree,
+candidates are already bounded (`top_m_sites = 8`), and `placement_rules::can_place_in_world` plus
+`corp_command_result`'s seven typed rejections *are* the oracle. The prescription: enumerate the
+legal candidates and hand them to the model; never ask it to select blind.
+
+**The finding that changes what should be built.** Cicero — still the reference for full-press
+negotiation — runs a strategic planner that selects actions and conditions a dialogue model on
+those actions as *intents*, explicitly "offloading the responsibility of learning game legality
+and strategy to other modules". That dialogue model was **2.7B**, and it did not choose the moves.
+So the capability the C-route is being pursued *for* — diplomacy, larger strategy — is separable
+from action generation, and Io already emits the intent stream it would consume (`corp_decision`).
+Against that, making the model the action generator buys little: distilling `corp_ai.cpp` cannot
+exceed `corp_ai.cpp`, and it walks straight into the **constraint tax** (a 1.5B model measured at
+91.5% → 48.0% executable accuracy under hard tool-call schema, with the damage entering where
+instructions suppress deliberation rather than at the decoder).
+
+**Left open, deliberately.** The layer recommendation contradicts § 10d, which Ben *accepted* on
+2026-08-03, so it is filed as **NR-094** (`decision-taken`, open) rather than written into
+`AI_OPPONENT.md`, and the note itself carries a `⟳` saying plainly that it does not supersede
+§ 10d. The § 4–5 feasibility findings stand independently of the § 7/§ 9 judgement call, and the
+NR entry separates them so Ben can accept one and reject the other. The recommended first move is
+neither: § 10 flags the ~300-token-per-decision figure as an assumption, and one real decision
+through the already-landed BL-278 MCP server would replace it with a measurement for free.
+
+**Not done.** No `backlog.json` item was filed — the note is evidence for a ruling, not a build
+brief, and BL-279's scope depends on which way NR-094 goes.
+
+**Id note (2026-08-08 merge):** filed on the cloud session's branch as NR-079, which collided
+with an unrelated, already-landed local entry of that id (era-minus-1 rebase fallout) — renumbered
+to NR-094 integrating this session, per the same collision-renumbering practice as the morning's
+roadmap-extension merge.
+
+---
+
+## Session — Critique batch delivered: build ledger grouping, construction glyph, reach-circle retirement, military start (2026-08-08)
 
 Full mode, Batch Delivery, sub-agent fan-out (Ben's steer). Promoted BL-326, BL-327, BL-328,
 BL-329, BL-330 from the prior session's critique into REFINED.md as a three-way file-disjoint
@@ -497,7 +553,7 @@ corrected citations.
 
 ---
 
-## Session — Roadmap extension: v0.1.x retrofitted, the Era −1 arc given a home, v1.0.0 named (2026-08-08, latest)
+## Session — Roadmap extension: v0.1.x retrofitted, the Era −1 arc given a home, v1.0.0 named (2026-08-08)
 
 Full mode, doc-only (no `src/` touched, so the item-spanning requirement gate doesn't apply).
 Ben: *the roadmap should be extended to match sprints — anything after v0.2.0 isn't canonical,
