@@ -8739,6 +8739,156 @@
      "notes": "Four comments corrected; owner_index_limit guards the change list."
     }
    ]
+  },
+  {
+   "brief": "unit-hire-surface",
+   "title": "Wire units into the campaign build (BL-324)",
+   "difficulty": 4,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "active",
+   "resolved": null,
+   "resolution": null,
+   "promoted_from": "backlog.json BL-324",
+   "batch": null,
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "Brief-spanning: the unit record matches BL-157's settled schema (id-keyed map beside world::buildings, owner = nation or corp, position = a tile id, one fixed-point strength scalar, type index into the roster) and a hire affordance beside the build affordance can raise one, visible in the Selection panel.",
+     "verification": [
+      "headless",
+      "visual: manual (no golden covers unit placement yet)"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "unit_component carries position as a tile id (not body) and a fixed-point strength scalar, stored in a new id-keyed map beside world::buildings.",
+     "verification": [
+      "code",
+      "headless"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": "src/world/components.hpp, src/world/world.hpp"
+    },
+    {
+     "id": "R3",
+     "requirement": "A campaign hire gate reads the corp's stockpile and market access (not a province endowment) to determine which roster rows are hireable.",
+     "verification": [
+      "headless"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": "src/world/unit_roster.{hpp,cpp}"
+    },
+    {
+     "id": "R4",
+     "requirement": "A corp_verb raises a unit: committing it debits the gating cost from the corp's stockpile and constructs a unit_component at the chosen tile.",
+     "verification": [
+      "headless"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": "src/world/corp_command.hpp/.cpp"
+    },
+    {
+     "id": "R5",
+     "requirement": "corp_ai scores the hire verb for rival corporations the same way it scores build/demolish/survey/road, so rival corps can raise units without a special case.",
+     "verification": [
+      "headless"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": "src/world/corp_ai.cpp"
+    },
+    {
+     "id": "R6",
+     "requirement": "A hire affordance beside the build affordance in the construction panel commits through the verb above; the Selection panel's existing (currently unreachable) unit case renders the resulting unit.",
+     "verification": [
+      "visual: manual (no golden covers unit placement yet)"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": "src/ui/construction_panel.cpp, src/ui/selection_panel.cpp"
+    },
+    {
+     "id": "R7",
+     "requirement": "io-standing-rules.md gains an entry recording the AI-hire exception, alongside the BL-079/BL-202/BL-181 entries, at landing.",
+     "verification": [
+      "code"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ".claude/rules/io-standing-rules.md"
+    }
+   ]
+  },
+  {
+   "brief": "nation-corp-generation-visibility",
+   "title": "Visualise the political steps of generation (BL-305)",
+   "difficulty": 3,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "active",
+   "resolved": null,
+   "resolution": null,
+   "promoted_from": "backlog.json BL-305",
+   "batch": null,
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "Brief-spanning: the nation territory carve and corporation seeding are watchable during/after generation, with every GENERATION_STRATEGY.md pass either covered or explicitly marked invisible-by-design.",
+     "verification": [
+      "visual: manual"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "The nation territory carve (Voronoi BFS) is watched live as a generation-screen stage extending BL-256's globe, not only inspectable after generation completes.",
+     "verification": [
+      "visual: manual"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": "src/world/hard_coded_world.cpp, src/core/app.cpp"
+    },
+    {
+     "id": "R3",
+     "requirement": "The corp asset-placement step renders spatially on the generation-screen canvas/globe.",
+     "verification": [
+      "visual: manual"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R4",
+     "requirement": "The corp financial-profile derivation step surfaces as a card/ledger entry, not a canvas overlay.",
+     "verification": [
+      "visual: manual"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R5",
+     "requirement": "A coverage pass confirms every step in GENERATION_STRATEGY.md's pass map has a named visibility surface; any step without one gets an explicit \"invisible by design\" note in that doc.",
+     "verification": [
+      "code"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": "docs/generation/GENERATION_STRATEGY.md, docs/generation/NATION_GENERATION.md, docs/generation/CORPORATION_GENERATION.md"
+    }
+   ]
   }
  ]
 }

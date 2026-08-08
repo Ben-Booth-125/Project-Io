@@ -1,5 +1,61 @@
 # Project Io — REFINED (active worklist)
 
+## Unit hire surface (promoted from BL-324)
+
+Requirements: requirements.json § unit-hire-surface (R1–R7)
+
+- **[3] A — Land the unit record.** `unit_component` gains `position` (tile id, replacing
+  `body`) and one fixed-point `strength` scalar; a new id-keyed map (`world::units`) sits
+  beside `world::buildings`. Also finishes BL-157's own stub (owner/type already exist).
+  Files: `src/world/components.hpp`, `src/world/world.hpp`. Deps: foundation. Satisfies: R2.
+- **[3] B — Campaign hire gate.** A corp-economy overload of the roster gate — reads the
+  corp's stockpile and market access instead of a province endowment (`available_rows(const
+  province&, roster_band)` gets a sibling keyed on corp state, not a replacement — the Era −1
+  sim keeps its province-gated call). Files: `src/world/unit_roster.{hpp,cpp}`. Deps: foundation
+  (disjoint from A — pure roster/economy logic, doesn't touch the unit record layout).
+  Parallel-safe with A. Satisfies: R3.
+- **[3] C — Hire verb.** A `corp_verb` that debits B's gating cost from the corp's stockpile
+  and constructs a unit via A's record at the chosen tile; `corp_ai` scores it the same way it
+  already scores build/demolish/survey/road, so rival corps get it too (2026-08-08 ruling — no
+  player-only special case). Files: `src/world/corp_command.{hpp,cpp}`, `src/world/corp_ai.cpp`.
+  Deps: A, B. Satisfies: R4, R5.
+- **[2] D — Hire affordance + render.** A "hire" mode beside the build affordance in the
+  construction panel, committing through C's verb; the Selection panel's existing (currently
+  unreachable) `selection_kind::unit` case renders the result. Files: `src/ui/construction_panel.cpp`,
+  `src/ui/selection_panel.cpp`. Deps: C. Satisfies: R6.
+- **[1] E — Standing-rules record.** Add the AI-hire exception to `io-standing-rules.md`
+  alongside the BL-079/BL-202/BL-181 entries, once C actually gives corp_ai the verb. Files:
+  `.claude/rules/io-standing-rules.md`. Deps: C. Satisfies: R7.
+
+Parallelisation note: A ∥ B (disjoint files, no shared symbols); C needs both; D and E both
+need C but are disjoint from each other (UI vs. doc) — safe to run concurrently once C lands.
+Requires BL-157 designed (it is) — this group also completes BL-157's own record stub, so flip
+BL-157 to `complete` alongside BL-324 when A lands and is verified.
+
+## Nation/corp generation visibility (promoted from BL-305)
+
+Requirements: requirements.json § nation-corp-generation-visibility (R1–R5)
+
+- **[2] A — Live territory-carve stage.** Extend BL-256's generation-screen globe with a stage
+  that animates the Voronoi BFS carve as it runs, rather than only being inspectable after
+  generation completes. Files: `src/world/hard_coded_world.cpp`, `src/core/app.cpp`. Deps:
+  foundation. Satisfies: R2.
+- **[2] B — Corp asset-placement overlay.** Render corp asset seeding spatially on the same
+  generation-screen canvas/globe as A. Files: `src/world/hard_coded_world.cpp`, `src/core/app.cpp`.
+  Deps: A (shares the generation-screen staging A introduces). Satisfies: R3.
+- **[1] C — Corp financial-profile card.** Surface financial-profile derivation as a card/ledger
+  entry (not a canvas overlay) alongside B. Files: `src/core/app.cpp`. Deps: A. Parallel-safe
+  with B (disjoint UI regions once A's staging exists). Satisfies: R4.
+- **[1] D — Coverage pass.** Walk GENERATION_STRATEGY.md's pass map; confirm every step now has
+  a named visibility surface (BL-256, BL-303/304, BL-211, and A–C above), and add an explicit
+  "invisible by design" note to any step that doesn't. Files: `docs/generation/GENERATION_STRATEGY.md`,
+  `docs/generation/NATION_GENERATION.md`, `docs/generation/CORPORATION_GENERATION.md`. Deps: A, B, C
+  (needs the finished surface list to audit against). Satisfies: R5.
+
+Parallelisation note: A is the foundation (the staging both B and C hang off); B ∥ C once A
+lands (disjoint UI concerns — canvas vs. card); D runs last, after the surfaces it's auditing
+exist.
+
 ## Header chrome tightening (promoted from BL-312, BL-313)
 
 Requirements: requirements.json § header-chrome-tightening (R1–R5)
