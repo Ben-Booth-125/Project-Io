@@ -7384,7 +7384,54 @@
    ],
    "authority_doc": "docs/ai/AI_OPPONENT.md",
    "summary": "Ben's ruling 2026-08-08 (NR-094, AI_OPPONENT.md § 10g): the C-route feasibility note's Cicero-configuration recommendation is adopted as Stage C's concrete shape. Stage A/B (corp_ai.cpp's scored-utility core) stays the action generator indefinitely; Stage C is a small model (Cicero's reference point: 2.7B) conditioned on the corp_decision ring's winning-command + reason-code as an INTENT, generating in-character chat for the Public/private channels (§ 7) -- never emitting corp_command itself. This is the item that was flagged design-owed and unfiled as far back as the 2026-08-02 sprint note; filing it now that the ruling settles which Stage the model occupies.",
-   "design": "## What this item is\n\nAI_OPPONENT.md § 7 named Stage C ('the LLM planner speaks in-character in channels') since 2026-07-26 but it was never decomposed into a buildable item -- it rode along as a stub inside BL-199's decomposition and then as an unfiled sprint-note flag. NR-094's ruling (§ 10g) gives it a concrete shape for the first time: Cicero's architecture, not a from-scratch design.\n\n## Shape, per the ruling\n\n- **Input**: the existing `corp_decision` ring (`{command, winning_score, runner_up, reason}`) -- already the intent stream a conditioned dialogue model consumes in Cicero's own architecture. No new export needed; BL-206's blackboard covers state, `corp_command_result` covers legality.\n- **Output**: free-text chat into the Public channel or a private group (§ 7's existing chat surface, Stage-A templated today). The model NEVER calls `issue_command` -- it narrates decisions the scorer already made.\n- **Model size**: Cicero's reference point is 2.7B (R2C2, encoder-decoder) -- comfortably inside both C1 (compressibility) and C2 (tractability) per the feasibility note's own math, with more room to spare than an action-emitting model would have (no constraint-tax exposure, since chat output isn't schema-constrained).\n- **Corpus**: BL-279's trace collection, rescoped -- bootstrap from corp_ai.cpp's own decision ring (free, no cloud spend) rather than from cloud-played corp_command traces. Cloud inference's role, if any, is generating IN-CHARACTER TEXT for a given intent (a much cheaper, much lower-risk task than choosing the intent).\n- **Persona bias**: `industrial_focus` (already generated per corp) supplies persona bias without authoring, per the feasibility note § 7 and AI_OPPONENT.md § 10c.3's observation that personality is emergent and should not be flattened.\n\n## Open design questions (not settled by the ruling)\n\n1. Sequencing against the v0.2.0 corp-AI arc -- does Stage C ship before or after BL-202/203's line closes out, or alongside it?\n2. Whether BL-207's persona counsel packs (LLM-free, compiled offline) are a PRECURSOR to Stage C (ship personas without a runtime model first) or a permanently separate, cheaper tier that coexists with it.\n3. The goal-layer question (a planning layer above the scorer, for step-wise-myopia mitigation per § 10c.4) is explicitly NOT this item -- filed as an open question here, not a requirement, since § 10c.4's failure mode has not been observed in Io's own play yet, only predicted from the literature.\n4. Model attach mechanics: does Stage C run through the same MCP server (BL-278) as a client, or does it need its own local inference process wired directly into the chat surface? The feasibility note assumes MCP-attached; not yet verified against the chat surface's actual code path.\n\n## Why design-owed, not designed\n\nThe SHAPE is settled (this write-up); the concrete build -- which channel triggers a Stage C utterance, how often, what the prompt template looks like, how it composes with Stage A's templated messages already in the same channel -- needs its own design pass before promotion."
+   "design": "## What this item is\n\nAI_OPPONENT.md § 7 named Stage C ('the LLM planner speaks in-character in channels') since 2026-07-26 but it was never decomposed into a buildable item -- it rode along as a stub inside BL-199's decomposition and then as an unfiled sprint-note flag. NR-094's ruling (§ 10g) gives it a concrete shape for the first time: Cicero's architecture, not a from-scratch design.\n\n## Shape, per the ruling\n\n- **Input**: the existing `corp_decision` ring (`{command, winning_score, runner_up, reason}`) -- already the intent stream a conditioned dialogue model consumes in Cicero's own architecture. No new export needed; BL-206's blackboard covers state, `corp_command_result` covers legality.\n- **Output**: free-text chat into the Public channel or a private group (§ 7's existing chat surface, Stage-A templated today). The model NEVER calls `issue_command` -- it narrates decisions the scorer already made.\n- **Model size**: Cicero's reference point is 2.7B (R2C2, encoder-decoder) -- comfortably inside both C1 (compressibility) and C2 (tractability) per the feasibility note's own math, with more room to spare than an action-emitting model would have (no constraint-tax exposure, since chat output isn't schema-constrained).\n- **Corpus**: BL-279's trace collection, rescoped -- bootstrap from corp_ai.cpp's own decision ring (free, no cloud spend) rather than from cloud-played corp_command traces. Cloud inference's role, if any, is generating IN-CHARACTER TEXT for a given intent (a much cheaper, much lower-risk task than choosing the intent).\n- **Persona bias**: `industrial_focus` (already generated per corp) supplies persona bias without authoring, per the feasibility note § 7 and AI_OPPONENT.md § 10c.3's observation that personality is emergent and should not be flattened.\n\n## Open design questions (not settled by the ruling)\n\n1. Sequencing against the v0.2.0 corp-AI arc -- does Stage C ship before or after BL-202/203's line closes out, or alongside it?\n2. Whether BL-207's persona counsel packs (LLM-free, compiled offline) are a PRECURSOR to Stage C (ship personas without a runtime model first) or a permanently separate, cheaper tier that coexists with it.\n3. Model attach mechanics: does Stage C run through the same MCP server (BL-278) as a client, or does it need its own local inference process wired directly into the chat surface? The feasibility note assumes MCP-attached; not yet verified against the chat surface's actual code path.\n\n**Split out as their own items (2026-08-08), not carried here as footnotes:** BL-335 (measure the real per-decision token cost) and BL-336 (the goal-layer question, explicitly PARKED pending observed evidence). Neither blocks this item's promotion.\n\n## Why design-owed, not designed\n\nThe SHAPE is settled (this write-up); the concrete build -- which channel triggers a Stage C utterance, how often, what the prompt template looks like, how it composes with Stage A's templated messages already in the same channel -- needs its own design pass before promotion."
+  },
+  {
+   "id": "BL-335",
+   "short_name": "MEASURE_DECISION_TOKEN_COST",
+   "category": "AI",
+   "title": "Measure the real per-decision token count through BL-278, replacing the ~300-token assumption",
+   "status": "design-owed",
+   "glyph": "~",
+   "priority": "C",
+   "difficulty": 1,
+   "parked": false,
+   "version_goal": "post-v0.1.0",
+   "requires": [
+    "BL-278"
+   ],
+   "blocked_on": [],
+   "written": "2026-08-08",
+   "files": [
+    "tools/mcp/server.js"
+   ],
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "summary": "docs/ai/LANGUAGE_POLICY_FEASIBILITY.md § 10 flags its ~300-token-per-decision figure (feeding the § 5 latency budget) as an assumption, not a measurement, and names the fix: one real decision through the already-landed BL-278 MCP server settles it at essentially zero cost. Filed as its own item (NR-094's ruling left it as a noted follow-up, not a precondition) so it does not stay a footnote nobody picks up.",
+   "design": "Design-owed only in the sense that it needs a tiny plan, not a build: drive one real blackboard->issue_command round trip through the MCP server (any attached client — Claude, another local model, even a scripted stub) against the canonical world, and record the actual input/output token counts for the exchange that produced a corp_command. Feeds back into AI_OPPONENT.md § 10g / § 5's latency math with a measured figure in place of the assumed one. No dependency on BL-334 landing first — this can run against the existing scorer-driven blackboard/command shape today."
+  },
+  {
+   "id": "BL-336",
+   "short_name": "GOAL_LAYER_MYOPIA_MITIGATION",
+   "category": "AI",
+   "title": "A goal layer above the scorer, for step-wise myopia — contingent on observing the failure mode first",
+   "status": "design-owed",
+   "glyph": "~",
+   "priority": "C",
+   "difficulty": 3,
+   "parked": true,
+   "version_goal": "post-v0.1.0",
+   "requires": [],
+   "blocked_on": [
+    "observed evidence of step-wise myopia in corp_ai.cpp's own play"
+   ],
+   "written": "2026-08-08",
+   "files": [
+    "src/world/corp_ai.hpp",
+    "src/world/corp_ai.cpp"
+   ],
+   "authority_doc": "docs/ai/AI_OPPONENT.md",
+   "summary": "docs/ai/LANGUAGE_POLICY_FEASIBILITY.md § 9's third recommendation: a goal-persistence layer above the deterministic scorer, addressing the literature's documented step-wise-myopia failure mode (AI_OPPONENT.md § 10c.4 — greedy per-tick reasoning makes early commitments that amplify and cannot be recovered from). NR-094's ruling deliberately did NOT accept or reject this — filed here as its own item, explicitly PARKED, because no evidence yet shows corp_ai.cpp exhibiting the failure mode in Io's own play; the literature predicts it, Io has not measured it.",
+   "design": "Parked pending a measurement, not a design pass. Before this item can move to designed: run corp_ai.cpp over a long campaign (or a sweep, mirroring the Era -1 arc's own sweep-then-diagnose method) and look for the specific signature — an early commitment (e.g. a build/focus choice) that a longer-horizon evaluation would have avoided, with a measurable cost. If the signature does not appear, this item should be CUT, not left parked indefinitely (a fix for an unobserved problem is scope, not defense). If it does appear, the design work is: where does goal persistence live (a field on corporation_component? a separate periodic re-evaluation pass?), and whether it belongs to Stage A/B (still deterministic, still the scorer) or is itself a candidate for BL-334's dialogue-conditioned intent stream to carry forward as stated goals rather than raw commands."
   }
  ]
 }

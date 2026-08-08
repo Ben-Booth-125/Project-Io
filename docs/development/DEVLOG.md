@@ -10,7 +10,20 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — Ruling on NR-094: Stage C takes the dialogue layer, the scorer keeps the action seam (2026-08-08, latest)
+## Session — Two of NR-094's footnotes promoted to their own backlog items (2026-08-08, latest)
+
+Light mode, doc-only. Ben: the C-route ruling's open questions shouldn't just sit as prose inside
+BL-334. Filed **BL-335** (measure the real per-decision token cost through BL-278 — cheap,
+independent, no dependency on BL-334 landing) and **BL-336** (the goal-layer/myopia question,
+explicitly PARKED pending observed evidence — a fix for a failure mode nobody has measured Io's
+own scorer producing yet is scope, not defense). BL-334's design field and AI_OPPONENT.md § 10g's
+closing note updated to point at them instead of carrying the questions inline. The other two of
+BL-334's open questions (BL-207-vs-Stage-C precedence, model attach mechanics) stayed as BL-334's
+own design-owed detail — they resolve when BL-334 itself is promoted, not independently.
+
+---
+
+## Session — Ruling on NR-094: Stage C takes the dialogue layer, the scorer keeps the action seam (2026-08-08)
 
 Light mode, design ruling — no code. Ben, direct instruction after reading the pulled-in cloud
 research: *"Rule on NR-094 now."* Runtime: not tracked.

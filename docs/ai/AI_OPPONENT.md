@@ -818,5 +818,7 @@ occupies.
   invariant.
 
 **What this does not settle.** Whether Stage C ships before or after the v0.2.0 corp-AI arc
-closes; the model size/quantisation for Stage C specifically (Cicero's 2.7B is a reference point,
-not a spec); and the goal-layer question above. BL-334 files the design-owed remainder.
+closes, and the model size/quantisation for Stage C specifically (Cicero's 2.7B is a reference
+point, not a spec) — both left inside BL-334's design-owed remainder. The goal-layer question and
+the unmeasured token-cost assumption are filed as their own items (BL-336, parked pending
+observed evidence; BL-335, a cheap independent measurement) rather than carried as footnotes.
