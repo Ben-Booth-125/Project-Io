@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*87 entries — 10 open, 77 resolved.*
+*88 entries — 10 open, 78 resolved.*
 
 ---
 
@@ -114,12 +114,12 @@ There are two unit rosters. (1) SHIPPED, in-engine: src/world/unit_roster.{hpp,c
 
 *Files: `src/world/unit_roster.cpp`, `Project-Rival/docs/ai/UNITS.json`, `docs/development/backlog.json`*
 
-### NR-080 — Generation arc parked on Ben's ruling; scope call: the three session items, not the wider generation family
+### NR-082 — Generation arc parked on Ben's ruling; scope call: the three session items, not the wider generation family
 *decision taken on your behalf · raised 2026-08-07 · from Ben, 2026-08-07, end of session: 'we will park generation. Really it should've been pre-v0.1.0 work. What we're doing now is coming too early, since many game systems don't exist yet.'*
 
 Parked BL-316 (Era -1 logistics), BL-317 (wizard pre-history timelapse, carrying the six-stage Rival-to-timelapse route in its design), and BL-320 (Era -1 sim runtime). The scope interpretation is the delegated call: 'park generation' was read as THIS session's pre-history/generation-transparency arc, not the wider generation family - BL-297/BL-298 (diplomacy seam + battery), BL-305 (generation political visibility), BL-256 (generation globe), BL-300 (myth & theology) were left unparked since they predate the arc and other work may reach them first. Extend the parking to those if the ruling meant the whole theme. Landed work is unaffected: BL-318 (scorer), BL-319 (wizard preview pane) and the BL-271/BL-275 sim family are committed and live.
 
-### NR-082 — Kepler's wetland biome is effectively extinct (12 tiles); is world_audit's 3% forest+wetland target still right?
+### NR-083 — Kepler's wetland biome is effectively extinct (12 tiles); is world_audit's 3% forest+wetland target still right?
 *decision-needed · raised 2026-08-07 · from BL-291 (world_audit) work, 2026-08-07 — the one assertion that genuinely fails.*
 
 world_audit's S2 check wants forest + wetland >= 3% of Kepler's tiles. Measured today: 2.41% — forest 353 (2.33%), wetland 12 (0.08%). Twelve wetland tiles on the entire home body. The harness is otherwise green (25 of 26 assertions PASS); this is the only failure, and it is a world-generation finding, not a harness defect.
@@ -1284,7 +1284,7 @@ Filed BL-321 (Era -1 works) specifying an authored C++ table in src/world/works_
 
 *Files: `docs/tech/TECH_FOUNDATIONS.md`, `src/world/unit_roster.cpp`, `docs/development/backlog.json`*
 
-### NR-083 — BL-293 is much larger than filed: the order book is UI state, not world state, and is never saved
+### NR-084 — BL-293 is much larger than filed: the order book is UI state, not world state, and is never saved
 *decision-needed · raised 2026-08-07 · from Starting BL-293 (order book unreachable by command), 2026-08-07.*
 
 BL-293 reads as 'three presses have no corp_verb — add them'. They cannot be added as filed. `sell_order` is DEFINED in world/components.hpp:368 but STORED in src/ui/ui_state.hpp:273 (`std::vector<sell_order> sell_orders`), and passed into `clear_markets` from app.cpp:566 as the caller's argument. The world holds no order book at all. A corp_verb operates on `world&`, so there is nothing for it to mutate.
@@ -1305,7 +1305,7 @@ THIRD, AND THE ONE THAT NEEDS BEN BEFORE ANY CODE: putting place_sell_order into
 
 *Files: `src/world/corp_command.hpp`, `src/ui/ui_state.hpp`, `src/world/components.hpp`, `src/core/app.cpp`, `.claude/rules/io-standing-rules.md`*
 
-### NR-084 — Where does the buildings rework sit in the band? It is concrete work parked behind four design-forward stub minors
+### NR-085 — Where does the buildings rework sit in the band? It is concrete work parked behind four design-forward stub minors
 *decision-needed · raised 2026-08-07 · from Ben, 2026-08-07: 'If it isn't on the roadmap as a buildings rework, then add it now.'*
 
 BL-323 (buildings rework) is on the roadmap as v0.1.7, at the end of the v0.1.x band. That slot was chosen to avoid renumbering v0.1.2-v0.1.5, not because the work belongs last.
@@ -1324,7 +1324,7 @@ It also has a knock-on: v0.2.0 is the AI opponent. An opponent driving the corp-
 
 *Files: `docs/development/ROADMAP.md`, `docs/development/backlog.json`*
 
-### NR-085 — BL-305 (generation visibility) paused mid-batch — its file scope collides with another session's uncommitted work
+### NR-086 — BL-305 (generation visibility) paused mid-batch — its file scope collides with another session's uncommitted work
 *decision taken on your behalf · raised 2026-08-08 · from This session, during Batch Delivery of BL-324 (unit hire surface, complete) and BL-305 (nation/corp generation visibility, both promoted to REFINED.md the same session).*
 
 BL-305's task A (live territory-carve generation stage) touches src/world/hard_coded_world.cpp and src/core/app.cpp — the exact two files already carrying a second, unrelated body of uncommitted work found during this session's earlier buildings-rework audit (the New World wizard's async real-surface preview pane, generate_home_surface_preview, BL-316 S1's terrain-view adapter). That work is live in the tree, apparently from another session, and was deliberately left untouched (see the 2026-08-08 DEVLOG audit-note entry).
@@ -1341,7 +1341,7 @@ BL-305's task A (live territory-carve generation stage) touches src/world/hard_c
 
 *Files: `docs/development/REFINED.md`, `src/world/hard_coded_world.cpp`, `src/core/app.cpp`*
 
-### NR-086 — BL-324's Hire affordance was never clicked in a live app session — no display in this environment
+### NR-087 — BL-324's Hire affordance was never clicked in a live app session — no display in this environment
 *observation · raised 2026-08-08 · from This session's BL-324 close-out — same shape as NR-026 (BL-249's frame-budget targets, still needing a human at the keyboard).*
 
 requirements.json § unit-hire-surface R1/R6 cover the Hire button in selection_panel.cpp's construction ledger, and the Selection panel rendering the resulting unit. Both are code-complete, build clean, and are exercised indirectly (corp_ai raises real units every session via the same seam, verified headlessly across the full ai_skill_harness benchmark). Neither was clicked by a human in a live, on-screen app session, because this environment has no display.
@@ -1353,4 +1353,16 @@ requirements.json § unit-hire-surface R1/R6 cover the Hire button in selection_
 > **RESOLVED.** Filed rather than blocking the close-out — R1/R6 marked complete on the code + indirect-exercise evidence available, this entry stands as the open follow-up (mirrors NR-026's precedent for BL-249).
 
 *Files: `src/ui/selection_panel.cpp`, `docs/development/req/requirements.json`*
+
+### NR-088 — Roadmap extended: the Era −1 arc folded into v0.3.0, and v1.0.0 named as the playable-game cut
+*decision taken on your behalf · raised 2026-08-08 · from Ben, 2026-08-08 — direct ruling via AskUserQuestion during a roadmap-extension request*
+
+Two structural calls, together answering the roadmap-home half of NR-076 and giving the roadmap its missing terminal milestone. (1) The Era −1 sandbox arc (history sim, ancient tech ladder, mil-sim, diplomacy — BL-271/274/275/277/296–300/306/314) is folded into v0.3.0's writeup as its groundwork, rather than minted as its own v0.2.x band or left unversioned — it never ships to campaign play itself, so it is named the way v0.1.0 named its audit instruments (tooling, not a release). (2) A terminal 'playable full game' milestone is named v1.0.0 (Ben: 'This is v1.0.0 you are speaking of. If we can do that by following current steps, then go ahead') — explicitly reachable by the arc already mapped (v0.1.x–v0.4.0 landing and cohering), not a new pile of scope. ROADMAP.md carries both, plus a retrofit of the v0.1.1–v0.1.4 writeups against current backlog.json status and a v1.0.0 done-definition mirroring v0.1.0's.
+
+**Why it matters.** Resolves NR-076's fourth bullet (the roadmap-gap question) directly. NR-076's first three bullets — cutting BL-160, cutting/parking BL-207, cutting the generation-flavour tail — are Band 3 scope calls and remain OPEN, not pre-empted by this pass. Recorded here per Rule 0c since the shape (fold-in vs. new minor; v1.0.0 vs. an undefined placeholder) was a real fork Ben chose live rather than the assistant deciding silently.
+
+- Amend the v0.3.0 writeup if the Era −1 arc later outgrows a groundwork framing and wants its own minor after all
+- Amend v1.0.0's done-definition as v0.1.x–v0.4.0 actually land — it is explicitly written forward and expected to firm up
+
+> **RESOLVED.** Ratified live, 2026-08-08. ROADMAP.md updated: the v0.3.0 section gained a 'Groundwork folded in here: the Era −1 sandbox' subsection plus the BL-315 conflict spine and the nation-level AI-rivals graduation point; a new v1.0.0 section and matching 'Done-definition — v1.0.0' section were added; v0.1.1–v0.1.4 writeups were retrofitted against current backlog status (BL-203/204 complete, BL-205 cut, 13 new v0.1.1 items surfaced 2026-08-01→08-04, BL-157 firmed by the military design session). CLAUDE.md's ROADMAP.md pointer updated to match.
 

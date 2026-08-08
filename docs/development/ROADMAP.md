@@ -1,9 +1,11 @@
 # Project Io — Roadmap
 
-The milestone map from the current state through the **v0.1.0** prototype cut and on into the
-**expanded prototype** (v0.1.x → v0.4.0). This document is **forward-facing and lean**: it names
-the version sequence, the *theme* of each minor, and the done-definition for the prototype cut. It
-deliberately does **not** enumerate individual items — that lives in the backlog
+The milestone map from the current state through the **v0.1.0** prototype cut, on through the
+**expanded prototype** (v0.1.x → v0.4.0), and out to **v1.0.0** — the playable-game cut, named
+2026-08-08 as the second (and for now last) milestone with its own done-definition. This document
+is **forward-facing and lean**: it names the version sequence, the *theme* of each minor, and the
+done-definitions for the two cuts. It deliberately does **not** enumerate individual items — that
+lives in the backlog
 ([`backlog.json`](backlog.json), metadata + design prose; [`BACKLOG.md`](BACKLOG.md) is a legacy
 drain) and the active worklist [`REFINED.md`](REFINED.md). The roadmap sits *above* both: it says which theme each minor
 carries; the backlog and worklist say what work realises it.
@@ -111,8 +113,9 @@ The map no longer ends at the prototype cut. Ben's **2026-07-09 refocus** extend
 still cuts the economy-loop prototype; then the **v0.1.x** band lays groundwork for an *expanded
 prototype*, **v0.2.0** carries the AI opponent, **v0.3.0** the governing-body refocus (versioned
 as its own minor — Ben, 2026-08-04, resolving NR-045), and **v0.4.0** brings the political layer
-and the filter system online. The v0.0.x themes have all shipped; the roll-up is § Where we are, the per-item
-record `DEVLOG.md`.
+and the filter system online — then **v1.0.0** (Ben, 2026-08-08) names the point where all four
+cohere into one playable game. The v0.0.x themes have all shipped; the roll-up is § Where we are,
+the per-item record `DEVLOG.md`.
 
 ### v0.1.0 — Quality audit + legibility polish + cut
 
@@ -184,7 +187,7 @@ assertion holds.
 (BL-259). What had been listed as owed before it resolved as follows:
 
 - **BL-258** (gate the absolute timing bound on an optimised build) — the live successor is
-  **BL-288** (Release-only test failures, `design-owed`, A, v0.1.2). Four harnesses fail in Release
+  **BL-288** (Release-only test failures, `design-owed`, A, v0.1.3). Four harnesses fail in Release
   and nothing caught it, because the default `build/` tree is Debug. Same root, wider scope.
 - **Frame-budget targets measured against the real app** — still owed, and still needs a human at
   the keyboard: headless capture has no vsync and no real present, so its numbers cannot speak to
@@ -196,7 +199,7 @@ assertion holds.
 no committed systems yet.* Past the cut, the v0.1.x band is where the game's next dimensions get
 their first shape: enough design and stubbing that the v0.3.0 refocus and the v0.4.0 political
 layer land on positioned ground rather than a greenfield. v0.1.1 is a concrete build minor; the
-stub minors (v0.1.2–v0.1.5) are deliberately design-forward — each now has a placeholder
+stub minors (v0.1.3–v0.1.6) are deliberately design-forward — each now has a placeholder
 `design-owed` item that firms into real design as it is reached — and the band closes with
 **v0.1.6**, a second concrete build minor (generation visibility + the UI-alignment review,
 added by Ben 2026-08-04).
@@ -204,7 +207,7 @@ added by Ben 2026-08-04).
 > **What this band is FOR (Ben, 2026-08-03).** Until now the band was themed by what it stubs,
 > not by what the stubs serve. Ben's steer supplies the missing answer: the aim is to play as a
 > **governing body**, *"because it allows law, policy and science to use military might — not
-> just economic."* Laws (v0.1.2), techs (v0.1.3), military (v0.1.4) and politics (v0.1.5) are
+> just economic."* Laws (v0.1.3), techs (v0.1.4), military (v0.1.5) and politics (v0.1.6) are
 > therefore **the governing body's levers**, and each carries a design test it did not have:
 >
 > **Does this system reach military as well as economic outcomes?** If a law can only change a
@@ -236,6 +239,25 @@ added by Ben 2026-08-04).
   dual-endpoint trade-route log entries (BL-282), corp placement constrained to the home
   province (BL-283), exclave measurement reopened from BL-054 (BL-284), and harness golden
   coherence (BL-285).
+
+  **Retrofitted 2026-08-08 — still open, surfaced 2026-08-01 → 08-04.** The minor never fully
+  closed; three more waves of work now target it. **The documentation-audit findings
+  (2026-08-04)**, three at priority A: naming banks read Earth-European despite the no-real-names
+  standing rule (BL-290); the `world_audit` harness fails, so `TILES.md`'s tile census can't be
+  re-measured (BL-291); three order-book presses have no `corp_command` verb, so no text-driven
+  player can trade (BL-293 — independently re-found 2026-08-06 by Project-Rival's Battery A run
+  at a measured 20% gap in a basic instruction set, NR-073). Plus the orphaned Economy panel
+  (BL-292) and two dead-symbol cleanups (BL-294, BL-295). **A standing/scoring system** (BL-262,
+  priority A, opened by Ben 2026-08-01): nothing today tells the player how they compare to
+  rivals, on what axis — CONCEPT.md forbids an end-game verdict, so the answer is a standing, not
+  a score. **Settled UI revisions, still unbuilt:** generated body names (BL-257), the
+  UI-justification store pairing every readout with the question it answers (BL-260), the
+  disclosure-controls revision — expand vs. full-screen as two separate controls (BL-265),
+  Selection-always-open (BL-266), and the generation-globe preview (BL-256). Plus propellant as a
+  real resource (BL-308) and deed history-log lines, buildable now ahead of the Era 1 tree's
+  deed-gated keystones (BL-309, see v0.3.0 below). **Build health:** a fresh CMake configure
+  can't fetch SDL3 on at least one machine — a TLS revocation failure a populated `_deps` cache
+  hides (BL-302).
 - **v0.1.2 — Buildings rework** (**BL-323**). *(Added by Ben, 2026-08-07: "we need to pad out the
   number of available buildings, and start enforcing placement rules. Especially for logistical
   max building range… We need to put a lot of work into this before any simulated games can
@@ -253,20 +275,33 @@ added by Ben 2026-08-04).
   session tests anything until siting carries a trade-off. It is the placement-side counterpart to
   the constraint **BL-316** is landing in the Era −1 sim: breadth must cost something.
 
-  **Sequenced first in the band (Ben, 2026-08-07, resolving NR-084).** Originally slotted last to
-  avoid renumbering; moved ahead of the design-forward stub minors, which shift up one
-  (Laws v0.1.3, Techs v0.1.4, Military v0.1.5, Politics v0.1.6, Generation visibility v0.1.7).
-  None of them depends on this work and it depends on none of them, so the old order delayed the
-  concrete blocker behind four design passes for no technical reason.
-- **v0.1.3 — Laws** (**BL-155** law/policy surface design, **BL-186** laws ledger UI). First pass
-  at the law / policy surface — what a law *is* as a data object, how it gates or modifies
-  economic (and later political) behaviour, and its ledger surface. Design + stub.
+  **Sequenced ahead of the stub minors (Ben, 2026-08-07, resolving NR-084).** Originally slotted
+  last to avoid renumbering; moved ahead of the design-forward stub minors (Laws, Techs, Military,
+  Politics), which follow it here. None of them depends on this work and it depends on none of
+  them, so the old order delayed the concrete blocker behind four design passes for no technical
+  reason.
+- **v0.1.3 — Laws** (**BL-155** law/policy surface design, **BL-186** laws ledger UI, **BL-280**
+  negotiated tax rate). First pass at the law / policy surface — what a law *is* as a data
+  object, how it gates or modifies economic (and later political) behaviour, and its ledger
+  surface. **BL-280** (settled 2026-08-03, NR-024) gives Tax its first concrete lever: a
+  chartered corp bargains its rate with its home nation rather than reading a fixed number.
+  Design + stub.
 - **v0.1.4 — Techs** (**BL-156**). Early design toward the tech / quest system — the condition-set
   gate model (gate = quest = tech) that BL-087 reframed and the v0.4.0 filter system formalises.
-  Design only; precursor to BL-087.
+  Design only; precursor to BL-087. **Overtaken in practice, 2026-08-04/05:** BL-087 itself —
+  versioned v0.3.0, not this stub, see below — is now under active design as a constellation tech
+  web at the same grain as the Era −1 sandbox's ancient tech ladder; BL-156's early pass and
+  BL-087's real one are converging rather than cleanly sequencing one after the other.
 - **v0.1.5 — Military systems** (**BL-157**). The Conflict dimension's first data-model footing —
   units, forces, and the seams they need in the world model. Stub, not mechanics (Conflict proper
-  stays post-cut scope).
+  stays post-cut scope). **Firmed up substantially by the 2026-08-07 military design session**
+  (NR-077, six rulings filed in total — the rest fall under BL-315 below): unit-grain verbs
+  rather than stacks, tile position as the canonical location, era-keyed (not player-tech-gated)
+  rosters, doctrine-preference as the voice-bias shape — plus a filed follow-on, **BL-314** (unit
+  verb family, design-owed), for the
+  actual command verbs once this stub has a seam to transcribe from. Still a stub for *campaign*
+  play; the Era −1 sandbox (v0.3.0, below) is where the same architecture gets proven under real
+  simulated wars first.
 - **v0.1.6 — Politics (stub)** (**BL-158**). A data-model stub only — enough political layer for
   the v0.3.0 governing actor to have something to own, deferring the working system to v0.4.0.
 - **v0.1.7 — Generation visibility + UI alignment.** *(Added by Ben, 2026-08-04: "a pass on
@@ -289,19 +324,25 @@ added by Ben 2026-08-04).
   serve them.
 ### v0.2.0 — The AI opponent
 
-*Versioned theme: the AI opponent.* The backlog's live v0.2.0 set is the corp-AI arc: stage A —
-the deterministic scored-utility layer over the corp-command seam — already landed (BL-202,
-complete; `src/world/corp_ai.hpp`). Queued: BL-203 (predictive spending), BL-204 (AI skill
-harness), BL-205 (corp chat log), BL-207 (persona counsel packs), and the trade-policy pair
-BL-160/161 (auto-exchange policy, counterparty allow/deny).
+*Versioned theme: the AI opponent.* The backlog's live v0.2.0 set is the corp-AI arc: stage A
+(**BL-202**) and stage B — predictive spending (**BL-203**) — are both **complete**
+(`src/world/corp_ai.{hpp,cpp}`), together with the skill-regression harness (**BL-204**,
+complete — seed-set bot-vs-bot goldens + the tick-boundary state hash). **BL-205** (corp chat
+log) was **cut 2026-08-07** (NR-075) — self-declared inactive; its successor is the BL-278/BL-279
+MCP arc below, not a standalone chat window. Still open: **BL-207** (persona counsel packs) and
+the trade-policy pair **BL-160/161** (auto-exchange policy, counterparty allow/deny). **Three
+pending scope calls sit on these, unresolved** (NR-076, 2026-08-07): cut BL-160 and let BL-161
+stand alone; cut or park BL-207 behind BL-279's local-model evidence. Ben's to rule on; this
+roadmap pass does not pre-empt them. **BL-261** (player alerts) stays deliberately parked here,
+pending real AI-opponent play data to judge alerts against.
 
 *Added 2026-08-03 — the word-interface route.* Ben's direction after the public
 LLM-grand-strategy research sweep (`docs/ai/AI_OPPONENT.md` § 10): the C-route planner gets an
 **MCP** interface and a **small, local** runtime model, with cloud inference used only to
 generate the training corpus. **BL-279** (AI trace corpus + the fine-tuning pipeline) carries
-that here; its prerequisite **BL-278** (Io MCP server) sits in **v0.1.1**, where NR-044 placed
-it. Both sit *above* the deterministic utility core, not in place of it — the small local model
-is a macro layer over BL-202/203, never the whole opponent.
+that here; its prerequisite **BL-278** (Io MCP server) **landed 2026-08-03** in **v0.1.1**, where
+NR-044 placed it. Both sit *above* the deterministic utility core, not in place of it — the small
+local model is a macro layer over BL-202/203, never the whole opponent.
 
 ### v0.3.0 — The governing body (the refocus)
 
@@ -325,12 +366,75 @@ can point them at force. That is also **Conflict's route to being load-bearing**
 corporate player, laws and techs could only ever feed Trade, which is why Conflict has stayed
 the least-designed pillar.
 
+**The conflict spine (BL-315, filed 2026-08-07).** BL-094's own promotion cost named a "new
+conflict/military design item" as owed; the 2026-08-07 military design session filed it —
+design-owed, priority A, gated behind BL-094's sequence. It is what a governing body *commands*:
+force raised from the shared treasury, materiel drawn from the chartered corp's production,
+supply lines as live targets (CONCEPT.md § Combat) — the item that turns `resolve_battle`
+(BL-272, already shipped) from an Era −1 research tool into a campaign mechanic.
+
+**Basic AI rivals graduate from corp-level to nation-level here.** v0.2.0's scored-utility AI
+(BL-202/203) contests Trade alone, one corp at a time. The old container for this, **BL-054**
+(nation behaviour), was closed 2026-08-07 (NR-075 cut audit) and its parts redistributed — tax/
+licences to BL-155, sentiment to BL-158, territorial fragmentation to BL-218/BL-284 — leaving one
+residual: *the runtime nation actor*, which BL-054's own closure note says **BL-094 will
+re-specify from the new player identity**, not inherit as-is. Symmetry still holds — every AI
+nation needs to run the same governing-body layer the player does — so v0.3.0 is where a rival
+first contests **Conflict**, not only Trade; it is just specified fresh here rather than promoted
+from the old stub. That graduation is the "basic AI rivals" bar this roadmap pass is aimed at.
+
+**Groundwork folded in here: the Era −1 sandbox** (named 2026-08-08, closing the gap NR-076
+flagged 2026-08-07 — roughly 15 items, most landed or landing since 2026-08-02, bot-only and
+never in the shipped campaign path). A year-tick history sim from 0 CE to the campaign epoch
+(**BL-271**, first slice landed 2026-08-04) proves out, ahead of building any of it against real
+campaign play:
+- **the combat engine** — `resolve_battle` (**BL-272**, complete) over a class-matchup ×
+  formation-doctrine × terrain × supply × season model, with era-keyed unit rosters (**BL-274**)
+  and a filed strategic layer above it (**BL-277** — where armies go, when a nation sues for
+  peace);
+- **a diplomacy seam** (**BL-297**) — nation-level word-interface verbs entering through the same
+  command-queue-at-tick-boundary pattern as `corp_command`, kept out-of-process per
+  `AI_OPPONENT.md` § 10, with its own test battery (**BL-298**) required before any LLM touches
+  it; Project-Rival is independently exercising this seam with a phrasing/voice-dictionary layer
+  (`Project-Rival/docs/ai/PHRASINGS.json`, `VOICES.json`);
+- **the ancient tech ladder** (**BL-296**) — a 0 CE → 1960 endowment-gated tech spine, distinct
+  from the player-facing tree, whose *grain* — a constellation, not a binary tree — the
+  concurrent BL-087 work below has already adopted.
+
+**BL-271's own contract governs what transfers:** only *architecture* graduates into the 1960
+era — the combat engine, the diplomacy seam's shape, the tech-web grain — never the
+Rome-calibrated tuning constants; the sim "dies into (or is absorbed by) the 1960 era when those
+systems graduate." Its output feeds BL-315 directly — the doctrine presets and four-era-band
+unit tables authored 2026-08-07 (`Project-Rival/docs/ai/UNITS.json`) are numbers BL-315 inherits,
+not invents from nothing.
+
+**BL-087 (Era 1 tech/quest system) sits here too, not v0.1.4.** Reframed 2026-08-04 as a
+constellation (rings = bands, sectors = domains, keystones opened by one-time **deeds**),
+overturning the earlier binary-tree call; two regions — the Era 1 tree itself and "the
+industrial neighbourhood" — are worked at that grain as of 2026-08-05. v0.1.4's BL-156 stays the
+early stub pass; BL-087 is the real system, and the two are converging rather than strictly
+sequencing.
+
+**Three scope calls stay open** (NR-076, still unresolved as of this pass): cutting BL-160 and
+letting BL-161 (counterparty allow/deny) stand alone; cutting or parking BL-207 (persona counsel
+packs) behind BL-279's local-model evidence; cutting the generation-flavour tail (BL-209, BL-289)
+while keeping BL-300/BL-301 as notes only. All three are Ben's to rule on.
+
 ### v0.4.0 — Politics + the filter system
 
 *Theme: the political layer for real, and Era → Filter.* Two coupled deliverables:
 
 - **Politics.** Promote the v0.1.x political stub into a working layer — the nation's political
-  character, its relationships, and the levers the player-as-nation actually pulls.
+  character, its relationships, and the levers the player-as-nation actually pulls. **Its
+  generation-time substrate** is a ~7-item, still-unsequenced cluster (`post-v0.1.0` in the
+  backlog, named here 2026-08-08): culture regions replacing Voronoi BFS as the ground nations
+  grow over (**BL-239**), the industrial-disciplines-the-sovereign history-ladder stages
+  (**BL-222**), the averted-rupture diplomacy origin (**BL-223**), the non-hegemony invariant as
+  a measured harness assertion rather than lore (**BL-224**), the evolution-to-sapience gate
+  chain that sets industrialisation timing (**BL-238**), the cross-pipeline sweep tuning
+  (**BL-240**), and a State-Arsenal charter gate touching BL-094 directly (**BL-311**,
+  design-owed). None of these ship campaign content on their own; they generate the political
+  character this layer promotes into something real.
 - **The filter system (Era → Filter).** Rename and reframe **Era** as **Filter**: the world-state
   gate governing what content is available when (**BL-087**'s catastrophic-event / quest-tree model
   re-read as a *filter* over the world). A terminology change with reach — `ERAS.md`,
@@ -338,13 +442,28 @@ the least-designed pillar.
   ahead of it (authority time-slice). *(Naming watch: "filter" sits near the map-lens vocabulary in
   `LENSES.md`; confirm the two read as distinct before the rename lands.)*
 
+### v1.0.0 — The playable game
+
+*Theme: everything above coheres into one game.* Named 2026-08-08, at Ben's direction, as the
+terminal cut past which the four minors above stop being separate arcs and become one playable
+whole. **Not a fifth pile of new systems** — Ben's framing on naming it: reachable "by following
+current steps," i.e. it is what v0.1.x through v0.4.0 *add up to* once each lands, not a new arc
+invented on top. Its own done-definition is below, mirroring v0.1.0's.
+
+The bar, in one line: a **governing body**, contesting **both Trade and Conflict**, against **AI
+rivals doing the same** — corp-level (v0.2.0) and nation-level (v0.3.0) — with **law, policy and
+science** actually reaching military outcomes rather than staying economic flavour (BL-094's own
+design test, § v0.3.0 above).
+
 ---
 
 ## Done-definition — v0.1.0 (the prototype cut)
 
 v0.1.0 is the **economy loop, validated and playable end-to-end** — not the full game. It remains
-the **prototype cut**; the expanded-prototype milestones above (v0.1.x → v0.4.0) are theme-level
-and earn their own done-definitions as they firm up. v0.1.0 is cut when all of the following hold:
+the **prototype cut**; the expanded-prototype milestones above (v0.1.x → v0.4.0) stay theme-level
+and earn their own done-definitions as they firm up. **v1.0.0, below, is the one exception** —
+named and given a done-definition 2026-08-08, since it is the "full game" this cut deliberately
+excludes. v0.1.0 is cut when all of the following hold:
 
 - The player can **construct and manage** buildings — placement with cost and validation,
   recipe and workforce control — not merely observe authored assets. *(Shipped v0.0.7.)*
@@ -374,6 +493,52 @@ and earn their own done-definitions as they firm up. v0.1.0 is cut when all of t
 
 When these hold, the prototype has validated what it set out to validate, and v0.1.0 is the
 milestone that says so.
+
+---
+
+## Done-definition — v1.0.0 (the playable-game cut)
+
+v1.0.0 is **the whole game, not the economy loop alone** — the synthesis of v0.1.x through
+v0.4.0, reached by the arc already mapped above rather than by inventing new scope. Forward-facing
+like the rest of the arc past v0.1.0 (direction, not committed line-items) but concrete enough to
+test against, the way the v0.1.0 list above is. v1.0.0 is cut when all of the following hold:
+
+- The player plays as a **governing body** — research, military and intelligence owned at the
+  nation tier — with a chartered corporation as its economic arm, not the strategic actor itself.
+  *(BL-094, v0.3.0.)*
+- **AI rivals contest both pillars.** The corp-level scored-utility AI (v0.2.0) still runs Trade;
+  nation-level AI — the runtime-actor behaviour BL-094 specifies fresh for the governing body,
+  the residual of the now-closed BL-054 — now runs Conflict too, through the same conflict spine
+  the player commands (BL-315) and the combat engine proven in the Era −1 sandbox (BL-272).
+  Rivals are **beatable and legible** — the standing `AI_OPPONENT.md` goal — not merely present.
+- **Law, policy and science reach military outcomes**, not only economic ones — BL-094's own
+  design test — satisfied once the v0.1.3–v0.1.6 stubs (laws BL-155/186, tech BL-156/BL-087,
+  military BL-157/BL-314/BL-315, politics BL-158) have graduated into the real systems above
+  rather than stayed placeholders.
+- **The political layer is real** (v0.4.0) — nations carry working political character and
+  relationships generated from actual settlement/culture history, not a random draw, and the
+  player-as-governing-body has levers that pull it.
+- **The filter system is live** (v0.4.0, Era → Filter) — content gating reads as one coherent
+  model end to end, not a leftover Era enum beside a newer quest-gate concept.
+- **The player can tell whether they are winning** — a standing, not a verdict (CONCEPT.md
+  forbids an end-game score), legible against rivals whose internals stay appropriately private
+  under the existing visibility rule. *(BL-262.)*
+- **The word interface covers every pillar**, not only the economic one — the diplomacy verbs
+  (BL-297) and military verbs (BL-314) a text-driven player or the local-model opponent
+  (`AI_OPPONENT.md` § 10) would need exist alongside the economic verbs BL-270/206/278 already
+  shipped, so the AI-opponent architecture doesn't bit-rot as new pillars land.
+- The build stays **green and deterministic** throughout — nation-tier commands extend the
+  `corp_command` seam pattern rather than inventing a parallel one, preserving the
+  multiplayer-lockstep property the seam was built to hold (`AI_OPPONENT.md` § 6).
+- Excluded, by scope, unless a later Ben call moves it in: the small-local-model runtime opponent
+  running unattended by default (§ 10 stays corpus-generation-and-design at this bar — a working
+  local model is a stretch goal, not a gate); live multiplayer netcode (the seam exists, the
+  network layer does not); and economic/political depth beyond the "basic" bar this roadmap names
+  (`POPULATION.md`'s deferred scale mechanics and similar).
+
+This list is written **forward**, the way v0.1.x → v0.4.0 already are — it will firm up, and
+probably split by minor, as each one is actually reached. Read it as the target the map above is
+aimed at, not a frozen spec.
 
 ---
 

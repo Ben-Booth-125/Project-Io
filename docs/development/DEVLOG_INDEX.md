@@ -3,7 +3,7 @@
 > **Generated file.** Produced by `node tools/session/devlog_index.js`.
 > Edit the log entries themselves, then re-run; hand edits here are overwritten.
 
-One line per session, newest first — 132 entries across 2 volume(s).
+One line per session, newest first — 133 entries across 2 volume(s).
 Read this to find the session you want, then open only that entry. The full prose of
 the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 [`archive/`](archive/).
@@ -12,6 +12,7 @@ the live sessions is in [`DEVLOG.md`](DEVLOG.md); older volumes are under
 |---|---|---|---|
 | 2026-08-08 | [military design thread + BL-324 batch delivery](DEVLOG.md) | BL-079 BL-157 BL-181 BL-202 BL-280 BL-305 BL-324 | DEVLOG.md |
 | 2026-08-08 | [audit note: uncommitted generation-preview / Era -1 terrain work found in the tree](DEVLOG.md) | BL-274 BL-316 BL-320 BL-321 BL-323 | DEVLOG.md |
+| 2026-08-08 | [Roadmap extension: v0.1.x retrofitted, the Era −1 arc given a home, v1.0.0 named](DEVLOG.md) | BL-054 BL-087 BL-094 BL-157 BL-160 BL-203 BL-204 BL-205 BL-207 BL-222 BL-262 BL-271 BL-280 BL-315 | DEVLOG.md |
 | 2026-08-05 | [The Era -1 arc's second day: Ages view, sweep verdict, review, and the fixes](DEVLOG.md) | BL-224 BL-271 BL-274 BL-275 BL-277 BL-299 | DEVLOG.md |
 | 2026-08-05 | [Red herrings and the rupture: making Era 1 failure a skill test](DEVLOG.md) | BL-223 | DEVLOG.md |
 | 2026-08-05 | [The Era 1 tree, first draft: keystones opened by deeds](DEVLOG.md) | — | DEVLOG.md |

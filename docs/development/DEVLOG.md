@@ -10,7 +10,7 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — military design thread + BL-324 batch delivery (2026-08-08, latest)
+## Session — military design thread + BL-324 batch delivery (2026-08-08)
 
 Full mode: design conversation (BL-157/BL-324/BL-305/BL-280), then Batch Delivery of the two
 items that reached `designed`. Runtime: not tracked — no session timer available in this
@@ -185,6 +185,57 @@ unnumbered in the 2026-08-07 working tree), and BL-277's (Era -1 military strate
 prose lost both its five answers and the Q2 correction. NR-079 records the debt; requirement
 groups `history-sweep`, `era-rosters-and-great-powers` and `era-minus-1-review-fixes` carry the
 corrected citations.
+
+---
+
+## Session — Roadmap extension: v0.1.x retrofitted, the Era −1 arc given a home, v1.0.0 named (2026-08-08, latest)
+
+Full mode, doc-only (no `src/` touched, so the item-spanning requirement gate doesn't apply).
+Ben: *the roadmap should be extended to match sprints — anything after v0.2.0 isn't canonical,
+read the docs and the latest backlog, then map a path to a playable game with basic AI rivals.*
+Runtime: ~45 min.
+
+**The gap was already named, just not closed.** NR-076 (2026-08-07, still open) had flagged that
+the Era −1 sandbox arc — the history sim, ancient tech ladder, mil-sim and diplomacy work, ~15
+items and the most active recent work in the backlog — appeared nowhere in `ROADMAP.md`, whose
+arc section stopped at v0.4.0. That is the concrete shape of "not canonical": v0.3.0/v0.4.0 were
+named in prose but thin, and the largest live body of work sat outside the map entirely.
+
+**Two structural calls, put to Ben directly rather than decided silently** (per the tone rule —
+present options, let the developer choose): where does the Era −1 arc live, and does the roadmap
+need a terminal "playable game" milestone? Answers: fold the arc into **v0.3.0**'s writeup as
+groundwork (it never ships to campaign play itself, so it's named the way v0.1.0 named its audit
+instruments — tooling, not a release) rather than minting a new v0.2.x band; and yes, name the
+terminal cut — **v1.0.0**, not v0.5.0 (Ben's correction), reachable "by following current steps"
+rather than by inventing new scope.
+
+**`ROADMAP.md` changes.** v0.3.0 gained the conflict spine (**BL-315**, filed 2026-08-07, the
+governing body's answer to "what force does it command"), the Era −1 groundwork writeup (combat
+engine, diplomacy seam, ancient tech ladder — with BL-271's own architecture-only transfer
+contract stated explicitly), BL-087's real home (it had drifted from its nominal v0.1.3 stub),
+and the point where AI rivals graduate from corp-level (v0.2.0, Trade only) to nation-level (the
+runtime-actor residual BL-094 specifies fresh, now that its old container BL-054 is closed and
+redistributed — NR-075 — contesting Conflict too) — the "basic AI rivals" bar the request asked
+for. v0.4.0 gained the culture-region/history-ladder generation cluster
+(BL-222/223/224/238/239/240/311) as the substrate its political layer promotes into something
+real. A new **v1.0.0** section plus a **Done-definition — v1.0.0** section (mirroring v0.1.0's
+structure) name the whole-game bar: governing-body play, AI rivals across both pillars, law/tech/
+politics reaching military outcomes, a standing/scoring system, the word interface covering every
+pillar, determinism preserved throughout.
+
+**v0.1.x retrofitted against current `backlog.json` status**, since it had drifted since
+2026-08-04: BL-203/BL-204 (corp AI predictive spending, skill harness) are complete, not
+"queued"; BL-205 (corp chat log) was cut 2026-08-07 (NR-075) and its stale "queued" mention
+removed; 13 items surfaced 2026-08-01→08-04 (the documentation-audit findings, the BL-262
+standing/scoring system, several settled-but-unbuilt UI revisions, a build-health bug) were added
+to v0.1.1, which never actually closed; BL-280 (negotiated tax rate) added to v0.1.2; BL-157
+(military stub) noted as firmed up by the 2026-08-07 military design session rather than still a
+blank stub.
+
+**Left deliberately open.** NR-076's other three Band-3 scope calls (cut BL-160, cut-or-park
+BL-207, cut the generation-flavour tail) are Ben's to rule on and this pass doesn't pre-empt
+them — recorded as still-open in the new NR-078 entry rather than silently resolved. `CLAUDE.md`'s
+`ROADMAP.md` pointer paragraph was updated to match; `NEEDS_REVIEW.md` regenerated.
 
 ---
 

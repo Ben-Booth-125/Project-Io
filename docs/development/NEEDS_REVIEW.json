@@ -1572,7 +1572,7 @@
    "resolution": "RESOLVED 2026-08-07 (Ben): use Lua. Option B. The works table moves to scripts/works.lua. The headless objection is answered by DEPENDENCY INJECTION rather than by keeping it in C++: works_roster.hpp stays pure data (no sol2), a separate TU loads the table from Lua exactly as recipe_registry.cpp does, and history_sim takes the table as a parameter. The app passes the Lua-loaded table; the harnesses build one directly. Same seam recipe_registry already proves. TECH_FOUNDATIONS' scripting boundary therefore stands unamended and unit_roster.cpp becomes the outlier to revisit, not the precedent to follow."
   },
   {
-   "id": "NR-080",
+   "id": "NR-082",
    "title": "Generation arc parked on Ben's ruling; scope call: the three session items, not the wider generation family",
    "raised": "2026-08-07",
    "kind": "decision-taken",
@@ -1582,7 +1582,7 @@
    "resolution": null
   },
   {
-   "id": "NR-082",
+   "id": "NR-083",
    "title": "Kepler's wetland biome is effectively extinct (12 tiles); is world_audit's 3% forest+wetland target still right?",
    "raised": "2026-08-07",
    "kind": "decision-needed",
@@ -1604,7 +1604,7 @@
    "resolution": null
   },
   {
-   "id": "NR-083",
+   "id": "NR-084",
    "title": "BL-293 is much larger than filed: the order book is UI state, not world state, and is never saved",
    "raised": "2026-08-07",
    "kind": "decision-needed",
@@ -1628,7 +1628,7 @@
    "resolution": "RESOLVED 2026-08-07 (Ben): 'Order book needs to be a background process, the AI must be able to trade as a player does.' Option A, with B's fence explicitly REJECTED. So: (1) the order book moves from ui_state into world state and is serialised; (2) order matching runs in the economy tick as a background process, not driven by the UI caller; (3) place_sell_order / remove_sell_order / set_workforce_auto join corp_verb; (4) corp_ai MAY score them - rival corps trade on the same seam the player uses. CONSEQUENCE TO LAND WITH THE WORK: .claude/rules/io-standing-rules.md enumerates the rival-corp exception's permitted verbs and trading is not among them. That list must be widened as part of this item, not left to contradict the code."
   },
   {
-   "id": "NR-084",
+   "id": "NR-085",
    "title": "Where does the buildings rework sit in the band? It is concrete work parked behind four design-forward stub minors",
    "raised": "2026-08-07",
    "kind": "decision-needed",
@@ -1649,7 +1649,7 @@
    "resolution": "RESOLVED 2026-08-07 (Ben): option A, renumber. Buildings rework is v0.1.2; the four design-forward stub minors and the generation-visibility minor each shift up one — Laws v0.1.3, Techs v0.1.4, Military v0.1.5, Politics v0.1.6, Generation visibility + UI alignment v0.1.7. ROADMAP.md reordered and 14 backlog items had version_goal updated (BL-098, 155, 156, 157, 158, 186, 280, 287, 288, 303, 304, 305, 323, 324). No v0.1.x minor past v0.1.1 has been cut, so every one of these was a live target rather than a shipped record — including BL-287, which is complete but unreleased and moved with its cohort."
   },
   {
-   "id": "NR-085",
+   "id": "NR-086",
    "title": "BL-305 (generation visibility) paused mid-batch — its file scope collides with another session's uncommitted work",
    "raised": "2026-08-08",
    "kind": "decision-taken",
@@ -1671,7 +1671,7 @@
    "resolution": "RESOLVED 2026-08-08 (this session, acting on Ben's 'if we don't have to review it, that's ok'): option A taken. BL-324 landed and committed in full (all 5 tasks, all requirements met, CTest green). BL-305's REFINED.md task group is left in place, untouched, for a session that either finds the other work has landed (rebase and resume) or confirms it can be safely built around."
   },
   {
-   "id": "NR-086",
+   "id": "NR-087",
    "title": "BL-324's Hire affordance was never clicked in a live app session — no display in this environment",
    "raised": "2026-08-08",
    "kind": "observation",
@@ -1686,6 +1686,21 @@
     "docs/development/req/requirements.json"
    ],
    "resolution": "Filed rather than blocking the close-out — R1/R6 marked complete on the code + indirect-exercise evidence available, this entry stands as the open follow-up (mirrors NR-026's precedent for BL-249)."
+  },
+  {
+   "id": "NR-088",
+   "title": "Roadmap extended: the Era −1 arc folded into v0.3.0, and v1.0.0 named as the playable-game cut",
+   "raised": "2026-08-08",
+   "kind": "decision-taken",
+   "status": "resolved",
+   "source": "Ben, 2026-08-08 — direct ruling via AskUserQuestion during a roadmap-extension request",
+   "what": "Two structural calls, together answering the roadmap-home half of NR-076 and giving the roadmap its missing terminal milestone. (1) The Era −1 sandbox arc (history sim, ancient tech ladder, mil-sim, diplomacy — BL-271/274/275/277/296–300/306/314) is folded into v0.3.0's writeup as its groundwork, rather than minted as its own v0.2.x band or left unversioned — it never ships to campaign play itself, so it is named the way v0.1.0 named its audit instruments (tooling, not a release). (2) A terminal 'playable full game' milestone is named v1.0.0 (Ben: 'This is v1.0.0 you are speaking of. If we can do that by following current steps, then go ahead') — explicitly reachable by the arc already mapped (v0.1.x–v0.4.0 landing and cohering), not a new pile of scope. ROADMAP.md carries both, plus a retrofit of the v0.1.1–v0.1.4 writeups against current backlog.json status and a v1.0.0 done-definition mirroring v0.1.0's.",
+   "why_it_matters": "Resolves NR-076's fourth bullet (the roadmap-gap question) directly. NR-076's first three bullets — cutting BL-160, cutting/parking BL-207, cutting the generation-flavour tail — are Band 3 scope calls and remain OPEN, not pre-empted by this pass. Recorded here per Rule 0c since the shape (fold-in vs. new minor; v1.0.0 vs. an undefined placeholder) was a real fork Ben chose live rather than the assistant deciding silently.",
+   "options": [
+    "Amend the v0.3.0 writeup if the Era −1 arc later outgrows a groundwork framing and wants its own minor after all",
+    "Amend v1.0.0's done-definition as v0.1.x–v0.4.0 actually land — it is explicitly written forward and expected to firm up"
+   ],
+   "resolution": "Ratified live, 2026-08-08. ROADMAP.md updated: the v0.3.0 section gained a 'Groundwork folded in here: the Era −1 sandbox' subsection plus the BL-315 conflict spine and the nation-level AI-rivals graduation point; a new v1.0.0 section and matching 'Done-definition — v1.0.0' section were added; v0.1.1–v0.1.4 writeups were retrofitted against current backlog status (BL-203/204 complete, BL-205 cut, 13 new v0.1.1 items surfaced 2026-08-01→08-04, BL-157 firmed by the military design session). CLAUDE.md's ROADMAP.md pointer updated to match."
   }
  ]
 }
