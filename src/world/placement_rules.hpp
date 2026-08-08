@@ -72,11 +72,31 @@ struct placement_result
 /// (Mine → iron ore, Oil Platform → petroleum, Ice Extractor → water,
 /// Farm → agricultural produce). An extraction site is only productive on a tile
 /// carrying one of these. See docs/economy/PRODUCTION.md § Layer 3 prototype scope.
+///
+/// BL-323 S1 (2026-08-08): widened from the original four to every resource
+/// tile_generation.cpp already deposits but no target reached — the Mine's full
+/// mineral spread (coal, silica, copper ore, rare earth ore), the Quarry/Lumber
+/// Camp ambient goods (stone, sand, clay, timber), and the Era 1 off-world pair
+/// (Ice Extractor's water is already covered; Surface Extractor's iron-nickel
+/// ore, platinum group metals, regolith). No placement_rules.cpp change needed —
+/// `can_place`, the build-mode target picker, and the resource presentation
+/// table are all already generic over this list.
 inline constexpr resource_type k_extractable[] = {
     resource_type::iron_ore,
     resource_type::petroleum,
     resource_type::water,
     resource_type::agricultural_produce,
+    resource_type::coal,
+    resource_type::silica,
+    resource_type::copper_ore,
+    resource_type::rare_earth_ore,
+    resource_type::stone,
+    resource_type::sand,
+    resource_type::clay,
+    resource_type::timber,
+    resource_type::iron_nickel_ore,
+    resource_type::platinum_group_metals,
+    resource_type::regolith,
 };
 
 /// True if the given composition is ocean — buildings are never placed on water.

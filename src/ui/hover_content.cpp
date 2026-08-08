@@ -123,9 +123,18 @@ void hover_building_supply(const world& w, const building_component& b)
     ImGui::Text("Workforce: %.0f%%",
                 static_cast<double>(b.workforce_assigned) * 100.0);
 
-    // Why-line: explain operational status.
+    // Why-line: explain operational status. Construction outranks every other
+    // status line — a site with ticks_remaining > 0 has no output to explain
+    // yet regardless of workforce/decommission state (BL-323 S4: at-a-glance
+    // legibility; the Selection panel's construction_status gives the fuller
+    // rate/stall diagnosis on click).
     ImGui::Spacing();
-    if (b.decommissioned)
+    if (b.ticks_remaining > 0)
+    {
+        ImGui::TextDisabled("Under construction \xe2\x80\x94 %d tick%s remaining",
+                            b.ticks_remaining, b.ticks_remaining == 1 ? "" : "s");
+    }
+    else if (b.decommissioned)
     {
         ImGui::TextDisabled("Decommissioned — no output");
     }

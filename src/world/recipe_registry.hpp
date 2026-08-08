@@ -78,6 +78,29 @@ struct construction_params
     /// a harness that wants the rule passes a budget explicitly, as
     /// tools/verify/logistics_reach_harness.cpp does.
     float max_logistics_reach = -1.0f;
+
+    // BL-323 S3 — build time depends on the site, not just the type. Three
+    // multipliers on the base build_duration_ticks, applied once at placement
+    // (construct_building): landform reuses logistics.hpp's own cost function
+    // (no second terrain table); reach and stack are new knobs below.
+
+    /// Extra time at the FURTHEST placeable reach (max_logistics_reach), as a
+    /// fraction of base duration — linear from 0 at reach 0 to this at reach ==
+    /// max_logistics_reach. E.g. 1.0 means a site right at the budget's edge
+    /// takes 2x base; a site at an anchor takes 1x. Ignored (treated as 0) when
+    /// max_logistics_reach is disabled (< 0), since there is then no scale to
+    /// normalise against.
+    float site_time_reach_scale = 1.0f;
+
+    /// Per-existing-building discount on a tile that already carries a site of
+    /// the SAME building type — an established stack builds faster, one less
+    /// multiplier step per prior building. E.g. 0.15 means the second building
+    /// on a tile takes 0.85x, the third 0.70x, floored at site_time_stack_min.
+    float site_time_stack_discount = 0.15f;
+
+    /// Floor on the stack discount, so an old, heavily-stacked site never
+    /// reaches implausibly-instant (or zero/negative) build time.
+    float site_time_stack_min = 0.5f;
 };
 
 /// BL-148/149 logistics-node discount tunables, authored in scripts/economy.lua under

@@ -3,6 +3,12 @@
 > Drained 2026-08-08: unit hire surface (BL-324), all 5 tasks COMPLETE — removed per the
 > retain-one policy. Record lives in DEVLOG.md (2026-08-08 entry), backlog.json BL-324/BL-157
 > `resolution` fields, and requirements.json § unit-hire-surface (R1–R7).
+>
+> Drained 2026-08-08: buildings rework first slice (BL-323 S1 partial + S3 + S4; S2/S2b were
+> already landed pre-promotion), all 4 tasks COMPLETE — removed per the retain-one policy. Record
+> lives in DEVLOG.md (2026-08-08 entry), backlog.json BL-323 `resolution` field, and
+> requirements.json § buildings-rework-first-slice (R1–R7). **Not closed**: BL-323's full S1
+> (processing chains needing new resource_type values) stays `designed`, next slice ready.
 
 ## Nation/corp generation visibility (promoted from BL-305) — **PAUSED, no tasks started**
 

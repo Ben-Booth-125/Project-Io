@@ -134,6 +134,9 @@ void recipe_registry::load_from_lua(lua_state& lua)
         construction_params cp;
         cp.max_stretch = construction->get_or("max_stretch", cp.max_stretch);
         cp.max_logistics_reach = construction->get_or("max_logistics_reach", cp.max_logistics_reach);
+        cp.site_time_reach_scale = construction->get_or("site_time_reach_scale", cp.site_time_reach_scale);
+        cp.site_time_stack_discount = construction->get_or("site_time_stack_discount", cp.site_time_stack_discount);
+        cp.site_time_stack_min = construction->get_or("site_time_stack_min", cp.site_time_stack_min);
         m_construction = cp;
     }
 

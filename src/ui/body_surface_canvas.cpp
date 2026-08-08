@@ -1927,8 +1927,30 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 // plate. Lightening toward white keeps the owner hue, so identity
                 // survives; an unowned tile's owner_col is already white, so it stays
                 // white through the same blend.
-                const ImU32 marker_col =
+                ImU32 marker_col =
                     lerp_colour(owner_col, IM_COL32(255, 255, 255, 255), 0.5f);
+
+                // BL-323 S4: a site still under construction reads as such at a
+                // glance — desaturated toward the plate and half-alpha, rather
+                // than looking identical to a finished, producing building.
+                // ticks_remaining is the single source of truth economy_system
+                // counts down; no separate "under construction" flag to drift.
+                bool under_construction = false;
+                if (k == 0)
+                {
+                    const auto ctb_it = tile_to_bld.find(id);
+                    if (ctb_it != tile_to_bld.end())
+                    {
+                        const auto cbld_it = w.buildings.find(ctb_it->second);
+                        if (cbld_it != w.buildings.end() && cbld_it->second.ticks_remaining > 0)
+                            under_construction = true;
+                    }
+                }
+                if (under_construction)
+                {
+                    marker_col = lerp_colour(marker_col, IM_COL32(90, 92, 98, 255), 0.6f);
+                    marker_col = (marker_col & 0x00FFFFFFu) | (140u << 24);
+                }
 
                 // The Workforce (Population lens) and Opportunity lenses replace the
                 // building silhouette with the per-tile value mark drawn below

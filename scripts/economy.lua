@@ -172,6 +172,20 @@ economy = {
         --
         -- Negative disables the rule entirely (the pre-BL-323 behaviour).
         max_logistics_reach = 24.0,
+
+        -- BL-323 S3 — BUILD TIME DEPENDS ON THE SITE. Three multipliers on the
+        -- base build_duration_ticks, applied once at placement: landform reuses
+        -- logistics.hpp's own cost function (no separate table to author here).
+        --   site_time_reach_scale     — extra time (as a fraction of base) at the
+        --     furthest placeable reach; 1.0 means a site right at the
+        --     max_logistics_reach budget takes 2x base, one at an anchor takes 1x.
+        --   site_time_stack_discount  — per-existing-building discount on a tile
+        --     that already carries the same building type; 0.15 means the second
+        --     site there takes 0.85x, the third 0.70x, ...
+        --   site_time_stack_min       — floor on the stack discount.
+        site_time_reach_scale    = 1.0,
+        site_time_stack_discount = 0.15,
+        site_time_stack_min      = 0.5,
     },
 }
 

@@ -46,6 +46,15 @@ recipes = {
         inputs  = { water = 1.5, steel = 0.5 },
         outputs = { agricultural_produce = 1.0 },
     },
+
+    -- id 4 — Smelter, second recipe (BL-323 S1, PRODUCTION.md): metallic-asteroid
+    -- feedstock needs no carbon addition (already reduced), so this is single-input
+    -- like id 0's steel recipe but with no coal reagent.
+    {
+        name    = "steel_from_iron_nickel",
+        inputs  = { iron_nickel_ore = 2.0 },
+        outputs = { steel = 1.0 },
+    },
 }
 
 print(string.format("[Lua] recipes.lua loaded  recipe_count=%d", #recipes))

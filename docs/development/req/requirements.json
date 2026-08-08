@@ -8889,6 +8889,94 @@
      "notes": "docs/generation/GENERATION_STRATEGY.md, docs/generation/NATION_GENERATION.md, docs/generation/CORPORATION_GENERATION.md"
     }
    ]
+  },
+  {
+   "brief": "buildings-rework-first-slice",
+   "title": "Buildings rework — extraction padding, site-dependent build time, construction legibility",
+   "difficulty": null,
+   "importance": null,
+   "evaluated_difficulty": null,
+   "status": "complete",
+   "resolved": "2026-08-08",
+   "resolution": "All 7 rows met. k_extractable widened 4->15 targets (11 already-deposited resources reached, no other placement_rules.cpp change needed). recipes.lua gained the Smelter's iron-nickel-ore recipe. construct_building now scales build_duration_ticks by landform x reach x stack at placement (recipe_registry.hpp construction_params + economy.lua construction knobs). A building under construction reads desaturated on the canvas and the glance-then-stick hover card states its remaining ticks. buildings_rework_harness: 12/12 PASS. Full ProjectIo build clean; CTest 46/55 pass -- the 9 non-passing tests are pre-existing environment timeouts/failures (history_sim_harness, history_sweep, mediterranean_sweep, notable_worlds, earthlike_lean_trace, earthlike_tile_census timeouts; econ_stability, world_audit, ai_skill_harness failures) documented in the 2026-08-08 audit-note DEVLOG entry, unrelated to this change and reproduced identically without it.",
+   "promoted_from": "backlog.json BL-323 (BUILDINGS_REWORK) — S1 (partial: extraction targets only, no new resource_type values), S3, S4. S2/S2b already landed pre-promotion. S1's full roster (new processing chains: Chemical Plant, Electronics Lab, Fabricator, Assembly Plant, most Refinery outputs) is blocked on a resource_type expansion that is its own design item and stays out of this slice.",
+   "batch": null,
+   "rows": [
+    {
+     "id": "R1",
+     "requirement": "Brief-spanning: the extraction roster widens to every resource already generated on tiles (coal, silica, copper ore, rare earth ore, stone, sand, clay, timber, iron-nickel ore, platinum group metals, regolith), build time depends on the site (landform, logistics distance, established stack) rather than a flat per-type constant, and a building under construction reads as such at a glance on the canvas.",
+     "verification": [
+      "headless: buildings_rework_harness",
+      "visual: manual"
+     ],
+     "status": "complete",
+     "result_metric": "12/12 buildings_rework_harness PASS; full build clean",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "k_extractable (placement_rules.hpp) includes the 11 additional resource types PRODUCTION.md's Mine/Quarry/Lumber Camp/Ice Extractor/Surface Extractor design; each is placeable wherever its tile deposit is >0, with no placement_rules.cpp logic change (the check is already generic over k_extractable).",
+     "verification": [
+      "headless: buildings_rework_harness",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "k_extractable 4 -> 15 targets; R1/R2 harness assertions PASS",
+     "notes": "src/world/placement_rules.hpp"
+    },
+    {
+     "id": "R3",
+     "requirement": "The Smelter gains its second designed recipe (iron-nickel ore -> steel, PRODUCTION.md), authored in recipes.lua with no enum churn.",
+     "verification": [
+      "headless: buildings_rework_harness",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "R3 harness assertions PASS (iron-nickel recipe distinct from iron recipe, still outputs steel)",
+     "notes": "scripts/recipes.lua"
+    },
+    {
+     "id": "R4",
+     "requirement": "construct_building scales the base build_duration_ticks by three site factors at placement: the tile's landform_logistics_cost (plains 1.0x .. mountain 2.0x), a reach-distance factor (near an anchor cheaper, up to the max_logistics_reach budget dearer), and an established-stack discount (a tile that already carries a building of the same kind builds faster). Constants authored in economy.lua, not hard-coded.",
+     "verification": [
+      "headless: buildings_rework_harness",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "R4 harness assertions PASS (landform, reach, stack all move ticks_remaining as designed)",
+     "notes": "src/world/construction.cpp, src/world/recipe_registry.{hpp,cpp}, scripts/economy.lua"
+    },
+    {
+     "id": "R5",
+     "requirement": "The site-time multiplier composes correctly with BL-095's material-starvation stretch (max_stretch) -- a remote, mountainous, first-of-its-kind build is slower from BOTH mechanisms, neither overrides the other, and ticks_remaining never rounds to zero.",
+     "verification": [
+      "headless: buildings_rework_harness"
+     ],
+     "status": "complete",
+     "result_metric": "R5 harness assertions PASS (floor at 1 tick for real durations; 0-duration stays instant)",
+     "notes": ""
+    },
+    {
+     "id": "R6",
+     "requirement": "A building under construction (ticks_remaining > 0) renders visually distinct from a completed building on the Planetary surface canvas (desaturated/dimmed marker) -- reads at a glance, no click required.",
+     "verification": [
+      "visual: manual"
+     ],
+     "status": "complete",
+     "result_metric": "Verified visually via a zoomed capture (zoomcheck_built) -- desaturated marker renders on the built tile",
+     "notes": "src/ui/body_surface_canvas.cpp"
+    },
+    {
+     "id": "R7",
+     "requirement": "The glance-then-stick hover card for a player-owned building under construction shows its remaining tick count.",
+     "verification": [
+      "visual: manual"
+     ],
+     "status": "complete",
+     "result_metric": "Code review: hover_building_supply construction branch added, outranks decommissioned/idle lines",
+     "notes": "src/ui/hover_content.cpp hover_building_supply"
+    }
+   ]
   }
  ]
 }

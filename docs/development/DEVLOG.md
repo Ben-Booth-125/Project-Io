@@ -10,7 +10,76 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — landing the uncommitted generation-preview / Era -1 terrain work (2026-08-08, latest)
+## Session — Buildings rework, first slice: extraction padding, site-dependent build time, construction legibility (2026-08-08, latest)
+
+Full mode, Delivery lifecycle: promote BL-323 (Buildings rework) into REFINED.md, deliver, drain.
+Runtime: not tracked. Ben's steer: pull from origin, work the roadmap, land the uncommitted
+tree, then pick up BL-323 next.
+
+**Scoped honestly rather than promoted whole.** BL-323 has four sub-slices; S2 (logistics reach)
+and its S2b UI wiring were already landed in the prior session. Of the remaining three, S1
+(roster pad) was promoted **partially**: PRODUCTION.md's designed extraction table (Mine, Quarry,
+Lumber Camp, Ice Extractor, Surface Extractor) all target resources already in the current
+`resource_type` enum, but most of its processing chains (Chemical Plant, Electronics Lab,
+Fabricator, Assembly Plant, most Refinery outputs) need NEW resource types with no market/price/
+serialisation wiring — a design item of its own, not a Lua-authoring pass. Flagged in REFINED.md
+rather than silently narrowing the item's promoted scope.
+
+**A — extraction roster padded, zero logic changes.** `k_extractable` (`placement_rules.hpp`)
+widened from 4 to 15 targets: coal, silica, copper_ore, rare_earth_ore, stone, sand, clay, timber,
+iron_nickel_ore, platinum_group_metals, regolith — every resource `tile_generation.cpp` already
+deposits (confirmed by reading the generation code, not assumed) but that no extraction target
+reached. `can_place`, the build-mode target picker (`selection_panel.cpp`, `body_surface_canvas.cpp`),
+and the resource presentation table (names, short codes, colours) were all already generic over
+this list, so the whole pad is an 11-line whitelist addition.
+
+**B — the Smelter's second recipe.** `iron_nickel_ore -> steel` added to `recipes.lua`
+(PRODUCTION.md's designed Era-1 Smelter input, no carbon reagent needed since metallic asteroids
+are already reduced) — no enum churn, recipe count 4 -> 5.
+
+**C — build time depends on the site (S3, landed in full).** `construct_building` now scales the
+base `build_duration_ticks` by three multipliers at placement, each 1.0 at the cheapest case so an
+anchor-adjacent plains first-of-its-kind build reproduces the old flat behaviour exactly:
+**landform** reuses `landform_logistics_cost` (plains 1.0 .. mountain 2.0, no second terrain
+table); **reach** is linear in the tile's distance from its nearest supply anchor, from 1.0 at the
+anchor to `1 + site_time_reach_scale` at the `max_logistics_reach` budget edge; **stack** discounts
+an established site (a tile already carrying the same building type), floored at
+`site_time_stack_min`. New `construction_params` fields (`recipe_registry.hpp`), authored in
+`economy.lua`. `ticks_remaining` floors at 1 for any real-duration type; a 0-duration type (some
+infrastructure, by design) stays instant regardless of site.
+
+**D — construction reads as such at a glance (S4).** A building with `ticks_remaining > 0` renders
+desaturated/half-alpha on the Planetary canvas — previously identical to a finished building until
+clicked. The glance-then-stick hover card (`hover_building_supply` in `hover_content.cpp`) gained a
+"under construction — N ticks remaining" line, outranking the decommissioned/idle status lines
+(construction has no output to explain yet regardless of workforce). The Selection panel's fuller
+rate/stall diagnosis (`construction_status`, already existing) is unchanged — this closes the
+canvas-legibility gap the item's own design record named, not the click-through detail, which
+already existed.
+
+**Verification.** New `tools/verify/buildings_rework_harness.cpp`: 12/12 PASS (every widened
+`k_extractable` target placeable on its own deposit and refused without one; the iron-nickel
+recipe resolves distinctly from the iron recipe; landform/reach/stack each move `ticks_remaining`
+the right direction; the 1-tick floor and the 0-duration instant case both hold). One harness bug
+caught and fixed in-session: the R5 fixture built only the tiles under test rather than the full
+grid, so the reach-field's A* found a gap and read the remote test tile as unreachable
+(`out_of_logistics_range`) rather than merely far — fixed by building a complete grid, as the
+existing `logistics_reach_harness` fixture already does. Full `ProjectIo` build clean. CTest
+46/55 — the 9 non-passing (`ai_skill_harness`, `econ_stability`, `world_audit` failures;
+`earthlike_lean_trace`/`earthlike_tile_census`/`history_sim_harness`/`history_sweep`/
+`mediterranean_sweep`/`notable_worlds` timeouts) all match the pre-existing failures the prior
+session's audit note and this session's own environment already documented — reproduced
+identically without this change, not a regression it introduced. A zoomed `--verify` capture
+(`zoomcheck_built`, not a golden — a one-off inspection tool) confirmed the desaturated marker
+renders correctly on a freshly-placed, still-building tile.
+
+**What stayed open, recorded in BL-323's own design field rather than silently dropped.** The
+processing-chain half of S1 (see above). Requirements: requirements.json § buildings-rework-
+first-slice (R1–R7, all complete). REFINED.md drained per the retain-one policy.
+
+---
+
+## Session — landing the uncommitted generation-preview / Era -1 terrain work (2026-08-08)
 
 Full mode: review and land the foreign uncommitted working-tree state the prior audit-note entry
 (below) found but deliberately left untouched. Runtime: not tracked. Ben's steer: sort out the
