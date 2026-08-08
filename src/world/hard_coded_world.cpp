@@ -458,8 +458,12 @@ world make_hard_coded_world(world_params params, generation_report* report,
     generate_roads(w, kepler);
 
     // Attach installations to the first two land tiles found in raster order.
+    // kepler_home_tile is also the player unit stub's starting position (BL-324) —
+    // reusing the same land-tile lookup rather than a second one.
+    entity_id kepler_home_tile = null_entity;
     {
         auto land = first_land_tiles(kepler_tiles, w, 180, 84, 2);
+        kepler_home_tile = land.size() > 0 ? land[0] : null_entity;
 
         const entity_id kepler_extraction = w.create_entity();
         w.buildings[kepler_extraction] = building_component{
@@ -652,12 +656,14 @@ world make_hard_coded_world(world_params params, generation_report* report,
     generate_corporations(w, corporation_params{ .corporation_count = gen_cfg.corporation_count },
         /*seed=*/params.seed ^ 0x4A71012u, &kepler_settlement);
 
-    // Player unit stub on Kepler.
+    // Player unit stub on Kepler, sited on the same home tile the installations
+    // used (BL-324: position is a tile id, not a body).
     const entity_id kepler_unit = w.create_entity();
     w.units[kepler_unit] = unit_component{
-        .body  = kepler,
-        .owner = w.player_entity,
-        .count = 50,
+        .position = kepler_home_tile,
+        .owner    = w.player_entity,
+        .count    = 50,
+        .strength = 50,
     };
 
     // -----------------------------------------------------------------------

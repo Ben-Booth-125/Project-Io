@@ -3161,6 +3161,33 @@ void app::render()
         m_ui.construction.pending_road_tile = null_entity; // consume the request
     }
 
+    // Execute any hire-unit request queued this frame by the build front door's
+    // Hire affordance (BL-324). Routes through the same corp_verb seam corp_ai
+    // scores for rival corps — the player takes no shortcut around it.
+    if (m_ui.construction.pending_hire_tile != null_entity)
+    {
+        corp_command cmd;
+        cmd.corp      = m_world.player_entity;
+        cmd.verb      = corp_verb::hire_unit;
+        cmd.tile      = m_ui.construction.pending_hire_tile;
+        cmd.unit_type = m_ui.construction.pending_hire_unit_type;
+        entity_id hired = null_entity;
+        const corp_command_result r = apply_corp_command(m_world, m_registry, cmd, &hired);
+        switch (r)
+        {
+            case corp_command_result::applied:
+                m_ui.construction.last_message = "Unit raised.";
+                m_ui.selected_entity           = hired; // inspect the new unit
+                m_ui.selection_hidden_for      = null_entity;
+                break;
+            case corp_command_result::rejected_funds:
+                m_ui.construction.last_message = "Can't supply it."; break;
+            default:
+                m_ui.construction.last_message = "Hiring failed."; break;
+        }
+        m_ui.construction.pending_hire_tile = null_entity; // consume the request
+    }
+
     // Execute a demolition queued this frame by the building Selection element. The
     // selection is cleared on success: the entity it pointed at no longer exists, and
     // leaving it dangling would leave the panel resolving a dead id.

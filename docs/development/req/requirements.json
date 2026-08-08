@@ -8746,9 +8746,9 @@
    "difficulty": 4,
    "importance": "B",
    "evaluated_difficulty": null,
-   "status": "active",
-   "resolved": null,
-   "resolution": null,
+   "status": "complete",
+   "resolved": "2026-08-08",
+   "resolution": "Code-complete and headless-verified 2026-08-08. R1/R6's manual-visual leg (a human clicking the Hire button in a live app session) was not run in this headless environment — filed as NR-086, same shape as NR-026's frame-budget gap for BL-249: shipped complete with the human-verification step open as a named follow-up, not silently skipped.",
    "promoted_from": "backlog.json BL-324",
    "batch": null,
    "rows": [
@@ -8759,9 +8759,9 @@
       "headless",
       "visual: manual (no golden covers unit placement yet)"
      ],
-     "status": "pending",
-     "result_metric": "",
-     "notes": ""
+     "status": "complete",
+     "result_metric": "Record shape + verb path headless-verified (combat_harness, corp_ai_harness, ai_skill_harness, full CTest); the affordance itself was never clicked in a live app session here.",
+     "notes": "Manual-visual leg owed — no display in this environment, see NR-086. Everything else is code-complete."
     },
     {
      "id": "R2",
@@ -8770,9 +8770,9 @@
       "code",
       "headless"
      ],
-     "status": "pending",
-     "result_metric": "",
-     "notes": "src/world/components.hpp, src/world/world.hpp"
+     "status": "complete",
+     "result_metric": "combat_harness, corp_ai_harness PASS against the new field shape; full app + all harnesses build clean.",
+     "notes": "src/world/components.hpp, src/world/world.hpp (world::units already existed as the id-keyed map)"
     },
     {
      "id": "R3",
@@ -8780,9 +8780,9 @@
      "verification": [
       "headless"
      ],
-     "status": "pending",
-     "result_metric": "",
-     "notes": "src/world/unit_roster.{hpp,cpp}"
+     "status": "complete",
+     "result_metric": "Exercised live by corp_ai's hire candidates across the ai_skill_harness benchmark seeds (525 hires/run pre-cap, gate-driven and identical across all 5 seeds, confirming it fires on presence not RNG).",
+     "notes": "src/world/unit_roster.{hpp,cpp} — campaign_gate_input + corp_stockpile_total, binary presence (1000/0)"
     },
     {
      "id": "R4",
@@ -8790,9 +8790,9 @@
      "verification": [
       "headless"
      ],
-     "status": "pending",
-     "result_metric": "",
-     "notes": "src/world/corp_command.hpp/.cpp"
+     "status": "complete",
+     "result_metric": "corp_ai_harness + ai_skill_harness PASS; apply_corp_command's hire_unit path exercised every eval a corp is eligible.",
+     "notes": "src/world/corp_command.hpp/.cpp — two-phase check-then-commit debit, all-or-nothing"
     },
     {
      "id": "R5",
@@ -8800,8 +8800,8 @@
      "verification": [
       "headless"
      ],
-     "status": "pending",
-     "result_metric": "",
+     "status": "complete",
+     "result_metric": "ai_skill_harness: hire_unit appears in every seed's action tally, capped at 1/eval + 3 units/corp (the cap added after measuring unconditional firing against the presence gate).",
      "notes": "src/world/corp_ai.cpp"
     },
     {
@@ -8810,9 +8810,9 @@
      "verification": [
       "visual: manual (no golden covers unit placement yet)"
      ],
-     "status": "pending",
-     "result_metric": "",
-     "notes": "src/ui/construction_panel.cpp, src/ui/selection_panel.cpp"
+     "status": "complete",
+     "result_metric": "Builds clean; ProjectIo target compiles with the new Hire section wired to pending_hire_tile/pending_hire_unit_type -> apply_corp_command. Never clicked live, see NR-086.",
+     "notes": "Landed in src/ui/selection_panel.cpp's construction ledger, not construction_panel.cpp as originally scoped — that's where the tile ledger's Build candidates already lived. Manual-visual leg owed."
     },
     {
      "id": "R7",
@@ -8820,8 +8820,8 @@
      "verification": [
       "code"
      ],
-     "status": "pending",
-     "result_metric": "",
+     "status": "complete",
+     "result_metric": "Entry added, reviewed by re-reading the file.",
      "notes": ".claude/rules/io-standing-rules.md"
     }
    ]

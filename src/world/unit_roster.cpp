@@ -1,6 +1,7 @@
 #include "unit_roster.hpp"
 
 #include "settlement.hpp"
+#include "world.hpp"
 
 #include <algorithm>
 
@@ -50,13 +51,20 @@ const std::vector<roster_row> g_table = {
     {"Mechanised Column", roster_band::industrial, unit_class::cavalry,{750,  0,   0, 700}, 420, 160},
 };
 
+/// The shared primitive both gate paths (province, campaign) funnel through —
+/// a threshold check against four 0-1000 axis values, whatever supplied them.
+bool gate_met(const roster_gate& g, int ore_q, int farm_q, int port_q, int energy_q)
+{
+    if (g.ore_q    > 0 && ore_q    < g.ore_q)    return false;
+    if (g.farm_q   > 0 && farm_q   < g.farm_q)   return false;
+    if (g.port_q   > 0 && port_q   < g.port_q)   return false;
+    if (g.energy_q > 0 && energy_q < g.energy_q) return false;
+    return true;
+}
+
 bool gate_met(const roster_gate& g, const province& p)
 {
-    if (g.ore_q    > 0 && p.ore_q    < g.ore_q)    return false;
-    if (g.farm_q   > 0 && p.farm_q   < g.farm_q)   return false;
-    if (g.port_q   > 0 && p.port_q   < g.port_q)   return false;
-    if (g.energy_q > 0 && p.energy_q < g.energy_q) return false;
-    return true;
+    return gate_met(g, p.ore_q, p.farm_q, p.port_q, p.energy_q);
 }
 
 } // namespace
@@ -82,6 +90,70 @@ std::vector<const roster_row*> available_rows(const province& p, roster_band ban
         // polity still fields levies where its ground cannot pay for better.
         if (static_cast<int>(r.band) > static_cast<int>(band)) continue;
         if (!gate_met(r.gate, p)) continue;
+        out.push_back(&r);
+    }
+    return out;
+}
+
+namespace {
+
+bool corp_owns_port(const world& w, entity_id corp)
+{
+    const auto cit = w.corporations.find(corp);
+    if (cit == w.corporations.end()) return false;
+    for (const entity_id asset : cit->second.assets)
+    {
+        const auto bit = w.buildings.find(asset);
+        if (bit != w.buildings.end() && bit->second.type == building_type::port)
+            return true;
+    }
+    return false;
+}
+
+} // namespace
+
+float corp_stockpile_total(const world& w, entity_id corp, resource_type res)
+{
+    const auto cit = w.corporations.find(corp);
+    if (cit == w.corporations.end()) return 0.0f;
+    float total = 0.0f;
+    for (const entity_id asset : cit->second.assets)
+    {
+        const auto sit = w.stockpiles.find(asset);
+        if (sit != w.stockpiles.end())
+            total += sit->second.quantities[static_cast<std::size_t>(res)];
+    }
+    return total;
+}
+
+campaign_roster_gate_input campaign_gate_input(const world& w, entity_id corp)
+{
+    campaign_roster_gate_input g;
+    const auto has = [&](resource_type r) { return corp_stockpile_total(w, corp, r) > 0.0f; };
+
+    // ore_q: metallurgy access — refined steel or either raw ore counts.
+    g.ore_q = (has(resource_type::steel) || has(resource_type::iron_ore)
+               || has(resource_type::iron_nickel_ore)) ? 1000 : 0;
+    // farm_q: PROXY FOR PASTURE, same convention the province table already
+    // uses (the roster has no horse/pasture signal at all) — food access stands in.
+    g.farm_q = (has(resource_type::food_rations)
+                || has(resource_type::agricultural_produce)) ? 1000 : 0;
+    // port_q: a building, not a resource — does the corp hold a port anywhere.
+    g.port_q = corp_owns_port(w, corp) ? 1000 : 0;
+    // energy_q: PROXY FOR SALTPETRE/FUEL, same convention as the province table.
+    g.energy_q = (has(resource_type::coal) || has(resource_type::refined_fuel)
+                  || has(resource_type::petroleum)) ? 1000 : 0;
+    return g;
+}
+
+std::vector<const roster_row*> available_rows(const world& w, entity_id corp, roster_band band)
+{
+    const campaign_roster_gate_input in = campaign_gate_input(w, corp);
+    std::vector<const roster_row*> out;
+    for (const roster_row& r : g_table)
+    {
+        if (static_cast<int>(r.band) > static_cast<int>(band)) continue;
+        if (!gate_met(r.gate, in.ore_q, in.farm_q, in.port_q, in.energy_q)) continue;
         out.push_back(&r);
     }
     return out;

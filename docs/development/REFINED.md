@@ -1,38 +1,17 @@
 # Project Io — REFINED (active worklist)
 
-## Unit hire surface (promoted from BL-324)
+> Drained 2026-08-08: unit hire surface (BL-324), all 5 tasks COMPLETE — removed per the
+> retain-one policy. Record lives in DEVLOG.md (2026-08-08 entry), backlog.json BL-324/BL-157
+> `resolution` fields, and requirements.json § unit-hire-surface (R1–R7).
 
-Requirements: requirements.json § unit-hire-surface (R1–R7)
+## Nation/corp generation visibility (promoted from BL-305) — **PAUSED, no tasks started**
 
-- **[3] A — Land the unit record.** `unit_component` gains `position` (tile id, replacing
-  `body`) and one fixed-point `strength` scalar; a new id-keyed map (`world::units`) sits
-  beside `world::buildings`. Also finishes BL-157's own stub (owner/type already exist).
-  Files: `src/world/components.hpp`, `src/world/world.hpp`. Deps: foundation. Satisfies: R2.
-- **[3] B — Campaign hire gate.** A corp-economy overload of the roster gate — reads the
-  corp's stockpile and market access instead of a province endowment (`available_rows(const
-  province&, roster_band)` gets a sibling keyed on corp state, not a replacement — the Era −1
-  sim keeps its province-gated call). Files: `src/world/unit_roster.{hpp,cpp}`. Deps: foundation
-  (disjoint from A — pure roster/economy logic, doesn't touch the unit record layout).
-  Parallel-safe with A. Satisfies: R3.
-- **[3] C — Hire verb.** A `corp_verb` that debits B's gating cost from the corp's stockpile
-  and constructs a unit via A's record at the chosen tile; `corp_ai` scores it the same way it
-  already scores build/demolish/survey/road, so rival corps get it too (2026-08-08 ruling — no
-  player-only special case). Files: `src/world/corp_command.{hpp,cpp}`, `src/world/corp_ai.cpp`.
-  Deps: A, B. Satisfies: R4, R5.
-- **[2] D — Hire affordance + render.** A "hire" mode beside the build affordance in the
-  construction panel, committing through C's verb; the Selection panel's existing (currently
-  unreachable) `selection_kind::unit` case renders the result. Files: `src/ui/construction_panel.cpp`,
-  `src/ui/selection_panel.cpp`. Deps: C. Satisfies: R6.
-- **[1] E — Standing-rules record.** Add the AI-hire exception to `io-standing-rules.md`
-  alongside the BL-079/BL-202/BL-181 entries, once C actually gives corp_ai the verb. Files:
-  `.claude/rules/io-standing-rules.md`. Deps: C. Satisfies: R7.
-
-Parallelisation note: A ∥ B (disjoint files, no shared symbols); C needs both; D and E both
-need C but are disjoint from each other (UI vs. doc) — safe to run concurrently once C lands.
-Requires BL-157 designed (it is) — this group also completes BL-157's own record stub, so flip
-BL-157 to `complete` alongside BL-324 when A lands and is verified.
-
-## Nation/corp generation visibility (promoted from BL-305)
+**Resume here.** Paused 2026-08-08 before any code (see NR-085): task A's file scope
+(`hard_coded_world.cpp`, `app.cpp`) exactly matches uncommitted, unreviewed work already in the
+tree from another session (the New World wizard's async real-surface preview pane + the Era −1
+sim's terrain-view adapter — see DEVLOG's 2026-08-08 audit-note entry). Resume once that work
+has either landed (rebase onto it) or is confirmed gone/safe to build around — check `git status`
+for `src/ui/generation_preview.{cpp,hpp}` and `src/world/sim_terrain_build.hpp` first.
 
 Requirements: requirements.json § nation-corp-generation-visibility (R1–R5)
 

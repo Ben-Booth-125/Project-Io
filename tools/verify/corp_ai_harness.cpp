@@ -315,7 +315,8 @@ int main()
                 if (b.tick != a.tick || b.corp != a.corp)
                     continue;
                 if (b.command.verb == corp_verb::build) ++builds;
-                else if (b.command.verb != corp_verb::survey) ++dials;
+                else if (b.command.verb != corp_verb::survey && b.command.verb != corp_verb::hire_unit)
+                    ++dials;
             }
             if (builds > 1 || dials > 3)
                 budget_ok = false;
@@ -331,8 +332,15 @@ int main()
             {
                 const corp_decision& a = es[i];
                 const corp_decision& b = es[j];
-                const bool a_dial = a.command.verb != corp_verb::build && a.command.verb != corp_verb::survey;
-                const bool b_dial = b.command.verb != corp_verb::build && b.command.verb != corp_verb::survey;
+                // hire_unit is neither a build nor a per-building dial — it never
+                // sets cmd.subject (BL-324), so two hires in different evals would
+                // otherwise misread as "the same building dialled twice".
+                const bool a_dial = a.command.verb != corp_verb::build &&
+                                   a.command.verb != corp_verb::survey &&
+                                   a.command.verb != corp_verb::hire_unit;
+                const bool b_dial = b.command.verb != corp_verb::build &&
+                                   b.command.verb != corp_verb::survey &&
+                                   b.command.verb != corp_verb::hire_unit;
                 if (!a_dial || !b_dial) continue;
                 if (a.command.subject != b.command.subject) continue;
                 const int gap = (b.tick > a.tick) ? b.tick - a.tick : a.tick - b.tick;

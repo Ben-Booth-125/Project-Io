@@ -223,6 +223,7 @@ const char* verb_name(corp_verb v)
         case corp_verb::resume:        return "resume";
         case corp_verb::place_road:    return "place_road";
         case corp_verb::survey:        return "survey";
+        case corp_verb::hire_unit:     return "hire_unit";
     }
     return "?";
 }
@@ -412,7 +413,11 @@ int main()
         {
             std::printf("    action[%s] = %d\n", verb_name(verb), count);
             if (verb == corp_verb::build) build_total += count;
-            else if (verb != corp_verb::survey) dial_total += count;
+            // hire_unit is neither a build nor a per-building dial (BL-324) —
+            // it never touches a building, so it does not belong in the
+            // dial-thrash ceiling this loop is measuring.
+            else if (verb != corp_verb::survey && verb != corp_verb::hire_unit)
+                dial_total += count;
         }
 
         char label[128];

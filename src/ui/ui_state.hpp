@@ -88,6 +88,15 @@ struct construction_state
     entity_id     pending_road_tile = null_entity;
     std::uint8_t  pending_road_tier = 1;
 
+    /// Pending hire-unit request (BL-324) — set by the build front door's Hire
+    /// affordance (the construction ledger's roster section) and executed by
+    /// `app::render` via `apply_corp_command`'s `hire_unit` verb. Same deferred
+    /// path as `pending_tile`, for the same reason (const-world UI surfaces).
+    /// `null_entity` = nothing pending; `pending_hire_unit_type` is an index
+    /// into `unit_roster_table()`.
+    entity_id     pending_hire_tile      = null_entity;
+    std::uint16_t pending_hire_unit_type = 0;
+
     /// Pending demolition request — set by the building Selection element's Demolish
     /// control and executed by `app::render` via `demolish_building`. Takes the same
     /// deferred path as `pending_tile` for the same reason (UI surfaces hold only

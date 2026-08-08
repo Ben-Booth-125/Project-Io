@@ -10,7 +10,122 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — The Era -1 arc's second day: Ages view, sweep verdict, review, and the fixes (2026-08-05, latest)
+## Session — military design thread + BL-324 batch delivery (2026-08-08, latest)
+
+Full mode: design conversation (BL-157/BL-324/BL-305/BL-280), then Batch Delivery of the two
+items that reached `designed`. Runtime: not tracked — no session timer available in this
+environment; treat as missing rather than guessed.
+
+**Military design thread (BL-157).** Recorded as an open thread, not a ruling: hybrid units
+(lean toward blended roster-entry class weights over a composite/force model, to avoid
+reopening BL-157's own "no force record, unit grain" settlement), zone of control (a
+radius-1 tile-neighbourhood projection, 5-8 tiles, open question on what it actually denies),
+and multi-round battle resolution (a bounded outer loop around `resolve_battle`, seeded RNG,
+keeping the Era -1 sweep's single-evaluation cost contract intact). Three rendering sketches
+produced to react to, none chosen. See BL-157's `design` field for the full write-up.
+
+**Three items designed in one pass, question-by-question.** BL-324 (unit hire surface): hire
+gate reads the corp's own stockpile/market access; the `unit_component.body`->tile grain fix
+lands inside this item rather than reopening BL-157; rival AI corps get the hire verb from day
+one. BL-305 (nation/corp generation visibility): territory carve watched live on the
+generation screen; corp step splits by surface (canvas for placement, card for the financial
+profile). BL-280 (negotiated tax rate): negotiation surface (Laws ledger) and cadence
+(player-initiated, at a cost) settled; the counterparty-cost mechanism stayed explicitly
+parked, so BL-280 stays `design-owed` — not every open question resolves in one pass.
+
+**BL-324 promoted and delivered in full — all 5 tasks, all 7 requirements met.**
+- **A — the unit record.** `unit_component.position` (a tile id, replacing `body`) + a
+  fixed-point `strength` scalar; `world::units` already existed as the id-keyed map BL-157
+  asked for. Two other consumers of the old `.body` field were still on it and needed fixing
+  alongside components.hpp: `entity_summary.cpp`'s Selection-panel render and `view_nav.cpp`'s
+  go-to-selection navigation — both resolve the body through the tile now.
+- **B — the campaign hire gate.** `unit_roster.cpp` gained a `gate_met` overload taking four
+  raw ints (shared by both the province path and this one) plus `campaign_gate_input`, which
+  derives ore/farm/port/energy axis values from the corp's own summed stockpile
+  (`corp_stockpile_total`, exported for corp_command.cpp to reuse) and whether it holds a
+  port. Binary presence (1000 or 0) by design — a yes/no supply-chain question, not graduated
+  tuning.
+- **C — the hire verb.** `corp_verb::hire_unit` debits a flat per-axis cost from the gated
+  resources (two-phase check-then-commit, all-or-nothing) and constructs the unit at the
+  target tile. `corp_ai.cpp` scores it in its own candidate bucket, capped at one hire per
+  eval — and, after the AI skill harness measured the consequence, at **three units per corp
+  total**: the presence-based gate never runs out on its own (unlike build sites or
+  unsurveyed bodies), so without a ceiling a corp with steady extraction hired every single
+  eligible eval, forever (measured: 525 hires in a 300-tick/5-corp run, identical across all
+  five benchmark seeds — the count was gate-driven, not score-driven). The cap is a first-cut
+  brake (a modest garrison, not full mobilisation), not a tuned balance figure.
+- **D — the hire affordance.** A Hire section in the tile Selection element's construction
+  ledger (`selection_panel.cpp`), beside the existing Build candidates — not folded into that
+  loop, since hiring never touches building slots or placement validity. `selection_kind::unit`
+  was already wired end-to-end (label, render) from BL-157's stub; this is what finally makes
+  it reachable.
+- **E — the standing-rules record.** `io-standing-rules.md` gained the rival-corp hiring
+  exception entry, alongside BL-079/BL-202/BL-181.
+
+**Two harness regressions found and fixed, both from the same root cause.** `corp_ai_harness`'s
+cooldown check and `ai_skill_harness`'s dial-thrash-ceiling check both classify "not build, not
+survey" as a per-building dial — `hire_unit` is neither (it never sets `cmd.subject`), so both
+harnesses needed `hire_unit` excluded from that classification. Caught by running the harnesses
+after each change, not assumed clean from a compile pass.
+
+**What stayed out.** BL-305 was promoted into REFINED.md (4 tasks, requirements written) but
+**paused before any code**, on discovering its file scope (`hard_coded_world.cpp`, `app.cpp`)
+exactly matches the uncommitted generation-preview/Era -1 work already sitting in the tree from
+another session (see the entry below). Recorded as NR-085, `decision-taken`: safer to land the
+disjoint, complete BL-324 delivery than risk colliding with unreviewed foreign edits on the same
+files. BL-305's tasks stay in REFINED.md, ready to resume.
+
+**Pre-existing failures surfaced, none caused by this session's changes** (verified by stashing
+this session's diff and re-running against the bare tree, twice — before and after the unit
+cap): `ai_skill_harness`'s seed 0/1 net-worth bands and seed 3's dial-thrash ceiling, and
+`world_audit`'s S2 forest+wetland target, all fail identically with or without this session's
+code. `history_sim_harness` alone (no contention) still ran past 30s in isolation against its
+own documented ~2.1s budget — so `earthlike_lean_trace` / `history_sweep` /
+`mediterranean_sweep` / `notable_worlds` timing out under CTest's 60s bound is plausibly the
+same cause, not CPU contention. All of these touch files the uncommitted foreign work already
+modifies (`hard_coded_world.cpp`, the Era -1 sim's terrain view); left unreviewed and unfixed
+per this session's scope, consistent with pausing BL-305 for the same reason.
+
+---
+
+## Session — audit note: uncommitted generation-preview / Era -1 terrain work found in the tree (2026-08-08)
+
+Not a build session — nothing here was authored in this session. Recorded per Ben's steer
+("fill a phantom devlog for the work... if we don't have to review it, that's ok") so a chunk of
+real, uncommitted working-tree state doesn't sit unexplained for whoever finds it next. Runtime:
+not applicable — this is an inspection record, not delivered work, ~10 min of `git diff`/`grep`.
+
+**What was found.** While auditing whether the buildings rework (BL-323) was actually complete
+(it isn't — see the entry below), `git status` turned up a second, unrelated body of uncommitted
+work already sitting in the tree, apparently mid-flight from another session:
+
+- `src/ui/generation_preview.{cpp,hpp}` (new, 525 lines) + an `app.hpp`/`app.cpp` diff — the New
+  World wizard's preview pane now builds the REAL homeworld surface asynchronously
+  (`generate_home_surface_preview`, new in `hard_coded_world.hpp`) instead of a stylised
+  painting; async off-thread so a wizard control click never blocks, synchronous under
+  `--verify` so goldens don't race the worker. `tools/verify/home_surface_bench.cpp` (new)
+  benches it.
+- `src/world/sim_terrain_build.hpp` (new) — an ECS-to-view adapter for the Era -1 sim (BL-316
+  S1). Its own header comment records a real bug this fixes: every Era -1 battle before this was
+  fought on default grassland/plains regardless of actual terrain, so `terrain_combat`'s
+  defence/attrition modifiers were dead code in every run to date.
+- `app.hpp` also wires in `works_registry` (BL-321, Era -1 works table).
+- `tools/verify/history_sim_harness.cpp` / `history_sweep.cpp` — R7's timing bound relaxed
+  1s -> 3s, with an in-code comment explaining why (the settle-occupancy fix quadrupled real
+  province count — correct behaviour, more work — measured ~2.1s; the sub-second bar is filed to
+  return once BL-320, Era -1 sim runtime, lands its index).
+- `perf_*.csv`, `docs/ui/mockdata/*.csv`, and the re-captured golden PNGs are just local
+  perf/verify-script output, not source changes.
+
+**State.** BL-316, BL-321 and BL-274 (era-keyed rosters, which this touches too) are all still
+`designed` in `backlog.json` — no matching `complete`/`resolution`, no prior DEVLOG entry, no
+stash. This is live, uncommitted, working-tree state, most plausibly another session still open
+elsewhere. Left untouched — not reviewed, not committed, not reverted. If it's yours, it's
+exactly where you left it.
+
+---
+
+## Session — The Era -1 arc's second day: Ages view, sweep verdict, review, and the fixes (2026-08-05)
 
 Retroactive entry, written 2026-08-07: this session's five commits reached `main` that day by
 rebase onto `origin/main`, and the arc had no DEVLOG record until this repair (NR-079). Full

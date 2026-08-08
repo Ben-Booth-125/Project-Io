@@ -3,6 +3,7 @@
 #include "construction.hpp"
 #include "recipe_registry.hpp"
 #include "survey_system.hpp"
+#include "unit_roster.hpp"
 #include "world.hpp"
 
 #include <algorithm>
@@ -19,6 +20,96 @@ bool owns(const world& w, entity_id corp, entity_id building)
     const auto& a = cit->second.assets;
     return std::find(a.begin(), a.end(), building) != a.end();
 }
+
+// ---------------------------------------------------------------------------
+// hire_unit's cost debit (BL-324)
+//
+// The campaign roster gate (unit_roster.hpp) asks a yes/no question: does the
+// corp hold ANY of the resource an axis needs, summed across its buildings.
+// The debit below spends a flat, first-cut draw (hire_axis_cost) from that
+// same resource preference order — not final balance, just enough that
+// hiring is a real spend rather than a free unlock. Two-phase (check every
+// axis affordable, THEN debit) so a mid-hire failure never leaves the corp
+// partially charged.
+// ---------------------------------------------------------------------------
+
+constexpr float hire_axis_cost = 5.0f;
+
+/// The resource (in preference order) each gated axis draws from — mirrors
+/// unit_roster.cpp's campaign_gate_input exactly, so a hire never spends a
+/// resource the gate didn't already confirm access to.
+resource_type hire_axis_resource(const world& w, entity_id corp,
+                                 std::initializer_list<resource_type> candidates)
+{
+    for (const resource_type r : candidates)
+        if (corp_stockpile_total(w, corp, r) >= hire_axis_cost)
+            return r;
+    return candidates.begin()[0]; // unreachable if the gate already passed; a safe fallback.
+}
+
+/// Debit @p amount of @p res from @p corp's stockpile, draining across its
+/// owned buildings in asset order. Only called after affordability is
+/// confirmed, so this should never under-run — but walks defensively rather
+/// than assuming a single building holds the whole amount.
+void debit_from_corp(world& w, entity_id corp, resource_type res, float amount)
+{
+    const auto cit = w.corporations.find(corp);
+    if (cit == w.corporations.end()) return;
+    for (const entity_id asset : cit->second.assets)
+    {
+        if (amount <= 0.0f) return;
+        const auto sit = w.stockpiles.find(asset);
+        if (sit == w.stockpiles.end()) continue;
+        float& q = sit->second.quantities[static_cast<std::size_t>(res)];
+        const float take = std::min(q, amount);
+        q      -= take;
+        amount -= take;
+    }
+}
+
+/// Debit the roster row's gated axes from the corp's stockpile. All-or-nothing:
+/// checks every gated axis is affordable before debiting any of them.
+bool debit_hire_cost(world& w, entity_id corp, const roster_row& row)
+{
+    const bool need_ore    = row.gate.ore_q    > 0;
+    const bool need_farm   = row.gate.farm_q   > 0;
+    const bool need_energy = row.gate.energy_q > 0;
+    // port_q is a building check (corp_owns_port), not a resource — nothing to debit.
+
+    if (need_ore && corp_stockpile_total(w, corp, resource_type::steel) < hire_axis_cost &&
+        corp_stockpile_total(w, corp, resource_type::iron_ore) < hire_axis_cost &&
+        corp_stockpile_total(w, corp, resource_type::iron_nickel_ore) < hire_axis_cost)
+        return false;
+    if (need_farm && corp_stockpile_total(w, corp, resource_type::food_rations) < hire_axis_cost &&
+        corp_stockpile_total(w, corp, resource_type::agricultural_produce) < hire_axis_cost)
+        return false;
+    if (need_energy && corp_stockpile_total(w, corp, resource_type::coal) < hire_axis_cost &&
+        corp_stockpile_total(w, corp, resource_type::refined_fuel) < hire_axis_cost &&
+        corp_stockpile_total(w, corp, resource_type::petroleum) < hire_axis_cost)
+        return false;
+
+    if (need_ore)
+        debit_from_corp(w, corp,
+            hire_axis_resource(w, corp, {resource_type::steel, resource_type::iron_ore,
+                                         resource_type::iron_nickel_ore}),
+            hire_axis_cost);
+    if (need_farm)
+        debit_from_corp(w, corp,
+            hire_axis_resource(w, corp, {resource_type::food_rations,
+                                         resource_type::agricultural_produce}),
+            hire_axis_cost);
+    if (need_energy)
+        debit_from_corp(w, corp,
+            hire_axis_resource(w, corp, {resource_type::coal, resource_type::refined_fuel,
+                                         resource_type::petroleum}),
+            hire_axis_cost);
+    return true;
+}
+
+/// The batch size one hire_unit command raises — matches the campaign's
+/// original Kepler unit stub (hard_coded_world.cpp), which used the same
+/// figure before BL-324 gave hiring a real seam.
+constexpr int hire_batch_manpower = 50;
 
 corp_command_result map_construction(construction_result r)
 {
@@ -140,6 +231,39 @@ corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                 case survey_dispatch_result::invalid:            return corp_command_result::rejected_invalid;
             }
             return corp_command_result::rejected_invalid;
+        }
+
+        case corp_verb::hire_unit:
+        {
+            const auto& table = unit_roster_table();
+            if (cmd.unit_type >= table.size())
+                return corp_command_result::rejected_invalid;
+            const roster_row& row = table[cmd.unit_type];
+
+            // Re-check availability against the LIVE gate rather than trusting a
+            // caller's cached list — mirrors construct_building's own re-validation
+            // of placement rather than the tile the UI last showed as buildable.
+            const auto avail = available_rows(w, cmd.corp, campaign_roster_band);
+            if (std::find(avail.begin(), avail.end(), &row) == avail.end())
+                return corp_command_result::rejected_invalid;
+
+            if (w.tiles.find(cmd.tile) == w.tiles.end())
+                return corp_command_result::rejected_invalid;
+
+            if (!debit_hire_cost(w, cmd.corp, row))
+                return corp_command_result::rejected_funds;
+
+            const entity_id unit = w.create_entity();
+            w.units[unit] = unit_component{
+                .position = cmd.tile,
+                .owner    = cmd.corp,
+                .count    = hire_batch_manpower,
+                .type     = cmd.unit_type,
+                .strength = hire_batch_manpower,
+            };
+            if (out_building)
+                *out_building = unit;
+            return corp_command_result::applied;
         }
     }
     return corp_command_result::rejected_invalid;

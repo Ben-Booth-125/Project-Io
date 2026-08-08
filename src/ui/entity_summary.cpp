@@ -258,11 +258,17 @@ void draw_unit_summary(const world& w, entity_id id)
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
                        "Unit group");
     ImGui::Text("Count: %d", u.count);
+    ImGui::Text("Strength: %d", u.strength);
 
-    // Location: name the body the unit currently occupies, when resolvable.
-    auto body_it = w.bodies.find(u.body);
-    if (body_it != w.bodies.end())
-        ImGui::Text("Location: %s", body_it->second.name.c_str());
+    // Location: position is a tile id (BL-157/BL-324) — resolve the tile, then
+    // name the body it belongs to.
+    auto tile_it = w.tiles.find(u.position);
+    if (tile_it != w.tiles.end())
+    {
+        auto body_it = w.bodies.find(tile_it->second.body);
+        if (body_it != w.bodies.end())
+            ImGui::Text("Location: %s", body_it->second.name.c_str());
+    }
 }
 
 void draw_nation_summary(const world& w, entity_id id)

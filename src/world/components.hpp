@@ -415,12 +415,19 @@ struct population_centre_component
 /// resolved into an army_stack_entry for resolve_battle. `type` is an opaque
 /// index into whichever roster table the current era supplies (BL-274 owns
 /// rosters, not this file) — unit_component itself does not interpret it.
+///
+/// BL-157 ruled tile position canonical over body/province (2026-08-07); this
+/// struct shipped with a `body` field ahead of that ruling — `position`
+/// (BL-324, 2026-08-08) is the fix, landed with the hire-unit item that first
+/// needed tile grain rather than deferring it back to BL-157.
 struct unit_component
 {
-    entity_id body;      ///< Body where the unit is currently located.
-    entity_id owner;     ///< Corporation or faction entity that controls this unit.
-    int       count;     ///< Number of units in the group.
-    uint16_t  type = 0;  ///< Opaque roster-type index; see combat.hpp's army_stack_entry.
+    entity_id position;      ///< Tile the unit currently occupies (BL-157: tile-canonical).
+    entity_id owner;         ///< Corporation or faction entity that controls this unit.
+    int       count;         ///< Number of units in the group.
+    uint16_t  type = 0;      ///< Opaque roster-type index; see combat.hpp's army_stack_entry.
+    int32_t   strength = 0;  ///< Fixed-point combat strength scalar (BL-157). Not a stat block —
+                              ///< a single number, same spirit as building_component's own scalars.
 };
 
 // ---------------------------------------------------------------------------

@@ -18,6 +18,7 @@
 #include "world/placement_rules.hpp" // buildable-type validity + stack capacity
 #include "world/recipe_registry.hpp" // recipe/economics lookups for the building element
 #include "world/survey_system.hpp"
+#include "world/unit_roster.hpp" // campaign hire gate + roster table (BL-324)
 
 #include <imgui.h>
 
@@ -1669,6 +1670,37 @@ void draw_construction_ledger(const world& w, const recipe_registry& reg, ui_sta
 
         ImGui::EndChild();
         ImGui::Spacing();
+    }
+
+    // Hire (BL-324) — the campaign roster gated on the player corp's OWN
+    // stockpile/market access (unit_roster.hpp), not this tile's deposit or
+    // placement rules; the tile is only where the raised unit is sited. Beside
+    // Build rather than folded into it: hiring never touches building slots or
+    // terrain validity, so it does not belong in the candidate loop above.
+    {
+        const auto& table = unit_roster_table();
+        const auto  avail = available_rows(w, w.player_entity, campaign_roster_band);
+        if (!avail.empty())
+        {
+            ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "Hire");
+            ImGui::BeginChild("##hire_list", {0.0f, row_h * std::min<std::size_t>(avail.size(), 3)},
+                              false, ImGuiWindowFlags_NoSavedSettings);
+            for (const roster_row* row : avail)
+            {
+                const auto idx = static_cast<std::uint16_t>(row - table.data());
+                ImGui::PushID(static_cast<int>(idx));
+                ImGui::TextUnformatted(row->name);
+                ImGui::SameLine(bar_w - style.WindowPadding.x - 70.0f);
+                if (ImGui::Button("Hire", {60.0f, 0.0f}))
+                {
+                    ui.construction.pending_hire_tile      = tile_id;
+                    ui.construction.pending_hire_unit_type = idx;
+                }
+                ImGui::PopID();
+            }
+            ImGui::EndChild();
+            ImGui::Spacing();
+        }
     }
 
     // Road placement (BL-147 core, BL-172 tier ladder) — a per-tile mutation, not a building, so

@@ -48,10 +48,10 @@ int main()
     // --- R1: unit_component carries a type; armies are (type,count) stacks -
     {
         unit_component u{};
-        u.body  = 1;
-        u.owner = 2;
-        u.count = 40;
-        u.type  = 7;
+        u.position = 1;
+        u.owner    = 2;
+        u.count    = 40;
+        u.type     = 7;
         check(u.type == 7, "R1 unit_component carries a type field");
 
         // An army as a vector of (type, count) pairs, per the backlog shape.

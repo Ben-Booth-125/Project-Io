@@ -89,7 +89,9 @@ void focus_on_entity(const world& w, ui_state& ui, entity_id entity)
     }
     if (auto u = w.units.find(entity); u != w.units.end())
     {
-        focus_on_surface(w, ui, u->second.body);
+        // position is a tile id (BL-157/BL-324) — resolve the body through it.
+        if (auto t = w.tiles.find(u->second.position); t != w.tiles.end())
+            focus_on_surface(w, ui, t->second.body);
         return;
     }
     if (auto m = w.markets.find(entity); m != w.markets.end())

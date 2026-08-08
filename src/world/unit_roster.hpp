@@ -32,11 +32,13 @@
 // Both are recorded on the row so a reader can see what is standing in for what.
 
 #include "combat.hpp"
+#include "entity.hpp"
 
 #include <cstdint>
 #include <vector>
 
 struct province;
+struct world;
 
 /// The four roster bands. Values are the ladder's own grouping, so a band index
 /// converts to ladder bands via ANCIENT_TECH_LADDER.md's roster_bands table.
@@ -49,6 +51,12 @@ enum class roster_band : uint8_t
 };
 
 inline constexpr int roster_band_count = 4;
+
+/// The 1960s campaign's fixed roster band (BL-324, 2026-08-08) — not derived
+/// from a military-capacity score (that's the Era -1 settlement model); the
+/// campaign is simply industrial-era throughout, and bands are cumulative, so
+/// this still exposes every earlier-band row a corp's ground can support.
+inline constexpr roster_band campaign_roster_band = roster_band::industrial;
 
 /// What a row needs from the ground before a polity can field it. Each is a
 /// threshold on a province endowment window (0-1000); zero means "no gate".
@@ -89,6 +97,31 @@ const std::vector<roster_row>& unit_roster_table();
 /// Bands are cumulative: a gunpowder-band polity still fields infantry. A row
 /// from an EARLIER band stays available, because nothing un-invents a spear.
 std::vector<const roster_row*> available_rows(const province& p, roster_band band);
+
+/// The campaign-side stand-in for a province's authored ground endowment
+/// (BL-324, 2026-08-08 — the 1960 campaign has no provinces to gate on). Read
+/// from the corp's OWN stockpile and market access. Presence is binary by
+/// design (1000, the table's own max threshold, or 0) — "you may field
+/// rifles because you can buy steel" is a yes/no supply-chain question here,
+/// not a graduated tuning knob; quantity-scaled readiness is a follow-on.
+struct campaign_roster_gate_input
+{
+    int ore_q = 0, farm_q = 0, port_q = 0, energy_q = 0;
+};
+
+/// Sum @p corp's stockpile of @p res across every building it owns. Buildings
+/// carry the stockpile, not the corp; exported so both the gate above and the
+/// hire verb's cost debit (corp_command.cpp) share one aggregation.
+float corp_stockpile_total(const world& w, entity_id corp, resource_type res);
+
+/// Derive @p corp's campaign gate input: stockpiles summed across its owned
+/// buildings, plus whether it holds a port anywhere.
+campaign_roster_gate_input campaign_gate_input(const world& w, entity_id corp);
+
+/// available_rows' campaign-side sibling — gates on @p corp's stockpile/market
+/// access (via campaign_gate_input) instead of a province endowment. The
+/// Era -1 sim is untouched: it keeps calling the province-gated overload above.
+std::vector<const roster_row*> available_rows(const world& w, entity_id corp, roster_band band);
 
 /// Compose an army stack from @p manpower over the rows @p p and @p band make
 /// available, scaled by @p readiness_q (1000 = full). Returns an empty stack

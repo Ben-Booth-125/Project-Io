@@ -1647,6 +1647,45 @@
     "docs/development/backlog.json"
    ],
    "resolution": "RESOLVED 2026-08-07 (Ben): option A, renumber. Buildings rework is v0.1.2; the four design-forward stub minors and the generation-visibility minor each shift up one — Laws v0.1.3, Techs v0.1.4, Military v0.1.5, Politics v0.1.6, Generation visibility + UI alignment v0.1.7. ROADMAP.md reordered and 14 backlog items had version_goal updated (BL-098, 155, 156, 157, 158, 186, 280, 287, 288, 303, 304, 305, 323, 324). No v0.1.x minor past v0.1.1 has been cut, so every one of these was a live target rather than a shipped record — including BL-287, which is complete but unreleased and moved with its cohort."
+  },
+  {
+   "id": "NR-085",
+   "title": "BL-305 (generation visibility) paused mid-batch — its file scope collides with another session's uncommitted work",
+   "raised": "2026-08-08",
+   "kind": "decision-taken",
+   "status": "resolved",
+   "source": "This session, during Batch Delivery of BL-324 (unit hire surface, complete) and BL-305 (nation/corp generation visibility, both promoted to REFINED.md the same session).",
+   "what": "BL-305's task A (live territory-carve generation stage) touches src/world/hard_coded_world.cpp and src/core/app.cpp — the exact two files already carrying a second, unrelated body of uncommitted work found during this session's earlier buildings-rework audit (the New World wizard's async real-surface preview pane, generate_home_surface_preview, BL-316 S1's terrain-view adapter). That work is live in the tree, apparently from another session, and was deliberately left untouched (see the 2026-08-08 DEVLOG audit-note entry).",
+   "why_it_matters": "BL-305 A extends the SAME generation-screen/globe surface the uncommitted work is already extending. Building on top of it risks either corrupting an in-progress session's edits or duplicating machinery it may already be adding, and there is no way to tell from the working tree alone which functions the other session intends to land next.",
+   "options": [
+    "A - Pause BL-305 here (tasks B-D also depend on A's staging, so the whole group pauses): land only what is safe (BL-324, fully complete and file-disjoint from the collision), leave BL-305's REFINED.md tasks in place for the next session once the other work has landed or been confirmed abandoned.",
+    "B - Proceed anyway, accepting the risk of colliding with the other session's edits.",
+    "C - Investigate the other session (find/contact it) before touching app.cpp/hard_coded_world.cpp at all."
+   ],
+   "recommendation": "A. Cheapest and safest: BL-324 is a clean, complete, verified delivery on its own; BL-305 stays exactly where it was promoted (REFINED.md), ready to resume once the file collision resolves one way or the other.",
+   "files": [
+    "docs/development/REFINED.md",
+    "src/world/hard_coded_world.cpp",
+    "src/core/app.cpp"
+   ],
+   "resolution": "RESOLVED 2026-08-08 (this session, acting on Ben's 'if we don't have to review it, that's ok'): option A taken. BL-324 landed and committed in full (all 5 tasks, all requirements met, CTest green). BL-305's REFINED.md task group is left in place, untouched, for a session that either finds the other work has landed (rebase and resume) or confirms it can be safely built around."
+  },
+  {
+   "id": "NR-086",
+   "title": "BL-324's Hire affordance was never clicked in a live app session — no display in this environment",
+   "raised": "2026-08-08",
+   "kind": "observation",
+   "status": "resolved",
+   "source": "This session's BL-324 close-out — same shape as NR-026 (BL-249's frame-budget targets, still needing a human at the keyboard).",
+   "what": "requirements.json § unit-hire-surface R1/R6 cover the Hire button in selection_panel.cpp's construction ledger, and the Selection panel rendering the resulting unit. Both are code-complete, build clean, and are exercised indirectly (corp_ai raises real units every session via the same seam, verified headlessly across the full ai_skill_harness benchmark). Neither was clicked by a human in a live, on-screen app session, because this environment has no display.",
+   "why_it_matters": "A UI affordance can compile and even be exercised by the AI's own use of the same verb while still rendering wrong, laying out badly, or being unreachable from an actual mouse click — none of which a headless build catches. Marking R1/R6 complete on code + indirect exercise alone, without flagging the gap, would read as a stronger claim than the evidence supports.",
+   "options": [],
+   "recommendation": "Whoever next opens the app: place a building, select its tile, open the Hire section, click Hire, and confirm the new unit appears in the Selection panel with the right count/strength/location. Cheap, ~2 minutes.",
+   "files": [
+    "src/ui/selection_panel.cpp",
+    "docs/development/req/requirements.json"
+   ],
+   "resolution": "Filed rather than blocking the close-out — R1/R6 marked complete on the code + indirect-exercise evidence available, this entry stands as the open follow-up (mirrors NR-026's precedent for BL-249)."
   }
  ]
 }

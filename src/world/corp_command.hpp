@@ -32,6 +32,7 @@ enum class corp_verb : uint8_t
     resume,        ///< building_component.decommissioned := false.
     place_road,    ///< place_road(tile, tier).
     survey,        ///< dispatch_survey(body) on behalf of the corp.
+    hire_unit,     ///< Raise a unit at a tile from the campaign roster (BL-324).
 };
 
 /// One serialisable intent: {tick, corp, verb, fixed-size args}. Which args are
@@ -54,6 +55,7 @@ struct corp_command
     uint16_t      recipe    = no_recipe;                ///< set_recipe (and build seed).
     int           workforce = 100;                      ///< set_workforce value [0, 200].
     uint8_t       road_tier = 1;                        ///< place_road tier (1–3).
+    uint16_t      unit_type = 0;                        ///< hire_unit: index into unit_roster_table().
 };
 
 /// Outcome of applying a command. Only `applied` mutates the world; every
@@ -71,7 +73,7 @@ enum class corp_command_result : uint8_t
 
 /// Apply one command through the player-grade seams. Deterministic; a rejected
 /// command mutates nothing. `out_building` (optional) receives the entity id a
-/// successful `build` created.
+/// successful `build` or `hire_unit` created.
 corp_command_result apply_corp_command(world& w, const recipe_registry& reg,
                                        const corp_command& cmd,
                                        entity_id* out_building = nullptr);
@@ -89,6 +91,7 @@ enum class corp_decision_reason : uint8_t
     dial_idle,        ///< Sustained loss; idling saves more than running.
     dial_resume,      ///< Idled asset now reads profitable.
     survey_expand,    ///< Discovery spend within the solvency floor.
+    hire_available,   ///< Roster row available under the corp's own campaign gate (BL-324).
 };
 
 /// One ring-buffer entry: the command plus its score rationale.
