@@ -10,7 +10,48 @@ sessions can be scoped and paced with less waste.
 
 ---
 
-## Session — C-route feasibility: both gates pass, and Cicero says the model is on the wrong layer (2026-08-08, latest)
+## Session — Ruling on NR-094: Stage C takes the dialogue layer, the scorer keeps the action seam (2026-08-08, latest)
+
+Light mode, design ruling — no code. Ben, direct instruction after reading the pulled-in cloud
+research: *"Rule on NR-094 now."* Runtime: not tracked.
+
+**The ruling.** Accepted the C-route feasibility note's layer recommendation
+(`docs/ai/LANGUAGE_POLICY_FEASIBILITY.md` § 9). `corp_ai.cpp`'s deterministic scored-utility core
+stays the action generator indefinitely — distilling it can only reproduce it (no skill upside),
+and the note's measured constraint tax (91.5% → 48.0% executable accuracy under a hard schema)
+is a live, avoidable risk at exactly the scale a local model would run at. The diplomacy
+capability that motivated the C-route in the first place is separable from action generation —
+Cicero's own architecture proves it at 2.7B — and Io already named this Stage ("the LLM planner
+speaks in-character in channels") in `AI_OPPONENT.md` § 7 back on 2026-07-26, just never
+decomposed it into a buildable item.
+
+**AI_OPPONENT.md gained § 10g**, recording the ruling and — this is the actual correction, not
+just an endorsement — naming precisely where § 10d drifted: its "small local model plays through
+text" framing reads as the model calling `issue_command` directly, which is Stage A/B territory,
+not Stage C. MCP, BL-278, and the local-model-as-runtime-target all stand unchanged; only which
+Stage the model occupies was wrong.
+
+**BL-334 filed** (design-owed): Stage C's dialogue layer, shaped by the ruling — a small model
+(Cicero's reference point, 2.7B) conditioned on the `corp_decision` ring's winning command +
+reason code as an intent, speaking into the Public/private channels, never emitting
+`corp_command` itself. The concrete build (trigger cadence, prompt template, composition with
+Stage A's existing templated messages) is left open; the shape is settled, the item is not
+promotable yet. **BL-279 rescoped in place**, not cancelled or reopened: its corpus now trains
+BL-334 instead of an action-emitting model, bootstrapped from `corp_ai.cpp`'s own decision ring
+first per the note's own instruction, before any cloud spend.
+
+**Left deliberately open, not ruled on.** The note's third recommendation (a goal layer above the
+scorer, for the documented step-wise-myopia failure mode) — filed as an open question inside
+BL-334 rather than accepted or rejected, since Io's own play has not yet shown that failure mode;
+ruling on a mitigation for an unobserved problem would be guessing. The ~300-token-per-decision
+figure the note flags as an assumption also stays unmeasured — noted as a cheap, independent
+follow-up, not a precondition on this ruling.
+
+**NR-094 resolved.** Regenerated `NEEDS_REVIEW.md`.
+
+---
+
+## Session — C-route feasibility: both gates pass, and Cicero says the model is on the wrong layer (2026-08-08)
 
 Full mode, doc-only (no `src/` touched, so the item-spanning requirement gate doesn't apply).
 Ben, carrying context from the 2023 entailment-tree dissertation into Io: *see what patterns we
