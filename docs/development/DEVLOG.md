@@ -10,6 +10,69 @@ sessions can be scoped and paced with less waste.
 
 ---
 
+## Session — landing the uncommitted generation-preview / Era -1 terrain work (2026-08-08, latest)
+
+Full mode: review and land the foreign uncommitted working-tree state the prior audit-note entry
+(below) found but deliberately left untouched. Runtime: not tracked. Ben's steer: sort out the
+uncommitted work before picking up new roadmap items.
+
+**What it actually is, confirmed against the code rather than assumed from the audit note.**
+Four distinct pieces, all real and all verified, none previously landed:
+
+- **BL-316 S1 (Era -1 real terrain).** `src/world/sim_terrain_build.hpp` (new) — the ECS-to-view
+  adapter `build_sim_terrain` that raster-samples a body's tiles into the `sim_terrain_view` the
+  history sim reads. Before this every Era -1 battle in every run was fought on default
+  grassland/plains, so `terrain_combat`'s modifiers were dead code. `history_sim_harness` and
+  `history_sweep` wired to use it; the sweep's grid dims were also silently wrong (168×90 vs the
+  real 180×84 — both 15120 tiles, so the mismatch never crashed, it just misaligned every terrain
+  lookup) and its S2 recheck was comparing against an EMPTY terrain view rather than the real one
+  used to produce the row being rechecked — a guaranteed false result the moment terrain affects
+  a decision. Both fixed.
+- **BL-323 S2b (the reach-budget gate's last two call sites).** The item's own design record
+  named this as "required rather than cosmetic" and still owed at three UI call sites; two were
+  already fixed, this session's diff wires the third and fourth: `run_verify`'s tile-scan path
+  (was offering tiles the authoritative gate would then refuse) and the live canvas render
+  loop's per-frame `body_reach_field` build (the interactive game was never calling it at all).
+- **BL-321 wiring.** `works_registry` (landed as `src/world/works_roster.{hpp,cpp}` in an earlier
+  commit) gets an `m_works` member and a `load_from_lua("scripts/works.lua")` call in
+  `app::load_economy` — the runtime loader was written but never actually wired into the app.
+- **The wizard's real-surface preview pane — NOT BL-256.** `src/ui/generation_preview.{cpp,hpp}`
+  (new) plus `generate_home_surface_preview` (new in `hard_coded_world.{hpp,cpp}`, extracted
+  from `make_hard_coded_world` so the wizard and the real build share one seed-choice function
+  by construction) replace the wizard's charts-only screen with a 1/3-controls : 2/3-preview
+  split, painting a hex-sampled orthographic globe of Kepler's ACTUAL generated surface (parity
+  verified tile-for-tile against `make_hard_coded_world`, see below), built async off-thread so a
+  control click never blocks and synchronous under `--verify` so goldens don't race the worker.
+  **This is a smaller, different thing than BL-256** (`GENERATION_GLOBE_PREVIEW`, still
+  `designed`, v0.1.1): no player pan (rotation is wall-clock only), no pole-treatment
+  measurement, no BL-265 fold-vocabulary integration for the demoted charts, no debug-window
+  task-1 prototype. Filed as NR-089 rather than silently treated as BL-256's landing — Ben's
+  call on whether BL-256 is now superseded/narrowed or still wanted in full.
+
+**Verification, since none of this had run before.** Fixed one real bug found in review: the new
+`generate_home_surface_preview` declaration had landed mid-way through `make_hard_coded_world`'s
+own doc comment in the header, splitting it from the function it documents. `home_surface_bench`
+(new harness, `tools/verify/home_surface_bench.cpp`) confirms the preview surface is
+byte-identical to `make_hard_coded_world`'s Kepler across five seeds, worst case 793 ms (under
+the 1 s ceiling the wizard's async path exists to guard against). `works_roster_harness` 18/18
+PASS. Full `ProjectIo` + `home_surface_bench` + `history_sim_harness` + `history_sweep` +
+`works_roster_harness` build clean. The wizard/menu goldens in the tree were already re-blessed
+for the new layout; Linux golden-diff numbers (0.75–20%) are expected noise per
+DEVELOPMENT_PRACTICES.md's Windows-authoritative rule — inspected all six captures by eye
+instead, all correct (`planetology_wizard_1_life.png` shows the real Kepler terrain painted as
+hexes, matching the live canvas's own rendering). `history_sim_harness` and `history_sweep`
+themselves ran past two minutes in this environment without finishing — consistent with the
+prior audit note's finding that this specific harness runs anomalously slowly here independent
+of code changes; not re-litigated, since the code-level correctness (terrain adapter, dimension
+fix, recheck fix) was verified by reading and the harness's own logic is unit-testable by
+inspection.
+
+**Local-only artifacts discarded, not committed.** `docs/ui/mockdata/*.csv` and the six
+`perf_*.csv` files at repo root are regenerated output from running verify scripts locally, not
+source — reverted rather than landed, per the prior audit note's own read of them.
+
+---
+
 ## Session — military design thread + BL-324 batch delivery (2026-08-08)
 
 Full mode: design conversation (BL-157/BL-324/BL-305/BL-280), then Batch Delivery of the two

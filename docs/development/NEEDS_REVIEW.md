@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*88 entries — 10 open, 78 resolved.*
+*89 entries — 11 open, 78 resolved.*
 
 ---
 
@@ -135,6 +135,19 @@ Wetland at 0.08% is the part that should not be tuned away regardless: RESOURCES
 > **Recommendation:** C. The denominator genuinely is wrong — an ocean-inclusive share of a biome that can only occur on land measures the hydrology, not the biome — but fixing it alone would turn a red light green while wetland stays extinct. Split the two.
 
 *Files: `tools/verify/world_audit.cpp`, `src/world/tile_generation.cpp`, `docs/economy/TILES.md`*
+
+### NR-089 — Wizard real-surface preview pane landed, but it is not BL-256's globe — scope call for Ben
+*question · raised 2026-08-08 · from Found landing an uncommitted, unreviewed session's working-tree state (src/ui/generation_preview.{cpp,hpp}, generate_home_surface_preview) — see the DEVLOG entry that lands it.*
+
+The landed pane paints a hex-sampled orthographic globe of the wizard's ACTUAL generated Kepler surface (verified byte-parity with make_hard_coded_world), in a fixed 1/3-controls : 2/3-preview split, rotating on wall-clock time only. BL-256 (GENERATION_GLOBE_PREVIEW, still `designed`, v0.1.1) specifies a considerably larger item on the same idea: player-controlled pan clamped at the poles, a measured pole-treatment call (cap / weighted-sampling / accept), a pre-world solar-system diagram stage, and the demoted charts folding through BL-265's disclosure vocabulary rather than a fixed column split. None of those four are present in what landed.
+
+**Why it matters.** Landing this without flagging it would read as BL-256 having shipped when it has not — BL-256's own design doc treats pan and the fold integration as load-bearing, not optional polish. Left BL-256 unchanged (still `designed`) rather than guessing whether this session's smaller version supersedes it, narrows it, or is a throwaway task-1-style prototype BL-256's own sequencing already calls for ("prove the projection... in a throwaway debug window... before any wizard work").
+
+- Treat this as BL-256's task 1 prototype, now proven in the real wizard rather than a throwaway window — promote BL-256's remaining tasks (pan, pole call, BL-265 fold integration) as the item's next slice
+- Treat this as a smaller, permanent, different feature — close or narrow BL-256's scope to just the parts this doesn't cover
+- Leave both as-is: this pane ships as an interim improvement, BL-256 stays queued for its full design untouched
+
+*Files: `src/ui/generation_preview.hpp`, `src/ui/generation_preview.cpp`, `src/core/app.cpp`*
 
 ---
 

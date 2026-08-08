@@ -126,3 +126,19 @@ struct generation_report
 /// @return A fully populated world ready to drive the simulation.
 world make_hard_coded_world(world_params params = {}, generation_report* report = nullptr,
                             const world_gen_config& gen_cfg = {});
+
+/// The homeworld's tile grid dimensions — one authority for the 180×84 the
+/// build and the wizard preview both assume.
+inline constexpr int home_grid_width  = 180;
+inline constexpr int home_grid_height = 84;
+
+/// Generate ONLY the homeworld tile surface into @p w (a scratch world), exactly
+/// as make_hard_coded_world builds Kepler's: same resolved preferences, same
+/// planetology chain, same Continents pass, same BL-276 acceptance gate, same
+/// seed formulas — the gate is literally the same function. The New World
+/// wizard's preview pane calls this so the map a player rerolls IS the map
+/// "Begin" hands them. Rivers and the political layer (sibling passes the
+/// preview does not show) are skipped. Returns raster-order tile ids.
+std::vector<entity_id> generate_home_surface_preview(world& w, entity_id body,
+                                                     const world_params& params,
+                                                     const world_gen_config& gen_cfg = {});

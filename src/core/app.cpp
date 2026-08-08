@@ -21,6 +21,7 @@
 #include "ui/chat_panel.hpp"
 #include "ui/fonts.hpp"
 #include "ui/generation_charts.hpp" // the shared chain-stage charts (BL-211)
+#include "ui/generation_preview.hpp" // the wizard's painted right pane
 #include "ui/format.hpp"
 #include "ui/frame_stats.hpp" // frame-budget HUD (BL-249, v0.1.0 quality audit)
 #include "ui/header_panel.hpp"
@@ -44,6 +45,8 @@
 #include "world/placement_rules.hpp"
 #include "world/survey_system.hpp"
 #include "world/hard_coded_world.hpp"
+
+#include <chrono> // poll_wizard_surface's zero-wait future probe
 #include "world/logistics.hpp"
 #include "world/market_clearing.hpp"
 #include "world/orbital_system.hpp"
@@ -422,6 +425,54 @@ void app::refresh_wizard_preview()
     undrawn.drawdown = 0.0f;
     preview_system(undrawn, m_wiz_resolved.home_orbit_au,
                    m_pending_world_params.seed, m_wiz_undrawn);
+
+    // The globe's real surface. Synchronous under --verify (a capture must never
+    // race the worker); asynchronous in play, marked stale if already in flight.
+    if (!m_golden_dir.empty())
+    {
+        world scratch;
+        const entity_id probe = scratch.create_entity();
+        const auto tiles = generate_home_surface_preview(scratch, probe,
+                                                         m_pending_world_params);
+        m_wiz_surface.resize(tiles.size());
+        for (std::size_t i = 0; i < tiles.size(); ++i)
+            m_wiz_surface[i] = static_cast<uint8_t>(scratch.tiles.at(tiles[i]).composition);
+    }
+    else if (m_wiz_surface_future.valid())
+        m_wiz_surface_stale = true;
+    else
+        launch_wizard_surface_build();
+}
+
+void app::launch_wizard_surface_build()
+{
+    m_wiz_surface_future = std::async(std::launch::async,
+        [params = m_pending_world_params]() {
+            world scratch;
+            const entity_id probe = scratch.create_entity();
+            const auto tiles = generate_home_surface_preview(scratch, probe, params);
+            std::vector<uint8_t> comp(tiles.size());
+            for (std::size_t i = 0; i < tiles.size(); ++i)
+                comp[i] = static_cast<uint8_t>(scratch.tiles.at(tiles[i]).composition);
+            return comp;
+        });
+}
+
+void app::poll_wizard_surface()
+{
+    if (!m_wiz_surface_future.valid())
+        return;
+    if (m_wiz_surface_future.wait_for(std::chrono::seconds(0))
+            != std::future_status::ready)
+        return;
+    m_wiz_surface = m_wiz_surface_future.get();
+    if (m_wiz_surface_stale)
+    {
+        // Preferences moved while that build ran: it is already the wrong
+        // world, so go straight around again with the current params.
+        m_wiz_surface_stale = false;
+        launch_wizard_surface_build();
+    }
 }
 
 void app::start_new_game()
@@ -475,6 +526,19 @@ void app::load_economy()
     m_lua.load("scripts/recipes.lua");
     m_lua.load("scripts/economy.lua");
     m_registry.load_from_lua(m_lua);
+
+    // BL-323 S2b: mirror the reach budget onto ui_state so every placement surface
+    // filters on the same number the authoritative gate uses. Done here, once, right
+    // after the registry is loaded — a surface that filtered on a different budget
+    // would offer tiles construct_building then refuses.
+    m_ui.max_logistics_reach = m_registry.construction().max_logistics_reach;
+
+    // BL-321 Era -1 works table. Loaded here rather than at generation time so a
+    // malformed works.lua fails at startup, alongside every other data-layer
+    // error, instead of midway through world generation. load_from_lua validates
+    // the table and throws; see works_registry.cpp for what it enforces.
+    m_lua.load("scripts/works.lua");
+    m_works.load_from_lua(m_lua);
 
     // BL-087 mock tech/quest tree — display data for the F9 viewer only; no
     // simulation system reads it (the tech system is post-prototype).
@@ -1182,7 +1246,12 @@ int app::run_verify(const std::string& script_path, bool bless)
         {
             if (tc.body != m_ui.active_body || occupied.count(tid))
                 continue;
-            if (!placement_rules::can_place_in_world(m_world, tid, bt, tgt))
+            // BL-323 S2: filter on the SAME reach budget construct_building will
+            // enforce. Without this the scan offers a tile the authoritative gate
+            // then refuses, which reads as a broken build rather than a rule.
+            body_reach_field(m_world, tc.body);
+            if (!placement_rules::can_place_in_world(m_world, tid, bt, tgt,
+                                                     m_registry.construction().max_logistics_reach))
                 continue;
             entity_id built = null_entity;
             const construction_result r = construct_building(
@@ -2244,14 +2313,17 @@ bool lean_row(const char* id, const char* label, lean& value,
 
     // PushID scopes the four buttons to this row, so two rows sharing an option
     // name ("Balanced" appears under both Ocean and Oxygen) never collide.
+    // Label on its own line, options in a 2x2 grid beneath — the wizard's
+    // control column is a third of the panel now, and four radios in a row
+    // ("Old and cold ... Young and vigorous") no longer fit one line.
     ImGui::PushID(id);
-    ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted(label);
 
+    const float col2 = ImGui::GetContentRegionAvail().x * 0.5f;
     bool changed = false;
     for (int i = 0; i < 4; ++i)
     {
-        ImGui::SameLine(i == 0 ? 170.0f : 0.0f);
+        if (i % 2 == 1) ImGui::SameLine(col2);
         int v = static_cast<int>(value);
         if (ImGui::RadioButton(names[i], &v, static_cast<int>(order[i])))
         {
@@ -2290,6 +2362,10 @@ void app::draw_generation_screen()
     }
     if (m_wiz_preview.empty())
         return; // defensive: the preview is the wizard's only data source
+
+    // Adopt a finished real-surface build (and chain a relaunch if the params
+    // moved mid-build). Cheap zero-wait probe; runs every wizard frame.
+    poll_wizard_surface();
 
     static_assert(ui::chain_round_count == wizard_round_count,
                   "the wizard's round count and the shared chain-round table must agree");
@@ -2337,7 +2413,9 @@ void app::draw_generation_screen()
     // A wide centred surface — this is the first thing a player sees, so it takes
     // the screen rather than the menu's 280px column. Same borderless,
     // background-less idiom as draw_main_menu; the render clear colour is the backdrop.
-    const float panel_w = std::min(disp.x - 96.0f, 1180.0f);
+    // Split 1/3 : 2/3 — controls (stage folds, leans, reroll) left, the round's
+    // painted preview right, so every reroll is SEEN, not just re-plotted.
+    const float panel_w = std::min(disp.x - 96.0f, 1440.0f);
     const float panel_h = std::max(420.0f, disp.y - 96.0f);
     ImGui::SetNextWindowPos({disp.x * 0.5f, disp.y * 0.5f}, ImGuiCond_Always, {0.5f, 0.5f});
     ImGui::SetNextWindowSize({panel_w, panel_h}, ImGuiCond_Always);
@@ -2348,6 +2426,14 @@ void app::draw_generation_screen()
     if (ImGui::Begin("##generation", nullptr, flags))
     {
         char buf[256];
+
+        // ── Left third: everything the player DOES — header, stage folds, leans,
+        //    navigation. The stage folds still expand to their full chart views
+        //    (the fold idiom is unchanged); they simply live in a column now. ──
+        const float col_w = (panel_w - style.WindowPadding.x * 2.0f
+                             - style.ItemSpacing.x) / 3.0f;
+        ImGui::BeginChild("##wiz_left", {col_w, 0.0f}, false,
+                          ImGuiWindowFlags_NoBackground);
 
         // ── (a) Header: the round name large, what it settles beneath, progress right ──
         {
@@ -2390,12 +2476,14 @@ void app::draw_generation_screen()
         //    charts they act on. ──
         const float frame_h  = ImGui::GetFrameHeight();
         const float line_h   = ImGui::GetTextLineHeightWithSpacing();
+        // Each lean row is now a label line plus a 2x2 radio grid (three lines).
         const float decide_h = static_cast<float>(round_pref_count(m_wiz_round))
-                                   * (frame_h + style.ItemSpacing.y)
+                                   * (line_h + 2.0f * (frame_h + style.ItemSpacing.y))
                              + line_h * static_cast<float>(round_note_lines(m_wiz_round)
                                                            + (m_wiz_resolved.gave_up ? 2 : 0))
                              + style.ItemSpacing.y * 3.0f;
-        const float footer_h = 34.0f + style.ItemSpacing.y * 2.0f;
+        // Two button rows now: Reroll full-width above, Back / Continue below.
+        const float footer_h = 34.0f * 2.0f + style.ItemSpacing.y * 3.0f;
         ImGui::BeginChild("##wiz_charts", {0.0f, -(decide_h + footer_h)}, false,
                           ImGuiWindowFlags_NoBackground);
 
@@ -2474,39 +2562,84 @@ void app::draw_generation_screen()
         }
 
         // ── (d) Navigation. Reroll re-draws THIS round from a fresh number (and
-        //    everything downstream of it, because the chain is causal); Back is a plain
-        //    revision, since a round's leans feed its own gates and the ones after
-        //    them, never a chart the player has already been shown. ──
-        const ImVec2 btn  = {150.0f, 34.0f};
-        const bool   last = (m_wiz_round == wizard_round_count - 1);
+        //    everything downstream of it, because the chain is causal); the preview
+        //    pane repaints from the same roll, so what changed is SEEN. The seed
+        //    still names a determinate family: (seed, leans, roll counters) is the
+        //    whole input, and the same triple always returns the same world. ──
+        const bool  last  = (m_wiz_round == wizard_round_count - 1);
+        const float bar_w = ImGui::GetContentRegionAvail().x;
+
+        // Reroll full-width and first — it is the wizard's main verb now.
+        if (ImGui::Button("Reroll##wizroll", {bar_w, 34.0f}))
+        {
+            ++pf.roll[m_wiz_round];
+            m_wiz_dirty = true;
+        }
 
         // Back always steps out one level, and the level outside round 0 is the main
         // menu — a wizard the player cannot leave is a trap (nothing is generated
         // until "Begin", so leaving costs nothing). Preferences survive the trip, so
         // re-entering resumes the same leans from round 0.
-        if (ImGui::Button("Back##wizback", btn))
+        const float half = (bar_w - style.ItemSpacing.x) * 0.5f;
+        if (ImGui::Button("Back##wizback", {half, 34.0f}))
         {
             if (m_wiz_round == 0)
                 m_screen = app_screen::menu;
             else
                 --m_wiz_round;
         }
-
         ImGui::SameLine();
-        if (ImGui::Button("Reroll##wizroll", btn))
-        {
-            ++pf.roll[m_wiz_round];
-            m_wiz_dirty = true;
-        }
-
-        ImGui::SameLine(panel_w - style.WindowPadding.x - btn.x);
-        if (ImGui::Button(last ? "Begin##wizgo" : "Continue##wizgo", btn))
+        if (ImGui::Button(last ? "Begin##wizgo" : "Continue##wizgo", {half, 34.0f}))
         {
             if (last)
                 start_new_game(); // the one and only generation call
             else
                 ++m_wiz_round;
         }
+        ImGui::EndChild(); // ##wiz_left
+
+        // ── Right two-thirds: what this roll LOOKS like. A stylised painting read
+        //    straight from the preview states — the system in round 0, the homeworld
+        //    surface in round 1, its industrial history in round 2. ──
+        ImGui::SameLine();
+        ImGui::BeginChild("##wiz_preview", {0.0f, 0.0f}, false,
+                          ImGuiWindowFlags_NoBackground);
+        {
+            std::vector<ui::preview_body> pv;
+            pv.reserve(static_cast<std::size_t>(n_bodies));
+            for (int i = 0; i < n_bodies; ++i)
+            {
+                const body_inputs& bi = prototype_body(i);
+                pv.push_back(ui::preview_body{
+                    bi.name, bi.orbit_au, bi.mass_earths, bi.parent_orbit_au,
+                    bi.is_homeworld, &m_wiz_preview[static_cast<std::size_t>(i)] });
+            }
+            // Kepler turns slowly — one revolution per minute, wall-clock — so
+            // the far hemisphere can be read too. Frozen under --verify
+            // (m_golden_dir set): a golden capture must never race an animation.
+            const float rot = m_golden_dir.empty()
+                ? static_cast<float>(std::fmod(ImGui::GetTime() / 60.0, 1.0)) * 6.2831853f
+                : 0.0f;
+            const ui::preview_surface_view surf{
+                home_grid_width, home_grid_height,
+                m_wiz_surface.size() == static_cast<std::size_t>(home_grid_width)
+                                            * static_cast<std::size_t>(home_grid_height)
+                    ? m_wiz_surface.data() : nullptr };
+            ui::draw_generation_preview(pv.data(), pv.size(),
+                                        m_wiz_resolved.params, m_wiz_round, rot, surf);
+
+            // The honest wait note: while a build is in flight the globe still
+            // shows the PREVIOUS roll's surface (or the stylised stand-in on
+            // the very first frames).
+            if (m_wiz_surface_future.valid() && m_wiz_round > 0)
+            {
+                ImGui::SetCursorPosY(ImGui::GetWindowHeight() - 28.0f);
+                ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(120, 128, 145, 255));
+                ImGui::TextUnformatted("  resolving the surface...");
+                ImGui::PopStyleColor();
+            }
+        }
+        ImGui::EndChild();
     }
     ImGui::End();
 }
@@ -2658,6 +2791,12 @@ void app::render()
                 // a non-const world for the route-cached pathfinder, so it cannot live in
                 // the const-world draw. Derived VIEW state — no feedback into the sim.
                 ui::update_body_vision(m_world, m_ui, m_ui.sim_now_days);
+                // BL-323 S2b: build the logistics reach field for the body about to be
+                // drawn, for the same reason and in the same place as the vision update
+                // above — the Dijkstra needs a mutable world, the draw is const. Cached,
+                // so this is a map lookup on every frame but the first after an
+                // invalidation (a road laid, a building placed or demolished).
+                body_reach_field(m_world, m_ui.active_body);
                 ui::draw_body_surface_canvas(m_world, m_ui, m_registry, m_last_econ_report,
                                              m_generation_report, {0.0f, 0.0f}, disp, primary_input,
                                              {mm_origin.x, mm_origin.y + mm_h * 0.5f});

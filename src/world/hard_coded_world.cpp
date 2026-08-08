@@ -100,7 +100,82 @@ int largest_enclosed_sea(const world& w, const std::vector<entity_id>& tile_ids,
     return best;
 }
 
+// ---------------------------------------------------------------------------
+// The BL-276 acceptance gate, as one function. Reject-and-reroll over the
+// homeworld tile seed, two bars — the hybrid Ben chose (2026-08-03: "about 90%
+// likely ... never impossible to try"):
+//
+//   ARENA (>= 300 tiles): a playable Mediterranean. Three attempts only —
+//     with the rift-basin mechanism (continents.cpp) putting a single seed
+//     at ~58%, three tries land ~90% of worlds. Deliberately NOT retried to
+//     exhaustion: the ~1-in-10 worlds without an arena are the wanted
+//     hard-Rome tail.
+//   FLOOR (>= 30 tiles): some enclosed sea, so trying is never impossible.
+//     All six attempts may serve it; ~98% of seeds pass on attempt 0.
+//
+// Attempt 0 is the unfolded seed, so worlds already qualifying are untouched;
+// on full exhaustion attempt 0 is kept honestly rather than clamping anything
+// (the resolve_preferences idiom). Each probe is one scratch tile generation
+// (~tens of ms). Extracted (2026-08-07) so the wizard's real-tile preview and
+// make_hard_coded_world choose the SAME seed by calling the same code — a
+// forked copy would drift and the preview would silently stop being the world.
+uint32_t choose_home_tile_seed(const planetology_state& pl,
+                               const std::vector<float>& bias,
+                               const std::vector<uint8_t>& convergent,
+                               uint32_t campaign_seed, float deposit_scalar)
+{
+    uint32_t chosen = campaign_seed ^ 0xE471001u;
+    uint32_t floor_seed = 0;
+    bool have_floor = false;
+    for (int attempt = 0; attempt < 6; ++attempt)
+    {
+        const uint32_t candidate = (campaign_seed ^ 0xE471001u)
+                                 ^ (static_cast<uint32_t>(attempt) * 0x9E3779B9u);
+        world scratch;
+        const entity_id probe = scratch.create_entity();
+        const auto probe_tiles = generate_body_tiles(scratch, probe,
+            home_grid_width, home_grid_height, pl.profile,
+            candidate, deposit_scalar, &pl, nullptr, &bias, &convergent);
+        const int sea = largest_enclosed_sea(scratch, probe_tiles,
+                                             home_grid_width, home_grid_height);
+        if (attempt < 3 && sea >= 300)
+            return candidate;
+        if (!have_floor && sea >= 30) { floor_seed = candidate; have_floor = true; }
+        // Past the arena window with the floor already met: done searching.
+        if (attempt >= 2 && have_floor) break;
+    }
+    if (have_floor) chosen = floor_seed;
+    return chosen;
+}
+
 } // namespace
+
+std::vector<entity_id> generate_home_surface_preview(world& w, entity_id body,
+                                                     const world_params& params,
+                                                     const world_gen_config& gen_cfg)
+{
+    // The same pipeline make_hard_coded_world runs for Kepler, and nothing else:
+    // resolve, chain, Continents, the acceptance gate, the final generation.
+    // Every seed formula below matches its twin in make_hard_coded_world by
+    // construction (the gate IS the same function). Rivers and the political
+    // layer are sibling passes the preview does not show, and are skipped.
+    const float deposit_scalar = deposit_scalar_for(params.abundance, gen_cfg);
+    const resolved_world rw = resolve_preferences(params.preferences, params.seed);
+
+    body_inputs in = prototype_body(1);
+    in.orbit_au = rw.home_orbit_au;
+    const uint32_t body_seed = params.seed ^ prototype_body_seed(1);
+    const planetology_state st = run_planetology(in, rw.params, body_seed);
+
+    continent_state cs = run_continents(st, home_grid_width, home_grid_height,
+                                        body_seed ^ 0xC0117E57u);
+
+    const uint32_t tile_seed = choose_home_tile_seed(st, cs.height_bias, cs.convergent,
+                                                     params.seed, deposit_scalar);
+    return generate_body_tiles(w, body, home_grid_width, home_grid_height,
+                               st.profile, tile_seed, deposit_scalar, &st,
+                               nullptr, &cs.height_bias, &cs.convergent);
+}
 
 world make_hard_coded_world(world_params params, generation_report* report,
                             const world_gen_config& gen_cfg)
@@ -272,45 +347,11 @@ world make_hard_coded_world(world_params params, generation_report* report,
     // history hook) and does not perturb the deterministic tile surface itself.
     generation_record kepler_record;
 
-    // Reject-and-reroll acceptance gate (BL-276), two bars — the hybrid Ben
-    // chose (2026-08-03: "about 90% likely ... never impossible to try"):
-    //
-    //   ARENA (>= 300 tiles): a playable Mediterranean. Three attempts only —
-    //     with the rift-basin mechanism (continents.cpp) putting a single seed
-    //     at ~58%, three tries land ~90% of worlds. Deliberately NOT retried to
-    //     exhaustion: the ~1-in-10 worlds without an arena are the wanted
-    //     hard-Rome tail.
-    //   FLOOR (>= 30 tiles): some enclosed sea, so trying is never impossible.
-    //     All six attempts may serve it; ~98% of seeds pass on attempt 0.
-    //
-    // Attempt 0 is the unfolded seed, so worlds already qualifying are
-    // untouched; on full exhaustion attempt 0 is kept honestly rather than
-    // clamping anything (the resolve_preferences idiom). Each probe is one
-    // scratch tile generation (~tens of ms).
-    uint32_t kepler_tile_seed = params.seed ^ 0xE471001u;
-    {
-        uint32_t floor_seed = 0;
-        bool have_floor = false, have_arena = false;
-        for (int attempt = 0; attempt < 6; ++attempt)
-        {
-            const uint32_t candidate = (params.seed ^ 0xE471001u) ^ (static_cast<uint32_t>(attempt) * 0x9E3779B9u);
-            world scratch;
-            const entity_id probe = scratch.create_entity();
-            const auto probe_tiles = generate_body_tiles(scratch, probe, 180, 84, kepler_pl.profile,
-                candidate, deposit_scalar, &kepler_pl, nullptr, &kepler_bias, &kepler_convergent);
-            const int sea = largest_enclosed_sea(scratch, probe_tiles, 180, 84);
-            if (attempt < 3 && sea >= 300)
-            {
-                kepler_tile_seed = candidate;
-                have_arena = true;
-                break;
-            }
-            if (!have_floor && sea >= 30) { floor_seed = candidate; have_floor = true; }
-            // Past the arena window with the floor already met: done searching.
-            if (attempt >= 2 && have_floor) break;
-        }
-        if (!have_arena && have_floor) kepler_tile_seed = floor_seed;
-    }
+    // Reject-and-reroll acceptance gate (BL-276) — extracted to
+    // choose_home_tile_seed above, SHARED with the wizard's real-tile preview
+    // so both choose the same seed by running the same code.
+    const uint32_t kepler_tile_seed = choose_home_tile_seed(
+        kepler_pl, kepler_bias, kepler_convergent, params.seed, deposit_scalar);
 
     auto kepler_tiles = generate_body_tiles(w, kepler, 180, 84, kepler_pl.profile,
         kepler_tile_seed, deposit_scalar, &kepler_pl, &kepler_record, &kepler_bias, &kepler_convergent);

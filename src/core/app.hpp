@@ -8,6 +8,7 @@
 #include "world/hard_coded_world.hpp"
 #include "world/recipe_registry.hpp"
 #include "world/tech_tree.hpp"
+#include "world/works_roster.hpp"
 #include "world/world.hpp"
 
 #include "ui/canvas_command.hpp"
@@ -20,6 +21,7 @@
 
 #include <cstdint>
 #include <deque>
+#include <future>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -208,8 +210,24 @@ private:
     std::vector<planetology_state> m_wiz_preview; ///< Live chain result per prototype body at the resolved params.
     std::vector<planetology_state> m_wiz_undrawn; ///< The same run with drawdown forced to 0 — the Spend chart's "before" reference.
 
+    // The REAL homeworld surface for the preview globe: raster terrain_composition
+    // values from generate_home_surface_preview (same pipeline, same gate, same
+    // seed as "Begin" — bench + parity: tools/verify/home_surface_bench.cpp).
+    // Built ASYNC (~0.5-0.9s: the BL-276 gate probes up to 6 scratch surfaces),
+    // so a control click never blocks; the pane shows the previous surface until
+    // the new one lands. Under --verify it is built synchronously instead, so a
+    // golden capture never races the worker. The future is never destroyed while
+    // pending (std::async's dtor would block); a params move mid-build sets the
+    // stale flag and the poll relaunches on arrival.
+    std::future<std::vector<uint8_t>> m_wiz_surface_future;
+    std::vector<uint8_t> m_wiz_surface;       ///< Raster compositions; empty = not yet built.
+    bool m_wiz_surface_stale = false;         ///< Params moved while a build was in flight.
+    void launch_wizard_surface_build();       ///< Start the worker for the CURRENT pending params.
+    void poll_wizard_surface();               ///< Per-frame: adopt a finished build, relaunch if stale.
+
     ui_state        m_ui;
     recipe_registry m_registry;          ///< Recipes + economy constants, loaded from Lua at startup.
+    works_registry  m_works;             ///< BL-321 Era -1 works table, loaded from scripts/works.lua at startup.
     tech_tree_registry m_tech_tree;      ///< BL-087 mock tech/quest tree, loaded from Lua at startup; F9 viewer only.
     economy_report  m_last_econ_report;  ///< Most recent economy-step report; read by the economy panel.
     std::vector<corp_standing> m_last_corp_standings; ///< Per-corp standing profile (BL-262 first slice), recomputed each econ tick from m_last_econ_report's cash flow; read by the Corporations panel. Transient runtime cache — NOT serialised, same as m_last_econ_report.

@@ -184,15 +184,20 @@ int main(int argc, char** argv)
         params.start_year = 0;
         params.stop_year  = 1960;
 
-        // REAL TERRAIN (BL-314 S1). Kepler's own ground, so mountains cost what
-        // mountains cost and terrain_combat is finally live.
+        // REAL TERRAIN (BL-316 S1). Kepler's own ground, so mountains cost what
+        // mountains cost and terrain_combat is finally live. Grid dims come from
+        // the one authority (hard_coded_world.hpp): a wrong-but-same-area pair
+        // here (the original 168x90 vs the real 180x84 — both 15120) misaligns
+        // every terrain lookup SILENTLY instead of crashing.
         entity_id kepler_id = null_entity;
         for (const auto& [bid, b] : w.bodies)
             if (b.name == k->name) { kepler_id = bid; break; }
-        const sim_terrain_arrays terr = build_sim_terrain(w, kepler_id, 168, 90);
+        const sim_terrain_arrays terr = build_sim_terrain(w, kepler_id,
+                                                          home_grid_width, home_grid_height);
 
         const history_sim_state sim =
-            run_history_sim(ss, nullptr, terr.view(), 168, 90, params, wp.seed);
+            run_history_sim(ss, nullptr, terr.view(),
+                            home_grid_width, home_grid_height, params, wp.seed);
 
         {
             int64_t early = 0;
@@ -371,13 +376,20 @@ int main(int argc, char** argv)
         world_params wp; wp.seed = rows.front().seed;
         generation_report rep;
         const world w = make_hard_coded_world(wp, &rep);
-        (void)w;
         const generation_report::body_entry* k = kepler_of(rep);
         settlement_state ss = k->settlement;
         history_sim_params params; params.start_year = 0; params.stop_year = 1960;
-        const sim_terrain_view no_terrain{};
+        // The re-run must be the SAME run: real terrain, real dims. The original
+        // recheck passed an empty sim_terrain_view against real-terrain rows —
+        // a guaranteed false FAIL the moment terrain changes any decision.
+        entity_id kepler_id = null_entity;
+        for (const auto& [bid, b] : w.bodies)
+            if (b.name == k->name) { kepler_id = bid; break; }
+        const sim_terrain_arrays terr = build_sim_terrain(w, kepler_id,
+                                                          home_grid_width, home_grid_height);
         const history_sim_state again =
-            run_history_sim(ss, nullptr, no_terrain, 168, 90, params, wp.seed);
+            run_history_sim(ss, nullptr, terr.view(),
+                            home_grid_width, home_grid_height, params, wp.seed);
         check(again.battles == rows.front().battles && again.conquests == rows.front().conquests,
               "S2   re-running a swept seed reproduces its row exactly");
     }

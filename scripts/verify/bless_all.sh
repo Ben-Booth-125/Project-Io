@@ -22,9 +22,15 @@ fi
 export SDL_RENDER_DRIVER=software
 
 # Use a virtual display if one is available so the bless needs no monitor.
+# Without xvfb, SDL's offscreen video driver serves the same purpose — verified
+# bit-identical to the xvfb+software path (2026-08-07: 0.0000% against goldens
+# blessed by cloud sessions). The software renderer alone on a live Wayland
+# display FAILS to create textures, so one of the two headless paths is required.
 RUN=()
 if command -v xvfb-run >/dev/null 2>&1; then
     RUN=(xvfb-run -a)
+else
+    export SDL_VIDEO_DRIVER=offscreen
 fi
 
 shopt -s nullglob
