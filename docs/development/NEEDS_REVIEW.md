@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*77 entries — 6 open, 71 resolved.*
+*78 entries — 6 open, 72 resolved.*
 
 ---
 
@@ -1217,4 +1217,16 @@ ST-04 (propellant_first) abandon line reads "a rival fires the world-first and t
 > **RESOLVED.** RESOLVED (2026-08-06, Ben) — applied the same tempo-race rework as ST-10 (NR-070). ST-04's watch/abandon no longer treat a rival's First Tank as closing your fork; abandon now triggers on the early-mover WINDOW closing (a mature rival programme makes your own Tank pointlessly late), not on losing a shared trophy. Roster-table row updated to match. Ben's note: the earlier NR-071 filing was overly cautious given this was the same fix already applied and approved on ST-10 moments earlier — judgement was right, should have just applied it.
 
 *Files: `docs/ai/STRATEGIES.md`*
+
+### NR-078 — Roadmap extended: the Era −1 arc folded into v0.3.0, and v1.0.0 named as the playable-game cut
+*decision taken on your behalf · raised 2026-08-08 · from Ben, 2026-08-08 — direct ruling via AskUserQuestion during a roadmap-extension request*
+
+Two structural calls, together answering the roadmap-home half of NR-076 and giving the roadmap its missing terminal milestone. (1) The Era −1 sandbox arc (history sim, ancient tech ladder, mil-sim, diplomacy — BL-271/274/275/277/296–300/306/314) is folded into v0.3.0's writeup as its groundwork, rather than minted as its own v0.2.x band or left unversioned — it never ships to campaign play itself, so it is named the way v0.1.0 named its audit instruments (tooling, not a release). (2) A terminal 'playable full game' milestone is named v1.0.0 (Ben: 'This is v1.0.0 you are speaking of. If we can do that by following current steps, then go ahead') — explicitly reachable by the arc already mapped (v0.1.x–v0.4.0 landing and cohering), not a new pile of scope. ROADMAP.md carries both, plus a retrofit of the v0.1.1–v0.1.4 writeups against current backlog.json status and a v1.0.0 done-definition mirroring v0.1.0's.
+
+**Why it matters.** Resolves NR-076's fourth bullet (the roadmap-gap question) directly. NR-076's first three bullets — cutting BL-160, cutting/parking BL-207, cutting the generation-flavour tail — are Band 3 scope calls and remain OPEN, not pre-empted by this pass. Recorded here per Rule 0c since the shape (fold-in vs. new minor; v1.0.0 vs. an undefined placeholder) was a real fork Ben chose live rather than the assistant deciding silently.
+
+- Amend the v0.3.0 writeup if the Era −1 arc later outgrows a groundwork framing and wants its own minor after all
+- Amend v1.0.0's done-definition as v0.1.x–v0.4.0 actually land — it is explicitly written forward and expected to firm up
+
+> **RESOLVED.** Ratified live, 2026-08-08. ROADMAP.md updated: the v0.3.0 section gained a 'Groundwork folded in here: the Era −1 sandbox' subsection plus the BL-315 conflict spine and the nation-level AI-rivals graduation point; a new v1.0.0 section and matching 'Done-definition — v1.0.0' section were added; v0.1.1–v0.1.4 writeups were retrofitted against current backlog status (BL-203/204 complete, BL-205 cut, 13 new v0.1.1 items surfaced 2026-08-01→08-04, BL-157 firmed by the military design session). CLAUDE.md's ROADMAP.md pointer updated to match.
 
