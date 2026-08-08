@@ -86,8 +86,8 @@ Beyond the base grid and the chrome in the table above, the draw pass
 - **Built-tile installations** — building markers (enlarged silhouette + corp
   emblem tag on built tiles), road spans (BL-172), settlement conurbation
   markers, the home-cluster ring + HQ star.
-- **Corporate borders** — per-corp seat borders (`draw_corp_border`, BL-201
-  foundation).
+- **Corporate HQ markers** — per-corp seat markers (`draw_corp_hq`, BL-182/201
+  foundation; the reach ring retired BL-329, 2026-08-08 — see LENSES.md).
 - **Activity fog + convoy beams** — the intra-body vision layers
   (`permanent_vision`, `convoy_beams` in `ui_state`, BL-151/152/154) and the
   survey region mask (BL-067). Model authority: [DISCOVERY.md](DISCOVERY.md).

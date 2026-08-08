@@ -1927,14 +1927,16 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                 // plate. Lightening toward white keeps the owner hue, so identity
                 // survives; an unowned tile's owner_col is already white, so it stays
                 // white through the same blend.
-                ImU32 marker_col =
+                const ImU32 marker_col =
                     lerp_colour(owner_col, IM_COL32(255, 255, 255, 255), 0.5f);
 
-                // BL-323 S4: a site still under construction reads as such at a
-                // glance — desaturated toward the plate and half-alpha, rather
-                // than looking identical to a finished, producing building.
-                // ticks_remaining is the single source of truth economy_system
-                // counts down; no separate "under construction" flag to drift.
+                // BL-327 (replacing BL-323 S4's dimming, same-day: Ben found the
+                // desaturated silhouette read as "faded", not "being built"): a
+                // site with ticks_remaining > 0 draws the dedicated crane glyph
+                // IN PLACE OF its type silhouette, at full owner-tinted colour —
+                // identity still reads, the type does not, which is honest: the
+                // installation is not that type yet. ticks_remaining is the single
+                // source of truth economy_system counts down; no separate flag.
                 bool under_construction = false;
                 if (k == 0)
                 {
@@ -1946,18 +1948,18 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                             under_construction = true;
                     }
                 }
-                if (under_construction)
-                {
-                    marker_col = lerp_colour(marker_col, IM_COL32(90, 92, 98, 255), 0.6f);
-                    marker_col = (marker_col & 0x00FFFFFFu) | (140u << 24);
-                }
 
                 // The Workforce (Population lens) and Opportunity lenses replace the
                 // building silhouette with the per-tile value mark drawn below
                 // (BL-135) — the mark reads the tile's rank, not its installation.
                 if (state.overlay != overlay_mode::population &&
                     state.overlay != overlay_mode::opportunity)
-                    icons::building(dl, {cx, cy}, sil_r, built_type, marker_col);
+                {
+                    if (under_construction)
+                        icons::under_construction(dl, {cx, cy}, sil_r, marker_col);
+                    else
+                        icons::building(dl, {cx, cy}, sil_r, built_type, marker_col);
+                }
 
                 // Owner-identity tag (BL-090): a small corp emblem tucked into the
                 // hex's lower-right corner, for BOTH player and rival buildings —
@@ -2304,24 +2306,18 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
     }
 
-    // Corporate borders (BL-182 foundation). A corp's border now reads from its
-    // PERSISTED seat + range (corporation_component::hq_building / influence_range,
-    // designated deterministically at generation), replacing the render-time
-    // centroid+hull recompute the player home-ring (BL-085) and rival reach slice
-    // (BL-183) each open-coded. influence_range is unit-hex distance (hex_size = 1),
-    // so the pixel radius is range * hex_size * zoom — matching hex_local_centre
-    // exactly. Drawn on the corp's HOME body only (the single-home model; branch
-    // offices on other bodies are deferred with the full BL-182 mechanic). Still
-    // render-only: the border gates nothing until the deferred operate-gate lands.
-    //
-    // OWED EYEBALL (no in-session build; SDL FetchContent 403): the range is fixed
-    // at generation, so the ring no longer grows as the player builds outward, and a
-    // single projected-range constant now sizes both player and rival rings. Both are
-    // deliberate foundation choices, flagged for a play-test look.
-    auto draw_corp_border = [&](entity_id corp_id, const corporation_component& cc,
-                                unsigned edge_alpha)
+    // Corporate HQ marker (BL-182 foundation; the border RING retired BL-329,
+    // 2026-08-08 — Ben's live critique: "retire the circle around corp
+    // buildings. It doesn't show anything informative." The reach fog/lens
+    // already shows supply reach properly; this fixed-radius, non-growing ring
+    // duplicated that less accurately and added noise). What remains is just
+    // the seat marker itself, from the PERSISTED hq_building (designated
+    // deterministically at generation) — drawn on the corp's HOME body only
+    // (the single-home model; branch offices are deferred with the full
+    // BL-182 mechanic).
+    auto draw_corp_hq = [&](entity_id corp_id, const corporation_component& cc)
     {
-        if (cc.hq_building == null_entity || cc.influence_range <= 0.0f)
+        if (cc.hq_building == null_entity)
             return;
         const auto b = w.buildings.find(cc.hq_building);
         if (b == w.buildings.end())
@@ -2331,48 +2327,43 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             return;
 
         const ImU32  accent = corp_identity(corp_id);
-        const ImU32  edge   = (accent & 0x00FFFFFFu) | (edge_alpha << 24);
         const ImVec2 hq_lc  = hex_local_centre(t->second.grid_x, t->second.grid_y, hex_size);
         const ImVec2 hq_s   = to_screen(hq_lc);
-        const float  ring_r = cc.influence_range * hex_size * zoom;
         const float  hq_r   = std::max(4.0f, draw_r * 0.5f);
 
         const int k_min = (period_px > 0.0f)
-            ? static_cast<int>(std::ceil((visible_left  - hq_s.x - ring_r) / period_px)) : 0;
+            ? static_cast<int>(std::ceil((visible_left  - hq_s.x - hq_r) / period_px)) : 0;
         const int k_max = (period_px > 0.0f)
-            ? static_cast<int>(std::floor((visible_right - hq_s.x + ring_r) / period_px)) : 0;
+            ? static_cast<int>(std::floor((visible_right - hq_s.x + hq_r) / period_px)) : 0;
         for (int k = k_min; k <= k_max; ++k)
         {
             const float off = static_cast<float>(k) * period_px;
-            dl->AddCircle({ hq_s.x + off, hq_s.y }, ring_r, edge, 0, 2.5f);
             icons::hq(dl, { hq_s.x + off, hq_s.y }, hq_r, accent);
         }
     };
 
-    // The player's border is always-on identity chrome (BL-085 lineage), drawn on the
-    // player's home body regardless of the active lens.
+    // The player's HQ marker is always-on identity chrome (BL-085 lineage), drawn on
+    // the player's home body regardless of the active lens.
     if (state.active_body == w.home_body && w.player_entity != null_entity)
     {
         const auto pc = w.corporations.find(w.player_entity);
         if (pc != w.corporations.end())
-            draw_corp_border(w.player_entity, pc->second, 140u);
+            draw_corp_hq(w.player_entity, pc->second);
     }
 
-    // Rival borders (BL-183 lineage): under the Corporation lens, every rival corp's
-    // border reads from the same persisted seat + range via the shared lambda above,
-    // so corporations read as having borders too — the corporation-side counterpart
-    // to the Country lens's national borders. The player's own border is the
-    // always-on chrome above (excluded here, no double-draw). Each rival's border is
-    // drawn on its OWN home body (draw_corp_border gates on the seat's body), so a
-    // rival only shows a ring when its home body is the one on screen. Still
-    // render-only; the operate-gating mechanic stays deferred (BL-182, post-v0.1.0).
+    // Rival HQ markers (BL-183 lineage): under the Corporation lens, every rival
+    // corp's seat reads from the same persisted hq_building via the shared lambda
+    // above. The player's own marker is the always-on chrome above (excluded here,
+    // no double-draw). Each rival's marker is drawn on its OWN home body
+    // (draw_corp_hq gates on the seat's body), so a rival only shows one when its
+    // home body is the one on screen.
     if (state.overlay == overlay_mode::corporation)
     {
         for (const auto& [corp_id, cc] : w.corporations)
         {
             if (corp_id == w.player_entity)
                 continue;
-            draw_corp_border(corp_id, cc, 150u);
+            draw_corp_hq(corp_id, cc);
         }
     }
 

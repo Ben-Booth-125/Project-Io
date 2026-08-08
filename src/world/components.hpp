@@ -540,6 +540,14 @@ struct corporation_component
     /// holdings on its home body keeps `{null_entity, 0}` — no border. **Render-only
     /// today**: the border gates nothing until the deferred BL-182 operate-gate
     /// lands (post-v0.1.0). See docs/generation/CORPORATION_GENERATION.md, LENSES.md.
+    ///
+    /// **The border RING itself was retired 2026-08-08 (BL-329)** — Ben's live
+    /// critique: a fixed-radius circle that never grew as the player built
+    /// outward showed nothing informative once the BL-323 reach fog existed to
+    /// show supply reach properly. `influence_range` is still computed and
+    /// stored (a future operate-gate may want it); only `body_surface_canvas.cpp`'s
+    /// `draw_corp_hq` (formerly `draw_corp_border`) stopped drawing it — the HQ
+    /// marker glyph itself is unaffected.
     entity_id hq_building     = null_entity;
     float     influence_range = 0.0f;
 };

@@ -124,6 +124,30 @@ void unit(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
     dl->AddPolyline(v, 3, colour,  ImDrawFlags_None, 1.5f);
 }
 
+void under_construction(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
+{
+    // Crane silhouette: a mast, an angled boom reaching toward the load, a
+    // back-stay bracing it, and a short hook line hanging from the boom tip.
+    // Four strokes, stroke-only (see the header contract) — distinct from the
+    // unit chevron (a closed V), the convoy chevron (points right), and every
+    // filled building glyph. Same shadow-then-colour pass as unit()/convoy() so
+    // it reads against any terrain or lens fill.
+    const ImVec2 base    { centre.x - r * 0.15f, centre.y + r         };
+    const ImVec2 top     { centre.x - r * 0.15f, centre.y - r         };
+    const ImVec2 boom_tip{ centre.x + r,         centre.y - r * 0.60f };
+    const ImVec2 stay    { centre.x - r * 0.85f, centre.y - r * 0.15f };
+    const ImVec2 hook    { boom_tip.x,            boom_tip.y + r * 0.35f };
+
+    const auto stroke = [&](ImVec2 a, ImVec2 b) {
+        dl->AddLine(a, b, outline, 2.5f);
+        dl->AddLine(a, b, colour,  1.5f);
+    };
+    stroke(base, top);       // mast
+    stroke(top, boom_tip);   // boom
+    stroke(top, stay);       // back-stay
+    stroke(boom_tip, hook);  // hook line
+}
+
 void ledger(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
 {
     const ImVec2 a = { centre.x - r, centre.y - r };
