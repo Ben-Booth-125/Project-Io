@@ -9304,6 +9304,69 @@
      "notes": "Goldens NOT re-blessed: on this Linux box every golden diffs ~20-35% even on untouched captures (environment mismatch). Re-bless list in NR-104."
     }
    ]
+  },
+  {
+   "brief": "generated-body-names",
+   "title": "BL-257: Body names are generated, and body identity stops being a display string",
+   "difficulty": 3,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "active",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-257: no code anywhere compares a body's NAME to decide which body it is. generation_report::body_entry carries the world entity id it describes plus an is_homeworld flag; hard_coded_world's settlement merge, seed_genesis_history, the Tile Ledger biography lookup and Ages sim cache, the Continent lens plate lookup and every verify harness read identity, not name.",
+     "verification": [
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "grep of src/ and tools/verify/ for `.name == \"` / `.name != \"` returns nothing; 12 sites converted across 5 source files and 7 harnesses",
+     "notes": "Done and landed independently of the naming change, as the item required."
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-257: body names are coined from world/tongue.hpp (the BL-290 phoneme inventory + word builder) rather than a naming bank of their own, and generate_body_names is a PURE function of the world seed - same seed, same catalogue, run to run.",
+     "verification": [
+      "headless: body_names_harness",
+      "headless: world_audit"
+     ],
+     "status": "complete",
+     "result_metric": "body_names_harness B1 PASS across 8 seeds; world_audit BL-257 R2 PASS; world_determinism + determinism_harness unchanged",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "requirement": "BL-257: no two bodies in one system share a name, moons included; different seeds coin different catalogues.",
+     "verification": [
+      "headless: body_names_harness",
+      "headless: world_audit"
+     ],
+     "status": "complete",
+     "result_metric": "body_names_harness B2/B3 PASS; world_audit BL-257 R1 PASS",
+     "notes": ""
+    },
+    {
+     "id": "R4",
+     "requirement": "BL-257: the register rule holds and is written down - star/planets mythological (one bare coined word), moons descriptive and derived from their parent, the home body a root plus the tongue's place morpheme, asteroids a coined word plus a catalogue index. Documented in docs/generation/PLANETOLOGY.md § Body naming.",
+     "verification": [
+      "headless: body_names_harness",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "body_names_harness B4 PASS (moon name ends with its parent's; asteroid name ends in a digit); rule table in PLANETOLOGY.md",
+     "notes": ""
+    },
+    {
+     "id": "R5",
+     "requirement": "BL-257: verify scripts address bodies by ROLE (home / star / moon / asteroid / inner) through find_body, never by display name, so a script cannot break when the seed changes.",
+     "verification": [
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "28 scripts converted; no body-name literal remains in scripts/verify/*.lua outside comments",
+     "notes": "Visual goldens showing a body name on screen need regenerating - the names they captured no longer exist."
+    }
+   ]
   }
  ]
 }
