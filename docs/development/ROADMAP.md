@@ -339,12 +339,31 @@ added by Ben 2026-08-04).
   surface. **BL-280** (settled 2026-08-03, NR-024) gives Tax its first concrete lever: a
   chartered corp bargains its rate with its home nation rather than reading a fixed number.
   Design + stub.
+
+  **No longer design-only (2026-08-09).** Two prototype-enablers were filed so this minor can be
+  **cut** rather than merely designed: **BL-342** (the shared `condition_set` evaluator) and
+  **BL-343** (laws MVP — one enacted extraction levy, appearing as its own line in the budget
+  ledger). The unlock was structural: BL-155 and BL-156 had *both* settled on the same predicate
+  object — "a flat AND-list of atomic conditions" — and neither built it, because each was scoped
+  design-only. One small pure evaluator was all that stood between two design-forward minors and
+  two shippable ones. BL-342 lands here because Laws is its first consumer.
 - **v0.1.4 — Techs** (**BL-156**). Early design toward the tech / quest system — the condition-set
   gate model (gate = quest = tech) that BL-087 reframed and the v0.4.0 filter system formalises.
   Design only; precursor to BL-087. **Overtaken in practice, 2026-08-04/05:** BL-087 itself —
   versioned v0.3.0, not this stub, see below — is now under active design as a constellation tech
   web at the same grain as the Era −1 sandbox's ancient tech ladder; BL-156's early pass and
   BL-087's real one are converging rather than cleanly sequencing one after the other.
+
+  **No longer design-only (2026-08-09).** **BL-344** (techs MVP) makes it cuttable. More of this
+  minor exists than its status suggested — a tech tree has been in `world/tech_tree.{hpp,cpp}`
+  since 2026-07-08 and BL-310 shipped its radial viewer — but `tech_tree.hpp:49` stores
+  `condition` as a descriptive **string**, so no tech can be earned and nothing can be unlocked.
+  BL-344 promotes that field to BL-342's `condition_set` and closes the loop once, end to end.
+  Its unlock target is deliberately the **military base** (landed with BL-325) rather than another
+  building: BL-094's design test says a technology that can only unlock a building is being
+  designed for the corporate player we are pivoting away from, and gating the base costs the same
+  as gating a smelter. Also a cheap window — no save format exists yet (BL-107 is open), so
+  changing a stored field is a compile-time change today and a migration later.
 - **v0.1.5 — Military systems** (**BL-157**). The Conflict dimension's first data-model footing —
   units, forces, and the seams they need in the world model. Stub, not mechanics (Conflict proper
   stays post-cut scope). **Firmed up substantially by the 2026-08-07 military design session**
@@ -357,6 +376,16 @@ added by Ben 2026-08-04).
   simulated wars first.
 - **v0.1.6 — Politics (stub)** (**BL-158**). A data-model stub only — enough political layer for
   the v0.3.0 governing actor to have something to own, deferring the working system to v0.4.0.
+
+  **No longer design-only (2026-08-09).** **BL-345** (politics MVP) makes it cuttable, and it is
+  smaller than the minor looks: BL-158's own 2026-08-02 settlement records that most of the stub
+  had already dissolved into other items — political character into nation generation, the lever
+  slots into BL-155 and BL-094 — leaving exactly one unowned axis, **inter-nation relationships**.
+  BL-345 builds that axis *with a consumer*, on a deliberate rule: **a stub nothing reads is
+  indistinguishable from no stub**, and shipping records no code path consults is how you discover
+  at v0.3.0 that the shape was wrong. The consumer is convoy cost across a cold border — a
+  modifier on a cost function logistics already computes, the same cheap shape BL-323's reach rule
+  took — so the political map starts mattering to the economic one.
 - **v0.1.7 — Generation visibility + UI alignment.** *(Added by Ben, 2026-08-04: "a pass on
   generation visibility... visualising the world at each step — we haven't yet done that.")* The
   band's last minor before the refocus, and its third concrete build minor. Two themes:

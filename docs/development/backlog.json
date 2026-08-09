@@ -7570,6 +7570,108 @@
       "authority_doc": "docs/development/DEVELOPMENT_PRACTICES.md",
       "summary": "Split out of BL-302 at the v0.1.8 cut. BL-302 settled and implemented the dependency-acquisition posture (seeded FETCHCONTENT_SOURCE_DIR_<dep> cache + a documented from-cold check), but the fault that opened it -- a schannel TLS revocation failure downloading SDL3 -- is Windows-specific and does NOT reproduce on Linux, where a from-cold configure succeeds in ~74s. So the fix is untested against the actual symptom.",
       "design": "One command, on the Windows machine, from `DEVELOPMENT_PRACTICES.md` § Dependency acquisition:\n\n```\nIO_DEPS_CACHE=/nonexistent cmake -S . -B <tmp>/build -DFETCHCONTENT_BASE_DIR=<tmp>/deps -DCMAKE_BUILD_TYPE=Release\n```\n\n`IO_DEPS_CACHE=/nonexistent` is load-bearing: without it the seeded cache satisfies the configure and the check proves nothing.\n\n**Two outcomes, and they lead different ways.**\n\n- **It fails with the schannel revocation error** -- the posture is vindicated: seed `_deps_cache` from a working tree once, and that machine never needs the network at configure time again. Confirm the seeded path then works there.\n- **It succeeds** -- the original failure was transient or environmental (AV TLS interception, a cert-chain change since), and BL-302's machinery is insurance rather than a fix. Record that, because it changes how much the cache is worth carrying.\n\nEither way the answer is cheap and the item is a verification, not a build. Blocked only on being at that machine."
+    },
+    {
+      "id": "BL-342",
+      "short_name": "CONDITION_SET_EVALUATOR",
+      "category": "Systems",
+      "title": "condition_set: build the shared predicate once, and make it evaluable - the spine laws, techs and the filter system all read",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 3,
+      "parked": false,
+      "blocked_on": [],
+      "written": "2026-08-09",
+      "version_goal": "v0.1.3",
+      "requires": [],
+      "files": [
+        "src/world/condition_set.{hpp,cpp}",
+        "src/world/tech_tree.hpp",
+        "tools/verify/condition_set_harness.cpp",
+        "docs/SYSTEMS.md"
+      ],
+      "authority_doc": "docs/SYSTEMS.md",
+      "summary": "Prototype-enabler filed 2026-08-09 to make v0.1.3 and v0.1.4 cuttable. BL-155 (laws) and BL-156 (techs) BOTH settled on the same object -- 'condition_set = a flat AND-list of atomic conditions', shared by tech/quest/law and inherited by v0.3.0's filter system -- and neither builds it, because each is scoped as design-only. So the one thing standing between two design-forward minors and two shippable ones is a small, pure, testable predicate evaluator that nobody owns. This item owns it.",
+      "design": "## Why this is the unlock\n\nTwo minors (v0.1.3 Laws, v0.1.4 Techs) are stuck in design-forward limbo, and they are stuck on\nthe SAME missing object. BL-156 settled its shape on 2026-07-11 and BL-155 depends on it:\n\n> `condition_set` = a flat AND-list of atomic conditions -- no nested OR-mesh (mirrors BL-087\n> resolution 1: binary tree, no re-converging mesh). Keeps evaluation order deterministic and the\n> predicate legible.\n\nNothing builds it. `tech_tree.hpp:49` still stores `condition` as a bare descriptive **string**\n(`research | structure | stockpile | market | surplus | era`) -- a label, not something that can\nresolve true or false. BL-156's own note names the promotion this forces: *\"a law is read every\ntick and must resolve true/false, so the label must become a structured predicate.\"*\n\nBuild it once, and both minors become buildable. That is the whole argument for this item existing\nseparately rather than inside either one.\n\n## Scope -- deliberately just the predicate\n\n**In:** the atomic-condition type, the AND-list container, a pure `evaluate(condition_set, const\nworld&) -> bool`, and a headless harness. **Out:** laws, techs, UI, persistence, any consumer. Those\nare BL-343 and BL-344.\n\n## Shape\n\nAn atomic condition is `{subject, comparator, operand}` over readable world state. The prototype\nset follows tech_tree.hpp's existing six labels, promoted from strings to real subjects --\n`research`, `structure`, `stockpile`, `market`, `surplus`, `era` -- because they were chosen\nagainst real content and re-deriving them abstractly would be inventing where evidence exists.\n\nThree properties are load-bearing:\n\n1. **Pure and deterministic.** `evaluate` reads `const world&` and nothing else -- no RNG, no\n   clock, no cached mutable state. It runs every tick for every enacted law, so it sits directly\n   on the determinism invariant.\n2. **Empty set means true.** BL-155: *\"Most laws are unconditional once enacted (empty\n   `condition_set` = always-on)\"*. The degenerate case is the common case; it must be the cheap\n   one, not a special case bolted on.\n3. **A subject may be MILITARY, not only economic.** This is BL-094's design test applied at the\n   foundation: *\"Does this system reach military as well as economic outcomes?\"* The prototype\n   need not ship a military subject, but the type MUST NOT be shaped so that adding one later\n   means changing the type. A `subject` enum that only enumerates economic quantities is exactly\n   the failure the pivot is trying to avoid, and it is far cheaper to avoid now than to unpick.\n\n## Verification\n\n`tools/verify/condition_set_harness.cpp`: empty set is true; each subject resolves against a\nhand-built world; comparator boundaries (>=, >, ==) are exact rather than epsilon-fuzzy on integer\nsubjects; evaluation is order-independent for an AND-list; the same world evaluates identically\ntwice (determinism).\n\n## Sequencing\n\nFirst. BL-343 (laws MVP) and BL-344 (techs MVP) both consume it and can then run in parallel."
+    },
+    {
+      "id": "BL-343",
+      "short_name": "LAWS_MVP_ONE_LEVER",
+      "category": "Systems",
+      "title": "Laws MVP: one enacted law, one effect family, and its cost visible in the budget ledger",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 3,
+      "parked": false,
+      "blocked_on": [],
+      "written": "2026-08-09",
+      "version_goal": "v0.1.3",
+      "requires": [
+        "BL-342"
+      ],
+      "files": [
+        "src/world/law.{hpp,cpp}",
+        "src/world/economy_system.cpp",
+        "src/ui/economy_ledger.cpp",
+        "tools/verify/law_harness.cpp",
+        "docs/SYSTEMS.md"
+      ],
+      "authority_doc": "docs/SYSTEMS.md",
+      "summary": "Prototype-enabler filed 2026-08-09 to make v0.1.3 cuttable. BL-155 settled the law object (condition_set + polymorphic effect), a ten-law list and a four-family effect taxonomy, but is scoped design-only -- so v0.1.3 has a complete design and nothing a player can touch. This builds the thinnest END-TO-END slice: one law, enacted, read at the enforcement seam, with its effect legible where the player already looks.",
+      "design": "## The bar: one law you can turn on and see\n\nNot the ten-law list, not a policy screen. **One law, enacted, changing a number the player can\nalready read.** A law the player cannot observe working is indistinguishable from an unimplemented\none, and that is the difference between v0.1.3 being cuttable and being another design document.\n\n## Which law, and why that one\n\n**The extraction tax** -- BL-155's law #1, family (a) margin modifiers: a per-unit levy on raw\nextraction output.\n\nIt is the right first instance for reasons that are about the SEAM, not the fiction:\n\n- Its effect family (scale a flow's price/cost) is the one the other three margin laws reuse, so\n  building it builds a quarter of the taxonomy rather than a special case.\n- Extraction output already flows through a single accounted path, so the seam is one place.\n- The result lands in `apply_budget`'s existing five flows, which the budget ledger already\n  itemises (BL-072/073/074). **The legibility is free** -- a new expenditure line, not a new\n  surface.\n- It is unconditional once enacted, so it exercises BL-342's empty-`condition_set` path, which is\n  the common case.\n\n## Scope\n\n**In:** the `law` record (id, subject, `condition_set`, effect, enacted flag); ONE effect family\n(margin modifier); the enforcement seam in `economy_system`; the enacted set on the world; a\nbudget-ledger line; a headless harness. **Out:** the other nine laws, the other three families,\nenactment UI beyond a debug toggle, repeal politics, nation-negotiated rates (BL-280).\n\n## The enforcement seam -- the one real design decision\n\nBL-155 names it as open: *\"where enforcement hooks into `economy_system` without breaking\ndeterminism.\"* Settle it here, with one rule: **a law is a modifier OVER the market, never an\noverride OF it.** That is the principle already established when price clamps were vetoed\n(2026-07-11) precisely because they would fight price resolution rather than shift a flow's cost.\n\nSo the levy applies where the flow is *accounted*, not where the price is *resolved*: extraction\noutput is priced by the market exactly as now, and the levy is a separate accounted cost. Two\nconsequences worth stating -- the market stays the only thing that sets prices, and the player can\nsee the tax as its own number rather than as an unexplained worse price.\n\nEvaluation happens once per law per tick, before the economy step reads it, so ordering is fixed\nand the determinism invariant holds.\n\n## The design test, honestly applied\n\nBL-094 asks: *does this reach military as well as economic outcomes?* An extraction tax does not,\nand pretending otherwise would be dishonest. What this item owes instead is that **nothing in the\nlaw record or the effect dispatch assumes an economic subject** -- the taxonomy must accept a\nmilitary effect when there is one to add (BL-315's conflict spine). Build the seam so the answer\ncan become yes; do not claim it already is.\n\n## Verification\n\n`tools/verify/law_harness.cpp`: an unenacted law changes nothing; an enacted levy reduces net\nmargin by exactly rate x units, with no other flow perturbed; two identical worlds with the same\nenacted set produce identical balances (determinism); repeal restores the baseline exactly."
+    },
+    {
+      "id": "BL-344",
+      "short_name": "TECHS_MVP_ONE_GATE",
+      "category": "Systems",
+      "title": "Techs MVP: promote the tech-tree label to a real condition_set gate, and let one tech unlock one thing",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "A",
+      "difficulty": 3,
+      "parked": false,
+      "blocked_on": [],
+      "written": "2026-08-09",
+      "version_goal": "v0.1.4",
+      "requires": [
+        "BL-342"
+      ],
+      "files": [
+        "src/world/tech_tree.{hpp,cpp}",
+        "src/world/construction.cpp",
+        "tools/verify/tech_gate_harness.cpp",
+        "docs/SYSTEMS.md"
+      ],
+      "authority_doc": "docs/SYSTEMS.md",
+      "summary": "Prototype-enabler filed 2026-08-09 to make v0.1.4 cuttable. A tech-tree mock has existed since 2026-07-08 with a radial viewer on F9 (BL-310), but its `condition` is a descriptive STRING -- so no tech can actually be earned and nothing can actually be unlocked. This closes the loop: one tech, gated on a real condition_set, unlocking one piece of content.",
+      "design": "## What already exists, and the one thing missing\n\nMore of this is built than the minor's design-forward status suggests. `world/tech_tree.{hpp,cpp}`\nholds a tree; BL-310 shipped a radial constellation viewer on F9. What is missing is that\n`tech_tree.hpp:49` stores:\n\n```\nstd::string condition; ///< research | structure | stockpile | market | surplus | era.\n```\n\nA label. It describes what the gate would be about; it cannot resolve. So the tree is a picture of\na system rather than the system, and no tech has ever been earned.\n\n## The bar: one tech, earned by play, unlocking something real\n\nReplace `std::string condition` with BL-342's `condition_set`, then make exactly one tech\nsatisfiable through ordinary play and have its unlock change what the player may do. End to end,\nonce. Everything else in the tree keeps its authored shape.\n\n## Scope\n\n**In:** the field promotion (string -> `condition_set`) with the existing tree re-authored onto it;\nper-corp earned-tech state; the unlock check at ONE content gate; the F9 viewer showing\nlocked/earned honestly. **Out:** research points and their economy (BL-332), the constellation\ngrain and deeds (BL-087, v0.3.0), quest trees, the Era->Filter rename (v0.4.0).\n\n## Which unlock, and the design test\n\nPick a **building or recipe** gate, because `can_place_in_world` and the recipe registry are\nalready the single choke points that placement and production both pass through -- so the unlock\nis one condition in one place, not a new subsystem.\n\n**And prefer a MILITARY unlock over an economic one.** This is BL-094's test -- *\"does this system\nreach military as well as economic outcomes? If a technology can only unlock a building, it is\nbeing designed for the corporate player we are pivoting away from\"* -- and v0.1.5 has just given\nus something to point at: `building_type::military_base` landed with BL-325. Gating the military\nbase behind a tech is the same amount of work as gating a smelter, and it is the instance that\nproves the pillar the pivot cares about. BL-332 (military points and research) is the natural\nfollow-on and should be sequenced against this rather than designed independently.\n\n## Why the promotion is safe now\n\nNo serialisation layer exists yet (BL-107 is still open), so changing a stored field is a\ncompile-time change rather than a save-format break. This is a *cheap* window that closes the\nmoment saves land -- worth doing now for that reason alone.\n\n## Verification\n\n`tools/verify/tech_gate_harness.cpp`: a tech with an unmet gate is not earned and its content is\nrefused with the right reason; satisfying the condition earns it; the unlock then permits placement\nat the same call site that refused it; earned state is per-corp, not global; two identical worlds\nearn identically (determinism)."
+    },
+    {
+      "id": "BL-345",
+      "short_name": "POLITICS_MVP_RELATIONSHIP_AXIS",
+      "category": "Systems",
+      "title": "Politics MVP: the nation-pair relationship axis, generated from existing character, with one consumer that actually reads it",
+      "status": "designed",
+      "glyph": "✓",
+      "priority": "B",
+      "difficulty": 3,
+      "parked": false,
+      "blocked_on": [],
+      "written": "2026-08-09",
+      "version_goal": "v0.1.6",
+      "requires": [],
+      "files": [
+        "src/world/components.hpp",
+        "src/world/nation_generation.cpp",
+        "src/world/logistics.cpp",
+        "tools/verify/relationship_harness.cpp",
+        "docs/SYSTEMS.md"
+      ],
+      "authority_doc": "docs/SYSTEMS.md",
+      "summary": "Prototype-enabler filed 2026-08-09 to make v0.1.6 cuttable. BL-158's own 2026-08-02 note records that most of the politics stub was already dissolved into other items, leaving ONE axis genuinely unowned: inter-nation relationships. This builds that axis and -- the part that matters -- gives it a consumer, because a data stub nothing reads is indistinguishable from no stub at all.",
+      "design": "## What is actually left of v0.1.6\n\nBL-158 was a data-model stub for political character, relationships and lever slots. Its 2026-08-02\nsettlement records that most of it dissolved: political character already exists in nation\ngeneration, and the lever slots went to BL-155 (laws) and BL-094 (the governing actor). The\nresidual is the **relationship axis** -- how two nations stand toward each other -- and nothing\nowns it.\n\n## The rule this item is built on\n\n**A stub nothing reads is indistinguishable from no stub.** The failure mode for a\n\"data-model stub\" minor is shipping serialisable records that no code path consults, declaring the\nmodel positioned, and discovering at v0.3.0 that the shape was wrong because nothing ever exercised\nit. So this item deliberately includes a consumer, and the consumer is the acceptance criterion.\n\n## Scope\n\n**In:** a symmetric per-nation-pair relationship scalar; derivation at world generation from\npolitical character and shared borders that already exist; ONE consumer that changes observable\nbehaviour; a headless harness. **Out:** diplomacy verbs (BL-297), treaties, war declaration, any\nruntime nation actor (BL-094 re-specifies that from the new player identity), AI decision-making.\n\n## Shape\n\nOne scalar per unordered pair, seeded deterministically. Derive it from what generation already\nproduces rather than rolling it fresh -- the ladder's fragmentation outcome, shared border length,\nand the political character already assigned. Two nations that share a long contested border and\nopposed characters start cold; two that share neither start neutral. **Derived, not narrated**, which\nis the same discipline HISTORY.md's ladder is held to.\n\nStorage is a flat symmetric structure keyed by the pair, not a per-nation list of opinions --\nasymmetric relationships are a real design option but they double the state and nothing in the\nprototype needs them yet. Say so explicitly so v0.3.0 knows it was a choice.\n\n## The consumer -- pick the cheapest honest one\n\n**Convoy/trade access across a hostile border.** The logistics layer already computes\nterrain-weighted routes with road discounts and already knows which nation owns a tile, so a\nrelationship term is a modifier on an existing cost function rather than a new system -- the same\nshape BL-323's reach rule took, and the reason that one was affordable.\n\nThe player-visible consequence: trading across a cold border costs more, so the political map\nstarts mattering to the economic one. That is also the first time politics reaches something the\nplayer already cares about, which is what makes v0.1.6 worth cutting rather than filing.\n\n## The design test\n\nBL-094 asks whether the system reaches military as well as economic outcomes. Relationships are\nthe axis a conflict layer reads FIRST -- who may cross whom, who supplies whom (BL-315's supply\nlines as live targets). So the axis must be shaped as a general standing between nations, not as a\ntrade modifier that happens to be called a relationship. The MVP's single consumer is economic\nbecause that is what exists to consume it; the TYPE must not encode that.\n\n## Verification\n\n`tools/verify/relationship_harness.cpp`: every nation pair has exactly one entry and it is\nsymmetric; the same seed produces the same matrix; a cold pair raises cross-border convoy cost by\nthe stated term while a neutral pair does not; no self-pair exists; the derivation reacts to\nshared-border length in the stated direction."
     }
   ]
 }
