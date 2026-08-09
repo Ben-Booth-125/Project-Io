@@ -1032,6 +1032,11 @@ std::vector<entity_id> generate_body_tiles(
     // --- Pass 2: ocean placement ---
     float ocean_threshold = 0.0f;
     int   ocean_tiles     = 0;
+    // Poorly-drained ground: the lowest slice of LAND, measured against this
+    // body's own sea level rather than an absolute height. Filled by Pass 2 and
+    // consumed by Pass 4b (drainage). Empty on a body with no standing water,
+    // which is exactly the case where "poorly drained" has no meaning.
+    std::vector<uint8_t> lowland(total, 0u);
     if (profile.hydrology == hydrological_state::liquid && profile.water_fraction > 0.0f)
     {
         // Bias the heightmap downward toward the equator so ocean concentrates
@@ -1074,6 +1079,29 @@ std::vector<entity_id> generate_body_tiles(
                 comp[idx]     = terrain_composition::ocean;
                 ++ocean_tiles;
             }
+        }
+
+        // Land elevation runs from `ocean_threshold` (the shoreline) up to
+        // sorted.back(). Take the bottom `lowland_share` of that ordering — a
+        // PERCENTILE, like the ocean threshold above it, so the coastal-plain
+        // slice exists on every seed instead of depending on where a noise blob
+        // happened to land. An absolute cut cannot do this job: the Pass 5 valley
+        // fill uses height < 0.35 and finds literally zero Kepler tiles, because
+        // the ocean already took the bottom 60% of the heightmap.
+        //
+        // 0.15 is the ground genuinely near base level — coastal plain and delta,
+        // where water has nowhere further to go. Widening it to 0.20-0.25 starts
+        // taking ordinary inland plain that drains perfectly well, which is not
+        // what this pass is for; measured, those values push Kepler's wetland to
+        // 3.2%/4.0% of land by marshing ground that has no reason to be marsh.
+        constexpr float lowland_share = 0.15f;
+        if (k < total - 1)
+        {
+            const int lk = k + static_cast<int>(lowland_share * static_cast<float>(total - 1 - k));
+            const float lowland_threshold = sorted[static_cast<std::size_t>(std::clamp(lk, k, total - 1))];
+            for (int idx = 0; idx < total; ++idx)
+                if (!is_ocean[idx] && biased[idx] <= lowland_threshold)
+                    lowland[static_cast<std::size_t>(idx)] = 1u;
         }
     }
 
@@ -1141,6 +1169,64 @@ std::vector<entity_id> generate_body_tiles(
         }
 
         comp[idx] = c;
+    }
+
+    // --- Pass 4b: drainage (BL-338) ---
+    //
+    // Wetland is a DRAINAGE feature, not a climate zone. Until now it was
+    // reachable only from two cells of the (band, moisture) table — subtropical
+    // and tropical at high moisture — which on Kepler is 16% of rows, the same
+    // rows the equatorial ocean bias drowns hardest. Moisture is latitude-blind
+    // noise, so whether the home planet has any wetland at all was decided by
+    // where one noise blob happened to sit. On the shipped seed it sat off the
+    // equator: the subtropical/tropical bands came out DRY (437 of 624 land tiles
+    // in the lowest moisture column) and the world generated 12 wetland tiles.
+    // Meanwhile the wet ground the world does have — 2,332 high-moisture land
+    // tiles in the temperate and subpolar bands — could not produce a marsh,
+    // because latitude forbade it.
+    //
+    // Marshes form where low ground cannot drain: coastal plains, deltas, the
+    // ground a river has nowhere to leave. That is height + water + moisture, and
+    // height had no say in composition at all. So: low-lying, high-moisture ground
+    // carrying an already-biotic cover becomes wetland.
+    //
+    // EXTENDS the table rather than contradicting it. The override adds the axis
+    // the table lacks (elevation) to the two bands whose wet cell the table leaves
+    // as ordinary vegetation, and stays out of the cells where the table has
+    // already NAMED what wet ground is:
+    //   - polar wet ground is icy, and a cap does not thaw because it is low;
+    //   - subpolar wet ground is TUNDRA, which the table states deliberately.
+    // Peat bog is a real subpolar landform and arguably belongs here, but taking
+    // tundra would overrule the table's own answer for that band — and tundra
+    // scores 9 for farm quality against wetland's 58 (settlement.cpp), so
+    // converting it swings habitability hard enough to redraw the province map.
+    // Left alone; if subpolar peatland is wanted it should be the table's call.
+    //
+    // Deliberately an OVERRIDE applied after the table, drawing no RNG of its own
+    // — the same shape as the deposit_scalar / endowment post-multiplies in Pass
+    // 6. comp_rng's stream is untouched, so this cannot shift any later draw, and
+    // Pass 5 is bit-for-bit unchanged (pick_seeds prefers rocky/barren/regolith
+    // on HIGH ground; this converts only biotic cover on the lowest ground).
+    if (biotic && !airless && ocean_tiles > 0)
+    {
+        for (int idx = 0; idx < total; ++idx)
+        {
+            if (is_ocean[idx] || lowland[static_cast<std::size_t>(idx)] == 0u)
+                continue;
+            if (moisture_column(moisture[idx]) < 2)
+                continue;
+            const lat_band b = band[idx];
+            if (b == lat_band::polar || b == lat_band::subpolar)
+                continue;
+            // Only ground that already carries a land biosphere: a marsh needs
+            // vegetation. Barren, rocky and volcanic are excluded on their own
+            // terms, and grassland/forest are the two covers the warm bands' wet
+            // cells actually produce.
+            const terrain_composition c = comp[idx];
+            if (c == terrain_composition::grassland
+             || c == terrain_composition::forest)
+                comp[idx] = terrain_composition::wetland;
+        }
     }
 
     // --- Pass 5: landform clusters ---

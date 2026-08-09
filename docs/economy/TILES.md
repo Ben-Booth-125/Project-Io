@@ -28,6 +28,32 @@ Composition describes the material character of the tile — the geology, ecolog
 
 **Habitable compositions** — grassland, forest, wetland — support population centres and amenity production. The others are primarily extraction or infrastructure terrain.
 
+**Wetland is a drainage feature, not a climate zone (BL-338, 2026-08-09).** Every other
+composition falls out of the Pass 4 `(latitude band, moisture)` table alone. Wetland is the one
+that cannot: a marsh is defined by *where the water fails to leave*, which is an elevation
+question, and elevation had no say in composition at all. Generated from the table alone it went
+effectively extinct — the home body carried **12 wetland tiles, 0.20% of land**, because the table
+reaches wetland only from the subtropical and tropical wet cells (16% of Kepler's rows), moisture
+is latitude-blind noise, and on the shipped seed that noise left exactly those rows dry.
+
+So Pass 4 now has a **Pass 4b drainage override** (`tile_generation.cpp`): low-lying, high-moisture
+ground carrying grassland or forest becomes wetland. "Low-lying" is the bottom **15%** of land by
+elevation measured against *this body's own sea level* — a percentile, like the ocean threshold
+itself, so the coastal-plain slice exists on every seed rather than depending on where a noise blob
+landed. It is deliberately a post-table override that draws no RNG, so it cannot shift any later
+draw, and Pass 5's landform distribution is bit-for-bit unchanged.
+
+It **extends** the table rather than contradicting it, and so stays out of the bands where the
+table has already named what wet ground is: polar wet ground is icy, and subpolar wet ground is
+*tundra*. Real subpolar peatland arguably belongs, but claiming it would overrule the table's own
+answer for that band — and tundra scores 9 for settle quality against wetland's 58, so converting
+it redraws the province map. Left as the table's call to make.
+
+Measured: Kepler **159 wetland tiles, 2.61% of land** (from 0.20%); across the 120-seed
+`earthlike_tile_census`, wetland median **4.3% of land** against Earth's ~6%. Coming in under Earth
+is expected and correct — Earth's figure is carried substantially by the boreal peatlands this
+pass deliberately declines to generate.
+
 ### Terrain landform
 
 Landform describes the physical geography of the tile — its elevation, slope, and shape. It modifies the base properties set by composition without changing them fundamentally.
@@ -297,4 +323,13 @@ barren/icy pair) and is now **325**; per-body land means now separate (defence 8
 
 **Open tuning question raised by that measurement: Kepler generated no valley tiles at all.** Valley is assigned to unclaimed non-ocean ground below the height threshold (Pass 5), but on a wet body the ocean has already taken everything that low — so the ×1.1 fertile landform was unreachable on exactly the bodies where river valleys should be most characteristic. Dry bodies carried 20–27% valley. Self-consistent rather than a defect, but a generation-tuning question; it belongs with the tile-generation refinements (BL-051).
 
-*Re-measured and it still holds (2026-08-09, closing BL-291). Pass 5's ring→landform mapping was rewritten and the ocean band moved after the original measurement, so this was re-run against the current generator: **Kepler 0.0% valley**, against Cinder 24.9%, Pallas 24.8% and Selene 19.8%. The wet-body/dry-body split is reproducible and is a real property of the generator, not a stale artifact. It stays a tuning question for the tile-generation refinements (BL-051), not a defect.*
+*Re-measured and it still holds (2026-08-09, closing BL-291). Pass 5's ring→landform mapping was rewritten and the ocean band moved after the original measurement, so this was re-run against the current generator: **Kepler 0.0% valley**, against Cinder 24.9%, Pallas 24.8% and Selene 19.8%. The wet-body/dry-body split is reproducible and is a real property of the generator, not a stale artifact.*
+
+> **And the fix shape is now known (BL-338, 2026-08-09).** It is the same defect the wetland work
+> above diagnosed, in the landform axis instead of the composition one: an **absolute** height cut
+> (`height < 0.35`) cannot find low ground on a body whose ocean has already taken the bottom 60%
+> of the heightmap. Pass 4b solves it by measuring elevation as a **percentile of land above this
+> body's own sea level**, and `lowland[]` — the mask it builds in Pass 2 — is already sitting there
+> for the valley fill to read. Kepler's 0.0% valley is a one-line change away whenever BL-051 is
+> picked up; it was left alone here only because moving landform would have moved every relief
+> number in the same commit as the biome change.
