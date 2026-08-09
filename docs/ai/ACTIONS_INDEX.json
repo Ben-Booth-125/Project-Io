@@ -247,7 +247,7 @@
   ],
   [
    "ledger.history_body_selector",
-   "History ledger, 'Body' combo (Story and Tiles views only)"
+   "History ledger, 'Body' combo (Story view only)"
   ],
   [
    "ledger.history_chain_round_tab",
@@ -255,7 +255,7 @@
   ],
   [
    "ledger.history_view_expand",
-   "History ledger, chevron on the tab row (Story and Tiles views)"
+   "History ledger, chevron on the tab row (Story view only)"
   ],
   [
    "ledger.history_view_tab",
@@ -288,6 +288,10 @@
   [
    "ledger.nav_corporations_table",
    "Nav rail, slot 8 (Diplomacy icon - provisionally hosts the corporations table)"
+  ],
+  [
+   "ledger.nav_economy",
+   "Nav rail, slot 3 (Workforce icon - provisionally hosts the Economy panel)"
   ],
   [
    "ledger.nav_history",

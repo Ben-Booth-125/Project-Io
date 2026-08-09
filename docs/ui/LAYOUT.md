@@ -115,7 +115,7 @@ A fixed, full-height **icon rail** pinned to the left edge (`nav_pane_width`, cu
 
 - Holds a vertical strip of **nine square icon slots** (BL-174 dropped the glyph-less tenth) — the home for the game's menus and ledgers. **Every slot carries its own vector glyph** (`src/ui/icons.hpp`) — live slots in the bright stroke, reserved slots dimmed — plus a wrapping name-and-blurb tooltip (BL-174, nav-rail legibility).
 - Each slot toggles a panel open/closed; the open slot lights its glyph in the selection accent. An active slot **folds its ledger out into the shell column** to the rail's right (`[nav_pane_width, W]`, BL-122) rather than spawning a floating window; opening one collapses whichever was open (accordion, via `close_all_panels`).
-- **Five slots are live** (`nav_pane.cpp`): Corporation overview, Budget, Market Ledger, Construction, History. **Four are reserved**, disabled with dimmed glyphs: Workforce, Research, Corp. Strategy, Diplomacy. Full slot semantics in `MENU.md`.
+- **Eight slots are live** (`nav_pane.cpp`): five carry their own subject — Corporation overview, Budget, Market Ledger, Construction, History — and three carry a **provisional occupant**, an unbuilt subject whose slot hosts a surface that would otherwise have no door: Workforce hosts the Economy panel (BL-292), Research the tech-tree mock (BL-310), Diplomacy the corporations table (NR-012). **One is reserved**, disabled with a dimmed glyph: Corp. Strategy. Full slot semantics in `MENU.md`.
 
 ---
 
@@ -276,7 +276,8 @@ splits: the **Construction** panel — **Construction / Buildings** (BL-143, bui
 redesign; the Build front door moved to the tile Selection element and Sell Orders moved out;
 defaults to Buildings, BL-176); the **Market Ledger** — **Prices / Sell Orders** (BL-159,
 sell orders on the market surface); the **Economy** panel — Corps / Holdings / Markets
-(`ui_state::economy_view`); the **History** ledger — Story / Chain / Tiles (BL-211). The
+(`ui_state::economy_view`, reachable from nav slot 3 since BL-292); the **History** ledger —
+Story / Chain (BL-211, narrowed from three views by BL-281). The
 **Balance** and **Corporation** ledgers remain single-question — no split. The principle is
 *one question per view, a menu to move between views* — not a mandate to split every panel.
 
@@ -456,9 +457,10 @@ was never part of this item. It stands.
 
 ### The surfaces, and the extension recipe
 
-On the ladder today: the Selection band's metric card, the History ledger's Story / Chain /
-Tiles views, the wizard's chain stages (per stage — Ben, 2026-08-01), and the Corporation
-dashboard's four roll-ups.
+On the ladder today: the Selection band's metric card, the History ledger's Story and Chain
+views, the wizard's chain stages (per stage — Ben, 2026-08-01), and the Corporation
+dashboard's four roll-ups. (A `history_tiles` surface was on the ladder until BL-281 retired
+the view it belonged to; removing a surface is the same two edits in reverse.)
 
 Adding surface #N is **two edits**: an enumerator in `detail_surface`, and a
 `fold_chevron` + `fold_overlay_begin` pair at the call site. Nothing else — no new control,

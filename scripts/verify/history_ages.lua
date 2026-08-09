@@ -9,7 +9,7 @@
 -- shows a settled political map with the run's own counters under it.
 verify.show_panel("economy", false) -- econ_step force-opens it; keep the shot clean
 verify.show_panel("tile", true)
-verify.panel_view("history", 3)     -- 3 = Ages
+verify.panel_view("history", 2)     -- 2 = Ages (was 3 before BL-281 retired Tiles)
 
 verify.panel_view("ages_year", 0)
 verify.capture("history_ages_start")
