@@ -29,6 +29,104 @@ if(NOT IO_IS_MULTI_CONFIG AND NOT CMAKE_BUILD_TYPE)
         "Debug" "Release" "RelWithDebInfo" "MinSizeRel")
 endif()
 
+# ---------------------------------------------------------------------------
+# Dependency acquisition posture (BL-302)
+# ---------------------------------------------------------------------------
+# Every dependency below (SDL3, Lua, sol2, ImGui) is fetched at CONFIGURE time
+# — ~120 MB of tarballs from codeload.github.com. BL-302 was filed when a fresh
+# configure on Windows could not download SDL3 at all (a schannel TLS
+# revocation failure), which stops the build before a single file compiles.
+#
+# Posture chosen: seed a shared per-checkout SOURCE cache. Not vendoring the
+# tarballs (120 MB into git to solve a fault seen on one machine), and not a
+# machine-specific TLS fix (not reproducible, not portable).
+#
+# Measured on Linux 2026-08-09, and this is why the cache shares *sources only*
+# rather than a whole shared FETCHCONTENT_BASE_DIR:
+#
+#   * From-cold configure, empty cache, network live:  SUCCEEDS in ~74 s.
+#     The schannel fault is Windows-specific and does NOT reproduce here.
+#   * Shared FETCHCONTENT_BASE_DIR across two build trees: HARD FAILS.
+#     The <dep>-subbuild dir carries a generator-locked CMakeCache, so a
+#     second tree with a different generator dies with "generator : Ninja
+#     does not match the generator used previously: Unix Makefiles".
+#     That rules the whole-base-dir variant out — this checkout has
+#     build_gen / build_vs / build_linux / build_rel side by side.
+#   * Shared FETCHCONTENT_SOURCE_DIR_<dep>: WORKS. Different generator,
+#     FETCHCONTENT_FULLY_DISCONNECTED=ON, zero downloads, exit 0. Each build
+#     tree still owns its own <dep>-build, so nothing is shared that a
+#     generator can lock.
+#
+# Behaviour:
+#   * No cache dir present  -> nothing happens; each build dir downloads as
+#                              before. This is the default on a fresh clone.
+#   * Cache dir present     -> a COLD build tree takes its sources from there
+#                              and never touches the network.
+#   * Build tree already populated -> left completely alone (build_linux and
+#                              friends keep the sources they already have; no
+#                              re-download, no forced SDL rebuild).
+#   * -DFETCHCONTENT_SOURCE_DIR_<dep>=... on the command line always wins.
+#
+# Seed the cache once (see DEVELOPMENT_PRACTICES.md § Dependency acquisition):
+#   cmake -S . -B <throwaway> -DFETCHCONTENT_BASE_DIR="$PWD/_deps_cache"
+#
+# IO_DEPS_CACHE (env var) overrides the location. A sub-agent worktree points
+# it at the main checkout's cache so a fresh worktree configures offline:
+#   export IO_DEPS_CACHE=/path/to/Project-Io/_deps_cache
+set(IO_DEPS_CACHE "$ENV{IO_DEPS_CACHE}")
+if(NOT IO_DEPS_CACHE)
+    set(IO_DEPS_CACHE "${CMAKE_CURRENT_SOURCE_DIR}/_deps_cache")
+endif()
+
+# Where THIS build tree keeps its own populated deps. FETCHCONTENT_BASE_DIR is
+# not defaulted until include(FetchContent) below, so mirror its default here.
+if(FETCHCONTENT_BASE_DIR)
+    set(IO_LOCAL_DEPS "${FETCHCONTENT_BASE_DIR}")
+else()
+    set(IO_LOCAL_DEPS "${CMAKE_CURRENT_BINARY_DIR}/_deps")
+endif()
+
+# "<FetchContent name>|<a file that proves the source tree is really there>".
+# A bare directory test would accept a half-extracted cache.
+set(IO_DEPS_SEEDED "")
+set(IO_DEPS_COLD "")
+foreach(dep_spec IN ITEMS
+        "sdl3|CMakeLists.txt"
+        "lua_src|lua.h"
+        "sol2_src|include/sol/sol.hpp"
+        "imgui_src|imgui.cpp")
+    string(REPLACE "|" ";" dep_parts "${dep_spec}")
+    list(GET dep_parts 0 dep_name)
+    list(GET dep_parts 1 dep_marker)
+
+    string(TOUPPER "${dep_name}" dep_upper)
+    set(dep_var "FETCHCONTENT_SOURCE_DIR_${dep_upper}")
+    set(dep_cached_src "${IO_DEPS_CACHE}/${dep_name}-src")
+
+    if(NOT "${${dep_var}}" STREQUAL "")
+        # Explicitly pointed somewhere by the caller — never second-guess it.
+    elseif(IS_DIRECTORY "${IO_LOCAL_DEPS}/${dep_name}-src")
+        # This build tree already has it; leave warm trees untouched.
+    elseif(EXISTS "${dep_cached_src}/${dep_marker}")
+        set(${dep_var} "${dep_cached_src}" CACHE PATH
+            "Seeded from the shared Io dependency cache (BL-302)")
+        list(APPEND IO_DEPS_SEEDED "${dep_name}")
+    else()
+        list(APPEND IO_DEPS_COLD "${dep_name}")
+    endif()
+endforeach()
+
+# Say cold-or-warm out loud. A green local build dir hides this failure class
+# completely (BL-302) — the configure line is where it becomes visible.
+if(IO_DEPS_SEEDED)
+    message(STATUS "Deps: seeded from ${IO_DEPS_CACHE} -> ${IO_DEPS_SEEDED}")
+endif()
+if(IO_DEPS_COLD)
+    message(STATUS "Deps: COLD -> ${IO_DEPS_COLD}")
+    message(STATUS "      these download at configure time (~120 MB total);"
+                   " no cache at ${IO_DEPS_CACHE}")
+endif()
+
 include(FetchContent)
 
 # ---------------------------------------------------------------------------
