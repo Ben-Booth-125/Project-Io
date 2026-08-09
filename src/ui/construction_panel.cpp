@@ -6,7 +6,8 @@
 #include <string>  // status strings (BL-095)
 
 #include "foldout_column.hpp" // shell fold-out column host (BL-122)
-#include "icons.hpp"          // production-method pip glyph (building-management shell)
+#include "detail_level.hpp"   // the BL-265 disclosure idiom, reused by BL-229's sections
+#include "icons.hpp"          // production-method pip glyph + the identity plate (BL-229)
 #include "presentation.hpp"
 #include "ui_state.hpp"
 
@@ -16,6 +17,7 @@
 #include "world/logistics.hpp"         // invalidate_logistics_caches (decommission flips the anchor set)
 #include "world/building_profit.hpp"   // estimate_building_profit (BL-143 Buildings tab)
 #include "world/components.hpp"
+#include "world/construction.hpp"     // demolish_building (BL-229 Dismantle)
 #include "world/economy_system.hpp"    // economy_report (BL-143 status column)
 #include "world/market_clearing.hpp"   // market_for_tile (build-rate read, BL-095)
 #include "world/placement_rules.hpp"
@@ -228,8 +230,10 @@ resource_type primary_output_resource(const recipe& r)
 // and a workforce-target button grid. The graphs read PLACEHOLDER deterministic
 // series (no per-building history recorded yet) and the target is still a manual
 // field — the auto-solver that treats it as an editable heuristic is a separate item.
+// Takes ui_state MUTABLE (was const): BL-229's sections use the BL-265 disclosure
+// idiom, and which sections a player has opened lives in ui_state.expanded.
 void draw_selected_section(world& w, const recipe_registry& reg,
-                           const economy_report& report, const ui_state& state)
+                           const economy_report& report, ui_state& state)
 {
     building_component* found = nullptr;
     if (const auto bit = w.buildings.find(state.selected_entity); bit != w.buildings.end())
@@ -255,35 +259,100 @@ void draw_selected_section(world& w, const recipe_registry& reg,
 
     building_component& b = *found;
 
-    // --- Title + placeholder image ---
-    ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s",
-                       building_type_name(b.type));
-
+    // --- Identity plate: the building's own glyph, its name, and where it stands ---
+    //
+    // BL-229 (Ben, 2026-08-09): the image is DRAWN FROM `ui::icons`, not an authored
+    // asset. The glyph vocabulary already carries one silhouette per building_type and
+    // is the same mark the canvas puts on the tile, so the plate and the map agree by
+    // construction rather than by an artist keeping two things in sync. It also costs
+    // no asset pipeline, which the prototype does not have.
+    //
+    // The plate is a SQUARE beside the text rather than a full-width banner: Menu Space
+    // is 380 px at its floor, and a banner at 34% of that spends 130 px of vertical
+    // budget on decoration in a column whose scarce axis is height.
     ImDrawList*  dl        = ImGui::GetWindowDrawList();
     const float  content_w = ImGui::GetContentRegionAvail().x;
     {
-        const float  img_h = content_w * 0.34f;
+        const float  plate = ImGui::GetFrameHeight() * 2.6f;
         const ImVec2 p     = ImGui::GetCursorScreenPos();
-        const ImVec2 mx    = {p.x + content_w, p.y + img_h};
-        dl->AddRectFilled(p, mx, IM_COL32(72, 72, 72, 255), 3.0f);
-        dl->AddRect(p, mx, IM_COL32(110, 110, 110, 255), 3.0f);
-        const char*  ph = "PLACEHOLDER IMAGE";
-        const ImVec2 ts = ImGui::CalcTextSize(ph);
-        dl->AddText({(p.x + mx.x - ts.x) * 0.5f, (p.y + mx.y - ts.y) * 0.5f}, // fit-exempt: watermark centred in a measured cell
-                    IM_COL32(180, 180, 180, 255), ph);
-        ImGui::Dummy({content_w, img_h});
+        const ImVec2 mx    = {p.x + plate, p.y + plate};
+        dl->AddRectFilled(p, mx, IM_COL32(26, 30, 40, 255), 3.0f);
+        dl->AddRect(p, mx, IM_COL32(58, 66, 84, 255), 3.0f);
+        // The Buildings tab lists the player's own holdings, so the identity colour is
+        // theirs — no owner lookup needed here (ownership lives in corp.assets, not on
+        // the building).
+        icons::building(dl, {(p.x + mx.x) * 0.5f, (p.y + mx.y) * 0.5f}, plate * 0.30f,
+                        b.type, palette::corp_identity_colour(w.player_entity, w.player_entity));
+        ImGui::Dummy({plate, plate});
+
+        ImGui::SameLine();
+        ImGui::BeginGroup();
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s",
+                           building_type_name(b.type));
+        if (const auto tit = w.tiles.find(b.tile); tit != w.tiles.end())
+            ImGui::TextDisabled("Tile [%d, %d]", tit->second.grid_x, tit->second.grid_y);
+        if (b.ticks_remaining > 0)
+            ImGui::TextDisabled("Under construction - %d ticks", b.ticks_remaining);
+        else
+            ImGui::TextDisabled("%s", b.decommissioned ? "Closed" : "Operating");
+        ImGui::EndGroup();
     }
 
-    // --- Production Methods: a dropdown of the building's recipes, each tagged with a
+    // --- The four sections, folded to a verdict line each (BL-229, Ben's variant C) --
+    //
+    // Each section rests as ONE line carrying its own answer and opens in place. This
+    // is deliberately the BL-265 idiom rather than a second one: the player already
+    // learned it on the History Chain and the dashboard roll-ups the same day, and
+    // reusing it means the full-canvas control comes free on every section.
+    //
+    // PRODUCTION IS OPEN BY DEFAULT (see `default_open` below). The mockup's own
+    // objection to variant C was that the controls a player touches constantly sit
+    // behind a click; the method combo is the one that earns being open at rest.
+    //
+    // Lifecycle is LAST and its two controls are the only irreversible ones on the
+    // panel. Keeping them inside a section that rests closed is what stops Dismantle
+    // sitting a mis-click away from a workforce button — the one recommendation the
+    // mockups made independently of which variant was chosen.
+    enum building_view_section { sec_production = 0, sec_workforce, sec_profit, sec_lifecycle };
+
+    // A section's resting line: title, its verdict in the right gutter, then `⌄ ›`.
+    // Mirrors corporation_dashboard.cpp's `card_row` so the two read identically.
+    const auto section_row = [&](int key, const char* title, ImU32 col, const char* verdict)
+    {
+        ImGui::PushID(key);
+        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection), "%s", title);
+        ImGui::SameLine();
+        gutter_text(col, verdict);
+        disclosure_controls(state, detail_surface::building_section, key);
+        ImGui::PopID();
+        return is_open_in_place(state, detail_surface::building_section, key);
+    };
+
+    // --- Production: a dropdown of the building's recipes, each tagged with a
     // resource pip for its primary output. ---
-    ImGui::SeparatorText("Production Methods");
     const int   n_recipes = reg.recipe_count(b.type);
     const float pipr      = ImGui::GetFontSize() * 0.42f;
     const auto  method_res = [&](int i) -> resource_type {
         if (b.type == building_type::extraction_site) return b.target_resource;
         return primary_output_resource(reg.recipe_at(b.type, i));
     };
-    if (n_recipes >= 1)
+
+    // Production rests OPEN — see the note above. `set_open_in_place` is called once,
+    // guarded on the section never having been touched, so a player who folds it away
+    // keeps it folded.
+    if (!state.building_section_seeded)
+    {
+        set_open_in_place(state, detail_surface::building_section, sec_production, true);
+        state.building_section_seeded = true;
+    }
+
+    const char* method_verdict =
+        (n_recipes >= 1) ? reg.recipe_at(b.type, std::clamp(b.active_recipe_index, 0, n_recipes - 1)).name.c_str()
+                         : "Single method";
+    const bool open_production =
+        section_row(sec_production, "Production", IM_COL32(150, 158, 172, 255), method_verdict);
+
+    if (open_production && n_recipes >= 1)
     {
         b.active_recipe_index = std::clamp(b.active_recipe_index, 0, n_recipes - 1);
         const recipe& cur     = reg.recipe_at(b.type, b.active_recipe_index);
@@ -318,8 +387,6 @@ void draw_selected_section(world& w, const recipe_registry& reg,
             ImGui::EndCombo();
         }
     }
-    else
-        ImGui::TextDisabled("Single method");
 
     // --- Where this site sits in its tile's stack (BL-193) ---------------------
     // Sites stack on one tile up to a ceiling the deposit's richness sets, which the
@@ -332,13 +399,12 @@ void draw_selected_section(world& w, const recipe_registry& reg,
     // Homed here rather than in the Selection element: the rich building card that
     // used to carry it was deleted by BL-339 (it had been parked and unreachable), and
     // Manage routes to this tab (NR-093). A readout in a dead function is not a readout.
-    if (const auto tit = w.tiles.find(b.tile); tit != w.tiles.end())
+    if (const auto tit = w.tiles.find(b.tile); open_production && tit != w.tiles.end())
     {
         const int cap  = placement_rules::stack_capacity(tit->second, b.type, b.target_resource);
         const int here = placement_rules::buildings_on_tile(w, b.tile, b.type, b.target_resource);
         const int rank = placement_rules::stack_rank(w, state.selected_entity);
 
-        ImGui::SeparatorText("On this tile");
         ImGui::TextDisabled("%d of %d site%s", here, cap, cap == 1 ? "" : "s");
         if (here < cap)
         {
@@ -374,8 +440,17 @@ void draw_selected_section(world& w, const recipe_registry& reg,
         const float t = static_cast<float>(i) / (N - 1);
         profit_series[i] = (p_end - 35.0f) + t * 35.0f; // gentle ramp to the current estimate
     }
-    ImGui::SeparatorText("Profit");
-    ImGui::PlotLines("##profit", profit_series, N, 0, nullptr, FLT_MAX, FLT_MAX, {graph_w, 60.0f});
+    // Profit: the verdict line carries the number, so the graph is what opening buys.
+    char profit_verdict[48];
+    if (prof.has_data)
+        std::snprintf(profit_verdict, sizeof profit_verdict, "%+.0f / qtr", static_cast<double>(p_end));
+    else
+        std::snprintf(profit_verdict, sizeof profit_verdict, "no data yet");
+    const ImU32 profit_col = !prof.has_data ? IM_COL32(150, 158, 172, 255)
+                           : (p_end >= 0.0f) ? IM_COL32(140, 205, 140, 255)
+                                             : IM_COL32(215, 130, 120, 255);
+    if (section_row(sec_profit, "Profit", profit_col, profit_verdict))
+        ImGui::PlotLines("##profit", profit_series, N, 0, nullptr, FLT_MAX, FLT_MAX, {graph_w, 60.0f});
 
     float wf_series[N];
     const float wf = static_cast<float>(b.workforce_target);
@@ -385,14 +460,15 @@ void draw_selected_section(world& w, const recipe_registry& reg,
         const float dip = -20.0f * std::sin(t * 3.14159265f); // placeholder dip-and-recover
         wf_series[i]    = std::clamp(wf + dip, 0.0f, 200.0f);
     }
-    ImGui::SeparatorText("Workforce");
-    ImGui::PlotLines("##workforce", wf_series, N, 0, nullptr, 0.0f, 120.0f, {graph_w, 60.0f});
-
-    // --- Workforce Target: Auto (the economy tick solves the profit-max target each
-    // tick, BL-181) plus a manual 0–100 button grid. A manual tier pins the target and
-    // clears Auto; the Auto button re-enables it and shows the current solved value. ---
-    ImGui::SeparatorText("Workforce Target");
+    // --- Workforce: the trend graph, then Auto (the economy tick solves the profit-max
+    // target each tick, BL-181) plus a manual 0–100 button grid. A manual tier pins the
+    // target and clears Auto; the Auto button re-enables it and shows the solved value.
+    char wf_verdict[48];
+    std::snprintf(wf_verdict, sizeof wf_verdict, "%d%%%s", b.workforce_target,
+                  b.workforce_auto ? " (auto)" : "");
+    if (section_row(sec_workforce, "Workforce", IM_COL32(150, 158, 172, 255), wf_verdict))
     {
+        ImGui::PlotLines("##workforce", wf_series, N, 0, nullptr, 0.0f, 120.0f, {graph_w, 60.0f});
         if (b.workforce_auto)
             ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
         char autolbl[32];
@@ -428,25 +504,83 @@ void draw_selected_section(world& w, const recipe_registry& reg,
         }
     }
 
-    // Under-construction status + decommission — kept from the prior detail (not in the
-    // mockup, but load-bearing): the analog build rate/ETA and the stop control.
-    if (b.ticks_remaining > 0)
+    // --- Lifecycle: closing and dismantling (BL-229) --------------------------
+    // LAST, and rests CLOSED, on purpose. These are the only two irreversible-ish
+    // controls on the panel — one stops a building earning, the other destroys it —
+    // and the mockups' standing recommendation was that neither should sit adjacent
+    // to a workforce button at the same size. A section that rests folded is the
+    // cheapest way to honour that without inventing a confirm dialog idiom the rest
+    // of the UI does not have.
+    //
+    // Closing is REVERSIBLE (idle/resume in the command seam) and says so; dismantling
+    // is not, so it asks once. Both mirror verbs an agent can already issue, so the
+    // player and a text-driven player have the same powers here.
     {
-        const float rate = construction_rate(w, reg, b.type, b.tile);
-        ImGui::Spacing();
-        ImGui::SeparatorText("Under construction");
-        ImGui::TextColored(construction_status_colour(rate), "%s",
-                           construction_status(rate, b.ticks_remaining).c_str());
-    }
+        const char* life_verdict = (b.ticks_remaining > 0) ? "under construction"
+                                 : b.decommissioned        ? "closed"
+                                                           : "operating";
+        const ImU32 life_col = (b.ticks_remaining > 0) ? IM_COL32(215, 190, 115, 255)
+                             : b.decommissioned        ? IM_COL32(215, 130, 120, 255)
+                                                       : IM_COL32(140, 205, 140, 255);
+        if (section_row(sec_lifecycle, "Lifecycle", life_col, life_verdict))
+        {
+            if (b.ticks_remaining > 0)
+            {
+                const float rate = construction_rate(w, reg, b.type, b.tile);
+                ImGui::TextColored(construction_status_colour(rate), "%s",
+                                   construction_status(rate, b.ticks_remaining).c_str());
+            }
 
-    ImGui::Spacing();
-    if (b.decommissioned)
-        ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative), "DECOMMISSIONED");
-    else if (ImGui::Button("Decommission"))
-    {
-        b.decommissioned = true;
-        // A decommissioned port/hub stops anchoring supply — reach field stale.
-        invalidate_logistics_caches(w);
+            if (b.decommissioned)
+            {
+                if (ImGui::Button("Reopen"))
+                {
+                    b.decommissioned = false;
+                    // Reopening a port/hub restores its anchor — reach field stale.
+                    invalidate_logistics_caches(w);
+                }
+                ImGui::SameLine();
+                ImGui::TextDisabled("Closed: no output, no wages.");
+            }
+            else
+            {
+                if (ImGui::Button("Close"))
+                {
+                    b.decommissioned = true;
+                    // A decommissioned port/hub stops anchoring supply — reach field stale.
+                    invalidate_logistics_caches(w);
+                }
+                ImGui::SameLine();
+                ImGui::TextDisabled("Stops output and wages. Reversible.");
+            }
+
+            ImGui::Spacing();
+            if (ImGui::Button("Dismantle..."))
+                ImGui::OpenPopup("confirm_dismantle");
+            ImGui::SameLine();
+            ImGui::TextDisabled("Permanent. The tile keeps its deposit.");
+
+            if (ImGui::BeginPopup("confirm_dismantle"))
+            {
+                ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::negative),
+                                   "Dismantle this %s?", building_type_name(b.type));
+                ImGui::TextDisabled("This cannot be undone.");
+                ImGui::Separator();
+                if (ImGui::Button("Dismantle"))
+                {
+                    // Through the same seam an agent uses, so the two cannot diverge.
+                    demolish_building(w, w.player_entity, state.selected_entity);
+                    state.selected_entity = null_entity;
+                    ImGui::CloseCurrentPopup();
+                    ImGui::EndPopup();
+                    return; // `b` dangles past this point — the building is gone.
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Keep"))
+                    ImGui::CloseCurrentPopup();
+                ImGui::EndPopup();
+            }
+        }
     }
 }
 
@@ -474,7 +608,23 @@ void draw_buildings_tab(world& w, const recipe_registry& reg,
         ImGuiTableFlags_SizingStretchProp |
         ImGuiTableFlags_ScrollY;
 
-    const bool has_table = ImGui::BeginTable("##buildings", 5, table_flags, {0.0f, 220.0f});
+    // The table takes what its ROWS need, up to a ceiling — not a flat 220 px.
+    //
+    // BL-229: 220 px was spent whether the player owned four buildings or forty, and
+    // in a 380 px column that pushed the management view below the comms dock's top
+    // edge, so the surface the Manage button routes to was mostly invisible. A fixed
+    // height is the wrong shape for a list that starts empty and grows.
+    //
+    // Ceiling rather than pure content-fit because the list is unbounded: a corp with
+    // thirty holdings would otherwise take the whole column and push the detail off the
+    // bottom again, which is the same defect from the other direction.
+    const int   n_rows    = static_cast<int>(std::count_if(
+        w.buildings.begin(), w.buildings.end(),
+        [&](const auto& kv) { return is_player_owned(w, kv.first); }));
+    const float row_h     = ImGui::GetFrameHeight();
+    const float table_h   = std::clamp((static_cast<float>(n_rows) + 1.4f) * row_h,
+                                       row_h * 3.0f, 220.0f);
+    const bool has_table = ImGui::BeginTable("##buildings", 5, table_flags, {0.0f, table_h});
     if (has_table)
     {
         ImGui::TableSetupColumn("Building",   ImGuiTableColumnFlags_WidthStretch, 2.0f);

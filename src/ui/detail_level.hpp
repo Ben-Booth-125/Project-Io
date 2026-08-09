@@ -77,6 +77,7 @@ enum class detail_surface : std::uint8_t
     history_chain,     ///< History ledger, Chain view (key = chain_stage).
     generation_stage,  ///< The New World wizard's chain stages (key = chain_stage).
     corp_rollup,       ///< The Corporation dashboard's roll-up cards (key = card index, BL-248).
+    building_section,  ///< Building management in the Buildings tab (key = building_view_section, BL-229).
 };
 
 /// What is disclosed right now — the takeover target, and the in-place set.

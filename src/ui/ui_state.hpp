@@ -241,6 +241,14 @@ struct ui_state
     // open is a display preference, not something to restore. See ui/detail_level.hpp.
     fold_state expanded{};
 
+    /// One-shot latch: has the building-management view seeded its default open
+    /// section yet (BL-229)? Production rests OPEN, which is the answer to variant C's
+    /// own objection — the control a player touches constantly should not start behind
+    /// a click. It is a LATCH rather than a per-frame default so that folding Production
+    /// away STAYS folded; re-defaulting every frame would make the section unclosable.
+    /// VIEW state, not serialised, like everything else here.
+    bool building_section_seeded = false;
+
     /// Which row of the expanded Corporation-dashboard roll-up is drilled into
     /// (BL-248); -1 = the roll-up itself. One index is enough because only one card
     /// can be expanded at a time, and a drill can only be reached from inside an
