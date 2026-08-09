@@ -112,11 +112,36 @@ not a broad presence across the nation.
   **processing 2–3** (processors plus a little feed), **trade 1–2** (about one depot). A nation
   too cramped or deposit-poor to host the drawn count yields fewer — the count is a ceiling the
   placement walks up to, not a guarantee.
-- **Cluster to the home nation.** Holdings sit **within the home nation's territory** and pack
-  around a single focus-scored **anchor** tile, the remaining slots filling the nearest valid
-  unoccupied tiles by grid distance — so a corp's holdings read as one contiguous operation. The
-  lean counts ride on top of this retained clustering; with the smaller counts the cluster is
-  naturally tighter than the earlier 3–6 spread.
+- **Anchored in the home PROVINCE** *(BL-283, landed 2026-08-09)*. The anchor tile is searched
+  **inside the corporation's home province** — the same province Pass 2 read its focus from — not
+  across the whole nation. The province therefore decides *where* the corp is as well as *what* it
+  is, and a corp's holdings cluster where its history says it came from instead of scattering
+  nation-wide. "Inside a province" is `nearest_province`: provinces are anchor points, not stored
+  tile sets, so the nearest anchor is the province a tile belongs to.
+- **Cluster around the anchor.** The remaining slots fill the nearest valid unoccupied tiles by
+  grid distance, searched **nation-wide** rather than inside the province — so a corp whose own
+  province is small spills onto the ground next door rather than opening short. In practice the
+  cluster is tight anyway (mean maximum separation between a corp's holdings: **1.2 tiles**), so
+  the anchor constraint is what determines where the operation sits. The lean counts ride on top
+  of this retained clustering.
+- **The fallback ladder** *(BL-283)*. Each rung is deterministic, and a rung that finds no
+  anchorable tile consumes no randomness, so widening is free in stream terms:
+  1. the home province alone;
+  2. the home province plus the **three nearest same-nation provinces** (by column-wrapped anchor
+     distance, ties to the lower province index);
+  3. the whole nation — the pre-BL-283 behaviour.
+
+  **How often it fires** (measured across 8 generations / 64 corporations, seeds 0–5): rung 1
+  **89 %**, rung 2 **0 %**, rung 3 **11 %** — and *every* rung-3 case was a corporation with **no
+  home province at all**, in a nation the settlement pass never reached (all its land arrived by
+  conquest or orphan assignment), which already falls back to the national character for its focus.
+  Where a home province exists, it has never yet failed to host the anchor. Rung 2 is therefore an
+  unfired guard, kept because the cost is a sort and the failure it covers is real.
+
+  **What it moved.** Corporate holdings shifted off barren and icy ground onto settled land —
+  seed 0, 18 holdings: barren 6→3, icy 5→3, grassland 3→7, forest 1→2, wetland 0→1. That is the
+  expected causal read, not a tuning: provinces sit where people settled, so anchoring inside one
+  pulls the corporation onto habitable ground.
 - **Mix follows focus.** The asset mix is shaped by `industrial_focus` — an extraction corp
   places extractors on its richest deposits, a processing corp pairs processors with feed, a
   trade corp a depot. The prototype retains this pattern (applied over the lean counts); the
