@@ -319,7 +319,7 @@ history_ladder_state run_history_ladder(const planetology_state& pl,
 
         out.history.push_back(history_event{
             years_from_calendar_year(year), chain_stage::legacy,
-            std::move(ev), std::move(cons) });
+            std::move(ev), std::move(cons), ladder_rung::surplus });
     }
 
     return out;
@@ -422,7 +422,8 @@ void record_institutional_history(history_ladder_state& hl,
         hl.history.push_back(history_event{
             years_from_calendar_year(charter_year), chain_stage::legacy,
             "The " + holder + " Charter Act - first perpetual company registered.",
-            "-> a company outlives its founders; it can own, sue, and be sued" });
+            "-> a company outlives its founders; it can own, sue, and be sued",
+            ladder_rung::charter });
     }
 
     // --- Stage 2: the border accord ----------------------------------------
@@ -438,13 +439,15 @@ void record_institutional_history(history_ladder_state& hl,
         hl.history.push_back(history_event{
             years_from_calendar_year(accord_year), chain_stage::legacy,
             "The Great Accord - " + std::to_string(realms) + " realms confirm mutual borders.",
-            "-> no hegemon; a capability banned in one polity re-emerges next door" });
+            "-> no hegemon; a capability banned in one polity re-emerges next door",
+            ladder_rung::borders });
     }
     else
     {
         hl.history.push_back(history_event{
             years_from_calendar_year(accord_year), chain_stage::legacy,
             "One power absorbed the rest; the frontier wars ended early.",
-            "-> a hegemon can choose stagnation, and this one could" });
+            "-> a hegemon can choose stagnation, and this one could",
+            ladder_rung::borders });
     }
 }

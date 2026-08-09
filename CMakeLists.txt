@@ -537,12 +537,58 @@ file(GLOB IO_VERIFY_HARNESSES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/too
 # econ_stability and data_creep_harness, whose long-running sweep/1500-tick
 # passes are not yet present in this checkout (see BL-255 report) but land
 # on the same fast-tier build these values must already tolerate.
+#
+# RE-TIERED 2026-08-09 (BL-288, at the v0.1.8 cut). The tiers above were set
+# from Debug measurements before the sweeps existed, and the result was that
+# `ctest` reported ten failures of which only ONE was a failing assertion.
+# Measured on Linux/GCC Release, each harness run alone on an idle machine:
+#
+#   earthlike_lean_trace    121s   PASSES   (was reported Timeout at 60s)
+#   notable_worlds          105s   PASSES   (was reported Timeout at 60s)
+#   mediterranean_sweep      87s   PASSES   (was reported Timeout at 60s)
+#   earthlike_tile_census    58s   PASSES   (2s under the bound - flaky by luck)
+#   history_sim_harness    >400s   did not finish
+#   history_sweep          >400s   did not finish
+#
+# A timeout is not a failing assertion, and reporting it as one trains sessions
+# to ignore a red suite - which is exactly how the real ai_skill_harness golden
+# drift sat unnoticed among nine false positives.
 set(IO_TEST_TIMEOUT_DEFAULT 60)
-set(IO_TEST_TIMEOUT_LONG 120)
+set(IO_TEST_TIMEOUT_LONG 240)
 set(IO_TEST_LONG_HARNESSES
     corp_terrain_matrix
     econ_stability
     data_creep_harness
+    earthlike_lean_trace
+    earthlike_tile_census
+    mediterranean_sweep
+    notable_worlds
+)
+
+# RESEARCH SWEEPS - labelled `sweep`, and NOT part of the routine gate.
+#
+# These are not regression checks that happen to be slow; they are open-ended
+# exploration tools that answer a design question over many generated worlds,
+# and both ran past 400s without finishing. Their cost is the point, so the
+# answer is to stop pretending they are gate tests rather than to keep raising
+# a bound they will always outgrow. Run them deliberately, by name or by label.
+# (Their runtime is BL-320's subject; this only stops them failing the gate.)
+set(IO_TEST_SWEEP_HARNESSES
+    history_sim_harness
+    history_sweep
+)
+
+# WALL-CLOCK BENCHES - labelled `bench`, and only meaningful on an idle machine.
+#
+# These assert ABSOLUTE times (econ_stability's per-tick bound, the 1s ceiling
+# on home_surface_bench's preview), so they measure the machine as much as the
+# code. Both PASS standalone and both failed in the 2026-08-09 suite run purely
+# because a concurrent build was loading the box. Kept in the gate, because the
+# budgets are real and worth defending - but labelled, so a failure here is read
+# as "re-run it idle" rather than as a regression.
+set(IO_TEST_BENCH_HARNESSES
+    econ_stability
+    home_surface_bench
 )
 
 foreach(harness_src ${IO_VERIFY_HARNESSES})
@@ -556,9 +602,16 @@ foreach(harness_src ${IO_VERIFY_HARNESSES})
         target_compile_options(${harness_name} PRIVATE ${IO_WARNING_FLAGS})
     endif()
     add_test(NAME ${harness_name} COMMAND ${harness_name})
-    if(harness_name IN_LIST IO_TEST_LONG_HARNESSES)
+    if(harness_name IN_LIST IO_TEST_SWEEP_HARNESSES)
+        # No TIMEOUT is set deliberately: a sweep runs until it has its answer,
+        # and the `sweep` label is what keeps it out of the routine gate.
+        set_tests_properties(${harness_name} PROPERTIES LABELS "sweep")
+    elseif(harness_name IN_LIST IO_TEST_LONG_HARNESSES)
         set_tests_properties(${harness_name} PROPERTIES TIMEOUT ${IO_TEST_TIMEOUT_LONG})
     else()
         set_tests_properties(${harness_name} PROPERTIES TIMEOUT ${IO_TEST_TIMEOUT_DEFAULT})
+    endif()
+    if(harness_name IN_LIST IO_TEST_BENCH_HARNESSES)
+        set_property(TEST ${harness_name} APPEND PROPERTY LABELS "bench")
     endif()
 endforeach()

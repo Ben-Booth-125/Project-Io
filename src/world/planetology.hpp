@@ -297,6 +297,21 @@ constexpr int64_t years_from_calendar_year(int64_t year)
 /// happened); `consequence` is the right column (what it left behind) and is
 /// empty for lines that carry no endowment payload.
 ///
+/// A rung of the institutional history ladder (HISTORY.md), tagged onto the
+/// lines `history_ladder.cpp` emits so consumers can select them structurally.
+///
+/// Ordered by causal position, and the ordering is load-bearing: a charter
+/// cannot precede the farms that fed it, and a border accord counts an outcome
+/// of both. `none` covers every line written by some other pass — planetology,
+/// continents, creeds, settlement — which is most of the biography.
+enum class ladder_rung : uint8_t
+{
+    none = 0,  ///< Not a ladder line.
+    surplus,   ///< Stage 0 — first granary cities on a floodplain.
+    charter,   ///< Stage 1 — the Charter Act; the enforceable perpetual promise.
+    borders,   ///< Stage 2 — the border accord, or the hegemon that replaced it.
+};
+
 /// The right column is the entire feature — "640 Myr of ferruginous ocean ->
 /// iron x2.8" is a sentence a player argues with; a bare scalar is one they
 /// scroll past. See PLANETOLOGY.md § Presentation.
@@ -338,6 +353,21 @@ struct history_event
     chain_stage stage = chain_stage::system;   ///< Which gate emitted this line.
     std::string event;                         ///< Left column — the cause.
     std::string consequence;                   ///< Right column — the endowment effect (may be empty).
+
+    /// Which rung of the INSTITUTIONAL ladder wrote this line, if any (BL-285).
+    ///
+    /// Distinct from `stage` above, and deliberately a second axis rather than
+    /// more values on the first: `stage` names the planetology gate, and every
+    /// ladder line sits at `chain_stage::legacy`, so it cannot tell the three
+    /// rungs apart. `history_ladder.cpp` is the only writer.
+    ///
+    /// It exists so a check can FILTER on the rung instead of pattern-matching
+    /// the prose. `history_ladder_harness`'s H4 used to find its window by
+    /// matching line text ("granary", "Charter Act", "Great Accord"), which
+    /// meant any rewording of a biography line silently changed what H4
+    /// asserted over — the failure mode a golden exists to catch rather than
+    /// exhibit.
+    ladder_rung  rung = ladder_rung::none;
 };
 
 /// Render a timestamp for display, picking its unit from its magnitude.

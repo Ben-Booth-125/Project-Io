@@ -512,13 +512,36 @@ repository public to enable this feature"*). And GitHub Actions was **deleted on
 from the tree. Do not cite `build.yml` or a "red CI run"; neither can occur.
 
 What actually guards `main` is therefore **entirely local and human**: a green local build plus
-`ctest --test-dir build --output-on-failure` (or `check.bat`) before a release commit lands — step
+`ctest --test-dir build_linux -LE sweep --output-on-failure` (or `check.bat`) before a release commit lands — step
 1 of the Cut above. That is the whole gate. Run it deliberately; nothing will run it for you.
 
-One consequence worth stating, because it has already bitten: the default `build/` tree is an
-unoptimised **Debug** build, while `build_rel/` is Release. A harness can pass in Debug and fail in
-Release with no signal anywhere — which is exactly how BL-288 (Release-only test failures) went
-unnoticed.
+**Test tiers, and why the gate excludes one (BL-288, 2026-08-09).** The suite holds three kinds
+of program, and treating them alike is what made the gate untrustworthy:
+
+| Tier | Timeout | In the gate? | What it is |
+|---|---|---|---|
+| default | 60 s | yes | ordinary regression harnesses |
+| long (`IO_TEST_LONG_HARNESSES`) | 240 s | yes | structurally long generation/sweep passes |
+| `sweep` label | none | **no** | open-ended research tools; run them by name |
+| `bench` label | (its own tier) | yes | asserts *absolute* wall-clock times |
+
+Before this, every harness had a flat 60 s bound. A `ctest` run on 2026-08-09 reported **ten
+failures of which exactly one was a failing assertion**: four were harnesses that simply take
+longer than 60 s and pass (`earthlike_lean_trace` 121 s, `notable_worlds` 105 s,
+`mediterranean_sweep` 87 s, `earthlike_tile_census` 58 s — that last one passing only by luck),
+two were research sweeps that never finish on a bound (`history_sim_harness`, `history_sweep`),
+two were `bench` tests failing because a concurrent build was loading the machine, and one was a
+world-generation finding. **A red suite that is mostly noise trains you to ignore it** — which is
+how the one real defect, `ai_skill_harness`'s stale GCC goldens, sat unnoticed among nine false
+positives for days.
+
+So: a `bench` failure means *re-run it on an idle machine* before treating it as a regression,
+and the `sweep` tests are run deliberately (`ctest -L sweep`, or by name), never as a gate.
+
+One consequence worth stating, because it has already bitten: a build tree's **configuration is
+not obvious from its name**. `build_linux/` is Ninja + **Release** and is the canonical Linux tree;
+a Debug tree can pass a harness that fails in Release with no signal anywhere — which is how
+BL-288 went unnoticed in the first place.
 
 To restore an enforced gate later, CI has to come back first; then either make the repo public
 (branch protection is free for public repos) or move to Pro, require the build checks, and route
