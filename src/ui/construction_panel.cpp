@@ -269,7 +269,7 @@ void draw_selected_section(world& w, const recipe_registry& reg,
         dl->AddRect(p, mx, IM_COL32(110, 110, 110, 255), 3.0f);
         const char*  ph = "PLACEHOLDER IMAGE";
         const ImVec2 ts = ImGui::CalcTextSize(ph);
-        dl->AddText({(p.x + mx.x - ts.x) * 0.5f, (p.y + mx.y - ts.y) * 0.5f},
+        dl->AddText({(p.x + mx.x - ts.x) * 0.5f, (p.y + mx.y - ts.y) * 0.5f}, // fit-exempt: watermark centred in a measured cell
                     IM_COL32(180, 180, 180, 255), ph);
         ImGui::Dummy({content_w, img_h});
     }

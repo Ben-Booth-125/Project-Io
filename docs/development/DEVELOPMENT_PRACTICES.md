@@ -382,6 +382,14 @@ The runtime display and the verification harness do **not** render at the same s
 must be **resolution-robust** — sized from content and fixed anchors, never pinned to a
 resolution-scaled value.
 
+**The smallest supported display is 1280×720 at UI scale 1.0x** (BL-215). It is enforced, not
+merely stated: `SDL_SetWindowMinimumSize(1280·s, 720·s)` on window creation and from
+`app::apply_ui_scale()`, where `s` is the active UI-scale factor (1.0/1.25/1.5).
+
+The floor scales with UI scale because BL-063 grows the font without scaling the px chrome — at
+1.5x the same layout honestly needs 1920×1080. The persisted-settings floor clamps to 1280×720;
+the automated overflow check (`scripts/verify/text_overflow_floor.lua`) runs at 1280×720 @ 1.0x.
+
 - The window opens at **1280×720** (`window_w`/`window_h` in `src/core/app.cpp`,
   `SDL_WINDOW_RESIZABLE`) and persists its size to **`options.cfg`** in the run directory
   (`app::load_settings`/`save_settings` — keys `window_w`/`window_h`/`fullscreen`/`vsync`).

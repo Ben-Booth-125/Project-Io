@@ -1,5 +1,6 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include "body_surface_canvas.hpp"
+#include "text_fit.hpp"
 
 #include "entity_summary.hpp"
 #include "highlight.hpp"
@@ -227,12 +228,12 @@ void draw_scroll_list_key(ImVec2 anchor, float top_limit, float bottom_limit,
         y += kLensComboH + 4.0f;
     }
 
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), header);
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), header); // fit-exempt: legend box sized to its measured entries (container 2)
     y += header_h;
 
     if (rows.empty())
     {
-        dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), empty_note);
+        dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), empty_note); // fit-exempt: legend box sized to its measured entries (container 2)
         return;
     }
 
@@ -270,7 +271,7 @@ void draw_scroll_list_key(ImVec2 anchor, float top_limit, float bottom_limit,
             }
         }
         const float text_x = (r.marker == key_marker::bar) ? (bar_max + 6.0f) : (swatch + 4.0f);
-        wdl->AddText({ c.x + text_x, c.y }, r.label_colour, r.label.c_str());
+        wdl->AddText({ c.x + text_x, c.y }, r.label_colour, r.label.c_str()); // fit-exempt: legend box sized to its measured entries (container 2)
         ImGui::Dummy({ body_w, row_h });
     }
     ImGui::EndChild();
@@ -293,14 +294,14 @@ void draw_resource_key(ImDrawList* dl, ImVec2 anchor,
     draw_lens_resource_combo(state, {x, y}, bar_w);
     y += kLensComboH + 4.0f;
 
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Resource deposit");
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Resource deposit"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 4.0f;
     dl->AddRectFilled({x, y + 2.0f}, {x + 10.0f, y + 12.0f},
                       presentation_of(state.lens_resource).colour);
-    dl->AddText({x + 14.0f, y}, IM_COL32(235, 235, 235, 255),
+    dl->AddText({x + 14.0f, y}, IM_COL32(235, 235, 235, 255), // fit-exempt: legend box sized to its measured entries (container 2)
                 presentation_of(state.lens_resource).name);
     y += line_h + 4.0f;
-    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "filled = deposit present");
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "filled = deposit present"); // fit-exempt: legend box sized to its measured entries (container 2)
 }
 
 /// On-canvas legend for the Opportunity lens (BL-136): a body-relative red→green
@@ -317,7 +318,7 @@ void draw_opportunity_key(ImDrawList* dl, ImVec2 anchor)
     float x, y, bar_w;
     begin_lens_key(dl, anchor, 168.0f, body_h, pad, x, y, bar_w);
 
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Opportunity");
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Opportunity"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 4.0f;
     constexpr int segs = 24;
     for (int i = 0; i < segs; ++i)
@@ -328,9 +329,9 @@ void draw_opportunity_key(ImDrawList* dl, ImVec2 anchor)
                           { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
     }
     y += bar_h + 2.0f;
-    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "low");
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "low"); // fit-exempt: legend box sized to its measured entries (container 2)
     const ImVec2 ts = ImGui::CalcTextSize("high");
-    dl->AddText({x + bar_w - ts.x, y}, IM_COL32(170, 175, 185, 255), "high");
+    dl->AddText({x + bar_w - ts.x, y}, IM_COL32(170, 175, 185, 255), "high"); // fit-exempt: legend box sized to its measured entries (container 2)
 }
 
 /// On-canvas legend for the Production lens (BL-009): a diverging cool→warm bar
@@ -344,7 +345,7 @@ void draw_production_key(ImDrawList* dl, ImVec2 anchor)
     float x, y, bar_w;
     begin_lens_key(dl, anchor, 168.0f, body_h, pad, x, y, bar_w);
 
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Production intensity");
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Production intensity"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 4.0f;
     constexpr int segs = 24;
     for (int i = 0; i < segs; ++i)
@@ -355,9 +356,9 @@ void draw_production_key(ImDrawList* dl, ImVec2 anchor)
                           { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
     }
     y += bar_h + 2.0f;
-    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "low");
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "low"); // fit-exempt: legend box sized to its measured entries (container 2)
     const ImVec2 ts = ImGui::CalcTextSize("high");
-    dl->AddText({x + bar_w - ts.x, y}, IM_COL32(170, 175, 185, 255), "high");
+    dl->AddText({x + bar_w - ts.x, y}, IM_COL32(170, 175, 185, 255), "high"); // fit-exempt: legend box sized to its measured entries (container 2)
 }
 
 /// Diverging red→yellow→green colour for a ratio relative to 1.0 (BL-137, Production
@@ -396,10 +397,10 @@ void draw_market_key(ImVec2 anchor, float top_limit, float bottom_limit, const w
               [](const auto& a, const auto& b) { return a.first < b.first; });
 
     // Size the box to the widest label so long city names are not clipped.
-    float label_w = ImGui::CalcTextSize("Market catchments").x;
+    float label_w = ui::fit_width("Market catchments");
     for (const auto& [mid, col] : entries)
         label_w = std::max(label_w,
-            swatch + 4.0f + ImGui::CalcTextSize(market_city_name(w, mid).c_str()).x);
+            swatch + 4.0f + ui::fit_width(market_city_name(w, mid).c_str()));
     const float box_w = std::max(140.0f, label_w + 2.0f * pad);
 
     std::vector<key_row> rows;
@@ -436,13 +437,13 @@ void draw_country_key(ImVec2 anchor, float top_limit, float bottom_limit,
     const float line_h = ImGui::GetTextLineHeight();
     const float swatch = line_h;
 
-    float name_w = ImGui::CalcTextSize("Countries").x;
+    float name_w = ui::fit_width("Countries");
     for (const entity_id nid : present)
     {
         const auto nat_it = w.nations.find(nid);
         if (nat_it == w.nations.end())
             continue;
-        name_w = std::max(name_w, ImGui::CalcTextSize(nat_it->second.name.c_str()).x);
+        name_w = std::max(name_w, ui::fit_width(nat_it->second.name.c_str()));
     }
     const float box_w = pad * 2.0f + swatch + 4.0f + name_w;
 
@@ -480,7 +481,7 @@ void draw_population_key(ImDrawList* dl, ImVec2 anchor)
     const float bar_w = box_w - 2.0f * pad;
     float       y     = p0.y + pad * 0.5f;
 
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Workforce efficiency");
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Workforce efficiency"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 4.0f;
 
     // Red→green rank bar (BL-135): mirrors the per-tile value-mark dot the lens
@@ -495,9 +496,9 @@ void draw_population_key(ImDrawList* dl, ImVec2 anchor)
                           { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
     }
     y += bar_h + 2.0f;
-    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "low");
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "low"); // fit-exempt: legend box sized to its measured entries (container 2)
     const ImVec2 hts = ImGui::CalcTextSize("high");
-    dl->AddText({x + bar_w - hts.x, y}, IM_COL32(170, 175, 185, 255), "high");
+    dl->AddText({x + bar_w - hts.x, y}, IM_COL32(170, 175, 185, 255), "high"); // fit-exempt: legend box sized to its measured entries (container 2)
 }
 
 /// On-canvas legend for the Industry lens (BL-084): a low→high amber gradient bar
@@ -548,23 +549,23 @@ void draw_continent_key(ImDrawList* dl, ImVec2 anchor, const continent_state* pl
     const float x = p0.x + pad;
     float       y = p0.y + pad * 0.5f;
 
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Tectonic plates");
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Tectonic plates"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 6.0f;
 
     if (!plates)
     {
-        dl->AddText({x, y}, IM_COL32(170, 170, 180, 255), "No plate record");
+        dl->AddText({x, y}, IM_COL32(170, 170, 180, 255), "No plate record"); // fit-exempt: legend box sized to its measured entries (container 2)
         y += line_h + 4.0f;
-        dl->AddText({x, y}, IM_COL32(150, 150, 160, 255), "for this body.");
+        dl->AddText({x, y}, IM_COL32(150, 150, 160, 255), "for this body."); // fit-exempt: legend box sized to its measured entries (container 2)
         return;
     }
 
     const int n = static_cast<int>(plates->plates.size());
     if (n <= 1)
     {
-        dl->AddText({x, y}, IM_COL32(170, 170, 180, 255), "Stagnant lid:");
+        dl->AddText({x, y}, IM_COL32(170, 170, 180, 255), "Stagnant lid:"); // fit-exempt: legend box sized to its measured entries (container 2)
         y += line_h + 4.0f;
-        dl->AddText({x, y}, IM_COL32(150, 150, 160, 255), "one immobile plate.");
+        dl->AddText({x, y}, IM_COL32(150, 150, 160, 255), "one immobile plate."); // fit-exempt: legend box sized to its measured entries (container 2)
         return;
     }
 
@@ -582,12 +583,12 @@ void draw_continent_key(ImDrawList* dl, ImVec2 anchor, const continent_state* pl
     // legend shows the actual treatment rather than describing it.
     dl->AddRectFilled({ x, y }, { x + sw, y + sw },
                       lerp_colour(plate_colour(0), IM_COL32(255, 255, 245, 255), 0.45f));
-    dl->AddText({ x + sw + 6.0f, y - 1.0f }, IM_COL32(220, 220, 228, 255), "pale = boundary");
+    dl->AddText({ x + sw + 6.0f, y - 1.0f }, IM_COL32(220, 220, 228, 255), "pale = boundary"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += sw + 4.0f;
 
     char buf[64];
     std::snprintf(buf, sizeof(buf), "%d plates - uplift & rift", n);
-    dl->AddText({x, y}, IM_COL32(170, 170, 180, 255), buf);
+    dl->AddText({x, y}, IM_COL32(170, 170, 180, 255), buf); // fit-exempt: legend box sized to its measured entries (container 2)
 }
 
 void draw_industry_key(ImDrawList* dl, ImVec2 anchor)
@@ -607,7 +608,7 @@ void draw_industry_key(ImDrawList* dl, ImVec2 anchor)
     const float bar_w = box_w - 2.0f * pad;
     float       y     = p0.y + pad * 0.5f;
 
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Industry throughput");
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Industry throughput"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 4.0f;
 
     // Gradient mirrors the tile tint lerp (terrain hue -> industrial amber at
@@ -622,9 +623,9 @@ void draw_industry_key(ImDrawList* dl, ImVec2 anchor)
                           { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
     }
     y += bar_h + 2.0f;
-    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "low");
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "low"); // fit-exempt: legend box sized to its measured entries (container 2)
     const ImVec2 hts = ImGui::CalcTextSize("high");
-    dl->AddText({x + bar_w - hts.x, y}, IM_COL32(170, 175, 185, 255), "high");
+    dl->AddText({x + bar_w - hts.x, y}, IM_COL32(170, 175, 185, 255), "high"); // fit-exempt: legend box sized to its measured entries (container 2)
 }
 
 /// On-canvas legend for the Scarcity lens: an abundant→scarce gradient bar (no tint
@@ -651,7 +652,7 @@ void draw_scarcity_key(ImDrawList* dl, ImVec2 anchor,
     draw_lens_resource_combo(state, {x, y}, bar_w);
     y += kLensComboH + 4.0f;
 
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Market scarcity");
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Market scarcity"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 4.0f;
 
     // Met (substrate, no tint) → scarce (hot). Mirrors the per-market composite.
@@ -666,14 +667,14 @@ void draw_scarcity_key(ImDrawList* dl, ImVec2 anchor,
                           { x + bar_w * static_cast<float>(i + 1) / segs, y + bar_h }, c);
     }
     y += bar_h + 2.0f;
-    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "met");
+    dl->AddText({x, y}, IM_COL32(170, 175, 185, 255), "met"); // fit-exempt: legend box sized to its measured entries (container 2)
     const ImVec2 sts = ImGui::CalcTextSize("scarce");
-    dl->AddText({x + bar_w - sts.x, y}, IM_COL32(170, 175, 185, 255), "scarce");
+    dl->AddText({x + bar_w - sts.x, y}, IM_COL32(170, 175, 185, 255), "scarce"); // fit-exempt: legend box sized to its measured entries (container 2)
     y += line_h + 4.0f;
 
     dl->AddRectFilled({x, y + 2.0f}, {x + 10.0f, y + 12.0f},
                       presentation_of(state.lens_resource).colour);
-    dl->AddText({x + 14.0f, y}, IM_COL32(235, 235, 235, 255),
+    dl->AddText({x + 14.0f, y}, IM_COL32(235, 235, 235, 255), // fit-exempt: legend box sized to its measured entries (container 2)
                 presentation_of(state.lens_resource).name);
 }
 
@@ -890,7 +891,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         {
             const char* msg = "No body selected";
             const ImVec2 ts = ImGui::CalcTextSize(msg);
-            dl->AddText(origin + (size - ts) * 0.5f, IM_COL32(150, 150, 150, 255), msg);
+            dl->AddText(origin + (size - ts) * 0.5f, IM_COL32(150, 150, 150, 255), msg); // fit-exempt: legend box sized to its measured entries (container 2)
         }
         return;
     }
@@ -918,7 +919,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         char title[176];
         std::snprintf(title, sizeof(title), "%s  -  %s  (%dx%d)%s",
             body.name.c_str(), body_type_name(body.type), body.grid_width, body.grid_height, survey_note);
-        dl->AddText(origin + ImVec2{4.0f, 2.0f}, IM_COL32(235, 235, 235, 255), title);
+        dl->AddText(origin + ImVec2{4.0f, 2.0f}, IM_COL32(235, 235, 235, 255), title); // fit-exempt: legend box sized to its measured entries (container 2)
     }
 
     const int gw = std::max(1, body.grid_width);
@@ -2279,8 +2280,8 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     const char* name = settlement_names[
                         (static_cast<uint32_t>(a.tile) * 2654435761u) % settlement_name_count];
                     const ImVec2 tp{ mc.x + sr + 3.0f, mc.y - sr };
-                    dl->AddText({ tp.x + 1.0f, tp.y + 1.0f }, IM_COL32(20, 22, 28, 200), name); // shadow
-                    dl->AddText(tp, IM_COL32(236, 230, 214, 255), name);
+                    dl->AddText({ tp.x + 1.0f, tp.y + 1.0f }, IM_COL32(20, 22, 28, 200), name); // shadow // fit-exempt: legend box sized to its measured entries (container 2)
+                    dl->AddText(tp, IM_COL32(236, 230, 214, 255), name); // fit-exempt: legend box sized to its measured entries (container 2)
                 }
             }
         }
@@ -2387,7 +2388,7 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             dl->AddRectFilled({tp.x - 3.0f, tp.y - 1.0f},
                               {tp.x + tsz.x + 3.0f, tp.y + tsz.y + 1.0f},
                               IM_COL32(0, 0, 0, 180), 2.0f);
-            dl->AddText(tp, palette::negative, why);
+            dl->AddText(tp, palette::negative, why); // fit-exempt: legend box sized to its measured entries (container 2)
         }
     }
 

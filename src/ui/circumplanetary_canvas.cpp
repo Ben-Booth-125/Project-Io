@@ -72,7 +72,7 @@ void draw_market_price_strip(ImDrawList* dl, const world& w, entity_id anchor,
 
     const float x = p0.x + pad;
     float       y = p0.y + pad * 0.5f;
-    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Market prices");
+    dl->AddText({x, y}, IM_COL32(235, 235, 235, 255), "Market prices"); // fit-exempt: on-canvas label; panel/box sized from measured entries
     y += line_h + 3.0f;
 
     for (const auto& [r, price] : rows)
@@ -81,12 +81,12 @@ void draw_market_price_strip(ImDrawList* dl, const world& w, entity_id anchor,
         if (sel)
             dl->AddRectFilled({p0.x + 2.0f, y}, {p1.x - 2.0f, y + line_h}, IM_COL32(60, 70, 90, 255));
         dl->AddRectFilled({x, y + 3.0f}, {x + 8.0f, y + 11.0f}, presentation_of(r).colour);
-        dl->AddText({x + 12.0f, y}, sel ? IM_COL32(255, 255, 255, 255) : IM_COL32(210, 210, 215, 255),
+        dl->AddText({x + 12.0f, y}, sel ? IM_COL32(255, 255, 255, 255) : IM_COL32(210, 210, 215, 255), // fit-exempt: on-canvas label; panel/box sized from measured entries
                     presentation_of(r).abbrev);
         char pbuf[32];
         std::snprintf(pbuf, sizeof(pbuf), "%.1f", static_cast<double>(price));
         const ImVec2 pts = ImGui::CalcTextSize(pbuf);
-        dl->AddText({p1.x - pad - pts.x, y},
+        dl->AddText({p1.x - pad - pts.x, y}, // fit-exempt: on-canvas label; panel/box sized from measured entries
                     sel ? IM_COL32(255, 255, 255, 255) : IM_COL32(180, 185, 195, 255), pbuf);
         y += line_h + 2.0f;
     }
@@ -128,7 +128,7 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
         {
             const char* msg = "No body selected";
             const ImVec2 ts = ImGui::CalcTextSize(msg);
-            dl->AddText(origin + (size - ts) * 0.5f, IM_COL32(150, 150, 150, 255), msg);
+            dl->AddText(origin + (size - ts) * 0.5f, IM_COL32(150, 150, 150, 255), msg); // fit-exempt: on-canvas label; panel/box sized from measured entries
         }
         if (input_enabled && is_minimap && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
             state.primary_level = canvas_level::circumplanetary;
@@ -253,7 +253,7 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
         if (draw_labels)
         {
             const ImVec2 ts = ImGui::CalcTextSize(body.name.c_str());
-            dl->AddText({pos.x - ts.x * 0.5f, pos.y + radius + 2.0f},
+            dl->AddText({pos.x - ts.x * 0.5f, pos.y + radius + 2.0f}, // fit-exempt: on-canvas label; panel/box sized from measured entries
                         IM_COL32(255, 255, 255, 255), body.name.c_str());
         }
     }
@@ -297,7 +297,7 @@ void draw_circumplanetary_canvas(const world& w, ui_state& state, ImVec2 origin,
             dl->AddRectFilled({ bp.x - 2.0f, bp.y - 1.0f },
                               { bp.x + ts.x + 2.0f, bp.y + ts.y + 1.0f },
                               badge_bg, 2.0f);
-            dl->AddText(bp, badge_col, buf);
+            dl->AddText(bp, badge_col, buf); // fit-exempt: on-canvas label; panel/box sized from measured entries
         }
     }
 

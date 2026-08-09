@@ -23,7 +23,7 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*105 entries — 10 open, 95 resolved.*
+*107 entries — 12 open, 95 resolved.*
 
 ---
 
@@ -78,6 +78,16 @@ Two things for your eye. (1) Goldens: sticky_card_00/02-05, new sticky_card_01_r
 *observation · raised 2026-08-09 · from v0.1.2 cut, 2026-08-09 - archiving BL-323's design prose*
 
 tools/session/archive_designs.js:41 writes `JSON.stringify(data, null, 2)`, but docs/development/backlog.json is committed with a 1-space indent. So archiving ANY item silently reformats all ~7,500 lines: the run for BL-323 produced a 7531-insertion / 7502-deletion diff, and the file GREW from 895.6 KB to 907.1 KB even though 11.3 KB of prose had just moved out to the cold store. The tool's own summary line misreports this as '-1% smaller' (it prints a negated delta: '--11.4 KB'). Two consequences: the real change becomes unreviewable inside a whole-file diff, and it is a near-certain merge conflict for any concurrent session touching the backlog - which is exactly the situation this cut ran into. Worked around by rewriting backlog.json at indent=1 afterwards, which brought the diff back to 32 insertions / 3 deletions. FIX: change the indent to 1 for backlog.json (the cold archive files ARE 2-space, so the constant cannot simply be shared), and correct the sign on the size-delta message. Small item; not filed as a backlog entry because it is a two-line fix, but it will bite again on the next landing if left.
+
+### NR-107 — BL-215 (render audit): tick labels abbreviate only from 1000 up, not always
+*decision taken on your behalf · raised 2026-08-09 · from BL-215 design § 5 — 'labels format through fmt::abbreviate instead of %g'*
+
+fmt::abbreviate floors sub-1000 values to whole numbers, so a 2.5 gridline would print '2' on the wizard's fractional-ceiling charts. charts.cpp's tick_label() therefore abbreviates at >= 1000 (the 5-digit overrun the design targets) and keeps %g below it, preserving the existing tick text exactly.
+
+### NR-108 — BL-215 (render audit): the tile-selection goldens will drift despite the caller-opt-in guard
+*observation · raised 2026-08-09 · from BL-215 design decisions 7 and 8 pull in opposite directions*
+
+The legend_place opt-in keeps any width TEST out of draw_bars as specified, but two mandated fixes still move pixels everywhere draw_bars runs, tile graphs included: the measured legend reserve (was constexpr 190, band grows so capped bars can widen from ~25 to their 34 cap) and the top tick's y-clamp into the box. Goldens are disposable by standing practice; re-bless on the next Windows run. Linux golden diffs are uninformative (all Windows-blessed goldens fail ~25-55% here on font rasterisation alone).
 
 ---
 

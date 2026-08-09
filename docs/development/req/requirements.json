@@ -9181,73 +9181,76 @@
   },
   {
    "brief": "text-wrap-render-audit",
-   "title": "BL-215: render-precision audit — text_fit module, overflow ledger, charts reflow, display floor",
+   "title": "Render-precision audit: ui::text_fit module, overflow ledger, charts reflow, display floor (BL-215)",
    "difficulty": 3,
    "importance": "A",
    "evaluated_difficulty": null,
-   "status": "active",
-   "requirements": [
+   "status": "complete",
+   "resolved": "2026-08-09",
+   "resolution": "Landed with BL-215; verified by scripts/verify/text_overflow_floor.lua (0 overflow records at the 1280x720 floor).",
+   "promoted_from": "backlog.json BL-215",
+   "batch": null,
+   "rows": [
     {
      "id": "R1",
-     "requirement": "BL-215: a shared src/ui/text_fit.{hpp,cpp} module (namespace ui) owns measured text draws — fit_text / wrap_text / add_fit_text / fit_width / fitted per the design's API; profile_panel.cpp's private fit_ellipsis/text_ellipsized are deleted and routed through it.",
+     "requirement": "src/ui/text_fit.{hpp,cpp} exists with the exact ratified API (text_box x10, overflow_severity, text_align, fit_text, wrap_text, add_fit_text, fit_width, fitted, recorder surface); profile_panel.cpp's private fit_ellipsis/text_ellipsized are deleted and routed through fit_text.",
      "verification": [
       "code"
      ],
-     "status": "pending",
+     "status": "complete",
      "result_metric": "",
-     "notes": ""
+     "notes": "Module landed; profile_panel helpers deleted, both lines route through fit_text(header_strip)."
     },
     {
      "id": "R2",
-     "requirement": "BL-215: the overflow ledger records elided/clipped/unfittable per (site,text), deduped; verify.clipping() and verify.expect_no_clipping(label) Lua bindings exist; scripts/verify/text_overflow_floor.lua walks ledgers, wizard rounds, lenses, selection kinds, header, comms and build ledger at 1280x720 and fails the harness on any clipped/unfittable record.",
+     "requirement": "Overflow recording is on in Debug and unconditionally under --verify; records dedupe on (site,text) keeping worst severity; no source string is ever shortened and no font shrunk by the helper.",
      "verification": [
-      "visual: harness",
       "code"
      ],
-     "status": "pending",
+     "status": "complete",
      "result_metric": "",
-     "notes": ""
+     "notes": "set_overflow_recording(true) in Debug ctor + run_verify; dedupe on (site,text) keeps worst severity."
     },
     {
      "id": "R3",
-     "requirement": "BL-215: the display floor is enforced — SDL_SetWindowMinimumSize(1280*s,720*s) on creation and from apply_ui_scale(); persisted-settings floor moves 640x480 -> 1280x720; DEVELOPMENT_PRACTICES.md gains § Display environment stating the contract.",
+     "requirement": "Display floor: SDL_SetWindowMinimumSize(1280*s, 720*s) on creation and re-applied from apply_ui_scale; persisted-settings floor moved 640x480 -> 1280x720; DEVELOPMENT_PRACTICES.md states the contract.",
      "verification": [
       "code"
      ],
-     "status": "pending",
+     "status": "complete",
      "result_metric": "",
-     "notes": ""
+     "notes": "Min size on creation + apply_ui_scale (s = scale_px/16); settings floor 1280x720; § Display environment updated."
     },
     {
      "id": "R4",
-     "requirement": "BL-215: charts.cpp gains the measure-first API (legend_width, chart_metrics, measure_chart, chart_row_height overload; legend_place caller opt-in); chart_row_height(float) kept verbatim and the tile-selection golden stays pixel-identical; tick gutters and threshold caption become measured.",
+     "requirement": "charts.cpp is measure-first: legend_width replaces the 190px guess, measure_chart/chart_metrics/chart_row_height(metrics) added with chart_row_height(float) verbatim, draw_bars legend_place is a caller opt-in (no internal width test), tick gutters measured, threshold_line takes the resolved legend reserve, titles wrap to two lines then elide-with-tooltip.",
      "verification": [
-      "visual: harness",
-      "code"
+      "code",
+      "visual: scripts/verify/text_overflow_floor.lua"
      ],
-     "status": "pending",
-     "result_metric": "",
-     "notes": ""
+     "status": "complete",
+     "result_metric": "verify.expect_no_clipping: 0 failures, 0 records",
+     "notes": "text_overflow_floor.lua PASS on Linux Debug build: 0 clipped/unfittable, 0 elided after the band fix."
     },
     {
      "id": "R5",
-     "requirement": "BL-215: docs/ui/LAYOUT.md container table gains row 10 (hand-drawn chart plot, guaranteed-fit reflowing), container 4 widened to include the identity tile, closing amendment note added.",
+     "requirement": "verify.clipping() and verify.expect_no_clipping(label) exist; capture_frame names the overflow frame; scripts/verify/text_overflow_floor.lua walks the shell at 1280x720 and asserts zero clipped/unfittable records.",
      "verification": [
-      "code"
+      "visual: scripts/verify/text_overflow_floor.lua"
      ],
-     "status": "pending",
-     "result_metric": "",
-     "notes": ""
+     "status": "complete",
+     "result_metric": "verify.expect_no_clipping: 0 failures, 0 records",
+     "notes": "Bindings live; script walks ledgers/views/lenses/selection/wizard/history at 1280x720; exit 0."
     },
     {
      "id": "R6",
-     "requirement": "BL-215: coverage — rg 'AddText\\(' over src/ui src/core returns only text_fit.cpp, icons.cpp, or lines with a trailing '// fit-exempt: <reason>' comment.",
+     "requirement": "Coverage: rg -n \"AddText(\" src/ui src/core returns only text_fit.cpp, icons.cpp, or lines carrying a trailing // fit-exempt: <reason> comment; LAYOUT.md carries container row 10, the widened container-4 row, and the closing amendment note.",
      "verification": [
       "code"
      ],
-     "status": "pending",
+     "status": "complete",
      "result_metric": "",
-     "notes": ""
+     "notes": "Coverage grep clean (only text_fit.cpp, icons.cpp, fit-exempt lines); LAYOUT.md row 10 + container 4 + note added."
     }
    ]
   },
