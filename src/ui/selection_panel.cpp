@@ -611,6 +611,21 @@ void glyph_reserved(ImDrawList* dl, ImVec2 c, float r, ImU32 col)
     dl->AddCircle(c, r * 0.30f, col, 12, 1.5f);
 }
 
+// Name of a tile's road tier, or nullptr when the tile carries no road (BL-184).
+// The wording matches the construction ledger's tier affordances below and the
+// canvas weight ladder (Track thin/dim -> Highway thick/bright); >3 reads as the
+// top tier, exactly as body_surface_canvas.cpp's switch default does.
+const char* road_tier_name(std::uint8_t road_level)
+{
+    switch (road_level)
+    {
+        case 0:  return nullptr;
+        case 1:  return "Track";
+        case 2:  return "Road";
+        default: return "Highway";
+    }
+}
+
 // A square icon button: an ImGui::Button frame with a glyph drawn over it and a
 // hover tooltip (Ben's call: icons, text only on hover). Disabled buttons dim the
 // glyph and show the reason. Returns true only on an enabled click.
@@ -659,6 +674,21 @@ void draw_tile_selection(world& w, ui_state& ui)
         ImGui::SetCursorScreenPos({hc.x + ir * 2.0f + style.ItemSpacing.x, hc.y});
         ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
                            "Tile [%d, %d]", tile.grid_x, tile.grid_y);
+
+        // Road tier (BL-184). The three tiers render on the canvas by line weight and
+        // brightness alone, with no key anywhere: roads are always-on terrain rather
+        // than a lens (Ben, BL-147), so the per-lens legend drawer cannot carry them.
+        // Naming the tier here teaches that visual code contextually, at the moment of
+        // interest, without adding permanent chrome. Roadless tiles show nothing.
+        if (const char* tier = road_tier_name(tile.road_level))
+        {
+            ImGui::SameLine();
+            ImGui::TextDisabled("\xc2\xb7 %s", tier);
+            if (ImGui::IsItemHovered())
+                ImGui::SetTooltip("Road tier: Track (thin) - Road - Highway (thick, bright).\n"
+                                  "A better road moves goods across this tile faster.");
+        }
+
         // No close button: the band is always open (BL-266).
     }
     ImGui::Separator();

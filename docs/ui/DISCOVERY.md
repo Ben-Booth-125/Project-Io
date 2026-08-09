@@ -179,6 +179,17 @@ for the active body — never serialised, no feedback into `world/*`). A tile's 
 permanent layers, else the moving beam's intensity; the fog wash scales with `1 − vision`, applied over
 the lens fill so a fogged region's analytic read dims with it. Survey owns the *unrevealed* tiles.
 
+**Roads take the same wash (BL-185, 2026-08-09).** The road-edge pass used to draw independently of
+the fog, so a road on an unreached tile rendered exactly as brightly as one on the player's own
+corridor — the one bright thing on a dark surface. Both the lens fill and the road spans now go
+through a single `fog_dim` (`body_surface_canvas.cpp`), so the fog reads as one uniform wash. A road
+edge spans **two** tiles, and it is fogged by the **max** of the pair's vision — a road is lit if
+*either* end is reached. Max is chosen because it is **symmetric**, so the two tiles' halves fog to
+the same value and the span stays one continuous weight (the same no-from/to-asymmetry property
+BL-172 gave the geometry); and because reach is a flood outward from where the player operates, so
+an edge touching a reached tile is inside that reach rather than one hop past its rim. A junction's
+centre cap takes the brightest edge meeting there. Presentation only — no `world/*` change.
+
 - **Permanent building pockets (BL-151/154):** a radius-2 flood around each of the player's own
   building tiles — your installations are always visible.
 - **Permanent corp-centre → market corridors (BL-154):** a **3-wide** corridor (the A* path flooded
