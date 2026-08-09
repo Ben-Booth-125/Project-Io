@@ -9178,6 +9178,129 @@
      "notes": ""
     }
    ]
+  },
+  {
+   "brief": "text-wrap-render-audit",
+   "title": "BL-215: render-precision audit — text_fit module, overflow ledger, charts reflow, display floor",
+   "difficulty": 3,
+   "importance": "A",
+   "evaluated_difficulty": null,
+   "status": "active",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-215: a shared src/ui/text_fit.{hpp,cpp} module (namespace ui) owns measured text draws — fit_text / wrap_text / add_fit_text / fit_width / fitted per the design's API; profile_panel.cpp's private fit_ellipsis/text_ellipsized are deleted and routed through it.",
+     "verification": [
+      "code"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-215: the overflow ledger records elided/clipped/unfittable per (site,text), deduped; verify.clipping() and verify.expect_no_clipping(label) Lua bindings exist; scripts/verify/text_overflow_floor.lua walks ledgers, wizard rounds, lenses, selection kinds, header, comms and build ledger at 1280x720 and fails the harness on any clipped/unfittable record.",
+     "verification": [
+      "visual: harness",
+      "code"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "requirement": "BL-215: the display floor is enforced — SDL_SetWindowMinimumSize(1280*s,720*s) on creation and from apply_ui_scale(); persisted-settings floor moves 640x480 -> 1280x720; DEVELOPMENT_PRACTICES.md gains § Display environment stating the contract.",
+     "verification": [
+      "code"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R4",
+     "requirement": "BL-215: charts.cpp gains the measure-first API (legend_width, chart_metrics, measure_chart, chart_row_height overload; legend_place caller opt-in); chart_row_height(float) kept verbatim and the tile-selection golden stays pixel-identical; tick gutters and threshold caption become measured.",
+     "verification": [
+      "visual: harness",
+      "code"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R5",
+     "requirement": "BL-215: docs/ui/LAYOUT.md container table gains row 10 (hand-drawn chart plot, guaranteed-fit reflowing), container 4 widened to include the identity tile, closing amendment note added.",
+     "verification": [
+      "code"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    },
+    {
+     "id": "R6",
+     "requirement": "BL-215: coverage — rg 'AddText\\(' over src/ui src/core returns only text_fit.cpp, icons.cpp, or lines with a trailing '// fit-exempt: <reason>' comment.",
+     "verification": [
+      "code"
+     ],
+     "status": "pending",
+     "result_metric": "",
+     "notes": ""
+    }
+   ]
+  },
+  {
+   "brief": "selection-always-open",
+   "title": "BL-266: Selection element always open — retire dismissal, empty state rests on player corp",
+   "difficulty": 3,
+   "importance": "B",
+   "evaluated_difficulty": null,
+   "status": "active",
+   "requirements": [
+    {
+     "id": "R1",
+     "requirement": "BL-266: selection_hidden_for is deleted (all eleven call sites — draw gate, dismiss writer, three canvas click handlers, Esc rung, card_open test, two re-show paths); Esc's terminal rung becomes the system menu.",
+     "verification": [
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "Field deleted; 18 sites removed (design counted 11 - extra verify hooks + canvas files); Esc terminal rung = system menu; build clean",
+     "notes": ""
+    },
+    {
+     "id": "R2",
+     "requirement": "BL-266: with nothing selected the band rests on the player's own corporation via the existing corporation builder; selection_kind::none is never rendered by the band (rule stated in code comment); deselect returns the band to the player corp.",
+     "verification": [
+      "visual: harness",
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "Band substitutes player corp for null/stale selection via swap-draw-restore (selected_entity stays null, deselect representable); none never rendered, rule in comment; resting capture verified",
+     "notes": ""
+    },
+    {
+     "id": "R3",
+     "requirement": "BL-266: docs/ui/SELECTION.md updated in the same change — dismissal retired, empty state documented, Esc ladder described as ending at the system menu.",
+     "verification": [
+      "code"
+     ],
+     "status": "complete",
+     "result_metric": "SELECTION.md updated in the same change",
+     "notes": ""
+    },
+    {
+     "id": "R4",
+     "requirement": "BL-266: every verify script that pressed Esc expecting the band to hide is updated to assert the band persists showing the player corp (state assertion preferred over pixels); drill/fold goldens re-blessed.",
+     "verification": [
+      "visual: harness"
+     ],
+     "status": "pending",
+     "result_metric": "sticky_card.lua + continents_terrain.lua updated and run; dismiss_selection Lua hook replaced by clear_selection",
+     "notes": "Goldens NOT re-blessed: on this Linux box every golden diffs ~20-35% even on untouched captures (environment mismatch). Re-bless list in NR-104."
+    }
+   ]
   }
  ]
 }

@@ -23,13 +23,61 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*94 entries — 0 open, 94 resolved.*
+*105 entries — 10 open, 95 resolved.*
 
 ---
 
 ## Open
 
-*Nothing open.*
+### NR-095 — BL-262 (scoring system) judged not buildable this session — remaining half is design-owed in practice
+*decision taken on your behalf · raised 2026-08-09 · from Build-heavy v0.1.1 session, 2026-08-09*
+
+BL-262's first slice landed 2026-08-06; what remains is the production axis and the credit/counterparty hooks. The production axis has no honest visible-information source (rival recipe/workforce private under BL-068 competitor visibility), so it needs a proxy designed before it can be built. Skipped from this batch; consider filing the follow-on item BL-262's resolution note already asks for.
+
+### NR-097 — 119 commits since the v0.1.0 tag and no version cut; CHANGELOG [Unreleased] still reads 'Nothing yet'
+*observation · raised 2026-08-09 · from Roadmap gap review, 2026-08-09 session*
+
+The v0.1.0 tag is 2026-08-03. Six days and 119 commits later there is no v0.1.1 tag, and CHANGELOG.md's [Unreleased] section is empty - so the changelog is not merely un-stamped, it is not accruing. Meanwhile the roadmap kept extending FORWARD in the same window (v1.0.0 named 2026-08-08, the Era -1 arc folded into v0.3.0, four stub minors re-sequenced). Direction is being added faster than releases are being cut, which is the opposite of Ben's stated aim (2026-08-09: 'cut as many versions as we can now, rather than working on the lofty, conceptual stuff'). The cost is compounding: cutting v0.1.1 now means reconstructing changelog entries from 119 commits rather than 0, and it grows daily. Recommend either accruing [Unreleased] per delivery from here, or generating it from the DEVLOG at cut time.
+
+### NR-098 — v0.1.1 is a bucket, not a theme: its named theme is complete, 26 retrofitted items hold the cut hostage
+*question · raised 2026-08-09 · from Roadmap gap review, 2026-08-09 session*
+
+v0.1.1's theme is the word interface, and all three legs shipped: BL-270 (action dictionary) complete, BL-206 (blackboard export) complete, BL-278 (Io MCP server) complete. Despite that, v0.1.1 carries 29 open items. ROADMAP.md is candid about how: 'Retrofitted 2026-08-08 - still open, surfaced 2026-08-01 -> 08-04', three later waves of unrelated work assigned to a minor whose theme had already finished. That violates the roadmap's own versioning grain ('one minor carries one coherent theme') and is the single biggest reason no version has been cut. The 26 passengers cluster cleanly into shell/legibility (BL-215, BL-229, BL-260, BL-265, BL-266, BL-292, BL-281, BL-216, BL-193, BL-184, BL-185), build health (BL-288, BL-291, BL-302, BL-322, BL-285) and generation/content (BL-290, BL-257, BL-256, BL-338, BL-308, BL-309, BL-283, BL-284, BL-282) - three plausible minors. QUESTION: cut v0.1.1 on its actual theme now and re-home the passengers into those three, or keep holding the tag? One genuine wrinkle is filed separately as NR-099.
+
+### NR-099 — BL-293 is the one honest hole in v0.1.1's theme, and it is far bigger than its title - cut around it or hold?
+*question · raised 2026-08-09 · from Roadmap gap review, 2026-08-09 session; BL-293 scope correction 2026-08-07*
+
+BL-293 (priority A) says three order-book presses have no corp_command verb, so no text-driven player can trade - a hole in the write leg of v0.1.1's own theme, independently re-found by Project-Rival's Battery A at a measured 20% gap (NR-073). Its own 2026-08-07 scope correction makes it much larger than 'add three verbs': the world has NO order book at all (sell_order lives in ui_state.hpp, not the world), and no serialisation path touches sell_order/buy_order. So it needs a world-side order book plus save-format work - not a small item, and it touches the serialisation seam. QUESTION: (a) cut v0.1.1 with the word interface as read + partial write, fix the ACTIONS.md preamble that currently overclaims 'the full word interface' (a one-line honesty fix BL-293 already identifies), and let BL-293 carry the widening in a later minor; or (b) hold the v0.1.1 tag until BL-293 lands. Recommend (a) - the three legs are genuinely shipped and useful, and BL-293 is a widening of the write leg rather than a prerequisite for the theme existing.
+
+### NR-100 — v0.1.2 is finished but uncut, and BL-323's own scoped-out residual was never filed as an item
+*question · raised 2026-08-09 · from Roadmap gap review, 2026-08-09 session; BL-323 design field*
+
+v0.1.2 (buildings rework) has exactly one open item, BL-323, and BL-323's own design field records every slice as landed 2026-08-08: S2 + S2b (logistics reach gate), S1 partial (extractables 4 -> 15), S3 (site-dependent build time), S4 (construction legibility), plus the three-defect reach hardening - harnesses 12/12 and 26/26 PASS, requirements groups complete. The only residual is explicitly scoped OUT in the item's own words: 'the processing-chain half of S1 (Chemical Plant, Electronics Lab, Fabricator, Assembly Plant, most Refinery outputs) needs NEW resource_type values with market/price/serialisation wiring - a bigger item than Lua authoring, not attempted here.' That residual has no backlog item, so closing BL-323 would silently drop it. QUESTION: file the processing-chain item (new resource_types + market/serialisation wiring, its own version goal), flip BL-323 complete, and cut v0.1.2? On the evidence this is the cheapest available cut - the work is done and verified; only bookkeeping stands in the way.
+
+### NR-101 — 45 of 97 open items have no minor: 'post-v0.1.0' is being used as a synonym for someday
+*observation · raised 2026-08-09 · from Roadmap gap review, 2026-08-09 session*
+
+backlog_query over open items: 42 carry version_goal 'post-v0.1.0' and 3 carry none at all (BL-107 save-format version, BL-130 real market inventory, BL-132 market cogeneration). That is 45 of 97 - nearly half the open backlog with no minor to be cut in. 'post-v0.1.0' predates the arc being mapped out to v1.0.0 and is now stale: ROADMAP.md's v0.4.0 section, for instance, names seven of them (BL-239, BL-222, BL-223, BL-224, BL-238, BL-240, BL-311) as the political-layer substrate in PROSE, but their version_goal was never updated, so no query can see it. Effect: the roadmap and the backlog disagree about what is in which version, and the disagreement is invisible unless you read both. Cheap fix: sweep post-v0.1.0 into real minors, starting with the seven the roadmap already assigns in prose. Related to the sequencing decoupling in NR-102.
+
+### NR-102 — Work order has decoupled from version order, and landed items are again sitting on non-terminal status
+*observation · raised 2026-08-09 · from Roadmap gap review, 2026-08-09 session*
+
+Two coupled effects, both mechanical rather than judgement calls, but they are why minors stall partway. (1) SEQUENCE: v0.1.2 (buildings) was built to completion while v0.1.1 stayed open, and v0.1.5 military work is landing now, three minors ahead - BL-325 (military base) and BL-331 (starting military presence) both have commits on main. Building out of order is fine as work; the cost is that every minor ends up partially done and none reaches a cuttable state. (2) STATUS LAG: BL-325 and BL-331 still read 'designed' though 'Military base S1: the muster building lands (BL-325)' is committed. ROADMAP.md already caught this exact pattern once - 'Three of those had already landed and were simply never flipped off the non-terminal landed status, so they had been reading as open work' - and it has recurred. Worth a status sweep before any cut, since open-item counts are the input to deciding what a minor still owes.
+
+### NR-103 — Root cause of the stalled cuts: no minor between v0.1.0 and v1.0.0 has a done-definition
+*question · raised 2026-08-09 · from Roadmap gap review, 2026-08-09 session*
+
+ROADMAP.md writes done-definitions for exactly two versions: v0.1.0 (the prototype cut) and v1.0.0 (the playable-game cut, named 2026-08-08). Every minor in between is deliberately theme-level - 'the expanded-prototype milestones above (v0.1.x -> v0.4.0) stay theme-level and earn their own done-definitions as they firm up'. That deferral is the root cause of everything in NR-097 through NR-102. A theme with no done-definition has no test for 'is this finished?', so it can absorb items indefinitely - which is exactly what v0.1.1 did, taking on 26 retrofitted items after its own three legs had shipped. The two versions that DO have done-definitions are also the only two that have ever been cut or scheduled. QUESTION: write a short done-definition (3-5 bullets, v0.1.0's is the model) for each minor we intend to cut, starting with the ones that are already finished. It is the cheapest structural fix available and it converts 'when is this done?' from a judgement call into a checklist.
+
+### NR-104 — BL-266 (selection always open): goldens need re-bless, and the Continent lens key now shares its corner with the always-open band
+*question · raised 2026-08-09 · from BL-266 worktree agent, 2026-08-09*
+
+Two things for your eye. (1) Goldens: sticky_card_00/02-05, new sticky_card_01_resting_corp (old sticky_card_01_dismissed.png orphaned - delete), continents_lens_kepler_key, and every golden showing the Selection band header (selection_band_*, selection_bar_*, selection_building_manage, selection_tile_*, walk_04_selection, v009_emblem_selection_and_markers) need re-blessing - the [x] dismiss control is gone and [>] moved. Not re-blessed this session: on the Linux box ALL goldens diff 20-35% even on untouched captures, so a bless here would be blind. (2) Layout call: the Continent lens key permanently overlaps the always-open band corner (see continents_lens_kepler_key capture) - does the key want a new home?
+
+### NR-104 — archive_designs.js reformats the whole of backlog.json: it writes 2-space indent, the file is stored at 1
+*observation · raised 2026-08-09 · from v0.1.2 cut, 2026-08-09 - archiving BL-323's design prose*
+
+tools/session/archive_designs.js:41 writes `JSON.stringify(data, null, 2)`, but docs/development/backlog.json is committed with a 1-space indent. So archiving ANY item silently reformats all ~7,500 lines: the run for BL-323 produced a 7531-insertion / 7502-deletion diff, and the file GREW from 895.6 KB to 907.1 KB even though 11.3 KB of prose had just moved out to the cold store. The tool's own summary line misreports this as '-1% smaller' (it prints a negated delta: '--11.4 KB'). Two consequences: the real change becomes unreviewable inside a whole-file diff, and it is a near-certain merge conflict for any concurrent session touching the backlog - which is exactly the situation this cut ran into. Worked around by rewriting backlog.json at indent=1 afterwards, which brought the diff back to 32 insertions / 3 deletions. FIX: change the indent to 1 for backlog.json (the cold archive files ARE 2-space, so the constant cannot simply be shared), and correct the sign on the size-delta message. Small item; not filed as a backlog entry because it is a two-line fix, but it will bite again on the next landing if left.
 
 ---
 
@@ -1476,4 +1524,11 @@ New research note docs/ai/LANGUAGE_POLICY_FEASIBILITY.md, answering the two gate
 > **RESOLVED.** Ruled 2026-08-08 (Ben, direct instruction: 'Rule on NR-094 now'). Option 1 taken: the layer recommendation is ACCEPTED. AI_OPPONENT.md gained § 10g recording the ruling: Stage A/B (corp_ai.cpp's scored-utility core) stays the action generator indefinitely -- no skill upside to buy by distilling it, and the constraint tax (note § 6) is a live, avoidable risk at exactly the model scale being targeted. Stage C (already named in § 7 since 2026-07-26 but never decomposed) is the correct home for the model: a conditioned dialogue layer over the corp_decision intent stream, Cicero's own architecture. Filed as BL-334 (design-owed -- the shape is settled, the concrete build is not). BL-279's corpus is rescoped to train BL-334, not an action-emitting model; its design field amended in place rather than closed, since the item itself is not cancelled. The § 4-5 feasibility findings (both gates pass) are accepted as evidence without further review -- they were never in question. The goal-layer question (note § 9's third bullet) is deliberately left open, filed as an unresolved question inside BL-334 rather than ruled on here, since no evidence yet shows Io's own corp_ai.cpp exhibiting the step-wise-myopia failure mode the literature predicts. Option 3 (measure the ~300-token assumption via one real BL-278 decision) was not taken as a precondition -- it remains a cheap, independent follow-up noted in BL-334's open questions, not a blocker on this ruling.
 
 *Files: `docs/ai/LANGUAGE_POLICY_FEASIBILITY.md`, `docs/ai/AI_OPPONENT.md`*
+
+### NR-096 — BL-215 (text-wrap audit): verifier-visual SKILL.md extension awaits your permission
+*question · raised 2026-08-09 · from BL-215 design, decision 10 — skill edits need user permission*
+
+The overflow-ledger check (scripts/verify/text_overflow_floor.lua + the AddText coverage grep) is being built this session; the design says the saved check extends .claude/skills/verifier-visual/SKILL.md. That edit is deferred pending your yes/no; until then the script runs ad hoc.
+
+> **RESOLVED.** Ben approved 2026-08-09; SKILL.md § Text-overflow floor check added the same session.
 
