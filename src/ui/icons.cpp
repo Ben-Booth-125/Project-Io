@@ -71,10 +71,10 @@ void hub_node(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
 }
 
 // Shield silhouette — the Military Base marker (BL-325 S1). A flat top with
-// shoulders tapering to a bottom point: the martial building, echoing the unit
-// chevron's downward-point reading but FILLED like every other building glyph —
-// so it never reads as the stroke-only unit marker, the port's upward triangle,
-// or the hub's hexagon.
+// shoulders tapering to a bottom point: the martial building, FILLED like every
+// other building glyph — so it never reads as the port's upward triangle or the
+// hub's hexagon. (The stroke-only unit chevron was deleted uncalled, BL-294; a
+// unit marker returns with BL-157.)
 void shield(ImDrawList* dl, ImVec2 c, float r, ImU32 fill)
 {
     const ImVec2 v[5] = {
@@ -111,27 +111,14 @@ void resource(ImDrawList* dl, ImVec2 centre, float r, resource_type res)
     diamond(dl, centre, r, presentation_of(res).colour);
 }
 
-void unit(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
-{
-    // Open upward chevron (V): two lines meeting at a bottom point, open at top.
-    // Stroke-only so it is unambiguously distinct from the filled port triangle.
-    const ImVec2 v[3] = {
-        { centre.x - r, centre.y - r * 0.5f },  // top-left arm
-        { centre.x,     centre.y + r },          // bottom point
-        { centre.x + r, centre.y - r * 0.5f },  // top-right arm
-    };
-    dl->AddPolyline(v, 3, outline, ImDrawFlags_None, 2.0f);
-    dl->AddPolyline(v, 3, colour,  ImDrawFlags_None, 1.5f);
-}
-
 void under_construction(ImDrawList* dl, ImVec2 centre, float r, ImU32 colour)
 {
     // Crane silhouette: a mast, an angled boom reaching toward the load, a
     // back-stay bracing it, and a short hook line hanging from the boom tip.
     // Four strokes, stroke-only (see the header contract) — distinct from the
-    // unit chevron (a closed V), the convoy chevron (points right), and every
-    // filled building glyph. Same shadow-then-colour pass as unit()/convoy() so
-    // it reads against any terrain or lens fill.
+    // convoy chevron (points right) and every filled building glyph. Same
+    // shadow-then-colour pass as convoy() so it reads against any terrain or
+    // lens fill.
     const ImVec2 base    { centre.x - r * 0.15f, centre.y + r         };
     const ImVec2 top     { centre.x - r * 0.15f, centre.y - r         };
     const ImVec2 boom_tip{ centre.x + r,         centre.y - r * 0.60f };
