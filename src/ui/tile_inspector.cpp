@@ -83,18 +83,19 @@ void draw_tile_inspector(const world& w, ui_state& s,
     ImGui::SameLine();
     nav_button("Tiles", view_tiles, view, p_open);
 
-    // The view-level fold control (BL-214). Story and Tiles are single blocks, so
-    // the chevron gives the whole view the screen — which is the honest fix for the
-    // Tiles table, whose 29 columns have always overflowed a 380 px column. Chain
-    // does NOT take one: its stages carry their own, and a second control governing
-    // all four at once would re-merge what the per-stage fold separates.
+    // The view-level disclosure control (BL-214, revised BL-265). Story and Tiles
+    // are single blocks that already show their content in the column, so there is
+    // nothing for `⌄` to expand — they take the full-canvas control alone, which is
+    // the honest fix for the Tiles table, whose columns have always overflowed a
+    // 380 px column. It still lands in the SAME rightmost column as every paired
+    // control elsewhere: `disclosure_controls` leaves the gutter's left slot empty
+    // rather than letting `›` slide sideways. Chain does NOT take one: its stages
+    // carry their own, and a second control governing all four at once would
+    // re-merge what the per-stage disclosure separates.
     if (view != view_chain)
-    {
-        ImGui::SameLine(ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX()
-                        - ImGui::GetFrameHeight());
-        fold_chevron(s, (view == view_story) ? detail_surface::history_story
-                                             : detail_surface::history_tiles, 0);
-    }
+        disclosure_controls(s, (view == view_story) ? detail_surface::history_story
+                                                    : detail_surface::history_tiles,
+                            0, /*in_place=*/false);
     ImGui::Separator();
 
     const body_component& sel_body = w.bodies.at(selected_body);
@@ -140,8 +141,8 @@ void draw_tile_inspector(const world& w, ui_state& s,
     // ("generation history, not a live event log").
     if (view == view_story)
     {
-        // Drawn into whichever host is active — the column at rest, the full-screen
-        // overlay when expanded — rather than twice. One body, two hosts, so the two
+        // Drawn into whichever host is active — the column at rest, the full-canvas
+        // takeover when expanded — rather than twice. One body, two hosts, so the two
         // cannot show different things.
         auto story_body = [&]() {
             if (!entry || entry->state.history.empty())
@@ -230,12 +231,13 @@ void draw_tile_inspector(const world& w, ui_state& s,
         const ui::generation_chart_source src{
             chart_bodies.data(), chart_bodies.size(), home };
 
-        // Each stage rests as its verdict line and expands full screen (BL-214).
-        // This replaces the per-stage CollapsingHeader, which was this surface's own
-        // private disclosure idiom — the fourth one the item exists to retire. It
-        // also fixes what the accordion could not: four stages of charts never fit
-        // this 380 px column, so "open" here always meant "scroll", while the
-        // overlay gives every chart the width it was drawn for.
+        // Each stage rests as its verdict line, grows in place on `⌄`, and gives the
+        // WHOLE ROUND the canvas on `›` (BL-214, revised BL-265). This replaces the
+        // per-stage CollapsingHeader, which was this surface's own private disclosure
+        // idiom — the fourth one the item exists to retire. The takeover is what
+        // fixes the thing the accordion could not: a round's charts never fit this
+        // 380 px column, so "open" here always meant "scroll", while the canvas gives
+        // every chart the width it was drawn for.
         for (int si = static_cast<int>(cr.first); si <= static_cast<int>(cr.last); ++si)
             ui::draw_stage_fold(src, static_cast<chain_stage>(si), s,
                                 detail_surface::history_chain);

@@ -90,31 +90,84 @@ const char* stage_explainer(chain_stage s)
     }
 }
 
+/// Which round a stage belongs to — the accordion it is one item of. Derived
+/// rather than passed, so a full-canvas takeover can show the WHOLE accordion
+/// (BL-265 change 3) without either caller having to hand its round bounds down.
+/// Null only if the stage tables and `chain_round_at` ever disagree.
+static const chain_round* round_of(chain_stage s)
+{
+    const int si = static_cast<int>(s);
+    for (int r = 0; r < chain_round_count; ++r)
+    {
+        const chain_round& cr = chain_round_at(r);
+        if (si >= static_cast<int>(cr.first) && si <= static_cast<int>(cr.last))
+            return &cr;
+    }
+    return nullptr;
+}
+
 void draw_stage_fold(const generation_chart_source& src, chain_stage s,
                      ui_state& ui, detail_surface surface)
 {
     const int key = static_cast<int>(s);
 
-    // ── Folded: [chevron] Stage name  ·  verdict ──
+    // ── Folded: Stage name  ·  verdict … ⌄ › ──
     // The verdict is a GLANCE-class figure — a label and a list, no sentences — so
     // it survives at the resting level. The explainer paragraph and the charts are
-    // what expanding buys.
+    // what the controls buy. Both controls sit in the row's right gutter (BL-265
+    // change 4); the chevron used to lead the row here, which is exactly the split
+    // placement Ben called disorienting.
     ImGui::PushID(key);
-    fold_chevron(ui, surface, key);
-    ImGui::SameLine();
     ImGui::TextColored(ImGui::ColorConvertU32ToFloat4(palette::selection),
                        "%s", chain_stage_name(s));
     ImGui::SameLine();
     const std::string verdict = stage_verdict(src, s);
-    ImGui::TextDisabled("%s", verdict.c_str());
+    gutter_text(ImGui::GetColorU32(ImGuiCol_TextDisabled), verdict.c_str());
+    disclosure_controls(ui, surface, key);
     ImGui::PopID();
 
-    // ── Expanded: the whole stage, full screen ──
-    if (fold_overlay_begin(ui, surface, key, chain_stage_name(s)))
+    // ── Expanded in place: this one stage, where it sits ──
+    // Indented under its own verdict line so the accordion reads as a list with
+    // something opened inside it, not as a new section.
+    if (is_open_in_place(ui, surface, key))
     {
+        ImGui::PushID(key);
+        ImGui::Indent();
         ImGui::TextWrapped("%s", chain_stage_title(s));
         ImGui::Spacing();
         draw_stage_charts(src, s, false, &ui);
+        ImGui::Unindent();
+        ImGui::PopID();
+    }
+
+    // ── Full canvas: the whole ROUND, every stage open, scrolled ──
+    // Not just this stage. "Anything full screen deserves its full space" (Ben,
+    // 2026-08-02) — a takeover that showed one item of an accordion and left its
+    // siblings folded behind it was spending the largest rectangle in the app on a
+    // subset. The in-place set is deliberately not consulted: every stage renders
+    // open, so the view does not depend on what the player happened to unfold first.
+    if (!is_expanded(ui, surface, key))
+        return;
+
+    const chain_round* cr    = round_of(s);
+    const char*        title = cr ? cr->name : chain_stage_name(s);
+    if (fold_overlay_begin(ui, surface, key, title))
+    {
+        if (cr)
+        {
+            ImGui::TextDisabled("%s", cr->question);
+            ImGui::Spacing();
+        }
+        const int first = cr ? static_cast<int>(cr->first) : key;
+        const int last  = cr ? static_cast<int>(cr->last)  : key;
+        for (int si = first; si <= last; ++si)
+        {
+            ImGui::PushID(si);
+            // heading = true: each stage names itself, so the scroll reads as a
+            // chain of headed sections rather than one undifferentiated run.
+            draw_stage_charts(src, static_cast<chain_stage>(si), true, &ui);
+            ImGui::PopID();
+        }
         fold_overlay_end(ui);
     }
 }
