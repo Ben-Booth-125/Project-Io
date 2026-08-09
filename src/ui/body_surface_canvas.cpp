@@ -61,6 +61,21 @@ ImU32 lerp_colour(ImU32 a, ImU32 b, float t)
     return IM_COL32(r, g, bl, 255);
 }
 
+/// The intra-body reach fog's wash (BL-151/152/154): dim a colour toward the fog dark
+/// by how little the player sees the tile — `vision` 1 = fully lit, 0 = unreached.
+/// Alpha is preserved (lerp_colour forces opaque, which would change how a translucent
+/// road span reads). Every layer the fog covers goes through this one function — the
+/// lens fill and, since BL-185, the road spans — so the fog reads as a single wash
+/// rather than a dark ground with brightly-lit roads laid over it.
+ImU32 fog_dim(ImU32 c, float vision)
+{
+    if (vision >= 1.0f)
+        return c;
+    const ImU32 alpha = (c >> IM_COL32_A_SHIFT) & 0xFFu;
+    const ImU32 dim   = lerp_colour(c, IM_COL32(8, 10, 16, 255), 0.5f * (1.0f - vision));
+    return (dim & ~(0xFFu << IM_COL32_A_SHIFT)) | (alpha << IM_COL32_A_SHIFT);
+}
+
 /// Fill colour of a tile that carries a building — its **plate**. A built tile is
 /// swapped out of the terrain palette entirely (Ben, 2026-07-22): it fills with a
 /// desaturated wash of the owning corporation's identity colour, so ownership — the
@@ -1410,6 +1425,17 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         }
     }
 
+    // A tile's vision scalar (0..1): 1 inside the permanent layers (building pockets +
+    // the corp-centre->market corridors), else the moving beam's intensity. Hoisted out
+    // of the tile loop's fill block for BL-185, because the road pass now needs the same
+    // number for a *neighbour* tile — the fog must size identically wherever it is read.
+    auto tile_vision = [&](entity_id tid) -> float {
+        if (state.permanent_vision.find(tid) != state.permanent_vision.end())
+            return 1.0f;
+        const auto bi = beam_intensity.find(tid);
+        return (bi != beam_intensity.end()) ? bi->second : 0.0f;
+    };
+
     const ImVec2 mouse = state.mouse.active
                          ? ImVec2{state.mouse.x, state.mouse.y}
                          : ImVec2{-1.0f, -1.0f}; // off-screen sentinel suppresses hover
@@ -1673,20 +1699,11 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
         // convoy beam's contribution (bright at the head, dimming down the tail). The
         // fog wash scales with (1 − vision), so the surface reads mostly unknown, lit
         // along the player's corridors, with a convoy's beam gliding and trailing over
-        // them. Survey mask owns unrevealed tiles, so this skips them.
+        // them. Survey mask owns unrevealed tiles, so this skips them. The road pass
+        // below reads the same scalar (BL-185) — hence the hoist out of the branch.
+        const float vision = tile_vision(id);
         if (revealed)
-        {
-            float vision = (state.permanent_vision.find(id) != state.permanent_vision.end())
-                               ? 1.0f : 0.0f;
-            if (vision < 1.0f)
-            {
-                const auto bi = beam_intensity.find(id);
-                if (bi != beam_intensity.end())
-                    vision = std::max(vision, bi->second);
-            }
-            if (vision < 1.0f)
-                fill = lerp_colour(fill, IM_COL32(8, 10, 16, 255), 0.5f * (1.0f - vision));
-        }
+            fill = fog_dim(fill, vision);
 
         // Wrap copies inside the canvas: k_min/k_max were computed at the top of
         // the loop body (BL-268), where they double as the column cull.
@@ -1719,6 +1736,17 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
             // rounds junctions and keeps an isolated / just-placed road tile visible. Styled by
             // THIS tile's tier — Track(1) thin/dim, Road(2) medium, Highway(3) thick/bright — so a
             // tier change reads as a taper at the midpoint. Seam-crossing edges shift one period.
+            //
+            // BL-185: roads dim with the intra-body reach fog, through the same fog_dim wash
+            // the lens fill takes, so an unreached road recedes with the ground under it rather
+            // than reading as brightly as one on your own corridor. A road edge spans two tiles,
+            // so the pair's vision is combined with MAX — a road is lit if EITHER end is reached.
+            // Max is the choice for two reasons: it is SYMMETRIC, so both tiles' halves fog to the
+            // same value and the span stays one continuous weight (the BL-172 no-from/to-asymmetry
+            // property the geometry already guarantees); and reach is a flood outward from where
+            // the player operates, so an edge touching a reached tile is inside that reach — a
+            // corridor's roads should not darken one hop early at its rim. Survey (BL-067) still
+            // owns genuinely unrevealed tiles; this is only the commercial-reach fog.
             if (tile.road_level > 0)
             {
                 ImU32 col; float thick;
@@ -1728,6 +1756,10 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     case 2:  col = IM_COL32(205, 188, 140, 225); thick = std::max(1.8f, draw_r * 0.18f); break;
                     default: col = IM_COL32(225, 205, 150, 238); thick = std::max(2.4f, draw_r * 0.24f); break;
                 }
+
+                // The junction cap takes the brightest edge meeting at this centre, so it
+                // never reads as a dark blot on the end of a lit span.
+                float cap_vision = vision;
 
                 static const int card_off[4][2] = {{+1, 0}, {-1, 0}, {0, +1}, {0, -1}};
                 for (int n = 0; n < 4; ++n)
@@ -1757,10 +1789,13 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
                     // This tile's half only: centre -> shared-edge midpoint (the neighbour draws
                     // its half, and the two meet — continuous and symmetric, no "from vs to").
                     const ImVec2 mid = {(cx + nb_sc.x) * 0.5f, (cy + nb_sc.y) * 0.5f};
-                    dl->AddLine({cx, cy}, mid, col, thick);
+                    const float edge_vision = std::max(vision, tile_vision(nb_id));
+                    cap_vision = std::max(cap_vision, edge_vision);
+                    dl->AddLine({cx, cy}, mid, fog_dim(col, edge_vision), thick);
                 }
                 // Centre cap: rounds junctions and keeps a lone / just-placed road tile visible.
-                dl->AddCircleFilled({cx, cy}, std::max(1.5f, thick * 0.75f), col);
+                dl->AddCircleFilled({cx, cy}, std::max(1.5f, thick * 0.75f),
+                                    fog_dim(col, cap_vision));
             }
 
             // Rivers (BL-170 data; this render is new, 2026-08-02). Always-on terrain like
