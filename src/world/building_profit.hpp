@@ -48,12 +48,18 @@ building_profit estimate_building_profit(const world& w, const recipe_registry& 
 ///     `workforce_target` 100, exactly what `construct_building` authors;
 ///   * contention scalar 1.0 — there is no economy_report in hand and the new building
 ///     has not joined the labour pool yet, so assume no shortage and say so;
-///   * today's local prices, flat. No supply-response elasticity, no deposit sharing with
-///     existing sites (`run_extraction` gives every building the full richness, so no
-///     adjustment is the correct model). Do not "improve" these silently.
+///   * today's local prices, flat. No supply-response elasticity. Do not "improve"
+///     these silently.
 ///
 /// The depletion taper IS applied: `resource_remaining` is the TILE's reserve, drawn down
 /// by every site that ever worked it, so a tile can be spent before this candidate exists.
+///
+/// Deposit sharing IS modelled (BL-346). Under BL-193's stack rule a candidate on a tile
+/// that already works this deposit joins that stack as its NEWEST member: its own yield
+/// carries `stack_output_scalar(rank)`, and the taper is sized against the stack's
+/// COMBINED draw rather than its own. This estimator once assumed every site drew the
+/// full richness off an untouched reserve — true before BL-193, and an over-statement of
+/// both revenue and remaining life for every rank above 1 after it.
 ///
 /// `has_data == false` when the tile is missing or no market resolves — a chart of zeros
 /// is a lie.
