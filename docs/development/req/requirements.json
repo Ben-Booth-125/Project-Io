@@ -8476,9 +8476,9 @@
    "difficulty": 2,
    "importance": "C",
    "evaluated_difficulty": null,
-   "status": "active",
-   "resolved": null,
-   "resolution": null,
+   "status": "closed",
+   "resolved": "2026-08-09",
+   "resolution": "Closed retroactively with the NR-075 cut audit (ratified by Ben 2026-08-09): BL-312/BL-313 landed in 9ecbbcf but were never flipped, so this group was never closed. Rows stand as pending-at-closure; the work shipped and the visual state was accepted in use — verification was overtaken by the closure, not performed.",
    "promoted_from": "backlog.json BL-312, BL-313",
    "batch": null,
    "rows": [

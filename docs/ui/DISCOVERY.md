@@ -68,6 +68,10 @@ branch point is `is_player_owned(world, building)` (with `owner_corp_of` behind 
   (subject to the *geographic* fog: a rival marker shows only on surveyed regions).
 - **Rival internals are private** — production rates and stockpile quantities never appear. A rival
   hover card shows **type and owner only**.
+- **Construction state is public** (ruled 2026-08-09, NR-090): a rival's under-construction
+  buildings render with the same BL-323 dimming as the player's own. Scaffolding is externally
+  observable, so a rival's expansion frontier is readable at a glance — deliberate counterplay, not
+  a leak. Tick counts / progress detail stay private (the hover card hides them).
 - **Market supply/demand aggregates and prices are public** — the deliberate signal. The player
   *infers* rival state from market movement: a rising price in a good Kepler Industries is known to
   extract means their output is down, or demand is up elsewhere — not a fact read off a panel.

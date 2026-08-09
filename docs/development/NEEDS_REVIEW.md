@@ -23,179 +23,13 @@ that item's id.
 Entries are **never silently deleted** — set `status: resolved` and write the resolution, so
 the reasoning survives the answer.
 
-*94 entries — 15 open, 79 resolved.*
+*94 entries — 0 open, 94 resolved.*
 
 ---
 
 ## Open
 
-### NR-072 — NL-phrasing sub-dictionary designed in Rival: seven-stance readings over the gameplay family, plus a 0 CE register battery
-*decision taken on your behalf · raised 2026-08-06 · from Rival session with Ben, 2026-08-06 — Ben directed pulling ACTIONS.json into Rival as the AI-thinking home and authoring a rich sentence dictionary, not aliases*
-
-Authored Project-Rival/docs/ai/PHRASINGS.json — a per-action sub-dictionary of natural-language readings for all 11 gameplay entries (33 readings). Each reading is {sentence, stance, binds, via, resolution}: a sentence standing at a deliberate deviation from the canonical press, with its explicit path back. Stance taxonomy settled in-session: imperative, outcome, future-anchored, corrective, deictic, composite, gated — future-anchored and gated are the same precondition relation seen from opposite ends, both carrying a via field routing through other action ids. Register drift (ancient/divine idiom) is held out as an eighth axis in Project-Rival/docs/ai/SANDBOX-0CE.md, a runnable Battery A (buildings, over the MCP seam) plus a design-owed Battery B (units, blocked on BL-271 Era -1 sim / BL-274 era-keyed rosters — Io has no unit actions today). ACTIONS.json was mirrored into Project-Rival/docs/ai/ with provenance notes; Io’s copy untouched.
-
-**Why it matters.** This is the fourth leg of the word interface (press/read/write/PHRASING) and doubles as labelled SFT material for the BL-279 corpus — the compressed local opponent (no cloud) needs the dictionary to carry the reasoning. Decisions taken on Ben’s behalf: readings live in a sibling file keyed by action id rather than injected into ACTIONS.json (keeps the mirror byte-comparable for re-pulls); pilot scope is the gameplay family only.
-
-- Ratify the stance taxonomy and sibling-file shape, then file the Io-landing backlog item (readings field vs sibling file in Io is Io’s call)
-- Run Battery A over the MCP seam and let instructive fails grow PHRASINGS.json before landing anything
-- Redirect the shape before more families are authored
-
-### NR-073 — Battery A (0 CE phrasing test) run over the live MCP seam: 10/10 action resolution; BL-293 order-book gap measured at 20% of a basic instruction set
-*observation · raised 2026-08-06 · from Rival session 2026-08-06 — blind resolver (cloud, corpus-generation role) over ProjectIo --serve via tools/mcp/server.js, player corp discovered via the CORPS opcode*
-
-Ten era-voiced building instructions (Project-Rival/docs/ai/SANDBOX-0CE.md Battery A) resolved blind against ACTIONS_INDEX.json + the stance taxonomy, grounded on the live blackboard (corp 30318). All ten resolved to the expected action id; two stance labels diverged defensibly (stance is a set, not a scalar — PHRASINGS.json amended). Full record: Project-Rival/annals/battery-0ce-A-run1.md.
-
-**Why it matters.** Two of ten basic instructions resolve cleanly to place_sell_order, which has no corp_verb — BL-293 (order book unreachable by command) is now a measured 20% hole in an era-basic instruction set, strengthening its case. Also: the IO-EARTHLIKE-TESTS gap list is stale on corp discovery — --serve now answers a CORPS opcode.
-
-- Raise BL-293 (order book verbs) priority on the strength of the 20% measurement
-- Leave BL-293 as sequenced; note the measurement on the item
-- No action — observation only
-
-### NR-074 — Voice dictionary authored in Rival: six ideology-mapped voices with explicit decision-bias weights
-*decision taken on your behalf · raised 2026-08-06 · from Rival session 2026-08-06 — Ben directed a voice dictionary where each entry maps to an ideology, seeding the AI with a religious or philosophical voice*
-
-Authored Project-Rival/docs/ai/VOICES.json: six voices (imperial-providential, harmonic-preservationist, covenantal-mercantile, stoic-necessitarian, catastrophe-mender, ledger-rationalist), each carrying creed, register, causal idiom, per-stance inflections over the PHRASINGS taxonomy, an explicit decision_bias multiplier table, and a re-voiced Battery A sample whose resolution is unchanged. Campaign seats mapped: imperial-providential is our voice, harmonic-preservationist the rival’s; the other four are bench for BL-207 (persona packs).
-
-**Why it matters.** Decisions taken on Ben’s behalf: (1) ideology = register + decision bias together, with bias as compact explicit multipliers on the urgency-importance scoring (AI_OPPONENT.md § 6a) so a deterministic scorer and a tightly compressed local model can both consume it — no embedding-scale matching; (2) the Battery A invariant is load-bearing: every voice must resolve every sentence to the same canonical press, bias changes only what a voice reaches for unprompted; (3) real traditions cited as mechanism sources only, per the naming rule — Pantheon voices corpus consumed read-only. Natural Io homes when landing: BL-207 (persona packs), BL-210 (oral-history pivot).
-
-- Ratify the shape and the six-voice bench
-- Adjust the bias tables (numbers were set by judgement, not measurement — a battery run per voice would calibrate them)
-- Fold decision_bias out and keep voices register-only
-
-### NR-075 — Cut audit executed: ten items closed as already-landed or settled-in-design
-*decision taken on your behalf · raised 2026-08-07 · from Rival session 2026-08-07 — Ben asked for a cut audit and approved executing bands 1-2*
-
-Flipped to complete with dated closure notes, prose archived to the cold store: BL-267 (GPU/multicore perf — re-measure gate passed, residual owned by BL-269), BL-312/BL-313 (header chrome — landed in 9ecbbcf, never flipped), BL-286 (logistics enum — shipped, follow-ons owned by BL-295), BL-205 (corp chat log — self-declared inactive, C-route now the BL-278/BL-279 arc), BL-131 (market destruction — dissolved into BL-263 dormancy), BL-189 (coastal defense — answered free by BL-157 tile position), BL-169 (solar geometry — feasibility note delivered in-item), BL-051 (tile-gen refinements — split to BL-040/BL-210, cosmetic residue), BL-054 (nation behaviour — redistributed to BL-155/BL-158/BL-284, actor residual is BL-094 v0.3.0 work). Incidental: archive_designs.js was also run and swept three already-terminal items (BL-287, BL-307, BL-310) into the cold store.
-
-**Why it matters.** Ben approved the bands, but each per-item closure case is an agent judgement — recorded so any single closure can be overturned rather than becoming silent precedent. BL-131, BL-189, BL-051 and BL-054 carry their intent into named heir items; if any heir is later cut, the intent needs a new home.
-
-- Ratify all ten closures
-- Reopen any item whose closure case reads wrong (each note names its heirs)
-
-### NR-076 — Band 3 scope calls pending, and the Era −1 arc has no roadmap home
-*question · raised 2026-08-07 · from Rival session 2026-08-07 — cut-audit findings Ben has not yet ruled on*
-
-Three deliberate scope decisions remain from the audit: (1) BL-160 (auto exchange policy) — cut and re-scope BL-161 (exchange allow/deny) to stand alone; (2) BL-207 (persona packs) — cut or park at F behind BL-279 local-model evidence; (3) the generation-flavour group — cut BL-209 (molecular trace) and BL-289 (sky-event extinctions) outright, keep BL-300 (myth generation) and BL-301 (GOE calibration) only as notes. Separately: the Era −1 arc (~25 open items, most recent commits) appears nowhere in ROADMAP.md, whose arc section stops at v0.4.0.
-
-**Why it matters.** All three Band 3 calls hinge on BL-094’s military-reach test and are Ben’s to make. The roadmap gap is the larger issue: until the Era −1 arc has a named version band, committed work and brainstorm residue are indistinguishable there — which is where the next round of cut candidates hides.
-
-- Rule on the three Band 3 cuts
-- Amend ROADMAP.md to name the Era −1 arc and its version band
-- Defer both until after the military design session
-
-### NR-077 — Military design session executed: six rulings filed, roster dictionary and doctrine-preference field authored
-*decision taken on your behalf · raised 2026-08-07 · from Rival session 2026-08-07 — Ben ruled the six session questions by form; execution details were delegated*
-
-Ben’s rulings: roster-now-verbs-design-owed; unit-grain verbs; tile position canonical; era-keying roster-only; doctrine-preference as the voice bias shape; BL-094’s conflict spine filed now. Executed as: UNITS.json authored in Project-Rival/docs/ai (4 era bands, 17 unit types, 7 doctrine presets); doctrine_preference added to all six VOICES.json voices; BL-274 and BL-157 amended with the rulings; BL-314 (unit verb family, design-owed, B) and BL-315 (governing-body conflict spine, design-owed, A, v0.3.0) filed; BL-094 updated to point at BL-315.
-
-**Why it matters.** Delegated judgement calls inside the execution: (1) four era bands taken as ratified from BL-274’s lean since Ben left the notes box empty; (2) all type_power_mod and doctrine_preference numbers set by judgement, to calibrate against BL-271 sweep evidence; (3) horses resolved as the grassland-share named substitution; (4) naval kept strategic-only with no naval battle verb — flagged in UNITS.json because players and agents will expect one; (5) BL-315 scoped thin with promotion gated behind BL-094’s sequence.
-
-- Ratify the execution
-- Adjust the authored numbers (power mods, doctrine preferences, band boundaries)
-- Reverse any delegated call — each is one field or one row
-
-### NR-078 — Wizard pre-history timelapse filed as BL-317; BL-271's harness-only bound superseded for the generation path
-*decision taken on your behalf · raised 2026-08-07 · from Ben, 2026-08-07: 'Moving to render the timelapse of pre-history ... should be a documented aim by now' + the ultracode coverage workflow (8 agents) + adversarial checks*
-
-Filed BL-317 (wizard pre-history timelapse, designed, B, post-v0.1.0). Decisions taken on Ben's stated aim: BL-271 open Q2 answered YES (sim runs at generation time, world seed); Q3 answered YES-for-watching (skippable playback; sim always completes identically watched or skipped - determinism guard); BL-271's 'never in the shipped campaign path' bound superseded for the generation path only, dated 2026-08-07. Scope fences written against BL-305 (keeps the 1960 carve, loses the scrubber idea) and BL-256 (globe not-in-scope list amended only when BL-317 lands). The full Rival-to-timelapse plan is a second workflow, reported in-session.
-
-### NR-080 — Two unit rosters exist and disagree; the engine table landed ahead of the item that owns it
-*decision-needed · raised 2026-08-07 · from Ben's question 2026-08-07: 'do we have a list of units available?'*
-
-There are two unit rosters. (1) SHIPPED, in-engine: src/world/unit_roster.{hpp,cpp} - 19 rows across four bands, gated on the four province endowment windows, no doctrine data. (2) DESIGN DRAFT, Rival-side: Project-Rival/docs/ai/UNITS.json - 17 types plus 7 doctrine presets and per-row named_substitutions. They share the four-band structure and nothing else: different counts, entirely different names (iron_line vs Iron Foot), and pike_block / war_galleys have no engine row while Plated Foot / Crossbow Corps / Mechanised Column have no JSON row.
-
-**Why it matters.** BL-274 (era-keyed unit rosters) says the Rival artifact 'lands into Io explicitly with this item, never by silent merge' - but an Io table landed anyway in efe97ba, and BL-274 is still status designed (not complete). So the item's own landing contract has already been bypassed, and there is now no single answer to 'what units exist'. The doctrine presets in particular are pure design debt: combat.cpp has the doctrine_row shape and nothing populates it.
-
-- A - Engine table wins. Retire UNITS.json to a design-history note; port only the doctrine presets across. Cheapest; loses the named_substitutions documentation.
-- B - JSON wins. Rewrite unit_roster.cpp from UNITS.json as BL-274 intended, keeping the engine's gate mechanism. Honours the item; costs a rewrite of a table that already works.
-- C - Merge deliberately, then mark BL-274 complete. Reconcile row by row into the engine table, port the doctrine presets, and record which rows came from where.
-
-> **Recommendation:** C, and close BL-274 when it lands. The engine table's gate mechanism is the better half; the JSON's doctrine presets and named_substitutions are the better half of the other. Neither should simply be discarded, and leaving BL-274 open with a shipped table under it is the state that caused the confusion.
-
-*Files: `src/world/unit_roster.cpp`, `Project-Rival/docs/ai/UNITS.json`, `docs/development/backlog.json`*
-
-### NR-082 — Generation arc parked on Ben's ruling; scope call: the three session items, not the wider generation family
-*decision taken on your behalf · raised 2026-08-07 · from Ben, 2026-08-07, end of session: 'we will park generation. Really it should've been pre-v0.1.0 work. What we're doing now is coming too early, since many game systems don't exist yet.'*
-
-Parked BL-316 (Era -1 logistics), BL-317 (wizard pre-history timelapse, carrying the six-stage Rival-to-timelapse route in its design), and BL-320 (Era -1 sim runtime). The scope interpretation is the delegated call: 'park generation' was read as THIS session's pre-history/generation-transparency arc, not the wider generation family - BL-297/BL-298 (diplomacy seam + battery), BL-305 (generation political visibility), BL-256 (generation globe), BL-300 (myth & theology) were left unparked since they predate the arc and other work may reach them first. Extend the parking to those if the ruling meant the whole theme. Landed work is unaffected: BL-318 (scorer), BL-319 (wizard preview pane) and the BL-271/BL-275 sim family are committed and live.
-
-### NR-083 — Kepler's wetland biome is effectively extinct (12 tiles); is world_audit's 3% forest+wetland target still right?
-*decision-needed · raised 2026-08-07 · from BL-291 (world_audit) work, 2026-08-07 — the one assertion that genuinely fails.*
-
-world_audit's S2 check wants forest + wetland >= 3% of Kepler's tiles. Measured today: 2.41% — forest 353 (2.33%), wetland 12 (0.08%). Twelve wetland tiles on the entire home body. The harness is otherwise green (25 of 26 assertions PASS); this is the only failure, and it is a world-generation finding, not a harness defect.
-
-**Why it matters.** Two separate questions are tangled in one failing line. (1) IS 2.41% WRONG? The likely cause is collateral from the 2026-08-04 relief commits (802421c, 71e8a9b): more highland displaces the low wet ground forest and wetland both need. If so this is a real regression in biome variety on the body the player actually plays, and retuning the target would hide it. (2) IS THE TARGET EVEN MEASURED RIGHT? The denominator is ALL Kepler tiles including ocean. Against LAND tiles the same measurement reads 6.0%, comfortably over. A target whose denominator is arguable will keep producing arguable failures.
-
-Wetland at 0.08% is the part that should not be tuned away regardless: RESOURCES.md and TILES.md both give wetland a terrain affinity, and a biome present on twelve tiles cannot carry one.
-
-- A - Treat 2.41% as a regression. Investigate the relief commits' effect on the moisture/height bands and restore wetland generation; leave the target at 3%.
-- B - Re-base the denominator to land tiles (6.0% today), keep 3%, and close the failure. Cheapest, but it makes the check pass without anyone looking at the 12 wetland tiles.
-- C - Both: re-base the denominator AND open a separate item on wetland generation specifically, since 0.08% is indefensible at any denominator.
-
-> **Recommendation:** C. The denominator genuinely is wrong — an ocean-inclusive share of a biome that can only occur on land measures the hydrology, not the biome — but fixing it alone would turn a red light green while wetland stays extinct. Split the two.
-
-*Files: `tools/verify/world_audit.cpp`, `src/world/tile_generation.cpp`, `docs/economy/TILES.md`*
-
-### NR-089 — Wizard real-surface preview pane landed, but it is not BL-256's globe — scope call for Ben
-*question · raised 2026-08-08 · from Found landing an uncommitted, unreviewed session's working-tree state (src/ui/generation_preview.{cpp,hpp}, generate_home_surface_preview) — see the DEVLOG entry that lands it.*
-
-The landed pane paints a hex-sampled orthographic globe of the wizard's ACTUAL generated Kepler surface (verified byte-parity with make_hard_coded_world), in a fixed 1/3-controls : 2/3-preview split, rotating on wall-clock time only. BL-256 (GENERATION_GLOBE_PREVIEW, still `designed`, v0.1.1) specifies a considerably larger item on the same idea: player-controlled pan clamped at the poles, a measured pole-treatment call (cap / weighted-sampling / accept), a pre-world solar-system diagram stage, and the demoted charts folding through BL-265's disclosure vocabulary rather than a fixed column split. None of those four are present in what landed.
-
-**Why it matters.** Landing this without flagging it would read as BL-256 having shipped when it has not — BL-256's own design doc treats pan and the fold integration as load-bearing, not optional polish. Left BL-256 unchanged (still `designed`) rather than guessing whether this session's smaller version supersedes it, narrows it, or is a throwaway task-1-style prototype BL-256's own sequencing already calls for ("prove the projection... in a throwaway debug window... before any wizard work").
-
-- Treat this as BL-256's task 1 prototype, now proven in the real wizard rather than a throwaway window — promote BL-256's remaining tasks (pan, pole call, BL-265 fold integration) as the item's next slice
-- Treat this as a smaller, permanent, different feature — close or narrow BL-256's scope to just the parts this doesn't cover
-- Leave both as-is: this pane ships as an interim improvement, BL-256 stays queued for its full design untouched
-
-*Files: `src/ui/generation_preview.hpp`, `src/ui/generation_preview.cpp`, `src/core/app.cpp`*
-
-### NR-090 — Rival construction state is publicly visible on the canvas — BL-068 never ruled on it
-*question · raised 2026-08-08 · from Ben's outside-the-box review prompt during BL-323; found reviewing the S4 dimming against DISCOVERY.md's visibility model*
-
-The BL-323 S4 under-construction dimming applies to ALL buildings, rivals included — so a rival's construction sites (and therefore their expansion frontier) are readable at a glance. BL-068's ruling covers type + owner (public) vs production/stockpile (private) but never classified construction state. The rival hover card correctly hides tick counts; only the canvas dimming leaks.
-
-**Why it matters.** Currently public by accident, not by decision. Arguably GOOD gameplay (scaffolding is externally observable; watching a rival build teaches the competitive map), but it also telegraphs reach frontiers the activity-fog design (BL-089) never priced. Needs a one-line ruling either way, recorded in DISCOVERY.md's visibility model when next touched.
-
-- Ratify: construction state is public (scaffolding is observable) — document in BL-068's model
-- Restrict: rivals render at full brightness regardless of construction state (state becomes private)
-
-> **Recommendation:** Ratify as public — it is realistic, legible, and creates counterplay.
-
-*Files: `src/ui/body_surface_canvas.cpp`, `docs/ui/DISCOVERY.md`*
-
-### NR-091 — Interpretation taken: one shared reach field — the military base is NOT a supply anchor
-*decision taken on your behalf · raised 2026-08-08 · from Ben's custom Q&A answer on military supply: 'This feeds into the logistics system (directional). So a nation's reach for economy is also the military reach. Beyond the boundary, units slowly deplete...'*
-
-Recorded in BL-325 (military base + supply) as: ONE reach field, computed off the existing economic anchors (cities, built ports, built hubs); the military_base is a muster/hire building only and does NOT anchor or extend reach. To project force farther, the player extends the same road/hub network the economy uses. The alternative reading — bases join the anchor set so a forward base extends supply for armies (and, as a side effect, economic placement) — was NOT taken.
-
-**Why it matters.** The word 'directional' could mean the dependency direction (military depends on economic logistics — the reading taken) or a directional/forward extension (bases push the envelope outward). The taken reading is cleaner (no second field, no base-extends-economy side effect) but it removes the classic forward-operating-base move. Overturnable in one line in BL-325 if misread.
-
-- Confirm: bases never anchor; forward projection = extend the road/hub network
-- Overturn: a completed military_base joins the anchor set (forward operating bases exist, and also extend economic placement reach)
-
-*Files: `docs/development/backlog.json`*
-
-### NR-092 — Reach gates placement only, never operation — asymmetry stands until BL-288
-*observation · raised 2026-08-08 · from The BL-323 outside-the-box review (buildings x unfinished logistics)*
-
-A building that exists beyond the reach budget (grandfathered, or placed while the rule was off) operates forever at zero penalty, and convoy dispatch has no reach check — so you cannot PLACE at reach 25 but a stale building at reach 40 ships freely. The ongoing-cost half is BL-288's unbuilt transport_capacity good.
-
-**Why it matters.** Not a bug — the placement gate was the designed slice — but the asymmetry will read as inconsistent the moment a player notices it, and the BL-325 unit-decay mechanic makes the contrast sharper (units decay out of range; buildings do not). Noted so BL-288's design starts from this.
-
-*Files: `src/world/supply_system.cpp`, `docs/development/backlog.json`*
-
-### NR-093 — Building-selection bypass reversed; the rich management card is parked, not deleted
-*decision taken on your behalf · raised 2026-08-08 · from Ben, 2026-08-08 live critique: 'selection of a building skips the selection menu, going straight to manage. This is a bug.'*
-
-The bypass at draw_selection_content (a selected player building rendered the full management card as its Selection content, per the 2026-07-22 'four-numbers card is useless' ruling) is removed. A building now takes the shared action|facts Selection view: construction status, an Operate/Manage button (opens the construction ledger's Buildings tab, which already keys off selected_entity), and the profitability facts column. The old rich vertical card (draw_building_selection, ~300 lines: workforce slider, recipe picker, production status) is PARKED [[maybe_unused]] rather than deleted.
-
-**Why it matters.** Two calls taken on Ben's behalf: (1) Manage routes to the construction ledger's Buildings tab rather than resurrecting the card in a full-screen takeover -- chosen because that tab already exists, already focuses the selected building, and already carries management detail; (2) the parked card is kept compiled because its content (per-building workforce/recipe controls) may be wanted as the Buildings tab's detail pane. If the Buildings tab's existing inline detail is judged sufficient, the parked function should be deleted instead.
-
-- Keep Manage -> construction ledger Buildings tab; delete the parked card
-- Fold the parked card's content into the Buildings tab as its detail pane, then delete the standalone function
-- Different destination for Manage entirely (a dedicated management surface)
-
-*Files: `src/ui/selection_panel.cpp`*
+*Nothing open.*
 
 ---
 
@@ -1321,12 +1155,113 @@ ST-04 (propellant_first) abandon line reads "a rival fires the world-first and t
 
 *Files: `docs/ai/STRATEGIES.md`*
 
+### NR-072 — NL-phrasing sub-dictionary designed in Rival: seven-stance readings over the gameplay family, plus a 0 CE register battery
+*decision taken on your behalf · raised 2026-08-06 · from Rival session with Ben, 2026-08-06 — Ben directed pulling ACTIONS.json into Rival as the AI-thinking home and authoring a rich sentence dictionary, not aliases*
+
+Authored Project-Rival/docs/ai/PHRASINGS.json — a per-action sub-dictionary of natural-language readings for all 11 gameplay entries (33 readings). Each reading is {sentence, stance, binds, via, resolution}: a sentence standing at a deliberate deviation from the canonical press, with its explicit path back. Stance taxonomy settled in-session: imperative, outcome, future-anchored, corrective, deictic, composite, gated — future-anchored and gated are the same precondition relation seen from opposite ends, both carrying a via field routing through other action ids. Register drift (ancient/divine idiom) is held out as an eighth axis in Project-Rival/docs/ai/SANDBOX-0CE.md, a runnable Battery A (buildings, over the MCP seam) plus a design-owed Battery B (units, blocked on BL-271 Era -1 sim / BL-274 era-keyed rosters — Io has no unit actions today). ACTIONS.json was mirrored into Project-Rival/docs/ai/ with provenance notes; Io’s copy untouched.
+
+**Why it matters.** This is the fourth leg of the word interface (press/read/write/PHRASING) and doubles as labelled SFT material for the BL-279 corpus — the compressed local opponent (no cloud) needs the dictionary to carry the reasoning. Decisions taken on Ben’s behalf: readings live in a sibling file keyed by action id rather than injected into ACTIONS.json (keeps the mirror byte-comparable for re-pulls); pilot scope is the gameplay family only.
+
+- Ratify the stance taxonomy and sibling-file shape, then file the Io-landing backlog item (readings field vs sibling file in Io is Io’s call)
+- Run Battery A over the MCP seam and let instructive fails grow PHRASINGS.json before landing anything
+- Redirect the shape before more families are authored
+
+> **RESOLVED.** Ratified 2026-08-09 (Ben). Stance taxonomy and sibling-file shape stand; readings stay keyed by action id in Project-Rival/docs/ai/PHRASINGS.json, keeping the ACTIONS.json mirror byte-comparable. The Io-landing shape question stays with the Io side when that work is picked up.
+
+### NR-073 — Battery A (0 CE phrasing test) run over the live MCP seam: 10/10 action resolution; BL-293 order-book gap measured at 20% of a basic instruction set
+*observation · raised 2026-08-06 · from Rival session 2026-08-06 — blind resolver (cloud, corpus-generation role) over ProjectIo --serve via tools/mcp/server.js, player corp discovered via the CORPS opcode*
+
+Ten era-voiced building instructions (Project-Rival/docs/ai/SANDBOX-0CE.md Battery A) resolved blind against ACTIONS_INDEX.json + the stance taxonomy, grounded on the live blackboard (corp 30318). All ten resolved to the expected action id; two stance labels diverged defensibly (stance is a set, not a scalar — PHRASINGS.json amended). Full record: Project-Rival/annals/battery-0ce-A-run1.md.
+
+**Why it matters.** Two of ten basic instructions resolve cleanly to place_sell_order, which has no corp_verb — BL-293 (order book unreachable by command) is now a measured 20% hole in an era-basic instruction set, strengthening its case. Also: the IO-EARTHLIKE-TESTS gap list is stale on corp discovery — --serve now answers a CORPS opcode.
+
+- Raise BL-293 (order book verbs) priority on the strength of the 20% measurement
+- Leave BL-293 as sequenced; note the measurement on the item
+- No action — observation only
+
+> **RESOLVED.** Resolved 2026-08-09 (Ben): the 20% measurement justifies weight, not just a note. BL-293 (order-book verbs) already sits at priority A / v0.1.1, so priority is confirmed at A and the measurement is appended to the item's design so the evidence travels with it.
+
+### NR-074 — Voice dictionary authored in Rival: six ideology-mapped voices with explicit decision-bias weights
+*decision taken on your behalf · raised 2026-08-06 · from Rival session 2026-08-06 — Ben directed a voice dictionary where each entry maps to an ideology, seeding the AI with a religious or philosophical voice*
+
+Authored Project-Rival/docs/ai/VOICES.json: six voices (imperial-providential, harmonic-preservationist, covenantal-mercantile, stoic-necessitarian, catastrophe-mender, ledger-rationalist), each carrying creed, register, causal idiom, per-stance inflections over the PHRASINGS taxonomy, an explicit decision_bias multiplier table, and a re-voiced Battery A sample whose resolution is unchanged. Campaign seats mapped: imperial-providential is our voice, harmonic-preservationist the rival’s; the other four are bench for BL-207 (persona packs).
+
+**Why it matters.** Decisions taken on Ben’s behalf: (1) ideology = register + decision bias together, with bias as compact explicit multipliers on the urgency-importance scoring (AI_OPPONENT.md § 6a) so a deterministic scorer and a tightly compressed local model can both consume it — no embedding-scale matching; (2) the Battery A invariant is load-bearing: every voice must resolve every sentence to the same canonical press, bias changes only what a voice reaches for unprompted; (3) real traditions cited as mechanism sources only, per the naming rule — Pantheon voices corpus consumed read-only. Natural Io homes when landing: BL-207 (persona packs), BL-210 (oral-history pivot).
+
+- Ratify the shape and the six-voice bench
+- Adjust the bias tables (numbers were set by judgement, not measurement — a battery run per voice would calibrate them)
+- Fold decision_bias out and keep voices register-only
+
+> **RESOLVED.** Ratified 2026-08-09 (Ben): shape and six-voice bench stand. The judgement-set decision_bias numbers get a calibration follow-up — filed as BL-337 (calibrate voice/unit numbers) alongside NR-077's power mods, to be run against battery/sweep evidence.
+
+### NR-075 — Cut audit executed: ten items closed as already-landed or settled-in-design
+*decision taken on your behalf · raised 2026-08-07 · from Rival session 2026-08-07 — Ben asked for a cut audit and approved executing bands 1-2*
+
+Flipped to complete with dated closure notes, prose archived to the cold store: BL-267 (GPU/multicore perf — re-measure gate passed, residual owned by BL-269), BL-312/BL-313 (header chrome — landed in 9ecbbcf, never flipped), BL-286 (logistics enum — shipped, follow-ons owned by BL-295), BL-205 (corp chat log — self-declared inactive, C-route now the BL-278/BL-279 arc), BL-131 (market destruction — dissolved into BL-263 dormancy), BL-189 (coastal defense — answered free by BL-157 tile position), BL-169 (solar geometry — feasibility note delivered in-item), BL-051 (tile-gen refinements — split to BL-040/BL-210, cosmetic residue), BL-054 (nation behaviour — redistributed to BL-155/BL-158/BL-284, actor residual is BL-094 v0.3.0 work). Incidental: archive_designs.js was also run and swept three already-terminal items (BL-287, BL-307, BL-310) into the cold store.
+
+**Why it matters.** Ben approved the bands, but each per-item closure case is an agent judgement — recorded so any single closure can be overturned rather than becoming silent precedent. BL-131, BL-189, BL-051 and BL-054 carry their intent into named heir items; if any heir is later cut, the intent needs a new home.
+
+- Ratify all ten closures
+- Reopen any item whose closure case reads wrong (each note names its heirs)
+
+> **RESOLVED.** Ratified 2026-08-09 (Ben): all ten closures stand as recorded, heirs as named.
+
+### NR-076 — Band 3 scope calls pending, and the Era −1 arc has no roadmap home
+*question · raised 2026-08-07 · from Rival session 2026-08-07 — cut-audit findings Ben has not yet ruled on*
+
+Three deliberate scope decisions remain from the audit: (1) BL-160 (auto exchange policy) — cut and re-scope BL-161 (exchange allow/deny) to stand alone; (2) BL-207 (persona packs) — cut or park at F behind BL-279 local-model evidence; (3) the generation-flavour group — cut BL-209 (molecular trace) and BL-289 (sky-event extinctions) outright, keep BL-300 (myth generation) and BL-301 (GOE calibration) only as notes. Separately: the Era −1 arc (~25 open items, most recent commits) appears nowhere in ROADMAP.md, whose arc section stops at v0.4.0.
+
+**Why it matters.** All three Band 3 calls hinge on BL-094’s military-reach test and are Ben’s to make. The roadmap gap is the larger issue: until the Era −1 arc has a named version band, committed work and brainstorm residue are indistinguishable there — which is where the next round of cut candidates hides.
+
+- Rule on the three Band 3 cuts
+- Amend ROADMAP.md to name the Era −1 arc and its version band
+- Defer both until after the military design session
+
+> **RESOLVED.** Resolved 2026-08-09 (Ben): 'roadmap now, cuts later'. The roadmap half had already landed via NR-088 (Era −1 arc folded into v0.3.0's writeup, 2026-08-08), which satisfies it. The three Band 3 cuts (BL-160 auto exchange policy, BL-207 persona packs, the generation-flavour tail BL-209/BL-289/BL-300/BL-301) are deliberately DEFERRED until BL-094's military-reach test resolves — re-raise them as a fresh entry at that point; the cut cases live in this entry's what field.
+
+### NR-077 — Military design session executed: six rulings filed, roster dictionary and doctrine-preference field authored
+*decision taken on your behalf · raised 2026-08-07 · from Rival session 2026-08-07 — Ben ruled the six session questions by form; execution details were delegated*
+
+Ben’s rulings: roster-now-verbs-design-owed; unit-grain verbs; tile position canonical; era-keying roster-only; doctrine-preference as the voice bias shape; BL-094’s conflict spine filed now. Executed as: UNITS.json authored in Project-Rival/docs/ai (4 era bands, 17 unit types, 7 doctrine presets); doctrine_preference added to all six VOICES.json voices; BL-274 and BL-157 amended with the rulings; BL-314 (unit verb family, design-owed, B) and BL-315 (governing-body conflict spine, design-owed, A, v0.3.0) filed; BL-094 updated to point at BL-315.
+
+**Why it matters.** Delegated judgement calls inside the execution: (1) four era bands taken as ratified from BL-274’s lean since Ben left the notes box empty; (2) all type_power_mod and doctrine_preference numbers set by judgement, to calibrate against BL-271 sweep evidence; (3) horses resolved as the grassland-share named substitution; (4) naval kept strategic-only with no naval battle verb — flagged in UNITS.json because players and agents will expect one; (5) BL-315 scoped thin with promotion gated behind BL-094’s sequence.
+
+- Ratify the execution
+- Adjust the authored numbers (power mods, doctrine preferences, band boundaries)
+- Reverse any delegated call — each is one field or one row
+
+> **RESOLVED.** Ratified 2026-08-09 (Ben): the execution and all five delegated calls stand. The judgement-set type_power_mod and doctrine_preference numbers get a calibration follow-up, filed as BL-337 (calibrate voice/unit numbers) against BL-271 sweep evidence.
+
+### NR-078 — Wizard pre-history timelapse filed as BL-317; BL-271's harness-only bound superseded for the generation path
+*decision taken on your behalf · raised 2026-08-07 · from Ben, 2026-08-07: 'Moving to render the timelapse of pre-history ... should be a documented aim by now' + the ultracode coverage workflow (8 agents) + adversarial checks*
+
+Filed BL-317 (wizard pre-history timelapse, designed, B, post-v0.1.0). Decisions taken on Ben's stated aim: BL-271 open Q2 answered YES (sim runs at generation time, world seed); Q3 answered YES-for-watching (skippable playback; sim always completes identically watched or skipped - determinism guard); BL-271's 'never in the shipped campaign path' bound superseded for the generation path only, dated 2026-08-07. Scope fences written against BL-305 (keeps the 1960 carve, loses the scrubber idea) and BL-256 (globe not-in-scope list amended only when BL-317 lands). The full Rival-to-timelapse plan is a second workflow, reported in-session.
+
+> **RESOLVED.** Ratified 2026-08-09 (Ben): BL-317 (wizard pre-history timelapse) stands; BL-271's harness-only bound stays superseded for the generation path only.
+
 ### NR-079 — Rebase fallout: era-minus-1 citations point at renumbered ids; history-sim arc has no DEVLOG entries
 *observation · raised 2026-08-07 · from Coverage workflow readers, verified against the tree: the 2026-08-07 rebase onto origin/main kept origin's ids for the 2026-08-06 items*
 
 Three repair debts from the history rewrite: (1) requirements.json's era-minus-1 groups and BL-316's prose cite BL-277/BL-308/BL-310..313 - ids now held by unrelated 2026-08-06 items (propellant, deeds, tech tree, works doctrine, minimap, time panel); (2) the whole history-sim implementation arc (7 rebased commits) has no DEVLOG entries and the index does not know it; (3) prose citing pre-rebase hashes (88f8c83, 341e5ad) points at orphaned commits - current equivalents f4e4c4c, 26510fb. Also stale: tile_inspector.cpp:205's ~600ms runtime comment predates the province-growth fix (~2.1s measured). A background-task chip was spawned for the repair.
 
 > **RESOLVED.** Repaired 2026-08-07 (commits 9cc23c9 + follow-up on claude/silly-cray-6d1b07, merged to main). (1) Every stale citation in the era-minus-1 requirement groups and BL-316's (era -1 logistics) prose rewritten to name the finding with its id marked pre-rebase; the stale NR-064/065 pointers in the Ages-view group went descriptive; the stale hashes appear only in this entry, which already names the current equivalents. (2) Two retroactive DEVLOG entries (2026-08-04, 2026-08-05) cover the seven-commit arc, with an id note; index regenerated. (3) tile_inspector.cpp's runtime comment corrected to ~2.1 s. Rulings taken by Ben, same day: the no-elimination finding is RETIRED as a standalone item - its target (elimination possible, subject-nation release possible) is recorded as design intent on BL-271 (Era -1 history sim); the lost pre-rebase prose (BL-277's answered questions, the sim-landing requirements group) is IGNORED, the commits and DEVLOG remaining its record. BL-275 (history sweep) status flipped to complete; its design prose stays hot until the next archive sweep. The verb-scales scorer redesign stays unnumbered per BL-317's re-file-if-it-stalls note.
+
+### NR-080 — Two unit rosters exist and disagree; the engine table landed ahead of the item that owns it
+*decision-needed · raised 2026-08-07 · from Ben's question 2026-08-07: 'do we have a list of units available?'*
+
+There are two unit rosters. (1) SHIPPED, in-engine: src/world/unit_roster.{hpp,cpp} - 19 rows across four bands, gated on the four province endowment windows, no doctrine data. (2) DESIGN DRAFT, Rival-side: Project-Rival/docs/ai/UNITS.json - 17 types plus 7 doctrine presets and per-row named_substitutions. They share the four-band structure and nothing else: different counts, entirely different names (iron_line vs Iron Foot), and pike_block / war_galleys have no engine row while Plated Foot / Crossbow Corps / Mechanised Column have no JSON row.
+
+**Why it matters.** BL-274 (era-keyed unit rosters) says the Rival artifact 'lands into Io explicitly with this item, never by silent merge' - but an Io table landed anyway in efe97ba, and BL-274 is still status designed (not complete). So the item's own landing contract has already been bypassed, and there is now no single answer to 'what units exist'. The doctrine presets in particular are pure design debt: combat.cpp has the doctrine_row shape and nothing populates it.
+
+- A - Engine table wins. Retire UNITS.json to a design-history note; port only the doctrine presets across. Cheapest; loses the named_substitutions documentation.
+- B - JSON wins. Rewrite unit_roster.cpp from UNITS.json as BL-274 intended, keeping the engine's gate mechanism. Honours the item; costs a rewrite of a table that already works.
+- C - Merge deliberately, then mark BL-274 complete. Reconcile row by row into the engine table, port the doctrine presets, and record which rows came from where.
+
+> **Recommendation:** C, and close BL-274 when it lands. The engine table's gate mechanism is the better half; the JSON's doctrine presets and named_substitutions are the better half of the other. Neither should simply be discarded, and leaving BL-274 open with a shipped table under it is the state that caused the confusion.
+
+> **RESOLVED.** Ruled 2026-08-09 (Ben): option C — merge deliberately. Reconcile row by row into the engine table (its endowment-gate mechanism is the keeper), port the doctrine presets and named_substitutions from Project-Rival/docs/ai/UNITS.json, record which rows came from where, then mark BL-274 (era-keyed rosters) complete. BL-274's design amended with this landing contract.
+
+*Files: `src/world/unit_roster.cpp`, `Project-Rival/docs/ai/UNITS.json`, `docs/development/backlog.json`*
 
 ### NR-081 — Decision taken: the Era -1 works table is authored in C++, not Lua, against the stated scripting boundary
 *decision taken on your behalf · raised 2026-08-07 · from Ben's question 2026-08-07: 'Should the building list be in Lua?'*
@@ -1344,6 +1279,32 @@ Filed BL-321 (Era -1 works) specifying an authored C++ table in src/world/works_
 > **RESOLVED.** RESOLVED 2026-08-07 (Ben): use Lua. Option B. The works table moves to scripts/works.lua. The headless objection is answered by DEPENDENCY INJECTION rather than by keeping it in C++: works_roster.hpp stays pure data (no sol2), a separate TU loads the table from Lua exactly as recipe_registry.cpp does, and history_sim takes the table as a parameter. The app passes the Lua-loaded table; the harnesses build one directly. Same seam recipe_registry already proves. TECH_FOUNDATIONS' scripting boundary therefore stands unamended and unit_roster.cpp becomes the outlier to revisit, not the precedent to follow.
 
 *Files: `docs/tech/TECH_FOUNDATIONS.md`, `src/world/unit_roster.cpp`, `docs/development/backlog.json`*
+
+### NR-082 — Generation arc parked on Ben's ruling; scope call: the three session items, not the wider generation family
+*decision taken on your behalf · raised 2026-08-07 · from Ben, 2026-08-07, end of session: 'we will park generation. Really it should've been pre-v0.1.0 work. What we're doing now is coming too early, since many game systems don't exist yet.'*
+
+Parked BL-316 (Era -1 logistics), BL-317 (wizard pre-history timelapse, carrying the six-stage Rival-to-timelapse route in its design), and BL-320 (Era -1 sim runtime). The scope interpretation is the delegated call: 'park generation' was read as THIS session's pre-history/generation-transparency arc, not the wider generation family - BL-297/BL-298 (diplomacy seam + battery), BL-305 (generation political visibility), BL-256 (generation globe), BL-300 (myth & theology) were left unparked since they predate the arc and other work may reach them first. Extend the parking to those if the ruling meant the whole theme. Landed work is unaffected: BL-318 (scorer), BL-319 (wizard preview pane) and the BL-271/BL-275 sim family are committed and live.
+
+> **RESOLVED.** Ratified 2026-08-09 (Ben): the narrow reading stands — parking covers the three session items (BL-316, BL-317, BL-320) only; BL-297/BL-298, BL-305, BL-256 and BL-300 stay unparked.
+
+### NR-083 — Kepler's wetland biome is effectively extinct (12 tiles); is world_audit's 3% forest+wetland target still right?
+*decision-needed · raised 2026-08-07 · from BL-291 (world_audit) work, 2026-08-07 — the one assertion that genuinely fails.*
+
+world_audit's S2 check wants forest + wetland >= 3% of Kepler's tiles. Measured today: 2.41% — forest 353 (2.33%), wetland 12 (0.08%). Twelve wetland tiles on the entire home body. The harness is otherwise green (25 of 26 assertions PASS); this is the only failure, and it is a world-generation finding, not a harness defect.
+
+**Why it matters.** Two separate questions are tangled in one failing line. (1) IS 2.41% WRONG? The likely cause is collateral from the 2026-08-04 relief commits (802421c, 71e8a9b): more highland displaces the low wet ground forest and wetland both need. If so this is a real regression in biome variety on the body the player actually plays, and retuning the target would hide it. (2) IS THE TARGET EVEN MEASURED RIGHT? The denominator is ALL Kepler tiles including ocean. Against LAND tiles the same measurement reads 6.0%, comfortably over. A target whose denominator is arguable will keep producing arguable failures.
+
+Wetland at 0.08% is the part that should not be tuned away regardless: RESOURCES.md and TILES.md both give wetland a terrain affinity, and a biome present on twelve tiles cannot carry one.
+
+- A - Treat 2.41% as a regression. Investigate the relief commits' effect on the moisture/height bands and restore wetland generation; leave the target at 3%.
+- B - Re-base the denominator to land tiles (6.0% today), keep 3%, and close the failure. Cheapest, but it makes the check pass without anyone looking at the 12 wetland tiles.
+- C - Both: re-base the denominator AND open a separate item on wetland generation specifically, since 0.08% is indefensible at any denominator.
+
+> **Recommendation:** C. The denominator genuinely is wrong — an ocean-inclusive share of a biome that can only occur on land measures the hydrology, not the biome — but fixing it alone would turn a red light green while wetland stays extinct. Split the two.
+
+> **RESOLVED.** Ruled 2026-08-09 (Ben): option C — both. Re-base world_audit's S2 denominator to land tiles (an ocean-inclusive share of a land-only biome measures hydrology, not biome) AND treat 12 wetland tiles as indefensible at any denominator. Filed as BL-338 (Kepler wetland extinct): denominator re-base plus a wetland-generation investigation rooted at the 2026-08-04 relief commits (802421c, 71e8a9b).
+
+*Files: `tools/verify/world_audit.cpp`, `src/world/tile_generation.cpp`, `docs/economy/TILES.md`*
 
 ### NR-084 — BL-293 is much larger than filed: the order book is UI state, not world state, and is never saved
 *decision-needed · raised 2026-08-07 · from Starting BL-293 (order book unreachable by command), 2026-08-07.*
@@ -1426,6 +1387,77 @@ Two structural calls, together answering the roadmap-home half of NR-076 and giv
 - Amend v1.0.0's done-definition as v0.1.x–v0.4.0 actually land — it is explicitly written forward and expected to firm up
 
 > **RESOLVED.** Ratified live, 2026-08-08. ROADMAP.md updated: the v0.3.0 section gained a 'Groundwork folded in here: the Era −1 sandbox' subsection plus the BL-315 conflict spine and the nation-level AI-rivals graduation point; a new v1.0.0 section and matching 'Done-definition — v1.0.0' section were added; v0.1.1–v0.1.4 writeups were retrofitted against current backlog status (BL-203/204 complete, BL-205 cut, 13 new v0.1.1 items surfaced 2026-08-01→08-04, BL-157 firmed by the military design session). CLAUDE.md's ROADMAP.md pointer updated to match.
+
+### NR-089 — Wizard real-surface preview pane landed, but it is not BL-256's globe — scope call for Ben
+*question · raised 2026-08-08 · from Found landing an uncommitted, unreviewed session's working-tree state (src/ui/generation_preview.{cpp,hpp}, generate_home_surface_preview) — see the DEVLOG entry that lands it.*
+
+The landed pane paints a hex-sampled orthographic globe of the wizard's ACTUAL generated Kepler surface (verified byte-parity with make_hard_coded_world), in a fixed 1/3-controls : 2/3-preview split, rotating on wall-clock time only. BL-256 (GENERATION_GLOBE_PREVIEW, still `designed`, v0.1.1) specifies a considerably larger item on the same idea: player-controlled pan clamped at the poles, a measured pole-treatment call (cap / weighted-sampling / accept), a pre-world solar-system diagram stage, and the demoted charts folding through BL-265's disclosure vocabulary rather than a fixed column split. None of those four are present in what landed.
+
+**Why it matters.** Landing this without flagging it would read as BL-256 having shipped when it has not — BL-256's own design doc treats pan and the fold integration as load-bearing, not optional polish. Left BL-256 unchanged (still `designed`) rather than guessing whether this session's smaller version supersedes it, narrows it, or is a throwaway task-1-style prototype BL-256's own sequencing already calls for ("prove the projection... in a throwaway debug window... before any wizard work").
+
+- Treat this as BL-256's task 1 prototype, now proven in the real wizard rather than a throwaway window — promote BL-256's remaining tasks (pan, pole call, BL-265 fold integration) as the item's next slice
+- Treat this as a smaller, permanent, different feature — close or narrow BL-256's scope to just the parts this doesn't cover
+- Leave both as-is: this pane ships as an interim improvement, BL-256 stays queued for its full design untouched
+
+> **RESOLVED.** Ruled 2026-08-09 (Ben): the landed pane is BL-256's task-1 prototype, proven in the real wizard rather than a throwaway window. BL-256 (generation globe) stays open; its remaining tasks — player pan with pole clamp, the measured pole-treatment call, the solar-system diagram stage, BL-265 fold integration — are the item's next slice. BL-256's design amended to record task 1 as done.
+
+*Files: `src/ui/generation_preview.hpp`, `src/ui/generation_preview.cpp`, `src/core/app.cpp`*
+
+### NR-090 — Rival construction state is publicly visible on the canvas — BL-068 never ruled on it
+*question · raised 2026-08-08 · from Ben's outside-the-box review prompt during BL-323; found reviewing the S4 dimming against DISCOVERY.md's visibility model*
+
+The BL-323 S4 under-construction dimming applies to ALL buildings, rivals included — so a rival's construction sites (and therefore their expansion frontier) are readable at a glance. BL-068's ruling covers type + owner (public) vs production/stockpile (private) but never classified construction state. The rival hover card correctly hides tick counts; only the canvas dimming leaks.
+
+**Why it matters.** Currently public by accident, not by decision. Arguably GOOD gameplay (scaffolding is externally observable; watching a rival build teaches the competitive map), but it also telegraphs reach frontiers the activity-fog design (BL-089) never priced. Needs a one-line ruling either way, recorded in DISCOVERY.md's visibility model when next touched.
+
+- Ratify: construction state is public (scaffolding is observable) — document in BL-068's model
+- Restrict: rivals render at full brightness regardless of construction state (state becomes private)
+
+> **Recommendation:** Ratify as public — it is realistic, legible, and creates counterplay.
+
+> **RESOLVED.** Ruled 2026-08-09 (Ben): construction state is PUBLIC — scaffolding is externally observable, legible, and creates counterplay. Recorded in DISCOVERY.md's competitor-visibility model; BL-323's dimming behaviour is now by decision, not accident.
+
+*Files: `src/ui/body_surface_canvas.cpp`, `docs/ui/DISCOVERY.md`*
+
+### NR-091 — Interpretation taken: one shared reach field — the military base is NOT a supply anchor
+*decision taken on your behalf · raised 2026-08-08 · from Ben's custom Q&A answer on military supply: 'This feeds into the logistics system (directional). So a nation's reach for economy is also the military reach. Beyond the boundary, units slowly deplete...'*
+
+Recorded in BL-325 (military base + supply) as: ONE reach field, computed off the existing economic anchors (cities, built ports, built hubs); the military_base is a muster/hire building only and does NOT anchor or extend reach. To project force farther, the player extends the same road/hub network the economy uses. The alternative reading — bases join the anchor set so a forward base extends supply for armies (and, as a side effect, economic placement) — was NOT taken.
+
+**Why it matters.** The word 'directional' could mean the dependency direction (military depends on economic logistics — the reading taken) or a directional/forward extension (bases push the envelope outward). The taken reading is cleaner (no second field, no base-extends-economy side effect) but it removes the classic forward-operating-base move. Overturnable in one line in BL-325 if misread.
+
+- Confirm: bases never anchor; forward projection = extend the road/hub network
+- Overturn: a completed military_base joins the anchor set (forward operating bases exist, and also extend economic placement reach)
+
+> **RESOLVED.** Confirmed 2026-08-09 (Ben): bases never anchor. One shared reach field off the economic anchors; forward projection means extending the same road/hub network. BL-325's recorded interpretation stands.
+
+*Files: `docs/development/backlog.json`*
+
+### NR-092 — Reach gates placement only, never operation — asymmetry stands until BL-288
+*observation · raised 2026-08-08 · from The BL-323 outside-the-box review (buildings x unfinished logistics)*
+
+A building that exists beyond the reach budget (grandfathered, or placed while the rule was off) operates forever at zero penalty, and convoy dispatch has no reach check — so you cannot PLACE at reach 25 but a stale building at reach 40 ships freely. The ongoing-cost half is BL-288's unbuilt transport_capacity good.
+
+**Why it matters.** Not a bug — the placement gate was the designed slice — but the asymmetry will read as inconsistent the moment a player notices it, and the BL-325 unit-decay mechanic makes the contrast sharper (units decay out of range; buildings do not). Noted so BL-288's design starts from this.
+
+> **RESOLVED.** Noted 2026-08-09 (Ben): asymmetry stands as designed until BL-288 (transport capacity) prices the operating half. No action now; BL-288's design starts from this entry.
+
+*Files: `src/world/supply_system.cpp`, `docs/development/backlog.json`*
+
+### NR-093 — Building-selection bypass reversed; the rich management card is parked, not deleted
+*decision taken on your behalf · raised 2026-08-08 · from Ben, 2026-08-08 live critique: 'selection of a building skips the selection menu, going straight to manage. This is a bug.'*
+
+The bypass at draw_selection_content (a selected player building rendered the full management card as its Selection content, per the 2026-07-22 'four-numbers card is useless' ruling) is removed. A building now takes the shared action|facts Selection view: construction status, an Operate/Manage button (opens the construction ledger's Buildings tab, which already keys off selected_entity), and the profitability facts column. The old rich vertical card (draw_building_selection, ~300 lines: workforce slider, recipe picker, production status) is PARKED [[maybe_unused]] rather than deleted.
+
+**Why it matters.** Two calls taken on Ben's behalf: (1) Manage routes to the construction ledger's Buildings tab rather than resurrecting the card in a full-screen takeover -- chosen because that tab already exists, already focuses the selected building, and already carries management detail; (2) the parked card is kept compiled because its content (per-building workforce/recipe controls) may be wanted as the Buildings tab's detail pane. If the Buildings tab's existing inline detail is judged sufficient, the parked function should be deleted instead.
+
+- Keep Manage -> construction ledger Buildings tab; delete the parked card
+- Fold the parked card's content into the Buildings tab as its detail pane, then delete the standalone function
+- Different destination for Manage entirely (a dedicated management surface)
+
+> **RESOLVED.** Ruled 2026-08-09 (Ben): keep Manage → construction ledger Buildings tab; DELETE the parked card — the tab's existing inline detail is sufficient. Deletion filed as BL-339 (delete parked building card) since this session cannot run the integrating build.
+
+*Files: `src/ui/selection_panel.cpp`*
 
 ### NR-094 — C-route feasibility assessed: both of Ben's gates pass, but the recommendation is to move the model off the action path
 *decision taken on your behalf · raised 2026-08-08 · from Ben, 2026-08-08 — "I personally believe that play via language opens up the door to diplomatic thinking and larger strategy. However if it can't be compressed, or if it is not technically possible on our machines, then it's not worth pursuing, and we can use traditional RL methods."*
