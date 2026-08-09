@@ -26,6 +26,7 @@
 #include "ui/frame_stats.hpp" // frame-budget HUD (BL-249, v0.1.0 quality audit)
 #include "ui/header_panel.hpp"
 #include "ui/foldout_column.hpp" // shell_column_width — permanent left shell column (BL-122)
+#include "ui/shell_metrics.hpp"  // the shell's rect algebra, one owner (BL-216)
 #include "ui/nav_pane.hpp"
 #include "ui/overlay.hpp"
 #include "ui/presentation.hpp"
@@ -2758,24 +2759,17 @@ void app::render()
     // sized off the minimap width so the right-hand column stays aligned.
     ImGuiIO&     io     = ImGui::GetIO();
     const ImVec2 disp   = io.DisplaySize;
-    constexpr float margin = 8.0f;
-    // Single source of truth (foldout_column.hpp): the bottom strip's height is
-    // derived from mm_h so the two stay aligned, which they cannot do if this
-    // formula is also written out here.
-    const float  mm_w   = ui::minimap_width(disp.x, disp.y);
-    const float  mm_h   = ui::minimap_height(disp.x, disp.y);
-    // Right edge flush to the screen edge (BL-312, Ben 2026-08-06: "wrap the
-    // minimap to the full edges of the canvas ... we aren't using the space
-    // effectively") — was `disp.x - margin - mm_w`, an unused 8px gap with no
-    // neighbour to its right to justify it. The BOTTOM edge keeps its margin
-    // deliberately: selection_band_height (foldout_column.hpp) is
-    // `minimap_height + chrome_margin`, computed so the Selection band's top
-    // edge lands exactly on the minimap's top edge (both equal
-    // `disp.y - mm_h - 8`, chrome_margin and this local `margin` both being
-    // 8.0f) — the "one band across the full width" fix from 2026-07-30.
-    // Flushing the bottom too would drop the minimap 8px lower than the strip
-    // and break that alignment; not done here.
-    const ImVec2 mm_origin = {disp.x - mm_w, disp.y - margin - mm_h};
+    constexpr float margin = ui::shell_margin;
+    // Single owner for the shell's rect algebra (BL-216, ui/shell_metrics.hpp).
+    // This block used to hand-roll `disp.x - margin - mm_w`, and so did four other
+    // places -- the time panel, the system gear, the header's right bound and the
+    // Selection band each re-derived the same right-chrome edge independently.
+    // That is how BL-312's flush-right minimap came to disagree with the four that
+    // did not follow it. Every site below now asks shell_metrics for a rect.
+    const ui::shell_rect mm        = ui::minimap_rect(disp);
+    const float          mm_w      = mm.w;
+    const float          mm_h      = mm.h;
+    const ImVec2         mm_origin = {mm.x, mm.y};
 
     // --- Primary canvases (Layer 2) — the zoom ladder ---
     // The primary rung fills the window; the rung one step *out* renders in the
@@ -2899,7 +2893,7 @@ void app::render()
     // thirds is "time controls" (the pause/speed-tier buttons + active-rate
     // label) — half the row count, so it fits. The panel takes input (the
     // speed buttons), so it is not flagged NoInputs.
-    const float tick_w = mm_w;
+    const float tick_w = ui::right_chrome_width(disp);
     const float col_gap  = ImGui::GetStyle().ItemSpacing.x;
     const float prog_w   = tick_w / 3.0f - col_gap * 0.5f;
     const float ctrl_w   = tick_w - prog_w - col_gap;
@@ -2928,8 +2922,10 @@ void app::render()
     const float time_content_h = time_line_h + std::max(prog_col_h, ctrl_col_h);
     const float time_h         = time_content_h + ImGui::GetStyle().WindowPadding.y * 2.0f;
     {
-        ImGui::SetNextWindowPos({disp.x - margin - tick_w, margin});
-        ImGui::SetNextWindowSize({tick_w, time_h});
+        // Head of the right chrome column (BL-216: shell_metrics owns the edge).
+        const ui::shell_rect tp = ui::time_panel_rect(disp, time_h);
+        ImGui::SetNextWindowPos({tp.x, tp.y});
+        ImGui::SetNextWindowSize({tp.w, tp.h});
         constexpr ImGuiWindowFlags time_flags =
             ImGuiWindowFlags_NoTitleBar          |
             ImGuiWindowFlags_NoResize            |
@@ -3084,7 +3080,8 @@ void app::render()
     // the same popup (handle_key_down). See docs/ui/MENU.md.
     {
         constexpr float gear = 26.0f;
-        const ImVec2 gear_pos{ (disp.x - margin - mm_w) - margin - gear, margin };
+        // One margin left of the right chrome column (BL-216).
+        const ImVec2 gear_pos{ ui::right_chrome_left(disp) - margin - gear, margin };
 
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, {0.0f, 0.0f});
         ImGui::SetNextWindowPos(gear_pos);
@@ -3160,7 +3157,7 @@ void app::render()
     // the identity tile / balance bar / Selection all clear the same permanent W (BL-122).
     {
         const float header_left  = ui::shell_column_width(disp.x);
-        const float header_right = (disp.x - margin - tick_w) - margin;
+        const float header_right = ui::right_chrome_left(disp) - margin;
         ui::draw_header_panel(m_world, m_balance_history, header_left, header_right);
     }
 
@@ -3243,13 +3240,13 @@ void app::render()
         // The band starts at the COMMS DOCK's right edge, not the shell column
         // edge: the dock narrowed to 3/4 of the column (2026-07-30) and the band
         // takes the quarter it gave back, so the bottom strip stays solid rather
-        // than showing a canvas sliver between the two.
-        const ui::foldout_rect comms      = ui::comms_dock_rect();
-        const float            band_left  = comms.x + comms.w;
-        const float            right_edge = disp.x - margin - mm_w; // left edge of the right chrome column
-        const float            band_h     = ui::selection_band_height(disp.x, disp.y);
-        const ImVec2 band_origin = { band_left, disp.y - band_h };
-        const ImVec2 band_size   = { std::max(0.0f, right_edge - band_left), band_h };
+        // than showing a canvas sliver between the two. The whole rect -- both
+        // flush edges and the shared strip height -- comes from shell_metrics
+        // (BL-216), so the band and the dock cannot disagree about where the
+        // seam between them falls.
+        const ui::shell_rect band = ui::selection_band_rect(disp);
+        const ImVec2 band_origin = { band.x, band.y };
+        const ImVec2 band_size   = { band.w, band.h };
         const ui::resource_history_view rhist{ &m_body_resource_hist,
                                                &m_tile_resource_hist,
                                                &m_resource_hist_days };

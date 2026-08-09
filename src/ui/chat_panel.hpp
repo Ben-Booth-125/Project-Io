@@ -57,20 +57,26 @@ struct chat_state
 /// @param text    Message body.
 void chat_post(chat_state& chat, int day, entity_id from, int channel, std::string text);
 
-/// Draw the comms panel — the channel-based chat log that replaces the Explorer
-/// placeholder in the right shell band (below the time column, above the
-/// minimap). Channel tabs (Public + created groups + the "+" group-create
-/// popup), a scrolling message log for the active channel, and a message input.
-/// Player input posts to the active channel with no mechanical effect yet — the
-/// hook the AI-opponent C-route consumes later (docs/ai/AI_OPPONENT.md § 7).
+/// Draw the comms panel — the channel-based chat log. It first replaced the
+/// Explorer placeholder in the right shell band; BL-227 (2026-07-30) re-homed it to
+/// the **bottom-left tile of the screen's bottom strip** (`comms_dock_rect`,
+/// `foldout_column.hpp`), sharing the Selection band's top edge and height. One
+/// control row (label + channel selector + the "+" group-create popup), a scrolling
+/// message log for the active channel, and a message input. Player input posts to
+/// the active channel with no mechanical effect yet — the hook the AI-opponent
+/// C-route consumes later (docs/ai/AI_OPPONENT.md § 7).
+///
+/// Rows, not width, are the scarce axis in that host (BL-216): the log uses a
+/// one-line-per-message form and the channels sit in a combo rather than a
+/// silently-clipping row of tabs. See docs/ui/CHAT.md.
 ///
 /// @param w      World (corp names + identity colours).
 /// @param chat   Comms state to draw and mutate.
 /// @param day    Current sim day (stamps player-sent messages).
-/// @param x      Left edge of the panel (aligned with the minimap).
-/// @param y      Top edge of the panel (below the time controls).
-/// @param width  Panel width (same as the minimap).
-/// @param height Panel height (down to just above the minimap).
+/// @param x      Left edge of the panel (the icon rail's right edge).
+/// @param y      Top edge of the panel (shared with the Selection band).
+/// @param width  Panel width (three quarters of the fold-out column's).
+/// @param height Panel height (the Selection band's, by design).
 void draw_chat_panel(const world& w, chat_state& chat, int day,
                      float x, float y, float width, float height);
 
