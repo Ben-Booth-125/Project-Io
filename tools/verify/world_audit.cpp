@@ -1,5 +1,11 @@
 // Throwaway headless harness: builds the hard-coded world and reports
-//   (S2) Kepler's forest + wetland tile fraction (biome-balance target ~>=3%);
+//   (S2) Kepler's forest + wetland tile fraction (biome-balance target ~>=3%
+//        of LAND — re-based from "of all tiles" 2026-08-09, BL-338. Forest and
+//        wetland are land-only biomes, so counting Kepler's 9,028 ocean tiles in
+//        the denominator asked the wrong question: the same world reads 2.4% or
+//        6.0% depending only on how wet the planet is. The threshold is
+//        deliberately unchanged at 3% — the point of the re-base is to make the
+//        number mean something, not to make it easier to clear.);
 //   (S1) whether every placed extraction asset sits on a tile carrying a
 //        non-zero prototype-extractable deposit (iron ore / petroleum / water /
 //        agricultural produce) on valid (non-ocean) terrain.
@@ -44,11 +50,12 @@ int main()
     }
 
     std::printf("Kepler tiles: %d total, %d land\n", total, land);
-    const float fw_frac = total ? 100.0f * static_cast<float>(forest + wetland) / total : 0.0f;
-    std::printf("  forest=%d (%.2f%%)  wetland=%d (%.2f%%)  forest+wetland=%.2f%% of all tiles\n",
-                forest, total ? 100.0f * forest / total : 0.0f,
-                wetland, total ? 100.0f * wetland / total : 0.0f, fw_frac);
-    std::printf("  S2 target forest+wetland >= 3%% of all tiles: %s\n",
+    // Denominator is LAND, not all tiles (BL-338): both biomes are land-only.
+    const float fw_frac = land ? 100.0f * static_cast<float>(forest + wetland) / land : 0.0f;
+    std::printf("  forest=%d (%.2f%% of land)  wetland=%d (%.2f%% of land)  forest+wetland=%.2f%% of land\n",
+                forest, land ? 100.0f * forest / land : 0.0f,
+                wetland, land ? 100.0f * wetland / land : 0.0f, fw_frac);
+    std::printf("  S2 target forest+wetland >= 3%% of land: %s\n",
                 fw_frac >= 3.0f ? "PASS" : "FAIL");
 
     // --- S3 (BL-231): per-body landform histogram ---
