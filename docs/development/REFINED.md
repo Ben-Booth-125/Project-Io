@@ -1,5 +1,46 @@
 # Project Io — REFINED (active worklist)
 
+## Render-precision audit (promoted from BL-215, text-wrap render audit) — 2026-08-09
+
+Requirements: requirements.json § text-wrap-render-audit (R1–R6)
+
+- **[3] A — `src/ui/text_fit.{hpp,cpp}` (new): the shared fit/wrap/measure module + overflow
+  ledger**, per the design's exact API; delete `profile_panel.cpp`'s private
+  `fit_ellipsis`/`text_ellipsized` into it. Files: `src/ui/text_fit.{hpp,cpp}`,
+  `src/ui/profile_panel.cpp`, `CMakeLists.txt`. Deps: foundation. Satisfies: R1.
+- **[2] B — display floor**: `SDL_SetWindowMinimumSize(1280*s, 720*s)` + persisted floor +
+  DEVELOPMENT_PRACTICES § Display environment. Files: `src/core/app.cpp`,
+  `docs/development/DEVELOPMENT_PRACTICES.md`. Deps: independent root. Satisfies: R3.
+- **[3] C — charts measure-first rework** (`legend_width`, `chart_metrics`, `measure_chart`,
+  `legend_place` opt-in; gutters/caption measured; `chart_row_height(float)` verbatim).
+  Files: `src/ui/charts.{hpp,cpp}`, `src/ui/generation_charts.cpp`. Deps: A. Satisfies: R4.
+- **[2] D — remaining-site adoption** (tile_inspector, chat_panel tab strip, selection_panel,
+  header_panel, body_surface_canvas legend boxes). Files: per § 6 table. Deps: A. Satisfies: R1.
+- **[2] E — verify bindings + `scripts/verify/text_overflow_floor.lua`** + LAYOUT.md row 10 +
+  coverage grep. Files: `src/core/app.cpp`, `scripts/verify/text_overflow_floor.lua`,
+  `docs/ui/LAYOUT.md`. Deps: A. Satisfies: R2, R5, R6.
+
+Parallelisation note: one coherent vertical slice, single worktree agent, sequential
+A → {B..E}. The verifier-visual SKILL.md edit needs Ben's permission — left to the main
+session to request; script runs ad hoc meanwhile.
+
+## Selection always open (promoted from BL-266) — 2026-08-09
+
+Requirements: requirements.json § selection-always-open (R1–R4)
+
+- **[2] A — delete `selection_hidden_for`** (eleven call sites) and the Esc hide rung; Esc's
+  terminal rung is the system menu. Files: `src/core/app.cpp`, `src/ui/selection_card.cpp`,
+  `src/ui/ui_state.hpp`. Deps: foundation. Satisfies: R1.
+- **[2] B — resting band on the player corporation** (existing corporation builder; `none`
+  never rendered by the band). Files: `src/ui/selection_card.cpp`, `src/ui/selection_panel.cpp`.
+  Deps: A. Satisfies: R2.
+- **[1] C — SELECTION.md aligned; Esc verify scripts re-asserted/re-blessed.**
+  Files: `docs/ui/SELECTION.md`, `scripts/verify/*`. Deps: A, B. Satisfies: R3, R4.
+
+Parallelisation note: one worktree agent, sequential A → B → C. Runs concurrent with the
+BL-215 agent — both touch `src/core/app.cpp` (worktree isolation; merge in main session,
+BL-215 first, then rebase-merge this one).
+
 > Drained 2026-08-08: critique batch (BL-326/327/328/329/330), all 3 tasks COMPLETE — removed
 > per the retain-one policy. Record lives in DEVLOG.md (2026-08-08 entry), backlog.json's five
 > `resolution` fields, and requirements.json § critique-batch-ui-polish (R1–R6).
@@ -50,20 +91,10 @@ Parallelisation note: A is the foundation (the staging both B and C hang off); B
 lands (disjoint UI concerns — canvas vs. card); D runs last, after the surfaces it's auditing
 exist.
 
-## Header chrome tightening (promoted from BL-312, BL-313)
-
-Requirements: requirements.json § header-chrome-tightening (R1–R5)
-
-- **[2] A — Minimap flush to the right edge (and bottom, if it doesn't break the
-  selection-band alignment).** Files: `src/core/app.cpp`. Deps: foundation.
-  Satisfies: R1, R2.
-- **[2] B — Time panel: two-column reflow (left 1/3 progress, right 2/3 controls).**
-  Files: `src/core/app.cpp`. Deps: independent of A (disjoint code regions in the
-  same file). Satisfies: R3, R4, R5.
-
-Parallelisation note: both tasks touch `app.cpp` but disjoint blocks (the minimap
-draw block vs the time-panel draw block) — one session, sequential, not fanned out
-(too small to be worth worktree overhead).
+> Drained 2026-08-09: header chrome tightening (BL-312/BL-313) — the work landed in 9ecbbcf but
+> the section was never flipped; items were closed retroactively by the NR-075 cut audit and the
+> requirement group closed 2026-08-09 (verification overtaken by the closure). Record lives in
+> req/requirements.json (§ header-chrome-tightening) and NR-075.
 
 ## Tech tree radial canvas (promoted from BL-310) — **COMPLETE**
 
@@ -82,61 +113,12 @@ hand-authored for the Era-1 keystones + branches this pass, other ~120 nodes fal
 truncated name). Verified via `scripts/verify/tech_tree_panel.lua` — 3/3 golden PASS (tabs,
 era1, antiquity), goldens re-blessed against every intentional change across all three rounds.
 
-## Corp standing profile (promoted from BL-262, first slice) — **COMPLETE**
-
-Requirements: requirements.json § corp-standing-profile (R1–R5, all met bar R1's visual leg,
-which is manual/Ben's). `standing_harness` 41/41 PASS (boundary determinism for all three bands,
-zero-total/empty-map no-NaN cases, player-exact/rival-banded visibility split, byte-identical
-re-computation). Full app + harness both build clean (MSVC 14.44, `build_app.bat`). Production
-axis deliberately absent this slice — no honest visible-information source exists yet (BL-068
-privates recipe/workforce); documented in `standing.hpp`, tracked as a follow-on.
-
-- **[4] A — `src/world/standing.{hpp,cpp}` (new): compute the three-axis profile.**
-  Files: `src/world/standing.hpp`, `src/world/standing.cpp`. Deps: foundation.
-  Satisfies: R1, R2, R3, R4, R5.
-- **[2] B — wire into `corporation_panel.cpp`: own row exact, rival rows banded, no total.**
-  Files: `src/ui/corporation_panel.cpp`, `src/ui/corporation_panel.hpp`. Deps: A.
-  Satisfies: R1.
-- **[2] C — cache this-tick `corp_cash_flow` for the panel to read (no save-format change).**
-  Files: `src/core/app.cpp`, `src/core/app.hpp`. Deps: A. Parallel-safe with B (disjoint files);
-  both need A's signature first, so effectively sequential after A in one agent's pass.
-  Satisfies: R3.
-- **[2] D — `tools/verify/standing_harness.cpp` (new): boundary determinism + sorted walk.**
-  Files: `tools/verify/standing_harness.cpp`. Deps: A. Satisfies: R2.
-
-Parallelisation note: A is the foundation (new struct/function signatures everything else
-calls); B/C/D all depend on A's header. Single coherent vertical slice on a small, mostly-new
-file set — one agent, sequential A→{B,C,D}, not fanned out.
-
-# Mediterranean rift sea (BL-276, 2026-08-03) — **COMPLETE**
-
-Requirements: requirements.json § mediterranean-rift-sea (R1–R4 all met).
-Rift-basin mechanism (interior-segment corridor, adaptive width, rift-shoulder rim) +
-intracratonic sag fallback in `run_continents`; two-bar acceptance gate (arena ≥ 300 ×3
-attempts, floor ≥ 30 ×6) in `hard_coded_world.cpp`; new asserted `mediterranean_sweep`
-harness. Measured over 500 seeds: floor 100%, arena 89.6% (~90% per Ben's call, hard tail
-kept). continents_harness, world_determinism, determinism_harness, world_audit all PASS.
-
----
-
-# Sprint 5 — Era −1 history sim: foundation wave (2026-08-02) — **COMPLETE**
-
-Both items landed as two parallel worktree-isolated agents (disjoint files, no collision), merged
-into `doc-compression` then fast-forwarded into `main`. Full CTest suite 41/41 green post-merge
-(also the first real build/test pass on the previously-uncommitted BL-218/219 settlement backend).
-
-**Combat engine (BL-272) — COMPLETE.** Files: `src/world/combat.{hpp,cpp}` (new),
-`src/world/components.hpp` (`unit_component.type`), `tools/verify/combat_harness.cpp` (new).
-unit-doctrine-combat R1–R4 all met; `combat_harness` 15/15 PASS. `resolve_battle` is the shared
-entry point for the future Era −1 sim and the existing 1960+ era path.
-
-**Province demography (BL-273) — COMPLETE.** Files: `src/world/settlement.{hpp,cpp}` (extended),
-`docs/economy/POPULATION.md`, `tools/verify/demography_harness.cpp` (new). province-demography
-R1–R4 all met; `demography_harness` 20/20 PASS; `settlement_harness` re-verified clean (21/21)
-against the extended `province` struct.
-
-**Next:** wave 2 (BL-274, era-keyed unit rosters) needs BL-272 landed in `main` — now true — and
-is ready to promote. Wave 3 (BL-271, the sim loop) needs all three; not promoted yet.
+> Drained 2026-08-09: corp standing profile (BL-262 first slice, 4 tasks COMPLETE,
+> standing_harness 41/41), Mediterranean rift sea (BL-276, R1–R4 met, 500-seed sweep), and
+> Sprint 5 Era −1 foundation wave (BL-272 combat engine + BL-273 province demography, harnesses
+> green) — removed per the retain-one policy. Records live in DEVLOG.md and
+> req/requirements.json (§ corp-standing-profile, § mediterranean-rift-sea,
+> § unit-doctrine-combat, § province-demography).
 
 ---
 
