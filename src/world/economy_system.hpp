@@ -156,10 +156,34 @@ void inject_substrate_demand(world& w, const recipe_registry& reg);
 /// @return    The step report (building states + auto-bought shortfalls).
 economy_report run_economy_step(world& w, const recipe_registry& reg);
 
+/// The rate one extraction site would yield at full reserve, BEFORE its stack
+/// decay: base_rate × richness × effective workforce × workforce target ×
+/// (1 − hazard). The single definition of "one site's nominal draw" — the stack
+/// pre-pass sizes the shared taper against a sum of these, `run_extraction` draws
+/// one of them, and `estimate_prospective_profit` prices one of them (BL-346), so
+/// the figure the taper is sized against is always the figure actually drawn.
+///
+/// Exported for the estimator; the taper and the stack decay are NOT in it.
+///
+/// @param w          Read-only world state.
+/// @param reg        Loaded recipe/economy registry.
+/// @param b          The extraction site (its tile supplies richness and hazard).
+/// @param contention The (corp, body) labour-contention scalar to apply.
+/// @return           Units per tick, before stack decay and before depletion taper.
+float extraction_nominal(const world& w, const recipe_registry& reg,
+                         const building_component& b, float contention);
+
 /// The BL-181 per-building workforce-dial solver: the workforce target (0–200,
 /// step 10) that maximises this building's estimated net this tick against the
 /// local market's price response. Exported (BL-202) so the strategic scorer can
 /// reuse it as the AI's `set_workforce` estimator — one solver, no drift.
 /// Deterministic; reads last tick's market state only.
+///
+/// @param stack_rank This site's 1-based rank in its tile's stack (BL-193). The
+///                   solver's revenue model scales by `stack_output_scalar(rank)`
+///                   exactly as `run_extraction` does — without it the dial was
+///                   maximised against a curve a stacked site never realises
+///                   (BL-346). 1 (the default) is a lone site.
 int solve_workforce_target(const world& w, const recipe_registry& reg,
-                           const building_component& b, float contention);
+                           const building_component& b, float contention,
+                           int stack_rank = 1);

@@ -24,6 +24,7 @@
 // Build: cmake --build build_linux --target stack_capacity_harness
 // Run:   ./build_linux/stack_capacity_harness
 
+#include "world/building_profit.hpp"
 #include "world/components.hpp"
 #include "world/economy_system.hpp"
 #include "world/placement_rules.hpp"
@@ -53,9 +54,10 @@ namespace {
 struct fixture
 {
     world                  w;
-    entity_id              body = null_entity;
-    entity_id              tile = null_entity;
-    entity_id              corp = null_entity;
+    entity_id              body   = null_entity;
+    entity_id              tile   = null_entity;
+    entity_id              corp   = null_entity;
+    entity_id              market = null_entity; ///< Only when the fixture asked for one.
     std::vector<entity_id> sites;
 };
 
@@ -76,7 +78,12 @@ recipe_registry make_registry()
     return reg;
 }
 
-fixture make_fixture(int sites, float reserve)
+/// Iron price in the optional market below. The estimator values output at it, and so
+/// does every estimate-vs-actual comparison here, so it never has to be a round number
+/// for the arithmetic to be legible — it just has to be the SAME number on both sides.
+constexpr float k_iron_price = 2.5f;
+
+fixture make_fixture(int sites, float reserve, bool with_market = false)
 {
     fixture f;
     f.body = f.w.create_entity();
@@ -125,7 +132,47 @@ fixture make_fixture(int sites, float reserve)
         f.w.corporations[f.corp] = cc;
     }
     f.w.player_entity = f.corp;
+
+    // Created LAST on purpose: every id above keeps the value it had before the market
+    // was an option, so S.R4-S.R6's stored-order assertions are untouched by it.
+    // estimate_prospective_profit refuses to answer without a market (a chart of zeros
+    // is a lie), so the BL-346 section is the only one that asks for it.
+    if (with_market)
+    {
+        f.market = f.w.create_entity();
+        market_component mc;
+        mc.body = f.body;
+        mc.base_price[ri(resource_type::iron_ore)] = k_iron_price;
+        mc.price = mc.base_price;
+        f.w.markets[f.market] = mc;
+    }
     return f;
+}
+
+/// Add one more extraction site to the fixture's tile, owned by the same corp. Created
+/// after every existing site, so its entity id is the highest and its rank is last —
+/// which is exactly what building one more site on the tile does.
+entity_id add_site(fixture& f)
+{
+    const entity_id bid = f.w.create_entity();
+    building_component b{};
+    b.tile               = f.tile;
+    b.type               = building_type::extraction_site;
+    b.workforce_assigned = 0.5f;
+    b.target_resource    = resource_type::iron_ore;
+    b.workforce_auto     = false;
+    f.w.buildings[bid]   = b;
+    f.sites.push_back(bid);
+    f.w.corporations[f.corp].assets.push_back(bid);
+    return bid;
+}
+
+/// What `estimate_prospective_profit` says the NEXT extraction site on the fixture's
+/// tile would earn per tick.
+building_profit estimate_next(const fixture& f, const recipe_registry& reg)
+{
+    return estimate_prospective_profit(f.w, reg, f.tile, building_type::extraction_site,
+                                       resource_type::iron_ore);
 }
 
 /// This tick's output for `building`, 0 if it produced nothing.
@@ -356,6 +403,105 @@ int main()
                 a.w, a.tile, building_type::extraction_site,
                 resource_type::iron_ore) == first);
         check(stable, "S.R6 stack_members is stored order, stable across calls");
+    }
+
+    // ---------------------------------------------------------------------
+    // S.R7 — the ESTIMATE and the TICK agree, member by member (BL-346).
+    //
+    // estimate_prospective_profit is what the construction ledger ranks the player's
+    // build options by, so an estimate that ignores BL-193 does not merely misprint a
+    // number — it recommends the build. BL-193 shipped without updating it: every
+    // candidate was priced at the lone-site rate and tapered against its own nominal,
+    // so a fourth site on a half-worked deposit read like a first site on a fresh one.
+    //
+    // The assertions below are deliberately estimate-against-ACTUAL, never
+    // estimate-against-a-constant: each takes the estimate for the next site, builds
+    // that site, ticks, and compares against what run_economy_step credited it. Pinned
+    // to a constant, the pair could drift together and stay green.
+    // ---------------------------------------------------------------------
+    {
+        // --- the decay half: rank 1, 2, 3 on an ample reserve (taper is 1 throughout,
+        //     so what is left in the comparison is the stack curve alone).
+        fixture f = make_fixture(/*sites=*/0, /*reserve=*/1.0e6f, /*with_market=*/true);
+        float   est_rank1 = 0.0f, est_rank3 = 0.0f;
+        for (int rank = 1; rank <= 3; ++rank)
+        {
+            const building_profit est = estimate_next(f, reg);
+            check(est.has_data, "S.R7 the estimator answers for a stacked tile");
+
+            const entity_id        site = add_site(f);
+            const economy_report   rep  = run_economy_step(f.w, reg);
+            const float            actual = output_of(rep, site) * k_iron_price;
+            check(near(est.revenue, actual, 1e-2f),
+                  "S.R7 estimated revenue == what the tick credits that very site",
+                  est.revenue, actual);
+
+            if (rank == 1) est_rank1 = est.revenue;
+            if (rank == 3) est_rank3 = est.revenue;
+        }
+        // And the curve is genuinely in there: the third site is priced at 0.64 of the
+        // first. Before BL-346 both estimates were the lone-site figure.
+        check(near(est_rank3, est_rank1 * 0.64f, 1e-2f),
+              "S.R7 the rank-3 estimate is 0.64x the rank-1 estimate (decay is priced)",
+              est_rank3, est_rank1 * 0.64f);
+        check(est_rank3 < est_rank1,
+              "S.R7 stacking is never estimated as free", est_rank3, est_rank1);
+
+        // --- the shared-depletion half: sweep the reserve across a 3-stack's taper
+        //     band, including below the exhaustion floor. At each level the estimate
+        //     for the third site must equal what that site is actually credited, and
+        //     must read zero on exactly the reserves where the tick reports exhausted.
+        //     That is the remaining-life claim, checked pointwise rather than asserted.
+        //
+        //     A 3-stack's combined nominal is 20 x 2.44 = 48.8, so its taper band is
+        //     8 x 48.8 = 390.4. The levels below straddle it: ample, mid-band, deep,
+        //     and under run_extraction's floor.
+        const float reserves[] = { 1.0e6f, 390.0f, 195.2f, 40.0f, 4.0f };
+        for (const float reserve : reserves)
+        {
+            fixture g = make_fixture(/*sites=*/2, reserve, /*with_market=*/true);
+
+            const building_profit est  = estimate_next(g, reg);
+            const entity_id       site = add_site(g);
+            const economy_report  rep  = run_economy_step(g.w, reg);
+
+            const float actual = output_of(rep, site) * k_iron_price;
+            check(near(est.revenue, actual, 1e-2f),
+                  "S.R7 estimate matches the credited revenue across the shared taper band",
+                  est.revenue, actual);
+
+            // The estimator's zero and the tick's `exhausted` are the same event: both
+            // are "the shared taper fell under run_extraction's floor".
+            const bool est_zero  = (est.revenue <= 0.0f);
+            const bool tick_done = exhausted_at(rep, site);
+            check(est_zero == tick_done,
+                  "S.R7 the estimate reads zero on exactly the reserves the tick exhausts",
+                  est_zero ? 1.0f : 0.0f, tick_done ? 1.0f : 0.0f);
+        }
+
+        // --- and the regression the fix closes: the pre-BL-346 model priced the
+        //     candidate at the lone-site rate tapered against its own nominal. On a
+        //     mid-band reserve that is a strict over-statement, so the corrected
+        //     estimate has to come in under it.
+        {
+            fixture g = make_fixture(/*sites=*/2, /*reserve=*/195.2f, /*with_market=*/true);
+            const building_profit est = estimate_next(g, reg);
+
+            // The old model, restated here rather than imported: lone nominal 20, its
+            // own band 8 x 20 = 160, reserve 195.2 -> taper clamps to 1.
+            const float old_model = k_lone_nominal * 1.0f * k_iron_price;
+            check(est.revenue < old_model,
+                  "S.R7 the stack-aware estimate is BELOW the lone-site model it replaced",
+                  est.revenue, old_model);
+
+            // A lone site on an identical reserve still estimates the old figure — the
+            // fix is a correction for stacked sites, not a haircut on every estimate.
+            fixture solo = make_fixture(/*sites=*/0, /*reserve=*/195.2f, /*with_market=*/true);
+            const building_profit est_solo = estimate_next(solo, reg);
+            check(near(est_solo.revenue, old_model, 1e-2f),
+                  "S.R7 an unstacked tile estimates exactly what it always did",
+                  est_solo.revenue, old_model);
+        }
     }
 
     std::printf("\n%s (%d failure%s)\n", g_failures == 0 ? "ALL PASS" : "FAILURES",

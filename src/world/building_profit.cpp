@@ -1,12 +1,15 @@
 #include "building_profit.hpp"
 
-#include "budget_system.hpp"   // compute_building_opex, body_mean_habitability
+#include "budget_system.hpp"    // compute_building_opex, body_mean_habitability
 #include "components.hpp"
-#include "market_clearing.hpp" // market_for_tile
+#include "economy_system.hpp"   // extraction_nominal (BL-346 stack-aware estimate)
+#include "market_clearing.hpp"  // market_for_tile
+#include "placement_rules.hpp"  // stack_members, stack_output_scalar (BL-193)
 #include "recipe_registry.hpp"
 #include "world.hpp"
 
 #include <algorithm> // std::clamp
+#include <vector>
 
 building_profit estimate_building_profit(const world& w, const recipe_registry& reg,
                                          const economy_report& report, entity_id building_id)
@@ -152,8 +155,45 @@ building_profit estimate_prospective_profit(const world& w, const recipe_registr
     if (type == building_type::extraction_site)
     {
         const std::size_t ri = static_cast<std::size_t>(target);
+
+        // BL-346: the candidate joins whatever stack already works this deposit, and
+        // BOTH halves of the BL-193 stack rule bear on its number.
+        //
+        //   * It is the NEWEST site, so it lands at the bottom of the decay curve —
+        //     rank = (sites already here) + 1, yielding 0.8^(rank-1) of a lone site.
+        //   * The taper is SHARED and sized against the whole stack's combined draw,
+        //     this candidate included, so a stacked deposit's remaining life is
+        //     shorter than the same reserve would give one site.
+        //
+        // Without both, the ledger priced a fourth site on a half-worked deposit as
+        // though it were the first site on a fresh one — over-stating its revenue and
+        // its remaining life at once, which is the ranking the player builds off.
+        const std::vector<entity_id> members = placement_rules::stack_members(
+            w, tile_id, building_type::extraction_site, target);
+        const int rank = static_cast<int>(members.size()) + 1;
+
         const float nominal = econ.base_rate * tc.resource_deposit[ri] * wf
-                              * (1.0f - tc.hazard_level);
+                              * (1.0f - tc.hazard_level)
+                              * placement_rules::stack_output_scalar(rank);
+
+        // Combined draw of the stack this candidate would join, itself included and at
+        // its own rank. Members are priced through `extraction_nominal`, the same
+        // figure run_extraction draws, at the contention 1.0 this estimator assumes
+        // throughout — re-deriving it here is how the two drift apart.
+        float combined = nominal;
+        for (std::size_t k = 0; k < members.size(); ++k)
+        {
+            const auto mit = w.buildings.find(members[k]);
+            if (mit == w.buildings.end())
+                continue;
+            const building_component& mb = mit->second;
+            if (mb.decommissioned || mb.ticks_remaining > 0)
+                continue; // holds its rank, contributes nothing to the draw
+            const float n = extraction_nominal(w, reg, mb, 1.0f)
+                          * placement_rules::stack_output_scalar(static_cast<int>(k) + 1);
+            if (n > 0.0f)
+                combined += n;
+        }
 
         // Apply run_extraction's depletion taper (economy_system.cpp § run_extraction).
         // resource_deposit is RICHNESS — a fixed property of the tile — while
@@ -166,7 +206,7 @@ building_profit estimate_prospective_profit(const world& w, const recipe_registr
         // The estimate is per-tile because the reserve is per-tile. This is the one
         // place the "a building that does not exist has extracted nothing" reasoning
         // does not hold.
-        const float taper_band = deposit_taper_ticks * nominal;
+        const float taper_band = deposit_taper_ticks * combined;
         const float taper      = taper_band > 0.0f
             ? std::clamp(tc.resource_remaining[ri] / taper_band, 0.0f, 1.0f)
             : 0.0f;
