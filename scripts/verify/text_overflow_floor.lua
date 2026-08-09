@@ -8,7 +8,7 @@
 -- Run:     ProjectIo --verify scripts/verify/text_overflow_floor.lua
 -- Report:  screenshots/text_overflow.txt (written by expect_no_clipping)
 
-verify.goto_surface("Kepler")
+verify.goto_surface("home")
 
 -- Live data everywhere: balances, markets, sparkline, chat epoch lines.
 verify.econ_step(4)
@@ -67,7 +67,7 @@ verify.capture("overflow_selection_tile")
 verify.place_mode("extraction", "iron_ore")
 verify.build_first_valid()
 verify.capture("overflow_selection_building")
-verify.go_to("Kepler")
+verify.go_to("home")
 verify.capture("overflow_selection_body")
 
 -- The New World wizard, all three rounds (the charts' widest host), expanding

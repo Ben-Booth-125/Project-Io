@@ -10,7 +10,7 @@
 
 -- Kepler → Pallas: two well-separated solar bodies; a minimal market is created
 -- on Pallas by seed_convoy so the Solar route line spans the canvas visibly.
-verify.seed_convoy("Kepler", "Pallas", "iron_ore", 50.0)
+verify.seed_convoy("home", "asteroid", "iron_ore", 50.0)
 
 -- Navigate to Solar (two rungs above Kepler surface).
 verify.goto_surface("home")

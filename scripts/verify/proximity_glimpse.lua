@@ -27,7 +27,7 @@ verify.capture("proximity_glimpse_before")
 -- Complete a long cross-system player lane Kepler->Pallas (a near-complete convoy; one econ
 -- step arrives + credits it). Cinder lies close to that segment, so it is glimpsed to the
 -- faint known_stale tier -- lit without a route of its own.
-verify.seed_convoy("Kepler", "Pallas", "iron_ore", 20, 0.98)
+verify.seed_convoy("home", "asteroid", "iron_ore", 20, 0.98)
 verify.econ_step(1)
 verify.show_panel("economy", false)
 verify.capture("proximity_glimpse_after")

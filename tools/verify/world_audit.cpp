@@ -24,6 +24,7 @@
 #include <cstdlib>
 #include <map>
 #include <set>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -926,6 +927,38 @@ int main()
     std::printf("  BL-182 R1 every home-holding corp has a valid HQ + positive range: %s\n",
                 hq_bad == 0 ? "PASS" : "FAIL");
 
+    // --- BL-257: the generated body catalogue -------------------------------
+    // Names are coined per seed now, so this prints the catalogue (the sample a
+    // reader judges the generator by) and asserts the two properties that make
+    // it a system rather than a shuffle: no duplicates within a system, and the
+    // same seed producing the same names run to run.
+    bool body_names_unique = true, body_names_stable = true;
+    {
+        std::printf("Body catalogue (seed 0):\n");
+        std::vector<entity_id> ids;
+        for (const auto& [bid, bc] : w.bodies) ids.push_back(bid);
+        std::sort(ids.begin(), ids.end());
+        std::set<std::string> seen;
+        for (const entity_id bid : ids)
+        {
+            const body_component& bc = w.bodies.at(bid);
+            static const char* kType[5] = { "planet", "moon", "asteroid", "station", "star" };
+            const int t = static_cast<int>(bc.type);
+            std::printf("  %-24s %s%s\n", bc.name.c_str(),
+                        (t >= 0 && t < 5) ? kType[t] : "?",
+                        bid == w.home_body ? "  (home)" : "");
+            if (!seen.insert(bc.name).second) body_names_unique = false;
+
+            const auto it2 = w2.bodies.find(bid);
+            if (it2 == w2.bodies.end() || it2->second.name != bc.name)
+                body_names_stable = false;
+        }
+    }
+    std::printf("  BL-257 R1 no two bodies share a name: %s\n",
+                body_names_unique ? "PASS" : "FAIL");
+    std::printf("  BL-257 R2 the same seed coins the same catalogue: %s\n",
+                body_names_stable ? "PASS" : "FAIL");
+
     int hq_det_bad = 0;
     for (const auto& [cid, corp] : w.corporations)
     {
@@ -1062,5 +1095,6 @@ int main()
             && floor_ok && variance_ok && count_ok
             && market_count_ok && cross_nation_ok && market_determinism_ok
             && hq_bad == 0 && hq_det_bad == 0 && landform_absent == 0
-            && frag_ok) ? 0 : 1;
+            && frag_ok
+            && body_names_unique && body_names_stable) ? 0 : 1;
 }

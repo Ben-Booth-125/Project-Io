@@ -17,7 +17,7 @@
 -- shell column the History captures below need.
 verify.econ_step(4)
 verify.show_panel("economy", false)
-verify.goto_surface("Kepler")
+verify.goto_surface("home")
 -- A tile with a real deposit, so the metric pages are drillable resources rather
 -- than the habitability/hazard fallback (which has no time series to drill into).
 verify.select_tile(110, 79)

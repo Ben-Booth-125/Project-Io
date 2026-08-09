@@ -59,6 +59,21 @@ struct generation_report
     struct body_entry
     {
         std::string       name;
+
+        /// The world entity this entry describes — the IDENTITY key (BL-257).
+        /// Every consumer that used to match a report entry to a world body by
+        /// comparing `name` matches on this instead: names are generated and
+        /// display-only, so a name test is a display string standing in for an
+        /// identity. `null_entity` only on a report built without a world
+        /// (none today; the wizard's preview uses `generate_body_previews`).
+        entity_id         id = null_entity;
+
+        /// True for the homeworld — the same flag `body_inputs::is_homeworld`
+        /// carries, copied through so a consumer holding only a report (a
+        /// harness comparing two generations, with no `world` in hand) can ask
+        /// "which entry is the home body" without a name test.
+        bool              is_homeworld = false;
+
         planetology_state state;
 
         /// The same body with the industrial drawdown dialled to zero — what the

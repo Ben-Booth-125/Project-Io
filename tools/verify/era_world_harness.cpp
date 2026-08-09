@@ -45,7 +45,7 @@ void check(bool ok, const char* what)
 const generation_report::body_entry* kepler_entry(const generation_report& rep)
 {
     for (const auto& be : rep.bodies)
-        if (be.name == "Kepler") return &be;
+        if (be.is_homeworld) return &be; // identity, not display name (BL-257)
     return nullptr;
 }
 

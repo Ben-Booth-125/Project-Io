@@ -10,7 +10,7 @@
 -- R2: the dramatic landforms on a WET body. Kepler is 90% plains with 7.7% highland
 -- and ~2.6% mountain/canyon/crater/rift, so this is the sparse-glyph case — the
 -- glyphs should read as scattered accents, not as a rash over the map.
-verify.goto_surface("Kepler")
+verify.goto_surface("home")
 verify.set_zoom(1)
 verify.set_overlay("none")
 verify.capture("landform_kepler_wide")
@@ -36,8 +36,8 @@ verify.capture("landform_kepler_relief")
 -- Cinder is NOT the home body, so it opens unsurveyed and the survey mask blanks
 -- every tile — without this reveal the captures below show a dark grid and verify
 -- nothing. Clamped to full.
-verify.set_survey("Cinder", 99999)
-verify.goto_surface("Cinder")
+verify.set_survey("inner", 99999)
+verify.goto_surface("inner")
 verify.set_zoom(1)
 verify.capture("landform_cinder_wide")
 
@@ -63,7 +63,7 @@ verify.capture("landform_cinder_lens_country")
 -- Coordinates come from world_audit § S4's exemplar readout, not from eyeballing a
 -- screenshot — if a generation change moves these runs, the harness prints the new
 -- ones instead of these captures quietly becoming pictures of empty ground.
-verify.goto_surface("Kepler")
+verify.goto_surface("home")
 verify.set_overlay("none")
 
 -- Mountain run at [89,10] vs the lone mountain at [76,12]: the span-vs-cap contrast

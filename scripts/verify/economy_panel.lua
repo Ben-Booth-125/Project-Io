@@ -6,7 +6,7 @@
 -- Inspect: screenshots/economy_panel*.png
 
 -- Land on the home planet so the corporate assets that produce are in scope.
-verify.goto_surface("Kepler")
+verify.goto_surface("home")
 
 -- Resolve three economy ticks: extraction fills pools, processors consume and
 -- auto-buy, the market clears, the budget moves balances.

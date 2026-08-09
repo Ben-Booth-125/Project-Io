@@ -15,7 +15,7 @@
 --   buildings.csv         building_id,corp_id,corp_name,body_name,type,output,active,exhausted
 --   player_timeseries.csv tick,balance,income,expenditure
 
-verify.goto_surface("Kepler")
+verify.goto_surface("home")
 
 -- ~10 game-years of quarterly economy ticks: enough for prices to move off their
 -- cold-start values and the trend series to be chartable.

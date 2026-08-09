@@ -141,15 +141,10 @@ void seed_genesis_history(world& w, const generation_report& report)
 {
     for (const auto& body_entry : report.bodies)
     {
-        entity_id body_id = null_entity;
-        for (const auto& [id, bc] : w.bodies)
-        {
-            if (bc.name == body_entry.name)
-            {
-                body_id = id;
-                break;
-            }
-        }
+        // The report entry names its own world entity (BL-257) — matching on the
+        // display name would break the moment names are generated.
+        const entity_id body_id =
+            (w.bodies.find(body_entry.id) != w.bodies.end()) ? body_entry.id : null_entity;
         if (body_id == null_entity)
             continue; // defensive: a generated body with no matching world entity
 

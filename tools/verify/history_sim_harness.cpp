@@ -33,7 +33,7 @@ void check(bool ok, const char* label)
 const generation_report::body_entry* kepler_of(const generation_report& r)
 {
     for (const generation_report::body_entry& b : r.bodies)
-        if (b.name == "Kepler") return &b;
+        if (b.is_homeworld) return &b; // identity, not display name (BL-257)
     return r.bodies.empty() ? nullptr : &r.bodies.front();
 }
 

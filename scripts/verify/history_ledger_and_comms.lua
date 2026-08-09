@@ -5,7 +5,7 @@
 -- rounds). The third view, Tiles, was retired by BL-281 — its capture came down
 -- with it. Then captures the Comms panel to confirm the Public channel is
 -- nation-authored.
-verify.goto_surface("Kepler")
+verify.goto_surface("home")
 verify.show_panel("tile", true)
 
 verify.panel_view("history", 0)

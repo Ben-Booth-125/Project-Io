@@ -4,6 +4,7 @@
 #include "sim_loop.hpp"
 #include "scripting/lua_state.hpp"
 #include "ui/ui_state.hpp"
+#include "world/body_names.hpp"
 #include "world/economy_system.hpp"
 #include "world/hard_coded_world.hpp"
 #include "world/recipe_registry.hpp"
@@ -207,6 +208,7 @@ private:
     int  m_wiz_round = 0;    ///< Round the player is on, 0 .. wizard_round_count-1.
     bool m_wiz_dirty = true; ///< A control moved (or the wizard just opened) — recompute the preview next frame.
     resolved_world m_wiz_resolved{};              ///< The pending preferences resolved against the seed — the params every preview chart is drawn from, plus the reroll cost (attempts / gave_up).
+    body_naming m_wiz_names{};                    ///< The coined body catalogue for the pending seed (BL-257) — what the wizard's charts and orrery label bodies with.
     std::vector<planetology_state> m_wiz_preview; ///< Live chain result per prototype body at the resolved params.
     std::vector<planetology_state> m_wiz_undrawn; ///< The same run with drawdown forced to 0 — the Spend chart's "before" reference.
 

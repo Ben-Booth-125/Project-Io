@@ -72,7 +72,7 @@ void check(bool ok, const char* what)
 const generation_report::body_entry* kepler_of(const generation_report& r)
 {
     for (const auto& b : r.bodies)
-        if (b.name == "Kepler") return &b;
+        if (b.is_homeworld) return &b; // identity, not display name (BL-257)
     return nullptr;
 }
 

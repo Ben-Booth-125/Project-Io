@@ -16,7 +16,7 @@
 -- CSVs land in the working directory as perf_*.csv.
 
 verify.window(1720, 1080)          -- the live interactive size, not the 1280x720 golden size
-verify.goto_surface("Kepler")      -- the 180x84 full-tile body
+verify.goto_surface("home")      -- the 180x84 full-tile body
 
 -- One measured phase: place the view, warm up out of the measurement window,
 -- then run 300 frames (the instrument's full ring) and dump it.

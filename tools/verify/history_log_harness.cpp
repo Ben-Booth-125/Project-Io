@@ -188,12 +188,11 @@ int main()
     seed_genesis_history(w, report);
 
     const generation_report::body_entry* kepler = nullptr;
-    for (const auto& b : report.bodies) if (b.name == "Kepler") kepler = &b;
+    for (const auto& b : report.bodies) if (b.is_homeworld) kepler = &b; // BL-257: identity, not name
     check(kepler != nullptr, "R1 Kepler appears in the generation report");
     if (!kepler) { std::printf("\n=== FAILURES PRESENT ===\n"); return 1; }
 
-    entity_id kepler_id = null_entity;
-    for (const auto& [id, bc] : w.bodies) if (bc.name == "Kepler") kepler_id = id;
+    const entity_id kepler_id = w.home_body; // the world already knows which body is home
     check(kepler_id != null_entity, "R1 Kepler resolves to a world body entity");
 
     {
@@ -270,8 +269,7 @@ int main()
                     v.push_back(&e);
             return v;
         };
-        entity_id kepler_id2 = null_entity;
-        for (const auto& [id, bc] : w2.bodies) if (bc.name == "Kepler") kepler_id2 = id;
+        const entity_id kepler_id2 = w2.home_body;
 
         const auto ga = genesis_of(w, kepler_id);
         const auto gb = genesis_of(w2, kepler_id2);

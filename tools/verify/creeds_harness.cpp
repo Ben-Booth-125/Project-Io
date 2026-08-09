@@ -132,8 +132,9 @@ int main()
 
     const generation_report::body_entry* k1 = nullptr;
     const generation_report::body_entry* k2 = nullptr;
-    for (const auto& b : r1.bodies) if (b.name == "Kepler") k1 = &b;
-    for (const auto& b : r2.bodies) if (b.name == "Kepler") k2 = &b;
+    // The home body is identified by its flag, never by its (generated) name - BL-257.
+    for (const auto& b : r1.bodies) if (b.is_homeworld) k1 = &b;
+    for (const auto& b : r2.bodies) if (b.is_homeworld) k2 = &b;
 
     check(k1 && k2, "C1 Kepler reports exist in both runs");
     if (!k1 || !k2) { std::printf("\n%d passed, %d FAILED\n", g_pass, g_fail); return 1; }

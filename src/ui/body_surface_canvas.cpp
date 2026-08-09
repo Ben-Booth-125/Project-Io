@@ -1240,13 +1240,14 @@ void draw_body_surface_canvas(const world& w, ui_state& state, const recipe_regi
     // where the land ended up, then folded its verdict into Pass 1's heightmap and
     // vanished — by the time a tile exists, the plate that raised it is unreadable
     // from the terrain. The generation report retains the plate field precisely so
-    // this lens can put it back on the map. Matched by body NAME, the same stable
-    // key the Tile Ledger's biography uses (body_entry carries no entity_id).
+    // this lens can put it back on the map. Matched by ENTITY ID (BL-257) — body
+    // names are generated and display-only, so the old name match was a display
+    // string standing in for an identity.
     const continent_state* plates = nullptr;
     if (state.overlay == overlay_mode::continent)
     {
         for (const auto& be : gen.bodies)
-            if (be.name == body.name) { plates = &be.continents; break; }
+            if (be.id == state.active_body) { plates = &be.continents; break; }
         // A world generated before the field was retained (or a body absent from
         // the report) leaves this null — the lens then draws plain terrain and
         // says so in its key, rather than inventing plates.

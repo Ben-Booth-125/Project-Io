@@ -8,7 +8,7 @@
 -- The player's own marker is the always-on home star (BL-085), so this layer
 -- excludes the player to avoid a double-draw. Render-only chrome; the full
 -- gameplay mechanic stays deferred in BL-182.
-verify.goto_surface("Kepler")
+verify.goto_surface("home")
 verify.set_overlay("corporation")
 
 -- Wide view: multiple rival corporations' HQ stars should be visible at once,

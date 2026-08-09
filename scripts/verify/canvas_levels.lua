@@ -1,6 +1,6 @@
 -- Demo capture: one frame at each rung of the zoom ladder.
 -- Planetary (default) -> ascend -> Circumplanetary -> ascend -> Solar.
-verify.goto_surface("Kepler")
+verify.goto_surface("home")
 verify.capture("level_1_planetary")
 
 verify.command("ascend")

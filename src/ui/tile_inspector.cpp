@@ -152,12 +152,12 @@ void draw_tile_inspector(const world& w, ui_state& s,
         ImGui::Separator();
     }
 
-    // The report is matched by NAME (generation_report::body_entry has no
-    // entity_id — bodies are authored once and never renamed, so name is a stable
-    // key here).
+    // The report is matched by ENTITY ID (BL-257): body_entry names its own world
+    // entity, so the biography is keyed on identity rather than on the display
+    // name, which is generated.
     const generation_report::body_entry* entry = nullptr;
     for (const auto& be : report.bodies)
-        if (be.name == sel_body.name) { entry = &be; break; }
+        if (be.id == selected_body) { entry = &be; break; }
 
     // --- Story: the oral-history biography (BL-211) ---
     // GENERATION_LEDGER.md flagged this as an open item ("player-facing
@@ -231,7 +231,7 @@ void draw_tile_inspector(const world& w, ui_state& s,
         // regenerating the world left the key matching and the view rendered the
         // PREVIOUS world's political history over the previous world's
         // provinces — confidently, with no cue that anything was wrong.
-        static std::string        cached_body;
+        static entity_id          cached_body = null_entity; // identity, not display name (BL-257)
         static uint64_t           cached_gen = 0;
         static settlement_state   cached_ss;
         static history_sim_state  cached_sim;
@@ -251,7 +251,7 @@ void draw_tile_inspector(const world& w, ui_state& s,
             ^ (static_cast<uint64_t>(entry->settlement.median_industrial_year & 0xFFFF) << 16)
             ^  static_cast<uint64_t>(report.attempts);
 
-        if (cached_body != sel_body.name || cached_gen != gen_id)
+        if (cached_body != selected_body || cached_gen != gen_id)
         {
             cached_ss = entry->settlement; // The copy the sim is allowed to move.
             history_sim_params p;
@@ -264,7 +264,7 @@ void draw_tile_inspector(const world& w, ui_state& s,
             cached_sim = run_history_sim(cached_ss, nullptr, terr.view(),
                                          sel_body.grid_width, sel_body.grid_height,
                                          p, 7u);
-            cached_body   = sel_body.name;
+            cached_body   = selected_body;
             cached_gen    = gen_id;
             s.ages_year   = 0;
             s.ages_playing = false;

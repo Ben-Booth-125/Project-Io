@@ -219,12 +219,47 @@ resource_type resource_from_name(const std::string& s)
     return it != m.end() ? it->second : resource_type::iron_ore;
 }
 
-/// Find a body by case-insensitive name, or the home body for "home". Returns
+/// Find a body by ROLE, or failing that by case-insensitive name. Returns
 /// null_entity when no match is found.
+///
+/// The roles are the stable handle (BL-257): body names are generated per seed,
+/// so a verify script naming a body by its display string would break the moment
+/// the seed changed. Every script should use a role; the name path remains for
+/// interactive/ad-hoc use.
+///
+///   home     - the homeworld
+///   star     - the central star
+///   moon     - the lowest-id moon of the homeworld
+///   asteroid - the lowest-id asteroid
+///   inner    - the innermost planet that is not the homeworld
 entity_id find_body(const world& w, const std::string& name)
 {
     if (name == "home")
         return w.home_body;
+    if (name == "star")
+        return w.star_body;
+    if (name == "moon" || name == "asteroid" || name == "inner")
+    {
+        entity_id best = null_entity;
+        float     best_orbit = 0.0f;
+        for (const auto& [id, body] : w.bodies)
+        {
+            const bool match =
+                  (name == "moon")     ? (body.type == body_type::moon && body.parent == w.home_body)
+                : (name == "asteroid") ? (body.type == body_type::asteroid)
+                                       : (body.type == body_type::planet && id != w.home_body);
+            if (!match) continue;
+            // Lowest id wins for moon/asteroid (creation order is deterministic);
+            // "inner" wants the smallest orbit, which is the meaningful ordering.
+            if (best == null_entity
+                || (name == "inner" ? body.orbital_radius_au < best_orbit : id < best))
+            {
+                best = id;
+                best_orbit = body.orbital_radius_au;
+            }
+        }
+        return best;
+    }
     auto lower = [](std::string v) {
         for (char& c : v) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
         return v;
@@ -438,6 +473,9 @@ void app::refresh_wizard_preview()
     // (resolved_world::attempts), which the round surfaces rather than hides.
     m_wiz_resolved = resolve_preferences(m_pending_world_params.preferences,
                                          m_pending_world_params.seed);
+    // The system's coined catalogue for this seed (BL-257) — the wizard must
+    // name the bodies the campaign will actually name them.
+    m_wiz_names = generate_body_names(m_pending_world_params.seed);
     preview_system(m_wiz_resolved.params, m_wiz_resolved.home_orbit_au,
                    m_pending_world_params.seed, m_wiz_preview);
 
@@ -1696,9 +1734,12 @@ int app::run_verify(const std::string& script_path, bool bless)
     // Circumplanetary canvas would (sets selected_entity to the body). Lets a
     // script stage the selection-aware descend gesture (BL-165).
     v.set_function("select_body", [this](const std::string& name) {
-        for (const auto& [bid, bc] : m_world.bodies)
-            if (bc.name == name)
-            { m_ui.selected_entity = bid; break; }
+        // Same resolver as goto_surface/go_to, so a script can name a body by
+        // ROLE ("home", "inner", "moon") rather than by its generated display
+        // name (BL-257).
+        const entity_id b = find_body(m_world, name);
+        if (b != null_entity)
+            m_ui.selected_entity = b;
     });
 
     // Force the player corp balance to an exact value (verify harness): lets a
@@ -2440,7 +2481,7 @@ void app::draw_generation_screen()
     {
         const std::size_t k = static_cast<std::size_t>(i);
         chart_bodies.push_back(ui::generation_chart_body{
-            prototype_body(i).name,
+            m_wiz_names.bodies[k].c_str(), // generated, not the table placeholder (BL-257)
             &m_wiz_preview[k],
             (k < m_wiz_undrawn.size()) ? &m_wiz_undrawn[k] : nullptr });
     }
@@ -2660,7 +2701,8 @@ void app::draw_generation_screen()
             {
                 const body_inputs& bi = prototype_body(i);
                 pv.push_back(ui::preview_body{
-                    bi.name, bi.orbit_au, bi.mass_earths, bi.parent_orbit_au,
+                    m_wiz_names.bodies[static_cast<std::size_t>(i)].c_str(), // BL-257
+                    bi.orbit_au, bi.mass_earths, bi.parent_orbit_au,
                     bi.is_homeworld, &m_wiz_preview[static_cast<std::size_t>(i)] });
             }
             // Kepler turns slowly — one revolution per minute, wall-clock — so

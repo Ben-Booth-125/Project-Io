@@ -13,12 +13,12 @@ verify.show_panel("economy", false)
 
 -- A near-complete player convoy to Cinder: one econ step arrives + credits it, which
 -- upserts a persistent route -> Cinder reads 'known'.
-verify.seed_convoy("Kepler", "Cinder", "iron_ore", 20, 0.98)
+verify.seed_convoy("home", "inner", "iron_ore", 20, 0.98)
 verify.econ_step(1)
 verify.show_panel("economy", false)
 
 -- A live player convoy in transit to Pallas -> Pallas reads 'visible' (active lane).
-verify.seed_convoy("Kepler", "Pallas", "iron_ore", 20, 0.4)
+verify.seed_convoy("home", "asteroid", "iron_ore", 20, 0.4)
 
 -- Ascend the zoom ladder to the Solar canvas and capture the fog.
 verify.command("ascend")

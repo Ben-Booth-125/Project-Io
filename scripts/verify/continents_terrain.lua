@@ -2,7 +2,7 @@
 -- Pass 1's heightmap is biased by simulated plate boundaries instead of pure
 -- noise. Plain terrain shows the landmass shape itself; the Country lens shows
 -- how nation borders (Voronoi over that terrain) read against it.
-verify.goto_surface("Kepler")
+verify.goto_surface("home")
 verify.set_zoom(1)
 
 verify.set_overlay("none")

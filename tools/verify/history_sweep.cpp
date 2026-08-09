@@ -42,7 +42,7 @@ void check(bool ok, const char* label)
 const generation_report::body_entry* kepler_of(const generation_report& r)
 {
     for (const generation_report::body_entry& b : r.bodies)
-        if (b.name == "Kepler") return &b;
+        if (b.is_homeworld) return &b; // identity, not display name (BL-257)
     return r.bodies.empty() ? nullptr : &r.bodies.front();
 }
 
@@ -189,9 +189,7 @@ int main(int argc, char** argv)
         // the one authority (hard_coded_world.hpp): a wrong-but-same-area pair
         // here (the original 168x90 vs the real 180x84 — both 15120) misaligns
         // every terrain lookup SILENTLY instead of crashing.
-        entity_id kepler_id = null_entity;
-        for (const auto& [bid, b] : w.bodies)
-            if (b.name == k->name) { kepler_id = bid; break; }
+        const entity_id kepler_id = k->id; // the report entry names its own entity (BL-257)
         const sim_terrain_arrays terr = build_sim_terrain(w, kepler_id,
                                                           home_grid_width, home_grid_height);
 
@@ -382,9 +380,7 @@ int main(int argc, char** argv)
         // The re-run must be the SAME run: real terrain, real dims. The original
         // recheck passed an empty sim_terrain_view against real-terrain rows —
         // a guaranteed false FAIL the moment terrain changes any decision.
-        entity_id kepler_id = null_entity;
-        for (const auto& [bid, b] : w.bodies)
-            if (b.name == k->name) { kepler_id = bid; break; }
+        const entity_id kepler_id = k->id; // the report entry names its own entity (BL-257)
         const sim_terrain_arrays terr = build_sim_terrain(w, kepler_id,
                                                           home_grid_width, home_grid_height);
         const history_sim_state again =

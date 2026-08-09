@@ -1,7 +1,7 @@
 -- Verify the Corporation lens player-tile border (BL-001 / corp-lens-border R1).
 -- Navigates to Kepler's surface, activates the Corporation overlay, and captures
 -- the planetary surface showing player tiles with a palette::selection border.
-verify.goto_surface("Kepler")
+verify.goto_surface("home")
 verify.set_overlay("corporation")
 verify.set_zoom(4)
 verify.capture("corp_lens_border_full")
